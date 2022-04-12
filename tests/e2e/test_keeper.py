@@ -8,10 +8,12 @@ import e2e.util as util
 from testflows.core import *
 
 
-def wait_keeper_ready(svc_name='zookeeper', keeper_type='zookeeper', pod_count=3, retries=10):
+def wait_keeper_ready(keeper_type='zookeeper', pod_count=3, retries=10):
+    svc_name = 'zookeeper-client' if keeper_type == "zookeeper-operator" else 'zookeeper'
     expected_containers = "2/2" if keeper_type == "clickhouse-keeper" else "1/1"
+    expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
     for i in range(retries):
-        ready_pods = kubectl.launch(f"get pods | grep {keeper_type} | grep Running | grep '{expected_containers}' | wc -l")
+        ready_pods = kubectl.launch(f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l")
         ready_endpoints = "0"
         if ready_pods == str(pod_count):
             ready_endpoints = kubectl.launch(f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l")
@@ -79,9 +81,14 @@ def test_keeper_outline(self,
             out = ""
             expected_out = ""
             for i in range(retry_count):
-                if keeper_type == "zookeeper":
+                if keeper_type == "zookeeper-operator":
+                    expected_out = "[clickhouse, zookeeper, zookeeper-operator]"
+                    keeper_cmd = './bin/zkCli.sh ls /'
+                    pod_prefix = "zookeeper"
+                elif keeper_type == "zookeeper":
                     expected_out = "[clickhouse, zookeeper]"
                     keeper_cmd = './bin/zkCli.sh ls /'
+                    pod_prefix = "zookeeper"
                 else:
                     expected_out = "clickhouse"
                     keeper_cmd = "if [[ ! $(command -v zookeepercli) ]]; then "
@@ -89,8 +96,9 @@ def test_keeper_outline(self,
                     keeper_cmd += "dpkg -i /tmp/zookeepercli.deb; "
                     keeper_cmd += "fi; "
                     keeper_cmd += "zookeepercli -servers 127.0.0.1:2181 -c ls /"
+                    pod_prefix = "clickhouse-keeper"
 
-                out = kubectl.launch(f"exec {keeper_type}-{pod_num} -- bash -ce '{keeper_cmd}'", ns=settings.test_namespace, ok_to_fail=True)
+                out = kubectl.launch(f"exec {pod_prefix}-{pod_num} -- bash -ce '{keeper_cmd}'", ns=settings.test_namespace, ok_to_fail=True)
                 if expected_out in out:
                     break
                 else:
@@ -99,8 +107,12 @@ def test_keeper_outline(self,
             assert expected_out in out, f"Unexpected {keeper_type} `ls /` output"
 
         out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
-        expected_out = "1" if keeper_type == "clickhouse-keeper" else "2"
-        assert expected_out == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
+        expected_out = {
+            "zookeeper": "2",
+            "zookeeper-operator": "3",
+            "clickhouse-keeper": "1",
+        }
+        assert expected_out[keeper_type] == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 
     def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, first_install=False):
         keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
@@ -117,9 +129,9 @@ def test_keeper_outline(self,
         )
         return chi
 
-    with When("Clean exists ClickHouse and Keeper"):
-        kubectl.delete_all_keeper(self.context.keeper_type, settings.test_namespace)
+    with When("Clean exists ClickHouse Keeper and ZooKeeper"):
         kubectl.delete_all_chi(settings.test_namespace)
+        kubectl.delete_all_keeper(settings.test_namespace)
 
     with When("Install CH 1 node ZK 1 node"):
         chi = rescale_zk_and_clickhouse(ch_node_count=1, keeper_node_count=1, first_install=True)
@@ -157,11 +169,11 @@ def test_keeper_outline(self,
         check_zk_root_znode(chi, pod_count=3)
 
     with Then('check data in tables'):
-        for table, exptected_rows in {"test_repl1": str(1000 + 2000 * total_iterations), "test_repl2": str(2000 * total_iterations), "test_repl3": str(1000 * total_iterations)}.items():
+        for table_name, exptected_rows in {"test_repl1": str(1000 + 2000 * total_iterations), "test_repl2": str(2000 * total_iterations), "test_repl3": str(1000 * total_iterations)}.items():
             actual_rows = clickhouse.query(
-                chi['metadata']['name'], f'SELECT count() FROM default.{table}', pod="chi-test-cluster-for-zk-default-0-1-0"
+                chi['metadata']['name'], f'SELECT count() FROM default.{table_name}', pod="chi-test-cluster-for-zk-default-0-1-0"
             )
-            assert actual_rows == exptected_rows, f"Invalid rows counter after inserts {table} expected={exptected_rows} actual={actual_rows}"
+            assert actual_rows == exptected_rows, f"Invalid rows counter after inserts {table_name} expected={exptected_rows} actual={actual_rows}"
 
     with Then('drop all created tables'):
         for i in range(3):
@@ -190,11 +202,34 @@ def test_clickhouse_keeper_rescale(self):
     )
 
 
+@TestScenario
+@Name("test_zookeeper_operator_rescale. Check Zookeeper OPERATOR scale-up / scale-down cases")
+def test_zookeeper_operator_rescale(self):
+    test_keeper_outline(
+        keeper_type="zookeeper-operator",
+        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
+        keeper_manifest_1_node='zookeeper-operator-1-node.yaml',
+        keeper_manifest_3_node='zookeeper-operator-3-node.yaml',
+    )
+
+@TestScenario
+@Name("test_zookeeper_pvc_scaleout_rescale. Check ZK+PVC scale-up / scale-down cases")
+def test_zookeeper_pvc_scaleout_rescale(self):
+    test_keeper_outline(
+        keeper_type="zookeeper",
+        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
+        keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml',
+        keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml',
+    )
+
+
 @TestModule
 @Name("e2e.test_keeper")
 def test(self):
     all_tests = [
+        test_zookeeper_operator_rescale,
         test_clickhouse_keeper_rescale,
+        test_zookeeper_pvc_scaleout_rescale,
         test_zookeeper_rescale,
     ]
 
