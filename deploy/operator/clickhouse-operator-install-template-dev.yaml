@@ -2760,6 +2760,9 @@ spec:
                     access:
                       type: object
                       properties:
+                        scheme:
+                          type: string
+                          description: "The scheme to user for connecting to ClickHouse. One of http or https"
                         username:
                           type: string
                           description: "ClickHouse username to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"
@@ -3479,7 +3482,7 @@ data:
                 "containers" : [
                   {
                     "name": "clickhouse",
-                    "image": "yandex/clickhouse-server:21.3",
+                    "image": "clickhouse/clickhouse-server:22.3",
                     "ports": [
                       {
                         "name": "http",

@@ -82,7 +82,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.7.0"
+          image: "docker.io/zookeeper:3.8.0"
           resources:
             requests:
               memory: "128M"
@@ -123,6 +123,7 @@ spec:
                 echo 'initLimit=300'
                 echo 'syncLimit=10'
                 echo 'maxClientCnxns=2000'
+                echo 'maxTimeToWaitForEpoch=2000'
                 echo 'maxSessionTimeout=60000000'
                 echo "dataDir=${ZOO_DATA_DIR}"
                 echo "dataLogDir=${ZOO_DATA_LOG_DIR}"

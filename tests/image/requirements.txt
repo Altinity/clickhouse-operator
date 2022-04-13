@@ -1,4 +1,4 @@
-testflows==1.7.77
+testflows==1.8.19
 requests
 PyYAML<6
 docker-compose>=1.29.1

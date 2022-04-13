@@ -1,3 +1,4 @@
+# DRAFT, doesn't works in 2022
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseUpgrade"
 metadata:
@@ -8,7 +9,7 @@ spec:
       zone:
         matchLabels:
           clickhouse.altinity.com/zone: zone1
-      podTemplate: clickhouse-v20.6
+      podTemplate: clickhouse-v21.8
       dataVolumeClaimTemplate: default
       logVolumeClaimTemplate: default
 #     scenario: Default
@@ -56,7 +57,7 @@ spec:
                 matchLabels:
                   clickhouse.altinity.com/zone: zone4
                   clickhouse.altinity.com/kind: ssd
-              podTemplate: clickhouse-v20.6
+              podTemplate: clickhouse-v22.3
 
             replicas:
               - index: 2
@@ -82,12 +83,12 @@ spec:
               storage: 1Gi
     podTemplates:
     # multiple pod templates makes possible to update version smoothly
-    # pod template for ClickHouse v18.16.1
-    - name: clickhouse-v20.6
+    # pod template for ClickHouse v21.8
+    - name: clickhouse-v21.8
     # volumes: are missing
       containers:
       - name: clickhouse
-        image: yandex/clickhouse-server:20.6
+        image: clickhouse/clickhouse-server:21.8
         volumeMounts:
         - name: clickhouse-data-test
           mountPath: /var/lib/clickhouse
@@ -98,12 +99,12 @@ spec:
           limits:
             memory: "64Mi"
             cpu: "100m"
-    # pod template for ClickHouse v20.6
-    - name: clickhouse-v20.6
+    # pod template for ClickHouse v22.3
+    - name: clickhouse-v22.3
     # volumes: are missing
       containers:
       - name: clickhouse
-        image: yandex/clickhouse-server:20.6
+        image: clickhouse/clickhouse-server:22.3
         volumeMounts:
         - name: clickhouse-data-test
           mountPath: /var/lib/clickhouse

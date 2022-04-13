@@ -1,0 +1,629 @@
+# Following scripts based from https://github.com/pravega/zookeeper-operator/
+---
+# service for REST administration and reconfiguration
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper-admin-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-admin-server
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: zookeeper
+
+---
+# service for clickhouse zookeeper client connections
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-client
+      port: 2181
+      protocol: TCP
+      targetPort: 2181
+  selector:
+    app: zookeeper
+    what: node
+---
+# headless service for Zookeeper Quorum Election and service name
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: tcp-client
+      port: 2181
+      protocol: TCP
+      targetPort: 2181
+    - name: tcp-quorum
+      port: 2888
+      protocol: TCP
+      targetPort: 2888
+    - name: tcp-leader-election
+      port: 3888
+      protocol: TCP
+      targetPort: 3888
+    - name: tcp-metrics
+      port: 7000
+      protocol: TCP
+      targetPort: 7000
+    - name: tcp-admin-server
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: zookeeper
+---
+# ConfigMap with common startup scripts and base config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper-scripts
+data:
+  env.sh: |
+    #!/usr/bin/env bash
+    export DOMAIN=`hostname -d`
+    export QUORUM_PORT=2888
+    export LEADER_PORT=3888
+    export CLIENT_HOST=zookeeper
+    export CLIENT_PORT=2181
+    export ADMIN_SERVER_HOST=zookeeper-admin-server
+    export ADMIN_SERVER_PORT=8080
+    export CLUSTER_NAME=zookeeper
+    export ZOO_LOG4J_PROP="WARN, CONSOLE"
+  log4j-quiet.properties: |
+    log4j.rootLogger=CONSOLE
+    log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+    log4j.appender.CONSOLE.Threshold=ERROR
+    log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+    log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n
+  log4j.properties: |
+    zookeeper.root.logger=CONSOLE
+    zookeeper.console.threshold=INFO
+    log4j.rootLogger=${zookeeper.root.logger}
+    log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+    log4j.appender.CONSOLE.Threshold=${zookeeper.console.threshold}
+    log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+    log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n
+  logback.xml: |
+    <configuration>
+        <property name="zookeeper.console.threshold" value="INFO"/>
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n</pattern>
+            </encoder>
+            <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+                <level>${zookeeper.console.threshold}</level>
+            </filter>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="CONSOLE" />
+        </root>        
+    </configuration>    
+
+  zoo.cfg: |
+    4lw.commands.whitelist=*
+    dataDir=/data
+    standaloneEnabled=false
+    reconfigEnabled=true
+    skipACL=yes
+    metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider
+    metricsProvider.httpPort=7000
+    metricsProvider.exportJvmInfo=true
+    tickTime=2000
+    initLimit=300
+    syncLimit=10
+    maxClientCnxns=2000
+    maxTimeToWaitForEpoch=2000
+    globalOutstandingLimit=1000
+    preAllocSize=65536
+    snapCount=10000
+    commitLogCount=500
+    snapSizeLimitInKb=4194304
+    maxCnxns=0
+    minSessionTimeout=4000
+    maxSessionTimeout=40000
+    autopurge.snapRetainCount=3
+    autopurge.purgeInterval=1
+    quorumListenOnAllIPs=false
+    admin.serverPort=8080
+    dynamicConfigFile=/data/zoo.cfg.dynamic
+  zookeeperFunctions.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    set -ex
+    function zkConfig() {
+      echo "$HOST.$DOMAIN:$QUORUM_PORT:$LEADER_PORT:$ROLE;$CLIENT_PORT"
+    }
+    function zkConnectionString() {
+      # If the client service address is not yet available, then return localhost
+      set +e
+      getent hosts "${CLIENT_HOST}" 2>/dev/null 1>/dev/null
+      if [[ $? -ne 0 ]]; then
+        set -e
+        echo "localhost:${CLIENT_PORT}"
+      else
+        set -e
+        echo "${CLIENT_HOST}:${CLIENT_PORT}"
+      fi
+    }
+  zookeeperStart.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+
+    set -ex
+    # TODO think how to add nslookup to docker image
+    apt-get update && apt-get install --no-install-recommends -y dnsutils curl procps
+    source /cluster-size/cluster-size.sh
+    source /conf/env.sh
+    source /conf/zookeeperFunctions.sh
+
+    HOST=`hostname -s`
+    DATA_DIR=/data
+    MYID_FILE=$DATA_DIR/myid
+    LOG4J_CONF=/conf/log4j-quiet.properties
+    DYNCONFIG=$DATA_DIR/zoo.cfg.dynamic
+    STATIC_CONFIG=/data/conf/zoo.cfg
+
+    # Extract resource name and this members ordinal value from pod hostname
+    if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+        NAME=${BASH_REMATCH[1]}
+        ORD=${BASH_REMATCH[2]}
+    else
+        echo Failed to parse name and ordinal of Pod
+        exit 1
+    fi
+
+    MYID=$((ORD+1))
+
+    # Values for first startup
+    WRITE_CONFIGURATION=true
+    REGISTER_NODE=true
+    ONDISK_MYID_CONFIG=false
+    ONDISK_DYN_CONFIG=false
+
+    # Check validity of on-disk configuration
+    if [ -f $MYID_FILE ]; then
+      EXISTING_ID="`cat $DATA_DIR/myid`"
+      if [[ "$EXISTING_ID" == "$MYID" && -f $STATIC_CONFIG ]]; then
+        # If Id is correct and configuration is present under `/data/conf`
+          ONDISK_MYID_CONFIG=true
+      fi
+    fi
+
+    if [ -f $DYNCONFIG ]; then
+      ONDISK_DYN_CONFIG=true
+    fi
+
+    set +e
+    # Check if envoy is up and running
+    if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
+      COUNT=0
+      MAXCOUNT=${1:-30}
+      HEALTHYSTATUSCODE="200"
+      while true; do
+        COUNT=$(expr $COUNT + 1)
+        SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
+        echo "waiting for envoy proxy to come up";
+        sleep 1;
+        if (( "$SC" == "$HEALTHYSTATUSCODE" || "$MAXCOUNT" == "$COUNT" )); then
+          break
+        fi
+      done
+    fi
+    set -e
+
+    # Determine if there is an ensemble available to join by checking the service domain
+    set +e
+    getent hosts $DOMAIN  # This only performs a dns lookup
+    if [[ $? -eq 0 ]]; then
+      ACTIVE_ENSEMBLE=true
+    elif nslookup $DOMAIN | grep -q "server can't find $DOMAIN"; then
+       echo "there is no active ensemble"
+       ACTIVE_ENSEMBLE=false
+    else
+      # If an nslookup of the headless service domain fails, then there is no
+      # active ensemble yet, but in certain cases nslookup of headless service
+      # takes a while to come up even if there is active ensemble
+      ACTIVE_ENSEMBLE=false
+      declare -i count=20
+      while [[ $count -ge 0 ]]
+      do
+        sleep 2
+        ((count=count-1))
+        getent hosts $DOMAIN
+        if [[ $? -eq 0 ]]; then
+          ACTIVE_ENSEMBLE=true
+          break
+        fi
+      done
+    fi
+
+    if [[ "$ONDISK_MYID_CONFIG" == true && "$ONDISK_DYN_CONFIG" == true ]]; then
+      # If Configuration is present, we assume, there is no need to write configuration.
+        WRITE_CONFIGURATION=false
+    else
+        WRITE_CONFIGURATION=true
+    fi
+
+    if [[ "$ACTIVE_ENSEMBLE" == false ]]; then
+      # This is the first node being added to the cluster or headless service not yet available
+      REGISTER_NODE=false
+    else
+      # An ensemble exists, check to see if this node is already a member.
+      if [[ "$ONDISK_MYID_CONFIG" == false || "$ONDISK_DYN_CONFIG" == false ]]; then
+        REGISTER_NODE=true
+      else
+        REGISTER_NODE=false
+      fi
+    fi
+
+    if [[ "$WRITE_CONFIGURATION" == true ]]; then
+      echo "Writing myid: $MYID to: $MYID_FILE."
+      echo $MYID > $MYID_FILE
+      if [[ $MYID -eq 1 ]]; then
+        ROLE=participant
+        echo Initial initialization of ordinal 0 pod, creating new config.
+        ZKCONFIG=$(zkConfig)
+        echo Writing bootstrap configuration with the following config:
+        echo $ZKCONFIG
+        echo $MYID > $MYID_FILE
+        echo "server.${MYID}=${ZKCONFIG}" > $DYNCONFIG
+      fi
+    fi
+
+    if [[ "$REGISTER_NODE" == true ]]; then
+        ROLE=observer
+        ZKURL=$(zkConnectionString)
+        ZKCONFIG=$(zkConfig)
+        
+        set -e
+        echo Registering node and writing local configuration to disk.
+        zkCli.sh -server ${ZKURL} reconfig -add "\nserver.$MYID=$ZKCONFIG" | grep -E '^server\.[0-9]+='  > $DYNCONFIG
+        set +e
+    fi
+
+    ZOOCFGDIR=/data/conf
+    export ZOOCFGDIR
+    echo Copying /conf contents to writable directory, to support Zookeeper dynamic reconfiguration
+    if [[ ! -d "$ZOOCFGDIR" ]]; then
+      mkdir $ZOOCFGDIR
+      cp -f /conf/zoo.cfg $ZOOCFGDIR
+    else
+      echo Copying the /conf/zoo.cfg contents except the dynamic config file during restart
+      echo -e "$( head -n -1 /conf/zoo.cfg )""\n""$( tail -n 1 "$STATIC_CONFIG" )" > $STATIC_CONFIG
+    fi
+    cp -f /conf/log4j.properties $ZOOCFGDIR
+    cp -f /conf/log4j-quiet.properties $ZOOCFGDIR
+    cp -f /conf/logback.xml $ZOOCFGDIR
+    cp -f /conf/env.sh $ZOOCFGDIR
+
+    if [ -f $DYNCONFIG ]; then
+      # Node registered, start server
+      echo Starting zookeeper service
+      zkServer.sh --config $ZOOCFGDIR start-foreground
+    else
+      echo "Node failed to register!"
+      exit 1
+    fi
+
+  zookeeperTeardown.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+
+    set -ex
+
+    source /cluster-size/cluster-size.sh
+    source /conf/env.sh
+    source /conf/zookeeperFunctions.sh
+
+    DATA_DIR=/data
+    MYID_FILE=$DATA_DIR/myid
+    LOG4J_CONF=/conf/log4j-quiet.properties
+
+    # Wait for client connections to drain. Kubernetes will wait until the confiugred
+    # "terminationGracePeriodSeconds" before focibly killing the container
+    CONN_COUNT=`echo cons | nc localhost 2181 | grep -v "^$" |grep -v "/127.0.0.1:" | wc -l`
+    for (( i = 0; i < 6; i++ )); do
+      if [[ "$CONN_COUNT" -gt 0 ]]; then
+        echo "$CONN_COUNT non-local connections still connected."
+        sleep 5
+      else
+        echo "$CONN_COUNT non-local connections"
+        break
+      fi
+    done
+
+    # Check to see if zookeeper service for this node is a participant
+    set +e
+    ZKURL=$(zkConnectionString)
+    set -e
+    MYID=`cat $MYID_FILE`
+    CLUSTER_SIZE=$(zkCli.sh -server ${ZKURL} config | grep -c -E '^server\.[0-9]+=') 
+    echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MYID"
+    if [[ "$MYID" -gt "1" ]]; then
+      # If ClusterSize < MyId, this server is being permanantly removed.
+      zkCli.sh  -server ${ZKURL} reconfig -remove $MYID | grep -E '^server\.[0-9]+='  > $DYNCONFIG 
+      echo $?
+    fi
+
+    # Kill the primary process ourselves to circumvent the terminationGracePeriodSeconds
+    ps -ef | grep zoo.cfg | grep -v grep | awk '{print $2}' | xargs kill
+    
+
+  zookeeperLive.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    set -ex
+    source /conf/env.sh
+    OK=$(echo ruok | nc 127.0.0.1 $CLIENT_PORT)
+    # Check to see if zookeeper service answers
+    if [[ "$OK" == "imok" ]]; then
+      exit 0
+    else
+      exit 1
+    fi
+
+  zookeeperReady.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    set -ex
+    source /cluster-size/cluster-size.sh
+    source /conf/env.sh
+    source /conf/zookeeperFunctions.sh
+
+    HOST=`hostname -s`
+    DATA_DIR=/data
+    MYID_FILE=$DATA_DIR/myid
+    LOG4J_CONF=/conf/log4j-quiet.properties
+    STATIC_CONFIG=/data/conf/zoo.cfg
+
+    OK=$(echo ruok | nc 127.0.0.1 $CLIENT_PORT)
+
+    # Check to see if zookeeper service answers
+    if [[ "$OK" == "imok" ]]; then
+      set +e
+      getent hosts $DOMAIN
+      if [[ $? -ne 0 ]]; then
+        set -e
+        echo "There is no active ensemble, skipping readiness probe..."
+        exit 0
+      else
+        set -e
+        # An ensemble exists, check to see if this node is already a member.
+        # Check to see if zookeeper service for this node is a participant
+        set +e
+        # Extract resource name and this members' ordinal value from pod hostname
+        HOST=`hostname -s`
+        if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+            NAME=${BASH_REMATCH[1]}
+            ORD=${BASH_REMATCH[2]}
+        else
+            echo Failed to parse name and ordinal of Pod
+            exit 1
+        fi
+        MYID=$((ORD+1))
+        ONDISK_CONFIG=false
+        if [ -f $MYID_FILE ]; then
+          EXISTING_ID="`cat $DATA_DIR/myid`"
+          if [[ "$EXISTING_ID" == "$MYID" && -f $STATIC_CONFIG ]]; then
+          #If Id is correct and configuration is present under `/data/conf`
+              ONDISK_CONFIG=true
+              DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
+              DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
+              SERVER_FOUND=`cat $DYN_CFG_FILE | grep "server.${MYID}=" | wc -l`
+              if [[ "$SERVER_FOUND" == "0" ]]; then
+                echo "Server not found in ensemble. Exiting ..."
+                exit 1
+              fi
+              SERVER=`cat $DYN_CFG_FILE | grep "server.${MYID}="`
+              if [[ "$SERVER" == *"participant"* ]]; then
+                  ROLE=participant
+              elif [[ "$SERVER" == *"observer"* ]]; then
+                  ROLE=observer
+              fi
+          fi
+        fi
+
+        if [[ "$ROLE" == "participant" ]]; then
+          echo "Zookeeper service is available and an active participant"
+          exit 0
+        elif [[ "$ROLE" == "observer" ]]; then
+          echo "Zookeeper service is ready to be upgraded from observer to participant."
+          ROLE=participant
+          ZKURL=$(zkConnectionString)
+          ZKCONFIG=$(zkConfig)
+          zkCli.sh -server ${ZKURL} reconfig -remove $MYID | grep -E '^server\.[0-9]+=' > $DYNCONFIG 
+          sleep 1
+          zkCli.sh -server ${ZKURL} reconfig -add "\nserver.$MYID=$ZKCONFIG"
+          exit 0
+        else
+          echo "Something has gone wrong. Unable to determine zookeeper role."
+          exit 1
+        fi
+      fi
+
+    else
+      echo "Zookeeper service is not available for requests"
+      exit 1
+    fi
+
+---
+# ConfigMap for current cluster size
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-cluster-size
+  labels:
+    app: zookeeper
+data:
+  cluster-size.sh: |
+    #!/usr/bin/env bash
+    CLUSTER_SIZE=1
+
+---
+# Main StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper
+
+spec:
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Delete
+    whenScaled: Delete
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  serviceName: zookeeper-headless
+  template:
+    metadata:
+      generateName: zookeeper
+      labels:
+        app: zookeeper
+        what: node
+      annotations:
+        prometheus.io/port: '7000'
+        prometheus.io/scrape: 'true'
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - zookeeper
+                topologyKey: kubernetes.io/hostname
+              weight: 20
+      containers:
+        - name: zookeeper
+          command:
+            - /conf/zookeeperStart.sh
+          env:
+            - name: ENVOY_SIDECAR_STATUS
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.annotations['sidecar.istio.io/status']
+          image: zookeeper:3.8.0
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /conf/zookeeperTeardown.sh
+          livenessProbe:
+            exec:
+              command:
+                - /conf/zookeeperLive.sh
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /conf/zookeeperReady.sh
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          ports:
+            - containerPort: 2181
+              name: client
+              protocol: TCP
+            - containerPort: 2888
+              name: quorum
+              protocol: TCP
+            - containerPort: 3888
+              name: leader-election
+              protocol: TCP
+            - containerPort: 7000
+              name: metrics
+              protocol: TCP
+            - containerPort: 8080
+              name: admin-server
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /data
+              name: data
+            - mountPath: /conf
+              name: conf
+            - mountPath: /cluster-size
+              name: cluster-size
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - configMap:
+            name: zookeeper-scripts
+            defaultMode: 0755
+          name: conf
+        - configMap:
+            name: zookeeper-cluster-size
+            defaultMode: 0755
+          name: cluster-size
+  updateStrategy:
+    type: RollingUpdate
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        labels:
+          app: zookeeper
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: standard
+        volumeMode: Filesystem

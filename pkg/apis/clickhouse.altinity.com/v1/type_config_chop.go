@@ -51,6 +51,7 @@ const (
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+	defaultChScheme   = "http"
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
@@ -146,6 +147,7 @@ type OperatorConfigClickHouse struct {
 		// 1. Metrics requests
 		// 2. Schema maintenance
 		// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+		Scheme   string `json:"scheme" yaml:"scheme"`
 		Username string `json:"username" yaml:"username"`
 		Password string `json:"password" yaml:"password"`
 
@@ -324,6 +326,7 @@ type OperatorConfig struct {
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+	CHScheme   string `json:"chScheme" yaml:"chScheme"`
 	CHUsername string `json:"chUsername" yaml:"chUsername"`
 	CHPassword string `json:"chPassword" yaml:"chPassword"`
 	// Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
@@ -645,6 +648,9 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+	if c.ClickHouse.Access.Scheme == "" {
+		c.ClickHouse.Access.Scheme = defaultChScheme
+	}
 	if c.ClickHouse.Access.Username == "" {
 		c.ClickHouse.Access.Username = defaultChUsername
 	}
@@ -941,6 +947,9 @@ func (c *OperatorConfig) move() {
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
+	if c.CHScheme != "" {
+		c.ClickHouse.Access.Password = c.CHScheme
+	}
 	if c.CHUsername != "" {
 		c.ClickHouse.Access.Username = c.CHUsername
 	}

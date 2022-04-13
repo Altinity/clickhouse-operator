@@ -561,7 +561,7 @@ with additional sections, such as:
         spec:
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:18.16.1
+              image: clickhouse/clickhouse-server:22.3
               volumeMounts:
                 - name: default-volume-claim
                   mountPath: /var/lib/clickhouse

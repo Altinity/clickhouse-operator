@@ -42,7 +42,7 @@ spec:
             fsGroup: 101
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:20.8
+              image: clickhouse/clickhouse-server:22.3
               imagePullPolicy: IfNotPresent
               volumeMounts:
                 - name: data-storage-vc-template-1

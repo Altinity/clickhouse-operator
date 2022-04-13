@@ -48,7 +48,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: yandex/clickhouse-server:19.6.2.11
+              image: clickhouse/clickhouse-server:22.3
 ```
 
 

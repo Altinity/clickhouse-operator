@@ -1,0 +1,21 @@
+apiVersion: zookeeper.pravega.io/v1beta1
+kind: ZookeeperCluster
+metadata:
+  name: zookeeper
+  labels:
+    app: zookeeper-operator
+spec:
+  replicas: 1
+  image:
+    repository: pravega/zookeeper
+    tag: 0.2.13
+  labels:
+    app: zookeeper-operator
+  storageType: persistence
+  persistence:
+    reclaimPolicy: Delete
+    spec:
+      storageClassName: "standard"
+      resources:
+        requests:
+          storage: 1Gi

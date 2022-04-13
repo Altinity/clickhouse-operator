@@ -37,7 +37,7 @@ spec:
             fsGroup: 101
           containers:
             - name: clickhouse
-              image: yandex/clickhouse-server:latest
+              image: clickhouse/clickhouse-server:latest
           initContainers:
             - name: copy
               image: alpine:latest

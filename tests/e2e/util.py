@@ -58,24 +58,34 @@ def require_keeper(keeper_manifest='', keeper_type='zookeeper', force_install=Fa
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = 'clickhouse-keeper-1-node-256M-for-test-only.yaml' if keeper_manifest == '' else keeper_manifest
             keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+        if keeper_type == "zookeeper-operator":
+            keeper_manifest = 'zookeeper-operator-1-node.yaml' if keeper_manifest == '' else keeper_manifest
+            keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+
         multi_doc = yaml_manifest.get_multidoc_manifest_data(get_full_path(keeper_manifest, lookup_in_host=True))
         keeper_nodes = 1
         docs_count = 0
         for doc in multi_doc:
             docs_count += 1
-            if doc["kind"] == "StatefulSet":
+            if doc["kind"] in ("StatefulSet", "ZookeeperCluster"):
                 keeper_nodes = doc["spec"]["replicas"]
         expected_docs = {
-            "zookeeper": 4,
-            "clickhouse-keeper": 6
+            "zookeeper": 6 if 'scaleout-pvc' in keeper_manifest else 4,
+            "clickhouse-keeper": 6,
+            "zookeeper-operator": 1,
+        }
+        expected_pod_prefix = {
+            "zookeeper": "zookeeper",
+            "zookeeper-operator": "zookeeper",
+            "clickhouse-keeper": "clickhouse-keeper",
         }
         assert docs_count == expected_docs[keeper_type], f"invalid {keeper_type} manifest, expected {expected_docs[keeper_type]}, actual {docs_count} documents in {keeper_manifest} file"
         with Given(f"Install {keeper_type} {keeper_nodes} nodes"):
             kubectl.apply(get_full_path(keeper_manifest, lookup_in_host=False))
-            for docs_count in range(keeper_nodes):
-                kubectl.wait_object("pod", f"{keeper_type}-{docs_count}")
-            for docs_count in range(keeper_nodes):
-                kubectl.wait_pod_status(f"{keeper_type}-{docs_count}", "Running")
+            for pod_num in range(keeper_nodes):
+                kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}")
+            for pod_num in range(keeper_nodes):
+                kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running")
 
 
 def wait_clickhouse_cluster_ready(chi):
@@ -87,7 +97,7 @@ def wait_clickhouse_cluster_ready(chi):
             for pod in chi['status']['pods']:
                 cluster_response = clickhouse.query(
                     chi["metadata"]["name"],
-                    "SYSTEM RELOAD CONFIG; SELECT host_name FROM system.clusters WHERE cluster='all-sharded'",
+                    "SELECT host_name FROM system.clusters WHERE cluster='all-sharded'",
                     pod=pod
                 )
                 for host in chi['status']['fqdns']:
@@ -102,7 +112,13 @@ def install_clickhouse_and_keeper(chi_file, chi_template_file, chi_name,
                                   keeper_type='zookeeper', keeper_manifest='', force_keeper_install=False, clean_ns=True, keeper_install_first=True,
                                   make_object_count=True):
     if keeper_manifest == '':
-        keeper_manifest = 'zookeeper-1-node-1GB-for-tests-only.yaml' if keeper_type == 'zookeeper' else 'clickhouse-keeper-1-node-256M-for-test-only.yaml'
+        if keeper_type == 'zookeeper':
+            keeper_manifest = 'zookeeper-1-node-1GB-for-tests-only.yaml'
+        if keeper_type == 'clickhouse-keeper':
+            keeper_manifest = 'clickhouse-keeper-1-node-256M-for-test-only.yaml'
+        if keeper_type == 'zookeeper-operator':
+            keeper_manifest = 'zookeeper-operator-1-node.yaml'
+
     with Given("install zookeeper/clickhouse-keeper + clickhouse"):
         if clean_ns:
             kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)

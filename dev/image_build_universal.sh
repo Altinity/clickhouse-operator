@@ -36,7 +36,7 @@ if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|ina
 fi
 
 DOCKER_CMD="docker buildx build --progress plain"
-if [[ "${DOCKER_IMAGE}" =~ ":dev" || "yes" == "${MINIKUBE}" ]]; then
+if [[ "${DOCKER_IMAGE}" =~ ":dev" || "${MINIKUBE}" == "yes" ]]; then
     DOCKER_CMD="${DOCKER_CMD} --output type=image,name=${DOCKER_IMAGE} --platform=linux/amd64"
 else
     DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64,linux/arm64"
@@ -44,7 +44,7 @@ fi
 
 DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev} --build-arg RELEASE=${RELEASE:-1}"
 
-if [[ "" != "${GCFLAGS}" ]]; then
+if [[ ! -z "${GCFLAGS}" ]]; then
     DOCKER_CMD="--build-arg GCFLAGS='${GCFLAGS}'"
 fi
 

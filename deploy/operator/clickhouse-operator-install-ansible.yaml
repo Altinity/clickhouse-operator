@@ -17,7 +17,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1351,7 +1351,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2682,7 +2682,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2782,6 +2782,9 @@ spec:
                     access:
                       type: object
                       properties:
+                        scheme:
+                          type: string
+                          description: "The scheme to user for connecting to ClickHouse. One of http or https"
                         username:
                           type: string
                           description: "ClickHouse username to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"
@@ -2976,7 +2979,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
 ---
 # Template Parameters:
 #
@@ -2993,7 +2996,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
 rules:
 - apiGroups:
     - ""
@@ -3150,7 +3153,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -3172,7 +3175,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3403,7 +3406,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
     app: clickhouse-operator
 data:
 ---
@@ -3419,7 +3422,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3478,7 +3481,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3513,7 +3516,7 @@ data:
                 "containers" : [
                   {
                     "name": "clickhouse",
-                    "image": "yandex/clickhouse-server:21.3",
+                    "image": "clickhouse/clickhouse-server:22.3",
                     "ports": [
                       {
                         "name": "http",
@@ -3578,7 +3581,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
     app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
@@ -3629,8 +3632,8 @@ data:
 #
 # NAMESPACE={{ namespace }}
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.18.3
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.18.3
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.18.4
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.18.4
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3640,7 +3643,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3674,7 +3677,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.18.3
+          image: altinity/clickhouse-operator:0.18.4
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3739,7 +3742,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.18.3
+          image: altinity/metrics-exporter:0.18.4
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3772,7 +3775,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.3
+    clickhouse.altinity.com/chop: 0.18.4
     app: clickhouse-operator
 spec:
   ports:

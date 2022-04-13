@@ -70,6 +70,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		queue:      q,
 		normalizer: chopmodel.NewNormalizer(c.kubeClient),
 		schemer: chopmodel.NewSchemer(
+			chop.Config().ClickHouse.Access.Scheme,
 			chop.Config().ClickHouse.Access.Username,
 			chop.Config().ClickHouse.Access.Password,
 			chop.Config().ClickHouse.Access.Port,
