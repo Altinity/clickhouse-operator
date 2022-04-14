@@ -4,6 +4,7 @@
 1. [chi_update_clickhouse_version.md](./chi_update_clickhouse_version.md) - how to update version
 1. [clickhouse_config_errors_handling.md](./clickhouse_config_errors_handling.md) - how operator handles ClickHouse's config errors
 1. [custom_resource_explained.md](./custom_resource_explained.md) - explain Custom Resource Definition in details
+1. [devspace.md](./devspace.md) - dev space how to     
 1. [grafana_setup.md](./grafana_setup.md) - how to set up Grafana
 1. [introduction.md](./introduction.md) - general introduction
 1. [k8s_cluster_access.md](./k8s_cluster_access.md) - how to set up cluster access
