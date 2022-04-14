@@ -16,6 +16,7 @@
 1. [prometheus_setup.md](./prometheus_setup.md) - how to set up Prometheus
 1. [pull_request_template.md](./pull_request_template.md) - template used by github during PR process
 1. [quick_start.md](./quick_start.md) - quick start
+1. [README.md](./README.md) - this doc
 1. [replication_setup.md](./replication_setup.md) - how to set up replication
 1. [schema_migration.md](./schema_migration.md) - how operator migrates schema during cluster resize
 1. [storage.md](./storage.md) - storage explained
