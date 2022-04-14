@@ -794,73 +794,40 @@ def test_014(self):
         'test_buffer',
         'a_view',
         'test_local2',
-        'test_local_uuid'
+        'test_local_uuid',
+        'test_uuid'
     ]
     replicated_tables = [
-        'test_local',
+        'default.test_local',
         'test_atomic.test_local2',
         'test_atomic.test_local_uuid'
     ]
+    create_ddls = [
+        "CREATE TABLE test_local ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
+        "CREATE VIEW test_view as SELECT * from test_local",
+        "CREATE VIEW a_view as SELECT * from test_view",
+        "CREATE MATERIALIZED VIEW test_mv Engine = Log as SELECT * from test_local",
+        "CREATE DICTIONARY test_dict (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
+        "CREATE TABLE test_buffer(a Int8) Engine = Buffer(default, test_local, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
+        "CREATE DATABASE test_atomic ON CLUSTER '{cluster}' Engine = Atomic",
+        "CREATE TABLE test_atomic.test_local2 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
+        "CREATE TABLE test_atomic.test_local_uuid ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{uuid}/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
+        "CREATE TABLE test_atomic.test_uuid ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic, test_local_uuid, rand())"
+    ]
     with Given("Create schema objects"):
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_local ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE VIEW test_view as SELECT * from test_local",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE VIEW a_view as SELECT * from test_view",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE MATERIALIZED VIEW test_mv Engine = Log as SELECT * from test_local",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE DICTIONARY test_dict (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_buffer(a Int8) Engine = Buffer(default, test_local, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE DATABASE test_atomic ON CLUSTER '{cluster}' Engine = Atomic",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_atomic.test_local2 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
-            host=f"chi-{chi}-{cluster}-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_atomic.test_local_uuid ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{uuid}/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
-            host=f"chi-{chi}-{cluster}-0-0")
-
+        for q in create_ddls:
+            clickhouse.query(chi, q, host=f"chi-{chi}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
         for table in replicated_tables:
-            clickhouse.query(
-                chi,
-                f"INSERT INTO {table} values(1)",
-                host=f"chi-{chi}-{cluster}-0-0")
-        time.sleep(10)
-        with Then("Data should be replicated"):
-            for table in replicated_tables:
-                out = clickhouse.query(
-                    chi,
-                    f"SELECT a FROM {table}",
-                    host=f"chi-{chi}-{cluster}-0-1")
-                assert out == "1"
-                print(f"{table} is ok")
+            clickhouse.query(chi, f"INSERT INTO {table} values(0)", host=f"chi-{chi}-{cluster}-0-0")
+            clickhouse.query(chi, f"INSERT INTO {table} values(1)", host=f"chi-{chi}-{cluster}-1-0")
 
     with When("Add more replicas"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-014-replication-2.yaml",
             check={
-                "pod_count": 4,
+                "pod_count": 6,
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -872,7 +839,7 @@ def test_014(self):
         assert start_time == new_start_time
 
         with Then("Schema objects should be migrated to the new replicas"):
-            for replica in [2, 3]:
+            for replica in [1, 2]:
                 host = f"chi-{chi}-{cluster}-0-{replica}"
                 print(f"Checking replica {host}")
                 print("Checking tables and views")
@@ -899,10 +866,9 @@ def test_014(self):
 
         with And("Replicated table should have the data"):
             for table in replicated_tables:
-                out = clickhouse.query(
-                    chi,
-                    f"SELECT a FROM {table}",
-                    host=f"chi-{chi}-{cluster}-0-2")
+                out = clickhouse.query(chi, f"SELECT a FROM {table}", host=f"chi-{chi}-{cluster}-0-2")
+                assert out == "0"
+                out = clickhouse.query(chi, f"SELECT a FROM {table}", host=f"chi-{chi}-{cluster}-1-2")
                 assert out == "1"
                 print(f"{table} is ok")
                 
@@ -910,7 +876,7 @@ def test_014(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
-                "pod_count": 1,
+                "pod_count": 2,
                 "do_not_delete": 1,
             })
 
@@ -918,11 +884,10 @@ def test_014(self):
         assert start_time == new_start_time
 
         with Then("Replica needs to be removed from the Keeper as well"):
-            out = clickhouse.query(
-                chi,
-                "SELECT total_replicas FROM system.replicas WHERE table='test_local'")
-            note(f"Found {out} total replicas")
-            assert out == "2"
+            for table in replicated_tables:
+                out = clickhouse.query(chi, f"SELECT total_replicas FROM system.replicas WHERE concat(database, '.', table) = '{table}'")
+                note(f"Found {out} total replicas of {table}")
+                assert out == "1"
 
     with When("Restart keeper pod"):
         with Then("Delete Zookeeper pod"):
@@ -952,7 +917,7 @@ def test_014(self):
             kubectl.create_and_check(
                 manifest=manifest,
                 check={
-                    "pod_count": 1,
+                    "pod_count": 2,
                     "do_not_delete": 1,
                 })
             with Then("Tables are deleted in ZooKeeper"):
