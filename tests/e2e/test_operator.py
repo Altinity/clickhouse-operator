@@ -756,20 +756,13 @@ def test_013(self):
 
 
 @TestScenario
-@Name("test_014. Test that replication works")
+@Name("test_014. Test that schema is correctly propagated on replicas")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0")
 )
 def test_014(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
-
-    create_table = """
-    CREATE TABLE test_local(a Int8)
-    Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-    PARTITION BY tuple()
-    ORDER BY a
-    """.replace('\r', '').replace('\n', '')
 
     manifest = "manifests/chi/test-014-replication-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -800,12 +793,18 @@ def test_014(self):
         'test_mv',
         'test_buffer',
         'a_view',
-        'test_local2'
+        'test_local2',
+        'test_local_uuid'
+    ]
+    replicated_tables = [
+        'test_local',
+        'test_atomic.test_local2',
+        'test_atomic.test_local_uuid'
     ]
     with Given("Create schema objects"):
         clickhouse.query(
             chi,
-            create_table,
+            "CREATE TABLE test_local ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
             host=f"chi-{chi}-{cluster}-0-0")
         clickhouse.query(
             chi,
@@ -829,31 +828,33 @@ def test_014(self):
             host=f"chi-{chi}-{cluster}-0-0")
         clickhouse.query(
             chi,
-            "CREATE DATABASE test_db Engine = Atomic",
+            "CREATE DATABASE test_atomic ON CLUSTER '{cluster}' Engine = Atomic",
             host=f"chi-{chi}-{cluster}-0-0")
         clickhouse.query(
             chi,
-            "CREATE TABLE test_db.test_local2 (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
+            "CREATE TABLE test_atomic.test_local2 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
+            host=f"chi-{chi}-{cluster}-0-0")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_atomic.test_local_uuid ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{uuid}/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
             host=f"chi-{chi}-{cluster}-0-0")
 
+
     with Given("Replicated table is created on a first replica and data is inserted"):
-        clickhouse.query(
-            chi,
-            "INSERT INTO test_local values(1)",
-            host=f"chi-{chi}-{cluster}-0-0")
-        with When("Table is created on the second replica"):
+        for table in replicated_tables:
             clickhouse.query(
                 chi,
-                create_table,
-                host=f"chi-{chi}-{cluster}-0-1")
-            # Give some time for replication to catch up
-            time.sleep(10)
-            with Then("Data should be replicated"):
+                f"INSERT INTO {table} values(1)",
+                host=f"chi-{chi}-{cluster}-0-0")
+        time.sleep(10)
+        with Then("Data should be replicated"):
+            for table in replicated_tables:
                 out = clickhouse.query(
                     chi,
-                    "SELECT a FROM test_local",
+                    f"SELECT a FROM {table}",
                     host=f"chi-{chi}-{cluster}-0-1")
                 assert out == "1"
+                print(f"{table} is ok")
 
     with When("Add more replicas"):
         kubectl.create_and_check(
@@ -892,17 +893,19 @@ def test_014(self):
                 print("Checking database engine")
                 out = clickhouse.query(
                     chi,
-                    f"SELECT engine FROM system.databases WHERE name = 'test_db'",
+                    f"SELECT engine FROM system.databases WHERE name = 'test_atomic'",
                     host=host)
                 assert out == "Atomic"
 
         with And("Replicated table should have the data"):
-            out = clickhouse.query(
-                chi,
-                "SELECT a FROM test_local",
-                host=f"chi-{chi}-{cluster}-0-2")
-            assert out == "1"
-
+            for table in replicated_tables:
+                out = clickhouse.query(
+                    chi,
+                    f"SELECT a FROM {table}",
+                    host=f"chi-{chi}-{cluster}-0-2")
+                assert out == "1"
+                print(f"{table} is ok")
+                
     with When("Remove replicas"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -945,18 +948,19 @@ def test_014(self):
         kubectl.delete_chi("test-014-replication")
 
         with Then(
-                f"Tables should be deleted. We can test it re-creating the chi and checking {self.context.keeper_type} contents"):
+                f"Tables should be deleted in {self.context.keeper_type}. We can test it re-creating the chi and checking {self.context.keeper_type} contents"):
             kubectl.create_and_check(
                 manifest=manifest,
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
                 })
-            out = clickhouse.query(
-                chi,
-                f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{chi}/tables/0/default'")
-            note(f"Found {out} replicated tables in ZooKeeper")
-            assert out == "0"
+            with Then("Tables are deleted in ZooKeeper"):
+                out = clickhouse.query_with_error(
+                    chi,
+                    f"SELECT count() FROM system.zookeeper WHERE path ='/clickhouse/{chi}/tables/0/default'")
+                note(f"Found {out} replicated tables in {self.context.keeper_type}")
+                assert "DB::Exception: No node" in out or out == "0"
 
     kubectl.delete_chi("test-014-replication")
 
