@@ -330,7 +330,7 @@ func createTableDistributed(cluster string) string {
 						create_table_query 
 					FROM
 						clusterAllReplicas('%s', system.tables)
-					SETTINGS skip_unavailable_shards = 1
+					SETTINGS skip_unavailable_shards = 1, show_table_uuid_in_table_create_query_if_not_nil=1
 				) t 
 				USING (database, name)
 			WHERE
@@ -372,7 +372,7 @@ func createTableReplicated(cluster string) string {
 			database NOT IN (%s) AND
 			create_table_query != '' AND
 			name NOT LIKE '.inner.%%'
-		SETTINGS skip_unavailable_shards = 1
+		SETTINGS skip_unavailable_shards=1, show_table_uuid_in_table_create_query_if_not_nil=1
 		`,
 		cluster,
 		ignoredDBs,
