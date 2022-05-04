@@ -99,7 +99,7 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=5):
     }
     assert expected_out[keeper_type] == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 
-def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, keeper_manifest_1_node, keeper_manifest_3_node, first_install=False):
+def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, keeper_manifest_1_node, keeper_manifest_3_node, first_install=False, clean_ns=None):
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f'manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml',
@@ -107,7 +107,7 @@ def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, kee
         chi_name='test-cluster-for-zk',
         keeper_manifest=keeper_manifest,
         keeper_type=keeper_type,
-        clean_ns=first_install,
+        clean_ns=first_install if clean_ns is None else clean_ns,
         force_keeper_install=True,
         keeper_install_first=first_install,
         make_object_count=False,
@@ -232,7 +232,7 @@ def test_keeper_probes_outline(
         kubectl.delete_all_keeper(settings.test_namespace)
 
     with Then("Install CH 2 node ZK 3 node"):
-        chi = rescale_zk_and_clickhouse(ch_node_count=2, keeper_node_count=3, keeper_type=keeper_type, keeper_manifest_1_node=keeper_manifest_1_node, keeper_manifest_3_node=keeper_manifest_3_node, first_install=True)
+        chi = rescale_zk_and_clickhouse(ch_node_count=2, keeper_node_count=3, keeper_type=keeper_type, keeper_manifest_1_node=keeper_manifest_1_node, keeper_manifest_3_node=keeper_manifest_3_node, first_install=True, clean_ns=False)
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
         check_zk_root_znode(chi, keeper_type, pod_count=3)
@@ -309,6 +309,7 @@ def test(self):
         test_zookeeper_operator_probes_workload,
     ]
 
+    util.clean_namespace(delete_chi=True)
     util.install_operator_if_not_exist()
     for t in all_tests:
         Scenario(test=t)()

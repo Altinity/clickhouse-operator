@@ -188,27 +188,19 @@ spec:
 #          readinessProbe:
 #            exec:
 #              command:
-#                - timeout
-#                - 15s
 #                - bash
-#                - -c
-#                - "OK=$(echo ruok | nc -w 15 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
-#            tcpSocket:
-#              port: 2181
+#                - -xc
+#                - 'OK=$(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;); if [[ "$OK" == "imok" ]]; then exit 0; else exit 1; fi'
 #            initialDelaySeconds: 20
 #            timeoutSeconds: 15
-#          livenessProbe:
-#            exec:
-#              command:
-#                - timeout
-#                - 15s
-#                - bash
-#                - -c
-#                - "OK=$(echo ruok | nc -w 15 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
-#            tcpSocket:
-#              port: 2181
-#            initialDelaySeconds: 15
-#            timeoutSeconds: 15
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -xc
+                - 'date && OK=$(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;); if [[ "$OK" == "imok" ]]; then exit 0; else exit 1; fi'
+            initialDelaySeconds: 20
+            timeoutSeconds: 15
           volumeMounts:
             - name: datadir-volume
               mountPath: /var/lib/zookeeper
