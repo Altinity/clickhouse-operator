@@ -297,6 +297,15 @@ def test_zookeeper_operator_probes_workload(self):
         keeper_manifest_3_node='zookeeper-operator-3-node.yaml',
     )
 
+@TestScenario
+@Name('test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
+def test_clickhouse_keeper_probes_workload(self):
+    test_keeper_probes_outline(
+        keeper_type="clickhouse-keeper",
+        keeper_manifest_1_node='clickhouse-keeper-1-node-256M-for-test-only.yaml',
+        keeper_manifest_3_node='clickhouse-keeper-3-nodes-256M-for-test-only.yaml',
+    )
+
 @TestModule
 @Name("e2e.test_keeper")
 def test(self):
@@ -307,6 +316,7 @@ def test(self):
         test_zookeeper_rescale,
         test_zookeeper_probes_workload,
         test_zookeeper_operator_probes_workload,
+        test_clickhouse_keeper_probes_workload,
     ]
 
     util.clean_namespace(delete_chi=True)
