@@ -19,5 +19,6 @@ type ClusterEndpointCredentials struct {
 	Scheme   string
 	Username string
 	Password string
+	Cacrt    string
 	Port     int
 }

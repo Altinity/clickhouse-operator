@@ -2791,6 +2791,9 @@ spec:
                         password:
                           type: string
                           description: "ClickHouse password to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"
+                        cacrt:
+                          type: string
+                          description: "ClickHouse rootCA certificate authentication to be added to verify ClickHouse Https connection"
                         secret:
                           type: object
                           properties:

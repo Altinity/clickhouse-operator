@@ -55,6 +55,7 @@ const (
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
+	defaultChCacrt    = ""
 
 	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
@@ -150,6 +151,7 @@ type OperatorConfigClickHouse struct {
 		Scheme   string `json:"scheme" yaml:"scheme"`
 		Username string `json:"username" yaml:"username"`
 		Password string `json:"password" yaml:"password"`
+		Cacrt    string `json:"cacrt" yaml:"cacrt"`
 
 		// Location of k8s Secret with username and password to be used by the operator to connect to ClickHouse instances
 		// Can be used instead of explicitly specified (above) username and password
@@ -329,6 +331,7 @@ type OperatorConfig struct {
 	CHScheme   string `json:"chScheme" yaml:"chScheme"`
 	CHUsername string `json:"chUsername" yaml:"chUsername"`
 	CHPassword string `json:"chPassword" yaml:"chPassword"`
+	CHCacrt    string `json:"chcacrt" yaml:"chcacrt"`
 	// Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
 	// Can be used instead of explicitly specified username and password
 	CHCredentialsSecretNamespace string `json:"chCredentialsSecretNamespace" yaml:"chCredentialsSecretNamespace"`
@@ -657,7 +660,9 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	if c.ClickHouse.Access.Password == "" {
 		c.ClickHouse.Access.Password = defaultChPassword
 	}
-
+	if c.ClickHouse.Access.Cacrt == "" {
+		c.ClickHouse.Access.Cacrt = defaultChCacrt
+	}
 	// config.CHCredentialsSecretNamespace
 	// config.CHCredentialsSecretName
 
@@ -955,6 +960,9 @@ func (c *OperatorConfig) move() {
 	}
 	if c.CHPassword != "" {
 		c.ClickHouse.Access.Password = c.CHPassword
+	}
+	if c.CHCacrt != "" {
+		c.ClickHouse.Access.Cacrt = c.CHCacrt
 	}
 	// Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
 	// Can be used instead of explicitly specified username and password

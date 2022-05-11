@@ -35,11 +35,12 @@ type Schemer struct {
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 
 // NewSchemer creates new Schemer object
-func NewSchemer(scheme, username, password string, port int) *Schemer {
+func NewSchemer(scheme, username, password, cacrt string, port int) *Schemer {
 	credentials := &clickhouse.ClusterEndpointCredentials{
 		Scheme:   scheme,
 		Username: username,
 		Password: password,
+		Cacrt: 	  cacrt,
 		Port:     port,
 	}
 	return &Schemer{

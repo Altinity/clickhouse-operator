@@ -17,6 +17,7 @@ package clickhouse
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	databasesql "database/sql"
 	"fmt"
 	"time"
@@ -68,6 +69,18 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 
 // connect performs connect
 func (c *Connection) connect(ctx context.Context) {
+	//Add certificate if exist
+	if c.params.cacrt != "" {
+		c.l.V(1).Info("suzy trying to see if this gets triggered")
+		certPool := x509.NewCertPool()
+		cert, _ := x509.ParseCertificate([]byte(c.params.cacrt))
+		certPool.AddCert(cert)
+		err := goch.RegisterTLSConfig(tlsSettings, &tls.Config{RootCAs: certPool})
+		if err != nil {
+			c.l.V(1).F().Error("suzy debugging !!! %s", err)
+		}
+	}
+
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {
