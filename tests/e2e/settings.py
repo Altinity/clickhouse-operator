@@ -22,6 +22,11 @@ def get_docker_compose_path():
 kubectl_cmd = "kubectl" \
     if current().context.native \
     else f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
+
+kubectl_cmd = os.getenv('KUBECTL_CMD') \
+    if 'KUBECTL_CMD' in os.environ \
+    else kubectl_cmd
+
 test_namespace = os.getenv('TEST_NAMESPACE') \
     if 'TEST_NAMESPACE' in os.environ \
     else "test"
