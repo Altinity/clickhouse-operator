@@ -2088,7 +2088,7 @@ def test_032(self):
 
     util.require_keeper(keeper_type=self.context.keeper_type)
     create_table = """
-    CREATE TABLE test_local(a UInt32)
+    CREATE TABLE test_local ON CLUSTER 'default' (a UInt32)
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
     PARTITION BY tuple()
     ORDER BY a
@@ -2163,14 +2163,13 @@ def test_032(self):
         timeout=int(1000),
         )
 
-
     note("Setting the thread event to true...")
     trigger_event.set()
+    note("Joining the parallel thread with main...")
     join()
 
-    kubectl.launch('delete clickhouse-test-032-client')
     kubectl.delete_chi(chi)
-
+    kubectl.launch(f"delete pod clickhouse-test-032-client", ns=kubectl.namespace, timeout=600, ok_to_fail=True)
 
 @TestModule
 @Name("e2e.test_operator")
