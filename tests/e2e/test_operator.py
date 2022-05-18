@@ -2128,7 +2128,7 @@ def test_032(self):
         clickhouse.query(chi, "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
         clickhouse.query(chi, f"INSERT INTO test_local select * from numbers({numbers})", timeout=120)
 
-    with Then("check the initnal select query count before rolling update"):
+    with When("check the initial select query count before rolling update"):
         with By("executing query in the clickhouse installation"):
                 cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_local", with_error=True)
         with Then("checking expected result"):
