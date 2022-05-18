@@ -1,6 +1,7 @@
 import os
 import time
 import yaml
+import threading
 
 import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
@@ -11,6 +12,7 @@ import e2e.util as util
 from testflows.core import *
 from testflows.asserts import error
 from requirements.requirements import *
+from testflows.connect import Shell
 
 
 @TestScenario
@@ -2058,6 +2060,116 @@ def test_031(self):
                                            manifest=util.get_full_path(settings.clickhouse_operator_install_manifest,
                                                                        False))
         util.restart_operator(ns=settings.operator_namespace)
+
+
+@TestCheck
+def run_select_query(self, client_pod, user_name, password, trigger_event):
+    """Run a select query in parallel until the stop signal is received."""
+    i = 0
+    try:
+        self.context.shell = Shell()
+        while not trigger_event.is_set():
+            with When(f"query #{i}", flags=TE):
+                with By("executing query in the client pod"):
+                    cnt_test_local = kubectl.launch(f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user_name} --password={password} -h clickhouse-test-032-rescaling  -q 'select count() from test_local' ")
+                with Then("checking expected result"):
+                    assert cnt_test_local == '100000000', error()
+            i += 1
+
+    finally:
+        if hasattr(self.context, "shell"):
+            self.context.shell.close()
+
+
+@TestScenario
+@Name("test_032. Test rolling update logic")
+def test_032(self):
+    """Test rolling update logic."""
+
+    util.require_keeper(keeper_type=self.context.keeper_type)
+    create_table = """
+    CREATE TABLE test_local(a UInt32)
+    Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+    PARTITION BY tuple()
+    ORDER BY a
+    """.replace('\r', '').replace('\n', '')
+
+    manifest = "manifests/chi/test-032-rescaling.yaml"
+
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    kubectl.create_and_check(
+        manifest=manifest,
+        check={
+            "apply_templates": {
+                settings.clickhouse_template,
+                "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+            },
+            "object_counts": {
+                "statefulset": 2,
+                "pod": 2,
+                "service": 3,
+            },
+            "do_not_delete": 2,
+        },
+        timeout=600,
+    )
+    
+    kubectl.wait_jsonpath("pod", "chi-test-032-rescaling-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
+                          ns=kubectl.namespace)
+    kubectl.launch(f'run clickhouse-test-032-client --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c "sleep 3600"')
+    kubectl.wait_jsonpath("pod", "clickhouse-test-032-client", "{.status.containerStatuses[0].ready}", "true",
+                          ns=kubectl.namespace)
+    
+    numbers = "100000000"
+
+    with Given("Create replicated table and populate it"):
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
+        clickhouse.query(chi, f"INSERT INTO test_local select * from numbers({numbers})", timeout=120)
+
+    with Then("check the initnal select query count before rolling update"):
+        with By("executing query in the clickhouse installation"):
+                cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_local", with_error=True)
+        with Then("checking expected result"):
+            assert cnt_test_local == '100000000', error()   
+
+    trigger_event = threading.Event()
+
+    Check("run select query until receive stop event",
+        test=run_select_query, 
+        parallel=True)(            
+            client_pod = "clickhouse-test-032-client",
+            user_name = "test_032",
+            password = "test_032",
+            trigger_event = trigger_event,
+            )
+
+    with When("Change the image in the podTemplate by updating the chi version to test the rolling update logic"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-032-rescaling-2.yaml",
+            check={
+            "apply_templates": {
+                settings.clickhouse_template,
+                "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+            },
+            "object_counts": {
+                "statefulset": 2,
+                "pod": 2,
+                "service": 3,
+            },
+            "do_not_delete": 2,
+        },
+        timeout=int(1000),
+        )
+
+
+    note("Setting the thread event to true...")
+    trigger_event.set()
+    join()
+
+    kubectl.launch('delete clickhouse-test-032-client')
+    kubectl.delete_chi(chi)
 
 
 @TestModule
