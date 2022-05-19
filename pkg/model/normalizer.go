@@ -288,6 +288,9 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 	if host.Name == "" {
 		host.Name = template.Spec.Name
 	}
+	if !host.Secure {
+		host.Secure = template.Spec.Secure
+	}
 
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {

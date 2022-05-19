@@ -2264,6 +2264,45 @@ def test_032(self):
     kubectl.delete_chi(chi)
     kubectl.launch(f"delete pod clickhouse-test-032-client", ns=kubectl.namespace, timeout=600)
 
+
+@TestScenario
+@Name("test_033. Test installing with TLS")
+def test_033(self):
+    """Test installing with TLS."""
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    shell = Shell()
+
+    manifest = "manifests/chi/test-033-tls.yaml"
+    chi = "test-033-tls"
+
+    # generate certs for installing clickhouse with TLS
+    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+    shell(f"""
+        openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+            -keyout clickhouse-key.pem -out clickhouse-cert.pem \
+            -subj "/CN=clickhouse-test-033-tls" \
+            -addext "subjectAltName=DNS:clickhouse-{chi},DNS:clickhouse-{chi}.clickhouse-test,DNS:clickhouse-{chi}.test.svc.cluster.local"
+    """)
+    # create secrets for the certs
+    shell("kubectl -n test create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
+    # create a configmap with the CA to validate the cert
+    shell("kubectl -n test create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
+
+    # deploy clickhouse
+    kubectl.apply(util.get_full_path(manifest, lookup_in_host=False))
+
+    kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=1)
+    time.sleep(10)
+
+    with And("ClickHouse should be queryable and running on port 9440"):
+        # connect on the TLS port and verify the node registered itself in the cluster with port 9440
+        out = clickhouse.query(chi, "select count() from system.clusters WHERE cluster='default' AND port=9440;", port=9440)
+        assert "2" == out
+
+    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+    kubectl.delete_chi(chi)
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
