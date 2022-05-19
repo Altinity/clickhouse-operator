@@ -809,6 +809,11 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          secure:
+                                            type: boolean
+                                            description: |
+                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
+                                              if specified
                                           httpPort:
                                             type: integer
                                             description: |
@@ -961,6 +966,11 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          secure:
+                                            type: boolean
+                                            description: |
+                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
+                                              if specified
                                           httpPort:
                                             type: integer
                                             description: |
@@ -1077,6 +1087,11 @@ spec:
                                   More info: https://clickhouse.tech/docs/en/interfaces/tcp/
                                 minimum: 1
                                 maximum: 65535
+                              secure:
+                                type: boolean
+                                description: |
+                                  optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
+                                  if specified
                               httpPort:
                                 type: integer
                                 description: |
@@ -2143,6 +2158,11 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          secure:
+                                            type: boolean
+                                            description: |
+                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
+                                              if specified
                                           httpPort:
                                             type: integer
                                             description: |
@@ -2295,6 +2315,11 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          secure:
+                                            type: boolean
+                                            description: |
+                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
+                                              if specified
                                           httpPort:
                                             type: integer
                                             description: |
@@ -2411,6 +2436,11 @@ spec:
                                   More info: https://clickhouse.tech/docs/en/interfaces/tcp/
                                 minimum: 1
                                 maximum: 65535
+                              secure:
+                                type: boolean
+                                description: |
+                                  optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
+                                  if specified
                               httpPort:
                                 type: integer
                                 description: |
