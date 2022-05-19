@@ -34,7 +34,10 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
         cmd += " ".join(cmd_args[1:])
 
     # Run command
-    cmd = shell(cmd, timeout=timeout)
+    if hasattr(current().context, "shell"):
+        cmd = current().context.shell(cmd, timeout=timeout)
+    else:    
+        cmd = shell(cmd, timeout=timeout)
 
     # Check command failure
     code = cmd.exitcode
