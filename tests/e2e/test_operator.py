@@ -2169,7 +2169,7 @@ def test_032(self):
     join()
 
     kubectl.delete_chi(chi)
-    kubectl.launch(f"delete pod clickhouse-test-032-client", ns=kubectl.namespace, timeout=600, ok_to_fail=True)
+    kubectl.launch(f"delete pod clickhouse-test-032-client", ns=kubectl.namespace, timeout=600)
 
 @TestModule
 @Name("e2e.test_operator")
