@@ -2087,9 +2087,11 @@ def test_032(self):
     kubectl.wait_jsonpath("pod", "chi-test-032-rescaling-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                           ns=kubectl.namespace)
     kubectl.launch(f'run clickhouse-test-032-client --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c "sleep 3600"')
-    kubectl.wait_jsonpath("pod", "clickhouse-test-032-client", "{.status.containerStatuses[0].ready}", "true",
-                          ns=kubectl.namespace)
-    
+    for attempt in retries(timeout=300, delay=20, count=10):
+        with attempt:
+            kubectl.wait_jsonpath("pod", "clickhouse-test-032-client", "{.status.containerStatuses[0].ready}", "true",
+                                ns=kubectl.namespace)
+        
     numbers = "100000000"
 
     with Given("Create replicated table and populate it"):
