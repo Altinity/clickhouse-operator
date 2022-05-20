@@ -1860,8 +1860,8 @@ def test_028(self):
             chi_downtime = 0
             with And("Queries keep running"):
                 while kubectl.get_field("chi", chi, ".status.status") == "InProgress":
-                    ch1 = clickhouse.query_with_error(chi, sql, host="chi-test-014-replication-default-0-0-0")
-                    ch2 = clickhouse.query_with_error(chi, sql, host="chi-test-014-replication-default-0-1-0")
+                    ch1 = clickhouse.query_with_error(chi, sql, pod="chi-test-014-replication-default-0-0-0", host="chi-test-014-replication-default-1-0")
+                    ch2 = clickhouse.query_with_error(chi, sql, pod="chi-test-014-replication-default-1-0-0", host="chi-test-014-replication-default-0-0")
                     print(ch1 + "   " + ch2)
                     if "error" in ch1 or "Exception" in ch1 or ch2.endswith("1"):
                         ch1_downtime = ch1_downtime + 5
