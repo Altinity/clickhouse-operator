@@ -574,7 +574,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 	} else if template.Zone.Key == "" {
 		// We have values specified, but no key
 		// Use default zone key in this case
-		template.Zone.Key = "failure-domain.beta.kubernetes.io/zone"
+		template.Zone.Key = v1.LabelTopologyZone
 	} else {
 		// We have both key and value(s) specified explicitly
 	}
