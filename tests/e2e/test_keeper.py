@@ -207,7 +207,7 @@ def test_zookeeper_operator_rescale(self):
         keeper_type="zookeeper-operator",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node='zookeeper-operator-1-node.yaml',
-        keeper_manifest_3_node='zookeeper-operator-3-node.yaml',
+        keeper_manifest_3_node='zookeeper-operator-3-nodes.yaml',
     )
 
 @TestScenario
@@ -287,6 +287,15 @@ def test_zookeeper_probes_workload(self):
         keeper_manifest_3_node='zookeeper-3-nodes-for-test-probes.yaml',
     )
 
+@TestScenario
+@Name('test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
+def test_zookeeper_pvc_probes_workload(self):
+    test_keeper_probes_outline(
+        keeper_type="zookeeper",
+        keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml',
+        keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml',
+    )
+
 
 @TestScenario
 @Name('test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
@@ -294,7 +303,10 @@ def test_zookeeper_operator_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="zookeeper-operator",
         keeper_manifest_1_node='zookeeper-operator-1-node.yaml',
-        keeper_manifest_3_node='zookeeper-operator-3-node.yaml',
+        keeper_manifest_3_node='zookeeper-operator-3-nodes.yaml',
+        # uncomment
+        # keeper_manifest_1_node='zookeeper-operator-1-node-with-custom-probes.yaml',
+        # keeper_manifest_3_node='zookeeper-operator-3-nodes-with-custom-probes.yaml',
     )
 
 @TestScenario
@@ -314,7 +326,9 @@ def test(self):
         test_clickhouse_keeper_rescale,
         test_zookeeper_pvc_scaleout_rescale,
         test_zookeeper_rescale,
+
         test_zookeeper_probes_workload,
+        test_zookeeper_pvc_probes_workload,
         test_zookeeper_operator_probes_workload,
         test_clickhouse_keeper_probes_workload,
     ]
