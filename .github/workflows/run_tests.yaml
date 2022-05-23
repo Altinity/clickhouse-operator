@@ -30,7 +30,7 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.21.9
+          kubernetes-version: v1.23.3
 
       - name: Run Tests
         run: |

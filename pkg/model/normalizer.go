@@ -27,7 +27,6 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	"github.com/google/uuid"
-	"k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -574,7 +573,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 	} else if template.Zone.Key == "" {
 		// We have values specified, but no key
 		// Use default zone key in this case
-		template.Zone.Key = "failure-domain.beta.kubernetes.io/zone"
+		template.Zone.Key = corev1.LabelTopologyZone
 	} else {
 		// We have both key and value(s) specified explicitly
 	}
@@ -593,14 +592,14 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
 	// which tells:  For Pods running with hostNetwork, you should explicitly set its DNS policy “ClusterFirstWithHostNet”.
 	if template.Spec.HostNetwork {
-		template.Spec.DNSPolicy = v1.DNSClusterFirstWithHostNet
+		template.Spec.DNSPolicy = corev1.DNSClusterFirstWithHostNet
 	}
 
 	// Introduce PodTemplate into Index
 	n.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
-const defaultTopologyKey = "kubernetes.io/hostname"
+const defaultTopologyKey = corev1.LabelHostname
 
 func (n *Normalizer) normalizePodDistribution(podDistribution *chiV1.ChiPodDistribution) []chiV1.ChiPodDistribution {
 	if podDistribution.TopologyKey == "" {
@@ -883,8 +882,8 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 	envVar := corev1.EnvVar{
 		Name: envVarName,
 		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &v1.SecretKeySelector{
-				LocalObjectReference: v1.LocalObjectReference{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
 					Name: secretName,
 				},
 				Key: key,
