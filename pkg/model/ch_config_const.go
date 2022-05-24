@@ -73,8 +73,8 @@ const (
 	// defaultBusyBoxDockerImage specifies default BusyBox docker image to be used
 	defaultBusyBoxDockerImage = "busybox"
 
-	// defaultubiDockerImage specifies default ubi docker image to be used
-	defaultubiDockerImage = "ubi-minimal"
+	// defaultUbiDockerImage specifies default ubi docker image to be used
+	defaultUbiDockerImage = "ubi-minimal"
 
 	// Name of container within Pod with ClickHouse instance.
 	// Pod may have other containers included, such as monitoring, logging
