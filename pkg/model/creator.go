@@ -1080,7 +1080,7 @@ func newDefaultClickHouseContainer() corev1.Container {
 func newDefaultLogContainer() corev1.Container {
 	return corev1.Container{
 		Name:  ClickHouseLogContainerName,
-		Image: defaultBusyBoxDockerImage,
+		Image: defaultubiDockerImage,
 		Command: []string{
 			"/bin/sh", "-c", "--",
 		},
