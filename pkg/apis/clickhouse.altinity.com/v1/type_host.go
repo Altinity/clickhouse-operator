@@ -28,6 +28,8 @@ type ChiHost struct {
 	Secure              bool              `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	Username            string            `json:"username,omitempty"            yaml:"username,omitempty"`
+	Password            *HostPassword     `json:"password,omitempty"            yaml:"password,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
@@ -40,6 +42,29 @@ type ChiHost struct {
 	CurStatefulSet      *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
 	DesiredStatefulSet  *appsv1.StatefulSet        `json:"-" yaml:"-" testdiff:"ignore"`
 	CHI                 *ClickHouseInstallation    `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+// HostPassword defines the password for connecting to a clickhouse instance
+type HostPassword struct {
+	Value             string                    `json:"value,omitempty"             yaml:"value,omitempty"`
+	ValueSecretKeyRef *corev1.SecretKeySelector `json:"valueSecretKeyRef,omitempty" yaml:"valueSecretKeyRef,omitempty"`
+}
+
+func (hp *HostPassword) MergeFrom(from *HostPassword) *HostPassword {
+	if from == nil {
+		return hp
+	}
+	if hp == nil {
+		hp = new(HostPassword)
+	}
+
+	if hp.Value == "" {
+		hp.Value = from.Value
+	}
+	if hp.ValueSecretKeyRef == nil && from.ValueSecretKeyRef != nil {
+		hp.ValueSecretKeyRef = from.ValueSecretKeyRef
+	}
+	return hp
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
@@ -101,6 +126,10 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if host.InterserverHTTPPort == 0 {
 		host.InterserverHTTPPort = from.InterserverHTTPPort
 	}
+	if host.Username == "" {
+		host.Username = from.Username
+	}
+	host.Password = host.Password.MergeFrom(from.Password)
 	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
 	host.Templates.HandleDeprecatedFields()
 }

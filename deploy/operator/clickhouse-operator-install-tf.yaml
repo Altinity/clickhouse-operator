@@ -630,6 +630,29 @@ spec:
                               override top-level `chi.spec.configuration.files`
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
+                          secret:
+                            type: object
+                            description: "optional, shared secret value to secure cluster communications"
+                            properties:
+                              value:
+                                description: "Cluster shared secret value in plain text"
+                                type: string
+                              valueSecretKeyRef:
+                                description: "Source for the cluster shared secret value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                type: object
+                                properties:
+                                  key:
+                                    description: The key of the secret to select from. Must be a valid secret key.
+                                    type: string
+                                  name:
+                                    description: 'Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                    type: string
+                                  optional:
+                                    description: Specify whether the Secret or its key must be defined
+                                    type: boolean
+                                required:
+                                - key
                           templates:
                             type: object
                             description: |
@@ -835,6 +858,32 @@ spec:
                                               allows connect between replicas inside same shard during fetch replicated data parts HTTP protocol
                                             minimum: 1
                                             maximum: 65535
+                                          username:
+                                            type: string
+                                            description: "optional, username to authenticate as when connecting to other clickhouse nodes"
+                                          password:
+                                            type: object
+                                            description: "optional, password to authenticate with when connecting to other clickhouse nodes"
+                                            properties:
+                                              value:
+                                                description: "Password value in plain text"
+                                                type: string
+                                              valueSecretKeyRef:
+                                                description: "Source for the password value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                                type: object
+                                                properties:
+                                                  key:
+                                                    description: The key of the secret to select from. Must be a valid secret key.
+                                                    type: string
+                                                  name:
+                                                    description: 'Name of the referent. More info:
+                                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                                    type: string
+                                                  optional:
+                                                    description: Specify whether the Secret or its key must be defined
+                                                    type: boolean
+                                                required:
+                                                - key
                                           settings:
                                             type: object
                                             # nullable: true
@@ -992,6 +1041,32 @@ spec:
                                               allows connect between replicas inside same shard during fetch replicated data parts HTTP protocol
                                             minimum: 1
                                             maximum: 65535
+                                          username:
+                                            type: string
+                                            description: "optional, username to authenticate as when connecting to other clickhouse nodes"
+                                          password:
+                                            type: object
+                                            description: "optional, password to authenticate with when connecting to other clickhouse nodes"
+                                            properties:
+                                              value:
+                                                description: "Password value in plain text"
+                                                type: string
+                                              valueSecretKeyRef:
+                                                description: "Source for the password value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                                type: object
+                                                properties:
+                                                  key:
+                                                    description: The key of the secret to select from. Must be a valid secret key.
+                                                    type: string
+                                                  name:
+                                                    description: 'Name of the referent. More info:
+                                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                                    type: string
+                                                  optional:
+                                                    description: Specify whether the Secret or its key must be defined
+                                                    type: boolean
+                                                required:
+                                                - key
                                           settings:
                                             type: object
                                             description: |
@@ -1115,6 +1190,32 @@ spec:
                                   More info: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#interserver-http-port
                                 minimum: 1
                                 maximum: 65535
+                              username:
+                                type: string
+                                description: "optional, username to authenticate as when connecting to other clickhouse nodes"
+                              password:
+                                type: object
+                                description: "optional, password to authenticate with when connecting to other clickhouse nodes"
+                                properties:
+                                  value:
+                                    description: "Password value in plain text"
+                                    type: string
+                                  valueSecretKeyRef:
+                                    description: "Source for the password value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                    type: object
+                                    properties:
+                                      key:
+                                        description: The key of the secret to select from. Must be a valid secret key.
+                                        type: string
+                                      name:
+                                        description: 'Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                        type: string
+                                      optional:
+                                        description: Specify whether the Secret or its key must be defined
+                                        type: boolean
+                                    required:
+                                    - key
                               settings:
                                 type: object
                                 description: |
@@ -1979,6 +2080,29 @@ spec:
                               override top-level `chi.spec.configuration.files`
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
+                          secret:
+                            type: object
+                            description: "optional, shared secret value to secure cluster communications"
+                            properties:
+                              value:
+                                description: "Cluster shared secret value in plain text"
+                                type: string
+                              valueSecretKeyRef:
+                                description: "Source for the cluster shared secret value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                type: object
+                                properties:
+                                  key:
+                                    description: The key of the secret to select from. Must be a valid secret key.
+                                    type: string
+                                  name:
+                                    description: 'Name of the referent. More info:
+                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                    type: string
+                                  optional:
+                                    description: Specify whether the Secret or its key must be defined
+                                    type: boolean
+                                required:
+                                - key
                           templates:
                             type: object
                             description: |
@@ -2184,6 +2308,32 @@ spec:
                                               allows connect between replicas inside same shard during fetch replicated data parts HTTP protocol
                                             minimum: 1
                                             maximum: 65535
+                                          username:
+                                            type: string
+                                            description: "optional, username to authenticate as when connecting to other clickhouse nodes"
+                                          password:
+                                            type: object
+                                            description: "optional, password to authenticate with when connecting to other clickhouse nodes"
+                                            properties:
+                                              value:
+                                                description: "Password value in plain text"
+                                                type: string
+                                              valueSecretKeyRef:
+                                                description: "Source for the password value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                                type: object
+                                                properties:
+                                                  key:
+                                                    description: The key of the secret to select from. Must be a valid secret key.
+                                                    type: string
+                                                  name:
+                                                    description: 'Name of the referent. More info:
+                                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                                    type: string
+                                                  optional:
+                                                    description: Specify whether the Secret or its key must be defined
+                                                    type: boolean
+                                                required:
+                                                - key
                                           settings:
                                             type: object
                                             # nullable: true
@@ -2341,6 +2491,32 @@ spec:
                                               allows connect between replicas inside same shard during fetch replicated data parts HTTP protocol
                                             minimum: 1
                                             maximum: 65535
+                                          username:
+                                            type: string
+                                            description: "optional, username to authenticate as when connecting to other clickhouse nodes"
+                                          password:
+                                            type: object
+                                            description: "optional, password to authenticate with when connecting to other clickhouse nodes"
+                                            properties:
+                                              value:
+                                                description: "Password value in plain text"
+                                                type: string
+                                              valueSecretKeyRef:
+                                                description: "Source for the password value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                                type: object
+                                                properties:
+                                                  key:
+                                                    description: The key of the secret to select from. Must be a valid secret key.
+                                                    type: string
+                                                  name:
+                                                    description: 'Name of the referent. More info:
+                                                      https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                                    type: string
+                                                  optional:
+                                                    description: Specify whether the Secret or its key must be defined
+                                                    type: boolean
+                                                required:
+                                                - key
                                           settings:
                                             type: object
                                             description: |
@@ -2464,6 +2640,32 @@ spec:
                                   More info: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#interserver-http-port
                                 minimum: 1
                                 maximum: 65535
+                              username:
+                                type: string
+                                description: "optional, username to authenticate as when connecting to other clickhouse nodes"
+                              password:
+                                type: object
+                                description: "optional, password to authenticate with when connecting to other clickhouse nodes"
+                                properties:
+                                  value:
+                                    description: "Password value in plain text"
+                                    type: string
+                                  valueSecretKeyRef:
+                                    description: "Source for the password value. Cannot be used if value is not empty. Selects a key of a secret in the clickhouse installation namespace"
+                                    type: object
+                                    properties:
+                                      key:
+                                        description: The key of the secret to select from. Must be a valid secret key.
+                                        type: string
+                                      name:
+                                        description: 'Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                                        type: string
+                                      optional:
+                                        description: Specify whether the Secret or its key must be defined
+                                        type: boolean
+                                    required:
+                                    - key
                               settings:
                                 type: object
                                 description: |

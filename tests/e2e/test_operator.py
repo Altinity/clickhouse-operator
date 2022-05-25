@@ -2175,7 +2175,8 @@ def test_033(self):
 
     with And("ClickHouse should be queryable and running on port 9440"):
         # connect on the TLS port and verify the node registered itself in the cluster with port 9440
-        out = clickhouse.query(chi, "select count() from system.clusters WHERE cluster='default' AND port=9440;", port=9440)
+        out = clickhouse.query(chi, "select count() from system.clusters WHERE cluster='default' AND port=9440;", port=9440, user='default', pwd='test123')
+        # 2 nodes are configured
         assert "2" == out
 
     shell("rm -f clickhouse-cert.pem clickhouse-key.pem")

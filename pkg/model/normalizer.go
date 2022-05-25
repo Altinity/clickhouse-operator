@@ -162,6 +162,7 @@ func (n *Normalizer) finalizeCHI() {
 	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		hostTemplate := n.getHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
+		n.createHostEnv(host)
 		return nil
 	})
 	n.fillCHIAddressInfo()
@@ -244,6 +245,11 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 	if !host.Secure {
 		host.Secure = template.Spec.Secure
 	}
+
+	if host.Username == "" {
+		host.Username = template.Spec.Username
+	}
+	host.Password = host.Password.MergeFrom(template.Spec.Password)
 
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
@@ -1147,6 +1153,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
 	n.createHostsField(cluster)
+	n.createClusterSecretEnv(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	cluster.WalkShards(func(index int, shard *chiV1.ChiShard) error {
@@ -1406,6 +1413,60 @@ func (n *Normalizer) normalizeReplicaHosts(replica *chiV1.ChiReplica, cluster *c
 	}
 }
 
+const interNodePasswordEnvName = "CLICKHOUSE_INTERNODE_PASSWORD"
+
+func (n *Normalizer) createHostEnv(host *chiV1.ChiHost) {
+	if host.Password != nil {
+		if host.Password.Value != "" {
+			return
+		}
+
+		for _, envVar := range n.chi.Attributes.ExchangeEnv {
+			if envVar.Name == interNodePasswordEnvName {
+				// Such a variable already exists
+				return
+			}
+		}
+
+		// Set the password for internode communication using an env-var instead of
+		// supplying as plaintext in the configuration.
+		envVar := corev1.EnvVar{
+			Name: interNodePasswordEnvName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: host.Password.ValueSecretKeyRef,
+			},
+		}
+		n.chi.Attributes.ExchangeEnv = append(n.chi.Attributes.ExchangeEnv, envVar)
+	}
+}
+
+const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
+
+func (n *Normalizer) createClusterSecretEnv(cluster *chiV1.ChiCluster) {
+	if cluster.Secret != nil {
+		if cluster.Secret.Value != "" {
+			return
+		}
+
+		for _, envVar := range n.chi.Attributes.ExchangeEnv {
+			if envVar.Name == internodeClusterSecretEnvName {
+				// Such a variable already exists
+				return
+			}
+		}
+
+		// Set the password for internode communication using an env-var instead of
+		// supplying as plaintext in the configuration.
+		envVar := corev1.EnvVar{
+			Name: internodeClusterSecretEnvName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: cluster.Secret.ValueSecretKeyRef,
+			},
+		}
+		n.chi.Attributes.ExchangeEnv = append(n.chi.Attributes.ExchangeEnv, envVar)
+	}
+}
+
 // normalizeHost normalizes a host/replica
 func (n *Normalizer) normalizeHost(
 	host *chiV1.ChiHost,
@@ -1417,6 +1478,7 @@ func (n *Normalizer) normalizeHost(
 ) {
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	n.normalizeHostPorts(host)
+	n.createHostEnv(host)
 	// Inherit from either Shard or Replica
 	var s *chiV1.ChiShard
 	var r *chiV1.ChiReplica

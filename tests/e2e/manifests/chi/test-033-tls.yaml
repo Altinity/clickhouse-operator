@@ -63,6 +63,8 @@ spec:
     zookeeper:
       nodes:
       - host: zookeeper
+    users:
+      default/password: test123
   defaults:
     templates:
       hostTemplate: host-template
@@ -76,6 +78,15 @@ spec:
         interserverHTTPPort: 9010
         secure: true
         tcpPort: 9440
+        username: default
+        password:
+          value: test123
+          # Can also specify a k8s secret with the password, and the key within
+          # it containing the password
+          # valueFrom:
+          #   secretKeyRef:
+          #     name: some-secret
+          #     key: clickhouse-password
     podTemplates:
     - name: pod-template
       spec:

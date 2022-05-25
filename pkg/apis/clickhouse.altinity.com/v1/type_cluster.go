@@ -14,6 +14,8 @@
 
 package v1
 
+import corev1 "k8s.io/api/core/v1"
+
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
 	Name      string              `json:"name,omitempty"      yaml:"name,omitempty"`
@@ -22,6 +24,7 @@ type ChiCluster struct {
 	Files     *Settings           `json:"files,omitempty"     yaml:"files,omitempty"`
 	Templates *ChiTemplateNames   `json:"templates,omitempty" yaml:"templates,omitempty"`
 	Layout    *ChiClusterLayout   `json:"layout,omitempty"    yaml:"layout,omitempty"`
+	Secret    *ClusterSecret      `json:"secret,omitempty"    yaml:"secret,omitempty"`
 
 	// Internal data
 	Address ChiClusterAddress       `json:"-" yaml:"-"`
@@ -51,6 +54,12 @@ type ChiClusterLayout struct {
 	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
 	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
 	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+// ClusterSecret defines the shared secret to for nodes to authenticate each other with
+type ClusterSecret struct {
+	Value             string                    `json:"value,omitempty"             yaml:"value,omitempty"`
+	ValueSecretKeyRef *corev1.SecretKeySelector `json:"valueSecretKeyRef,omitempty" yaml:"valueSecretKeyRef,omitempty"`
 }
 
 // NewChiClusterLayout creates new cluster layout

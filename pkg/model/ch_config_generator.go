@@ -291,6 +291,15 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		// <my_cluster_name>
 		util.Iline(b, 8, "<%s>", cluster.Name)
 
+		// <secret>VALUE</secret>
+		if cluster.Secret != nil {
+			if cluster.Secret.Value != "" {
+				util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret)
+			} else if cluster.Secret.ValueSecretKeyRef != nil {
+				util.Iline(b, 12, `<secret from_env="%s" />`, internodeClusterSecretEnvName)
+			}
+		}
+
 		// Build each shard XML
 		cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
 			if c.ShardHostsNum(shard, options) < 1 {
@@ -319,6 +328,16 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 					util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
 					if host.Secure {
 						util.Iline(b, 16, "    <secure>1</secure>")
+					}
+					if host.Username != "" {
+						util.Iline(b, 16, "    <user>%s</user>", host.Username)
+					}
+					if host.Password != nil {
+						if host.Password.Value != "" {
+							util.Iline(b, 16, "    <password>%s</password>", host.Password.Value)
+						} else if host.Password.ValueSecretKeyRef != nil {
+							util.Iline(b, 16, `    <password from_env="%s" />`, interNodePasswordEnvName)
+						}
 					}
 					util.Iline(b, 16, "</replica>")
 				}
@@ -363,6 +382,16 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 				if host.Secure {
 					util.Iline(b, 16, "    <secure>1</secure>")
 				}
+				if host.Username != "" {
+					util.Iline(b, 16, "    <user>%s</user>", host.Username)
+				}
+				if host.Password != nil {
+					if host.Password.Value != "" {
+						util.Iline(b, 16, "    <password>%s</password>", host.Password.Value)
+					} else if host.Password.ValueSecretKeyRef != nil {
+						util.Iline(b, 16, `    <password from_env="%s" />`, interNodePasswordEnvName)
+					}
+				}
 				util.Iline(b, 16, "</replica>")
 			}
 			return nil
@@ -394,6 +423,16 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
 				if host.Secure {
 					util.Iline(b, 16, "    <secure>1</secure>")
+				}
+				if host.Username != "" {
+					util.Iline(b, 16, "    <user>%s</user>", host.Username)
+				}
+				if host.Password != nil {
+					if host.Password.Value != "" {
+						util.Iline(b, 16, "    <password>%s</password>", host.Password.Value)
+					} else if host.Password.ValueSecretKeyRef != nil {
+						util.Iline(b, 16, `    <password from_env="%s" />`, interNodePasswordEnvName)
+					}
 				}
 				util.Iline(b, 16, "</replica>")
 
