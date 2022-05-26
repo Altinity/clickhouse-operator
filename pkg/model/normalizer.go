@@ -969,11 +969,13 @@ func (n *Normalizer) normalizeUsersList(users *chiV1.Settings, extra ...string) 
 		tags := strings.Split(path, "/")
 
 		// Basic sanity check - need to have at least "username/something" pair
+		// This "something" part is not used, it just has to be
 		if len(tags) < 2 {
 			// Skip incorrect entry
 			return
 		}
 
+		// Register username
 		username := tags[0]
 		usernameMap[username] = true
 	})
@@ -1002,7 +1004,9 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 	}
 	users.Normalize()
 
-	// Add special "default" user to the list of users, which is required in order to secure host_regexp
+	// Add special "default" user to the list of users, which is used/required for:
+	// 1. ClickHouse hosts to communicate with each other
+	// 2. Specify host_regexp for default user as "allowed hosts to visit from"
 	usernames := n.normalizeUsersList(users, defaultUsername)
 
 	// Normalize each user in the list of users
@@ -1038,6 +1042,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 
 		// Than goes password_sha256_hex, thus keep it only
 		if users.Has(username + "/password_sha256_hex") {
+			users.Delete(username + "/password_double_sha1_hex")
 			users.Delete(username + "/password")
 			continue // move to the next user
 		}
@@ -1065,13 +1070,16 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 			// Replace plaintext password with encrypted
 			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
 			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+			// And keep it only
+			users.Delete(username + "/password_double_sha1_hex")
 			users.Delete(username + "/password")
 		}
 	}
 
 	if users.Has(defaultUsername+"/password_double_sha1_hex") || users.Has(defaultUsername+"/password_sha256_hex") {
 		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
-		// Set remove password flag for "default" user that is empty in stock ClickHouse users.xml
+		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
+		// thus we need to overwrite it.
 		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 
