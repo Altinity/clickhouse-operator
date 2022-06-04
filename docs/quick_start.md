@@ -177,7 +177,7 @@ ClickHouse is up and running!
 
 ## Connect to ClickHouse Database
 
-There are two ways to connect to ClickHouse database
+There are several ways to connect to ClickHouse database
 
 1. In case previous command `kubectl get service -n test-clickhouse-operator` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
@@ -188,9 +188,19 @@ ClickHouse client version 18.14.12.
 Connecting to abc-123.us-east-1.elb.amazonaws.com:9000.
 Connected to ClickHouse server version 19.4.3 revision 54416.
 ``` 
-1. In case there is not **EXTERNAL-IP** available, we can access ClickHouse from inside Kubernetes cluster
+2. In case there is not **EXTERNAL-IP** available, we can access ClickHouse from inside Kubernetes cluster
 ```bash
 kubectl -n test-clickhouse-operator exec -it chi-b3d29f-a242-0-0-0 -- clickhouse-client
+```
+```text
+ClickHouse client version 19.4.3.11.
+Connecting to localhost:9000 as user default.
+Connected to ClickHouse server version 19.4.3 revision 54416.
+```
+3. If we have a clickhouse client installed locally we can also use port forwarding
+```bash
+kubectl -n test-clickhouse-operator port-forward chi-b3d29f-a242-0-0-0 9000:9000 &
+clickhouse-client
 ```
 ```text
 ClickHouse client version 19.4.3.11.
