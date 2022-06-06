@@ -6,7 +6,7 @@ echo "External value for \$VALIDATE_YAML=$VALIDATE_YAML"
 
 export PROMETHEUS_NAMESPACE="${PROMETHEUS_NAMESPACE:-prometheus}"
 export OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-kube-system}"
-export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-release-0.50}"
+export PROMETHEUS_OPERATOR_BRANCH="${PROMETHEUS_OPERATOR_BRANCH:-v0.57.0}"
 export ALERT_MANAGER_EXTERNAL_URL="${ALERT_MANAGER_EXTERNAL_URL:-http://localhost:9093}"
 # Possible values for "validate yaml" are values from --validate=XXX kubectl option. They are true/false ATM
 export VALIDATE_YAML="${VALIDATE_YAML:-true}"
@@ -31,12 +31,12 @@ kubectl create namespace "${PROMETHEUS_NAMESPACE}" || true
 BASE_PATH="https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}"
 
 echo "Setup prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace."
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f  <( \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f  <( \
     wget -qO- "${BASE_PATH}"/bundle.yaml | \
     sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
 )
 
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f  <( \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f  <( \
     wget -qO- "${BASE_PATH}"/bundle.yaml | \
     sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" | \
     yq -M eval '. | select(.kind == "Deployment") | .spec.template.spec.containers[0].imagePullPolicy = "IfNotPresent" ' - \
@@ -44,17 +44,17 @@ kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}
 
 echo "Setup RBAC"
 RBAC_PATH="${BASE_PATH}/example/rbac/prometheus"
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f <( \
     wget -qO- "${RBAC_PATH}"/prometheus-cluster-role-binding.yaml | \
     sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
 )
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f \
     "${RBAC_PATH}"/prometheus-cluster-role.yaml
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f \
     "${RBAC_PATH}"/prometheus-service-account.yaml
 
 echo "Setup Prometheus instance via prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace"
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --validate="${VALIDATE_YAML}" -f <( \
+kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f <( \
     envsubst < "${CUR_DIR}/prometheus-template.yaml" \
 )
 
