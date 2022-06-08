@@ -54,7 +54,7 @@ func (shard *ChiShard) WalkHosts(f func(host *ChiHost) error) []error {
 // FirstHost finds first host in the shard
 func (shard *ChiShard) FirstHost() *ChiHost {
 	var result *ChiHost
-	cluster.WalkHosts(func(host *ChiHost) error {
+	shard.WalkHosts(func(host *ChiHost) error {
 		if result == nil {
 			result = host
 		}
