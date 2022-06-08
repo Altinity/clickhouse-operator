@@ -383,13 +383,9 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstalla
 		func(shard *chiv1.ChiShard) {
 		},
 		func(host *chiv1.ChiHost) {
-			var name string
 			var run *chiv1.ChiHost
-			if cluster := host.GetCluster(); cluster != nil {
-				name = cluster.Name
-			}
-			if cluster := chi.FindCluster(name); cluster != nil {
-				run = cluster.FirstHost()
+			if shard := host.GetShard(); shard != nil {
+				run = shard.FirstHost()
 			}
 
 			_ = w.dropReplica(ctx, run, host)
