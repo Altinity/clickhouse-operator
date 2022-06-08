@@ -115,7 +115,7 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
-	    SELECT 
+	    SELECT
 	        DISTINCT name,
 	        concat('DROP DICTIONARY IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 	    FROM
@@ -123,12 +123,12 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 	    WHERE database != ''
 	    UNION ALL
 		SELECT
-			DISTINCT name, 
+			DISTINCT name,
 			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
-			database NOT IN (%s) AND 
+			database NOT IN (%s) AND
 			(engine like 'Replicated%%' OR engine like '%%View%%')
 		`,
 		ignoredDBs,
@@ -142,7 +142,7 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 func (s *Schemer) getSyncTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	sql := heredoc.Doc(`
 		SELECT
-			DISTINCT name, 
+			DISTINCT name,
 			concat('SYSTEM SYNC REPLICA "', database, '"."', name, '"') AS sync_table_query
 		FROM
 			system.tables
@@ -166,7 +166,7 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
-	log.V(1).M(hostToRun).F().Info("Drop replica: %v", CreateReplicaHostname(hostToDrop))
+	log.V(1).M(hostToRun).F().Info("Drop replica: %v at %v", CreateReplicaHostname(hostToDrop), hostToRun)
 	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
 }
 
@@ -277,7 +277,7 @@ func createDatabaseDistributed(cluster string) string {
 			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine AS create_db_query
 		FROM (
 			SELECT
-				* 
+				*
 			FROM
 				clusterAllReplicas('%s', system.databases) databases
 			SETTINGS skip_unavailable_shards = 1
@@ -290,7 +290,7 @@ func createDatabaseDistributed(cluster string) string {
 			WHERE
 				engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
-		) 
+		)
 		`,
 		cluster,
 		cluster,
@@ -300,11 +300,11 @@ func createDatabaseDistributed(cluster string) string {
 func createTableDistributed(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
-			DISTINCT concat(database, '.', name) AS name, 
+			DISTINCT concat(database, '.', name) AS name,
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
-		FROM 
+		FROM
 		(
-			SELECT 
+			SELECT
 				database,
 				name,
 				create_table_query,
@@ -315,23 +315,23 @@ func createTableDistributed(cluster string) string {
 				engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
-			SELECT 
-				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database, 
+			SELECT
+				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database,
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
 				t.create_table_query,
 				1 AS order
 			FROM
 				clusterAllReplicas('%s', system.tables) tables
-				LEFT JOIN 
+				LEFT JOIN
 				(
-					SELECT 
-						DISTINCT database, 
-						name, 
-						create_table_query 
+					SELECT
+						DISTINCT database,
+						name,
+						create_table_query
 					FROM
 						clusterAllReplicas('%s', system.tables)
 					SETTINGS skip_unavailable_shards = 1, show_table_uuid_in_table_create_query_if_not_nil=1
-				) t 
+				) t
 				USING (database, name)
 			WHERE
 				engine = 'Distributed' AND t.create_table_query != ''
