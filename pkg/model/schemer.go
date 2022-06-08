@@ -166,7 +166,7 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
-	log.V(1).M(hostToRun).F().Info("Drop replica: %v at %v", CreateReplicaHostname(hostToDrop), hostToRun)
+	log.V(1).M(hostToRun).F().Info("Drop replica: %v at %v", CreateReplicaHostname(hostToDrop), hostToRun.Address.HostName)
 	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
 }
 
