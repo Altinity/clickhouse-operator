@@ -769,6 +769,7 @@ def test_014(self):
     manifest = "manifests/chi/test-014-replication-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
+    shards = [0,1]
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -825,23 +826,9 @@ def test_014(self):
             clickhouse.query(chi, f"INSERT INTO {table} values(0)", host=f"chi-{chi}-{cluster}-0-0")
             clickhouse.query(chi, f"INSERT INTO {table} values(1)", host=f"chi-{chi}-{cluster}-1-0")
 
-    with When("Add more replicas"):
-        kubectl.create_and_check(
-            manifest="manifests/chi/test-014-replication-2.yaml",
-            check={
-                "pod_count": 6,
-                "do_not_delete": 1,
-            },
-            timeout=600,
-        )
-        # Give some time for replication to catch up
-        time.sleep(10)
-
-        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        assert start_time == new_start_time
-
+    def check_schema_propagation(replicas):
         with Then("Schema objects should be migrated to the new replicas"):
-            for replica in [1, 2]:
+            for replica in replicas:
                 host = f"chi-{chi}-{cluster}-0-{replica}"
                 print(f"Checking replica {host}")
                 print("Checking tables and views")
@@ -867,13 +854,30 @@ def test_014(self):
                 assert out == "Atomic"
 
         with And("Replicated table should have the data"):
-            for table in replicated_tables:
-                out = clickhouse.query(chi, f"SELECT a FROM {table}", host=f"chi-{chi}-{cluster}-0-2")
-                assert out == "0"
-                out = clickhouse.query(chi, f"SELECT a FROM {table}", host=f"chi-{chi}-{cluster}-1-2")
-                assert out == "1"
-                print(f"{table} is ok")
-                
+            for replica in replicas:
+                for shard in shards:
+                    for table in replicated_tables:
+                        out = clickhouse.query(chi, f"SELECT a FROM {table} where a = {shard}", host=f"chi-{chi}-{cluster}-{shard}-{replica}")
+                        assert out == f"{shard}"
+                        print(f"{table} is ok")
+
+    with When("Add more replicas"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-014-replication-3.yaml",
+            check={
+                "pod_count": 6,
+                "do_not_delete": 1,
+            },
+            timeout=600,
+        )
+        # Give some time for replication to catch up
+        time.sleep(10)
+
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time == new_start_time
+
+        check_schema_propagation([1,2])
+
     with When("Remove replicas"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -886,10 +890,12 @@ def test_014(self):
         assert start_time == new_start_time
 
         with Then("Replica needs to be removed from the Keeper as well"):
-            for table in replicated_tables:
-                out = clickhouse.query(chi, f"SELECT total_replicas FROM system.replicas WHERE concat(database, '.', table) = '{table}'")
-                note(f"Found {out} total replicas of {table}")
-                assert out == "1"
+            for shard in shards:
+                for table in replicated_tables:
+                    out = clickhouse.query(chi, f"SELECT total_replicas FROM system.replicas WHERE concat(database, '.', table) = '{table}'",
+                                            host=f"chi-{chi}-{cluster}-{shard}-0")
+                    note(f"Found {out} total replicas of {table} at shard {shard}")
+                    assert out == "1"
 
     with When("Restart keeper pod"):
         with Then("Delete Zookeeper pod"):
@@ -910,6 +916,19 @@ def test_014(self):
 
         with Then("Table should be back to normal"):
             clickhouse.query(chi, "INSERT INTO test_local_014 VALUES(3)")
+
+    with When("Add replica one more time"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-014-replication-2.yaml",
+            check={
+                "pod_count": 4,
+                "do_not_delete": 1,
+            },
+            timeout=600,
+        )
+        # Give some time for replication to catch up
+        time.sleep(10)
+        check_schema_propagation([1])
 
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
@@ -2083,7 +2102,7 @@ def test_032(self):
         },
         timeout=600,
     )
-    
+
     kubectl.wait_jsonpath("pod", "chi-test-032-rescaling-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                           ns=kubectl.namespace)
     kubectl.launch(f'run clickhouse-test-032-client --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c "sleep 3600"')
@@ -2091,7 +2110,7 @@ def test_032(self):
         with attempt:
             kubectl.wait_jsonpath("pod", "clickhouse-test-032-client", "{.status.containerStatuses[0].ready}", "true",
                                 ns=kubectl.namespace)
-        
+
     numbers = "100000000"
 
     with Given("Create replicated table and populate it"):
@@ -2103,13 +2122,13 @@ def test_032(self):
         with By("executing query in the clickhouse installation"):
                 cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_local", with_error=True)
         with Then("checking expected result"):
-            assert cnt_test_local == '100000000', error()   
+            assert cnt_test_local == '100000000', error()
 
     trigger_event = threading.Event()
 
     Check("run select query until receive stop event",
-        test=run_select_query, 
-        parallel=True)(            
+        test=run_select_query,
+        parallel=True)(
             client_pod = "clickhouse-test-032-client",
             user_name = "test_032",
             password = "test_032",
