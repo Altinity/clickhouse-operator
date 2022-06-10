@@ -327,7 +327,8 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
-	if (time.Since(w.start) < 1*time.Minute) && (new.Generation == new.Status.Generation) {
+	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_IP)
+	if (time.Since(w.start) < 1*time.Minute) && (new.Generation == new.Status.Generation) && (ip == new.Status.CHOpIP) {
 		// First minute after restart do not reconcile already reconciled generations
 		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
 		return nil
@@ -824,6 +825,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiv1.ChiHo
 		w.ctx.registryReconciled.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
 	} else {
 		w.ctx.registryFailed.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
+		if err == errIgnore {
+			err = nil
+		}
 	}
 	return err
 }

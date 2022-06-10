@@ -967,13 +967,13 @@ func parseSecretFieldAddress(users *chiV1.Settings, username, userSettingsK8SSec
 		key = tags[2]
 	default:
 		// Skip incorrect entry
-		log.V(1).Warning("unable to parse secret field address: %s", secretFieldAddress)
+		log.V(1).Warning("unable to parse secret field address: '%s'", secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
 	// Sanity check
 	if (namespace == "") || (name == "") || (key == "") {
-		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: %s", secretFieldAddress)
+		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s'", secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
@@ -1027,7 +1027,9 @@ func (n *Normalizer) normalizeUsersList(users *chiV1.Settings, extra ...string) 
 
 	// Add extra users
 	for _, username := range extra {
-		usernameMap[username] = true
+		if username != "" {
+			usernameMap[username] = true
+		}
 	}
 
 	// Make sorted list of unique usernames
@@ -1049,10 +1051,14 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 	}
 	users.Normalize()
 
+	chopUsername := chop.Config().ClickHouse.Access.Username
+
 	// Add special "default" user to the list of users, which is used/required for:
 	// 1. ClickHouse hosts to communicate with each other
 	// 2. Specify host_regexp for default user as "allowed hosts to visit from"
-	usernames := n.normalizeUsersList(users, defaultUsername)
+	// Add special "chop" user to the list of users, which is used/required for:
+	// 1. Operator to communicate with hosts
+	usernames := n.normalizeUsersList(users, defaultUsername, chopUsername)
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
@@ -1067,12 +1073,20 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		quota := chop.Config().ClickHouse.Config.User.Default.Quota
 		ips := chop.Config().ClickHouse.Config.User.Default.NetworksIP
 		regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
-		// User `default` may have special opts
-		if username == defaultUsername {
+		// Some users may have special options
+		switch username {
+		case defaultUsername:
 			ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
 			if !n.ctx.options.DefaultUserInsertHostRegex {
 				regexp = ""
 			}
+		case chopUsername:
+			ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
+
+			profile = ""
+			quota = ""
+			ips = []string{ip}
+			regexp = ""
 		}
 		// Ensure required values aer in place and apply non-empty values in case no own value(s) provided
 		if profile != "" {
@@ -1088,7 +1102,14 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 			users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(regexp))
 		}
 
+		//
 		// Deal with passwords
+		//
+
+		// CHOp user does not handle password here
+		if username == chopUsername {
+			continue // move to the next user
+		}
 
 		// Values from the secret have higher priority
 		n.substWithSecretField(users, username, "password", "k8s_secret_password")
