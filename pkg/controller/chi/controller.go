@@ -240,6 +240,77 @@ func (c *Controller) addEventHandlersService(
 	})
 }
 
+func normalizeEndpoints(e *core.Endpoints) *core.Endpoints {
+	if e == nil {
+		e = &core.Endpoints{}
+	}
+	if len(e.Subsets) == 0 {
+		e.Subsets = []core.EndpointSubset{
+			{},
+		}
+	}
+	if len(e.Subsets[0].Addresses) == 0 {
+		e.Subsets[0].Addresses = []core.EndpointAddress{
+			{},
+		}
+	}
+	e.Subsets[0].Addresses[0].TargetRef = nil
+	return e
+}
+
+func checkIP(path *messagediff.Path, iValue interface{}) bool {
+	for _, pathNode := range *path {
+		// .String() function adds "." in front of the pathNode
+		// So it would be ".IP" for pathNode "IPs"
+		s := pathNode.String()
+		if s == ".IP" {
+			if typed, ok := iValue.(string); ok {
+				if typed != "" {
+					// Have IP address assigned|modified
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func updated(old, new *core.Endpoints) bool {
+	oldSubsets := normalizeEndpoints(old).Subsets
+	newSubsets := normalizeEndpoints(new).Subsets
+
+	diff, equal := messagediff.DeepDiff(oldSubsets[0].Addresses, newSubsets[0].Addresses)
+	if equal {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: no changes found")
+		// No need to react
+		return false
+	}
+
+	assigned := false
+	for path, iValue := range diff.Added {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: added %v", path)
+		if address, ok := iValue.(core.EndpointAddress); ok {
+			if address.IP != "" {
+				assigned = true
+			}
+		}
+	}
+	for path, _ := range diff.Removed {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: removed %v", path)
+	}
+	for path, iValue := range diff.Modified {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: modified %v", path)
+		assigned = assigned || checkIP(path, iValue)
+	}
+
+	if assigned {
+		log.V(1).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED %v", new.Subsets)
+		return true
+	}
+
+	return false
+}
+
 func (c *Controller) addEventHandlersEndpoint(
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
 ) {
@@ -249,7 +320,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(3).M(endpoints).Info("endpointsInformer.AddFunc")
+			log.V(2).M(endpoints).Info("endpointsInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
@@ -257,33 +328,9 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&oldEndpoints.ObjectMeta) {
 				return
 			}
-
-			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
-			if equal {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: no changes found")
-				// No need to react
-				return
-			}
-
-			added := false
-			for path := range diff.Added {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: added %v", path)
-				for _, pathnode := range *path {
-					s := pathnode.String()
-					if s == ".Addresses" {
-						added = true
-					}
-				}
-			}
-			for path := range diff.Removed {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: removed %v", path)
-			}
-			for path := range diff.Modified {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: modified %v", path)
-			}
-
-			if added {
-				log.V(1).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: IP ASSIGNED %v", newEndpoints.Subsets)
+			log.V(2).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
+			if updated(oldEndpoints, newEndpoints) {
+				c.enqueueObject(NewReconcileEndpoints(reconcileUpdate, oldEndpoints, newEndpoints))
 				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
@@ -292,7 +339,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
+			log.V(2).M(endpoints).Info("endpointsInformer.DeleteFunc")
 		},
 	})
 }
@@ -535,6 +582,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 	case
 		*ReconcileCHIT,
 		*ReconcileChopConfig,
+		*ReconcileEndpoints,
 		*DropDns:
 		variants := chi.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
