@@ -83,13 +83,6 @@ spec:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
           image: "docker.io/zookeeper:3.8.0"
-          resources:
-            requests:
-              memory: "128M"
-              cpu: "1"
-            limits:
-              memory: "1Gi"
-              cpu: "2"
           ports:
             - containerPort: 2181
               name: client
