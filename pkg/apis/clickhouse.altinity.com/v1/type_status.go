@@ -19,6 +19,7 @@ type ChiStatus struct {
 	CHOpVersion       string                  `json:"chop-version,omitempty"     yaml:"chop-version,omitempty"`
 	CHOpCommit        string                  `json:"chop-commit,omitempty"      yaml:"chop-commit,omitempty"`
 	CHOpDate          string                  `json:"chop-date,omitempty"        yaml:"chop-date,omitempty"`
+	CHOpIP            string                  `json:"chop-ip,omitempty"          yaml:"chop-ip,omitempty"`
 	ClustersCount     int                     `json:"clusters"                   yaml:"clusters"`
 	ShardsCount       int                     `json:"shards"                     yaml:"shards"`
 	ReplicasCount     int                     `json:"replicas"                   yaml:"replicas"`
