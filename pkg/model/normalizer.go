@@ -950,18 +950,22 @@ var (
 // parseSecretFieldAddress parses address into namespace, name, key triple
 func parseSecretFieldAddress(users *chiV1.Settings, username, userSettingsK8SSecretField string) (string, string, string, error) {
 	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	// Sanity check. In case secretFieldAddress not specified nothing to do here
+	if secretFieldAddress == "" {
+		return "", "", "", ErrSecretFieldNotFound
+	}
 
 	// Extract secret's namespace and name and then field name within the secret,
 	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted in the settings
 	var namespace, name, key string
 	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
 	case 2:
-		// Assume namespace is omitted
+		// Assume namespace is omitted. Expect to have name/key pair
 		namespace = chop.Config().Runtime.Namespace
 		name = tags[0]
 		key = tags[1]
 	case 3:
-		// All components are in place
+		// All components are in place. Expect to have namespace/name/key triple
 		namespace = tags[0]
 		name = tags[1]
 		key = tags[2]
