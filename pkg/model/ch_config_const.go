@@ -74,7 +74,7 @@ const (
 	defaultBusyBoxDockerImage = "busybox"
 
 	// defaultUbiDockerImage specifies default ubi docker image to be used
-	defaultUbiDockerImage = "ubi-minimal"
+	defaultUbiDockerImage = "redhat/ubi8-minimal"
 
 	// Name of container within Pod with ClickHouse instance.
 	// Pod may have other containers included, such as monitoring, logging
