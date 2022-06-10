@@ -119,6 +119,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -1453,6 +1456,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -3626,7 +3632,9 @@ data:
 # NAMESPACE=${OPERATOR_NAMESPACE}
 # COMMENT=
 # OPERATOR_IMAGE=${OPERATOR_IMAGE}
+# OPERATOR_IMAGE_PULL_POLICY=${OPERATOR_IMAGE_PULL_POLICY}
 # METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE}
+# METRICS_EXPORTER_IMAGE_PULL_POLICY=${METRICS_EXPORTER_IMAGE_PULL_POLICY}
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3671,7 +3679,7 @@ spec:
       containers:
         - name: clickhouse-operator
           image: ${OPERATOR_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: ${OPERATOR_IMAGE_PULL_POLICY}
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
@@ -3736,7 +3744,7 @@ spec:
 
         - name: metrics-exporter
           image: ${METRICS_EXPORTER_IMAGE}
-          imagePullPolicy: Always
+          imagePullPolicy: ${METRICS_EXPORTER_IMAGE_PULL_POLICY}
           volumeMounts:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
