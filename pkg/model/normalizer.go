@@ -949,7 +949,9 @@ var (
 
 // parseSecretFieldAddress parses address into namespace, name, key triple
 func parseSecretFieldAddress(users *chiV1.Settings, username, userSettingsK8SSecretField string) (string, string, string, error) {
-	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	settingsPath := username + "/" + userSettingsK8SSecretField
+	secretFieldAddress := users.Get(settingsPath).String()
+
 	// Sanity check. In case secretFieldAddress not specified nothing to do here
 	if secretFieldAddress == "" {
 		return "", "", "", ErrSecretFieldNotFound
@@ -971,13 +973,13 @@ func parseSecretFieldAddress(users *chiV1.Settings, username, userSettingsK8SSec
 		key = tags[2]
 	default:
 		// Skip incorrect entry
-		log.V(1).Warning("unable to parse secret field address: '%s'", secretFieldAddress)
+		log.V(1).Warning("unable to parse secret field address: '%s:%s'", settingsPath, secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
 	// Sanity check
 	if (namespace == "") || (name == "") || (key == "") {
-		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s'", secretFieldAddress)
+		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s:%s'", settingsPath, secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
