@@ -20,8 +20,8 @@ xfails = {
     "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
         (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465")
     ],
-    "/regression/e2e.test_keeper/test_zookeeper_operator_probes_workload*": [
-        (Fail, "zookeeper liveness probe doesn't work, don't know root reason")
+    "/regression/e2e.test_keeper/test_clickhouse_keeper_probes_workload*": [
+        (Fail, "clickhouse-keeper fail after insert 10000 parts")
     ],
 
 }
