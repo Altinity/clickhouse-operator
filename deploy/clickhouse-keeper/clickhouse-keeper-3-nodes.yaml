@@ -162,7 +162,11 @@ spec:
                 echo "</keeper_server></yandex>"
               } > /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml &&
               cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml && 
-              clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
+              if [[ "1" == "$MY_ID" ]]; then
+                clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml --force-recovery
+              else
+                clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
+              fi
           readinessProbe:
             tcpSocket:
               port: 9444
