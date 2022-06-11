@@ -126,6 +126,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -1460,6 +1463,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -3633,7 +3639,9 @@ data:
 # NAMESPACE=${namespace}
 # COMMENT=
 # OPERATOR_IMAGE=altinity/clickhouse-operator:0.19.0
+# OPERATOR_IMAGE_PULL_POLICY=Always
 # METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.19.0
+# METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace

@@ -107,7 +107,7 @@ type namer struct {
 	ctx namerContext
 }
 
-// newNamer
+// newNamer creates new namer with specified context
 func newNamer(ctx namerContext) *namer {
 	return &namer{
 		ctx: ctx,
@@ -589,7 +589,9 @@ func CreateStatefulSetServiceName(host *chop.ChiHost) string {
 	return macro(host).Line(pattern)
 }
 
-// CreatePodHostname returns a name of a Pod of a ClickHouse instance
+// CreatePodHostname returns a hostname of a Pod of a ClickHouse instance.
+// Is supposed to be used where network connection to a Pod is required.
+// NB: right now Pod's hostname points to a Service, through which Pod can be accessed.
 func CreatePodHostname(host *chop.ChiHost) string {
 	// Do not use Pod own hostname - point to appropriate StatefulSet's Service
 	return CreateStatefulSetServiceName(host)
@@ -618,8 +620,7 @@ func createPodFQDN(host *chop.ChiHost) string {
 }
 
 // createPodFQDNsOfCluster creates fully qualified domain names of all pods in a cluster
-func createPodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
-	fqdns := make([]string, 0)
+func createPodFQDNsOfCluster(cluster *chop.ChiCluster) (fqdns []string) {
 	cluster.WalkHosts(func(host *chop.ChiHost) error {
 		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
@@ -628,8 +629,7 @@ func createPodFQDNsOfCluster(cluster *chop.ChiCluster) []string {
 }
 
 // createPodFQDNsOfShard creates fully qualified domain names of all pods in a shard
-func createPodFQDNsOfShard(shard *chop.ChiShard) []string {
-	fqdns := make([]string, 0)
+func createPodFQDNsOfShard(shard *chop.ChiShard) (fqdns []string) {
 	shard.WalkHosts(func(host *chop.ChiHost) error {
 		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
@@ -638,8 +638,7 @@ func createPodFQDNsOfShard(shard *chop.ChiShard) []string {
 }
 
 // createPodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
-func createPodFQDNsOfCHI(chi *chop.ClickHouseInstallation) []string {
-	fqdns := make([]string, 0)
+func createPodFQDNsOfCHI(chi *chop.ClickHouseInstallation) (fqdns []string) {
 	chi.WalkHosts(func(host *chop.ChiHost) error {
 		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
@@ -683,10 +682,10 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 	return nil
 }
 
-// CreatePodRegexp creates pod regexp
-// template is defined in operator config:
-// CHConfigNetworksHostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
-func CreatePodRegexp(chi *chop.ClickHouseInstallation, template string) string {
+// CreatePodHostnameRegexp creates pod hostname regexp.
+// For example, `template` can be defined in operator config:
+// HostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
+func CreatePodHostnameRegexp(chi *chop.ClickHouseInstallation, template string) string {
 	return macro(chi).Line(template)
 }
 
@@ -701,6 +700,53 @@ func CreatePodName(obj interface{}) string {
 		return fmt.Sprintf(podNamePattern, CreateStatefulSetName(host))
 	}
 	return "unknown-type"
+}
+
+// CreatePodNames is a wrapper over set of create pod names functions
+// obj specifies source object to create names from
+func CreatePodNames(obj interface{}) []string {
+	switch typed := obj.(type) {
+	case *chop.ClickHouseInstallation:
+		return createPodNamesOfCHI(typed)
+	case *chop.ChiCluster:
+		return createPodNamesOfCluster(typed)
+	case *chop.ChiShard:
+		return createPodNamesOfShard(typed)
+	case
+		*chop.ChiHost,
+		*apps.StatefulSet:
+		return []string{
+			CreatePodName(typed),
+		}
+	}
+	return nil
+}
+
+// createPodNamesOfCluster creates pod names of all pods in a cluster
+func createPodNamesOfCluster(cluster *chop.ChiCluster) (names []string) {
+	cluster.WalkHosts(func(host *chop.ChiHost) error {
+		names = append(names, CreatePodName(host))
+		return nil
+	})
+	return names
+}
+
+// createPodNamesOfShard creates pod names of all pods in a shard
+func createPodNamesOfShard(shard *chop.ChiShard) (names []string) {
+	shard.WalkHosts(func(host *chop.ChiHost) error {
+		names = append(names, CreatePodName(host))
+		return nil
+	})
+	return names
+}
+
+// createPodNamesOfCHI creates fully qualified domain names of all pods in a CHI
+func createPodNamesOfCHI(chi *chop.ClickHouseInstallation) (names []string) {
+	chi.WalkHosts(func(host *chop.ChiHost) error {
+		names = append(names, CreatePodName(host))
+		return nil
+	})
+	return names
 }
 
 // CreatePVCName create PVC name from components, to which PVC belongs to

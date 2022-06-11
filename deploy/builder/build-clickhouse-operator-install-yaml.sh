@@ -33,7 +33,9 @@ METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:${O
 
 # Build templated installation .yaml manifest
 OPERATOR_IMAGE="\${OPERATOR_IMAGE}" \
+OPERATOR_IMAGE_PULL_POLICY="\${OPERATOR_IMAGE_PULL_POLICY}" \
 METRICS_EXPORTER_IMAGE="\${METRICS_EXPORTER_IMAGE}" \
+METRICS_EXPORTER_IMAGE_PULL_POLICY="\${METRICS_EXPORTER_IMAGE_PULL_POLICY}" \
 OPERATOR_NAMESPACE="\${OPERATOR_NAMESPACE}" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-template.yaml"
 

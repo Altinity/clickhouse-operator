@@ -403,13 +403,10 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
-// GetStatefulSetVersion gets version of the StatefulSet
+// GetObjectVersion gets version of the StatefulSet
 // TODO property of the labeler?
-func (c *Creator) GetStatefulSetVersion(statefulSet *apps.StatefulSet) (string, bool) {
-	if statefulSet == nil {
-		return "", false
-	}
-	label, ok := statefulSet.Labels[LabelObjectVersion]
+func (c *Creator) GetObjectVersion(meta metav1.ObjectMeta) (string, bool) {
+	label, ok := meta.Labels[LabelObjectVersion]
 	return label, ok
 }
 
@@ -1140,8 +1137,8 @@ func getOwnerReferences(chi *chiv1.ClickHouseInstallation) []metav1.OwnerReferen
 	block := true
 	return []metav1.OwnerReference{
 		{
-			APIVersion:         chi.APIVersion,
-			Kind:               chi.Kind,
+			APIVersion:         chiv1.SchemeGroupVersion.String(),
+			Kind:               chiv1.ClickHouseInstallationCRDResourceKind,
 			Name:               chi.Name,
 			UID:                chi.UID,
 			Controller:         &controller,
