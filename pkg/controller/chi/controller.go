@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"k8s.io/apimachinery/pkg/types"
+	"sort"
 	"time"
 
 	"gopkg.in/d4l3k/messagediff.v1"
@@ -791,9 +792,11 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 
 	if opts.ActionsErrorsOnly {
 		cur.Status.Action = chi.Status.Action
-		cur.Status.Actions = chi.Status.Actions
+		cur.Status.Actions = util.MergeStringArrays(cur.Status.Actions, chi.Status.Actions)
+		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Actions)))
 		cur.Status.Error = chi.Status.Error
-		cur.Status.Errors = chi.Status.Errors
+		cur.Status.Errors = util.MergeStringArrays(cur.Status.Errors, chi.Status.Errors)
+		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Errors)))
 	} else {
 		cur.Status = chi.Status
 	}

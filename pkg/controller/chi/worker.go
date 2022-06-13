@@ -198,7 +198,7 @@ func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.schemer.CHIDropDnsCache(ctx, chi)
 	} else {
-		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v", cmd.initiator.Labels)
+		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.Labels, err)
 	}
 	return nil
 }
@@ -291,10 +291,10 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			w.newContext(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
 		} else {
-			w.a.M(&new.ObjectMeta).F().Error("unable to find CHI by %v", new.Labels)
+			w.a.M(&new.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", new.Labels, err)
 		}
 	} else {
-		w.a.M(&new.ObjectMeta).F().Error("unable to find CHI by %v", new.Labels)
+		w.a.M(&new.ObjectMeta).F().Error("external unable to find CHI by %v err %v", new.Labels, err)
 	}
 	return nil
 }
