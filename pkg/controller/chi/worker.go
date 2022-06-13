@@ -446,7 +446,10 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstalla
 func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	(&chi.Status).ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCHIObjectStatus(ctx, chi, false)
+	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+		TolerateAbsence:   false,
+		ActionsErrorsOnly: false,
+	})
 
 	w.a.V(1).
 		WithEvent(chi, eventActionReconcile, eventReasonReconcileStarted).
@@ -459,7 +462,10 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 func (w *worker) markReconcileComplete(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
 	// Update CHI object
 	(&chi.Status).ReconcileComplete(chi)
-	_ = w.c.updateCHIObjectStatus(ctx, chi, false)
+	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+		TolerateAbsence:   false,
+		ActionsErrorsOnly: false,
+	})
 
 	w.a.V(1).
 		WithEvent(chi, eventActionReconcile, eventReasonReconcileCompleted).
@@ -1321,7 +1327,10 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 		Info("Delete CHI started")
 
 	(&chi.Status).DeleteStart()
-	if err := w.c.updateCHIObjectStatus(ctx, chi, true); err != nil {
+	if err := w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+		TolerateAbsence:   true,
+		ActionsErrorsOnly: false,
+	}); err != nil {
 		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err:%q", err)
 		return nil
 	}
@@ -1480,7 +1489,10 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	chi.Status.DeletedHostsCount++
-	_ = w.c.updateCHIObjectStatus(ctx, chi, true)
+	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+		TolerateAbsence:   true,
+		ActionsErrorsOnly: false,
+	})
 
 	if err == nil {
 		w.a.V(1).
@@ -1932,7 +1944,10 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 	err := w.c.createStatefulSet(ctx, host)
 
 	host.CHI.Status.AddedHostsCount++
-	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, false)
+	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+		TolerateAbsence:   false,
+		ActionsErrorsOnly: false,
+	})
 
 	if err == nil {
 		w.a.V(1).
@@ -2029,7 +2044,10 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 		if err == nil {
 			host.CHI.Status.UpdatedHostsCount++
-			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, false)
+			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+				TolerateAbsence:   false,
+				ActionsErrorsOnly: false,
+			})
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 				WithStatusAction(host.CHI).

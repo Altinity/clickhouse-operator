@@ -302,6 +302,9 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
-		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, true)
+		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, UpdateCHIStatusOptions{
+			TolerateAbsence:   true,
+			ActionsErrorsOnly: true,
+		})
 	}
 }

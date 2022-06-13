@@ -43,7 +43,7 @@ const (
 	priorityReconcileCHI        int = 10
 	priorityReconcileCHIT       int = 5
 	priorityReconcileChopConfig int = 3
-	priorityReconcileEndpoints  int = 7
+	priorityReconcileEndpoints  int = 15
 	priorityDropDNS             int = 7
 )
 

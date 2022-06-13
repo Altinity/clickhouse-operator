@@ -736,8 +736,32 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 	return nil
 }
 
+type UpdateCHIStatusOptions struct {
+	TolerateAbsence   bool
+	ActionsErrorsOnly bool
+}
+
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
+	for retry, attempt := true, 1; retry; attempt++ {
+		if attempt >= 5 {
+			retry = false
+		}
+
+		err = c.doUpdateCHIObjectStatus(ctx, chi, opts)
+		if err == nil {
+			return nil
+		}
+
+		if retry {
+			time.Sleep(5 * time.Second)
+		}
+	}
+	return
+}
+
+// doUpdateCHIObjectStatus updates ClickHouseInstallation object's Status
+func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, opts UpdateCHIStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -748,14 +772,14 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
-		if tolerateAbsence {
+		if opts.TolerateAbsence {
 			return nil
 		}
 		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 	if cur == nil {
-		if tolerateAbsence {
+		if opts.TolerateAbsence {
 			return nil
 		}
 		log.V(1).M(chi).F().Error("NULL returned")
@@ -764,7 +788,15 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 
 	// Update status of a real object.
 	// TODO DeepCopy depletes stack here
-	cur.Status = chi.Status
+
+	if opts.ActionsErrorsOnly {
+		cur.Status.Action = chi.Status.Action
+		cur.Status.Actions = chi.Status.Actions
+		cur.Status.Error = chi.Status.Error
+		cur.Status.Errors = chi.Status.Errors
+	} else {
+		cur.Status = chi.Status
+	}
 
 	// TODO fix this with verbosity update
 	// Start Debug object
@@ -782,8 +814,8 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 		return err
 	}
 
+	// Propagate updated ResourceVersion into chi
 	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
-		// Updated
 		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
 		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
 		return nil
