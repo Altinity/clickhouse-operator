@@ -2063,13 +2063,11 @@ def run_select_query(self, client_pod, user_name, password, trigger_event):
     try:
         self.context.shell = Shell()
         while not trigger_event.is_set():
-            with When(f"query #{i}", flags=TE):
-                with By("executing query in the client pod"):
-                    cnt_test_local = kubectl.launch(f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user_name} --password={password} -h clickhouse-test-032-rescaling  -q 'select count() from test_local' ")
-                with Then("checking expected result"):
-                    assert cnt_test_local == '100000000', error()
+            cnt_test_local = kubectl.launch(f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user_name} --password={password} -h clickhouse-test-032-rescaling  -q 'select count() from test_local' ")
+            assert cnt_test_local == '100000000', error()
             i += 1
-
+        with By(f"{i} queries have been executed during upgrade with no errors"):
+            True
     finally:
         if hasattr(self.context, "shell"):
             self.context.shell.close()
