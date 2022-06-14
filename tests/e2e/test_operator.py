@@ -370,8 +370,6 @@ def test_011(self):
             }
         )
 
-        time.sleep(60)
-
         with Then("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'")
             assert out == 'OK', f"out={out} should be 'OK'"
@@ -455,6 +453,14 @@ def test_011(self):
                 user="user4", pwd="secret"
             )
             assert 'ACCESS_DENIED' not in out
+
+        with And("User with google.com as a host filter can not login"):
+            out = clickhouse.query_with_error(
+                "test-011-insecured-cluster",
+                "select 'OK'",
+                user="user5", pwd="secret"
+            )
+            assert out != 'OK'
 
         kubectl.delete_chi("test-011-secured-cluster")
         kubectl.delete_chi("test-011-insecured-cluster")

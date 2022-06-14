@@ -23,6 +23,10 @@ spec:
       # User with access control enabled
       user4/password: secret
       user4/access_management: 1
+      # User with google.com as a host filter can not login
+      user5/password: secret
+      user5/networks/ip: "::/0"
+      user5/networks/host: www.google.com
     clusters:
     - name: default
       layout:
