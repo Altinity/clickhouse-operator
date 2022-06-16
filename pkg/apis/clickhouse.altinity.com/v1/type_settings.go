@@ -140,6 +140,18 @@ func (s *Setting) SetAttribute(name, value string) *Setting {
 	return s
 }
 
+// HasAttribute checks whether setting has specified attribute
+func (s *Setting) HasAttribute(name string) bool {
+	if s == nil {
+		return false
+	}
+	if s.attributes == nil {
+		return false
+	}
+	_, ok := s.attributes[name]
+	return ok
+}
+
 // HasAttributes checks whether setting has attributes
 func (s *Setting) HasAttributes() bool {
 	if s == nil {
@@ -192,14 +204,18 @@ func (s *Setting) MergeFrom(from *Setting) *Setting {
 	if s == nil {
 		s = NewSettingVector(from.Vector())
 		for name, value := range from.attributes {
-			s.SetAttribute(name, value)
+			if !s.HasAttribute(name) {
+				s.SetAttribute(name, value)
+			}
 		}
 		return s
 	}
 
 	s.vector = append(s.vector, from.vector...)
 	for name, value := range from.attributes {
-		s.SetAttribute(name, value)
+		if !s.HasAttribute(name) {
+			s.SetAttribute(name, value)
+		}
 	}
 
 	return s
