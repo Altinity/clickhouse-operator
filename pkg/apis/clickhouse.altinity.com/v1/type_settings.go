@@ -246,9 +246,6 @@ func (settings *Settings) Set(name string, setting *Setting) {
 	if settings == nil {
 		return
 	}
-	if settings == nil {
-		return
-	}
 	// Lazy load
 	if settings.m == nil {
 		settings.m = makeM()
