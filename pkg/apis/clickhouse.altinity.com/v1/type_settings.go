@@ -160,6 +160,51 @@ func (s *Setting) Attributes() string {
 	return a
 }
 
+// Len returns number of entries n the Setting
+func (s *Setting) Len() int {
+	if s.IsVector() {
+		return len(s.vector)
+	}
+	if s.IsScalar() {
+		return 1
+	}
+	return 0
+}
+
+// MergeFrom merges from specified source
+func (s *Setting) MergeFrom(from *Setting) *Setting {
+	// Need to have something to merge from
+	if from == nil {
+		return s
+	}
+
+	// Can merge from Vector only
+	if !from.IsVector() {
+		return s
+	}
+
+	// Reasonable to merge from non-zero vector only
+	if from.Len() < 1 {
+		return s
+	}
+
+	// In case recipient does not exist just copy values from source
+	if s == nil {
+		s = NewSettingVector(from.Vector())
+		for name, value := range from.attributes {
+			s.SetAttribute(name, value)
+		}
+		return s
+	}
+
+	s.vector = append(s.vector, from.vector...)
+	for name, value := range from.attributes {
+		s.SetAttribute(name, value)
+	}
+
+	return s
+}
+
 // String gets string value of a setting. Vector is combined into one string
 func (s *Setting) String() string {
 	if s == nil {
