@@ -1102,7 +1102,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 			users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(quota))
 		}
 		if len(ips) > 0 {
-			users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(ips))
+			users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
 		}
 		if regexp != "" {
 			users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(regexp))
