@@ -370,27 +370,43 @@ def test_011(self):
             }
         )
 
-        with Then("Connection to localhost should succeed with default user"):
-            out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'")
-            assert out == 'OK', f"out={out} should be 'OK'"
+        # Tests default user security
+        def test_default_user():
+            with Then("Connection to localhost should succeed with default user"):
+                out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'")
+                assert out == 'OK'
 
-        with And("Connection from secured to secured host should succeed"):
-            out = clickhouse.query_with_error(
-                "test-011-secured-cluster",
-                "select 'OK'",
-                host="chi-test-011-secured-cluster-default-1-0"
-            )
-            assert out == 'OK'
+            with And("Connection from secured to secured host should succeed"):
+                out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'",
+                    host="chi-test-011-secured-cluster-default-1-0"
+                )
+                assert out == 'OK'
 
-        with And("Connection from insecured to secured host should fail for default"):
-            out = clickhouse.query_with_error(
-                "test-011-insecured-cluster",
-                "select 'OK'",
-                host="chi-test-011-secured-cluster-default-1-0"
-            )
-            assert out != 'OK'
+            with And("Connection from insecured to secured host should fail for default user"):
+                out = clickhouse.query_with_error("test-011-insecured-cluster", "select 'OK'",
+                    host="chi-test-011-secured-cluster-default-1-0"
+                )
+                assert out != 'OK'
 
-        with And("Connection from insecured to secured host should fail for user with no password"):
+        chi = kubectl.get("chi", "test-011-secured-cluster")
+        ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
+        print(ips) # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
+        assert len(ips)>3
+
+        test_default_user()
+
+        # with When("Remove hostrexp for default user"):
+        #   kubectl.create_and_check(
+        #        manifest="manifests/chi/test-011-secured-cluster-2.yaml",
+        #            check={ "do_not_delete": 1 }
+        #    )
+        #    chi = kubectl.get("chi", "test-011-secured-cluster")
+        #    ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
+        #    print(ips) # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
+        #    assert len(ips)>3
+        #    test_default_user()
+
+        with And("Connection from insecured to secured host should fail for user 'user1' with no password"):
             time.sleep(10)  # FIXME
             out = clickhouse.query_with_error(
                 "test-011-insecured-cluster",
@@ -400,7 +416,7 @@ def test_011(self):
             )
             assert "Password" in out or "password" in out
 
-        with And("Connection from insecured to secured host should work for user with password"):
+        with And("Connection from insecured to secured host should work for user 'user1' with password"):
             out = clickhouse.query_with_error(
                 "test-011-insecured-cluster",
                 "select 'OK'",
@@ -415,7 +431,7 @@ def test_011(self):
             assert "<password>" not in users_xml
             assert "<password_sha256_hex>" in users_xml
 
-        with And("User with no password should get default automatically"):
+        with And("User 'user2' with no password should get default automatically"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select 'OK'",
@@ -423,7 +439,7 @@ def test_011(self):
             )
             assert out == 'OK'
 
-        with And("User with both plain and sha256 password should get the latter one"):
+        with And("User 'user3' with both plain and sha256 password should get the latter one"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select 'OK'",
@@ -431,7 +447,7 @@ def test_011(self):
             )
             assert out == 'OK'
 
-        with And("User with row-level security should have it applied"):
+        with And("User 'restricted' with row-level security should have it applied"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select * from system.numbers limit 1",
@@ -439,14 +455,14 @@ def test_011(self):
             )
             assert out == '1000'
 
-        with And("User with NO access management enabled CAN NOT run SHOW USERS"):
+        with And("User 'default' with NO access management enabled CAN NOT run SHOW USERS"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "SHOW USERS",
             )
             assert 'ACCESS_DENIED' in out
 
-        with And("User with access management enabled CAN run SHOW USERS"):
+        with And("User 'user4' with access management enabled CAN run SHOW USERS"):
             out = clickhouse.query(
                 "test-011-secured-cluster",
                 "SHOW USERS",
@@ -454,7 +470,7 @@ def test_011(self):
             )
             assert 'ACCESS_DENIED' not in out
 
-        with And("User with google.com as a host filter can not login"):
+        with And("User 'user5' with google.com as a host filter can not login"):
             out = clickhouse.query_with_error(
                 "test-011-insecured-cluster",
                 "select 'OK'",

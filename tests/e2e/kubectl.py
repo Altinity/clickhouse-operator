@@ -36,7 +36,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     # Run command
     if hasattr(current().context, "shell"):
         cmd = current().context.shell(cmd, timeout=timeout)
-    else:    
+    else:
         cmd = shell(cmd, timeout=timeout)
 
     # Check command failure
@@ -260,7 +260,10 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
 
 def get_field(kind, name, field, ns=namespace):
     out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
-    return out[1]
+    if len(out)>0:
+        return out[1]
+    else:
+        return ""
 
 
 def get_jsonpath(kind, name, field, ns=namespace):
