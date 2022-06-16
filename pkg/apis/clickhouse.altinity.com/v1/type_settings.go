@@ -17,6 +17,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"math"
 	"reflect"
 	"regexp"
@@ -202,21 +203,13 @@ func (s *Setting) MergeFrom(from *Setting) *Setting {
 
 	// In case recipient does not exist just copy values from source
 	if s == nil {
-		s = NewSettingVector(from.Vector())
-		for name, value := range from.attributes {
-			if !s.HasAttribute(name) {
-				s.SetAttribute(name, value)
-			}
-		}
-		return s
+		news := NewSettingVector(from.Vector())
+		news.attributes = util.MergeStringMapsPreserve(news.attributes, from.attributes)
+		return news
 	}
 
-	s.vector = append(s.vector, from.vector...)
-	for name, value := range from.attributes {
-		if !s.HasAttribute(name) {
-			s.SetAttribute(name, value)
-		}
-	}
+	s.vector = util.MergeStringArrays(s.vector, from.vector)
+	s.attributes = util.MergeStringMapsPreserve(s.attributes, from.attributes)
 
 	return s
 }
