@@ -57,6 +57,14 @@ func (s *ChiStatus) PushAction(action string) {
 	}
 }
 
+// PushError sets and pushes error into status
+func (s *ChiStatus) PushError(error string) {
+	s.Errors = append([]string{error}, s.Errors...)
+	if len(s.Errors) > maxErrors {
+		s.Errors = s.Errors[:maxErrors]
+	}
+}
+
 // SetAndPushError sets and pushes error into status
 func (s *ChiStatus) SetAndPushError(error string) {
 	s.Error = error
