@@ -738,8 +738,11 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 }
 
 type UpdateCHIStatusOptions struct {
-	TolerateAbsence   bool
-	ActionsErrorsOnly bool
+	TolerateAbsence bool
+	Actions         bool
+	Errors          bool
+	Normalized bool
+	WholeStatus     bool
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
@@ -790,16 +793,28 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 	// Update status of a real object.
 	// TODO DeepCopy depletes stack here
 
-	if opts.ActionsErrorsOnly {
+	if opts.Actions {
 		cur.Status.Action = chi.Status.Action
 		cur.Status.Actions = util.MergeStringArrays(cur.Status.Actions, chi.Status.Actions)
 		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Actions)))
+
+	}
+
+	if opts.Errors {
 		cur.Status.Error = chi.Status.Error
 		cur.Status.Errors = util.MergeStringArrays(cur.Status.Errors, chi.Status.Errors)
 		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Errors)))
-	} else {
+	}
+
+	if opts.Normalized {
+		cur.Status.NormalizedCHI = chi.Status.NormalizedCHI
+	}
+
+	if opts.WholeStatus {
 		cur.Status = chi.Status
 	}
+
+	cur.Status.PodIPs = c.getPodsIPs(chi)
 
 	// TODO fix this with verbosity update
 	// Start Debug object
