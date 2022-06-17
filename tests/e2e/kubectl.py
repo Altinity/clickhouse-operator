@@ -260,7 +260,7 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
 
 def get_field(kind, name, field, ns=namespace):
     out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
-    if len(out)>0:
+    if len(out) > 1:
         return out[1]
     else:
         return ""

@@ -388,10 +388,15 @@ def test_011(self):
                 )
                 assert out != 'OK'
 
-        chi = kubectl.get("chi", "test-011-secured-cluster")
-        ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
-        print(ips) # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
-        assert len(ips)>3
+        # wait for ips to propagate
+        for _ in range(20):
+            chi = kubectl.get("chi", "test-011-secured-cluster")
+            ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
+            print(ips)  # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
+            if len(ips) > 3:
+                break
+            time.sleep(30)
+        assert len(ips) > 3
 
         test_default_user()
 
