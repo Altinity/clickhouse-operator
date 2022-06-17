@@ -281,10 +281,16 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta) (*chiv1.ClickHouseInstallation, error) {
-	chiName, err := chopmodel.GetCHINameFromObjectMeta(objectMeta)
-	if err != nil {
-		return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
+func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool) (*chiv1.ClickHouseInstallation, error) {
+	var chiName string
+	var err error
+	if isCHI {
+		chiName = objectMeta.Name
+	} else {
+		chiName, err = chopmodel.GetCHINameFromObjectMeta(objectMeta)
+		if err != nil {
+			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
+		}
 	}
 
 	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(newContext(), chiName, newGetOptions())
