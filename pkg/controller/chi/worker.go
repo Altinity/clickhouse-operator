@@ -194,7 +194,7 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 }
 
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
-	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, chopmodel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopmodel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.schemer.CHIDropDnsCache(ctx, chi)
 	} else {
@@ -280,16 +280,20 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 
-	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, chopmodel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, chopmodel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(chi).Info("updating endpoints for CHI %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI %v", ips)
 		opts := chopmodel.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, opts); err == nil {
+		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS")
 			w.newContext(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
+			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+				TolerateAbsence: true,
+				Normalized: true,
+			})
 		} else {
 			w.a.M(&new.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", new.Labels, err)
 		}
@@ -447,8 +451,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	(&chi.Status).ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		TolerateAbsence:   false,
-		ActionsErrorsOnly: false,
+		WholeStatus: true,
 	})
 
 	w.a.V(1).
@@ -459,18 +462,31 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
-func (w *worker) markReconcileComplete(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHouseInstallation) {
 	// Update CHI object
-	(&chi.Status).ReconcileComplete(chi)
-	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		TolerateAbsence:   false,
-		ActionsErrorsOnly: false,
-	})
+	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, chopmodel.NewNormalizerOptions()); err == nil {
+		w.a.V(2).M(chi).Info("updating endpoints for CHI %s", chi.Name)
+		ips := w.c.getPodsIPs(chi)
+		w.a.V(1).M(chi).Info("IPs of the CHI %v", ips)
+		opts := chopmodel.NewNormalizerOptions()
+		opts.DefaultUserAdditionalIPs = ips
+		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
+			w.a.V(1).M(chi).Info("Update users IPS")
+			(&chi.Status).ReconcileComplete(chi)
+			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+				WholeStatus: true,
+			})
+		} else {
+			w.a.M(&_chi.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", _chi.Labels, err)
+		}
+	} else {
+		w.a.M(&_chi.ObjectMeta).F().Error("external unable to find CHI by %v err %v", _chi.Labels, err)
+	}
 
 	w.a.V(1).
-		WithEvent(chi, eventActionReconcile, eventReasonReconcileCompleted).
-		WithStatusActions(chi).
-		M(chi).F().
+		WithEvent(_chi, eventActionReconcile, eventReasonReconcileCompleted).
+		WithStatusActions(_chi).
+		M(_chi).F().
 		Info("reconcile completed")
 
 }
@@ -1329,7 +1345,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	(&chi.Status).DeleteStart()
 	if err := w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence:   true,
-		ActionsErrorsOnly: false,
+		WholeStatus: true,
 	}); err != nil {
 		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err:%q", err)
 		return nil
@@ -1491,7 +1507,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 	chi.Status.DeletedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence:   true,
-		ActionsErrorsOnly: false,
+		WholeStatus: true,
 	})
 
 	if err == nil {
@@ -1579,11 +1595,11 @@ func (w *worker) deleteCluster(ctx context.Context, chi *chiv1.ClickHouseInstall
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, options chopmodel.NormalizerOptions) (*chiv1.ClickHouseInstallation, error) {
+func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool, options chopmodel.NormalizerOptions) (*chiv1.ClickHouseInstallation, error) {
 	w.a.V(3).M(objectMeta).S().P()
 	defer w.a.V(3).M(objectMeta).E().P()
 
-	chi, err := w.c.GetCHIByObjectMeta(objectMeta)
+	chi, err := w.c.GetCHIByObjectMeta(objectMeta, isCHI)
 	if err != nil {
 		return nil, err
 	}
@@ -1945,8 +1961,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 
 	host.CHI.Status.AddedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-		TolerateAbsence:   false,
-		ActionsErrorsOnly: false,
+		WholeStatus: true,
 	})
 
 	if err == nil {
@@ -2045,8 +2060,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		if err == nil {
 			host.CHI.Status.UpdatedHostsCount++
 			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-				TolerateAbsence:   false,
-				ActionsErrorsOnly: false,
+				WholeStatus: true,
 			})
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
