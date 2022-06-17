@@ -129,6 +129,17 @@ func (s *Setting) AsVector() []string {
 	return s.vector
 }
 
+// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to Vector
+func (s *Setting) CastToVector() *Setting {
+	if s == nil {
+		return nil
+	}
+	if s.isScalar {
+		return NewSettingVector(s.AsVector())
+	}
+	return s
+}
+
 // SetAttribute sets attribute of the setting
 func (s *Setting) SetAttribute(name, value string) *Setting {
 	if s == nil {
@@ -192,9 +203,7 @@ func (s *Setting) MergeFrom(from *Setting) *Setting {
 	}
 
 	// Can merge from Vector only
-	if !from.IsVector() {
-		return s
-	}
+	from = from.CastToVector()
 
 	// Reasonable to merge from non-zero vector only
 	if from.Len() < 1 {
