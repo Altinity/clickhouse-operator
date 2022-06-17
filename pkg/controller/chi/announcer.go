@@ -310,7 +310,8 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
 		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, UpdateCHIStatusOptions{
 			TolerateAbsence:   true,
-			ActionsErrorsOnly: true,
+			Actions: true,
+			Errors: true,
 		})
 	}
 }
