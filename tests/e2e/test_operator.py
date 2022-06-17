@@ -7,6 +7,8 @@ import e2e.kubectl as kubectl
 import e2e.yaml_manifest as yaml_manifest
 import e2e.settings as settings
 import e2e.util as util
+import xml.etree.ElementTree as etree
+
 
 from testflows.core import *
 from testflows.asserts import error
@@ -339,6 +341,11 @@ def test_010(self):
     kubectl.delete_chi("test-010-zkroot")
 
 
+def get_user_xml_from_configmap(chi, user):
+    users_xml = kubectl.get("configmap", f"chi-{chi}-common-usersd")["data"]["chop-generated-users.xml"]
+    root_node = etree.fromstring(users_xml)
+    return root_node.find(f"users/{user}")
+
 @TestScenario
 @Name("test_011. Test user security and network isolation")
 @Requirements(
@@ -346,18 +353,15 @@ def test_010(self):
 )
 def test_011(self):
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
+
+        # Create clusters in parallel to speed it up
         kubectl.create_and_check(
             manifest="manifests/chi/test-011-secured-cluster.yaml",
             check={
-                "pod_count": 2,
-                "service": [
-                    "chi-test-011-secured-cluster-default-1-0",
-                    "ClusterIP",
-                ],
                 "apply_templates": {
                     settings.clickhouse_template,
-                    "manifests/chit/tpl-log-volume.yaml",
                 },
+                "chi_status": "InProgress",
                 "do_not_delete": 1,
             }
         )
@@ -365,14 +369,33 @@ def test_011(self):
         kubectl.create_and_check(
             manifest="manifests/chi/test-011-insecured-cluster.yaml",
             check={
-                "pod_count": 1,
+                "chi_status": "InProgress",
                 "do_not_delete": 1,
             }
         )
 
+        kubectl.wait_chi_status("test-011-secured-cluster", "Completed")
+        kubectl.wait_chi_status("test-011-insecured-cluster", "Completed")
+
         # Tests default user security
         def test_default_user():
-            with Then("Connection to localhost should succeed with default user"):
+            with Then("Default user should have 5 allowed ips"):
+                # Check normalized CHI
+                chi = kubectl.get("chi", "test-011-secured-cluster")
+                ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
+                print(f"normalized: {ips}") # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
+                assert len(ips) == 5
+
+            with And("Configmap should be updated"):
+                ips = get_user_xml_from_configmap("test-011-secured-cluster", "default").findall('networks/ip')
+                ips_l = []
+                for ip in ips:
+                    ips_l.append(ip.text)
+                print(f"users.xml: {ips_l}") # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
+                assert len(ips) == 5
+
+            clickhouse.query("test-011-secured-cluster", "SYSTEM RELOAD CONFIG")
+            with And("Connection to localhost should succeed with default user"):
                 out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'")
                 assert out == 'OK'
 
@@ -388,31 +411,20 @@ def test_011(self):
                 )
                 assert out != 'OK'
 
-        # wait for ips to propagate
-        for _ in range(20):
-            chi = kubectl.get("chi", "test-011-secured-cluster")
-            ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
-            print(ips)  # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
-            if len(ips) > 3:
-                break
-            time.sleep(30)
-        assert len(ips) > 3
 
         test_default_user()
 
-        # with When("Remove hostrexp for default user"):
-        #   kubectl.create_and_check(
-        #        manifest="manifests/chi/test-011-secured-cluster-2.yaml",
-        #            check={ "do_not_delete": 1 }
-        #    )
-        #    chi = kubectl.get("chi", "test-011-secured-cluster")
-        #    ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
-        #    print(ips) # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
-        #    assert len(ips)>3
-        #    test_default_user()
+        with When("Remove host_regexp for default user"):
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-011-secured-cluster-2.yaml",
+                    check={ "do_not_delete": 1 }
+            )
+            # Double check
+            kubectl.wait_chi_status("test-011-secured-cluster", "Completed")
+
+            test_default_user()
 
         with And("Connection from insecured to secured host should fail for user 'user1' with no password"):
-            time.sleep(10)  # FIXME
             out = clickhouse.query_with_error(
                 "test-011-insecured-cluster",
                 "select 'OK'",
