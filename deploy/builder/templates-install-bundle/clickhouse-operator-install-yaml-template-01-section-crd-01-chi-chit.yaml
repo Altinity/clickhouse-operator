@@ -191,6 +191,11 @@ spec:
                   description: "Pods"
                   items:
                     type: string
+                pod-ips:
+                  type: array
+                  description: "Pod IPs"
+                  items:
+                    type: string
                 fqdns:
                   type: array
                   description: "Pods FQDNs"

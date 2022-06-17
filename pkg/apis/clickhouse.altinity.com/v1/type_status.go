@@ -37,6 +37,7 @@ type ChiStatus struct {
 	DeletedHostsCount int                     `json:"deleted,omitempty"          yaml:"deleted,omitempty"`
 	DeleteHostsCount  int                     `json:"delete,omitempty"           yaml:"delete,omitempty"`
 	Pods              []string                `json:"pods,omitempty"             yaml:"pods,omitempty"`
+	PodIPs            []string                `json:"pod-ips,omitempty"          yaml:"pod-ips,omitempty"`
 	FQDNs             []string                `json:"fqdns,omitempty"            yaml:"fqdns,omitempty"`
 	Endpoint          string                  `json:"endpoint,omitempty"         yaml:"endpoint,omitempty"`
 	Generation        int64                   `json:"generation,omitempty"       yaml:"generation,omitempty"`
