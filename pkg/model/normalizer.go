@@ -36,14 +36,17 @@ import (
 
 // NormalizerContext specifies CHI-related normalization context
 type NormalizerContext struct {
+	// start specifies start CHI from which normalization has started
+	start *chiV1.ClickHouseInstallation
 	// chi specifies current CHI being normalized
 	chi     *chiV1.ClickHouseInstallation
-	options NormalizerOptions
+	// options specifies normalizaztion options
+	options *NormalizerOptions
 }
 
 // NewNormalizerContext creates new NormalizerContext
-func NewNormalizerContext(options NormalizerOptions) NormalizerContext {
-	return NormalizerContext{
+func NewNormalizerContext(options *NormalizerOptions) *NormalizerContext {
+	return &NormalizerContext{
 		options: options,
 	}
 }
@@ -58,8 +61,8 @@ type NormalizerOptions struct {
 }
 
 // NewNormalizerOptions creates new NormalizerOptions
-func NewNormalizerOptions() NormalizerOptions {
-	return NormalizerOptions{
+func NewNormalizerOptions() *NormalizerOptions {
+	return &NormalizerOptions{
 		DefaultUserInsertHostRegex: true,
 	}
 }
@@ -67,7 +70,7 @@ func NewNormalizerOptions() NormalizerOptions {
 // Normalizer specifies structures normalizer
 type Normalizer struct {
 	kubeClient kube.Interface
-	ctx        NormalizerContext
+	ctx        *NormalizerContext
 }
 
 // NewNormalizer creates new normalizer
@@ -77,37 +80,37 @@ func NewNormalizer(kubeClient kube.Interface) *Normalizer {
 	}
 }
 
+func newCHI() *chiV1.ClickHouseInstallation {
+	return &chiV1.ClickHouseInstallation{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
+			APIVersion: chiV1.SchemeGroupVersion.String(),
+		},
+	}
+}
+
 // CreateTemplatedCHI produces ready-to-use CHI object
 func (n *Normalizer) CreateTemplatedCHI(
 	chi *chiV1.ClickHouseInstallation,
-	options NormalizerOptions,
+	options *NormalizerOptions,
 ) (*chiV1.ClickHouseInstallation, error) {
 	// New CHI starts with new context
 	n.ctx = NewNormalizerContext(options)
 
 	if chi == nil {
 		// No CHI specified - meaning we are building 'empty' CHI with no clusters inside
-		chi = &chiV1.ClickHouseInstallation{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
-				APIVersion: chiV1.SchemeGroupVersion.String(),
-			},
-		}
+		chi = newCHI()
 		n.ctx.options.WithDefaultCluster = false
 	} else {
 		// Insert default cluster in case no clusters specified in this CHI
 		n.ctx.options.WithDefaultCluster = true
 	}
 
+	// Create new chi that will be populated with data during normalization process
 	// What base should be used to create CHI
 	if chop.Config().Template.CHI.Runtime.Template == nil {
 		// No template specified - start with clear page
-		n.ctx.chi = &chiV1.ClickHouseInstallation{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
-				APIVersion: chiV1.SchemeGroupVersion.String(),
-			},
-		}
+		n.ctx.chi = newCHI()
 	} else {
 		// Template specified - start with template
 		n.ctx.chi = chop.Config().Template.CHI.Runtime.Template.DeepCopy()
