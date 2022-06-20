@@ -242,7 +242,20 @@ func (w *worker) normalize(c *chiv1.ClickHouseInstallation) *chiv1.ClickHouseIns
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(chi).
 			M(chi).F().
-			Error("FAILED to normalize CHI : %v", err)
+			Error("FAILED to normalize CHI 1: %v", err)
+	}
+
+	ips := w.c.getPodsIPs(chi)
+	w.a.V(1).M(chi).Info("IPs of the CHI %v", ips)
+	opts := chopmodel.NewNormalizerOptions()
+	opts.DefaultUserAdditionalIPs = ips
+
+	chi, err = w.normalizer.CreateTemplatedCHI(c, opts)
+	if err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusError(chi).
+			M(chi).F().
+			Error("FAILED to normalize CHI 2: %v", err)
 	}
 
 	return chi
@@ -356,6 +369,8 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 		w.a.V(3).M(new).F().Info("ResourceVersion changed, but no actual changes found")
 		return nil
 	}
+
+	w.newContext(new)
 
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.excludeStopped(new)
@@ -639,8 +654,6 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
-
-	w.newContext(chi)
 
 	w.createPDB(ctx, chi)
 	return chi.WalkTillError(
@@ -1595,7 +1608,7 @@ func (w *worker) deleteCluster(ctx context.Context, chi *chiv1.ClickHouseInstall
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool, options chopmodel.NormalizerOptions) (*chiv1.ClickHouseInstallation, error) {
+func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool, options *chopmodel.NormalizerOptions) (*chiv1.ClickHouseInstallation, error) {
 	w.a.V(3).M(objectMeta).S().P()
 	defer w.a.V(3).M(objectMeta).E().P()
 
