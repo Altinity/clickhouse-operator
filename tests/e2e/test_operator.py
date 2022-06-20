@@ -422,6 +422,14 @@ def test_011(self):
             # Double check
             kubectl.wait_chi_status("test-011-secured-cluster", "Completed")
 
+            with Then("Make sure host_regexp is disabled"):
+                regexp = get_user_xml_from_configmap("test-011-secured-cluster", "default").find('networks/host_regexp').text
+                print(f"users.xml: {regexp}")
+                assert regexp == "disabled"
+
+            with Then("Wait until configmap changes are propagated to the pod"):
+                time.sleep(60)
+
             test_default_user()
 
         with And("Connection from insecured to secured host should fail for user 'user1' with no password"):
@@ -2221,7 +2229,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.16.1"
+    self.context.test_009_version_from = "0.18.3"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):

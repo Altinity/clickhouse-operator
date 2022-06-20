@@ -3,13 +3,14 @@ kind: ClickHouseInstallation
 metadata:
   name: test-011-secured-cluster
 spec:
+  # restart: RollingUpdate
   useTemplates:
     - name: clickhouse-version
   configuration:
     users:
       # default user should be security to localhost and interhost connections
       # operator adds IP addresses of pods
-      default/networks/host_regexp: ".*"
+      default/networks/host_regexp: "disabled"
       default/profile: default
       default/quota: default
       default/networks/ip:
