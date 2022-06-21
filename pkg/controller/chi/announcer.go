@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/golang/glog"
 
@@ -278,6 +279,9 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 		return
 	}
 
+	now := time.Now()
+	prefix := now.Format(time.RFC3339Nano) + " "
+
 	if a.writeStatusAction {
 		if len(args) > 0 {
 			a.chi.Status.Action = fmt.Sprintf(format, args...)
@@ -287,21 +291,27 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 	}
 	if a.writeStatusActions {
 		if len(args) > 0 {
-			(&a.chi.Status).PushAction(fmt.Sprintf(format, args...))
+			(&a.chi.Status).PushAction(prefix + fmt.Sprintf(format, args...))
 		} else {
-			(&a.chi.Status).PushAction(fmt.Sprint(format))
+			(&a.chi.Status).PushAction(prefix + fmt.Sprint(format))
 		}
 	}
 	if a.writeStatusError {
 		if len(args) > 0 {
-			(&a.chi.Status).SetAndPushError(fmt.Sprintf(format, args...))
+			a.chi.Status.Error = fmt.Sprintf(format, args...)
+			(&a.chi.Status).PushError(prefix + fmt.Sprintf(format, args...))
 		} else {
-			(&a.chi.Status).SetAndPushError(fmt.Sprint(format))
+			a.chi.Status.Error = fmt.Sprint(format)
+			(&a.chi.Status).PushError(prefix + fmt.Sprint(format))
 		}
 	}
 
 	// Propagate status updates into object
 	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
-		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, true)
+		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, UpdateCHIStatusOptions{
+			TolerateAbsence: true,
+			Actions:         true,
+			Errors:          true,
+		})
 	}
 }

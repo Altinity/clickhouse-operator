@@ -1,0 +1,18 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "settings-network"
+spec:
+  configuration:
+    users:
+      default/profile: default
+      default/quota: default
+      default/networks/ip:
+        - 127.0.0.1
+        - 127.0.0.2
+      user1/networks/ip: "::/0"
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+          replicasCount: 1

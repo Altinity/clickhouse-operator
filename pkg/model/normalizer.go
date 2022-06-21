@@ -34,12 +34,43 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+// NormalizerContext specifies CHI-related normalization context
+type NormalizerContext struct {
+	// start specifies start CHI from which normalization has started
+	start *chiV1.ClickHouseInstallation
+	// chi specifies current CHI being normalized
+	chi *chiV1.ClickHouseInstallation
+	// options specifies normalizaztion options
+	options *NormalizerOptions
+}
+
+// NewNormalizerContext creates new NormalizerContext
+func NewNormalizerContext(options *NormalizerOptions) *NormalizerContext {
+	return &NormalizerContext{
+		options: options,
+	}
+}
+
+// NormalizerOptions specifies normalization options
+type NormalizerOptions struct {
+	// WithDefaultCluster specifies whether should insert default cluster if no cluster specified
+	WithDefaultCluster bool
+	// DefaultUserAdditionalIPs specifies set of additional IPs applied to default user
+	DefaultUserAdditionalIPs   []string
+	DefaultUserInsertHostRegex bool
+}
+
+// NewNormalizerOptions creates new NormalizerOptions
+func NewNormalizerOptions() *NormalizerOptions {
+	return &NormalizerOptions{
+		DefaultUserInsertHostRegex: true,
+	}
+}
+
 // Normalizer specifies structures normalizer
 type Normalizer struct {
 	kubeClient kube.Interface
-	chi        *chiV1.ClickHouseInstallation
-	// Whether should insert default cluster if no cluster specified
-	withDefaultCluster bool
+	ctx        *NormalizerContext
 }
 
 // NewNormalizer creates new normalizer
@@ -49,24 +80,40 @@ func NewNormalizer(kubeClient kube.Interface) *Normalizer {
 	}
 }
 
+func newCHI() *chiV1.ClickHouseInstallation {
+	return &chiV1.ClickHouseInstallation{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
+			APIVersion: chiV1.SchemeGroupVersion.String(),
+		},
+	}
+}
+
 // CreateTemplatedCHI produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chiV1.ClickHouseInstallation, error) {
+func (n *Normalizer) CreateTemplatedCHI(
+	chi *chiV1.ClickHouseInstallation,
+	options *NormalizerOptions,
+) (*chiV1.ClickHouseInstallation, error) {
+	// New CHI starts with new context
+	n.ctx = NewNormalizerContext(options)
+
 	if chi == nil {
 		// No CHI specified - meaning we are building 'empty' CHI with no clusters inside
-		chi = new(chiV1.ClickHouseInstallation)
-		n.withDefaultCluster = false
+		chi = newCHI()
+		n.ctx.options.WithDefaultCluster = false
 	} else {
 		// Insert default cluster in case no clusters specified in this CHI
-		n.withDefaultCluster = true
+		n.ctx.options.WithDefaultCluster = true
 	}
 
+	// Create new chi that will be populated with data during normalization process
 	// What base should be used to create CHI
 	if chop.Config().Template.CHI.Runtime.Template == nil {
 		// No template specified - start with clear page
-		n.chi = new(chiV1.ClickHouseInstallation)
+		n.ctx.chi = newCHI()
 	} else {
 		// Template specified - start with template
-		n.chi = chop.Config().Template.CHI.Runtime.Template.DeepCopy()
+		n.ctx.chi = chop.Config().Template.CHI.Runtime.Template.DeepCopy()
 	}
 
 	// At this moment n.chi is either empty CHI or a system-wide template
@@ -106,17 +153,17 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 			log.V(1).M(chi).F().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			// Apply template
-			(&n.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
-			n.chi.Labels = util.MergeStringMapsOverwrite(
-				n.chi.Labels,
+			(&n.ctx.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
+			n.ctx.chi.Labels = util.MergeStringMapsOverwrite(
+				n.ctx.chi.Labels,
 				util.CopyMapFilter(
 					template.Labels,
 					chop.Config().Label.Include,
 					chop.Config().Label.Exclude,
 				),
 			)
-			n.chi.Annotations = util.MergeStringMapsOverwrite(
-				n.chi.Annotations, util.CopyMapFilter(
+			n.ctx.chi.Annotations = util.MergeStringMapsOverwrite(
+				n.ctx.chi.Annotations, util.CopyMapFilter(
 					template.Annotations,
 					chop.Config().Annotation.Include,
 					append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
@@ -127,7 +174,7 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 	}
 
 	// After all templates applied, place provided CHI on top of the whole stack
-	n.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
+	n.ctx.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
 
 	return n.normalize()
 }
@@ -136,43 +183,43 @@ func (n *Normalizer) CreateTemplatedCHI(chi *chiV1.ClickHouseInstallation) (*chi
 // Returns normalized CHI
 func (n *Normalizer) normalize() (*chiV1.ClickHouseInstallation, error) {
 	// Walk over ChiSpec datatype fields
-	n.chi.Spec.TaskID = n.normalizeTaskID(n.chi.Spec.TaskID)
-	n.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.chi.Spec.UseTemplates)
-	n.chi.Spec.Stop = n.normalizeStop(n.chi.Spec.Stop)
-	n.chi.Spec.Restart = n.normalizeRestart(n.chi.Spec.Restart)
-	n.chi.Spec.Troubleshoot = n.normalizeTroubleshoot(n.chi.Spec.Troubleshoot)
-	n.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.chi.Spec.NamespaceDomainPattern)
-	n.chi.Spec.Templating = n.normalizeTemplating(n.chi.Spec.Templating)
-	n.chi.Spec.Reconciling = n.normalizeReconciling(n.chi.Spec.Reconciling)
-	n.chi.Spec.Defaults = n.normalizeDefaults(n.chi.Spec.Defaults)
-	n.chi.Spec.Configuration = n.normalizeConfiguration(n.chi.Spec.Configuration)
-	n.chi.Spec.Templates = n.normalizeTemplates(n.chi.Spec.Templates)
+	n.ctx.chi.Spec.TaskID = n.normalizeTaskID(n.ctx.chi.Spec.TaskID)
+	n.ctx.chi.Spec.UseTemplates = n.normalizeUseTemplates(n.ctx.chi.Spec.UseTemplates)
+	n.ctx.chi.Spec.Stop = n.normalizeStop(n.ctx.chi.Spec.Stop)
+	n.ctx.chi.Spec.Restart = n.normalizeRestart(n.ctx.chi.Spec.Restart)
+	n.ctx.chi.Spec.Troubleshoot = n.normalizeTroubleshoot(n.ctx.chi.Spec.Troubleshoot)
+	n.ctx.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.chi.Spec.NamespaceDomainPattern)
+	n.ctx.chi.Spec.Templating = n.normalizeTemplating(n.ctx.chi.Spec.Templating)
+	n.ctx.chi.Spec.Reconciling = n.normalizeReconciling(n.ctx.chi.Spec.Reconciling)
+	n.ctx.chi.Spec.Defaults = n.normalizeDefaults(n.ctx.chi.Spec.Defaults)
+	n.ctx.chi.Spec.Configuration = n.normalizeConfiguration(n.ctx.chi.Spec.Configuration)
+	n.ctx.chi.Spec.Templates = n.normalizeTemplates(n.ctx.chi.Spec.Templates)
 	// UseTemplates already done
 
 	n.finalizeCHI()
 	n.fillStatus()
 
-	return n.chi, nil
+	return n.ctx.chi, nil
 }
 
 // finalizeCHI performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalizeCHI() {
-	n.chi.FillSelfCalculatedAddressInfo()
-	n.chi.FillCHIPointer()
-	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
+	n.ctx.chi.FillSelfCalculatedAddressInfo()
+	n.ctx.chi.FillCHIPointer()
+	n.ctx.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		hostTemplate := n.getHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
 	})
 	n.fillCHIAddressInfo()
-	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
+	n.ctx.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		return n.calcFingerprints(host)
 	})
 }
 
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
-	n.chi.WalkHostsFullPath(0, 0, func(
+	n.ctx.chi.WalkHostsFullPath(0, 0, func(
 		chi *chiV1.ClickHouseInstallation,
 
 		chiScopeIndex int,
@@ -328,10 +375,10 @@ func ensurePortValue(port *int32, value, _default int32) {
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := CreateCHIServiceFQDN(n.chi)
+	endpoint := CreateCHIServiceFQDN(n.ctx.chi)
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
-	n.chi.WalkHosts(func(host *chiV1.ChiHost) error {
+	n.ctx.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		pods = append(pods, CreatePodName(host))
 		fqdns = append(fqdns, CreateFQDN(host))
 		return nil
@@ -341,7 +388,8 @@ func (n *Normalizer) fillStatus() {
 	if v, err := chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
 		normalized = true
 	}
-	n.chi.FillStatus(endpoint, pods, fqdns, normalized)
+	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
+	n.ctx.chi.FillStatus(endpoint, pods, fqdns, ip, normalized)
 }
 
 // normalizeTaskID normalizes .spec.taskID
@@ -559,7 +607,7 @@ func (n *Normalizer) normalizeHostTemplate(template *chiV1.ChiHostTemplate) {
 	n.normalizeHostTemplateSpec(&template.Spec)
 
 	// Introduce HostTemplate into Index
-	n.chi.Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
+	n.ctx.chi.Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
@@ -596,7 +644,7 @@ func (n *Normalizer) normalizePodTemplate(template *chiV1.ChiPodTemplate) {
 	}
 
 	// Introduce PodTemplate into Index
-	n.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.ctx.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 const defaultTopologyKey = corev1.LabelHostname
@@ -651,7 +699,7 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *chiV1.ChiPodDistr
 		}
 
 		// TODO need to support multi-cluster
-		cluster := n.chi.Spec.Configuration.Clusters[0]
+		cluster := n.ctx.chi.Spec.Configuration.Clusters[0]
 
 		// Expand shortcut
 		return []chiV1.ChiPodDistribution{
@@ -700,7 +748,7 @@ func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaim
 	// Check Spec
 
 	// Introduce VolumeClaimTemplate into Index
-	n.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.ctx.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
@@ -711,7 +759,7 @@ func (n *Normalizer) normalizeServiceTemplate(template *chiV1.ChiServiceTemplate
 	// Check Spec
 
 	// Introduce ServiceClaimTemplate into Index
-	n.chi.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.ctx.chi.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates normalizes .spec.useTemplates
@@ -771,7 +819,7 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCl
 		return clusters
 	}
 
-	if n.withDefaultCluster {
+	if n.ctx.options.WithDefaultCluster {
 		return []*chiV1.ChiCluster{n.newDefaultCluster()}
 	}
 
@@ -783,7 +831,7 @@ func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
 	zk := host.GetZookeeper()
 	host.Config.ZookeeperFingerprint = util.Fingerprint(zk)
 
-	global := n.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
+	global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
 	local := host.Settings.AsSortedSliceOfStrings()
 	host.Config.SettingsFingerprint = util.Fingerprint(
 		fmt.Sprintf("%s%s",
@@ -794,7 +842,7 @@ func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
 	host.Config.FilesFingerprint = util.Fingerprint(
 		fmt.Sprintf("%s%s",
 			util.Fingerprint(
-				n.chi.Spec.Configuration.Files.Filter(
+				n.ctx.chi.Spec.Configuration.Files.Filter(
 					nil,
 					[]chiV1.SettingsSection{chiV1.SectionUsers},
 					true,
@@ -872,7 +920,7 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 	// ENV VAR name and value
 	envVarName := username + "_" + userSettingsField
 
-	for _, envVar := range n.chi.Attributes.ExchangeEnv {
+	for _, envVar := range n.ctx.chi.Attributes.ExchangeEnv {
 		if envVar.Name == envVarName {
 			// Such a variable already exists
 			return false
@@ -890,7 +938,7 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 			},
 		},
 	}
-	n.chi.Attributes.ExchangeEnv = append(n.chi.Attributes.ExchangeEnv, envVar)
+	n.ctx.chi.Attributes.ExchangeEnv = append(n.ctx.chi.Attributes.ExchangeEnv, envVar)
 
 	// Replace setting with empty value and reference to ENV VAR
 	users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar("").SetAttribute("from_env", envVarName))
@@ -904,31 +952,37 @@ var (
 
 // parseSecretFieldAddress parses address into namespace, name, key triple
 func parseSecretFieldAddress(users *chiV1.Settings, username, userSettingsK8SSecretField string) (string, string, string, error) {
-	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	settingsPath := username + "/" + userSettingsK8SSecretField
+	secretFieldAddress := users.Get(settingsPath).String()
+
+	// Sanity check. In case secretFieldAddress not specified nothing to do here
+	if secretFieldAddress == "" {
+		return "", "", "", ErrSecretFieldNotFound
+	}
 
 	// Extract secret's namespace and name and then field name within the secret,
 	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted in the settings
 	var namespace, name, key string
 	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
 	case 2:
-		// Assume namespace is omitted
+		// Assume namespace is omitted. Expect to have name/key pair
 		namespace = chop.Config().Runtime.Namespace
 		name = tags[0]
 		key = tags[1]
 	case 3:
-		// All components are in place
+		// All components are in place. Expect to have namespace/name/key triple
 		namespace = tags[0]
 		name = tags[1]
 		key = tags[2]
 	default:
 		// Skip incorrect entry
-		log.V(1).Warning("unable to parse secret field address: %s", secretFieldAddress)
+		log.V(1).Warning("unable to parse secret field address: '%s:%s'", settingsPath, secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
 	// Sanity check
 	if (namespace == "") || (name == "") || (key == "") {
-		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: %s", secretFieldAddress)
+		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s:%s'", settingsPath, secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
@@ -969,18 +1023,22 @@ func (n *Normalizer) normalizeUsersList(users *chiV1.Settings, extra ...string) 
 		tags := strings.Split(path, "/")
 
 		// Basic sanity check - need to have at least "username/something" pair
+		// This "something" part is not used, it just has to be
 		if len(tags) < 2 {
 			// Skip incorrect entry
 			return
 		}
 
+		// Register username
 		username := tags[0]
 		usernameMap[username] = true
 	})
 
 	// Add extra users
 	for _, username := range extra {
-		usernameMap[username] = true
+		if username != "" {
+			usernameMap[username] = true
+		}
 	}
 
 	// Make sorted list of unique usernames
@@ -1002,22 +1060,65 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 	}
 	users.Normalize()
 
-	// Add special "default" user to the list of users, which is required in order to secure host_regexp
-	usernames := n.normalizeUsersList(users, defaultUsername)
+	chopUsername := chop.Config().ClickHouse.Access.Username
+
+	// Add special "default" user to the list of users, which is used/required for:
+	// 1. ClickHouse hosts to communicate with each other
+	// 2. Specify host_regexp for default user as "allowed hosts to visit from"
+	// Add special "chop" user to the list of users, which is used/required for:
+	// 1. Operator to communicate with hosts
+	usernames := n.normalizeUsersList(users, defaultUsername, chopUsername)
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
+		//
 		// Ensure each user has mandatory sections:
+		//
 		// 1. user/profile
 		// 2. user/quota
 		// 3. user/networks/ip
 		// 4. user/networks/host_regexp
-		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Profile))
-		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(chop.Config().ClickHouse.Config.User.Default.Quota))
-		users.SetIfNotExists(username+"/networks/ip", chiV1.NewSettingVector(chop.Config().ClickHouse.Config.User.Default.NetworksIP))
-		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(CreatePodRegexp(n.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)))
+		profile := chop.Config().ClickHouse.Config.User.Default.Profile
+		quota := chop.Config().ClickHouse.Config.User.Default.Quota
+		ips := chop.Config().ClickHouse.Config.User.Default.NetworksIP
+		regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+		// Some users may have special options
+		switch username {
+		case defaultUsername:
+			ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
+			if !n.ctx.options.DefaultUserInsertHostRegex {
+				regexp = ""
+			}
+		case chopUsername:
+			ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
 
+			profile = ""
+			quota = ""
+			ips = []string{ip}
+			regexp = ""
+		}
+		// Ensure required values aer in place and apply non-empty values in case no own value(s) provided
+		if profile != "" {
+			users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(profile))
+		}
+		if quota != "" {
+			users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(quota))
+		}
+		if len(ips) > 0 {
+			users.Set(username+"/networks/ip", chiV1.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
+		}
+		if regexp != "" {
+			users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(regexp))
+		}
+
+		//
 		// Deal with passwords
+		//
+
+		// CHOp user does not handle password here
+		if username == chopUsername {
+			continue // move to the next user
+		}
 
 		// Values from the secret have higher priority
 		n.substWithSecretField(users, username, "password", "k8s_secret_password")
@@ -1038,6 +1139,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 
 		// Than goes password_sha256_hex, thus keep it only
 		if users.Has(username + "/password_sha256_hex") {
+			users.Delete(username + "/password_double_sha1_hex")
 			users.Delete(username + "/password")
 			continue // move to the next user
 		}
@@ -1065,13 +1167,16 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 			// Replace plaintext password with encrypted
 			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
 			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+			// And keep it only
+			users.Delete(username + "/password_double_sha1_hex")
 			users.Delete(username + "/password")
 		}
 	}
 
 	if users.Has(defaultUsername+"/password_double_sha1_hex") || users.Has(defaultUsername+"/password_sha256_hex") {
 		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
-		// Set remove password flag for "default" user that is empty in stock ClickHouse users.xml
+		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
+		// thus we need to overwrite it.
 		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 
@@ -1125,11 +1230,11 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 	}
 
 	// Inherit from .spec.configuration.zookeeper
-	cluster.InheritZookeeperFrom(n.chi)
+	cluster.InheritZookeeperFrom(n.ctx.chi)
 	// Inherit from .spec.configuration.files
-	cluster.InheritFilesFrom(n.chi)
+	cluster.InheritFilesFrom(n.ctx.chi)
 	// Inherit from .spec.defaults
-	cluster.InheritTemplatesFrom(n.chi)
+	cluster.InheritTemplatesFrom(n.ctx.chi)
 
 	cluster.Zookeeper = n.normalizeConfigurationZookeeper(cluster.Zookeeper)
 	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)

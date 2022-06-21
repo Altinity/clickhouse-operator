@@ -14,7 +14,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "6.5.1"
+      "version": "7.5.16"
     },
     {
       "type": "panel",
@@ -44,7 +44,7 @@
       "type": "datasource",
       "id": "vertamedia-clickhouse-datasource",
       "name": "ClickHouse",
-      "version": "1.9.5"
+      "version": "2.5.0"
     }
   ],
   "annotations": {

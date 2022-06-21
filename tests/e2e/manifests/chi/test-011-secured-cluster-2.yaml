@@ -3,13 +3,14 @@ kind: ClickHouseInstallation
 metadata:
   name: test-011-secured-cluster
 spec:
+  # restart: RollingUpdate
   useTemplates:
     - name: clickhouse-version
   configuration:
     users:
       # default user should be security to localhost and interhost connections
-      # operator creates host_regxp expression for that
-      # default/networks/host_regexp: \.chi-test-011-secure-user-[^.]+-\d+-\d+\.test.svc.cluster.local$
+      # operator adds IP addresses of pods
+      default/networks/host_regexp: "disabled"
       default/profile: default
       default/quota: default
       default/networks/ip:

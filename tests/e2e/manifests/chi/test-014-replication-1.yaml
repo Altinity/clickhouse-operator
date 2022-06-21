@@ -6,8 +6,8 @@ metadata:
   name: test-014-replication
 
 spec:
-  reconciling:
-    policy: wait
+  # reconciling:
+  #  policy: wait
   useTemplates:
     - name: clickhouse-version
     - name: persistent-volume

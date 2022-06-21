@@ -29,7 +29,7 @@ def wait_keeper_ready(keeper_type='zookeeper', pod_count=3, retries=10):
             Fail(f"Zookeeper failed, ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}")
 
 
-def wait_clickhouse_no_readonly_replicas(chi, retries=10):
+def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     expected_replicas = chi["spec"]["configuration"]["clusters"][0]["layout"]["replicasCount"]
     expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
     for i in range(retries):
@@ -38,12 +38,13 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=10):
             "SELECT groupArray(value) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'"
         )
         if readonly_replicas == expected_replicas:
+            message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
             break
         else:
-            with Then(f"Check ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"):
+            with But(f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"):
                 time.sleep(i * 3)
-        if i == retries - 1:
-            Fail(f"Check ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
+        if i >= (retries - 1):
+            raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
 
 
 def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_tables):

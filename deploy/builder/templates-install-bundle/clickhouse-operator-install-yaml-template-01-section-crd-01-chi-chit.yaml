@@ -119,6 +119,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -186,6 +189,11 @@ spec:
                 pods:
                   type: array
                   description: "Pods"
+                  items:
+                    type: string
+                pod-ips:
+                  type: array
+                  description: "Pod IPs"
                   items:
                     type: string
                 fqdns:

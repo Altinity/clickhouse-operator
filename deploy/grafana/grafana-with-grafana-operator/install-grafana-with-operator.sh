@@ -106,7 +106,8 @@ function wait_grafana_datasource_to_start() {
     local datasource=$2
 
     echo -n "Waiting for Grafana DataSource custom resource '${namespace}/${datasource}'"
-    while [[ $(kubectl --namespace="${namespace}" get grafanadatasources "${datasource}" -o'=custom-columns=NAME:.metadata.name,STATUS:.status.message' | grep -i "success" | wc -l) == "0" ]]; do
+    # while [[ $(kubectl --namespace="${namespace}" get grafanadatasources "${datasource}" -o'=custom-columns=NAME:.metadata.name,STATUS:.status.message' | grep -i "success" | wc -l) == "0" ]]; do
+    while [[ $(kubectl --namespace="${namespace}" get grafanadatasources "${datasource}" -o'=custom-columns=NAME:.metadata.name,STATUS:.status.message' | wc -l) == "0" ]]; do
         printf "."
         sleep 1
     done
