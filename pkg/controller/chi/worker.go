@@ -305,7 +305,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			w.reconcileCHIConfigMapUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				TolerateAbsence: true,
-				Normalized: true,
+				Normalized:      true,
 			})
 		} else {
 			w.a.M(&new.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", new.Labels, err)
@@ -1357,8 +1357,8 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 
 	(&chi.Status).DeleteStart()
 	if err := w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		TolerateAbsence:   true,
-		WholeStatus: true,
+		TolerateAbsence: true,
+		WholeStatus:     true,
 	}); err != nil {
 		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err:%q", err)
 		return nil
@@ -1519,8 +1519,8 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	chi.Status.DeletedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		TolerateAbsence:   true,
-		WholeStatus: true,
+		TolerateAbsence: true,
+		WholeStatus:     true,
 	})
 
 	if err == nil {

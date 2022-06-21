@@ -39,7 +39,7 @@ type NormalizerContext struct {
 	// start specifies start CHI from which normalization has started
 	start *chiV1.ClickHouseInstallation
 	// chi specifies current CHI being normalized
-	chi     *chiV1.ClickHouseInstallation
+	chi *chiV1.ClickHouseInstallation
 	// options specifies normalizaztion options
 	options *NormalizerOptions
 }

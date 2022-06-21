@@ -741,7 +741,7 @@ type UpdateCHIStatusOptions struct {
 	TolerateAbsence bool
 	Actions         bool
 	Errors          bool
-	Normalized bool
+	Normalized      bool
 	WholeStatus     bool
 }
 
