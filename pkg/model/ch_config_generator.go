@@ -517,7 +517,7 @@ func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.ChiHost) string {
-	return CreateReplicaHostname(host)
+	return CreateInstanceHostname(host)
 }
 
 // getMacrosInstallation returns macros value for <installation-name> macros
