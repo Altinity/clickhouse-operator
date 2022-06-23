@@ -42,10 +42,8 @@ type ChiHost struct {
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *appsv1.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
-	DesiredStatefulSet *appsv1.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
-	// CurPod is a Pod of this host
-	CurPod *corev1.Pod
-	CHI    *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+	DesiredStatefulSet *appsv1.StatefulSet     `json:"-" yaml:"-" testdiff:"ignore"`
+	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
