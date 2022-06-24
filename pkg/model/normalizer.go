@@ -1240,6 +1240,8 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)
 	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
 
+	cluster.SchemaPolicy = n.normalizeClusterSchemaPolicy(cluster.SchemaPolicy)
+
 	if cluster.Layout == nil {
 		cluster.Layout = chiV1.NewChiClusterLayout()
 	}
@@ -1285,6 +1287,40 @@ func (n *Normalizer) createHostsField(cluster *chiV1.ChiCluster) {
 
 	cluster.WalkHostsByShards(hostMergeFunc)
 	cluster.WalkHostsByReplicas(hostMergeFunc)
+}
+
+const (
+	SchemaPolicyReplicaNone = "None"
+	SchemaPolicyReplicaAll  = "All"
+	SchemaPolicyShardNone   = "None"
+	SchemaPolicyShardAll    = "All"
+)
+
+// normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
+func (n *Normalizer) normalizeClusterSchemaPolicy(policy *chiV1.SchemaPolicy) *chiV1.SchemaPolicy {
+	if policy == nil {
+		policy = chiV1.NewClusterSchemaPolicy()
+	}
+
+	switch strings.ToLower(policy.Replica) {
+	case strings.ToLower(SchemaPolicyReplicaNone):
+		policy.Replica = SchemaPolicyReplicaNone
+	case strings.ToLower(SchemaPolicyReplicaAll):
+		policy.Replica = SchemaPolicyReplicaAll
+	default:
+		policy.Replica = SchemaPolicyReplicaAll
+	}
+
+	switch strings.ToLower(policy.Shard) {
+	case strings.ToLower(SchemaPolicyShardNone):
+		policy.Shard = SchemaPolicyShardNone
+	case strings.ToLower(SchemaPolicyShardAll):
+		policy.Shard = SchemaPolicyShardAll
+	default:
+		policy.Shard = SchemaPolicyShardAll
+	}
+
+	return policy
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
