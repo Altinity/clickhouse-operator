@@ -443,29 +443,8 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *chiv1.ChiHost) string {
 	return b.String()
 }
 
-// noCustomPorts
-func noCustomPorts(host *chiv1.ChiHost) bool {
-	if host.TCPPort != chDefaultTCPPortNumber {
-		return false
-	}
-
-	if host.HTTPPort != chDefaultHTTPPortNumber {
-		return false
-	}
-
-	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
-		return false
-	}
-
-	return true
-}
-
-// GetHostPorts creates "ports.xml" content
-func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
-
-	if noCustomPorts(host) {
-		return ""
-	}
+// GetHostHostnameAndPorts creates "ports.xml" content
+func (c *ClickHouseConfigGenerator) GetHostHostnameAndPorts(host *chiv1.ChiHost) string {
 
 	b := &bytes.Buffer{}
 
@@ -478,6 +457,9 @@ func (c *ClickHouseConfigGenerator) GetHostPorts(host *chiv1.ChiHost) string {
 	if host.HTTPPort != chDefaultHTTPPortNumber {
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
 	}
+
+	// Interserver host and port
+	util.Iline(b, 4, "<interserver_http_host>%s</interserver_http_host>", c.getRemoteServersReplicaHostname(host))
 	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
 		util.Iline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort)
 	}
