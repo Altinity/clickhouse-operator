@@ -135,6 +135,9 @@ spec:
           podTemplate: clickhouse-v22.2
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
+        schemaPolicy:
+          replica: All
+          shard: All
         layout:
           shardsCount: 3
           replicasCount: 2
@@ -162,6 +165,9 @@ spec:
           podTemplate: clickhouse-v22.2
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
+        schemaPolicy:
+          replica: None
+          shard: None
         layout:
           shards:
             - name: shard0
