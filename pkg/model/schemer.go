@@ -55,6 +55,11 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 		return nil, nil, nil
 	}
 
+	if host.GetCluster().SchemaPolicy.Shard != SchemaPolicyShardAll {
+		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
+		return nil, nil, nil
+	}
+
 	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
 	if len(hosts) <= 1 {
 		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
@@ -83,6 +88,11 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
+		return nil, nil, nil
+	}
+
+	if host.GetCluster().SchemaPolicy.Replica != SchemaPolicyReplicaAll {
+		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
 		return nil, nil, nil
 	}
 
@@ -170,8 +180,11 @@ func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *ch
 	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
 }
 
-// HostCreateTablesSQLs makes all SQL for migrating tables
-func (s *Schemer) HostCreateTablesSQLs(ctx context.Context, host *chop.ChiHost) (
+// createTablesSQLs makes all SQL for migrating tables
+func (s *Schemer) createTablesSQLs(
+	ctx context.Context,
+	host *chop.ChiHost,
+) (
 	replicatedObjectNames []string,
 	replicatedCreateSQLs []string,
 	distributedObjectNames []string,
@@ -200,7 +213,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 	replicatedObjectNames,
 		replicatedCreateSQLs,
 		distributedObjectNames,
-		distributedCreateSQLs := s.HostCreateTablesSQLs(ctx, host)
+		distributedCreateSQLs := s.createTablesSQLs(ctx, host)
 
 	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
