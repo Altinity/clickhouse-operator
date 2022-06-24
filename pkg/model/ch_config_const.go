@@ -22,7 +22,7 @@ const (
 
 const (
 	configMacros        = "macros"
-	configPorts         = "ports"
+	configHostnamePorts = "hostname-ports"
 	configProfiles      = "profiles"
 	configQuotas        = "quotas"
 	configRemoteServers = "remote_servers"
