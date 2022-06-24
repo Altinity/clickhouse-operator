@@ -16,16 +16,22 @@ package v1
 
 // ChiCluster defines item of a clusters section of .configuration
 type ChiCluster struct {
-	Name      string              `json:"name,omitempty"      yaml:"name,omitempty"`
-	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper,omitempty"`
-	Settings  *Settings           `json:"settings,omitempty"  yaml:"settings,omitempty"`
-	Files     *Settings           `json:"files,omitempty"     yaml:"files,omitempty"`
-	Templates *ChiTemplateNames   `json:"templates,omitempty" yaml:"templates,omitempty"`
-	Layout    *ChiClusterLayout   `json:"layout,omitempty"    yaml:"layout,omitempty"`
+	Name         string              `json:"name,omitempty"      yaml:"name,omitempty"`
+	Zookeeper    *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper,omitempty"`
+	Settings     *Settings           `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files        *Settings           `json:"files,omitempty"     yaml:"files,omitempty"`
+	Templates    *ChiTemplateNames   `json:"templates,omitempty" yaml:"templates,omitempty"`
+	SchemaPolicy *SchemaPolicy       `json:"schemaPolicy"        yaml:"schemaPolicy"`
+	Layout       *ChiClusterLayout   `json:"layout,omitempty"    yaml:"layout,omitempty"`
 
 	// Internal data
 	Address ChiClusterAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+type SchemaPolicy struct {
+	Replica string `json:"replica" yaml:"replica"`
+	Shard   string `json:"shard"   yaml:"shard"`
 }
 
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
@@ -51,6 +57,11 @@ type ChiClusterLayout struct {
 	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
 	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
 	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+// NewClusterSchemaPolicy creates new cluster layout
+func NewClusterSchemaPolicy() *SchemaPolicy {
+	return new(SchemaPolicy)
 }
 
 // NewChiClusterLayout creates new cluster layout
