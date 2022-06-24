@@ -672,6 +672,25 @@ spec:
                               volumeClaimTemplate:
                                 type: string
                                 description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
+                          schemaPolicy:
+                            type: object
+                            description: |
+                              describes how schema is propagated within replicas and shards
+                            properties:
+                              replica:
+                                type: string
+                                description: "how schema is propagated within a replica"
+                                enum:
+                                  # List SchemaPolicyReplicaXXX constants from model
+                                  - "None"
+                                  - "All"
+                              shard:
+                                type: string
+                                description: "how schema is propagated between shards"
+                                enum:
+                                  # List SchemaPolicyShardXXX constants from model
+                                  - "None"
+                                  - "All"
                           layout:
                             type: object
                             description: |
@@ -2014,6 +2033,25 @@ spec:
                               volumeClaimTemplate:
                                 type: string
                                 description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
+                          schemaPolicy:
+                            type: object
+                            description: |
+                              describes how schema is propagated within replicas and shards
+                            properties:
+                              replica:
+                                type: string
+                                description: "how schema is propagated within a replica"
+                                enum:
+                                  # List SchemaPolicyReplicaXXX constants from model
+                                  - "None"
+                                  - "All"
+                              shard:
+                                type: string
+                                description: "how schema is propagated between shards"
+                                enum:
+                                  # List SchemaPolicyShardXXX constants from model
+                                  - "None"
+                                  - "All"
                           layout:
                             type: object
                             description: |
