@@ -807,7 +807,7 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiv1.ChiHost
 		return err
 	}
 
-	//replicatedObjectNames, replicatedCreateSQLs, distributedObjectNames, distributedCreateSQLs := w.schemer.HostCreateTablesSQLs(ctx, host)
+	//replicatedObjectNames, replicatedCreateSQLs, distributedObjectNames, distributedCreateSQLs := w.schemer.hostCreateTablesSQLs(ctx, host)
 	//names := append(replicatedObjectNames, distributedObjectNames...)
 	//sql := append(replicatedCreateSQLs, distributedCreateSQLs...)
 	//
@@ -1947,7 +1947,6 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiv1.ChiHost) 
 
 	// Host has to know current StatefulSet and Pod
 	host.CurStatefulSet, _ = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
-	host.CurPod, _ = w.c.getPod(host)
 
 	return err
 }
