@@ -1080,7 +1080,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		// 4. user/networks/host_regexp
 		profile := chop.Config().ClickHouse.Config.User.Default.Profile
 		quota := chop.Config().ClickHouse.Config.User.Default.Quota
-		ips := chop.Config().ClickHouse.Config.User.Default.NetworksIP
+		ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
 		regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 		// Some users may have special options
 		switch username {
