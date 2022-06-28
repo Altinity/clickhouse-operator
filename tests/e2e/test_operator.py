@@ -697,18 +697,6 @@ def test_013(self):
         }
     )
     start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-    out = ""
-    # wait for cluster to start
-    for _ in range(20):
-        time.sleep(10)
-        out = clickhouse.query_with_error(
-            chi,
-            "SELECT count() FROM cluster('all-sharded', system.one) SETTINGS receive_timeout=10")
-        note(f"cluster out:\n{out}")
-        if out == "1":
-            break
-    else:
-        assert out == "1"
 
     schema_objects = [
         'test_local_013',
@@ -746,19 +734,6 @@ def test_013(self):
             timeout=1500,
         )
 
-    # wait for cluster to start
-    out = ""
-    for _ in range(10):
-        out = clickhouse.query_with_error(
-            chi,
-            "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-        note(f"cluster out:\n{out}")
-        if out == str(nShards):
-            break
-        time.sleep(10)
-    else:
-        assert out == str(nShards)
-
     with Then("Unaffected pod should not be restarted"):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
@@ -784,18 +759,6 @@ def test_013(self):
                 "do_not_delete": 1,
             }
         )
-
-        # wait for cluster to start
-        for _ in range(10):
-            out = clickhouse.query_with_error(
-                chi,
-                "SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-            note(f"cluster out:\n{out}")
-            if out == "1":
-                break
-            time.sleep(10)
-        else:
-            assert out == "1"
 
         with Then("Unaffected pod should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
@@ -999,6 +962,77 @@ def test_014(self):
 
 
 @TestScenario
+@Name("test_014_1. Test replication under different configuration scenarios")
+def test_014_1(self):
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    manifest = "manifests/chi/test-014-1-replication-1.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "default"
+
+    kubectl.create_and_check(
+        manifest=manifest,
+        check={
+            "apply_templates": {
+                settings.clickhouse_template,
+                "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+            },
+            "pod_count": 2,
+            "do_not_delete": 1,
+        },
+        timeout=600,
+    )
+
+    create_table = "CREATE TABLE test_local_014_1 ON CLUSTER '{cluster}' (a Int8, r UInt64) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/{table}', '{replica}') ORDER BY tuple()"
+    table = "test_local_014_1"
+    replicas = [0,1]
+
+    with Given("Create schema objects"):
+        clickhouse.query(chi, create_table)
+
+    def checkDataIsReplicated(replicas, v):
+        with When("Data is inserted on two replicas"):
+            for replica in replicas:
+                clickhouse.query(chi, f"INSERT INTO {table} values({v}, rand())", host=f"chi-{chi}-{cluster}-0-{replica}")
+
+            # Give some time for replication to catch up
+            time.sleep(10)
+
+            with Then("Data is replicated"):
+                for replica in replicas:
+                    out = clickhouse.query(chi, f"SELECT count() FROM {table} where a = {v}", host=f"chi-{chi}-{cluster}-0-{replica}")
+                    assert int(out) == len(replicas)
+                    print(f"{table} is ok")
+
+    with When("replicasUseFQDN is disabled"):
+        with Then("Replica service should be used as interserver_http_host"):
+            for replica in replicas:
+                cfm = kubectl.get("configmap", f"chi-{chi}-deploy-confd-{cluster}-0-{replica}")
+                assert f"<interserver_http_host>chi-{chi}-{cluster}-0-{replica}</interserver_http_host>" in cfm["data"]["chop-generated-hostname-ports.xml"]
+
+
+        checkDataIsReplicated(replicas, 1)
+
+    with When("replicasUseFQDN is enabled"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-014-1-replication-2.yaml",
+            check={
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("FQDN should be used as interserver_http_host"):
+            for replica in replicas:
+                cfm = kubectl.get("configmap", f"chi-{chi}-deploy-confd-{cluster}-0-{replica}")
+                print(cfm["data"]["chop-generated-hostname-ports.xml"])
+                assert f"<interserver_http_host>chi-{chi}-{cluster}-0-{replica}." in cfm["data"]["chop-generated-hostname-ports.xml"]
+
+        checkDataIsReplicated(replicas, 2)
+
+    kubectl.delete_chi(chi)
+
+
+@TestScenario
 @Name("test_015. Test circular replication with hostNetwork")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0")
@@ -1007,34 +1041,35 @@ def test_015(self):
     kubectl.create_and_check(
         manifest="manifests/chi/test-015-host-network.yaml",
         check={
-            "pod_count": 2,
+            "object_counts": {
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
+                },
             "do_not_delete": 1,
         },
         timeout=600,
     )
+    # Sometimes DNS is not properly initialized in time
+    time.sleep(10)
 
-    time.sleep(30)
     with Then("Query from one server to another one should work"):
         out = clickhouse.query(
             "test-015-host-network",
             host="chi-test-015-host-network-default-0-0",
             port="10000",
-            sql="SELECT * FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)")
+            sql="SELECT count() FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)")
         note(f"remote out:\n{out}")
+        assert out == "1"
 
-    with Then("Distributed query should work"):
-        for _ in range(20):
-            time.sleep(10)
-            out = clickhouse.query_with_error(
+    with And("Distributed query should work"):
+        out = clickhouse.query_with_error(
                 "test-015-host-network",
                 host="chi-test-015-host-network-default-0-0",
                 port="10000",
                 sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10")
-            note(f"cluster out:\n{out}")
-            if out == "2":
-                break
-        else:
-            assert out == "2"
+        note(f"cluster out:\n{out}")
+        assert out == "2"
 
     kubectl.delete_chi("test-015-host-network")
 

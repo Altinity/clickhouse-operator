@@ -103,10 +103,7 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
 
     apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
-    if "chi_status" in check:
-        wait_chi_status(chi_name, check["chi_status"], ns=ns)
-    else:
-        wait_chi_status(chi_name, "Completed", ns=ns)
+    wait_chi_status(chi_name, "InProgress")
 
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns=ns)
@@ -134,6 +131,11 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
 
     if "do_not_delete" not in check:
         delete_chi(chi_name, ns=ns)
+
+    if "chi_status" in check:
+        wait_chi_status(chi_name, check["chi_status"], ns=ns)
+    else:
+        wait_chi_status(chi_name, "Completed", ns=ns)
 
 
 def get(kind, name, label="", ns=namespace, ok_to_fail=False):
