@@ -129,13 +129,13 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
     if "configmaps" in check:
         check_configmaps(chi_name, ns=ns)
 
-    if "do_not_delete" not in check:
-        delete_chi(chi_name, ns=ns)
-
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns)
     else:
         wait_chi_status(chi_name, "Completed", ns=ns)
+
+    if "do_not_delete" not in check:
+        delete_chi(chi_name, ns=ns)
 
 
 def get(kind, name, label="", ns=namespace, ok_to_fail=False):
