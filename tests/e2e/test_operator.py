@@ -1050,16 +1050,18 @@ def test_015(self):
         },
         timeout=600,
     )
-    # Sometimes DNS is not properly initialized in time
-    time.sleep(10)
 
     with Then("Query from one server to another one should work"):
-        out = clickhouse.query(
-            "test-015-host-network",
-            host="chi-test-015-host-network-default-0-0",
-            port="10000",
-            sql="SELECT count() FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)")
-        note(f"remote out:\n{out}")
+        for i in range(1, 10):
+            out = clickhouse.query_with_error(
+                "test-015-host-network",
+                host="chi-test-015-host-network-default-0-0",
+                port="10000",
+                sql="SELECT count() FROM remote('chi-test-015-host-network-default-0-1:11000', system.one)")
+            if "DNS_ERROR" not in out:
+                break
+            print(f"DNS_ERROR. Wait for {i * 5} seconds")
+            time.sleep(i*5)
         assert out == "1"
 
     with And("Distributed query should work"):
