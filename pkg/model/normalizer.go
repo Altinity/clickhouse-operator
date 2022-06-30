@@ -1290,10 +1290,11 @@ func (n *Normalizer) createHostsField(cluster *chiV1.ChiCluster) {
 }
 
 const (
-	SchemaPolicyReplicaNone = "None"
-	SchemaPolicyReplicaAll  = "All"
-	SchemaPolicyShardNone   = "None"
-	SchemaPolicyShardAll    = "All"
+	SchemaPolicyReplicaNone                = "None"
+	SchemaPolicyReplicaAll                 = "All"
+	SchemaPolicyShardNone                  = "None"
+	SchemaPolicyShardAll                   = "All"
+	SchemaPolicyShardDistributedTablesOnly = "DistributedTablesOnly"
 )
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
@@ -1316,6 +1317,8 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *chiV1.SchemaPolicy) *c
 		policy.Shard = SchemaPolicyShardNone
 	case strings.ToLower(SchemaPolicyShardAll):
 		policy.Shard = SchemaPolicyShardAll
+	case strings.ToLower(SchemaPolicyShardDistributedTablesOnly):
+		policy.Shard = SchemaPolicyShardDistributedTablesOnly
 	default:
 		policy.Shard = SchemaPolicyShardAll
 	}
