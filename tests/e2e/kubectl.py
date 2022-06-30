@@ -103,7 +103,10 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
 
     apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
-    wait_chi_status(chi_name, "InProgress")
+    if "chi_status" in check:
+        wait_chi_status(chi_name, check["chi_status"], ns=ns)
+    else:
+        wait_chi_status(chi_name, "Completed", ns=ns)
 
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns)
