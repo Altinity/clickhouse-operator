@@ -47,6 +47,22 @@ func NewSchemer(scheme, username, password string, port int) *Schemer {
 	}
 }
 
+func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
+	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
+
+	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardNone {
+		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
+		return false
+	}
+	if len(hosts) <= 1 {
+		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
+		return false
+	}
+
+	log.V(1).M(host).F().Info("Should create distributed objects the cluster: %v", hosts)
+	return true
+}
+
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
 // That includes all distributed tables, corresponding local tables and databases, if necessary
 func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
@@ -55,17 +71,10 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 		return nil, nil, nil
 	}
 
-	if host.GetCluster().SchemaPolicy.Shard != SchemaPolicyShardAll {
-		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
+	if !shouldCreateDistributedObjects(host) {
+		log.V(1).M(host).F().Info("Should not create distributed objects")
 		return nil, nil, nil
 	}
-
-	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
-	if len(hosts) <= 1 {
-		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
-		return nil, nil, nil
-	}
-	log.V(1).M(host).F().Info("Extracting distributed table definitions from the cluster: %v", hosts)
 
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
@@ -84,6 +93,33 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
 }
 
+func shouldCreateReplicatedObjects(host *chop.ChiHost) bool {
+	shard := CreateFQDNs(host, chop.ChiShard{}, false)
+	cluster := CreateFQDNs(host, chop.ChiCluster{}, false)
+
+	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardAll {
+		// We have explicit request to create replicated objects on each shard
+		// However, it is reasonable to have at least two instances in a cluster
+		if len(cluster) >= 2 {
+			log.V(1).M(host).F().Info("SchemaPolicy.Shard says we need replicated objects. Should create replicated objects for the shard: %v", shard)
+			return true
+		}
+	}
+
+	if host.GetCluster().SchemaPolicy.Replica == SchemaPolicyReplicaNone {
+		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
+		return false
+	}
+
+	if len(shard) <= 1 {
+		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
+		return false
+	}
+
+	log.V(1).M(host).F().Info("Should create replicated objects for the shard: %v", shard)
+	return true
+}
+
 // getReplicatedObjectsSQLs returns a list of objects that needs to be created on a host in a cluster
 func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
@@ -91,17 +127,10 @@ func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHo
 		return nil, nil, nil
 	}
 
-	if host.GetCluster().SchemaPolicy.Replica != SchemaPolicyReplicaAll {
-		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
+	if !shouldCreateReplicatedObjects(host) {
+		log.V(1).M(host).F().Info("Should not create replicated objects")
 		return nil, nil, nil
 	}
-
-	replicas := CreateFQDNs(host, chop.ChiShard{}, false)
-	if len(replicas) <= 1 {
-		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
-		return nil, nil, nil
-	}
-	log.V(1).M(host).F().Info("Extracting replicated table definitions from the shard: %v", replicas)
 
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
