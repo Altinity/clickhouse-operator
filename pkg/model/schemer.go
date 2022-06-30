@@ -47,6 +47,7 @@ func NewSchemer(scheme, username, password string, port int) *Schemer {
 	}
 }
 
+// shouldCreateDistributedObjects determines whether distributed objects should be created
 func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
 	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
 
@@ -93,6 +94,7 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
 }
 
+// shouldCreateReplicatedObjects determines whether replicated objects should be created
 func shouldCreateReplicatedObjects(host *chop.ChiHost) bool {
 	shard := CreateFQDNs(host, chop.ChiShard{}, false)
 	cluster := CreateFQDNs(host, chop.ChiCluster{}, false)
