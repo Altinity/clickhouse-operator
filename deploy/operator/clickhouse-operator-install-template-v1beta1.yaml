@@ -676,6 +676,7 @@ spec:
                               # List SchemaPolicyShardXXX constants from model
                               - "None"
                               - "All"
+                              - "DistributedTablesOnly"
                       layout:
                         type: object
                         description: |
@@ -2024,6 +2025,7 @@ spec:
                               # List SchemaPolicyShardXXX constants from model
                               - "None"
                               - "All"
+                              - "DistributedTablesOnly"
                       layout:
                         type: object
                         description: |
