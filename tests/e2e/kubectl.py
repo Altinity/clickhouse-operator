@@ -94,6 +94,8 @@ def delete_all_keeper(ns=namespace):
 def create_and_check(manifest, check, ns=namespace, timeout=900):
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(f'{manifest}'))
 
+    prev_taskID = get_field("chi", chi_name, ".status.taskID", ns)
+
     if "apply_templates" in check:
         debug("Need to apply additional templates")
         for t in check["apply_templates"]:
@@ -103,10 +105,9 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
 
     apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
-    if "chi_status" in check:
-        wait_chi_status(chi_name, check["chi_status"], ns=ns)
-    else:
-        wait_chi_status(chi_name, "Completed", ns=ns)
+    # Wait for reconcile to start before performing other checks
+    # wait_chi_status(chi_name, "InProgress")
+    wait_field_changed("chi", chi_name, ".status.taskID", prev_taskID, ns)
 
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns)
@@ -251,6 +252,16 @@ def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, back
                 time.sleep(i * backoff)
         assert cur_value == value, error()
 
+def wait_field_changed(kind, name, field, prev_value, ns=namespace, retries=max_retries, backoff=5):
+    with Then(f"{kind} {name} {field} should be different from {prev_value}"):
+        for i in range(1, retries):
+            cur_value = get_field(kind, name, field, ns)
+            if cur_value != "" and cur_value != prev_value:
+                break
+            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+                time.sleep(i * backoff)
+        assert cur_value != "" and cur_value != prev_value, error()
+
 
 def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
     with Then(f"{kind} {name} -o jsonpath={field} should be {value}"):
@@ -264,7 +275,9 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
 
 
 def get_field(kind, name, field, ns=namespace):
-    out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+    out = ""
+    if get_count(kind, name=name, ns=namespace) > 0:
+        out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     if len(out) > 1:
         return out[1]
     else:
