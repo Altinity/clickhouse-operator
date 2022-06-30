@@ -1933,6 +1933,10 @@ def test_028(self):
     kubectl.create_and_check(
         manifest=manifest,
         check={
+            "apply_templates": {
+                settings.clickhouse_template,
+                "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+            },
             "pod_count": 2,
             "do_not_delete": 1,
         },
@@ -1965,13 +1969,16 @@ def test_028(self):
                 while kubectl.get_field("chi", chi, ".status.status") == "InProgress":
                     ch1 = clickhouse.query_with_error(chi, sql, pod="chi-test-014-replication-default-0-0-0", host="chi-test-014-replication-default-0-0", advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10")
                     ch2 = clickhouse.query_with_error(chi, sql, pod="chi-test-014-replication-default-1-0-0", host="chi-test-014-replication-default-1-0", advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10")
-                    print(ch1 + "   " + ch2)
+
                     if "error" in ch1 or "Exception" in ch1 or ch2.endswith("1"):
                         ch1_downtime = ch1_downtime + 5
                     if "error" in ch2 or "Exception" in ch2 or ch1.endswith("1"):
                         ch2_downtime = ch2_downtime + 5
                     if ("error" in ch1 or "Exception" in ch1) and ("error" in ch2 or "Exception" in ch2):
                         chi_downtime = chi_downtime + 5
+
+                    print(ch1 + "\t" + ch2)
+
                     # print("Waiting 5 seconds")
                     time.sleep(5)
             end_time = time.time()
