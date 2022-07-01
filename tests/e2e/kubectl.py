@@ -105,9 +105,13 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
 
     apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
+    if "chi_status" in check:
+        wait_chi_status(chi_name, check["chi_status"], ns=ns)
+    else:
+        wait_chi_status(chi_name, "Completed", ns=ns)
     # Wait for reconcile to start before performing other checks
     # wait_chi_status(chi_name, "InProgress")
-    wait_field_changed("chi", chi_name, ".status.taskID", prev_taskID, ns)
+    #wait_field_changed("chi", chi_name, ".status.taskID", prev_taskID, ns)
 
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns)
