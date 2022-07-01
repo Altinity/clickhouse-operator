@@ -21,9 +21,9 @@ type ConnectionParams struct {
 }
 
 // NewConnectionParams creates new ConnectionParams
-func NewConnectionParams(scheme, hostname, username, password string, port int) *ConnectionParams {
+func NewConnectionParams(scheme, hostname, username, password, rootCA string, port int) *ConnectionParams {
 	return &ConnectionParams{
-		NewEndpointCredentials(scheme, hostname, username, password, port),
+		NewEndpointCredentials(scheme, hostname, username, password, rootCA, port),
 		NewTimeouts(),
 	}
 }

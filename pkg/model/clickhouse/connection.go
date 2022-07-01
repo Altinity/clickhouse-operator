@@ -17,15 +17,16 @@ package clickhouse
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	databasesql "database/sql"
 	"fmt"
 	"time"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-
 	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
 	goch "github.com/mailru/go-clickhouse"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func init() {
@@ -68,6 +69,21 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 
 // connect performs connect
 func (c *Connection) connect(ctx context.Context) {
+	// Add root CA
+	if c.params.rootCA != "" {
+		rootCAs := x509.NewCertPool()
+		if cert, err := x509.ParseCertificate([]byte(c.params.rootCA)); err != nil {
+			c.l.V(1).F().Error("unable to parse CERT specified in rootCA: %v", err)
+		} else {
+			rootCAs.AddCert(cert)
+			if err := goch.RegisterTLSConfig(tlsSettings, &tls.Config{
+				RootCAs: rootCAs,
+			}); err != nil {
+				c.l.V(1).F().Error("unable to register TLS config %v", err)
+			}
+		}
+	}
+
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
 	dbConnection, err := databasesql.Open("clickhouse", c.params.GetDSN())
 	if err != nil {

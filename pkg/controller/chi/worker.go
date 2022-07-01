@@ -85,6 +85,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 			chop.Config().ClickHouse.Access.Scheme,
 			chop.Config().ClickHouse.Access.Username,
 			chop.Config().ClickHouse.Access.Password,
+			chop.Config().ClickHouse.Access.RootCA,
 			chop.Config().ClickHouse.Access.Port,
 		),
 		start: start,

@@ -167,6 +167,7 @@ func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
 		hostname,
 		e.chAccessInfo.Username,
 		e.chAccessInfo.Password,
+		e.chAccessInfo.RootCA,
 		e.chAccessInfo.Port,
 	).SetQueryTimeout(e.timeout)
 }

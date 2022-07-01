@@ -132,9 +132,9 @@ type ClickHouseFetcher struct {
 }
 
 // NewClickHouseFetcher creates new clickhouse fetcher object
-func NewClickHouseFetcher(scheme, hostname, username, password string, port int) *ClickHouseFetcher {
+func NewClickHouseFetcher(scheme, hostname, username, password, rootCA string, port int) *ClickHouseFetcher {
 	return &ClickHouseFetcher{
-		connectionParams: clickhouse.NewConnectionParams(scheme, hostname, username, password, port),
+		connectionParams: clickhouse.NewConnectionParams(scheme, hostname, username, password, rootCA, port),
 	}
 }
 

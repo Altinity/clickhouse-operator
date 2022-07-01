@@ -55,7 +55,7 @@ const (
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
-	defaultChRootCA    = ""
+	defaultChRootCA   = ""
 
 	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
