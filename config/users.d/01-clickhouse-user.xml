@@ -3,8 +3,6 @@
         <clickhouse_operator>
             <networks>
                 <ip>127.0.0.1</ip>
-                <ip>0.0.0.0/0</ip>
-                <ip>::/0</ip>
             </networks>
             <password_sha256_hex>716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448</password_sha256_hex>
             <profile>clickhouse_operator</profile>
