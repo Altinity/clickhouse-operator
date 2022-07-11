@@ -1937,7 +1937,11 @@ def test_028(self):
                 settings.clickhouse_template,
                 "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
-            "pod_count": 2,
+            "object_counts": {
+                "statefulset": 2,
+                "pod": 2,
+                "service": 3,
+            },
             "do_not_delete": 1,
         },
     )
@@ -1998,7 +2002,7 @@ def test_028(self):
 
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3},
-                                   pod=f"chi-{chi}-default-0-0-0")
+                                  pod=f"chi-{chi}-default-0-0-0")
 
         with Then("Re-apply the original config. CHI should not be restarted"):
             kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1})

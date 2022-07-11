@@ -94,7 +94,8 @@ def delete_all_keeper(ns=namespace):
 def create_and_check(manifest, check, ns=namespace, timeout=900):
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(f'{manifest}'))
 
-    prev_taskID = get_field("chi", chi_name, ".status.taskID", ns)
+    # state_field = ".status.taskID"
+    # prev_state = get_field("chi", chi_name, state_field, ns)
 
     if "apply_templates" in check:
         debug("Need to apply additional templates")
@@ -105,13 +106,9 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
 
     apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
-    if "chi_status" in check:
-        wait_chi_status(chi_name, check["chi_status"], ns=ns)
-    else:
-        wait_chi_status(chi_name, "Completed", ns=ns)
-    # Wait for reconcile to start before performing other checks
-    # wait_chi_status(chi_name, "InProgress")
-    #wait_field_changed("chi", chi_name, ".status.taskID", prev_taskID, ns)
+    # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
+    # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
+    wait_chi_status(chi_name, "InProgress", ns=ns, retries=3, throw_error=False)
 
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns)
@@ -234,8 +231,8 @@ def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
         assert res == result, error()
 
 
-def wait_chi_status(chi, status, ns=namespace, retries=max_retries):
-    wait_field("chi", chi, ".status.status", status, ns, retries)
+def wait_chi_status(chi, status, ns=namespace, retries=max_retries, throw_error = True):
+    wait_field("chi", chi, ".status.status", status, ns, retries, throw_error = throw_error)
 
 
 def get_chi_status(chi, ns=namespace):
@@ -246,7 +243,7 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5):
+def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5, throw_error = True):
     with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
@@ -254,9 +251,9 @@ def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, back
                 break
             with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
                 time.sleep(i * backoff)
-        assert cur_value == value, error()
+        assert cur_value == value or throw_error == False, error()
 
-def wait_field_changed(kind, name, field, prev_value, ns=namespace, retries=max_retries, backoff=5):
+def wait_field_changed(kind, name, field, prev_value, ns=namespace, retries=max_retries, backoff=5, throw_error = True):
     with Then(f"{kind} {name} {field} should be different from {prev_value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
@@ -264,7 +261,7 @@ def wait_field_changed(kind, name, field, prev_value, ns=namespace, retries=max_
                 break
             with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
                 time.sleep(i * backoff)
-        assert cur_value != "" and cur_value != prev_value, error()
+        assert cur_value != "" and cur_value != prev_value or throw_error == False, error()
 
 
 def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
