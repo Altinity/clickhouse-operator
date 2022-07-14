@@ -33,7 +33,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     if len(cmd_args) > 1:
         cmd += " ".join(cmd_args[1:])
 
-    print(f"run command: {cmd}")
+    # print(f"run command: {cmd}")
 
     # Run command
     if hasattr(current().context, "shell"):

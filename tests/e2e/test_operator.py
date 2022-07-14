@@ -2007,6 +2007,8 @@ def test_028(self):
         with Then("Re-apply the original config. CHI should not be restarted"):
             kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1})
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            print(f"old_start_time: {start_time}")
+            print(f"new_start_time: {new_start_time}")
             assert start_time == new_start_time
 
     with When("Stop installation"):

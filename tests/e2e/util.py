@@ -42,14 +42,18 @@ def set_metrics_exporter_version(version, ns=settings.operator_namespace):
 def restart_operator(ns=settings.operator_namespace, timeout=600):
     if settings.operator_install != 'yes':
         return
-    pod_name = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]["metadata"]["name"]
-    print(f"delete pod: {pod_name}")
-    kubectl.launch(f"delete pod {pod_name}", ns=ns, timeout=timeout)
-    time.sleep(10)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    old_pod_name = pod["metadata"]["name"]
+    old_pod_ip = pod["status"]["podIP"]
+    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout)
     kubectl.wait_object("pod", name="", ns=ns, label=operator_label)
-    pod_name = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]["metadata"]["name"]
-    print(f"found pod: {pod_name}")
-    kubectl.wait_pod_status(pod_name, "Running", ns=ns)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    new_pod_name = pod["metadata"]["name"]
+    kubectl.wait_pod_status(new_pod_name, "Running", ns=ns)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    new_pod_ip = pod["status"]["podIP"]
+    print(f"old operator pod: {old_pod_name} ip: {old_pod_ip}")
+    print(f"new operator pod: {new_pod_name} ip: {new_pod_ip}")
 
 
 def require_keeper(keeper_manifest='', keeper_type='zookeeper', force_install=False):
