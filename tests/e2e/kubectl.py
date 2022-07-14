@@ -253,7 +253,8 @@ def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, back
                 break
             with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
                 time.sleep(i * backoff)
-        assert cur_value == value or throw_error == False, error()
+        assert cur_value == value or throw_error is False, error()
+
 
 def wait_field_changed(kind, name, field, prev_value, ns=namespace, retries=max_retries, backoff=5, throw_error = True):
     with Then(f"{kind} {name} {field} should be different from {prev_value}"):
@@ -386,7 +387,7 @@ def get_pvc_size(pvc_name, ns=namespace):
     return get_field("pvc", pvc_name, ".spec.resources.requests.storage", ns)
 
 
-def check_pod_antiaffinity(chi_name, pod_name = "", match_labels = {}, topologyKey = "kubernetes.io/hostname", ns=namespace):
+def check_pod_antiaffinity(chi_name, pod_name="", match_labels={}, topologyKey="kubernetes.io/hostname", ns=namespace):
     pod_spec = get_pod_spec(chi_name, pod_name, ns)
     if match_labels == {}:
         match_labels = {
