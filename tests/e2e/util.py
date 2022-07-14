@@ -44,6 +44,7 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
         return
     pod_name = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]["metadata"]["name"]
     kubectl.launch(f"delete pod {pod_name}", ns=ns, timeout=timeout)
+    time.sleep(10)
     kubectl.wait_object("pod", name="", ns=ns, label=operator_label)
     pod_name = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]["metadata"]["name"]
     kubectl.wait_pod_status(pod_name, "Running", ns=ns)
