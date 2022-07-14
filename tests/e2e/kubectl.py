@@ -233,8 +233,8 @@ def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
         assert res == result, error()
 
 
-def wait_chi_status(chi, status, ns=namespace, retries=max_retries, throw_error = True):
-    wait_field("chi", chi, ".status.status", status, ns, retries, throw_error = throw_error)
+def wait_chi_status(chi, status, ns=namespace, retries=max_retries, throw_error=True):
+    wait_field("chi", chi, ".status.status", status, ns, retries, throw_error=throw_error)
 
 
 def get_chi_status(chi, ns=namespace):
