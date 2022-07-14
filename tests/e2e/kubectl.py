@@ -245,7 +245,7 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5, throw_error = True):
+def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5, throw_error=True):
     with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
@@ -279,7 +279,7 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
 
 def get_field(kind, name, field, ns=namespace):
     out = ""
-    if get_count(kind, name=name, ns=namespace) > 0:
+    if get_count(kind, name=name, ns=ns) > 0:
         out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     if len(out) > 1:
         return out[1]
