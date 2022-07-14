@@ -22,6 +22,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/sanity-io/litter"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -305,7 +306,7 @@ func updated(old, new *core.Endpoints) bool {
 	}
 
 	if assigned {
-		log.V(1).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED %v", new.Subsets)
+		log.V(1).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
 		return true
 	}
 

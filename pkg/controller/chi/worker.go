@@ -247,7 +247,7 @@ func (w *worker) normalize(c *chiv1.ClickHouseInstallation) *chiv1.ClickHouseIns
 	}
 
 	ips := w.c.getPodsIPs(chi)
-	w.a.V(1).M(chi).Info("IPs of the CHI %v", ips)
+	w.a.V(1).M(chi).Info("IPs of the CHI %s/%s: %v", chi.Namespace, chi.Name, ips)
 	opts := chopmodel.NewNormalizerOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
