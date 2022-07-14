@@ -62,7 +62,7 @@ func (c *Controller) deleteLabelReady(ctx context.Context, host *chop.ChiHost) e
 
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.V(1).M(host).F().Info("FAIL get pod for host '%'s err: %v", host.Address.NamespaceNameString(), err)
+		log.V(1).M(host).F().Info("FAIL get pod for host '%s' err: %v", host.Address.NamespaceNameString(), err)
 		return err
 	}
 
