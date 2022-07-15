@@ -6,8 +6,8 @@ metadata:
   name: test-014-replication
 
 spec:
-  reconciling:
-    policy: wait
+  # reconciling:
+  #  policy: wait
   useTemplates:
     - name: clickhouse-version
     - name: persistent-volume
@@ -21,4 +21,7 @@ spec:
     clusters:
       - name: default
         layout:
-          replicasCount: 2
+          replicasCount: 1
+          shardsCount: 2
+    profiles:
+      default/database_atomic_wait_for_drop_and_detach_synchronously: 1

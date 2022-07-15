@@ -1,0 +1,33 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "settings-network"
+spec:
+  configuration:
+    users:
+      admin/networks/ip:
+        - 0.0.0.0/0
+        - '::/0'
+      admin/password_sha256_hex: 497b22d4e86a3caa9f5baa24435a99ac1154094a0b9302b9bcd9d6544d6efbe9
+      admin/profile: default
+      admin/quota: default
+
+      altinity/networks/ip:
+        - 0.0.0.0/0
+        - '::/0'
+      altinity/password_sha256_hex: 85c010e978f03501bf5e7e19077a16420b5ea721bea27bccdf1cb932cc91ef98
+      altinity/profile: default
+      altinity/quota: default
+
+      default/profile: default
+      default/quota: default
+      default/networks/ip:
+        - 127.0.0.1
+        - 127.0.0.2
+
+      user1/networks/ip: "::/0"
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+          replicasCount: 1

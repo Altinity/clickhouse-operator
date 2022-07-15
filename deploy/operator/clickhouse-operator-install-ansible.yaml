@@ -17,7 +17,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -126,6 +126,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -193,6 +196,11 @@ spec:
                 pods:
                   type: array
                   description: "Pods"
+                  items:
+                    type: string
+                pod-ips:
+                  type: array
+                  description: "Pod IPs"
                   items:
                     type: string
                 fqdns:
@@ -664,6 +672,26 @@ spec:
                               volumeClaimTemplate:
                                 type: string
                                 description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
+                          schemaPolicy:
+                            type: object
+                            description: |
+                              describes how schema is propagated within replicas and shards
+                            properties:
+                              replica:
+                                type: string
+                                description: "how schema is propagated within a replica"
+                                enum:
+                                  # List SchemaPolicyReplicaXXX constants from model
+                                  - "None"
+                                  - "All"
+                              shard:
+                                type: string
+                                description: "how schema is propagated between shards"
+                                enum:
+                                  # List SchemaPolicyShardXXX constants from model
+                                  - "None"
+                                  - "All"
+                                  - "DistributedTablesOnly"
                           layout:
                             type: object
                             description: |
@@ -1351,7 +1379,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1460,6 +1488,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -1527,6 +1558,11 @@ spec:
                 pods:
                   type: array
                   description: "Pods"
+                  items:
+                    type: string
+                pod-ips:
+                  type: array
+                  description: "Pod IPs"
                   items:
                     type: string
                 fqdns:
@@ -1998,6 +2034,26 @@ spec:
                               volumeClaimTemplate:
                                 type: string
                                 description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
+                          schemaPolicy:
+                            type: object
+                            description: |
+                              describes how schema is propagated within replicas and shards
+                            properties:
+                              replica:
+                                type: string
+                                description: "how schema is propagated within a replica"
+                                enum:
+                                  # List SchemaPolicyReplicaXXX constants from model
+                                  - "None"
+                                  - "All"
+                              shard:
+                                type: string
+                                description: "how schema is propagated between shards"
+                                enum:
+                                  # List SchemaPolicyShardXXX constants from model
+                                  - "None"
+                                  - "All"
+                                  - "DistributedTablesOnly"
                           layout:
                             type: object
                             description: |
@@ -2682,7 +2738,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2791,6 +2847,9 @@ spec:
                         password:
                           type: string
                           description: "ClickHouse password to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"
+                        rootCA:
+                          type: string
+                          description: "Root certificate authority that clients use when verifying server certificates. Used for https connection to ClickHouse"
                         secret:
                           type: object
                           properties:
@@ -2979,7 +3038,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
 ---
 # Template Parameters:
 #
@@ -2996,7 +3055,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
 rules:
 - apiGroups:
     - ""
@@ -3153,7 +3212,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -3175,13 +3234,16 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
     app: clickhouse-operator
 data:
   config.yaml: |
     # IMPORTANT
-    # This file is auto-generated from deploy/builder/templates-config.
-    # It will be overwritten upon next sources build.
+    # This file is auto-generated
+    # Do not edit this file - all changes would be lost
+    # Edit appropriate template in the following folder:
+    # deploy/builder/templates-config
+    # IMPORTANT
     #
     # Template parameters available:
     #   watchNamespaces
@@ -3406,7 +3468,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
     app: clickhouse-operator
 data:
 ---
@@ -3422,10 +3484,16 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
     <yandex>
         <!-- Listen wildcard address to allow accepting connections from other containers and host network. -->
         <listen_host>::</listen_host>
@@ -3434,6 +3502,12 @@ data:
     </yandex>
 
   01-clickhouse-02-logger.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
     <yandex>
         <logger>
             <!-- Possible levels: https://github.com/pocoproject/poco/blob/develop/Foundation/include/Poco/Logger.h#L105 -->
@@ -3448,6 +3522,12 @@ data:
     </yandex>
 
   01-clickhouse-03-query_log.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
     <yandex>
         <query_log replace="1">
             <database>system</database>
@@ -3459,6 +3539,12 @@ data:
     </yandex>
 
   01-clickhouse-04-part_log.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
     <yandex>
         <part_log replace="1">
             <database>system</database>
@@ -3481,7 +3567,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3581,17 +3667,21 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
     app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
     <yandex>
         <users>
             <clickhouse_operator>
                 <networks>
                     <ip>127.0.0.1</ip>
-                    <ip>0.0.0.0/0</ip>
-                    <ip>::/0</ip>
                 </networks>
                 <password_sha256_hex>{{ password | password_hash('sha256') }}</password_sha256_hex>
                 <profile>clickhouse_operator</profile>
@@ -3608,6 +3698,12 @@ data:
     </yandex>
 
   02-clickhouse-default-profile.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
     <yandex>
       <profiles>
         <default>
@@ -3619,6 +3715,12 @@ data:
       </profiles>
     </yandex>
   03-database-ordinary.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
     <!--  Remove it for ClickHouse versions before 20.4 -->
     <yandex>
         <profiles>
@@ -3632,8 +3734,10 @@ data:
 #
 # NAMESPACE={{ namespace }}
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.18.5
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.18.5
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.19.0
+# OPERATOR_IMAGE_PULL_POLICY=Always
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.19.0
+# METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
 # Deployment would be created in kubectl-specified namespace
@@ -3643,7 +3747,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3677,7 +3781,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.18.5
+          image: altinity/clickhouse-operator:0.19.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3742,7 +3846,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.18.5
+          image: altinity/metrics-exporter:0.19.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3775,7 +3879,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.18.5
+    clickhouse.altinity.com/chop: 0.19.0
     app: clickhouse-operator
 spec:
   ports:

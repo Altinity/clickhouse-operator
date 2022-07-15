@@ -22,6 +22,11 @@ def get_docker_compose_path():
 kubectl_cmd = "kubectl" \
     if current().context.native \
     else f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
+
+kubectl_cmd = os.getenv('KUBECTL_CMD') \
+    if 'KUBECTL_CMD' in os.environ \
+    else kubectl_cmd
+
 test_namespace = os.getenv('TEST_NAMESPACE') \
     if 'TEST_NAMESPACE' in os.environ \
     else "test"
@@ -40,10 +45,15 @@ minio_namespace = os.getenv('MINIO_NAMESPACE') \
 operator_docker_repo = os.getenv('OPERATOR_DOCKER_REPO') \
     if 'OPERATOR_DOCKER_REPO' in os.environ \
     else "altinity/clickhouse-operator"
-metrics_exporter_docker_repo = "altinity/metrics-exporter"
+metrics_exporter_docker_repo = os.getenv('METRICS_EXPORTER_DOCKER_REPO') \
+    if 'METRICS_EXPORTER_DOCKER_REPO' in os.environ \
+    else "altinity/metrics-exporter"
 clickhouse_operator_install_manifest = os.getenv('CLICKHOUSE_OPERATOR_INSTALL_MANIFEST') \
     if 'CLICKHOUSE_OPERATOR_INSTALL_MANIFEST' in os.environ \
     else '../../deploy/operator/clickhouse-operator-install-template.yaml'
+image_pull_policy = os.getenv('IMAGE_PULL_POLICY') \
+    if 'IMAGE_PULL_POLICY' in os.environ \
+    else "Always"
 
 # clickhouse_template = "manifests/chit/tpl-clickhouse-stable.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-19.17.yaml"

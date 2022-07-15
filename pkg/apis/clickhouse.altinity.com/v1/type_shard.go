@@ -51,6 +51,18 @@ func (shard *ChiShard) WalkHosts(f func(host *ChiHost) error) []error {
 	return res
 }
 
+// FirstHost finds first host in the shard
+func (shard *ChiShard) FirstHost() *ChiHost {
+	var result *ChiHost
+	shard.WalkHosts(func(host *ChiHost) error {
+		if result == nil {
+			result = host
+		}
+		return nil
+	})
+	return result
+}
+
 // HostsCount returns count of hosts in the shard
 func (shard *ChiShard) HostsCount() int {
 	count := 0

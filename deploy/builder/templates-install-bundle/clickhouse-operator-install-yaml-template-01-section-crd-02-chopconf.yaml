@@ -116,6 +116,9 @@ spec:
                         password:
                           type: string
                           description: "ClickHouse password to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"
+                        rootCA:
+                          type: string
+                          description: "Root certificate authority that clients use when verifying server certificates. Used for https connection to ClickHouse"
                         secret:
                           type: object
                           properties:

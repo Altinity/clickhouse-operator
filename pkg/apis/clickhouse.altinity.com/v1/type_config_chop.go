@@ -55,6 +55,7 @@ const (
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
+	defaultChRootCA   = ""
 
 	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
@@ -147,9 +148,10 @@ type OperatorConfigClickHouse struct {
 		// 1. Metrics requests
 		// 2. Schema maintenance
 		// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-		Scheme   string `json:"scheme" yaml:"scheme"`
+		Scheme   string `json:"scheme"   yaml:"scheme"`
 		Username string `json:"username" yaml:"username"`
 		Password string `json:"password" yaml:"password"`
+		RootCA   string `json:"rootCA"   yaml:"rootCA"`
 
 		// Location of k8s Secret with username and password to be used by the operator to connect to ClickHouse instances
 		// Can be used instead of explicitly specified (above) username and password
@@ -657,7 +659,9 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	if c.ClickHouse.Access.Password == "" {
 		c.ClickHouse.Access.Password = defaultChPassword
 	}
-
+	if c.ClickHouse.Access.RootCA == "" {
+		c.ClickHouse.Access.RootCA = defaultChRootCA
+	}
 	// config.CHCredentialsSecretNamespace
 	// config.CHCredentialsSecretName
 

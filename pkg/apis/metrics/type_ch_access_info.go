@@ -19,15 +19,17 @@ type CHAccessInfo struct {
 	Scheme   string
 	Username string
 	Password string
+	RootCA   string
 	Port     int
 }
 
 // NewCHAccessInfo creates new CHAccessInfo from specified access info
-func NewCHAccessInfo(scheme, username, password string, port int) *CHAccessInfo {
+func NewCHAccessInfo(scheme, username, password, rootCA string, port int) *CHAccessInfo {
 	return &CHAccessInfo{
 		Scheme:   scheme,
 		Username: username,
 		Password: password,
+		RootCA:   rootCA,
 		Port:     port,
 	}
 }

@@ -10,6 +10,12 @@ spec:
       # default user should be security to localhost and interhost connections
       # operator creates host_regxp expression for that
       # default/networks/host_regexp: \.chi-test-011-secure-user-[^.]+-\d+-\d+\.test.svc.cluster.local$
+      default/profile: default
+      default/quota: default
+      default/networks/ip:
+      - 127.0.0.1
+      - 127.0.0.2
+      # user1 with a password
       user1/password: topsecret
       user1/networks/ip: "::/0"
       # user2 should get default password automatically
@@ -23,6 +29,10 @@ spec:
       # User with access control enabled
       user4/password: secret
       user4/access_management: 1
+      # User with google.com as a host filter can not login
+      user5/password: secret
+      user5/networks/ip: "::/0"
+      user5/networks/host: www.google.com
     clusters:
     - name: default
       layout:

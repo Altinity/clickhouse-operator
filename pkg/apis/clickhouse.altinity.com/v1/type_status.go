@@ -19,6 +19,7 @@ type ChiStatus struct {
 	CHOpVersion       string                  `json:"chop-version,omitempty"     yaml:"chop-version,omitempty"`
 	CHOpCommit        string                  `json:"chop-commit,omitempty"      yaml:"chop-commit,omitempty"`
 	CHOpDate          string                  `json:"chop-date,omitempty"        yaml:"chop-date,omitempty"`
+	CHOpIP            string                  `json:"chop-ip,omitempty"          yaml:"chop-ip,omitempty"`
 	ClustersCount     int                     `json:"clusters"                   yaml:"clusters"`
 	ShardsCount       int                     `json:"shards"                     yaml:"shards"`
 	ReplicasCount     int                     `json:"replicas"                   yaml:"replicas"`
@@ -36,6 +37,7 @@ type ChiStatus struct {
 	DeletedHostsCount int                     `json:"deleted,omitempty"          yaml:"deleted,omitempty"`
 	DeleteHostsCount  int                     `json:"delete,omitempty"           yaml:"delete,omitempty"`
 	Pods              []string                `json:"pods,omitempty"             yaml:"pods,omitempty"`
+	PodIPs            []string                `json:"pod-ips,omitempty"          yaml:"pod-ips,omitempty"`
 	FQDNs             []string                `json:"fqdns,omitempty"            yaml:"fqdns,omitempty"`
 	Endpoint          string                  `json:"endpoint,omitempty"         yaml:"endpoint,omitempty"`
 	Generation        int64                   `json:"generation,omitempty"       yaml:"generation,omitempty"`
@@ -53,6 +55,14 @@ func (s *ChiStatus) PushAction(action string) {
 	s.Actions = append([]string{action}, s.Actions...)
 	if len(s.Actions) > maxActions {
 		s.Actions = s.Actions[:maxActions]
+	}
+}
+
+// PushError sets and pushes error into status
+func (s *ChiStatus) PushError(error string) {
+	s.Errors = append([]string{error}, s.Errors...)
+	if len(s.Errors) > maxErrors {
+		s.Errors = s.Errors[:maxErrors]
 	}
 }
 

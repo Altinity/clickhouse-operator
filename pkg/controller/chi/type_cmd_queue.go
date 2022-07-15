@@ -15,7 +15,8 @@
 package chi
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/queue"
 
@@ -42,6 +43,7 @@ const (
 	priorityReconcileCHI        int = 10
 	priorityReconcileCHIT       int = 5
 	priorityReconcileChopConfig int = 3
+	priorityReconcileEndpoints  int = 15
 	priorityDropDNS             int = 7
 )
 
@@ -162,10 +164,44 @@ func NewReconcileChopConfig(cmd string, old, new *chi.ClickHouseOperatorConfigur
 	}
 }
 
+// ReconcileChopConfig specifies CHOp config queue item
+type ReconcileEndpoints struct {
+	PriorityQueueItem
+	cmd string
+	old *corev1.Endpoints
+	new *corev1.Endpoints
+}
+
+var _ queue.PriorityQueueItem = &ReconcileEndpoints{}
+
+// Handle returns handle of the queue item
+func (r ReconcileEndpoints) Handle() queue.T {
+	if r.new != nil {
+		return "ReconcileEndpoints" + ":" + r.new.Namespace + "/" + r.new.Name
+	}
+	if r.old != nil {
+		return "ReconcileEndpoints" + ":" + r.old.Namespace + "/" + r.old.Name
+	}
+	return ""
+	return ""
+}
+
+// NewReconcileEndpoints creates new reconcile endpoints queue item
+func NewReconcileEndpoints(cmd string, old, new *corev1.Endpoints) *ReconcileEndpoints {
+	return &ReconcileEndpoints{
+		PriorityQueueItem: PriorityQueueItem{
+			priority: priorityReconcileEndpoints,
+		},
+		cmd: cmd,
+		old: old,
+		new: new,
+	}
+}
+
 // DropDns specifies drop dns queue item
 type DropDns struct {
 	PriorityQueueItem
-	initiator *v1.ObjectMeta
+	initiator *metav1.ObjectMeta
 }
 
 var _ queue.PriorityQueueItem = &DropDns{}
@@ -179,7 +215,7 @@ func (r DropDns) Handle() queue.T {
 }
 
 // NewDropDns creates new drop dns queue item
-func NewDropDns(initiator *v1.ObjectMeta) *DropDns {
+func NewDropDns(initiator *metav1.ObjectMeta) *DropDns {
 	return &DropDns{
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityDropDNS,

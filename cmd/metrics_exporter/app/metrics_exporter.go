@@ -101,6 +101,7 @@ func Run() {
 			chop.Config().ClickHouse.Access.Scheme,
 			chop.Config().ClickHouse.Access.Username,
 			chop.Config().ClickHouse.Access.Password,
+			chop.Config().ClickHouse.Access.RootCA,
 			chop.Config().ClickHouse.Access.Port,
 		),
 

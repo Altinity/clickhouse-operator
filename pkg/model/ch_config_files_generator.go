@@ -113,7 +113,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *chi.Ch
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.chConfigGenerator.GetHostMacros(host))
-	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configPorts), c.chConfigGenerator.GetHostPorts(host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configHostnamePorts), c.chConfigGenerator.GetHostHostnameAndPorts(host))
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configZookeeper), c.chConfigGenerator.GetHostZookeeper(host))
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(host))
 	util.MergeStringMapsOverwrite(hostConfigSections, c.chConfigGenerator.GetFiles(chi.SectionHost, true, host))

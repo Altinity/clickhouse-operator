@@ -6,7 +6,7 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    "/regression/e2e.test_operator/test_023*": [(Fail, "Template annotations do not work")],
+    # "/regression/e2e.test_operator/test_023*": [(Fail, "Template annotations do not work")],
 
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
@@ -20,6 +20,10 @@ xfails = {
     "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
         (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465")
     ],
+    "/regression/e2e.test_keeper/test_clickhouse_keeper_probes_workload*": [
+        (Fail, "clickhouse-keeper fail after insert 10000 parts")
+    ],
+
 }
 
 

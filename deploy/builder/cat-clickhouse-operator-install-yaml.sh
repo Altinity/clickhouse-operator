@@ -31,7 +31,9 @@ METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 RELEASE_VERSION=$(cat "${PROJECT_ROOT}/release")
 OPERATOR_VERSION="${OPERATOR_VERSION:-"${RELEASE_VERSION}"}"
 OPERATOR_IMAGE="${OPERATOR_IMAGE:-"altinity/clickhouse-operator:${OPERATOR_VERSION}"}"
+OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY:-"Always"}"
 METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:${OPERATOR_VERSION}"}"
+METRICS_EXPORTER_IMAGE_PULL_POLICY="${METRICS_EXPORTER_IMAGE_PULL_POLICY:-"Always"}"
 
 # Render configs into temp config folder
 TMP_CONFIG_DIR="${PROJECT_TEMP}/$(date +%s)"
@@ -246,12 +248,14 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment.yaml"
         ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
         render_separator
-        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-            COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
-            NAMESPACE="${OPERATOR_NAMESPACE}"                  \
-            OPERATOR_IMAGE="${OPERATOR_IMAGE}"                 \
-            METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
-            OPERATOR_VERSION="${OPERATOR_VERSION}"             \
+        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |                                  \
+            COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")"             \
+            NAMESPACE="${OPERATOR_NAMESPACE}"                                          \
+            OPERATOR_IMAGE="${OPERATOR_IMAGE}"                                         \
+            OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY}"                 \
+            METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}"                         \
+            METRICS_EXPORTER_IMAGE_PULL_POLICY="${METRICS_EXPORTER_IMAGE_PULL_POLICY}" \
+            OPERATOR_VERSION="${OPERATOR_VERSION}"                                     \
             envsubst
     else
         # Config file specified, render all ConfigMaps and then render deployment
@@ -325,12 +329,14 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml"
         ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
         render_separator
-        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-            COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
-            NAMESPACE="${OPERATOR_NAMESPACE}"                  \
-            OPERATOR_IMAGE="${OPERATOR_IMAGE}"                 \
-            METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
-            OPERATOR_VERSION="${OPERATOR_VERSION}"             \
+        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |                                  \
+            COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")"             \
+            NAMESPACE="${OPERATOR_NAMESPACE}"                                          \
+            OPERATOR_IMAGE="${OPERATOR_IMAGE}"                                         \
+            OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY}"                 \
+            METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}"                         \
+            METRICS_EXPORTER_IMAGE_PULL_POLICY="${METRICS_EXPORTER_IMAGE_PULL_POLICY}" \
+            OPERATOR_VERSION="${OPERATOR_VERSION}"                                     \
             envsubst
     fi
 fi
