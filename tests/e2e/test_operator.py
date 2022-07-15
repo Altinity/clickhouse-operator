@@ -2142,6 +2142,54 @@ def test_032(self):
     kubectl.delete_chi(chi)
     kubectl.launch(f"delete pod clickhouse-test-032-client", ns=kubectl.namespace, timeout=600)
 
+
+@TestScenario
+@Name("test_033. Check HTTPS support for health check")
+def test_033(self):
+    def check_monitoring_metrics(operator_namespace, operator_pod, expect_result, max_retries=10):
+        with Then(f"metrics-exporter /metrics endpoint result should match with {expect_result}"):
+            for i in range(1, max_retries):
+                url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
+                out = kubectl.launch(
+                    f"exec {operator_pod} -c metrics-exporter -- {url_cmd}",
+                    ns=operator_namespace
+                )
+                
+                all_strings_expected_done = True
+                for string, exists in expect_result.items():
+                    all_strings_expected_done = (exists == (string in out))
+                    if not all_strings_expected_done:
+                        break
+
+                if all_strings_expected_done:
+                    break
+                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                    time.sleep(i * 5)
+            assert all_strings_expected_done, error()
+
+    with Given("clickhouse-operator pod exists"):
+        kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
+                           ns=settings.operator_namespace)
+        assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
+        # launch clickhouse-operator and metrics-exporter
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
+        operator_namespace = settings.operator_namespace
+
+    with When("reboot metrics exporter to update the configuration"):
+        kubectl.launch(f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter -- bash -c 'kill 1'")
+        time.sleep(15)
+        kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
+                            ns=settings.operator_namespace)        
+
+    # for https metrics monitoring should be failed with values greater than 0
+    # for http metrics monitoring should be successful with values 0
+    with And("check for 'chi_clickhouse_metric_fetch_errors'"):
+        check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
+            'chi_clickhouse_metric_fetch_errors': True,
+        })
+
+  
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
