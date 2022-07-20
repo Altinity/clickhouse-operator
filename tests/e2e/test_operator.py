@@ -2162,7 +2162,6 @@ def test_033(self):
                 
                 rx = re.compile(expect_pattern,re.MULTILINE)
                 matches = rx.findall(out)
-                print(matches)
                 expected_pattern_found = False
                 if matches:
                     expected_pattern_found = True
@@ -2177,6 +2176,8 @@ def test_033(self):
         kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
                            ns=settings.operator_namespace)
         assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        operator_namespace = settings.operator_namespace
 
     with When("create the chi"):
         manifest = "manifests/chi/test-033-https-check.yaml"
@@ -2209,7 +2210,6 @@ def test_033(self):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
-        operator_namespace = settings.operator_namespace
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` string with non zero value at the end"):
         check_monitoring_metrics_failure(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 1$")
