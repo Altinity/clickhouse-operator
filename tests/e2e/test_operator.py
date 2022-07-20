@@ -2147,6 +2147,10 @@ def test_032(self):
 @TestScenario
 @Name("test_033. Check HTTPS support for health check")
 def test_033(self):
+    """Check HTTPS support by switching configuration to HTTPS using chopconf file and
+    monitor the metrics endpoint on the port 8888."""
+    chopconf_file = "manifests/chopconf/test-033-chopconf.yaml"
+
     def check_monitoring_metrics_failure(operator_namespace, operator_pod, expect_pattern, max_retries=10):
         with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
             for i in range(1, max_retries):
@@ -2198,8 +2202,8 @@ def test_033(self):
         kubectl.wait_jsonpath("pod", "chi-test-033-https-check-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
-    with And(f"apply ClickHouseOperatorConfiguration {settings.chopconf_test_033}"):
-        kubectl.apply(util.get_full_path(settings.chopconf_test_033, lookup_in_host=False), operator_namespace)
+    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file}"):
+        kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration"):
         util.restart_operator()
