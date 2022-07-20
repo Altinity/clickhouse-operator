@@ -81,9 +81,8 @@ clickhouse:
       # Can be used instead of explicitly specified username and password
       namespace: ""
       name: ""
-    schema: https
     # Port where to connect to ClickHouse instances to
-    port: 8443
+    port: 8123
 
 ################################################
 ##
