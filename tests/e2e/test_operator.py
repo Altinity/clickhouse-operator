@@ -2179,7 +2179,7 @@ def test_033(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_namespace = settings.operator_namespace
 
-    with When("create the chi"):
+    with When("create the chi without secure connection"):
         manifest = "manifests/chi/test-033-https-check.yaml"
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
@@ -2203,7 +2203,7 @@ def test_033(self):
         kubectl.wait_jsonpath("pod", "chi-test-033-https-check-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
-    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file}"):
+    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration"):
@@ -2214,10 +2214,59 @@ def test_033(self):
     with Then("check for `chi_clickhouse_metric_fetch_errors` string with non zero value at the end"):
         check_monitoring_metrics_failure(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 1$")
 
+    with When("remove the ClickHouseOperatorConfiguration"):
+        kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
+
+    with And("reboot metrics exporter to update the configuration"):
+        util.restart_operator()
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
+
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
+        check_monitoring_metrics_failure(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
+
     with When("delete the chi"):
         kubectl.delete_chi(chi)
 
-  
+    with When("create the chi with secure connection"):
+        manifest = "manifests/chi/test-033-https-check-secure.yaml"
+        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+                },
+                "object_counts": {
+                    "statefulset": 1,
+                    "pod": 1,
+                    "service": 2,
+                },
+                "do_not_delete": 1,
+            },
+            timeout=600,
+        )
+        
+        kubectl.wait_jsonpath("pod", "chi-test-033-https-check-secure-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
+                            ns=kubectl.namespace)
+
+    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
+        kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
+
+    with And("reboot metrics exporter to update the configuration"):
+        util.restart_operator()
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
+    
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
+        check_monitoring_metrics_failure(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
+
+    with When("delete the chi"):
+        kubectl.delete_chi(chi)
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
