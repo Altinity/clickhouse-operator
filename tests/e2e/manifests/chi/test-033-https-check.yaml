@@ -17,8 +17,8 @@ spec:
         - host: zookeeper
           port: 2181
     users:
-      test_032/password: test_033
-      test_032/networks/ip: 0.0.0.0/0           
+      test_033/password: test_033
+      test_033/networks/ip: 0.0.0.0/0           
     clusters:
       - name: default
         layout:
