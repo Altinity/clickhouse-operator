@@ -410,7 +410,7 @@ func createTableReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
