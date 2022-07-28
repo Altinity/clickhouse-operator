@@ -804,6 +804,7 @@ def test_014(self):
         'test_local_014',
         'test_view_014',
         'test_mv_014',
+        'test_lv_014',
         'test_buffer_014',
         'a_view_014',
         'test_local2_014',
@@ -820,11 +821,12 @@ def test_014(self):
         "CREATE VIEW test_view_014 as SELECT * FROM test_local_014",
         "CREATE VIEW a_view_014 as SELECT * FROM test_view_014",
         "CREATE MATERIALIZED VIEW test_mv_014 Engine = Log as SELECT * from test_local_014",
+        "CREATE LIVE VIEW test_lv_014 as SELECT * from test_local_014",
         "CREATE DICTIONARY test_dict_014 (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local_014' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
         "CREATE TABLE test_buffer_014(a Int8) Engine = Buffer(default, test_local_014, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
         "CREATE DATABASE test_atomic_014 ON CLUSTER '{cluster}' Engine = Atomic",
         "CREATE TABLE test_atomic_014.test_local2_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
-        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
+        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{uuid}', '{replica}') ORDER BY tuple()",
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())"
     ]
     with Given("Create schema objects"):
