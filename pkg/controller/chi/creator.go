@@ -96,7 +96,7 @@ func (c *Controller) updateStatefulSet(
 	return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
 }
 
-// updateStatefulSet is an internal function, used in reconcileStatefulSet only
+// updatePersistentVolume
 func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	log.V(2).M(pv).F().P()
 	if util.IsContextDone(ctx) {
@@ -115,6 +115,7 @@ func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.Persiste
 	return pv, err
 }
 
+// updatePersistentVolumeClaim
 func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
