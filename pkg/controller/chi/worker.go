@@ -1876,7 +1876,7 @@ func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) chiv1.StatefulSetSta
 		if curHasLabel && newHasLabel {
 			if curLabel == newLabel {
 				w.a.M(meta).F().Info(
-					"StatefulSet ARE EQUAL based on labels no reconcile is actually needed %s",
+					"cur and new StatefulSets ARE EQUAL based on labels. No reconcile is required for: %s",
 					util.NamespaceNameString(meta),
 				)
 				return chiv1.StatefulSetStatusSame
@@ -1889,7 +1889,7 @@ func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) chiv1.StatefulSetSta
 			//	//					return chop.StatefulSetStatusModified
 			//}
 			w.a.M(meta).F().Info(
-				"StatefulSet ARE DIFFERENT based on labels. Reconcile is required for %s",
+				"cur and new StatefulSets ARE DIFFERENT based on labels. Reconcile is required for: %s",
 				util.NamespaceNameString(meta),
 			)
 			return chiv1.StatefulSetStatusModified
