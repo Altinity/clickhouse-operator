@@ -889,7 +889,7 @@ metadata:
 spec:
   clickhouse:
     access:
-      schema: https
+      scheme: https
       port: 8443
 ```
 

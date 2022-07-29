@@ -334,7 +334,7 @@ RQ_SRS_026_ClickHouseOperator_EnableHttps = Requirement(
         'spec:\n'
         '  clickhouse:\n'
         '    access:\n'
-        '      schema: https\n'
+        '      scheme: https\n'
         '      port: 8443\n'
         '```\n'
         '\n'
@@ -7636,7 +7636,7 @@ metadata:
 spec:
   clickhouse:
     access:
-      schema: https
+      scheme: https
       port: 8443
 ```
 
