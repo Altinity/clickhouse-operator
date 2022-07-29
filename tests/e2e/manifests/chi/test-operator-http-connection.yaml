@@ -3,7 +3,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: test-033-https-check
+  name: test-operator-http-connection
 
 spec:
   defaults:

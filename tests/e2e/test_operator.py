@@ -2302,7 +2302,7 @@ def test_033(self):
         operator_namespace = settings.operator_namespace
 
     with When("create the chi without secure connection"):
-        manifest = "manifests/chi/test-033-https-check.yaml"
+        manifest = "manifests/chi/test-operator-http-connection.yaml"
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
         kubectl.create_and_check(
@@ -2322,7 +2322,7 @@ def test_033(self):
             timeout=600,
         )
         
-        kubectl.wait_jsonpath("pod", "chi-test-033-https-check-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
+        kubectl.wait_jsonpath("pod", "chi-test-operator-http-connection-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
@@ -2333,7 +2333,7 @@ def test_033(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with non zero value at the end"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with non zero value `1` at the end"):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 1$")
 
     with When("remove the ClickHouseOperatorConfiguration"):
@@ -2344,12 +2344,12 @@ def test_033(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value `1` at the end and delete the chi"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end and delete the chi"):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
         kubectl.delete_chi(chi)
 
     with When("create the chi with secure connection"):
-        manifest = "manifests/chi/test-033-https-check-secure.yaml"
+        manifest = "manifests/chi/test-operator-https-connection.yaml"
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
         kubectl.create_and_check(
@@ -2380,7 +2380,7 @@ def test_033(self):
         timeout=1200,
         )
         
-        kubectl.wait_jsonpath("pod", "chi-test-033-https-check-secure-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
+        kubectl.wait_jsonpath("pod", "chi-test-operator-https-connection-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
@@ -2402,7 +2402,7 @@ def test_033(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value `1` at the end and delete the chi"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end and delete the chi "):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
         kubectl.delete_chi(chi)
 
@@ -2425,7 +2425,7 @@ def test_034(self):
             out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
 
         with When("create the chi with secure connection"):
-            manifest = "manifests/chi/test-034-https-check-secure.yaml"
+            manifest = "manifests/chi/test-operator-https-connection.yaml"
             chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
             kubectl.create_and_check(
@@ -2456,7 +2456,7 @@ def test_034(self):
             timeout=1200,
             )
             
-            kubectl.wait_jsonpath("pod", "chi-test-034-https-check-secure-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
+            kubectl.wait_jsonpath("pod", "chi-test-operator-https-connection-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                                 ns=kubectl.namespace)
 
         with When("I enable port forwarding"):

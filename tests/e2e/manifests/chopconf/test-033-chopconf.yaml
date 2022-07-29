@@ -6,5 +6,5 @@ spec:
   clickhouse:
     access:
       # Port where to connect to ClickHouse instances to
-      schema: https
+      scheme: https
       port: 8443
