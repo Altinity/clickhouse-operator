@@ -171,9 +171,9 @@ def test_007(self):
     )
 
 
-@TestStep
+@TestCheck
 def test_operator_upgrade(self, manifest, version_from, version_to=settings.operator_version):
-    with Given(f"clickhouse-operator FROM {version_from}"):
+    with Given(f"clickhouse-operator from {version_from}"):
         util.set_operator_version(version_from)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
         cluster = "test-009"
@@ -182,41 +182,62 @@ def test_operator_upgrade(self, manifest, version_from, version_to=settings.oper
             manifest=manifest,
             check={
                 "object_counts": {
-                    "statefulset": 1,
-                    "pod": 1,
-                    "service": 2,
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
                 },
                 "do_not_delete": 1,
             }
         )
         start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
-        with Then("Create a table"):
-            clickhouse.query(chi, "CREATE TABLE test_local Engine = Log as SELECT 1")
-            clickhouse.query(chi, "CREATE TABLE test_dist as system.one Engine = Distributed('test-009', system, one)")
+        with Then("Create tables"):
+            for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
+                clickhouse.query(chi, "CREATE TABLE test_local (a UInt32) Engine = Log", host = h)
+                clickhouse.query(chi, "CREATE TABLE test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host = h)
+            clickhouse.query(chi, "INSERT INTO test_dist SELECT * from numbers(2)")
 
-        with When(f"upgrade operator TO {version_to}"):
-            util.set_operator_version(version_to, timeout=120)
-            kubectl.wait_chi_status(chi, "Completed", retries=20)
 
-            kubectl.wait_objects(chi, {"statefulset": 1, "pod": 1, "service": 2})
+    trigger_event = threading.Event()
 
-            with Then("Check that table is here"):
-                tables = clickhouse.query(chi, "SHOW TABLES")
-                assert "test_local" in tables
-                out = clickhouse.query(chi, "SELECT * FROM test_local")
-                assert "1" == out
+    Check("run query until receive stop event",
+        test=run_select_query,
+        parallel=True)(
+              host = f"clickhouse-{chi}",
+              user = "test_009",
+              password = "test_009",
+              query = "select count() from test_dist",
+              res1 = "2",
+              res2 = "1",
+              trigger_event = trigger_event,
+        )
 
-            with Then("ClickHouse pods should not be restarted"):
-                new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-                if start_time != new_start_time:
-                    kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
-                    kubectl.launch(
-                        f"logs -n {settings.test_namespace} pod/$(kubectl get pods -o name | grep clickhouse-operator) -c clickhouse-operator"
-                    )
-                assert start_time == new_start_time, error(
-                    f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
-        kubectl.delete_chi(chi)
+    with When(f"upgrade operator to {version_to}"):
+        util.set_operator_version(version_to, timeout=120)
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
+
+        kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+        with Then("Check that table is here"):
+            tables = clickhouse.query(chi, "SHOW TABLES")
+            assert "test_local" in tables
+            out = clickhouse.query(chi, "SELECT count() FROM test_local")
+            assert "1" == out
+
+        with Then("ClickHouse pods should not be restarted"):
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+            if start_time != new_start_time:
+                kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
+                kubectl.launch(
+                    f"logs -n {settings.test_namespace} pod/$(kubectl get pods -o name | grep clickhouse-operator) -c clickhouse-operator"
+                )
+            assert start_time == new_start_time, error(
+                f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
+
+    trigger_event.set()
+    join()
+
+    kubectl.delete_chi(chi)
 
 
 @TestStep
@@ -306,10 +327,10 @@ def test_009(self):
     version_from = self.context.test_009_version_from
     version_to = self.context.test_009_version_to
 
-    with Then("Test simple chi for operator upgrade"):
+    with Check("Test simple chi for operator upgrade"):
         test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-1.yaml", version_from=version_from,
                               version_to=version_to)
-    with Then("Test advanced chi for operator upgrade"):
+    with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-2.yaml", version_from=version_from,
                               version_to=version_to)
 
@@ -2156,18 +2177,33 @@ def test_031(self):
 
 
 @TestCheck
-def run_select_query(self, client_pod, user_name, password, trigger_event):
+def run_select_query(self, host, user, password, query, res1, res2, trigger_event):
     """Run a select query in parallel until the stop signal is received."""
-    i = 0
+
     try:
         self.context.shell = Shell()
+
+        client_pod = "clickhouse-client"
+        kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
+        kubectl.wait_pod_status(client_pod, "Running")
+
+        ok = 0
+        partial = 0
+        errors = 0
+
+        cmd = f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q '{query}'"
         while not trigger_event.is_set():
-            cnt_test_local = kubectl.launch(f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user_name} --password={password} -h clickhouse-test-032-rescaling  -q 'select count() from test_local' ")
-            assert cnt_test_local == '100000000', error()
-            i += 1
-        with By(f"{i} queries have been executed during upgrade with no errors"):
-            True
+            cnt_test = kubectl.launch(cmd, ok_to_fail = True)
+            if cnt_test == res1:
+                ok += 1
+            if cnt_test == res2:
+                partial += 1
+            if cnt_test != res1 and cnt_test != res2:
+                errors += 1
+        with By(f"{ok} queries have been executed with no errors, {partial} queries returned partial results. {errors} queries have failed"):
+            assert errors == 0
     finally:
+        kubectl.launch(f"delete pod {client_pod}")
         if hasattr(self.context, "shell"):
             self.context.shell.close()
 
@@ -2197,44 +2233,39 @@ def test_032(self):
                 "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {
-                "statefulset": 2,
-                "pod": 2,
-                "service": 3,
+                "statefulset": 4,
+                "pod": 4,
+                "service": 5,
             },
-            "do_not_delete": 2,
+            "do_not_delete": 1,
         },
         timeout=600,
     )
 
-    kubectl.wait_jsonpath("pod", "chi-test-032-rescaling-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
-                          ns=kubectl.namespace)
-    kubectl.launch(f'run clickhouse-test-032-client --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c "sleep 3600"')
-    for attempt in retries(timeout=300, delay=20, count=10):
-        with attempt:
-            kubectl.wait_jsonpath("pod", "clickhouse-test-032-client", "{.status.containerStatuses[0].ready}", "true",
-                                ns=kubectl.namespace)
+    numbers = 100
 
-    numbers = "100000000"
-
-    with Given("Create replicated table and populate it"):
+    with Given("Create replicated and distributed tables"):
         clickhouse.query(chi, create_table)
-        clickhouse.query(chi, "CREATE TABLE test_distr as test_local Engine = Distributed('default', default, test_local)")
-        clickhouse.query(chi, f"INSERT INTO test_local select * from numbers({numbers})", timeout=120)
+        clickhouse.query(chi, "CREATE TABLE test_distr ON CLUSTER 'default' as test_local Engine = Distributed('default', default, test_local, a%2)")
+        clickhouse.query(chi, f"INSERT INTO test_distr select * from numbers({numbers})")
 
     with When("check the initial select query count before rolling update"):
         with By("executing query in the clickhouse installation"):
-                cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_local", with_error=True)
+                cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_distr", with_error=True)
         with Then("checking expected result"):
-            assert cnt_test_local == '100000000', error()
+            assert cnt_test_local == str(numbers), error()
 
     trigger_event = threading.Event()
 
-    Check("run select query until receive stop event",
+    Check("run query until receive stop event",
         test=run_select_query,
         parallel=True)(
-            client_pod = "clickhouse-test-032-client",
-            user_name = "test_032",
+            host = "clickhouse-test-032-rescaling",
+            user = "test_032",
             password = "test_032",
+            query = "select count() from test_distr",
+            res1 = str(numbers),
+            res2 = str(numbers // 2),
             trigger_event = trigger_event,
             )
 
@@ -2247,22 +2278,19 @@ def test_032(self):
                 "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {
-                "statefulset": 2,
-                "pod": 2,
-                "service": 3,
+                "statefulset": 4,
+                "pod": 4,
+                "service": 5,
             },
-            "do_not_delete": 2,
+            "do_not_delete": 1,
         },
         timeout=int(1000),
         )
 
-    note("Setting the thread event to true...")
     trigger_event.set()
-    note("Joining the parallel thread with main...")
     join()
 
     kubectl.delete_chi(chi)
-    kubectl.launch(f"delete pod clickhouse-test-032-client", ns=kubectl.namespace, timeout=600)
 
 @TestModule
 @Name("e2e.test_operator")
@@ -2287,7 +2315,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.18.3"
+    self.context.test_009_version_from = "0.19.0"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):
