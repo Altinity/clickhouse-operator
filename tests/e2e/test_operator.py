@@ -172,7 +172,7 @@ def test_007(self):
 
 
 @TestCheck
-def test_operator_upgrade(self, manifest, version_from, version_to=settings.operator_version):
+def test_operator_upgrade(self, manifest, service, version_from, version_to=settings.operator_version):
     with Given(f"clickhouse-operator from {version_from}"):
         util.set_operator_version(version_from)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
@@ -193,8 +193,8 @@ def test_operator_upgrade(self, manifest, version_from, version_to=settings.oper
 
         with Then("Create tables"):
             for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
-                clickhouse.query(chi, "CREATE TABLE test_local (a UInt32) Engine = Log", host = h)
-                clickhouse.query(chi, "CREATE TABLE test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host = h)
+                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host = h)
+                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host = h)
             clickhouse.query(chi, "INSERT INTO test_dist SELECT * from numbers(2)")
 
 
@@ -203,10 +203,10 @@ def test_operator_upgrade(self, manifest, version_from, version_to=settings.oper
     Check("run query until receive stop event",
         test=run_select_query,
         parallel=True)(
-              host = f"clickhouse-{chi}",
+              host = service,
               user = "test_009",
               password = "test_009",
-              query = "select count() from test_dist",
+              query = "select count() from cluster('all-sharded', system.one)",
               res1 = "2",
               res2 = "1",
               trigger_event = trigger_event,
@@ -239,9 +239,7 @@ def test_operator_upgrade(self, manifest, version_from, version_to=settings.oper
 
     kubectl.delete_chi(chi)
 
-
-@TestStep
-def check_operator_restart(self, chi, wait_objects, pod):
+def check_operator_restart(chi, wait_objects, pod):
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
     with When("Restart operator"):
         util.restart_operator()
@@ -253,8 +251,8 @@ def check_operator_restart(self, chi, wait_objects, pod):
             assert start_time == new_start_time
 
 
-@TestStep
-def test_operator_restart(self, manifest, version=settings.operator_version):
+@TestCheck
+def test_operator_restart(self, manifest, service, version=settings.operator_version):
     with Given(f"clickhouse-operator {version}"):
         util.set_operator_version(version)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -264,39 +262,57 @@ def test_operator_restart(self, manifest, version=settings.operator_version):
             manifest=manifest,
             check={
                 "object_counts": {
-                    "statefulset": 1,
-                    "pod": 1,
-                    "service": 2,
+                    "statefulset": 2,
+                    "pod": 2,
+                    "service": 3,
                 },
                 "do_not_delete": 1,
             })
 
-        check_operator_restart(chi=chi, wait_objects={"statefulset": 1, "pod": 1, "service": 2},
-                               pod=f"chi-{chi}-{cluster}-0-0-0")
+    trigger_event = threading.Event()
 
-        kubectl.delete_chi(chi)
+    Check("run query until receive stop event",
+        test=run_select_query,
+        parallel=True)(
+              host = service,
+              user = "test_008",
+              password = "test_008",
+              query = "select count() from cluster('all-sharded', system.one)",
+              res1 = "2",
+              res2 = "1",
+              trigger_event = trigger_event,
+        )
+
+    check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3},
+                               pod=f"chi-{chi}-{cluster}-0-0-0")
+    trigger_event.set()
+    join()
+
+    kubectl.delete_chi(chi)
 
 
 @TestScenario
-@Name("test_008. Test operator restart")
+@Name("test_008_1. Test operator restart")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0")
 )
-def test_008(self):
-    with Then("Test simple chi for operator restart"):
-        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-1.yaml")
-    with Then("Test advanced chi for operator restart"):
-        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-2.yaml")
-
+def test_008_1(self):
+    with Check("Test simple chi for operator restart"):
+        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-1.yaml", service = "clickhouse-test-008-1")
 
 @TestScenario
-@Name("test_008_2. Test operator restart in the middle of reconcile")
+@Name("test_008_2. Test operator restart")
 def test_008_2(self):
+    with Check("Test advanced chi for operator restart"):
+        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-2.yaml", service = "service-test-008-2")
+
+@TestScenario
+@Name("test_008_3. Test operator restart in the middle of reconcile")
+def test_008_3(self):
     manifest = "manifests/chi/test-003-complex-layout.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
     full_cluster = {"statefulset": 4, "pod": 4, "service": 5}
-    # half_cluster = {"statefulset": 2, "pod": 2, "service": 3}
 
     with Given("4-node CHI creation started"):
         with Then("Wait for a half of the cluster to start"):
@@ -319,20 +335,25 @@ def test_008_2(self):
 
 
 @TestScenario
-@Name("test_009. Test operator upgrade")
+@Name("test_009_1. Test operator upgrade")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0")
 )
-def test_009(self):
-    version_from = self.context.test_009_version_from
-    version_to = self.context.test_009_version_to
-
+def test_009_1(self):
     with Check("Test simple chi for operator upgrade"):
-        test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-1.yaml", version_from=version_from,
-                              version_to=version_to)
+        test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-1.yaml",
+                              service = "clickhouse-test-009-1",
+                              version_from=self.context.test_009_version_from,
+                              version_to=self.context.test_009_version_to)
+
+@TestScenario
+@Name("test_009_2. Test operator upgrade")
+def test_009_2(self):
     with Check("Test advanced chi for operator upgrade"):
-        test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-2.yaml", version_from=version_from,
-                              version_to=version_to)
+        test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-2.yaml",
+                              service = "service-test-009-2",
+                              version_from=self.context.test_009_version_from,
+                              version_to=self.context.test_009_version_to)
 
 
 @TestScenario
@@ -1969,8 +1990,6 @@ def test_028(self):
         },
     )
 
-    clickhouse.query(chi, "CREATE TABLE test_dist as system.one Engine = Distributed('default', system, one)")
-
     sql = """select getMacro('replica') as replica, uptime() as uptime,
      (select count() from system.clusters where cluster='all-sharded') as total_hosts,
      (select count() online_hosts from cluster('all-sharded', system.one) settings skip_unavailable_shards=1) as online_hosts
@@ -2191,7 +2210,7 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
         partial = 0
         errors = 0
 
-        cmd = f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q '{query}'"
+        cmd = f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q \"{query}\""
         while not trigger_event.is_set():
             cnt_test = kubectl.launch(cmd, ok_to_fail = True)
             if cnt_test == res1:
@@ -2200,8 +2219,10 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
                 partial += 1
             if cnt_test != res1 and cnt_test != res2:
                 errors += 1
-        with By(f"{ok} queries have been executed with no errors, {partial} queries returned partial results. {errors} queries have failed"):
+        with By(f"{ok} queries have been executed with no errors, {partial} queries returned incomplete results. {errors} queries have failed"):
             assert errors == 0
+            if partial > 0:
+                print(f"*** WARNING ***: cluster was partially unavailable, {partial} queries returned incomplete results")
     finally:
         kubectl.launch(f"delete pod {client_pod}")
         if hasattr(self.context, "shell"):
