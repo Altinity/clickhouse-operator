@@ -3,8 +3,6 @@ kind: ClickHouseInstallation
 metadata:
   name: test-006
 spec:
-  reconciling:
-    policy: "wait"
   templates:
     podTemplates:
     - name: clickhouse-old

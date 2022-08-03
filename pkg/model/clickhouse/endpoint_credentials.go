@@ -40,6 +40,7 @@ type EndpointCredentials struct {
 	hostname string
 	username string
 	password string
+	rootCA   string
 	port     int
 
 	// Internal generated data
@@ -48,12 +49,13 @@ type EndpointCredentials struct {
 }
 
 // NewEndpointCredentials creates new EndpointCredentials object
-func NewEndpointCredentials(scheme, hostname, username, password string, port int) *EndpointCredentials {
+func NewEndpointCredentials(scheme, hostname, username, password, rootCA string, port int) *EndpointCredentials {
 	params := &EndpointCredentials{
 		scheme:   scheme,
 		hostname: hostname,
 		username: username,
 		password: password,
+		rootCA:   rootCA,
 		port:     port,
 	}
 

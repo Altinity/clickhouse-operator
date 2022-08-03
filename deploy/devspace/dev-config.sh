@@ -14,6 +14,13 @@ case "${DEPLOY_OPERATOR}" in
         OPERATOR_IMAGE="altinity/clickhouse-operator:latest"
         METRICS_EXPORTER_IMAGE="altinity/metrics-exporter:latest"
         ;;
+    "local")
+        # This would be release operator
+        OPERATOR_IMAGE="altinity/clickhouse-operator:latest"
+        OPERATOR_IMAGE_PULL_POLICY="IfNotPresent"
+        METRICS_EXPORTER_IMAGE="altinity/metrics-exporter:latest"
+        METRICS_EXPORTER_IMAGE_PULL_POLICY="IfNotPresent"
+        ;;
     "dev")
         # This would be dev operator
         OPERATOR_IMAGE="sunsingerus/clickhouse-operator:dev"

@@ -26,10 +26,11 @@ import (
 )
 
 // FillStatus fills .Status
-func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, normalized bool) {
+func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string, normalized bool) {
 	chi.Status.CHOpVersion = version.Version
 	chi.Status.CHOpCommit = version.GitSHA
 	chi.Status.CHOpDate = version.BuiltAt
+	chi.Status.CHOpIP = ip
 	chi.Status.ClustersCount = chi.ClustersCount()
 	chi.Status.ShardsCount = chi.ShardsCount()
 	chi.Status.HostsCount = chi.HostsCount()

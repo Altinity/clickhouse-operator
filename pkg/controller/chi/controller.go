@@ -19,8 +19,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"k8s.io/apimachinery/pkg/types"
+	"sort"
 	"time"
 
+	"github.com/sanity-io/litter"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -240,6 +242,77 @@ func (c *Controller) addEventHandlersService(
 	})
 }
 
+func normalizeEndpoints(e *core.Endpoints) *core.Endpoints {
+	if e == nil {
+		e = &core.Endpoints{}
+	}
+	if len(e.Subsets) == 0 {
+		e.Subsets = []core.EndpointSubset{
+			{},
+		}
+	}
+	if len(e.Subsets[0].Addresses) == 0 {
+		e.Subsets[0].Addresses = []core.EndpointAddress{
+			{},
+		}
+	}
+	e.Subsets[0].Addresses[0].TargetRef = nil
+	return e
+}
+
+func checkIP(path *messagediff.Path, iValue interface{}) bool {
+	for _, pathNode := range *path {
+		// .String() function adds "." in front of the pathNode
+		// So it would be ".IP" for pathNode "IPs"
+		s := pathNode.String()
+		if s == ".IP" {
+			if typed, ok := iValue.(string); ok {
+				if typed != "" {
+					// Have IP address assigned|modified
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func updated(old, new *core.Endpoints) bool {
+	oldSubsets := normalizeEndpoints(old).Subsets
+	newSubsets := normalizeEndpoints(new).Subsets
+
+	diff, equal := messagediff.DeepDiff(oldSubsets[0].Addresses, newSubsets[0].Addresses)
+	if equal {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: no changes found")
+		// No need to react
+		return false
+	}
+
+	assigned := false
+	for path, iValue := range diff.Added {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: added %v", path)
+		if address, ok := iValue.(core.EndpointAddress); ok {
+			if address.IP != "" {
+				assigned = true
+			}
+		}
+	}
+	for path, _ := range diff.Removed {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: removed %v", path)
+	}
+	for path, iValue := range diff.Modified {
+		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: modified %v", path)
+		assigned = assigned || checkIP(path, iValue)
+	}
+
+	if assigned {
+		log.V(1).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
+		return true
+	}
+
+	return false
+}
+
 func (c *Controller) addEventHandlersEndpoint(
 	kubeInformerFactory kubeinformers.SharedInformerFactory,
 ) {
@@ -249,7 +322,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(3).M(endpoints).Info("endpointsInformer.AddFunc")
+			log.V(2).M(endpoints).Info("endpointsInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
@@ -257,33 +330,9 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&oldEndpoints.ObjectMeta) {
 				return
 			}
-
-			diff, equal := messagediff.DeepDiff(oldEndpoints, newEndpoints)
-			if equal {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: no changes found")
-				// No need to react
-				return
-			}
-
-			added := false
-			for path := range diff.Added {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: added %v", path)
-				for _, pathnode := range *path {
-					s := pathnode.String()
-					if s == ".Addresses" {
-						added = true
-					}
-				}
-			}
-			for path := range diff.Removed {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: removed %v", path)
-			}
-			for path := range diff.Modified {
-				log.V(3).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: modified %v", path)
-			}
-
-			if added {
-				log.V(1).M(oldEndpoints).Info("endpointsInformer.UpdateFunc: IP ASSIGNED %v", newEndpoints.Subsets)
+			log.V(2).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
+			if updated(oldEndpoints, newEndpoints) {
+				c.enqueueObject(NewReconcileEndpoints(reconcileUpdate, oldEndpoints, newEndpoints))
 				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
@@ -292,7 +341,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
+			log.V(2).M(endpoints).Info("endpointsInformer.DeleteFunc")
 		},
 	})
 }
@@ -535,6 +584,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 	case
 		*ReconcileCHIT,
 		*ReconcileChopConfig,
+		*ReconcileEndpoints,
 		*DropDns:
 		variants := chi.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
@@ -688,8 +738,35 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 	return nil
 }
 
+type UpdateCHIStatusOptions struct {
+	TolerateAbsence bool
+	Actions         bool
+	Errors          bool
+	Normalized      bool
+	WholeStatus     bool
+}
+
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, tolerateAbsence bool) error {
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
+	for retry, attempt := true, 1; retry; attempt++ {
+		if attempt >= 5 {
+			retry = false
+		}
+
+		err = c.doUpdateCHIObjectStatus(ctx, chi, opts)
+		if err == nil {
+			return nil
+		}
+
+		if retry {
+			time.Sleep(5 * time.Second)
+		}
+	}
+	return
+}
+
+// doUpdateCHIObjectStatus updates ClickHouseInstallation object's Status
+func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, opts UpdateCHIStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -700,14 +777,14 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
-		if tolerateAbsence {
+		if opts.TolerateAbsence {
 			return nil
 		}
 		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 	if cur == nil {
-		if tolerateAbsence {
+		if opts.TolerateAbsence {
 			return nil
 		}
 		log.V(1).M(chi).F().Error("NULL returned")
@@ -716,7 +793,29 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 
 	// Update status of a real object.
 	// TODO DeepCopy depletes stack here
-	cur.Status = chi.Status
+
+	if opts.Actions {
+		cur.Status.Action = chi.Status.Action
+		cur.Status.Actions = util.MergeStringArrays(cur.Status.Actions, chi.Status.Actions)
+		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Actions)))
+
+	}
+
+	if opts.Errors {
+		cur.Status.Error = chi.Status.Error
+		cur.Status.Errors = util.MergeStringArrays(cur.Status.Errors, chi.Status.Errors)
+		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Errors)))
+	}
+
+	if opts.Normalized {
+		cur.Status.NormalizedCHI = chi.Status.NormalizedCHI
+	}
+
+	if opts.WholeStatus {
+		cur.Status = chi.Status
+	}
+
+	cur.Status.PodIPs = c.getPodsIPs(chi)
 
 	// TODO fix this with verbosity update
 	// Start Debug object
@@ -734,8 +833,8 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 		return err
 	}
 
+	// Propagate updated ResourceVersion into chi
 	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
-		// Updated
 		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
 		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
 		return nil

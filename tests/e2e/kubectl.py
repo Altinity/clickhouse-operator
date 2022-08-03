@@ -33,10 +33,12 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     if len(cmd_args) > 1:
         cmd += " ".join(cmd_args[1:])
 
+    # print(f"run command: {cmd}")
+
     # Run command
     if hasattr(current().context, "shell"):
         cmd = current().context.shell(cmd, timeout=timeout)
-    else:    
+    else:
         cmd = shell(cmd, timeout=timeout)
 
     # Check command failure
@@ -94,6 +96,9 @@ def delete_all_keeper(ns=namespace):
 def create_and_check(manifest, check, ns=namespace, timeout=900):
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(f'{manifest}'))
 
+    # state_field = ".status.taskID"
+    # prev_state = get_field("chi", chi_name, state_field, ns)
+
     if "apply_templates" in check:
         debug("Need to apply additional templates")
         for t in check["apply_templates"]:
@@ -102,6 +107,10 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
         time.sleep(5)
 
     apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
+
+    # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
+    # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
+    wait_chi_status(chi_name, "InProgress", ns=ns, retries=3, throw_error=False)
 
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns)
@@ -224,8 +233,8 @@ def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
         assert res == result, error()
 
 
-def wait_chi_status(chi, status, ns=namespace, retries=max_retries):
-    wait_field("chi", chi, ".status.status", status, ns, retries)
+def wait_chi_status(chi, status, ns=namespace, retries=max_retries, throw_error=True):
+    wait_field("chi", chi, ".status.status", status, ns, retries, throw_error=throw_error)
 
 
 def get_chi_status(chi, ns=namespace):
@@ -236,7 +245,7 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5):
+def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5, throw_error=True):
     with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
@@ -244,7 +253,18 @@ def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, back
                 break
             with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
                 time.sleep(i * backoff)
-        assert cur_value == value, error()
+        assert cur_value == value or throw_error is False, error()
+
+
+def wait_field_changed(kind, name, field, prev_value, ns=namespace, retries=max_retries, backoff=5, throw_error = True):
+    with Then(f"{kind} {name} {field} should be different from {prev_value}"):
+        for i in range(1, retries):
+            cur_value = get_field(kind, name, field, ns)
+            if cur_value != "" and cur_value != prev_value:
+                break
+            with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
+                time.sleep(i * backoff)
+        assert cur_value != "" and cur_value != prev_value or throw_error == False, error()
 
 
 def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
@@ -259,8 +279,13 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
 
 
 def get_field(kind, name, field, ns=namespace):
-    out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
-    return out[1]
+    out = ""
+    if get_count(kind, name=name, ns=ns) > 0:
+        out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
+    if len(out) > 1:
+        return out[1]
+    else:
+        return ""
 
 
 def get_jsonpath(kind, name, field, ns=namespace):
@@ -362,7 +387,7 @@ def get_pvc_size(pvc_name, ns=namespace):
     return get_field("pvc", pvc_name, ".spec.resources.requests.storage", ns)
 
 
-def check_pod_antiaffinity(chi_name, pod_name = "", match_labels = {}, topologyKey = "kubernetes.io/hostname", ns=namespace):
+def check_pod_antiaffinity(chi_name, pod_name="", match_labels={}, topologyKey="kubernetes.io/hostname", ns=namespace):
     pod_spec = get_pod_spec(chi_name, pod_name, ns)
     if match_labels == {}:
         match_labels = {

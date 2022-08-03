@@ -17,6 +17,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"math"
 	"reflect"
 	"regexp"
@@ -128,6 +129,17 @@ func (s *Setting) AsVector() []string {
 	return s.vector
 }
 
+// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to Vector
+func (s *Setting) CastToVector() *Setting {
+	if s == nil {
+		return nil
+	}
+	if s.isScalar {
+		return NewSettingVector(s.AsVector())
+	}
+	return s
+}
+
 // SetAttribute sets attribute of the setting
 func (s *Setting) SetAttribute(name, value string) *Setting {
 	if s == nil {
@@ -138,6 +150,18 @@ func (s *Setting) SetAttribute(name, value string) *Setting {
 	}
 	s.attributes[name] = value
 	return s
+}
+
+// HasAttribute checks whether setting has specified attribute
+func (s *Setting) HasAttribute(name string) bool {
+	if s == nil {
+		return false
+	}
+	if s.attributes == nil {
+		return false
+	}
+	_, ok := s.attributes[name]
+	return ok
 }
 
 // HasAttributes checks whether setting has attributes
@@ -158,6 +182,45 @@ func (s *Setting) Attributes() string {
 		a += fmt.Sprintf(` %s="%s"`, name, value)
 	}
 	return a
+}
+
+// Len returns number of entries n the Setting
+func (s *Setting) Len() int {
+	if s.IsVector() {
+		return len(s.vector)
+	}
+	if s.IsScalar() {
+		return 1
+	}
+	return 0
+}
+
+// MergeFrom merges from specified source
+func (s *Setting) MergeFrom(from *Setting) *Setting {
+	// Need to have something to merge from
+	if from == nil {
+		return s
+	}
+
+	// Can merge from Vector only
+	from = from.CastToVector()
+
+	// Reasonable to merge from non-zero vector only
+	if from.Len() < 1 {
+		return s
+	}
+
+	// In case recipient does not exist just copy values from source
+	if s == nil {
+		news := NewSettingVector(from.Vector())
+		news.attributes = util.MergeStringMapsPreserve(news.attributes, from.attributes)
+		return news
+	}
+
+	s.vector = util.MergeStringArrays(s.vector, from.vector)
+	s.attributes = util.MergeStringMapsPreserve(s.attributes, from.attributes)
+
+	return s
 }
 
 // String gets string value of a setting. Vector is combined into one string
@@ -243,9 +306,6 @@ func (settings *Settings) Get(name string) *Setting {
 
 // Set sets named setting
 func (settings *Settings) Set(name string, setting *Setting) {
-	if settings == nil {
-		return
-	}
 	if settings == nil {
 		return
 	}

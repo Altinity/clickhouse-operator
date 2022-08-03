@@ -8,17 +8,17 @@ require (
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/gosimple/slug v1.12.0
-	github.com/imdario/mergo v0.3.11
+	github.com/imdario/mergo v0.3.13
 	github.com/juliangruber/go-intersect v1.0.0
 	github.com/kubernetes-sigs/yaml v1.1.0
 	github.com/mailru/go-clickhouse v1.6.0
-	github.com/prometheus/client_golang v1.12.1
+	github.com/prometheus/client_golang v1.12.2
 	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
 	github.com/sanity-io/litter v1.3.0
 	github.com/securego/gosec/v2 v2.8.1
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c
+	gopkg.in/yaml.v3 v3.0.0
 	k8s.io/api v0.23.1
 	k8s.io/apiextensions-apiserver v0.23.1
 	k8s.io/apimachinery v0.23.1

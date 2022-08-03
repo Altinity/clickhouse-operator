@@ -35,16 +35,34 @@ type Schemer struct {
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 
 // NewSchemer creates new Schemer object
-func NewSchemer(scheme, username, password string, port int) *Schemer {
+func NewSchemer(scheme, username, password, rootCA string, port int) *Schemer {
 	credentials := &clickhouse.ClusterEndpointCredentials{
 		Scheme:   scheme,
 		Username: username,
 		Password: password,
+		RootCA:   rootCA,
 		Port:     port,
 	}
 	return &Schemer{
 		NewCluster().SetEndpointCredentials(credentials),
 	}
+}
+
+// shouldCreateDistributedObjects determines whether distributed objects should be created
+func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
+	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
+
+	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardNone {
+		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
+		return false
+	}
+	if len(hosts) <= 1 {
+		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
+		return false
+	}
+
+	log.V(1).M(host).F().Info("Should create distributed objects the cluster: %v", hosts)
+	return true
 }
 
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
@@ -55,12 +73,10 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 		return nil, nil, nil
 	}
 
-	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
-	if len(hosts) <= 1 {
-		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
+	if !shouldCreateDistributedObjects(host) {
+		log.V(1).M(host).F().Info("Should not create distributed objects")
 		return nil, nil, nil
 	}
-	log.V(1).M(host).F().Info("Extracting distributed table definitions from the cluster: %v", hosts)
 
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
@@ -79,6 +95,34 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
 }
 
+// shouldCreateReplicatedObjects determines whether replicated objects should be created
+func shouldCreateReplicatedObjects(host *chop.ChiHost) bool {
+	shard := CreateFQDNs(host, chop.ChiShard{}, false)
+	cluster := CreateFQDNs(host, chop.ChiCluster{}, false)
+
+	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardAll {
+		// We have explicit request to create replicated objects on each shard
+		// However, it is reasonable to have at least two instances in a cluster
+		if len(cluster) >= 2 {
+			log.V(1).M(host).F().Info("SchemaPolicy.Shard says we need replicated objects. Should create replicated objects for the shard: %v", shard)
+			return true
+		}
+	}
+
+	if host.GetCluster().SchemaPolicy.Replica == SchemaPolicyReplicaNone {
+		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
+		return false
+	}
+
+	if len(shard) <= 1 {
+		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
+		return false
+	}
+
+	log.V(1).M(host).F().Info("Should create replicated objects for the shard: %v", shard)
+	return true
+}
+
 // getReplicatedObjectsSQLs returns a list of objects that needs to be created on a host in a cluster
 func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
@@ -86,12 +130,10 @@ func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHo
 		return nil, nil, nil
 	}
 
-	replicas := CreateFQDNs(host, chop.ChiShard{}, false)
-	if len(replicas) <= 1 {
-		log.V(1).M(host).F().Info("Single replica in a shard. Nothing to create a schema from.")
+	if !shouldCreateReplicatedObjects(host) {
+		log.V(1).M(host).F().Info("Should not create replicated objects")
 		return nil, nil, nil
 	}
-	log.V(1).M(host).F().Info("Extracting replicated table definitions from the shard: %v", replicas)
 
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
@@ -115,7 +157,7 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
-	    SELECT 
+	    SELECT
 	        DISTINCT name,
 	        concat('DROP DICTIONARY IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 	    FROM
@@ -123,12 +165,12 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 	    WHERE database != ''
 	    UNION ALL
 		SELECT
-			DISTINCT name, 
+			DISTINCT name,
 			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
-			database NOT IN (%s) AND 
+			database NOT IN (%s) AND
 			(engine like 'Replicated%%' OR engine like '%%View%%')
 		`,
 		ignoredDBs,
@@ -142,7 +184,7 @@ func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]
 func (s *Schemer) getSyncTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	sql := heredoc.Doc(`
 		SELECT
-			DISTINCT name, 
+			DISTINCT name,
 			concat('SYSTEM SYNC REPLICA "', database, '"."', name, '"') AS sync_table_query
 		FROM
 			system.tables
@@ -166,12 +208,15 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
-	log.V(1).M(hostToRun).F().Info("Drop replica: %v", CreateReplicaHostname(hostToDrop))
-	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateReplicaHostname(hostToDrop))})
+	log.V(1).M(hostToRun).F().Info("Drop replica: %v at %v", CreateInstanceHostname(hostToDrop), hostToRun.Address.HostName)
+	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
 }
 
-// HostCreateTablesSQLs makes all SQL for migrating tables
-func (s *Schemer) HostCreateTablesSQLs(ctx context.Context, host *chop.ChiHost) (
+// createTablesSQLs makes all SQL for migrating tables
+func (s *Schemer) createTablesSQLs(
+	ctx context.Context,
+	host *chop.ChiHost,
+) (
 	replicatedObjectNames []string,
 	replicatedCreateSQLs []string,
 	distributedObjectNames []string,
@@ -200,7 +245,7 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 	replicatedObjectNames,
 		replicatedCreateSQLs,
 		distributedObjectNames,
-		distributedCreateSQLs := s.HostCreateTablesSQLs(ctx, host)
+		distributedCreateSQLs := s.createTablesSQLs(ctx, host)
 
 	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
@@ -277,7 +322,7 @@ func createDatabaseDistributed(cluster string) string {
 			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine AS create_db_query
 		FROM (
 			SELECT
-				* 
+				*
 			FROM
 				clusterAllReplicas('%s', system.databases) databases
 			SETTINGS skip_unavailable_shards = 1
@@ -290,7 +335,7 @@ func createDatabaseDistributed(cluster string) string {
 			WHERE
 				engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
-		) 
+		)
 		`,
 		cluster,
 		cluster,
@@ -300,11 +345,11 @@ func createDatabaseDistributed(cluster string) string {
 func createTableDistributed(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
-			DISTINCT concat(database, '.', name) AS name, 
+			DISTINCT concat(database, '.', name) AS name,
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
-		FROM 
+		FROM
 		(
-			SELECT 
+			SELECT
 				database,
 				name,
 				create_table_query,
@@ -315,23 +360,23 @@ func createTableDistributed(cluster string) string {
 				engine = 'Distributed'
 			SETTINGS skip_unavailable_shards = 1
 			UNION ALL
-			SELECT 
-				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database, 
+			SELECT
+				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database,
 				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
 				t.create_table_query,
 				1 AS order
 			FROM
 				clusterAllReplicas('%s', system.tables) tables
-				LEFT JOIN 
+				LEFT JOIN
 				(
-					SELECT 
-						DISTINCT database, 
-						name, 
-						create_table_query 
+					SELECT
+						DISTINCT database,
+						name,
+						create_table_query
 					FROM
 						clusterAllReplicas('%s', system.tables)
 					SETTINGS skip_unavailable_shards = 1, show_table_uuid_in_table_create_query_if_not_nil=1
-				) t 
+				) t
 				USING (database, name)
 			WHERE
 				engine = 'Distributed' AND t.create_table_query != ''
@@ -365,7 +410,7 @@ func createTableReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS')
 		FROM
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE

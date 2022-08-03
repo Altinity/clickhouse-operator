@@ -119,6 +119,9 @@ spec:
                 chop-date:
                   type: string
                   description: "ClickHouse operator build date"
+                chop-ip:
+                  type: string
+                  description: "IP address of the operator's pod which managed this CHI"
                 clusters:
                   type: integer
                   minimum: 0
@@ -186,6 +189,11 @@ spec:
                 pods:
                   type: array
                   description: "Pods"
+                  items:
+                    type: string
+                pod-ips:
+                  type: array
+                  description: "Pod IPs"
                   items:
                     type: string
                 fqdns:
@@ -657,6 +665,26 @@ spec:
                               volumeClaimTemplate:
                                 type: string
                                 description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
+                          schemaPolicy:
+                            type: object
+                            description: |
+                              describes how schema is propagated within replicas and shards
+                            properties:
+                              replica:
+                                type: string
+                                description: "how schema is propagated within a replica"
+                                enum:
+                                  # List SchemaPolicyReplicaXXX constants from model
+                                  - "None"
+                                  - "All"
+                              shard:
+                                type: string
+                                description: "how schema is propagated between shards"
+                                enum:
+                                  # List SchemaPolicyShardXXX constants from model
+                                  - "None"
+                                  - "All"
+                                  - "DistributedTablesOnly"
                           layout:
                             type: object
                             description: |

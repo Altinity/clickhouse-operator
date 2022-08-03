@@ -9,7 +9,7 @@ source "${CUR_DIR}/go_build_config.sh"
 
 # Externally configurable build-dependent options
 TAG="${TAG:-dev}"
-DOCKER_IMAGE="sunsingerus/metrics-exporter:${TAG}"
+DOCKER_IMAGE="altinity/metrics-exporter:${TAG}"
 DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN}"
 
 source "${CUR_DIR}/image_build_metrics_exporter_universal.sh"

@@ -3,11 +3,9 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: test-014-replication
+  name: test-014-1-replication
 
 spec:
-  # reconciling:
-  #  policy: wait
   useTemplates:
     - name: clickhouse-version
     - name: persistent-volume
@@ -22,6 +20,5 @@ spec:
       - name: default
         layout:
           replicasCount: 2
-          shardsCount: 2
-    profiles:
-      default/database_atomic_wait_for_drop_and_detach_synchronously: 1
+  defaults:
+    replicasUseFQDN: "yes"

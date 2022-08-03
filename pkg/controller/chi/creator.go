@@ -28,13 +28,15 @@ import (
 )
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) createStatefulSet(ctx context.Context, statefulSet *apps.StatefulSet, host *chiv1.ChiHost) error {
+func (c *Controller) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
 	log.V(1).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
 	}
+
+	statefulSet := host.StatefulSet
 
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, newCreateOptions()); err != nil {
@@ -49,7 +51,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, statefulSet *apps.St
 	}
 
 	// StatefulSet create failed, time to rollback?
-	return c.onStatefulSetCreateFailed(ctx, statefulSet, host)
+	return c.onStatefulSetCreateFailed(ctx, host)
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
@@ -140,7 +142,7 @@ var errUnexpectedFlow = errors.New("unexpected flow")
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
-func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatefulSet *apps.StatefulSet, host *chiv1.ChiHost) error {
+func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return errIgnore
@@ -155,13 +157,13 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, failedStatef
 
 	case chiv1.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
-		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(host.StatefulSet.ObjectMeta))
 		_ = c.deleteHost(ctx, host)
 		return c.shouldContinueOnCreateFailed()
 
 	case chiv1.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(failedStatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(host.StatefulSet.ObjectMeta))
 		return errIgnore
 
 	default:

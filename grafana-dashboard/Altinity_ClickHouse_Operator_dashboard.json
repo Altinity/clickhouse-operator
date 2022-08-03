@@ -1646,9 +1646,14 @@
           "step": 20
         },
         {
-          "expr": "chi_clickhouse_metric_ReplicasMaxQueueSize{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
-          "legendFormat": "max queue size {{hostname}}",
-          "refId": "Z"
+          "expr": "chi_clickhouse_metric_ReplicasSumInsertsInQueue{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "inserts in queue {{hostname}}",
+          "refId": "H"
+        },
+        {
+          "expr": "chi_clickhouse_metric_ReplicasSumMergesInQueue{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
+          "legendFormat": "merges in queue {{hostname}}",
+          "refId": "I"
         }
       ],
       "thresholds": [],
