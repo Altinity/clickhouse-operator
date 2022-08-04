@@ -33,11 +33,6 @@ BASE_PATH="https://raw.githubusercontent.com/prometheus-operator/prometheus-oper
 echo "Setup prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace."
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f  <( \
     wget -qO- "${BASE_PATH}"/bundle.yaml | \
-    sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
-)
-
-kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f  <( \
-    wget -qO- "${BASE_PATH}"/bundle.yaml | \
     sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" | \
     yq -M eval '. | select(.kind == "Deployment") | .spec.template.spec.containers[0].imagePullPolicy = "IfNotPresent" ' - \
 )

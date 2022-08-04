@@ -35,7 +35,7 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     for i in range(retries):
         readonly_replicas = clickhouse.query(
             chi['metadata']['name'],
-            "SELECT groupArray(value) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'"
+            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'"
         )
         if readonly_replicas == expected_replicas:
             message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
@@ -62,7 +62,7 @@ def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_table
                 pod=pod_for_insert_data
             )
 
-def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=5):
+def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
     for pod_num in range(pod_count):
         out = ""
         expected_out = ""
