@@ -2,7 +2,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 
 metadata:
-  name: clickhouse-version
+  name: clickhouse-stable-version
 spec:
   defaults:
     templates:
@@ -13,5 +13,5 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: altinity/clickhouse-server:21.8.15.15.altinitystable
+              image: altinity/clickhouse-server:22.3.8.40.altinitystable
 

@@ -24,7 +24,7 @@ xfails = {
         (Fail, "zookeeper liveness probe doesn't work, wait when https://github.com/pravega/zookeeper-operator/pull/476 will merge")
     ],
     "/regression/e2e.test_keeper/test_clickhouse_keeper_probes_workload*": [
-        (Fail, "clickhouse-keeper fail after insert 10000 parts")
+        (Fail, "clickhouse-keeper fail after insert 10000 parts, look https://github.com/ClickHouse/ClickHouse/issues/35712")
     ],
 }
 
