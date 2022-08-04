@@ -136,7 +136,7 @@ spec:
       containers:
         - name: clickhouse-keeper
           imagePullPolicy: Always
-          image: "clickhouse/clickhouse-server:head"
+          image: "clickhouse/clickhouse-keeper:head-alpine"
           resources:
             requests:
               memory: "256M"
@@ -181,7 +181,7 @@ spec:
                 echo "</keeper_server></yandex>"
               } > /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml &&
               cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml && 
-              clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml --force-recovery
+              clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml --force-recovery
           readinessProbe:
             tcpSocket:
               port: 9444

@@ -64,39 +64,45 @@ def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_table
 
 def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
     for pod_num in range(pod_count):
-        out = ""
-        expected_out = ""
+        found = False
         for i in range(retry_count):
             if keeper_type == "zookeeper-operator":
-                expected_out = "[clickhouse, zookeeper, zookeeper-operator]"
+                expected_outs = ("[clickhouse, zookeeper, zookeeper-operator]", )
                 keeper_cmd = './bin/zkCli.sh ls /'
                 pod_prefix = "zookeeper"
             elif keeper_type == "zookeeper":
-                expected_out = "[clickhouse, zookeeper]"
+                expected_outs = ("[clickhouse, zookeeper]", )
                 keeper_cmd = './bin/zkCli.sh ls /'
                 pod_prefix = "zookeeper"
             else:
-                expected_out = "clickhouse"
-                keeper_cmd = "if [[ ! $(command -v zookeepercli) ]]; then "
-                keeper_cmd += "wget -q -O /tmp/zookeepercli.deb https://github.com/outbrain/zookeepercli/releases/download/v1.0.12/zookeepercli_1.0.12_amd64.deb; "
-                keeper_cmd += "dpkg -i /tmp/zookeepercli.deb; "
+                expected_outs = ("[keeper, clickhouse]", "[clickhouse, keeper]", "[keeper]")
+                keeper_cmd = "if [[ ! $(command -v zkcli) ]]; then "
+                keeper_cmd += "wget -q -O /tmp/zkcli.tar.gz https://github.com/let-us-go/zkcli/releases/download/v0.4.0/zkcli-0.4.0-linux-amd64.tar.gz; "
+                keeper_cmd += "cd /tmp; tar -xf zkcli.tar.gz; "
+                keeper_cmd += "mv -fv ./zkcli-0.4.0-linux-amd64/zkcli /bin/zkcli; "
                 keeper_cmd += "fi; "
-                keeper_cmd += "zookeepercli -servers 127.0.0.1:2181 -c ls /"
+                keeper_cmd += "zkcli -s 127.0.0.1:2181 ls /"
                 pod_prefix = "clickhouse-keeper"
 
             out = kubectl.launch(f"exec {pod_prefix}-{pod_num} -- bash -ce '{keeper_cmd}'", ns=settings.test_namespace, ok_to_fail=True)
-            if expected_out in out:
+            found = False
+            for expected_out in expected_outs:
+                if expected_out in out:
+                    found = True
+                    break
+            if found:
                 break
             else:
                 with Then(f"{keeper_type} ROOT NODE not ready, wait {(i + 1) * 3} sec"):
                     time.sleep((i + 1) * 3)
-        assert expected_out in out, f"Unexpected {keeper_type} `ls /` output"
+
+        assert found, f"Unexpected {keeper_type} `ls /` output"
 
     out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
     expected_out = {
         "zookeeper": "2",
         "zookeeper-operator": "3",
-        "clickhouse-keeper": "1",
+        "clickhouse-keeper": "2",
     }
     assert expected_out[keeper_type] == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 

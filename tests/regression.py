@@ -17,9 +17,9 @@ xfails = {
     ],
 
     # test_keeper.py
-    "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
-        (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465. --force-recovery useless https://github.com/ClickHouse/ClickHouse/issues/37434"),
-    ],
+    # "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
+    #     (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465. --force-recovery useless https://github.com/ClickHouse/ClickHouse/issues/37434"),
+    # ],
     "/regression/e2e.test_keeper/test_zookeeper_operator_probes_workload*": [
         (Fail, "zookeeper liveness probe doesn't work, wait when https://github.com/pravega/zookeeper-operator/pull/476 will merge")
     ],
