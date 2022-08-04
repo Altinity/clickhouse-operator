@@ -43,10 +43,10 @@ spec:
         spec:
           ports:
             - name: http
-              port: 8443
+              port: 8123
               targetPort: 8123
             - name: client
-              port: 9440
+              port: 9000
               targetPort: 9000
           type: LoadBalancer
     volumeClaimTemplates:
