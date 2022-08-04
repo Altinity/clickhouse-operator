@@ -2459,8 +2459,8 @@ def test_034(self):
             kubectl.wait_jsonpath("pod", "chi-test-operator-https-connection-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                                 ns=kubectl.namespace)
 
-        with When("I enable port forwarding"):
-            self.context.shell("kubectl port-forward -n test pod/chi-test-034-https-check-secure-t1-0-0-0 9440:9440 --address 0.0.0.0 &")
+        with When("I enable port forwarding to the service port 9440"):
+            self.context.shell("kubectl port-forward -n test service/clickhouse-test-operator-https-connection 9440:9440 --address 0.0.0.0 &")
 
         with And("I send secure connection request to clickhouse pod"):
             for attempt in retries(timeout=30, delay=3, count=10):

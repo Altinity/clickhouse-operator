@@ -54,10 +54,22 @@ spec:
         resources:
           requests:
             storage: 1Gi
+    serviceTemplates:
+    - name: default-service-template
+      generateName: clickhouse-{chi}
+      spec:
+        ports:
+        - name: https
+          port: 8443
+        - name: tcp
+          port: 9440
+        type: LoadBalancer
+        externalTrafficPolicy: Local      
   defaults:
     templates:
       podTemplate: clickhouse-replica-1
       volumeClaimTemplate: default-gp2
+      serviceTemplate: default-service-template      
   configuration:
     files:
       settings.xml: |
