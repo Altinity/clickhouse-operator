@@ -426,7 +426,7 @@ func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chi
 	return pv
 }
 
-// PreparePersistentVolumeClaim prepares labels and annotations of the PVC
+// PreparePersistentVolumeClaim prepares PVC - labels and annotations
 func (c *Creator) PreparePersistentVolumeClaim(
 	pvc *corev1.PersistentVolumeClaim,
 	host *chiv1.ChiHost,

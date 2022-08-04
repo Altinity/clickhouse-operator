@@ -224,7 +224,7 @@ func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 }
 
 // GetVolumeMount gets VolumeMount by the name
-func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool){
+func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
 	host.WalkVolumeMounts(func(volumeMount *corev1.VolumeMount) {
 		if volumeMount.Name == volumeMountName {
 			vm = volumeMount
