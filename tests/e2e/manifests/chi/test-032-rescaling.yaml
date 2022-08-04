@@ -18,12 +18,12 @@ spec:
           port: 2181
     users:
       test_032/password: test_032
-      test_032/networks/ip: 0.0.0.0/0           
+      test_032/networks/ip: 0.0.0.0/0
     clusters:
       - name: default
         layout:
-          shardsCount: 1
-          replicasCount: 2 
+          shardsCount: 2
+          replicasCount: 2
   templates:
     podTemplates:
       - name: default
