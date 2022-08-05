@@ -246,11 +246,11 @@ def test_keeper_probes_outline(
         check_zk_root_znode(chi, keeper_type, pod_count=3)
         wait_clickhouse_no_readonly_replicas(chi)
 
-    with Then("Create zookeeper_bench table"):
-        clickhouse.query(chi['metadata']['name'],"DROP DATABASE IF EXISTS zookeeper_bench SYNC")
-        clickhouse.query(chi['metadata']['name'],"CREATE DATABASE zookeeper_bench")
+    with Then("Create keeper_bench table"):
+        clickhouse.query(chi['metadata']['name'],"DROP DATABASE IF EXISTS keeper_bench SYNC")
+        clickhouse.query(chi['metadata']['name'],"CREATE DATABASE keeper_bench")
         clickhouse.query(chi['metadata']['name'],"""
-            CREATE TABLE zookeeper_bench.zookeeper_bench (p UInt64, x UInt64)
+            CREATE TABLE keeper_bench.keeper_bench (p UInt64, x UInt64)
             ENGINE=ReplicatedSummingMergeTree('/clickhouse/tables/{database}/{table}', '{replica}' )
             ORDER BY tuple()
             PARTITION BY p
@@ -261,12 +261,12 @@ def test_keeper_probes_outline(
                 parts_to_throw_insert=1000000,
                 max_parts_in_total=1000000;        
         """)
-    with Then("Insert data to zookeeper_bench for make zookeeper workload"):
+    with Then("Insert data to keeper_bench for make zookeeper workload"):
         pod_prefix="chi-test-cluster-for-zk-default"
         rows = 100000
         for pod in ("0-0-0", "0-1-0"):
             clickhouse.query(chi['metadata']['name'],"""
-                INSERT INTO zookeeper_bench.zookeeper_bench SELECT rand(1)%100, rand(2) FROM numbers(100000)
+                INSERT INTO keeper_bench.keeper_bench SELECT rand(1)%100, rand(2) FROM numbers(100000)
                 SETTINGS max_block_size=1,
                   min_insert_block_size_bytes=1,
                   min_insert_block_size_rows=1,
