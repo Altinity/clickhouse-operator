@@ -426,14 +426,6 @@ func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	return isObjectVersionLabelTheSame(meta1, l)
 }
 
-// AppendLabelReady appends "Ready" label to ObjectMeta.Labels
-func AppendLabelReady(meta *meta.ObjectMeta) {
-	if meta == nil {
-		return
-	}
-	meta.Labels = appendLabelReady(meta.Labels)
-}
-
 // appendLabelReady appends "Ready" label to labels
 func appendLabelReady(dst map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(
@@ -442,6 +434,14 @@ func appendLabelReady(dst map[string]string) map[string]string {
 			LabelReadyName: LabelReadyValue,
 		},
 	)
+}
+
+// AppendLabelReady appends "Ready" label to ObjectMeta.Labels
+func AppendLabelReady(meta *meta.ObjectMeta) {
+	if meta == nil {
+		return
+	}
+	meta.Labels = appendLabelReady(meta.Labels)
 }
 
 // DeleteLabelReady deletes "Ready" label from ObjectMeta.Labels
