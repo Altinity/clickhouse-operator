@@ -267,8 +267,13 @@ func (l *Labeler) getPVC(
 	host *chiv1.ChiHost,
 	template *chiv1.ChiVolumeClaimTemplate,
 ) map[string]string {
+	// Prepare main labels based on template
 	labels := util.MergeStringMapsOverwrite(pvc.Labels, template.ObjectMeta.Labels)
-	return util.MergeStringMapsOverwrite(labels, l.getHostScopeReclaimPolicy(host, template, false))
+	// Append reclaim policy labels
+	return util.MergeStringMapsOverwrite(
+		labels,
+		l.getHostScopeReclaimPolicy(host, template, false),
+	)
 }
 
 // GetReclaimPolicy gets reclaim policy from meta
@@ -361,7 +366,7 @@ func IsCHOPGeneratedObject(meta *meta.ObjectMeta) bool {
 	return meta.Labels[LabelAppName] == LabelAppValue
 }
 
-// GetCHINameFromObjectMeta extracts CHI name from ObjectMeta by labels
+// GetCHINameFromObjectMeta extracts CHI name from ObjectMeta. Based on labels.
 func GetCHINameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	if !util.MapHasKeys(meta.Labels, LabelCHIName) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelCHIName)
@@ -369,7 +374,7 @@ func GetCHINameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelCHIName], nil
 }
 
-// GetClusterNameFromObjectMeta extracts cluster name from ObjectMeta by labels
+// GetClusterNameFromObjectMeta extracts cluster name from ObjectMeta. Based on labels.
 func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	if !util.MapHasKeys(meta.Labels, LabelClusterName) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
@@ -387,7 +392,7 @@ func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
 	)
 }
 
-// isObjectVersionLabelTheSame
+// isObjectVersionLabelTheSame checks whether object version in meta.Labels is the same as provided value
 func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	if meta == nil {
 		return false
@@ -421,7 +426,7 @@ func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	return isObjectVersionLabelTheSame(meta1, l)
 }
 
-// AppendLabelReady adds "Ready" label to ObjectMeta
+// AppendLabelReady appends "Ready" label to ObjectMeta.Labels
 func AppendLabelReady(meta *meta.ObjectMeta) {
 	if meta == nil {
 		return
@@ -429,7 +434,7 @@ func AppendLabelReady(meta *meta.ObjectMeta) {
 	meta.Labels = appendLabelReady(meta.Labels)
 }
 
-// appendLabelReady appends "Ready" label to labels set
+// appendLabelReady appends "Ready" label to labels
 func appendLabelReady(dst map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		dst,
@@ -439,7 +444,7 @@ func appendLabelReady(dst map[string]string) map[string]string {
 	)
 }
 
-// DeleteLabelReady deletes "ready" label
+// DeleteLabelReady deletes "Ready" label from ObjectMeta.Labels
 func DeleteLabelReady(meta *meta.ObjectMeta) {
 	if meta == nil {
 		return
