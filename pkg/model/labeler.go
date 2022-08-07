@@ -169,7 +169,7 @@ func (l *Labeler) GetSelectorCHIScope() map[string]string {
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return appendReady(l.GetSelectorCHIScope())
+	return appendLabelReady(l.GetSelectorCHIScope())
 }
 
 // getClusterScope gets labels for Cluster-scoped object
@@ -191,7 +191,7 @@ func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
 func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
-	return appendReady(getSelectorClusterScope(cluster))
+	return appendLabelReady(getSelectorClusterScope(cluster))
 }
 
 // getLabelsShardScope gets labels for Shard-scoped object
@@ -214,7 +214,7 @@ func getSelectorShardScope(shard *chiv1.ChiShard) map[string]string {
 
 // getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
 func getSelectorShardScopeReady(shard *chiv1.ChiShard) map[string]string {
-	return appendReady(getSelectorShardScope(shard))
+	return appendLabelReady(getSelectorShardScope(shard))
 }
 
 // getHostScope gets labels for Host-scoped object
@@ -246,7 +246,7 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getHostScopeReady(host *chiv1.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
-	return appendReady(l.getHostScope(host, applySupplementaryServiceLabels))
+	return appendLabelReady(l.getHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getHostScopeReclaimPolicy
@@ -307,13 +307,6 @@ func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string {
 func (l *Labeler) appendCHIProvidedTo(dst map[string]string) map[string]string {
 	sourceLabels := util.CopyMapFilter(l.chi.Labels, chop.Config().Label.Include, chop.Config().Label.Exclude)
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)
-}
-
-// appendReady appends "Ready" label to labels set
-func appendReady(dst map[string]string) map[string]string {
-	return util.MergeStringMapsOverwrite(dst, map[string]string{
-		LabelReadyName: LabelReadyValue,
-	})
 }
 
 // makeSetFromObjectMeta makes kublabels.Set from ObjectMeta
@@ -428,16 +421,22 @@ func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	return isObjectVersionLabelTheSame(meta1, l)
 }
 
-// AppendLabelReady adds "ready" label with value = UTC now
+// AppendLabelReady adds "Ready" label to ObjectMeta
 func AppendLabelReady(meta *meta.ObjectMeta) {
 	if meta == nil {
 		return
 	}
-	util.MergeStringMapsOverwrite(
-		meta.Labels,
+	meta.Labels = appendLabelReady(meta.Labels)
+}
+
+// appendLabelReady appends "Ready" label to labels set
+func appendLabelReady(dst map[string]string) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		dst,
 		map[string]string{
 			LabelReadyName: LabelReadyValue,
-		})
+		},
+	)
 }
 
 // DeleteLabelReady deletes "ready" label
