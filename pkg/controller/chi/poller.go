@@ -56,11 +56,11 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chiv1.ChiHost) err
 			if sts == nil {
 				return false
 			}
-			_ = c.deleteLabelReady(ctx, host)
+			_ = c.deleteLabelReadyPod(ctx, host)
 			return model.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func() {
-			_ = c.deleteLabelReady(ctx, host)
+			_ = c.deleteLabelReadyPod(ctx, host)
 		},
 	)
 	if err != nil {
@@ -73,11 +73,11 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chiv1.ChiHost) err
 		host.StatefulSet,
 		nil,
 		func(sts *apps.StatefulSet) bool {
-			_ = c.deleteLabelReady(ctx, host)
+			_ = c.deleteLabelReadyPod(ctx, host)
 			return model.IsStatefulSetReady(sts)
 		},
 		func() {
-			_ = c.deleteLabelReady(ctx, host)
+			_ = c.deleteLabelReadyPod(ctx, host)
 		},
 	)
 }

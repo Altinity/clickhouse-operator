@@ -1088,7 +1088,7 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *chiv1.ChiHost
 		return nil
 	}
 
-	return w.c.deleteLabelReady(ctx, host)
+	return w.c.deleteLabelReadyPod(ctx, host)
 }
 
 // includeHostIntoService
@@ -1098,7 +1098,7 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *chiv1.ChiHost
 		return nil
 	}
 
-	return w.c.appendLabelReady(ctx, host)
+	return w.c.appendLabelReadyPod(ctx, host)
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration

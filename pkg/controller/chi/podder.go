@@ -24,7 +24,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) appendLabelReady(ctx context.Context, host *chop.ChiHost) error {
+// appendLabelReadyPod appends Label "Ready" to the pod of the specified host
+func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -45,7 +46,8 @@ func (c *Controller) appendLabelReady(ctx context.Context, host *chop.ChiHost) e
 	return err
 }
 
-func (c *Controller) deleteLabelReady(ctx context.Context, host *chop.ChiHost) error {
+// deleteLabelReadyPod deletes Label "Ready" from the pod of the specified host
+func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -71,6 +73,7 @@ func (c *Controller) deleteLabelReady(ctx context.Context, host *chop.ChiHost) e
 	return err
 }
 
+// walkContainers walks with specified func over all containers of the specified host
 func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Container)) {
 	pod, err := c.getPod(host)
 	if err != nil {
@@ -84,6 +87,7 @@ func (c *Controller) walkContainers(host *chop.ChiHost, f func(container *v1.Con
 	}
 }
 
+// walkContainerStatuses walks with specified func over all statuses of the specified host
 func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1.ContainerStatus)) {
 	pod, err := c.getPod(host)
 	if err != nil {
@@ -97,6 +101,7 @@ func (c *Controller) walkContainerStatuses(host *chop.ChiHost, f func(status *v1
 	}
 }
 
+// isHostRunning checks whether ALL containers of the specified host are running
 func (c *Controller) isHostRunning(host *chop.ChiHost) bool {
 	all := true
 	c.walkContainerStatuses(host, func(status *v1.ContainerStatus) {
