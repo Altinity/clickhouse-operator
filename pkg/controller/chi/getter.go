@@ -21,10 +21,9 @@ import (
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kublabels "k8s.io/apimachinery/pkg/labels"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
@@ -56,7 +55,7 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 
 	// Try to find by labels
 
-	var selector kublabels.Selector
+	var selector k8slabels.Selector
 	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
 		return nil, err
 	}
@@ -87,7 +86,7 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 	case *core.Service:
 		name = typedObj.Name
 		namespace = typedObj.Namespace
-	case *chop.ChiHost:
+	case *chiv1.ChiHost:
 		name = chopmodel.CreateStatefulSetServiceName(typedObj)
 		namespace = typedObj.Address.Namespace
 	}
@@ -106,7 +105,7 @@ func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.Stat
 			b = byName[0]
 		}
 		return c.getStatefulSetByMeta(typedObj, b)
-	case *chop.ChiHost:
+	case *chiv1.ChiHost:
 		return c.getStatefulSetByHost(typedObj)
 	}
 	return nil, fmt.Errorf("unknown type")
@@ -138,7 +137,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", meta.Namespace, meta.Name)
 	}
 
-	var selector kublabels.Selector
+	var selector k8slabels.Selector
 	if selector, err = chopmodel.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
@@ -161,7 +160,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 }
 
 // getStatefulSetByHost finds StatefulSet of a specified host
-func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSetByHost(host *chiv1.ChiHost) (*apps.StatefulSet, error) {
 	// Namespaced name
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
@@ -178,7 +177,7 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	case *apps.StatefulSet:
 		name = chopmodel.CreatePodName(obj)
 		namespace = typedObj.Namespace
-	case *chop.ChiHost:
+	case *chiv1.ChiHost:
 		name = chopmodel.CreatePodName(obj)
 		namespace = typedObj.Address.Namespace
 	}
@@ -188,14 +187,14 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 // getPods gets all pods for provided entity
 func (c *Controller) getPods(obj interface{}) []*core.Pod {
 	switch typed := obj.(type) {
-	case *chop.ClickHouseInstallation:
+	case *chiv1.ClickHouseInstallation:
 		return c.getPodsOfCHI(typed)
-	case *chop.ChiCluster:
+	case *chiv1.ChiCluster:
 		return c.getPodsOfCluster(typed)
-	case *chop.ChiShard:
+	case *chiv1.ChiShard:
 		return c.getPodsOfShard(typed)
 	case
-		*chop.ChiHost,
+		*chiv1.ChiHost,
 		*apps.StatefulSet:
 		if pod, err := c.getPod(typed); err == nil {
 			return []*core.Pod{
@@ -207,8 +206,8 @@ func (c *Controller) getPods(obj interface{}) []*core.Pod {
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *Controller) getPodsOfCluster(cluster *chop.ChiCluster) (pods []*core.Pod) {
-	cluster.WalkHosts(func(host *chop.ChiHost) error {
+func (c *Controller) getPodsOfCluster(cluster *chiv1.ChiCluster) (pods []*core.Pod) {
+	cluster.WalkHosts(func(host *chiv1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -218,8 +217,8 @@ func (c *Controller) getPodsOfCluster(cluster *chop.ChiCluster) (pods []*core.Po
 }
 
 // getPodsOfShard gets all pods in a shard
-func (c *Controller) getPodsOfShard(shard *chop.ChiShard) (pods []*core.Pod) {
-	shard.WalkHosts(func(host *chop.ChiHost) error {
+func (c *Controller) getPodsOfShard(shard *chiv1.ChiShard) (pods []*core.Pod) {
+	shard.WalkHosts(func(host *chiv1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -229,8 +228,8 @@ func (c *Controller) getPodsOfShard(shard *chop.ChiShard) (pods []*core.Pod) {
 }
 
 // getPodsOfCHI gets all pods in a CHI
-func (c *Controller) getPodsOfCHI(chi *chop.ClickHouseInstallation) (pods []*core.Pod) {
-	chi.WalkHosts(func(host *chop.ChiHost) error {
+func (c *Controller) getPodsOfCHI(chi *chiv1.ClickHouseInstallation) (pods []*core.Pod) {
+	chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}

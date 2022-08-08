@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
