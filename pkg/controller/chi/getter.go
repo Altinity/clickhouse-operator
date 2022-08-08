@@ -17,15 +17,14 @@ package chi
 import (
 	"fmt"
 
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kublabels "k8s.io/apimachinery/pkg/labels"
-
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
@@ -91,7 +90,8 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 		name = chopmodel.CreateStatefulSetServiceName(typedObj)
 		namespace = typedObj.Address.Namespace
 	}
-	return c.kubeClient.CoreV1().Services(namespace).Get(newContext(), name, newGetOptions())
+	return c.serviceLister.Services(namespace).Get(name)
+	//return c.kubeClient.CoreV1().Services(namespace).Get(newContext(), name, newGetOptions())
 }
 
 // getStatefulSet gets StatefulSet. Accepted types:
