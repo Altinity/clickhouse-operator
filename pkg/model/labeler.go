@@ -449,5 +449,21 @@ func DeleteLabelReady(meta *meta.ObjectMeta) {
 	if meta == nil {
 		return
 	}
-	util.MapDeleteKeys(meta.Labels, LabelReadyName)
+	meta.Labels = util.MapDeleteKeys(meta.Labels, LabelReadyName)
+}
+
+// AppendAnnotationReady appends "Ready" annotation to ObjectMeta.Annotations
+func AppendAnnotationReady(meta *meta.ObjectMeta) {
+	if meta == nil {
+		return
+	}
+	meta.Annotations = appendLabelReady(meta.Annotations)
+}
+
+// DeleteAnnotationReady deletes "Ready" annotation from ObjectMeta.Annotations
+func DeleteAnnotationReady(meta *meta.ObjectMeta) {
+	if meta == nil {
+		return
+	}
+	meta.Annotations = util.MapDeleteKeys(meta.Annotations, LabelReadyName)
 }

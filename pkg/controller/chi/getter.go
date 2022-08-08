@@ -78,52 +78,20 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
-// getService gets Service either by namespaced name or by labels
-// TODO review byNameOnly params
-func (c *Controller) getService(objMeta *meta.ObjectMeta, byNameOnly bool) (*core.Service, error) {
-	get := c.serviceLister.Services(objMeta.Namespace).Get
-	list := c.serviceLister.Services(objMeta.Namespace).List
-	var objects []*core.Service
-
-	// Check whether object with such name already exists
-	obj, err := get(objMeta.Name)
-
-	if (obj != nil) && (err == nil) {
-		// Object found by name
-		return obj, nil
+// getService gets Service. Accepted types:
+//   1. *core.Service
+//   2. *chop.ChiHost
+func (c *Controller) getService(obj interface{}) (*core.Service, error) {
+	var name, namespace string
+	switch typedObj := obj.(type) {
+	case *core.Service:
+		name = typedObj.Name
+		namespace = typedObj.Namespace
+	case *chop.ChiHost:
+		name = chopmodel.CreateStatefulSetServiceName(typedObj)
+		namespace = typedObj.Address.Namespace
 	}
-
-	if !apierrors.IsNotFound(err) {
-		// Error, which is not related to "Object not found"
-		return nil, err
-	}
-
-	// Object not found by name. Try to find by labels
-
-	if byNameOnly {
-		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", objMeta.Namespace, objMeta.Name)
-	}
-
-	var selector kublabels.Selector
-	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
-		return nil, err
-	}
-
-	if objects, err = list(selector); err != nil {
-		return nil, err
-	}
-
-	if len(objects) == 0 {
-		return nil, apierrors.NewNotFound(apps.Resource("Service"), objMeta.Name)
-	}
-
-	if len(objects) == 1 {
-		// Exactly one object found by labels
-		return objects[0], nil
-	}
-
-	// Too much objects found by labels
-	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
+	return c.kubeClient.CoreV1().Services(namespace).Get(newContext(), name, newGetOptions())
 }
 
 // getStatefulSet gets StatefulSet. Accepted types:
@@ -200,18 +168,18 @@ func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, newGetOptions())
 }
 
-// getPod gets pod for host or StatefulSet. Accepted types:
+// getPod gets pod. Accepted types:
 //   1. *apps.StatefulSet
 //   2. *chop.ChiHost
 func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *chop.ChiHost:
-		name = chopmodel.CreatePodName(obj)
-		namespace = typedObj.Address.Namespace
 	case *apps.StatefulSet:
 		name = chopmodel.CreatePodName(obj)
 		namespace = typedObj.Namespace
+	case *chop.ChiHost:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Address.Namespace
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
 }

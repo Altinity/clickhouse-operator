@@ -1088,7 +1088,9 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *chiv1.ChiHost
 		return nil
 	}
 
-	return w.c.deleteLabelReadyPod(ctx, host)
+	_ = w.c.deleteLabelReadyPod(ctx, host)
+	_ = w.c.deleteAnnotationReadyService(ctx, host)
+	return nil
 }
 
 // includeHostIntoService
@@ -1098,7 +1100,9 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *chiv1.ChiHost
 		return nil
 	}
 
-	return w.c.appendLabelReadyPod(ctx, host)
+	_ = w.c.appendLabelReadyPod(ctx, host)
+	_ = w.c.appendAnnotationReadyService(ctx, host)
+	return nil
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
@@ -1837,7 +1841,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *chiv1.ClickHouseInst
 	defer w.a.V(2).M(chi).E().Info(service.Name)
 
 	// Check whether this object already exists
-	curService, err := w.c.getService(&service.ObjectMeta, false)
+	curService, err := w.c.getService(service)
 
 	if curService != nil {
 		// We have Service - try to update it
