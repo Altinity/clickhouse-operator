@@ -436,34 +436,66 @@ func appendLabelReady(dst map[string]string) map[string]string {
 	)
 }
 
-// AppendLabelReady appends "Ready" label to ObjectMeta.Labels
-func AppendLabelReady(meta *meta.ObjectMeta) {
+// AppendLabelReady appends "Ready" label to ObjectMeta.Labels.
+// Returns true in case label was not in place and was added.
+func AppendLabelReady(meta *meta.ObjectMeta) bool {
 	if meta == nil {
-		return
+		// Nowhere to add to, not added
+		return false
 	}
+	if _, ok := meta.Labels[LabelReadyName]; ok {
+		// Already in place, not added
+		return false
+	}
+	// Need to add
 	meta.Labels = appendLabelReady(meta.Labels)
+	return true
 }
 
 // DeleteLabelReady deletes "Ready" label from ObjectMeta.Labels
-func DeleteLabelReady(meta *meta.ObjectMeta) {
+// Returns true in case label was in place and was deleted.
+func DeleteLabelReady(meta *meta.ObjectMeta) bool {
 	if meta == nil {
-		return
+		// Nowhere to delete from, not deleted
+		return false
 	}
-	meta.Labels = util.MapDeleteKeys(meta.Labels, LabelReadyName)
+	if _, ok := meta.Labels[LabelReadyName]; ok {
+		// In place, need to delete
+		meta.Labels = util.MapDeleteKeys(meta.Labels, LabelReadyName)
+		return true
+	}
+	// Not available, not deleted
+	return false
 }
 
 // AppendAnnotationReady appends "Ready" annotation to ObjectMeta.Annotations
-func AppendAnnotationReady(meta *meta.ObjectMeta) {
+// Returns true in case annotation was not in place and was added.
+func AppendAnnotationReady(meta *meta.ObjectMeta) bool {
 	if meta == nil {
-		return
+		// Nowhere to add to, not added
+		return false
 	}
+	if _, ok := meta.Annotations[LabelReadyName]; ok {
+		// Already in place, not added
+		return false
+	}
+	// Need to add
 	meta.Annotations = appendLabelReady(meta.Annotations)
+	return true
 }
 
 // DeleteAnnotationReady deletes "Ready" annotation from ObjectMeta.Annotations
-func DeleteAnnotationReady(meta *meta.ObjectMeta) {
+// Returns true in case annotation was in place and was deleted.
+func DeleteAnnotationReady(meta *meta.ObjectMeta) bool {
 	if meta == nil {
-		return
+		// Nowhere to delete from, not deleted
+		return false
 	}
-	meta.Annotations = util.MapDeleteKeys(meta.Annotations, LabelReadyName)
+	if _, ok := meta.Annotations[LabelReadyName]; ok {
+		// In place, need to delete
+		meta.Annotations = util.MapDeleteKeys(meta.Annotations, LabelReadyName)
+		return true
+	}
+	// Not available, not deleted
+	return false
 }
