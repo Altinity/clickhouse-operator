@@ -259,13 +259,16 @@ func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiv1.ChiHos
 		return err
 	}
 
-	model.AppendLabelReady(&pod.ObjectMeta)
-	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
-	if err != nil {
-		log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
-		return err
+	if model.AppendLabelReady(&pod.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+		if err != nil {
+			log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
+			return err
+		}
 	}
-	return err
+
+	return nil
 }
 
 // deleteLabelReadyPod deletes Label "Ready" from the pod of the specified host
@@ -293,9 +296,13 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiv1.ChiHos
 		return err
 	}
 
-	model.DeleteLabelReady(&pod.ObjectMeta)
-	_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
-	return err
+	if model.DeleteLabelReady(&pod.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+		return err
+	}
+
+	return nil
 }
 
 // appendAnnotationReadyService appends Annotation "Ready" to the service of the specified host
@@ -311,13 +318,16 @@ func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chi
 		return err
 	}
 
-	model.AppendAnnotationReady(&svc.ObjectMeta)
-	_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
-	if err != nil {
-		log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Address.NamespaceNameString(), err)
-		return err
+	if model.AppendAnnotationReady(&svc.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
+		if err != nil {
+			log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Address.NamespaceNameString(), err)
+			return err
+		}
 	}
-	return err
+
+	return nil
 }
 
 // deleteAnnotationReadyService deletes Annotation "Ready" from the service of the specified host
@@ -345,7 +355,11 @@ func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chi
 		return err
 	}
 
-	model.DeleteAnnotationReady(&svc.ObjectMeta)
-	_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
-	return err
+	if model.DeleteAnnotationReady(&svc.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
+		return err
+	}
+
+	return nil
 }
