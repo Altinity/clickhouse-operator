@@ -183,7 +183,6 @@ func (r ReconcileEndpoints) Handle() queue.T {
 		return "ReconcileEndpoints" + ":" + r.old.Namespace + "/" + r.old.Name
 	}
 	return ""
-	return ""
 }
 
 // NewReconcileEndpoints creates new reconcile endpoints queue item
