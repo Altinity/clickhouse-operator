@@ -1231,7 +1231,7 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiv1.ChiHos
 
 // createPDB creates PodDisruptionBudget
 func (w *worker) createPDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	pdb, err := w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.ctx.creator.NewPodDisruptionBudget(), newCreateOptions())
+	pdb, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.ctx.creator.NewPodDisruptionBudget(), newCreateOptions())
 	if err != nil {
 		log.V(1).Warning("unable to create PDB %v", err)
 		return
@@ -1241,7 +1241,7 @@ func (w *worker) createPDB(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 
 // deletePDB deletes PodDisruptionBudget
 func (w *worker) deletePDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	_ = w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Delete(ctx, chi.Name, newDeleteOptions())
+	_ = w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Delete(ctx, chi.Name, newDeleteOptions())
 }
 
 // deleteCHI

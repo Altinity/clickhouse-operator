@@ -21,7 +21,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
@@ -795,9 +795,9 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 }
 
 // NewPodDisruptionBudget creates new PodDisruptionBudget
-func (c *Creator) NewPodDisruptionBudget() *v1beta1.PodDisruptionBudget {
+func (c *Creator) NewPodDisruptionBudget() *policyv1.PodDisruptionBudget {
 	ownerReferences := getOwnerReferences(c.chi)
-	return &v1beta1.PodDisruptionBudget{
+	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            c.chi.Name,
 			Namespace:       c.chi.Namespace,
@@ -805,7 +805,7 @@ func (c *Creator) NewPodDisruptionBudget() *v1beta1.PodDisruptionBudget {
 			Annotations:     macro(c.chi).Map(c.annotations.getCHIScope()),
 			OwnerReferences: ownerReferences,
 		},
-		Spec: v1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: c.labels.GetSelectorCHIScope(),
 			},
