@@ -136,6 +136,16 @@ type OperatorConfigDefault struct {
 	Quota      string   `json:"quota"     yaml:"quota"`
 	NetworksIP []string `json:"networksIP" yaml:"networksIP"`
 	Password   string   `json:"password"  yaml:"password"`
+	Secret     struct {
+		Namespace string `json:"namespace" yaml:"namespace"`
+		Name      string `json:"name"      yaml:"name"`
+
+		Runtime struct {
+			// User Default Password to be used by operator to connect to ClickHouse instances
+			// extracted from k8s secret specified above.
+			Password string
+		}
+	} `json:"secret" yaml:"secret"`
 }
 
 // OperatorConfigClickHouse specifies ClickHouse section
@@ -316,10 +326,12 @@ type OperatorConfig struct {
 	// 2. user/quota - string
 	// 3. user/networks/ip - multiple strings
 	// 4. user/password - string
-	CHConfigUserDefaultProfile    string   `json:"chConfigUserDefaultProfile"    yaml:"chConfigUserDefaultProfile"`
-	CHConfigUserDefaultQuota      string   `json:"chConfigUserDefaultQuota"      yaml:"chConfigUserDefaultQuota"`
-	CHConfigUserDefaultNetworksIP []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
-	CHConfigUserDefaultPassword   string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
+	CHConfigUserDefaultProfile         string   `json:"chConfigUserDefaultProfile"    yaml:"chConfigUserDefaultProfile"`
+	CHConfigUserDefaultQuota           string   `json:"chConfigUserDefaultQuota"      yaml:"chConfigUserDefaultQuota"`
+	CHConfigUserDefaultNetworksIP      []string `json:"chConfigUserDefaultNetworksIP" yaml:"chConfigUserDefaultNetworksIP"`
+	CHConfigUserDefaultPassword        string   `json:"chConfigUserDefaultPassword"   yaml:"chConfigUserDefaultPassword"`
+	CHConfigDefaultUserSecretNamespace string   `json:"chConfigDefaultUserSecretNamespace" yaml:"chConfigDefaultUserSecretNamespace"`
+	CHConfigDefaultUserSecretName      string   `json:"chConfigDefaultUserSecretName"      yaml:"chConfigDefaultUserSecretName"`
 
 	CHConfigNetworksHostRegexpTemplate string `json:"chConfigNetworksHostRegexpTemplate" yaml:"chConfigNetworksHostRegexpTemplate"`
 
@@ -641,7 +653,9 @@ func (c *OperatorConfig) normalizeSettingsSection() {
 	if c.ClickHouse.Config.User.Default.Password == "" {
 		c.ClickHouse.Config.User.Default.Password = defaultChConfigUserDefaultPassword
 	}
-
+	if c.ClickHouse.Config.User.Default.Secret.Runtime.Password != "" {
+		c.ClickHouse.Config.User.Default.Password = c.ClickHouse.Config.User.Default.Secret.Runtime.Password
+	}
 	// chConfigNetworksHostRegexpTemplate
 }
 
@@ -808,6 +822,7 @@ func (c *OperatorConfig) String(hideCredentials bool) string {
 	if hideCredentials {
 		conf = c.DeepCopy()
 		conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
+		conf.ClickHouse.Config.User.Default.Secret.Runtime.Password = PasswordReplacer
 		conf.ClickHouse.Access.Username = UsernameReplacer
 		conf.ClickHouse.Access.Password = PasswordReplacer
 		conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
@@ -940,6 +955,14 @@ func (c *OperatorConfig) move() {
 	}
 	if c.CHConfigUserDefaultPassword != "" {
 		c.ClickHouse.Config.User.Default.Password = c.CHConfigUserDefaultPassword
+	}
+
+	if c.CHConfigDefaultUserSecretNamespace != "" {
+		c.ClickHouse.Config.User.Default.Secret.Namespace = c.CHConfigDefaultUserSecretNamespace
+	}
+
+	if c.CHConfigDefaultUserSecretName != "" {
+		c.ClickHouse.Config.User.Default.Secret.Name = c.CHConfigDefaultUserSecretName
 	}
 
 	if c.CHConfigNetworksHostRegexpTemplate != "" {

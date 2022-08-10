@@ -98,6 +98,15 @@ spec:
                                 password:
                                   type: string
                                   description: "ClickHouse server configuration `<password>...</password>` for any <user>"
+                                secret:
+                                  type: object
+                                  properties:
+                                    namespace:
+                                      type: string
+                                      description: "Location of k8s Secret with username and password to be used by default user to connect to ClickHouse instances"
+                                    name:
+                                      type: string
+                                      description: "Name of k8s Secret with username and password to be used by default user to connect to ClickHouse instances"
                         network:
                           type: object
                           properties:

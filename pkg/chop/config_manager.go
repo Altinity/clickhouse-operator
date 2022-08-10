@@ -378,6 +378,45 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 			cm.config.ClickHouse.Access.Secret.Runtime.Password = string(value)
 		}
 	}
+
+	// repeat the steps above to fetch default user's password
+	name = cm.config.ClickHouse.Config.User.Default.Secret.Name
+
+	// Do we need to fetch credentials from the secret?
+	if name == "" {
+		// No name specified, no need to read secret
+		return
+	}
+
+	// We have secret name specified, let's move on and read credentials
+
+	// Figure out namespace where to look for the secret
+	namespace = cm.config.ClickHouse.Config.User.Default.Secret.Namespace
+	if namespace == "" {
+		// No namespace explicitly specified, let's look into namespace where pod is running
+		if cm.HasRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE) {
+			namespace, _ = cm.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
+		}
+	}
+
+	// Sanity check
+	if (namespace == "") || (name == "") {
+		return
+	}
+
+	secret, err = cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+
+	// Find username and password from credentials
+	for key, value := range secret.Data {
+		switch key {
+		case "password":
+			cm.config.ClickHouse.Config.User.Default.Secret.Runtime.Password = string(value)
+		}
+	}
+
 }
 
 // Postprocess performs postprocessing of the configuration
