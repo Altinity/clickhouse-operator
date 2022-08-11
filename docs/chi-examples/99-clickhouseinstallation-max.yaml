@@ -210,10 +210,15 @@ spec:
   templates:
     hostTemplates:
       - name: host-template-custom-ports
+        portDistribution:
+          - type: "ClusterScopeIndex"
         spec:
           tcpPort: 7000
           httpPort: 7001
           interserverHTTPPort: 7002
+          #settings:
+          #files:
+          #templates:
 
     serviceTemplates:
       - name: chi-service-template
