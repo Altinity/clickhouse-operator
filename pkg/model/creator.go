@@ -921,6 +921,35 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 	return nil
 }
 
+// CreatePVC
+func (c *Creator) CreatePVC(name string, host *chiv1.ChiHost, spec *corev1.PersistentVolumeClaimSpec) corev1.PersistentVolumeClaim {
+	persistentVolumeClaim := corev1.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "PersistentVolumeClaim",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			// TODO
+			//  this has to wait until proper disk inheritance procedure will be available
+			// UPDATE
+			//  we are close to proper disk inheritance
+			// Right now we hit the following error:
+			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
+			Labels:      macro(host).Map(c.labels.getHostScope(host, false)),
+			Annotations: macro(host).Map(c.annotations.getHostScope(host)),
+		},
+		// Append copy of PersistentVolumeClaimSpec
+		Spec: *spec.DeepCopy(),
+	}
+	// TODO introduce normalization
+	// Overwrite .Spec.VolumeMode
+	volumeMode := corev1.PersistentVolumeFilesystem
+	persistentVolumeClaim.Spec.VolumeMode = &volumeMode
+
+	return persistentVolumeClaim
+}
+
 // statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
 func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet *apps.StatefulSet,
@@ -943,32 +972,14 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 		}
 	}
 
+	//
 	// Provided VolumeClaimTemplate is not listed in statefulSet.Spec.VolumeClaimTemplates - let's add it
+	//
 
-	persistentVolumeClaim := corev1.PersistentVolumeClaim{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PersistentVolumeClaim",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: volumeClaimTemplate.Name,
-			// TODO
-			//  this has to wait until proper disk inheritance procedure will be available
-			// UPDATE
-			//  we are close to proper disk inheritance
-			// Right now we hit the following error:
-			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-			Labels:      macro(host).Map(c.labels.getHostScope(host, false)),
-			Annotations: macro(host).Map(c.annotations.getHostScope(host)),
-		},
-		Spec: *volumeClaimTemplate.Spec.DeepCopy(),
-	}
-	// TODO introduce normalization
-	volumeMode := corev1.PersistentVolumeFilesystem
-	persistentVolumeClaim.Spec.VolumeMode = &volumeMode
-
-	// Append copy of PersistentVolumeClaimSpec
-	statefulSet.Spec.VolumeClaimTemplates = append(statefulSet.Spec.VolumeClaimTemplates, persistentVolumeClaim)
+	statefulSet.Spec.VolumeClaimTemplates = append(
+		statefulSet.Spec.VolumeClaimTemplates,
+		c.CreatePVC(volumeClaimTemplate.Name, host, &volumeClaimTemplate.Spec),
+	)
 }
 
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
