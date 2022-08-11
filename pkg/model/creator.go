@@ -831,31 +831,29 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 	containerName string,
 	volumeMount corev1.VolumeMount,
 ) error {
-
+	//
 	// Sanity checks
+	//
 
-	// 1. mountPath has to be reasonable
-	if volumeMount.MountPath == "" {
-		// No mount path specified
+	// VolumeMount has to have reasonable data - name and mountPath
+	if (volumeMount.Name == "") || (volumeMount.MountPath == "") {
 		return nil
 	}
 
 	volumeClaimTemplateName := volumeMount.Name
-
-	// 2. volumeClaimTemplateName has to be reasonable
+	// volumeClaimTemplateName has to be reasonable
 	if volumeClaimTemplateName == "" {
-		// No VolumeClaimTemplate specified
 		return nil
 	}
 
-	// 3. Specified (by volumeClaimTemplateName) VolumeClaimTemplate has to be available as well
+	// Specified (by volumeClaimTemplateName) VolumeClaimTemplate has to be available as well
 	if _, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); !ok {
 		// Incorrect/unknown .templates.VolumeClaimTemplate specified
 		c.a.V(1).F().Warning("Can not find volumeClaimTemplate %s. Volume claim can not be mounted", volumeClaimTemplateName)
 		return nil
 	}
 
-	// 4. Specified container has to be available
+	// Specified container has to be available
 	container := getContainerByName(statefulSet, containerName)
 	if container == nil {
 		c.a.V(1).F().Warning("Can not find container %s. Volume claim can not be mounted", containerName)
@@ -933,18 +931,19 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 		statefulSet.Spec.VolumeClaimTemplates = make([]corev1.PersistentVolumeClaim, 0, 0)
 	}
 
-	// Check whether this VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
+	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
 	for i := range statefulSet.Spec.VolumeClaimTemplates {
 		// Convenience wrapper
-		volumeClaimTemplates := &statefulSet.Spec.VolumeClaimTemplates[i]
-		if volumeClaimTemplates.Name == volumeClaimTemplate.Name {
+		_volumeClaimTemplate := &statefulSet.Spec.VolumeClaimTemplates[i]
+		if _volumeClaimTemplate.Name == volumeClaimTemplate.Name {
 			// This VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
 			// No need to add it second time
 			return
 		}
 	}
 
-	// VolumeClaimTemplate is not listed in statefulSet.Spec.VolumeClaimTemplates - let's add it
+	// Provided VolumeClaimTemplate is not listed in statefulSet.Spec.VolumeClaimTemplates - let's add it
+
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
