@@ -615,8 +615,9 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 	}
 }
 
-// setupStatefulSetApplyVolumeMounts applies `volumeMounts` of a `container`
-func (c *Creator) setupStatefulSetApplyVolumeMounts(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+// statefulSetAppendPVCTemplates appends all PVC templates which are referenced (by name) within containers
+// to the StatefulSet.Spec.VolumeClaimTemplates list
+func (c *Creator) statefulSetAppendPVCTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Deal with `volumeMounts` of a `container`, located by the path:
 	// .spec.templates.podTemplates.*.spec.containers.volumeMounts.*
 	// VolumeClaimTemplates, that are directly referenced in Containers' VolumeMount object(s)
@@ -629,7 +630,7 @@ func (c *Creator) setupStatefulSetApplyVolumeMounts(statefulSet *apps.StatefulSe
 			volumeMount := &container.VolumeMounts[j]
 			if volumeClaimTemplate, ok := c.chi.GetVolumeClaimTemplate(volumeMount.Name); ok {
 				// Found VolumeClaimTemplate to mount by VolumeMount
-				c.statefulSetAppendPVCTemplate(host, statefulSet, volumeClaimTemplate)
+				c.statefulSetAppendPVCTemplate(statefulSet, host, volumeClaimTemplate)
 			}
 		}
 	}
@@ -648,7 +649,7 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplates(statefulSet *apps.St
 
 // setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
 func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.setupStatefulSetApplyVolumeMounts(statefulSet, host)
+	c.statefulSetAppendPVCTemplates(statefulSet, host)
 	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
 }
 
@@ -901,7 +902,7 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 	// Let's mount this VolumeClaimTemplate into `mountPath` (say '/var/lib/clickhouse') of a container
 	if template, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); ok {
 		// Add VolumeClaimTemplate to StatefulSet
-		c.statefulSetAppendPVCTemplate(host, statefulSet, template)
+		c.statefulSetAppendPVCTemplate(statefulSet, host, template)
 		// Add VolumeMount to ClickHouse container to `mountPath` point
 		container.VolumeMounts = append(
 			container.VolumeMounts,
@@ -922,8 +923,8 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 
 // statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
 func (c *Creator) statefulSetAppendPVCTemplate(
-	host *chiv1.ChiHost,
 	statefulSet *apps.StatefulSet,
+	host *chiv1.ChiHost,
 	volumeClaimTemplate *chiv1.ChiVolumeClaimTemplate,
 ) {
 	// Ensure VolumeClaimTemplates slice is in place
