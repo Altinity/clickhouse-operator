@@ -325,7 +325,7 @@ spec:
         reclaimPolicy: Retain
         metadata:
           labels:
-            a: b
+            a: "b"
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass
@@ -346,7 +346,7 @@ spec:
         reclaimPolicy: Retain
         metadata:
           labels:
-            a: b
+            a: "b"
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass
