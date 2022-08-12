@@ -854,7 +854,7 @@ func (c *OperatorConfig) GetInformerNamespace() string {
 
 		// This contradicts current implementation of multiple namespaces in config's watchNamespaces field,
 		// but k8s has possibility to specify one/all namespaces only, no 'multiple namespaces' option
-		var labelRegexp = regexp.MustCompile("^[a-z]([-a-z0-9]*[a-z0-9])?$")
+		var labelRegexp = regexp.MustCompile("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
 		if labelRegexp.MatchString(c.Watch.Namespaces[0]) {
 			namespace = c.Watch.Namespaces[0]
 		}
