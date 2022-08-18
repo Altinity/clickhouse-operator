@@ -1006,8 +1006,8 @@ func (c *Creator) containerAppendVolumeMount(container *corev1.Container, volume
 	return
 }
 
-// CreatePVC
-func (c *Creator) CreatePVC(name string, host *chiv1.ChiHost, spec *corev1.PersistentVolumeClaimSpec) corev1.PersistentVolumeClaim {
+// createPVC
+func (c *Creator) createPVC(name string, host *chiv1.ChiHost, spec *corev1.PersistentVolumeClaimSpec) corev1.PersistentVolumeClaim {
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -1067,7 +1067,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 
 	statefulSet.Spec.VolumeClaimTemplates = append(
 		statefulSet.Spec.VolumeClaimTemplates,
-		c.CreatePVC(volumeClaimTemplate.Name, host, &volumeClaimTemplate.Spec),
+		c.createPVC(volumeClaimTemplate.Name, host, &volumeClaimTemplate.Spec),
 	)
 }
 
