@@ -506,7 +506,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 	}
 
 	// Setup volumes based on ConfigMaps into Pod Template
-	c.setupConfigMapVolumes(statefulSet, host)
+	c.statefulSetSetupVolumesForConfigMaps(statefulSet, host)
 	// Setup statefulSet according to troubleshoot mode (if any)
 	c.setupTroubleshoot(statefulSet)
 	// Setup dedicated log container
@@ -583,15 +583,15 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 	return podTemplate
 }
 
-// setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
-func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
+// statefulSetSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects with
+func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	configMapHostName := CreateConfigMapHostName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	c.statefulSetAppendVolumes(
-		statefulSetObject,
+		statefulSet,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
 		newVolumeForConfigMap(configMapHostName),
@@ -600,9 +600,9 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have ConfigMaps mounted as Volumes
-	for i := range statefulSetObject.Spec.Template.Spec.Containers {
+	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
-		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
 		c.containerAppendVolumeMounts(
 			container,
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
