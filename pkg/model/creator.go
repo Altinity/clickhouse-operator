@@ -586,13 +586,12 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 // setupConfigMapVolumes adds to each container in the Pod VolumeMount objects with
 func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, host *chiv1.ChiHost) {
 	configMapHostName := CreateConfigMapHostName(host)
-	//configMapHostMigrationName := CreateConfigMapHostMigrationName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
 	configMapCommonUsersName := CreateConfigMapCommonUsersName(c.chi)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
-	statefulSetObject.Spec.Template.Spec.Volumes = append(
-		statefulSetObject.Spec.Template.Spec.Volumes,
+	c.statefulSetAppendVolumes(
+		statefulSetObject,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
 		newVolumeForConfigMap(configMapHostName),
@@ -604,13 +603,11 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 	for i := range statefulSetObject.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSetObject.Spec.Template.Spec.Containers[i]
-		// Append to each Container current VolumeMount's to VolumeMount's declared in template
-		container.VolumeMounts = append(
-			container.VolumeMounts,
+		c.containerAppendVolumeMounts(
+			container,
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
 			newVolumeMount(configMapHostName, dirPathHostConfig),
-			//newVolumeMount(configMapHostMigrationName, dirPathDockerEntrypointInit),
 		)
 	}
 }
@@ -638,22 +635,29 @@ func (c *Creator) statefulSetAppendUsedPVCTemplates(statefulSet *apps.StatefulSe
 	}
 }
 
-// setupStatefulSetApplyDataAndLogVolumeClaimTemplates applies Data and Log VolumeClaimTemplates on all containers.
-// Creates volume mounts for data and log volumes in case these volume templates are specified in `templates`.
-func (c *Creator) setupStatefulSetApplyDataAndLogVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+// statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates
+// appends VolumeMounts for Data and Log VolumeClaimTemplates on all containers.
+// Creates VolumeMounts for Data and Log volumes in case these volume templates are specified in `templates`.
+func (c *Creator) statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		_ = c.setupStatefulSetApplyVolumeMount(host, statefulSet, container.Name, newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), dirPathClickHouseData))
-		_ = c.setupStatefulSetApplyVolumeMount(host, statefulSet, container.Name, newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), dirPathClickHouseLog))
+		c.containerAppendVolumeMounts(
+			container,
+			newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), dirPathClickHouseData),
+		)
+		c.containerAppendVolumeMounts(
+			container,
+			newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), dirPathClickHouseLog),
+		)
 	}
 }
 
 // setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
 func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	c.statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates(statefulSet, host)
 	c.statefulSetAppendUsedPVCTemplates(statefulSet, host)
-	c.setupStatefulSetApplyDataAndLogVolumeClaimTemplates(statefulSet, host)
 }
 
 // statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided ChiPodTemplate
@@ -907,8 +911,8 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 		// Add VolumeClaimTemplate to StatefulSet
 		c.statefulSetAppendPVCTemplate(statefulSet, host, template)
 		// Add VolumeMount to ClickHouse container to `mountPath` point
-		container.VolumeMounts = append(
-			container.VolumeMounts,
+		c.containerAppendVolumeMounts(
+			container,
 			volumeMount,
 		)
 	}
@@ -922,6 +926,84 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 	)
 
 	return nil
+}
+
+// statefulSetAppendVolumes appends multiple Volume(s) to the specified StatefulSet
+func (c *Creator) statefulSetAppendVolumes(statefulSet *apps.StatefulSet, volumes ...corev1.Volume) {
+	statefulSet.Spec.Template.Spec.Volumes = append(
+		statefulSet.Spec.Template.Spec.Volumes,
+		volumes...,
+	)
+}
+
+// containerAppendVolumeMounts appends multiple VolumeMount(s) to the specified container
+func (c *Creator) containerAppendVolumeMounts(container *corev1.Container, volumeMounts ...corev1.VolumeMount) {
+	for _, volumeMount := range volumeMounts {
+		c.containerAppendVolumeMount(container, volumeMount)
+	}
+}
+
+// containerAppendVolumeMount appends one VolumeMount to the specified container
+func (c *Creator) containerAppendVolumeMount(container *corev1.Container, volumeMount corev1.VolumeMount) {
+	//
+	// Sanity checks
+	//
+
+	if container == nil {
+		return
+	}
+
+	// VolumeMount has to have reasonable data - Name and MountPath
+	if (volumeMount.Name == "") || (volumeMount.MountPath == "") {
+		return
+	}
+
+	// Check that:
+	// 1. Mountable item (VolumeClaimTemplate or Volume) specified in this VolumeMount is NOT already mounted
+	//    in this container by any other VolumeMount (to avoid double-mount of a mountable item)
+	// 2. And specified `mountPath` (say '/var/lib/clickhouse') is NOT already mounted in this container
+	//    by any VolumeMount (to avoid double-mount/rewrite into single `mountPath`)
+	for i := range container.VolumeMounts {
+		// Convenience wrapper
+		existingVolumeMount := &container.VolumeMounts[i]
+
+		// 1. Check whether this mountable item is already listed in VolumeMount of this container
+		if volumeMount.Name == existingVolumeMount.Name {
+			// This .templates.VolumeClaimTemplate is already used in VolumeMount
+			c.a.V(1).F().Warning(
+				"container.Name:%s volumeMount.Name:%s already used",
+				container.Name,
+				volumeMount.Name,
+			)
+			return
+		}
+
+		// 2. Check whether `mountPath` (say '/var/lib/clickhouse') is already mounted
+		if volumeMount.MountPath == existingVolumeMount.MountPath {
+			// `mountPath` (say /var/lib/clickhouse) is already mounted
+			c.a.V(1).F().Warning(
+				"container.Name:%s volumeMount.MountPath:%s already used",
+				container.Name,
+				volumeMount.MountPath,
+			)
+			return
+		}
+	}
+
+	// Add VolumeMount to ClickHouse container to `mountPath` point
+	container.VolumeMounts = append(
+		container.VolumeMounts,
+		volumeMount,
+	)
+
+	c.a.V(1).F().Info(
+		"container:%s volumeMount added: %s on %s",
+		container.Name,
+		volumeMount.Name,
+		volumeMount.MountPath,
+	)
+
+	return
 }
 
 // CreatePVC
