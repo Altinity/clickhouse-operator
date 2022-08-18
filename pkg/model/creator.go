@@ -615,13 +615,14 @@ func (c *Creator) setupConfigMapVolumes(statefulSetObject *apps.StatefulSet, hos
 	}
 }
 
-// statefulSetAppendPVCTemplates appends all PVC templates which are referenced (by name) within containers
+// statefulSetAppendUsedPVCTemplates appends all PVC templates which are used (referenced by name) by containers
 // to the StatefulSet.Spec.VolumeClaimTemplates list
-func (c *Creator) statefulSetAppendPVCTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+func (c *Creator) statefulSetAppendUsedPVCTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+	// VolumeClaimTemplates, that are directly referenced in containers' VolumeMount object(s)
+	// are appended to StatefulSet's Spec.VolumeClaimTemplates slice
+	//
 	// Deal with `volumeMounts` of a `container`, located by the path:
 	// .spec.templates.podTemplates.*.spec.containers.volumeMounts.*
-	// VolumeClaimTemplates, that are directly referenced in Containers' VolumeMount object(s)
-	// are appended to StatefulSet's Spec.VolumeClaimTemplates slice
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
@@ -629,6 +630,7 @@ func (c *Creator) statefulSetAppendPVCTemplates(statefulSet *apps.StatefulSet, h
 			// Convenience wrapper
 			volumeMount := &container.VolumeMounts[j]
 			if volumeClaimTemplate, ok := c.chi.GetVolumeClaimTemplate(volumeMount.Name); ok {
+				// This VolumeClaimTemplate is referenced by name in VolumeMount.
 				// Found VolumeClaimTemplate to mount by VolumeMount
 				c.statefulSetAppendPVCTemplate(statefulSet, host, volumeClaimTemplate)
 			}
@@ -636,8 +638,9 @@ func (c *Creator) statefulSetAppendPVCTemplates(statefulSet *apps.StatefulSet, h
 	}
 }
 
-// setupStatefulSetApplyVolumeClaimTemplates applies Data and Log VolumeClaimTemplates on all containers
-func (c *Creator) setupStatefulSetApplyVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
+// setupStatefulSetApplyDataAndLogVolumeClaimTemplates applies Data and Log VolumeClaimTemplates on all containers.
+// Creates volume mounts for data and log volumes in case these volume templates are specified in `templates`.
+func (c *Creator) setupStatefulSetApplyDataAndLogVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
@@ -649,8 +652,8 @@ func (c *Creator) setupStatefulSetApplyVolumeClaimTemplates(statefulSet *apps.St
 
 // setupStatefulSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
 func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	c.statefulSetAppendPVCTemplates(statefulSet, host)
-	c.setupStatefulSetApplyVolumeClaimTemplates(statefulSet, host)
+	c.statefulSetAppendUsedPVCTemplates(statefulSet, host)
+	c.setupStatefulSetApplyDataAndLogVolumeClaimTemplates(statefulSet, host)
 }
 
 // statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided ChiPodTemplate
@@ -956,6 +959,10 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	host *chiv1.ChiHost,
 	volumeClaimTemplate *chiv1.ChiVolumeClaimTemplate,
 ) {
+	//
+	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
+	//
+
 	// Ensure VolumeClaimTemplates slice is in place
 	if statefulSet.Spec.VolumeClaimTemplates == nil {
 		statefulSet.Spec.VolumeClaimTemplates = make([]corev1.PersistentVolumeClaim, 0, 0)
