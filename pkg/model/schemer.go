@@ -416,7 +416,8 @@ func createTableReplicated(cluster string) string {
 		WHERE
 			database NOT IN (%s) AND
 			create_table_query != '' AND
-			name NOT LIKE '.inner.%%'
+			name NOT LIKE '.inner.%%' AND
+			name NOT LIKE '.inner_id.%%'
 		SETTINGS skip_unavailable_shards=1, show_table_uuid_in_table_create_query_if_not_nil=1
 		`,
 		cluster,
