@@ -59,6 +59,8 @@ spec:
       clusterServiceTemplate: cluster-service-template
       shardServiceTemplate: shard-service-template
       replicaServiceTemplate: replica-service-template
+      pvcPrivisioner: StatefulSet
+      pvcPrivisioner: Operator
 
   configuration:
     zookeeper:
@@ -328,6 +330,13 @@ spec:
         #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
         # 2. Delete
         reclaimPolicy: Retain
+
+        pvcPrivisioner: StatefulSet
+        pvcPrivisioner: Operator
+
+        : VolumeClaimTemplate into STS
+        : PersistentVolumeClaim by operator
+
         metadata:
           labels:
             a: "b"
