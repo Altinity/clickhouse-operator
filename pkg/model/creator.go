@@ -403,13 +403,6 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
-// SetupStatefulSetVersion
-func (c *Creator) SetupStatefulSetVersion(statefulSet *apps.StatefulSet) {
-	// Existing LabelObjectVersion label must be removed first
-	delete(statefulSet.Labels, LabelObjectVersion)
-	c.setupStatefulSetVersion(statefulSet)
-}
-
 // GetObjectVersion gets version of the StatefulSet
 // TODO property of the labeler?
 func (c *Creator) GetObjectVersion(meta metav1.ObjectMeta) (string, bool) {
