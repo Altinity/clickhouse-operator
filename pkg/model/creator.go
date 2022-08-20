@@ -1014,7 +1014,8 @@ func (c *Creator) createPVC(name string, host *chiv1.ChiHost, spec *corev1.Persi
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: host.Address.Namespace,
 			// TODO
 			//  this has to wait until proper disk inheritance procedure will be available
 			// UPDATE
@@ -1035,20 +1036,20 @@ func (c *Creator) createPVC(name string, host *chiv1.ChiHost, spec *corev1.Persi
 	return persistentVolumeClaim
 }
 
+// CreatePVC
+func (c *Creator) CreatePVC(name string, host *chiv1.ChiHost, spec *corev1.PersistentVolumeClaimSpec) *corev1.PersistentVolumeClaim {
+	pvc := c.createPVC(name, host, spec)
+	return &pvc
+}
+
 // statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
 func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet *apps.StatefulSet,
 	host *chiv1.ChiHost,
 	volumeClaimTemplate *chiv1.ChiVolumeClaimTemplate,
 ) {
-	//
-	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
-	//
-
-	// Ensure VolumeClaimTemplates slice is in place
-	if statefulSet.Spec.VolumeClaimTemplates == nil {
-		statefulSet.Spec.VolumeClaimTemplates = make([]corev1.PersistentVolumeClaim, 0, 0)
-	}
+	// Since we have the same names for PVs produced from both VolumeClaimTemplates and Volumes,
+	// we need to check naming for all of them
 
 	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
 	for i := range statefulSet.Spec.VolumeClaimTemplates {
@@ -1061,14 +1062,35 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 		}
 	}
 
-	//
-	// Provided VolumeClaimTemplate is not listed in statefulSet.Spec.VolumeClaimTemplates - let's add it
-	//
+	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.Template.Spec.Volumes
+	for i := range statefulSet.Spec.Template.Spec.Volumes {
+		// Convenience wrapper
+		_volume := &statefulSet.Spec.Template.Spec.Volumes[i]
+		if _volume.Name == volumeClaimTemplate.Name {
+			// This VolumeClaimTemplate is already listed in statefulSet.Spec.Template.Spec.Volumes
+			// No need to add it second time
+			return
+		}
+	}
 
-	statefulSet.Spec.VolumeClaimTemplates = append(
-		statefulSet.Spec.VolumeClaimTemplates,
-		c.createPVC(volumeClaimTemplate.Name, host, &volumeClaimTemplate.Spec),
-	)
+	if c.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+		// Provided VolumeClaimTemplate is not listed in statefulSet.Spec.Template.Spec.Volumes - let's add it
+		claimName := CreatePVCName(host, nil, volumeClaimTemplate)
+		statefulSet.Spec.Template.Spec.Volumes = append(
+			statefulSet.Spec.Template.Spec.Volumes,
+			newVolumeForPVC(volumeClaimTemplate.Name, claimName),
+		)
+	} else {
+		// Provided VolumeClaimTemplate is not listed in statefulSet.Spec.VolumeClaimTemplates - let's add it
+		statefulSet.Spec.VolumeClaimTemplates = append(
+			statefulSet.Spec.VolumeClaimTemplates,
+			c.createPVC(volumeClaimTemplate.Name, host, &volumeClaimTemplate.Spec),
+		)
+	}
+}
+
+func (c *Creator) OperatorShouldCreatePVC(host *chiv1.ChiHost, volumeClaimTemplate *chiv1.ChiVolumeClaimTemplate) bool {
+	return true
 }
 
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
@@ -1197,6 +1219,19 @@ func newDefaultLogContainer() corev1.Container {
 // addContainer adds container to ChiPodTemplate
 func addContainer(podSpec *corev1.PodSpec, container corev1.Container) {
 	podSpec.Containers = append(podSpec.Containers, container)
+}
+
+// newVolumeForPVC returns corev1.Volume object with defined name
+func newVolumeForPVC(name, claimName string) corev1.Volume {
+	return corev1.Volume{
+		Name: name,
+		VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: claimName,
+				ReadOnly:  false,
+			},
+		},
+	}
 }
 
 // newVolumeForConfigMap returns corev1.Volume object with defined name
