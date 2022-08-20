@@ -3027,6 +3027,7 @@ rules:
     resources:
       - configmaps
       - services
+      - persistentvolumeclaims
     verbs:
       - get
       - list
@@ -3049,17 +3050,6 @@ rules:
       - events
     verbs:
       - create
-  - apiGroups:
-      - ""
-    resources:
-      - persistentvolumeclaims
-    verbs:
-      - get
-      - list
-      - patch
-      - update
-      - watch
-      - delete
   - apiGroups:
       - ""
     resources:
