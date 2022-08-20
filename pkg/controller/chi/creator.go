@@ -20,6 +20,7 @@ import (
 	"fmt"
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -123,13 +124,29 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.Pe
 		return nil, fmt.Errorf("ctx is done")
 	}
 
-	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
+	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// This is not an error per se, means PVC is not created (yet)?
+			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, newCreateOptions())
+			if err != nil {
+				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)
+			}
+			return pvc, err
+		} else {
+			// Any non-NotFound API error - unable to proceed
+			log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
+			return nil, err
+		}
+	}
+
+	_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
 	if err != nil {
 		// Update failed
 		//if strings.Contains(err.Error(), "field can not be less than previous value") {
 		//	return pvc, nil
 		//} else {
-		log.V(1).M(pvc).F().Error("unable to update PVC %v", err)
+		log.V(1).M(pvc).F().Error("unable to Update PVC err: %v", err)
 		//	return nil, err
 		//}
 	}
