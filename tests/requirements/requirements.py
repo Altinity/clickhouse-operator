@@ -1,6 +1,6 @@
 # These requirements were auto generated
 # from software requirements specification (SRS)
-# document by TestFlows v1.7.211208.1222904.
+# document by TestFlows v1.8.220312.1230154.
 # Do not edit by hand but re-generate instead
 # using 'tfs requirements generate' command.
 from testflows.core import Specification
@@ -312,6 +312,51 @@ RQ_SRS_026_ClickHouseOperator_Secrets = Requirement(
     link=None,
     level=4,
     num='4.8.3.1')
+
+RQ_SRS_026_ClickHouseOperator_EnableHttps = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.EnableHttps',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support secure `HTTPS` connection with [ClickHouse] server by changing the configuration. Configurations can be updated at run time using a `chopconf` file.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        '---\n'
+        'apiVersion: "clickhouse.altinity.com/v1"\n'
+        'kind: "ClickHouseOperatorConfiguration"\n'
+        'metadata:\n'
+        '  name: "test-xxx-chopconf"\n'
+        'spec:\n'
+        '  clickhouse:\n'
+        '    access:\n'
+        '      scheme: https\n'
+        '      port: 8443\n'
+        '```\n'
+        '\n'
+        ),
+    link=None,
+    level=4,
+    num='4.8.4.1')
+
+RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse] server deployed by [ClickHouse Operator] SHALL support secure `HTTPS` connection from local [ClickHouse] client.\n'
+        '\n'
+        ),
+    link=None,
+    level=4,
+    num='4.8.4.2')
 
 RQ_SRS_026_ClickHouseOperator_DefaultTemplates = Requirement(
     name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates',
@@ -5993,6 +6038,9 @@ QA_SRS026_ClickHouse_Operator = Specification(
         Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultUsers', level=4, num='4.8.2.1'),
         Heading(name='Secrets', level=3, num='4.8.3'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.Secrets', level=4, num='4.8.3.1'),
+        Heading(name='Secure Connection', level=3, num='4.8.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.EnableHttps', level=4, num='4.8.4.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps', level=4, num='4.8.4.2'),
         Heading(name='Default Templates', level=2, num='4.9'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates', level=3, num='4.9.1'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates', level=3, num='4.9.2'),
@@ -6465,6 +6513,8 @@ QA_SRS026_ClickHouse_Operator = Specification(
         RQ_SRS_026_ClickHouseOperator_DefaultAccessControl,
         RQ_SRS_026_ClickHouseOperator_DefaultUsers,
         RQ_SRS_026_ClickHouseOperator_Secrets,
+        RQ_SRS_026_ClickHouseOperator_EnableHttps,
+        RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps,
         RQ_SRS_026_ClickHouseOperator_DefaultTemplates,
         RQ_SRS_026_ClickHouseOperator_DefaultTemplates_MergingWithUserDefinedTemplates,
         RQ_SRS_026_ClickHouseOperator_AnnotationsInTemplates,
@@ -6775,6 +6825,9 @@ QA_SRS026_ClickHouse_Operator = Specification(
       * 4.8.2.1 [RQ.SRS-026.ClickHouseOperator.DefaultUsers](#rqsrs-026clickhouseoperatordefaultusers)
     * 4.8.3 [Secrets](#secrets)
       * 4.8.3.1 [RQ.SRS-026.ClickHouseOperator.Secrets](#rqsrs-026clickhouseoperatorsecrets)
+    * 4.8.4 [Secure Connection](#secure-connection)
+      * 4.8.4.1 [RQ.SRS-026.ClickHouseOperator.EnableHttps](#rqsrs-026clickhouseoperatorenablehttps)
+      * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
   * 4.9 [Default Templates](#default-templates)
     * 4.9.1 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates](#rqsrs-026clickhouseoperatordefaulttemplates)
     * 4.9.2 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates](#rqsrs-026clickhouseoperatordefaulttemplatesmergingwithuserdefinedtemplates)
@@ -7564,6 +7617,33 @@ templates:
                     name: secret-passwords
                     key: pwduser1
 ```
+
+#### Secure Connection
+
+##### RQ.SRS-026.ClickHouseOperator.EnableHttps
+version: 1.0
+
+[ClickHouse Operator] SHALL support secure `HTTPS` connection with [ClickHouse] server by changing the configuration. Configurations can be updated at run time using a `chopconf` file.
+
+For example,
+
+```yaml
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-xxx-chopconf"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+      port: 8443
+```
+
+##### RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps
+version: 1.0
+
+[ClickHouse] server deployed by [ClickHouse Operator] SHALL support secure `HTTPS` connection from local [ClickHouse] client.
 
 ### Default Templates
 

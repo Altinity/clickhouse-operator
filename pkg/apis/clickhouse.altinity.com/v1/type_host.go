@@ -207,6 +207,9 @@ func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTem
 
 // WalkVolumeMounts walks VolumeMount(s)
 func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
+	if host == nil {
+		return
+	}
 	if host.StatefulSet == nil {
 		return
 	}
@@ -218,4 +221,15 @@ func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 			f(volumeMount)
 		}
 	}
+}
+
+// GetVolumeMount gets VolumeMount by the name
+func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
+	host.WalkVolumeMounts(func(volumeMount *corev1.VolumeMount) {
+		if volumeMount.Name == volumeMountName {
+			vm = volumeMount
+			ok = true
+		}
+	})
+	return
 }

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	//"github.com/altinity/queue"
 
 	"github.com/altinity/queue"
 
@@ -964,13 +963,13 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
 		return err
 	}
+
+	w.reconcilePersistentVolumes(ctx, host)
+	_ = w.reconcilePVCs(ctx, host)
+
 	if err := w.reconcileHostStatefulSet(ctx, host); err != nil {
 		return err
 	}
-
-	// Reconcile host's Persistent Volumes
-	w.reconcilePersistentVolumes(ctx, host)
-	_ = w.reconcilePVCs(ctx, host)
 
 	_ = w.reconcileHostService(ctx, host)
 
@@ -1876,7 +1875,7 @@ func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) chiv1.StatefulSetSta
 		if curHasLabel && newHasLabel {
 			if curLabel == newLabel {
 				w.a.M(meta).F().Info(
-					"StatefulSet ARE EQUAL based on labels no reconcile is actually needed %s",
+					"cur and new StatefulSets ARE EQUAL based on labels. No reconcile is required for: %s",
 					util.NamespaceNameString(meta),
 				)
 				return chiv1.StatefulSetStatusSame
@@ -1889,7 +1888,7 @@ func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) chiv1.StatefulSetSta
 			//	//					return chop.StatefulSetStatusModified
 			//}
 			w.a.M(meta).F().Info(
-				"StatefulSet ARE DIFFERENT based on labels. Reconcile is required for %s",
+				"cur and new StatefulSets ARE DIFFERENT based on labels. Reconcile is required for: %s",
 				util.NamespaceNameString(meta),
 			)
 			return chiv1.StatefulSetStatusModified
@@ -2142,7 +2141,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 		volumeClaimTemplateName := volumeMount.Name
 		volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
 		if !ok {
-			// No this is not a reference to VolumeClaimTemplate
+			// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
 			return
 		}
 
@@ -2154,10 +2153,17 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				// This is not an error per se, means PVC is not created (yet)?
+				if w.ctx.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+					pvc = w.ctx.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
+				} else {
+					// Not created and we are not expected to create PVC by ourselves
+					return
+				}
 			} else {
+				// Any non-NotFound API error - unable to proceed
 				w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+				return
 			}
-			return
 		}
 
 		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)

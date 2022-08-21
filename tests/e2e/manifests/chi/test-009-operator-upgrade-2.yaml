@@ -18,6 +18,8 @@ spec:
       compression/case/method: zstd
       merge_tree/index_granularity_bytes: 0
     users:
+      test_009/password: test_009
+      test_009/networks/ip: 0.0.0.0/0
       user1/password: "@@CH_PASSWORD_REPLACE_ME@@"
       user1/networks/ip: "::/0"
       user1/profile: "default"
@@ -32,6 +34,7 @@ spec:
           podTemplate: clickhouse-template
           volumeClaimTemplate: aws-ebs-volume-claim
         layout:
+          shardsCount: 2
           replicasCount: 1
   templates:
     serviceTemplates:
@@ -40,10 +43,10 @@ spec:
         spec:
           ports:
             - name: http
-              port: 8443
+              port: 8123
               targetPort: 8123
             - name: client
-              port: 9440
+              port: 9000
               targetPort: 9000
           type: LoadBalancer
     volumeClaimTemplates:

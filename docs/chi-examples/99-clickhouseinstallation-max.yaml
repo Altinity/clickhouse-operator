@@ -59,6 +59,8 @@ spec:
       clusterServiceTemplate: cluster-service-template
       shardServiceTemplate: shard-service-template
       replicaServiceTemplate: replica-service-template
+      pvcPrivisioner: StatefulSet
+      pvcPrivisioner: Operator
 
   configuration:
     zookeeper:
@@ -210,10 +212,15 @@ spec:
   templates:
     hostTemplates:
       - name: host-template-custom-ports
+        portDistribution:
+          - type: "ClusterScopeIndex"
         spec:
           tcpPort: 7000
           httpPort: 7001
           interserverHTTPPort: 7002
+          #settings:
+          #files:
+          #templates:
 
     serviceTemplates:
       - name: chi-service-template
@@ -319,6 +326,20 @@ spec:
 
     volumeClaimTemplates:
       - name: default-volume-claim
+        # 1. Retain. Keep PVC from being deleted
+        #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        # 2. Delete
+        reclaimPolicy: Retain
+
+        pvcPrivisioner: StatefulSet
+        pvcPrivisioner: Operator
+
+        : VolumeClaimTemplate into STS
+        : PersistentVolumeClaim by operator
+
+        metadata:
+          labels:
+            a: "b"
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass
@@ -333,9 +354,13 @@ spec:
             requests:
               storage: 1Gi
       - name: volume-claim-retain-pvc
-        # Keep PVC from being deleted
-        # Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        # 1. Retain. Keep PVC from being deleted
+        #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        # 2. Delete
         reclaimPolicy: Retain
+        metadata:
+          labels:
+            a: "b"
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass

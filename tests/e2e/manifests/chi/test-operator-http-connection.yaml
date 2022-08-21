@@ -3,7 +3,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: test-032-rescaling
+  name: test-operator-http-connection
 
 spec:
   defaults:
@@ -17,13 +17,13 @@ spec:
         - host: zookeeper
           port: 2181
     users:
-      test_032/password: test_032
-      test_032/networks/ip: 0.0.0.0/0
+      test_033/password: test_033
+      test_033/networks/ip: 0.0.0.0/0           
     clusters:
       - name: default
         layout:
-          shardsCount: 2
-          replicasCount: 2
+          shardsCount: 1
+          replicasCount: 1
   templates:
     podTemplates:
       - name: default

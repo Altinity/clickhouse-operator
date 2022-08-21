@@ -11,7 +11,10 @@ spec:
     clusters:
       - name: test-009
         layout:
-          shardsCount: 1
+          shardsCount: 2
+    users:
+      test_009/password: test_009
+      test_009/networks/ip: 0.0.0.0/0
   defaults:
     templates:
       volumeClaimTemplate: default

@@ -14,9 +14,9 @@ spec:
         - host: zookeeper
           port: 2181
     clusters:
-    - name: simple
-      layout:
-        replicasCount: 2
+      - name: simple
+        layout:
+          replicasCount: 2
   defaults:
     templates:
       volumeClaimTemplate: default
