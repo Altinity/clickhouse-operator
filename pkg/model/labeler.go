@@ -32,7 +32,8 @@ const (
 	// Main labels
 
 	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
-	LabelReadyValue                   = "yes"
+	LabelReadyValueReady              = "yes"
+	LabelReadyValueNotReady           = "no"
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
 	LabelAppValue                     = "chop"
 	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
@@ -426,23 +427,30 @@ func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	return isObjectVersionLabelTheSame(meta1, l)
 }
 
-// appendKeyReady appends "Ready" label to labels
+// appendKeyReady sets "Ready" key to Ready state (used with labels and annotations)
 func appendKeyReady(dst map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		dst,
 		map[string]string{
-			LabelReadyName: LabelReadyValue,
+			LabelReadyName: LabelReadyValueReady,
 		},
 	)
 }
 
+// deleteKeyReady sets "Ready" key to NotReady state (used with labels and annotations)
 func deleteKeyReady(dst map[string]string) map[string]string {
-	return util.MapDeleteKeys(dst, LabelReadyName)
+	return util.MergeStringMapsOverwrite(
+		dst,
+		map[string]string{
+			LabelReadyName: LabelReadyValueNotReady,
+		},
+	)
 }
 
+// hasKeyReady checks whether "Ready" key has Ready state (used with labels and annotations)
 func hasKeyReady(src map[string]string) bool {
 	if _, ok := src[LabelReadyName]; ok {
-		return true
+		return src[LabelReadyName] == LabelReadyValueReady
 	}
 	return false
 }
