@@ -436,6 +436,17 @@ func appendLabelReady(dst map[string]string) map[string]string {
 	)
 }
 
+func deleteLabelReady(dst map[string]string) map[string]string {
+	return util.MapDeleteKeys(dst, LabelReadyName)
+}
+
+func hasLabelReady(src map[string]string) bool {
+	if _, ok := src[LabelReadyName]; ok {
+		return true
+	}
+	return false
+}
+
 // AppendLabelReady appends "Ready" label to ObjectMeta.Labels.
 // Returns true in case label was not in place and was added.
 func AppendLabelReady(meta *meta.ObjectMeta) bool {
@@ -443,8 +454,8 @@ func AppendLabelReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to add to, not added
 		return false
 	}
-	if _, ok := meta.Labels[LabelReadyName]; ok {
-		// Already in place, not added
+	if hasLabelReady(meta.Labels) {
+		// Already in place, value not added
 		return false
 	}
 	// Need to add
@@ -459,9 +470,9 @@ func DeleteLabelReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to delete from, not deleted
 		return false
 	}
-	if _, ok := meta.Labels[LabelReadyName]; ok {
+	if hasLabelReady(meta.Labels) {
 		// In place, need to delete
-		meta.Labels = util.MapDeleteKeys(meta.Labels, LabelReadyName)
+		meta.Labels = deleteLabelReady(meta.Labels)
 		return true
 	}
 	// Not available, not deleted
@@ -475,7 +486,7 @@ func AppendAnnotationReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to add to, not added
 		return false
 	}
-	if _, ok := meta.Annotations[LabelReadyName]; ok {
+	if hasLabelReady(meta.Annotations) {
 		// Already in place, not added
 		return false
 	}
@@ -491,9 +502,9 @@ func DeleteAnnotationReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to delete from, not deleted
 		return false
 	}
-	if _, ok := meta.Annotations[LabelReadyName]; ok {
+	if hasLabelReady(meta.Annotations) {
 		// In place, need to delete
-		meta.Annotations = util.MapDeleteKeys(meta.Annotations, LabelReadyName)
+		meta.Annotations = deleteLabelReady(meta.Annotations)
 		return true
 	}
 	// Not available, not deleted
