@@ -169,7 +169,7 @@ func (l *Labeler) GetSelectorCHIScope() map[string]string {
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return appendLabelReady(l.GetSelectorCHIScope())
+	return appendKeyReady(l.GetSelectorCHIScope())
 }
 
 // getClusterScope gets labels for Cluster-scoped object
@@ -191,7 +191,7 @@ func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
 func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
-	return appendLabelReady(getSelectorClusterScope(cluster))
+	return appendKeyReady(getSelectorClusterScope(cluster))
 }
 
 // getLabelsShardScope gets labels for Shard-scoped object
@@ -214,7 +214,7 @@ func getSelectorShardScope(shard *chiv1.ChiShard) map[string]string {
 
 // getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
 func getSelectorShardScopeReady(shard *chiv1.ChiShard) map[string]string {
-	return appendLabelReady(getSelectorShardScope(shard))
+	return appendKeyReady(getSelectorShardScope(shard))
 }
 
 // getHostScope gets labels for Host-scoped object
@@ -246,7 +246,7 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getHostScopeReady(host *chiv1.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
-	return appendLabelReady(l.getHostScope(host, applySupplementaryServiceLabels))
+	return appendKeyReady(l.getHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getHostScopeReclaimPolicy
@@ -426,8 +426,8 @@ func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	return isObjectVersionLabelTheSame(meta1, l)
 }
 
-// appendLabelReady appends "Ready" label to labels
-func appendLabelReady(dst map[string]string) map[string]string {
+// appendKeyReady appends "Ready" label to labels
+func appendKeyReady(dst map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		dst,
 		map[string]string{
@@ -436,11 +436,11 @@ func appendLabelReady(dst map[string]string) map[string]string {
 	)
 }
 
-func deleteLabelReady(dst map[string]string) map[string]string {
+func deleteKeyReady(dst map[string]string) map[string]string {
 	return util.MapDeleteKeys(dst, LabelReadyName)
 }
 
-func hasLabelReady(src map[string]string) bool {
+func hasKeyReady(src map[string]string) bool {
 	if _, ok := src[LabelReadyName]; ok {
 		return true
 	}
@@ -454,12 +454,12 @@ func AppendLabelReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to add to, not added
 		return false
 	}
-	if hasLabelReady(meta.Labels) {
+	if hasKeyReady(meta.Labels) {
 		// Already in place, value not added
 		return false
 	}
 	// Need to add
-	meta.Labels = appendLabelReady(meta.Labels)
+	meta.Labels = appendKeyReady(meta.Labels)
 	return true
 }
 
@@ -470,9 +470,9 @@ func DeleteLabelReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to delete from, not deleted
 		return false
 	}
-	if hasLabelReady(meta.Labels) {
+	if hasKeyReady(meta.Labels) {
 		// In place, need to delete
-		meta.Labels = deleteLabelReady(meta.Labels)
+		meta.Labels = deleteKeyReady(meta.Labels)
 		return true
 	}
 	// Not available, not deleted
@@ -486,12 +486,12 @@ func AppendAnnotationReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to add to, not added
 		return false
 	}
-	if hasLabelReady(meta.Annotations) {
+	if hasKeyReady(meta.Annotations) {
 		// Already in place, not added
 		return false
 	}
 	// Need to add
-	meta.Annotations = appendLabelReady(meta.Annotations)
+	meta.Annotations = appendKeyReady(meta.Annotations)
 	return true
 }
 
@@ -502,9 +502,9 @@ func DeleteAnnotationReady(meta *meta.ObjectMeta) bool {
 		// Nowhere to delete from, not deleted
 		return false
 	}
-	if hasLabelReady(meta.Annotations) {
+	if hasKeyReady(meta.Annotations) {
 		// In place, need to delete
-		meta.Annotations = deleteLabelReady(meta.Annotations)
+		meta.Annotations = deleteKeyReady(meta.Annotations)
 		return true
 	}
 	// Not available, not deleted
