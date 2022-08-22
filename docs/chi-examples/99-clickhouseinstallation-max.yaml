@@ -50,6 +50,11 @@ spec:
     replicasUseFQDN: "no"
     distributedDDL:
       profile: default
+    storageManagement:
+      reclaimPolicy: Delete
+      reclaimPolicy: Retain
+      pvcPrivisioner: StatefulSet
+      pvcPrivisioner: Operator
     templates:
       hostTemplate: host-template-custom-ports
       podTemplate: clickhouse-v22.2
@@ -59,8 +64,6 @@ spec:
       clusterServiceTemplate: cluster-service-template
       shardServiceTemplate: shard-service-template
       replicaServiceTemplate: replica-service-template
-      pvcPrivisioner: StatefulSet
-      pvcPrivisioner: Operator
 
   configuration:
     zookeeper:
