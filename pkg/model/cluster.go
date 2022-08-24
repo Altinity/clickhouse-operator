@@ -20,6 +20,7 @@ import (
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"strings"
 )
 
 // Cluster specifies ClickHouse cluster
@@ -75,6 +76,22 @@ func (c *Cluster) QueryUnzip2Columns(ctx context.Context, endpoints []string, sq
 	var column2 []string
 	if err := c.queryUnzipColumns(ctx, endpoints, sql, &column1, &column2); err != nil {
 		return nil, nil, err
+	}
+	return column1, column2, nil
+}
+
+// QueryUnzipAndApplyUUIDs unzips query result into two columns and applis UUID substituation if present
+func (c *Cluster) QueryUnzipAndApplyUUIDs(ctx context.Context, endpoints []string, sql string) ([]string, []string, error) {
+	var column1 []string
+	var column2 []string
+	var column3 []string
+	if err := c.queryUnzipColumns(ctx, endpoints, sql, &column1, &column2, &column3); err != nil {
+		return nil, nil, err
+	}
+	for i := 0; i < len(column1); i++  {
+		if column3[i] != "" {
+			column2[i] = strings.ReplaceAll(column2[i], "{uuid}", column3[i])
+		}
 	}
 	return column1, column2, nil
 }
