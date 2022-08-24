@@ -876,11 +876,13 @@ def test_014(self):
                         out = clickhouse.query(chi, f"SELECT a FROM {table} where a = {shard}", host=f"chi-{chi}-{cluster}-{shard}-{replica}")
                         assert out == f"{shard}"
 
-    with When("Add more replicas"):
+    # replicas = [1]
+    replicas = [1,2]
+    with When(f"Add {len(replicas)} more replicas"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-014-replication-3.yaml",
+            manifest=f"manifests/chi/test-014-replication-{1+len(replicas)}.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 2 + 2*len(replicas),
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -891,7 +893,7 @@ def test_014(self):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
-        check_schema_propagation([1,2])
+        check_schema_propagation(replicas)
 
     with When("Remove replicas"):
         kubectl.create_and_check(
