@@ -347,7 +347,8 @@ func createTableDistributed(cluster string) string {
 		SELECT
 			DISTINCT concat(database, '.', name) AS name,
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
-			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid
+			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
+			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
 		FROM
 		(
 			SELECT
@@ -412,7 +413,8 @@ func createTableReplicated(cluster string) string {
 		SELECT
 			DISTINCT name,
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
-			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid
+			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
+			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
 		FROM
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
