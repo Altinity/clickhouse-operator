@@ -329,17 +329,18 @@ spec:
 
     volumeClaimTemplates:
       - name: default-volume-claim
+        # Specify PVC provisioner.
+        # 1. StatefulSet. PVC would be provisioned by the StatefulSet
+        # 2. Operator. PVC would be provisioned by the operator
+        provisioner: StatefulSet
+
+        # Specify PVC reclaim policy.
         # 1. Retain. Keep PVC from being deleted
         #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
         # 2. Delete
         reclaimPolicy: Retain
 
-        pvcPrivisioner: StatefulSet
-        pvcPrivisioner: Operator
-
-        : VolumeClaimTemplate into STS
-        : PersistentVolumeClaim by operator
-
+        # type ObjectMeta struct from k8s.io/core/v1
         metadata:
           labels:
             a: "b"
@@ -356,11 +357,15 @@ spec:
           resources:
             requests:
               storage: 1Gi
+
       - name: volume-claim-retain-pvc
+        # Specify PVC reclaim policy.
         # 1. Retain. Keep PVC from being deleted
         #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
         # 2. Delete
         reclaimPolicy: Retain
+
+        # type ObjectMeta struct from k8s.io/core/v1
         metadata:
           labels:
             a: "b"
