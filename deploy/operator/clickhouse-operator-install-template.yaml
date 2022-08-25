@@ -1279,7 +1279,7 @@ spec:
                             type: string
                           provisioner:
                             type: string
-                            description: "defines `PVC` provisioner - be it StatefulSet or the operator"
+                            description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
                             enum:
                               - ""
                               - "StatefulSet"
@@ -2648,7 +2648,7 @@ spec:
                             type: string
                           provisioner:
                             type: string
-                            description: "defines `PVC` provisioner - be it StatefulSet or the operator"
+                            description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
                             enum:
                               - ""
                               - "StatefulSet"
