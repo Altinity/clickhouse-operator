@@ -21,10 +21,9 @@ import (
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kublabels "k8s.io/apimachinery/pkg/labels"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
@@ -56,7 +55,7 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 
 	// Try to find by labels
 
-	var selector kublabels.Selector
+	var selector k8slabels.Selector
 	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
 		return nil, err
 	}
@@ -78,52 +77,21 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
-// getService gets Service either by namespaced name or by labels
-// TODO review byNameOnly params
-func (c *Controller) getService(objMeta *meta.ObjectMeta, byNameOnly bool) (*core.Service, error) {
-	get := c.serviceLister.Services(objMeta.Namespace).Get
-	list := c.serviceLister.Services(objMeta.Namespace).List
-	var objects []*core.Service
-
-	// Check whether object with such name already exists
-	obj, err := get(objMeta.Name)
-
-	if (obj != nil) && (err == nil) {
-		// Object found by name
-		return obj, nil
+// getService gets Service. Accepted types:
+//   1. *core.Service
+//   2. *chop.ChiHost
+func (c *Controller) getService(obj interface{}) (*core.Service, error) {
+	var name, namespace string
+	switch typedObj := obj.(type) {
+	case *core.Service:
+		name = typedObj.Name
+		namespace = typedObj.Namespace
+	case *chiv1.ChiHost:
+		name = chopmodel.CreateStatefulSetServiceName(typedObj)
+		namespace = typedObj.Address.Namespace
 	}
-
-	if !apierrors.IsNotFound(err) {
-		// Error, which is not related to "Object not found"
-		return nil, err
-	}
-
-	// Object not found by name. Try to find by labels
-
-	if byNameOnly {
-		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", objMeta.Namespace, objMeta.Name)
-	}
-
-	var selector kublabels.Selector
-	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
-		return nil, err
-	}
-
-	if objects, err = list(selector); err != nil {
-		return nil, err
-	}
-
-	if len(objects) == 0 {
-		return nil, apierrors.NewNotFound(apps.Resource("Service"), objMeta.Name)
-	}
-
-	if len(objects) == 1 {
-		// Exactly one object found by labels
-		return objects[0], nil
-	}
-
-	// Too much objects found by labels
-	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
+	return c.serviceLister.Services(namespace).Get(name)
+	//return c.kubeClient.CoreV1().Services(namespace).Get(newContext(), name, newGetOptions())
 }
 
 // getStatefulSet gets StatefulSet. Accepted types:
@@ -137,7 +105,7 @@ func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.Stat
 			b = byName[0]
 		}
 		return c.getStatefulSetByMeta(typedObj, b)
-	case *chop.ChiHost:
+	case *chiv1.ChiHost:
 		return c.getStatefulSetByHost(typedObj)
 	}
 	return nil, fmt.Errorf("unknown type")
@@ -169,7 +137,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", meta.Namespace, meta.Name)
 	}
 
-	var selector kublabels.Selector
+	var selector k8slabels.Selector
 	if selector, err = chopmodel.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
@@ -192,7 +160,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 }
 
 // getStatefulSetByHost finds StatefulSet of a specified host
-func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSetByHost(host *chiv1.ChiHost) (*apps.StatefulSet, error) {
 	// Namespaced name
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
@@ -200,18 +168,18 @@ func (c *Controller) getStatefulSetByHost(host *chop.ChiHost) (*apps.StatefulSet
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, newGetOptions())
 }
 
-// getPod gets pod for host or StatefulSet. Accepted types:
+// getPod gets pod. Accepted types:
 //   1. *apps.StatefulSet
 //   2. *chop.ChiHost
 func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *chop.ChiHost:
-		name = chopmodel.CreatePodName(obj)
-		namespace = typedObj.Address.Namespace
 	case *apps.StatefulSet:
 		name = chopmodel.CreatePodName(obj)
 		namespace = typedObj.Namespace
+	case *chiv1.ChiHost:
+		name = chopmodel.CreatePodName(obj)
+		namespace = typedObj.Address.Namespace
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
 }
@@ -219,14 +187,14 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 // getPods gets all pods for provided entity
 func (c *Controller) getPods(obj interface{}) []*core.Pod {
 	switch typed := obj.(type) {
-	case *chop.ClickHouseInstallation:
+	case *chiv1.ClickHouseInstallation:
 		return c.getPodsOfCHI(typed)
-	case *chop.ChiCluster:
+	case *chiv1.ChiCluster:
 		return c.getPodsOfCluster(typed)
-	case *chop.ChiShard:
+	case *chiv1.ChiShard:
 		return c.getPodsOfShard(typed)
 	case
-		*chop.ChiHost,
+		*chiv1.ChiHost,
 		*apps.StatefulSet:
 		if pod, err := c.getPod(typed); err == nil {
 			return []*core.Pod{
@@ -238,8 +206,8 @@ func (c *Controller) getPods(obj interface{}) []*core.Pod {
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *Controller) getPodsOfCluster(cluster *chop.ChiCluster) (pods []*core.Pod) {
-	cluster.WalkHosts(func(host *chop.ChiHost) error {
+func (c *Controller) getPodsOfCluster(cluster *chiv1.ChiCluster) (pods []*core.Pod) {
+	cluster.WalkHosts(func(host *chiv1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -249,8 +217,8 @@ func (c *Controller) getPodsOfCluster(cluster *chop.ChiCluster) (pods []*core.Po
 }
 
 // getPodsOfShard gets all pods in a shard
-func (c *Controller) getPodsOfShard(shard *chop.ChiShard) (pods []*core.Pod) {
-	shard.WalkHosts(func(host *chop.ChiHost) error {
+func (c *Controller) getPodsOfShard(shard *chiv1.ChiShard) (pods []*core.Pod) {
+	shard.WalkHosts(func(host *chiv1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -260,8 +228,8 @@ func (c *Controller) getPodsOfShard(shard *chop.ChiShard) (pods []*core.Pod) {
 }
 
 // getPodsOfCHI gets all pods in a CHI
-func (c *Controller) getPodsOfCHI(chi *chop.ClickHouseInstallation) (pods []*core.Pod) {
-	chi.WalkHosts(func(host *chop.ChiHost) error {
+func (c *Controller) getPodsOfCHI(chi *chiv1.ClickHouseInstallation) (pods []*core.Pod) {
+	chi.WalkHosts(func(host *chiv1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}

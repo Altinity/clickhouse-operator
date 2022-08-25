@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"strings"
 
-	v13 "k8s.io/api/apps/v1"
-	v12 "k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -109,7 +110,7 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 	return nil
 }
 
-func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*v12.Pod, error) {
+func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*corev1.Pod, error) {
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR get Pod %s/%s %v", namespace, name, err)
@@ -137,7 +138,7 @@ func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*v12
 	return pod, nil
 }
 
-func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) (*v13.ReplicaSet, error) {
+func (c *Controller) labelReplicaSet(ctx context.Context, pod *corev1.Pod) (*appsv1.ReplicaSet, error) {
 	// Find parent ReplicaSet
 	replicaSetName := ""
 	for i := range pod.OwnerReferences {
@@ -184,7 +185,7 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *v12.Pod) (*v13.Re
 	return replicaSet, nil
 }
 
-func (c *Controller) labelDeployment(ctx context.Context, rs *v13.ReplicaSet) error {
+func (c *Controller) labelDeployment(ctx context.Context, rs *appsv1.ReplicaSet) error {
 	// Find parent Deployment
 	deploymentName := ""
 	for i := range rs.OwnerReferences {
@@ -243,4 +244,122 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 			model.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
 		},
 	)
+}
+
+// appendLabelReadyPod appends Label "Ready" to the pod of the specified host
+func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	pod, err := c.getPod(host)
+	if err != nil {
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		return err
+	}
+
+	if model.AppendLabelReady(&pod.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+		if err != nil {
+			log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// deleteLabelReadyPod deletes Label "Ready" from the pod of the specified host
+func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	if host == nil {
+		return nil
+	}
+	if host.StatefulSet.Spec.Replicas != nil {
+		if *host.StatefulSet.Spec.Replicas == 0 {
+			return nil
+		}
+	}
+
+	pod, err := c.getPod(host)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		log.V(1).M(host).F().Info("FAIL get pod for host '%s' err: %v", host.Address.NamespaceNameString(), err)
+		return err
+	}
+
+	if model.DeleteLabelReady(&pod.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+		return err
+	}
+
+	return nil
+}
+
+// appendAnnotationReadyService appends Annotation "Ready" to the service of the specified host
+func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	svc, err := c.getService(host)
+	if err != nil {
+		log.M(host).F().Error("FAIL get service for host %s err:%v", host.Address.NamespaceNameString(), err)
+		return err
+	}
+
+	if model.AppendAnnotationReady(&svc.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
+		if err != nil {
+			log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Address.NamespaceNameString(), err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// deleteAnnotationReadyService deletes Annotation "Ready" from the service of the specified host
+func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chiv1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	if host == nil {
+		return nil
+	}
+	if host.StatefulSet.Spec.Replicas != nil {
+		if *host.StatefulSet.Spec.Replicas == 0 {
+			return nil
+		}
+	}
+
+	svc, err := c.getService(host)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		log.V(1).M(host).F().Info("FAIL get service for host '%s' err: %v", host.Address.NamespaceNameString(), err)
+		return err
+	}
+
+	if model.DeleteAnnotationReady(&svc.ObjectMeta) {
+		// Modified, need to update
+		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
+		return err
+	}
+
+	return nil
 }

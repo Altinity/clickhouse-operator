@@ -86,7 +86,7 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
-		s.QueryUnzip2Columns(
+		s.QueryUnzipAndApplyUUIDs(
 			ctx,
 			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
 			createTableDistributed(host.Address.ClusterName),
@@ -143,7 +143,7 @@ func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHo
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
-		s.QueryUnzip2Columns(
+		s.QueryUnzipAndApplyUUIDs(
 			ctx,
 			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
 			createTableReplicated(host.Address.ClusterName),
@@ -346,7 +346,9 @@ func createTableDistributed(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT concat(database, '.', name) AS name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS')
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
+			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
+			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
 		FROM
 		(
 			SELECT
@@ -410,13 +412,16 @@ func createTableReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS')
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
+			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
+			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
 		FROM
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
 			database NOT IN (%s) AND
 			create_table_query != '' AND
-			name NOT LIKE '.inner.%%'
+			name NOT LIKE '.inner.%%' AND
+			name NOT LIKE '.inner_id.%%'
 		SETTINGS skip_unavailable_shards=1, show_table_uuid_in_table_create_query_if_not_nil=1
 		`,
 		cluster,
