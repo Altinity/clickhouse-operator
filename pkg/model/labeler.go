@@ -32,7 +32,8 @@ const (
 	// Main labels
 
 	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
-	LabelReadyValue                   = "yes"
+	LabelReadyValueReady              = "yes"
+	LabelReadyValueNotReady           = "no"
 	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
 	LabelAppValue                     = "chop"
 	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
@@ -169,7 +170,7 @@ func (l *Labeler) GetSelectorCHIScope() map[string]string {
 
 // getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
 func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return appendReady(l.GetSelectorCHIScope())
+	return appendKeyReady(l.GetSelectorCHIScope())
 }
 
 // getClusterScope gets labels for Cluster-scoped object
@@ -191,7 +192,7 @@ func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
 func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
-	return appendReady(getSelectorClusterScope(cluster))
+	return appendKeyReady(getSelectorClusterScope(cluster))
 }
 
 // getLabelsShardScope gets labels for Shard-scoped object
@@ -214,7 +215,7 @@ func getSelectorShardScope(shard *chiv1.ChiShard) map[string]string {
 
 // getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
 func getSelectorShardScopeReady(shard *chiv1.ChiShard) map[string]string {
-	return appendReady(getSelectorShardScope(shard))
+	return appendKeyReady(getSelectorShardScope(shard))
 }
 
 // getHostScope gets labels for Host-scoped object
@@ -246,7 +247,7 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getHostScopeReady(host *chiv1.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
-	return appendReady(l.getHostScope(host, applySupplementaryServiceLabels))
+	return appendKeyReady(l.getHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getHostScopeReclaimPolicy
@@ -267,8 +268,13 @@ func (l *Labeler) getPVC(
 	host *chiv1.ChiHost,
 	template *chiv1.ChiVolumeClaimTemplate,
 ) map[string]string {
+	// Prepare main labels based on template
 	labels := util.MergeStringMapsOverwrite(pvc.Labels, template.ObjectMeta.Labels)
-	return util.MergeStringMapsOverwrite(labels, l.getHostScopeReclaimPolicy(host, template, false))
+	// Append reclaim policy labels
+	return util.MergeStringMapsOverwrite(
+		labels,
+		l.getHostScopeReclaimPolicy(host, template, false),
+	)
 }
 
 // GetReclaimPolicy gets reclaim policy from meta
@@ -307,13 +313,6 @@ func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string {
 func (l *Labeler) appendCHIProvidedTo(dst map[string]string) map[string]string {
 	sourceLabels := util.CopyMapFilter(l.chi.Labels, chop.Config().Label.Include, chop.Config().Label.Exclude)
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)
-}
-
-// appendReady appends "Ready" label to labels set
-func appendReady(dst map[string]string) map[string]string {
-	return util.MergeStringMapsOverwrite(dst, map[string]string{
-		LabelReadyName: LabelReadyValue,
-	})
 }
 
 // makeSetFromObjectMeta makes kublabels.Set from ObjectMeta
@@ -368,7 +367,7 @@ func IsCHOPGeneratedObject(meta *meta.ObjectMeta) bool {
 	return meta.Labels[LabelAppName] == LabelAppValue
 }
 
-// GetCHINameFromObjectMeta extracts CHI name from ObjectMeta by labels
+// GetCHINameFromObjectMeta extracts CHI name from ObjectMeta. Based on labels.
 func GetCHINameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	if !util.MapHasKeys(meta.Labels, LabelCHIName) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelCHIName)
@@ -376,7 +375,7 @@ func GetCHINameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelCHIName], nil
 }
 
-// GetClusterNameFromObjectMeta extracts cluster name from ObjectMeta by labels
+// GetClusterNameFromObjectMeta extracts cluster name from ObjectMeta. Based on labels.
 func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	if !util.MapHasKeys(meta.Labels, LabelClusterName) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelClusterName)
@@ -394,7 +393,7 @@ func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
 	)
 }
 
-// isObjectVersionLabelTheSame
+// isObjectVersionLabelTheSame checks whether object version in meta.Labels is the same as provided value
 func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	if meta == nil {
 		return false
@@ -428,22 +427,94 @@ func IsObjectTheSame(meta1, meta2 *meta.ObjectMeta) bool {
 	return isObjectVersionLabelTheSame(meta1, l)
 }
 
-// AppendLabelReady adds "ready" label with value = UTC now
-func AppendLabelReady(meta *meta.ObjectMeta) {
-	if meta == nil {
-		return
-	}
-	util.MergeStringMapsOverwrite(
-		meta.Labels,
+// appendKeyReady sets "Ready" key to Ready state (used with labels and annotations)
+func appendKeyReady(dst map[string]string) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		dst,
 		map[string]string{
-			LabelReadyName: LabelReadyValue,
-		})
+			LabelReadyName: LabelReadyValueReady,
+		},
+	)
 }
 
-// DeleteLabelReady deletes "ready" label
-func DeleteLabelReady(meta *meta.ObjectMeta) {
-	if meta == nil {
-		return
+// deleteKeyReady sets "Ready" key to NotReady state (used with labels and annotations)
+func deleteKeyReady(dst map[string]string) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		dst,
+		map[string]string{
+			LabelReadyName: LabelReadyValueNotReady,
+		},
+	)
+}
+
+// hasKeyReady checks whether "Ready" key has Ready state (used with labels and annotations)
+func hasKeyReady(src map[string]string) bool {
+	if _, ok := src[LabelReadyName]; ok {
+		return src[LabelReadyName] == LabelReadyValueReady
 	}
-	util.MapDeleteKeys(meta.Labels, LabelReadyName)
+	return false
+}
+
+// AppendLabelReady appends "Ready" label to ObjectMeta.Labels.
+// Returns true in case label was not in place and was added.
+func AppendLabelReady(meta *meta.ObjectMeta) bool {
+	if meta == nil {
+		// Nowhere to add to, not added
+		return false
+	}
+	if hasKeyReady(meta.Labels) {
+		// Already in place, value not added
+		return false
+	}
+	// Need to add
+	meta.Labels = appendKeyReady(meta.Labels)
+	return true
+}
+
+// DeleteLabelReady deletes "Ready" label from ObjectMeta.Labels
+// Returns true in case label was in place and was deleted.
+func DeleteLabelReady(meta *meta.ObjectMeta) bool {
+	if meta == nil {
+		// Nowhere to delete from, not deleted
+		return false
+	}
+	if hasKeyReady(meta.Labels) {
+		// In place, need to delete
+		meta.Labels = deleteKeyReady(meta.Labels)
+		return true
+	}
+	// Not available, not deleted
+	return false
+}
+
+// AppendAnnotationReady appends "Ready" annotation to ObjectMeta.Annotations
+// Returns true in case annotation was not in place and was added.
+func AppendAnnotationReady(meta *meta.ObjectMeta) bool {
+	if meta == nil {
+		// Nowhere to add to, not added
+		return false
+	}
+	if hasKeyReady(meta.Annotations) {
+		// Already in place, not added
+		return false
+	}
+	// Need to add
+	meta.Annotations = appendKeyReady(meta.Annotations)
+	return true
+}
+
+// DeleteAnnotationReady deletes "Ready" annotation from ObjectMeta.Annotations
+// Returns true in case annotation was in place and was deleted.
+func DeleteAnnotationReady(meta *meta.ObjectMeta) bool {
+	if meta == nil {
+		// Nowhere to delete from, not deleted
+		return false
+	}
+	if hasKeyReady(meta.Annotations) {
+		// In place, need to delete
+		meta.Annotations = deleteKeyReady(meta.Annotations)
+		return true
+	}
+	// Not available, not deleted
+	return false
 }

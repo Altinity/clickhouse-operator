@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	//"github.com/altinity/queue"
 
 	"github.com/altinity/queue"
 
@@ -656,7 +655,7 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
 
-	w.createPDB(ctx, chi)
+	w.createPodDisruptionBudget(ctx, chi)
 	return chi.WalkTillError(
 		ctx,
 		w.reconcileCHIAuxObjectsPreliminary,
@@ -1088,7 +1087,9 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *chiv1.ChiHost
 		return nil
 	}
 
-	return w.c.deleteLabelReady(ctx, host)
+	_ = w.c.deleteLabelReadyPod(ctx, host)
+	_ = w.c.deleteAnnotationReadyService(ctx, host)
+	return nil
 }
 
 // includeHostIntoService
@@ -1098,7 +1099,9 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *chiv1.ChiHost
 		return nil
 	}
 
-	return w.c.appendLabelReady(ctx, host)
+	_ = w.c.appendLabelReadyPod(ctx, host)
+	_ = w.c.appendAnnotationReadyService(ctx, host)
+	return nil
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
@@ -1226,9 +1229,9 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiv1.ChiHos
 	})
 }
 
-// createPDB creates PodDisruptionBudget
-func (w *worker) createPDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	pdb, err := w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.ctx.creator.NewPodDisruptionBudget(), newCreateOptions())
+// createPodDisruptionBudget creates PodDisruptionBudget
+func (w *worker) createPodDisruptionBudget(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+	pdb, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.ctx.creator.NewPodDisruptionBudget(), newCreateOptions())
 	if err != nil {
 		log.V(1).Warning("unable to create PDB %v", err)
 		return
@@ -1236,9 +1239,9 @@ func (w *worker) createPDB(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 	log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
 }
 
-// deletePDB deletes PodDisruptionBudget
-func (w *worker) deletePDB(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	_ = w.c.kubeClient.PolicyV1beta1().PodDisruptionBudgets(chi.Namespace).Delete(ctx, chi.Name, newDeleteOptions())
+// deletePodDisruptionBudget deletes PodDisruptionBudget
+func (w *worker) deletePodDisruptionBudget(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+	_ = w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Delete(ctx, chi.Name, newDeleteOptions())
 }
 
 // deleteCHI
@@ -1367,7 +1370,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 
 	// Start delete protocol
 
-	w.deletePDB(ctx, chi)
+	w.deletePodDisruptionBudget(ctx, chi)
 
 	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)
@@ -1837,7 +1840,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *chiv1.ClickHouseInst
 	defer w.a.V(2).M(chi).E().Info(service.Name)
 
 	// Check whether this object already exists
-	curService, err := w.c.getService(&service.ObjectMeta, false)
+	curService, err := w.c.getService(service)
 
 	if curService != nil {
 		// We have Service - try to update it
