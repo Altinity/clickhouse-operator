@@ -110,6 +110,9 @@ spec:
                   echo "Failed to parse name and ordinal of Pod"
                   exit 1
               fi &&
+
+              mkdir -p ${ZOO_DATA_DIR} &&
+              mkdir -p ${ZOO_DATA_LOG_DIR} &&
               export MY_ID=$((ORD+1)) &&
               echo $MY_ID > $ZOO_DATA_DIR/myid &&
               if [[ $SERVERS -gt 1 ]]; then
