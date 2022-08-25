@@ -195,7 +195,7 @@ func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
 	return appendKeyReady(getSelectorClusterScope(cluster))
 }
 
-// getLabelsShardScope gets labels for Shard-scoped object
+// getShardScope gets labels for Shard-scoped object
 func (l *Labeler) getShardScope(shard *chiv1.ChiShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorShardScope(shard)))
