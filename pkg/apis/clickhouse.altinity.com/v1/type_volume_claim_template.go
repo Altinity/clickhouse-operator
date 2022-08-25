@@ -33,6 +33,7 @@ type PVCProvisioner string
 
 // Possible values of PVC provisioner
 const (
+	PVCProvisionerUnspecified PVCProvisioner = ""
 	PVCProvisionerStatefulSet PVCProvisioner = "StatefulSet"
 	PVCProvisionerOperator    PVCProvisioner = "Operator"
 )
@@ -46,6 +47,7 @@ func NewPVCProvisionerFromString(s string) PVCProvisioner {
 func (v PVCProvisioner) IsValid() bool {
 	switch v {
 	case
+		PVCProvisionerUnspecified,
 		PVCProvisionerStatefulSet,
 		PVCProvisionerOperator:
 		return true
@@ -63,8 +65,9 @@ type PVCReclaimPolicy string
 
 // Possible values of PVC reclaim policy
 const (
-	PVCReclaimPolicyRetain PVCReclaimPolicy = "Retain"
-	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
+	PVCReclaimPolicyUnspecified PVCReclaimPolicy = ""
+	PVCReclaimPolicyRetain      PVCReclaimPolicy = "Retain"
+	PVCReclaimPolicyDelete      PVCReclaimPolicy = "Delete"
 )
 
 // NewPVCReclaimPolicyFromString creates new PVCReclaimPolicy from string
@@ -76,6 +79,7 @@ func NewPVCReclaimPolicyFromString(s string) PVCReclaimPolicy {
 func (v PVCReclaimPolicy) IsValid() bool {
 	switch v {
 	case
+		PVCReclaimPolicyUnspecified,
 		PVCReclaimPolicyRetain,
 		PVCReclaimPolicyDelete:
 		return true

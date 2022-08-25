@@ -745,12 +745,12 @@ func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaim
 
 	// Check PVCProvisioner
 	if !template.PVCProvisioner.IsValid() {
-		template.PVCProvisioner = chiV1.PVCProvisionerStatefulSet
+		template.PVCProvisioner = chiV1.PVCProvisionerUnspecified
 	}
 
 	// Check PVCReclaimPolicy
 	if !template.PVCReclaimPolicy.IsValid() {
-		template.PVCReclaimPolicy = chiV1.PVCReclaimPolicyDelete
+		template.PVCReclaimPolicy = chiV1.PVCReclaimPolicyUnspecified
 	}
 
 	// Check Spec

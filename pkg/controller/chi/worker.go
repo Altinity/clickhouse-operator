@@ -1461,7 +1461,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiv1.ChiHost) error {
 		return nil
 	}
 
-	if !host.CanDeleteAllPVCs() {
+	if !chopmodel.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
 	err := w.schemer.HostDropTables(ctx, host)

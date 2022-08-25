@@ -187,19 +187,6 @@ func (host *ChiHost) GetShard() *ChiShard {
 	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
 }
 
-// CanDeleteAllPVCs checks whether all PVCs can be deleted
-func (host *ChiHost) CanDeleteAllPVCs() bool {
-	canDeleteAllPVCs := true
-	host.CHI.WalkVolumeClaimTemplates(func(template *ChiVolumeClaimTemplate) {
-		if template.PVCReclaimPolicy == PVCReclaimPolicyRetain {
-			// At least one template wants to keep its PVC
-			canDeleteAllPVCs = false
-		}
-	})
-
-	return canDeleteAllPVCs
-}
-
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
 func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
 	host.CHI.WalkVolumeClaimTemplates(f)
