@@ -741,11 +741,20 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *chiV1.ChiPodDistr
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaimTemplate) {
 	// Check name
+	// Skip for now
+
+	// Check PVCProvisioner
+	if !template.PVCProvisioner.IsValid() {
+		template.PVCProvisioner = chiV1.PVCProvisionerStatefulSet
+	}
+
 	// Check PVCReclaimPolicy
 	if !template.PVCReclaimPolicy.IsValid() {
 		template.PVCReclaimPolicy = chiV1.PVCReclaimPolicyDelete
 	}
+
 	// Check Spec
+	// Skip for now
 
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)

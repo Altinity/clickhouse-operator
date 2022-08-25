@@ -720,44 +720,6 @@ type ChiPodDistribution struct {
 	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
 }
 
-// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
-type ChiVolumeClaimTemplate struct {
-	Name             string                           `json:"name"                    yaml:"name"`
-	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
-	ObjectMeta       metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
-	Spec             corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
-}
-
-// PVCReclaimPolicy defines PVC reclaim policy
-type PVCReclaimPolicy string
-
-// Possible values of PVC reclaim policy
-const (
-	PVCReclaimPolicyRetain PVCReclaimPolicy = "Retain"
-	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
-)
-
-// NewPVCReclaimPolicyFromString creates new PVCReclaimPolicy from string
-func NewPVCReclaimPolicyFromString(s string) PVCReclaimPolicy {
-	return PVCReclaimPolicy(s)
-}
-
-// IsValid checks whether PVCReclaimPolicy is valid
-func (v PVCReclaimPolicy) IsValid() bool {
-	switch v {
-	case PVCReclaimPolicyRetain:
-		return true
-	case PVCReclaimPolicyDelete:
-		return true
-	}
-	return false
-}
-
-// String returns string value for PVCReclaimPolicy
-func (v PVCReclaimPolicy) String() string {
-	return string(v)
-}
-
 // ChiServiceTemplate defines CHI service template
 type ChiServiceTemplate struct {
 	Name         string             `json:"name"                   yaml:"name"`
