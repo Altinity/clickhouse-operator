@@ -421,7 +421,7 @@ spec:
                   description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
                   # nullable: true
                   properties:
-                    zookeeper:
+                    zookeeper: &TypeZookeeperConfig
                       type: object
                       description: |
                         allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
@@ -527,41 +527,10 @@ spec:
                             maxLength: 15
                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                           zookeeper:
-                            type: object
+                            <<: *TypeZookeeperConfig
                             description: |
                               optional, allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` only in current ClickHouse cluster, during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
                               override top-level `chi.spec.configuration.zookeeper` settings
-                            # nullable: true
-                            properties:
-                              nodes:
-                                type: array
-                                description: "describe every available zookeeper cluster node for interaction"
-                                # nullable: true
-                                items:
-                                  type: object
-                                  #required:
-                                  #  - host
-                                  properties:
-                                    host:
-                                      type: string
-                                      description: "dns name or ip address for Zookeeper node"
-                                    port:
-                                      type: integer
-                                      description: "TCP port which used to connect to Zookeeper node"
-                                      minimum: 0
-                                      maximum: 65535
-                              session_timeout_ms:
-                                type: integer
-                                description: "session timeout during connect to Zookeeper"
-                              operation_timeout_ms:
-                                type: integer
-                                description: "one operation timeout during Zookeeper transactions"
-                              root:
-                                type: string
-                                description: "optional root znode path inside zookeeper to store ClickHouse related data (replication queue or distributed DDL)"
-                              identity:
-                                type: string
-                                description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
                           settings:
                             type: object
                             description: |
