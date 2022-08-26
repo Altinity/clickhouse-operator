@@ -1319,14 +1319,10 @@ def test_018(self):
     kubectl.delete_chi(chi)
 
 
-@TestScenario
-@Name("test_019. Test that volume is correctly retained and can be re-attached")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
-)
-def test_019(self):
+@TestCheck
+def test_019(self, step=1):
     util.require_keeper(keeper_type=self.context.keeper_type)
-    manifest = "manifests/chi/test-019-retain-volume-1.yaml"
+    manifest = f"manifests/chi/test-019-{step}-retain-volume-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1378,7 +1374,7 @@ def test_019(self):
 
     with When("Stop the Installation"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-019-retain-volume-2.yaml",
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-2.yaml",
             check={
                 "object_counts": {
                     "statefulset": 1,  # When stopping, pod is removed but StatefulSet and all volumes are in place
@@ -1391,7 +1387,7 @@ def test_019(self):
 
         with And("Re-start the Installation"):
             kubectl.create_and_check(
-                manifest="manifests/chi/test-019-retain-volume-1.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1409,7 +1405,7 @@ def test_019(self):
 
     with When("Add a second replica"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-019-retain-volume-3.yaml",
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-3.yaml",
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
@@ -1424,7 +1420,7 @@ def test_019(self):
             pv_count = kubectl.get_count("pv")
 
             kubectl.create_and_check(
-                manifest="manifests/chi/test-019-retain-volume-1.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1440,7 +1436,7 @@ def test_019(self):
 
     with When("Add a second replica one more time"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-019-retain-volume-3.yaml",
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-3.yaml",
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
@@ -1453,7 +1449,7 @@ def test_019(self):
 
         with When("Set reclaim policy to Delete but do not wait for completion"):
             kubectl.create_and_check(
-                manifest="manifests/chi/test-019-retain-volume-4.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-4.yaml",
                 check={
                     "pod_count": 2,
                     "do_not_delete": 1,
@@ -1466,7 +1462,7 @@ def test_019(self):
                 pv_count = kubectl.get_count("pv")
 
                 kubectl.create_and_check(
-                    manifest="manifests/chi/test-019-retain-volume-1.yaml",
+                    manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                     check={
                         "pod_count": 1,
                         "do_not_delete": 1,
@@ -1485,12 +1481,26 @@ def test_019(self):
 
 
 @TestScenario
-@Name("test_020. Test multi-volume configuration")
+@Name("test_019_1. Test that volume is correctly retained and can be re-attached. Provisioner: StatefulSet")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+    RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
 )
-def test_020(self):
-    manifest = "manifests/chi/test-020-multi-volume.yaml"
+def test_019_1(self):
+    test_019(step=1)
+
+
+@TestScenario
+@Name("test_019_2. Test that volume is correctly retained and can be re-attached. Provisioner: Operator")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
+)
+def test_019_2(self):
+    test_019(step=2)
+
+
+@TestCheck
+def test_020(self, step=1):
+    manifest = f"manifests/chi/test-020-{step}-multi-volume.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1523,12 +1533,26 @@ def test_020(self):
 
 
 @TestScenario
-@Name("test_021. Test rescaling storage")
+@Name("test_020_1. Test multi-volume configuration. Provisioner: StatefulSet")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0")
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
 )
-def test_021(self):
-    manifest = "manifests/chi/test-021-rescale-volume-01.yaml"
+def test_020_1(self):
+    test_020(step=1)
+
+
+@TestScenario
+@Name("test_020_2. Test multi-volume configuration. Provisioner: Operators")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+)
+def test_020_2(self):
+    test_020(step=2)
+
+
+@TestCheck
+def test_021(self, step=1):
+    manifest = f"manifests/chi/test-021-{step}-rescale-volume-01.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
     with Given("Default storage class is expandable"):
@@ -1548,7 +1572,8 @@ def test_021(self):
     )
 
     with Then("Storage size should be 1Gi"):
-        size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+        size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+        print(f"size: {size}")
         assert size == "1Gi"
 
     with Then("Create a table with a single row"):
@@ -1556,7 +1581,7 @@ def test_021(self):
 
     with When("Re-scale volume configuration to 2Gi"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-02-enlarge-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-02-enlarge-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1564,9 +1589,10 @@ def test_021(self):
         )
 
         with Then("Storage size should be 2Gi"):
-            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0",
+            kubectl.wait_field("pvc", f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0",
                                ".spec.resources.requests.storage", "2Gi")
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "2Gi"
 
         with And("Table should exist"):
@@ -1575,7 +1601,7 @@ def test_021(self):
 
     with When("Add a second disk"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-03-add-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1584,15 +1610,16 @@ def test_021(self):
         # Adding new volume takes time, so pod_volumes check does not work
 
         with Then("There should be two PVC"):
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             assert size == "2Gi"
-            kubectl.wait_object("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0")
-            kubectl.wait_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase", "Bound")
-            size = kubectl.get_pvc_size("disk2-chi-test-021-rescale-volume-simple-0-0-0")
+            kubectl.wait_object("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            kubectl.wait_field("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0", ".status.phase", "Bound")
+            size = kubectl.get_pvc_size(f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "1Gi"
 
         with And("There should be two disks recognized by ClickHouse"):
-            kubectl.wait_pod_status("chi-test-021-rescale-volume-simple-0-0-0", "Running")
+            kubectl.wait_pod_status(f"chi-test-021-{step}-rescale-volume-simple-0-0-0", "Running")
             # ClickHouse requires some time to mount volume. Race conditions.
             # TODO: wait for proper pod state and check the liveness probe probably. This is better than waiting
             out = ""
@@ -1610,7 +1637,7 @@ def test_021(self):
 
     with When("Try reducing the disk size and also change a version to recreate the stateful set"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-04-decrease-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-04-decrease-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1618,7 +1645,8 @@ def test_021(self):
         )
 
         with Then("Storage size should be unchanged 2Gi"):
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "2Gi"
 
         with And("Table should exist"):
@@ -1626,12 +1654,12 @@ def test_021(self):
             assert out == "1"
 
         with And("PVC status should not be Terminating"):
-            status = kubectl.get_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase")
+            status = kubectl.get_field("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0", ".status.phase")
             assert status != "Terminating"
 
     with When("Revert disk size back to 2Gi"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-03-add-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1639,9 +1667,10 @@ def test_021(self):
         )
 
         with Then("Storage size should be 2Gi"):
-            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0",
+            kubectl.wait_field("pvc", f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0",
                                ".spec.resources.requests.storage", "2Gi")
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "2Gi"
 
         with And("Table should exist"):
@@ -1649,6 +1678,22 @@ def test_021(self):
             assert out == "1"
 
     kubectl.delete_chi(chi)
+
+@TestScenario
+@Name("test_021. Test rescaling storage. Provisioner: StatefulSet")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0")
+)
+def test_021_1(self):
+    test_021(step=1)
+
+@TestScenario
+@Name("test_021. Test rescaling storage. Provisioner: Operator")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0")
+)
+def test_021_2(self):
+    test_021(step=2)
 
 
 @TestScenario
