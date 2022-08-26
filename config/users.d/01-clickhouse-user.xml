@@ -4,6 +4,12 @@
 <!-- Edit appropriate template in the following folder: -->
 <!-- deploy/builder/templates-config -->
 <!-- IMPORTANT -->
+<!--
+#
+# Template parameters available:
+#   password_sha256_hex
+#
+-->
 <yandex>
     <users>
         <clickhouse_operator>
