@@ -384,7 +384,7 @@ spec:
                             - ""
                             - "Retain"
                             - "Delete"
-                    templates:
+                    templates: &TypeTemplateNames
                       type: object
                       description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
                       # nullable: true
@@ -578,39 +578,10 @@ spec:
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
                           templates:
-                            type: object
+                            <<: *TypeTemplateNames
                             description: |
                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
                               override top-level `chi.spec.configuration.templates`
-                            # nullable: true
-                            properties:
-                              hostTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one cluster"
-                              podTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                              dataVolumeClaimTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                              logVolumeClaimTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                              serviceTemplate:
-                                type: string
-                                description: "optional, fully ignores for cluster-level"
-                              clusterServiceTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                              shardServiceTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                              replicaServiceTemplate:
-                                type: string
-                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                              volumeClaimTemplate:
-                                type: string
-                                description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                           schemaPolicy:
                             type: object
                             description: |
@@ -695,39 +666,10 @@ spec:
                                         override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`
                                       x-kubernetes-preserve-unknown-fields: true
                                     templates:
-                                      type: object
+                                      <<: *TypeTemplateNames
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected shard
                                         override top-level `chi.spec.configuration.templates` and cluster-level `chi.spec.configuration.clusters.templates`
-                                      # nullable: true
-                                      properties:
-                                        hostTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one shard"
-                                        podTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                        dataVolumeClaimTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                        logVolumeClaimTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                        serviceTemplate:
-                                          type: string
-                                          description: "optional, fully ignores for shard-level"
-                                        clusterServiceTemplate:
-                                          type: string
-                                          description: "optional, fully ignores for shard-level"
-                                        shardServiceTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                        replicaServiceTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                        volumeClaimTemplate:
-                                          type: string
-                                          description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                                     replicasCount:
                                       type: integer
                                       description: |
@@ -788,39 +730,10 @@ spec:
                                               override top-level `chi.spec.configuration.files`, cluster-level `chi.spec.configuration.clusters.files` and shard-level `chi.spec.configuration.clusters.layout.shards.files`
                                             x-kubernetes-preserve-unknown-fields: true
                                           templates:
-                                            type: object
+                                            <<: *TypeTemplateNames
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates` and shard-level `chi.spec.configuration.clusters.layout.shards.templates`
-                                            # nullable: true
-                                            properties:
-                                              hostTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one replica"
-                                              podTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one replica"
-                                              dataVolumeClaimTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                              logVolumeClaimTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                              serviceTemplate:
-                                                type: string
-                                                description: "optional, fully ignores for replica-level"
-                                              clusterServiceTemplate:
-                                                type: string
-                                                description: "optional, fully ignores for replica-level"
-                                              shardServiceTemplate:
-                                                type: string
-                                                description: "optional, fully ignores for replica-level"
-                                              replicaServiceTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one replica"
-                                              volumeClaimTemplate:
-                                                type: string
-                                                description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                               replicas:
                                 type: array
                                 description: "optional, allows override top-level `chi.spec.configuration` and cluster-level `chi.spec.configuration.clusters` configuration for each replica and each shard relates to selected replica, use it only if you fully understand what you do"
@@ -851,39 +764,10 @@ spec:
                                         override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
                                       x-kubernetes-preserve-unknown-fields: true
                                     templates:
-                                      type: object
+                                      <<: *TypeTemplateNames
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                         override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
-                                      # nullable: true
-                                      properties:
-                                        hostTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one replica"
-                                        podTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one replica"
-                                        dataVolumeClaimTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                        logVolumeClaimTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                        serviceTemplate:
-                                          type: string
-                                          description: "optional, fully ignores for replica-level"
-                                        clusterServiceTemplate:
-                                          type: string
-                                          description: "optional, fully ignores for replica-level"
-                                        shardServiceTemplate:
-                                          type: string
-                                          description: "optional, fully ignores for replica-level"
-                                        replicaServiceTemplate:
-                                          type: string
-                                          description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one replica"
-                                        volumeClaimTemplate:
-                                          type: string
-                                          description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                                     shardsCount:
                                       type: integer
                                       description: "optional, count of shards related to current replica, you can override each shard behavior on low-level `chi.spec.configuration.clusters.layout.replicas.shards`"
@@ -940,39 +824,10 @@ spec:
                                             # nullable: true
                                             x-kubernetes-preserve-unknown-fields: true
                                           templates:
-                                            type: object
+                                            <<: *TypeTemplateNames
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
-                                            # nullable: true
-                                            properties:
-                                              hostTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one shard"
-                                              podTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                              dataVolumeClaimTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                              logVolumeClaimTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                              serviceTemplate:
-                                                type: string
-                                                description: "optional, fully ignores for shard-level"
-                                              clusterServiceTemplate:
-                                                type: string
-                                                description: "optional, fully ignores for shard-level"
-                                              shardServiceTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                              replicaServiceTemplate:
-                                                type: string
-                                                description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                              volumeClaimTemplate:
-                                                type: string
-                                                description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                 templates:
                   type: object
                   description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -1056,26 +911,8 @@ spec:
                                 # nullable: true
                                 x-kubernetes-preserve-unknown-fields: true
                               templates:
-                                type: object
-                                description: "be carefull, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
-                                # nullable: true
-                                properties:
-                                  hostTemplate:
-                                    type: string
-                                  podTemplate:
-                                    type: string
-                                  dataVolumeClaimTemplate:
-                                    type: string
-                                  logVolumeClaimTemplate:
-                                    type: string
-                                  serviceTemplate:
-                                    type: string
-                                  clusterServiceTemplate:
-                                    type: string
-                                  shardServiceTemplate:
-                                    type: string
-                                  replicaServiceTemplate:
-                                    type: string
+                                <<: *TypeTemplateNames
+                                description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
 
                     podTemplates:
                       type: array
