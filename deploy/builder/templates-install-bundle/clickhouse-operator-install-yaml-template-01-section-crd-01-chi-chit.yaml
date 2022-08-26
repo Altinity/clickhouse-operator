@@ -265,7 +265,7 @@ spec:
                     - "RollingUpdate"
                 # Need to be StringBool
                 troubleshoot:
-                  << : *TypeStringBool
+                  <<: *TypeStringBool
                   description: "allows troubleshoot Pods during CrashLoopBack state, when you apply wrong configuration, `clickhouse-server` wouldn't startup"
                 namespaceDomainPattern:
                   type: string
@@ -306,67 +306,40 @@ spec:
                           description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
                           # nullable: true
                           properties:
-                            statefulSet:
+                            statefulSet: &TypeObjectsCleanup
                               type: string
                               description: "behavior policy for unknown StatefulSet, Delete by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
                                 - "Retain"
-                                - "Dele te"
+                                - "Delete"
                             pvc:
                               type: string
+                              <<: *TypeObjectsCleanup
                               description: "behavior policy for unknown PVC, Delete by default"
-                              enum:
-                                # List ObjectsCleanupXXX constants from model
-                                - "Retain"
-                                - "Delete"
                             configMap:
-                              type: string
+                              <<: *TypeObjectsCleanup
                               description: "behavior policy for unknown ConfigMap, Delete by default"
-                              enum:
-                                # List ObjectsCleanupXXX constants from model
-                                - "Retain"
-                                - "Delete"
                             service:
-                              type: string
+                              <<: *TypeObjectsCleanup
                               description: "behavior policy for unknown Service, Delete by default"
-                              enum:
-                                # List ObjectsCleanupXXX constants from model
-                                - "Retain"
-                                - "Delete"
                         reconcileFailedObjects:
                           type: object
                           description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
                           # nullable: true
                           properties:
                             statefulSet:
-                              type: string
+                              <<: *TypeObjectsCleanup
                               description: "behavior policy for failed StatefulSet reconciling, Retain by default"
-                              enum:
-                                # List ObjectsCleanupXXX constants from model
-                                - "Retain"
-                                - "Delete"
                             pvc:
-                              type: string
+                              <<: *TypeObjectsCleanup
                               description: "behavior policy for failed PVC reconciling, Retain by default"
-                              enum:
-                                # List ObjectsCleanupXXX constants from model
-                                - "Retain"
-                                - "Delete"
                             configMap:
-                              type: string
+                              <<: *TypeObjectsCleanup
                               description: "behavior policy for failed ConfigMap reconciling, Retain by default"
-                              enum:
-                                # List ObjectsCleanupXXX constants from model
-                                - "Retain"
-                                - "Delete"
                             service:
-                              type: string
+                              <<: *TypeObjectsCleanup
                               description: "behavior policy for failed Service reconciling, Retain by default"
-                              enum:
-                                # List ObjectsCleanupXXX constants from model
-                                - "Retain"
-                                - "Delete"
                 defaults:
                   type: object
                   description: |
