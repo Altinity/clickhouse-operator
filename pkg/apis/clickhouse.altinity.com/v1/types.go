@@ -478,13 +478,6 @@ func (t *ChiReconciling) GetCleanup() *ChiCleanup {
 	return t.Cleanup
 }
 
-// ChiDefaults defines defaults section of .spec
-type ChiDefaults struct {
-	ReplicasUseFQDN string             `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN,omitempty"`
-	DistributedDDL  *ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL,omitempty"`
-	Templates       *ChiTemplateNames  `json:"templates,omitempty"       yaml:"templates,omitempty"`
-}
-
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
 	HostTemplate            string `json:"hostTemplate,omitempty"            yaml:"hostTemplate,omitempty"`

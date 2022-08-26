@@ -19,13 +19,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
+// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template
 type ChiVolumeClaimTemplate struct {
-	Name             string                           `json:"name"                    yaml:"name"`
-	PVCProvisioner   PVCProvisioner                   `json:"provisioner,omitempty"   yaml:"provisioner,omitempty"`
-	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
-	ObjectMeta       metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
-	Spec             corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
+	Name string `json:"name"                    yaml:"name"`
+	StorageManagement
+	ObjectMeta metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
+	Spec       corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
 }
 
 // PVCProvisioner defines PVC provisioner
