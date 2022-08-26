@@ -217,13 +217,15 @@ spec:
               # x-kubernetes-preserve-unknown-fields: true
               description: |
                 Specification of the desired behavior of one or more ClickHouse clusters
-                More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md"
+                More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md
               properties:
                 taskID:
                   type: string
-                  description: "Allow define custom taskID for named update and watch status of this update execution in .status.taskIDs field, by default every update of chi manifest will generate random taskID"
+                  description: |
+                    Allows to define custom taskID for named update operation and watch status of this update execution in .status.taskIDs field.
+                    By default every update of chi manifest will generate random taskID
                 # Need to be StringBool
-                stop:
+                stop: &TypeStringBool
                   type: string
                   description: |
                     Allow stop all ClickHouse clusters described in current chi.
@@ -263,33 +265,8 @@ spec:
                     - "RollingUpdate"
                 # Need to be StringBool
                 troubleshoot:
-                  type: string
+                  << : *TypeStringBool
                   description: "allows troubleshoot Pods during CrashLoopBack state, when you apply wrong configuration, `clickhouse-server` wouldn't startup"
-                  enum:
-                    # List StringBoolXXX constants from model
-                    - ""
-                    - "0"
-                    - "1"
-                    - "False"
-                    - "false"
-                    - "True"
-                    - "true"
-                    - "No"
-                    - "no"
-                    - "Yes"
-                    - "yes"
-                    - "Off"
-                    - "off"
-                    - "On"
-                    - "on"
-                    - "Disable"
-                    - "disable"
-                    - "Enable"
-                    - "enable"
-                    - "Disabled"
-                    - "disabled"
-                    - "Enabled"
-                    - "enabled"
                 namespaceDomainPattern:
                   type: string
                   description: "custom domain suffix which will add to end of `Service` or `Pod` name, use it when you use custom cluster domain in your Kubernetes cluster"
@@ -335,7 +312,7 @@ spec:
                               enum:
                                 # List ObjectsCleanupXXX constants from model
                                 - "Retain"
-                                - "Delete"
+                                - "Dele te"
                             pvc:
                               type: string
                               description: "behavior policy for unknown PVC, Delete by default"
@@ -399,35 +376,11 @@ spec:
                   properties:
                     # Need to be StringBool
                     replicasUseFQDN:
-                      type: string
+                      << : *TypeStringBool
                       description: |
-                        define should replicas be specified by FQDN in `<host></host>`, then "no" then will use short hostname and clickhouse-server will use kubernetes default suffixes for properly DNS lookup
+                        define should replicas be specified by FQDN in `<host></host>`.
+                        In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
                         "yes" by default
-                      enum:
-                        # List StringBoolXXX constants from model
-                        - ""
-                        - "0"
-                        - "1"
-                        - "False"
-                        - "false"
-                        - "True"
-                        - "true"
-                        - "No"
-                        - "no"
-                        - "Yes"
-                        - "yes"
-                        - "Off"
-                        - "off"
-                        - "On"
-                        - "on"
-                        - "Disable"
-                        - "disable"
-                        - "Enable"
-                        - "enable"
-                        - "Disabled"
-                        - "disabled"
-                        - "Enabled"
-                        - "enabled"
                     distributedDDL:
                       type: object
                       description: |
@@ -438,6 +391,26 @@ spec:
                         profile:
                           type: string
                           description: "Settings from this profile will be used to execute DDL queries"
+                    storageManagement:
+                      type: object
+                      description: default storage management options
+                      properties:
+                        provisioner: &TypePVCProvisioner
+                          type: string
+                          description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
+                          enum:
+                            - ""
+                            - "StatefulSet"
+                            - "Operator"
+                        reclaimPolicy: &TypePVCReclaimPolicy
+                          type: string
+                          description: |
+                            defines behavior of `PVC` deletion.
+                            `Delete` by default, if `Retain` specified then `PVC` will be kept when deleting StatefulSet
+                          enum:
+                            - ""
+                            - "Retain"
+                            - "Delete"
                     templates:
                       type: object
                       description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
@@ -727,37 +700,12 @@ spec:
                                         More details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
                                     # Need to be StringBool
                                     internalReplication:
-                                      type: string
+                                      << : *TypeStringBool
                                       description: |
                                         optional, `true` by default when `chi.spec.configuration.clusters[].layout.ReplicaCount` > 1 and 0 otherwise
                                         allows setup <internal_replication> setting which will use during insert into tables with `Distributed` engine for insert only in one live replica and other replicas will download inserted data during replication,
                                         will apply in <remote_servers> inside ConfigMap which will mount in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml
                                         More details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
-                                      enum:
-                                        # List StringBoolXXX constants from model
-                                        - ""
-                                        - "0"
-                                        - "1"
-                                        - "False"
-                                        - "false"
-                                        - "True"
-                                        - "true"
-                                        - "No"
-                                        - "no"
-                                        - "Yes"
-                                        - "yes"
-                                        - "Off"
-                                        - "off"
-                                        - "On"
-                                        - "on"
-                                        - "Disable"
-                                        - "disable"
-                                        - "Enable"
-                                        - "enable"
-                                        - "Disabled"
-                                        - "disabled"
-                                        - "Enabled"
-                                        - "enabled"
                                     settings:
                                       type: object
                                       # nullable: true
@@ -1270,31 +1218,19 @@ spec:
                         #  - spec
                         properties:
                           name:
+                            type: string
                             description: |
                               template name, could use to link inside
                               top-level `chi.spec.defaults.templates.dataVolumeClaimTemplate` or `chi.spec.defaults.templates.logVolumeClaimTemplate`,
                               cluster-level `chi.spec.configuration.clusters.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.templates.logVolumeClaimTemplate`,
                               shard-level `chi.spec.configuration.clusters.layout.shards.temlates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.shards.temlates.logVolumeClaimTemplate`
                               replica-level `chi.spec.configuration.clusters.layout.replicas.templates.dataVolumeClaimTemplate` or `chi.spec.configuration.clusters.layout.replicas.templates.logVolumeClaimTemplate`
-                            type: string
-                          provisioner:
-                            type: string
-                            description: "defines `PVC` provisioner - be it StatefulSet or the Operator"
-                            enum:
-                              - ""
-                              - "StatefulSet"
-                              - "Operator"
-                          reclaimPolicy:
-                            type: string
-                            description: "define behavior of `PVC` deletion policy during delete `Pod`, `Delete` by default, when `Retain` then `PVC` still alive even `Pod` will deleted"
-                            enum:
-                              - ""
-                              - "Retain"
-                              - "Delete"
+                          provisioner: *TypePVCProvisioner
+                          reclaimPolicy: *TypePVCReclaimPolicy
                           metadata:
                             type: object
                             description: |
-                              allows pass standard object's metadata from template to PVC
+                              allows to pass standard object's metadata from template to PVC
                               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
