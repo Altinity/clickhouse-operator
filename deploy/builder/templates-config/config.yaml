@@ -3,7 +3,7 @@
 #   watchNamespaces
 #   chUsername
 #   chPassword
-#   password_sha256_hex
+#
 
 ################################################
 ##
@@ -12,7 +12,7 @@
 ################################################
 watch:
   # List of namespaces where clickhouse-operator watches for events.
-  # Concurrently running operators should watch on different namespaces
+  # Concurrently running operators should watch on different namespaces.
   #namespaces: ["dev", "test"]
   namespaces: [${watchNamespaces}]
 
@@ -29,7 +29,7 @@ clickhouse:
         common: config.d
         # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
         host: conf.d
-        # Path to the folder where ClickHouse configuration files with users settings are located.
+        # Path to the folder where ClickHouse configuration files with users' settings are located.
         # Files are common for all instances within a CHI.
         user: users.d
     ################################################
@@ -64,19 +64,32 @@ clickhouse:
   ##
   ################################################
   access:
-    # ClickHouse credentials (username, password and port) to be used by operator to connect to ClickHouse instances
-    # for:
+    # Possible values for `scheme` are:
+    # 1. http
+    # 2. https
+    scheme: ""
+    # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
+    # Used for:
     # 1. Metrics requests
     # 2. Schema maintenance
     # 3. DROP DNS CACHE
-    # User with such credentials can be specified in additional ClickHouse .xml config files,
-    # located in `chUsersConfigsPath` folder
+    # User with these credentials can be specified in additional ClickHouse .xml config files,
+    # located in `clickhouse.configuration.file.path.user` folder
     username: "${chUsername}"
     password: "${chPassword}"
+    rootCA: ""
+
+    # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
+    # Can be used instead of explicitly specified username and password which are:
+    # clickhouse.access.username
+    # clickhouse.access.password
+    # Secret should have two keys:
+    # 1. username
+    # 2. password
     secret:
-      # Location of k8s Secret with username and password to be used by operator to connect to ClickHouse instances
-      # Can be used instead of explicitly specified username and password
+      # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
       namespace: ""
+      # Empty `name` means no k8s Secret would be looked for
       name: ""
     # Port where to connect to ClickHouse instances to
     port: 8123
@@ -104,7 +117,7 @@ reconcile:
 
   statefulSet:
     create:
-      # What to do in case created StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+      # What to do in case created StatefulSet is not in Ready after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
       # 1. abort - do nothing, just break the process and wait for admin
       # 2. delete - delete newly created problematic StatefulSet
@@ -116,7 +129,7 @@ reconcile:
       timeout: 300
       # How many seconds to wait between checks for created/updated StatefulSet status
       pollInterval: 5
-      # What to do in case updated StatefulSet is not in Ready after `statefulSetUpdateTimeout` seconds
+      # What to do in case updated StatefulSet is not in Ready after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
       # 1. abort - do nothing, just break the process and wait for admin
       # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
@@ -126,8 +139,9 @@ reconcile:
 
   host:
     # Whether reconciler should wait for host:
-    # to be excluded from cluster OR
-    # to be included into cluster
+    # - to be excluded from cluster
+    # OR
+    # - to be included into cluster
     # respectfully
     wait:
       exclude: true

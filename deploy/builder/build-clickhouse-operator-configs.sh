@@ -59,7 +59,7 @@ EOF
         >> "${dst}"
 }
 
-# Process files in root
+# Process files in the root folder
 # List files only
 for f in $(ls -pa "${TEMPLATES_DIR}" | grep -v /); do
     # Source
