@@ -459,6 +459,10 @@ func (n *Normalizer) normalizeDefaults(defaults *chiV1.ChiDefaults) *chiV1.ChiDe
 		//defaults.DistributedDDL = chiV1.NewChiDistributedDDL()
 	}
 	// Ensure field
+	if defaults.StorageManagement == nil {
+		defaults.StorageManagement = chiV1.NewStorageManagement()
+	}
+	// Ensure field
 	if defaults.Templates == nil {
 		//defaults.Templates = chiV1.NewChiTemplateNames()
 	}
@@ -743,21 +747,27 @@ func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaim
 	// Check name
 	// Skip for now
 
-	// Check PVCProvisioner
-	if !template.PVCProvisioner.IsValid() {
-		template.PVCProvisioner = chiV1.PVCProvisionerUnspecified
-	}
-
-	// Check PVCReclaimPolicy
-	if !template.PVCReclaimPolicy.IsValid() {
-		template.PVCReclaimPolicy = chiV1.PVCReclaimPolicyUnspecified
-	}
+	// StorageManagement
+	n.normalizeStorageManagement(&template.StorageManagement)
 
 	// Check Spec
 	// Skip for now
 
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+}
+
+// normalizeStorageManagement normalizes StorageManagement
+func (n *Normalizer) normalizeStorageManagement(storage *chiV1.StorageManagement) {
+	// Check PVCProvisioner
+	if !storage.PVCProvisioner.IsValid() {
+		storage.PVCProvisioner = chiV1.PVCProvisionerUnspecified
+	}
+
+	// Check PVCReclaimPolicy
+	if !storage.PVCReclaimPolicy.IsValid() {
+		storage.PVCReclaimPolicy = chiV1.PVCReclaimPolicyUnspecified
+	}
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates

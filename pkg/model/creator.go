@@ -1088,10 +1088,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 
 // OperatorShouldCreatePVC checks whether operator should create PVC for specified volumeCLimaTemplate
 func (c *Creator) OperatorShouldCreatePVC(host *chiv1.ChiHost, volumeClaimTemplate *chiv1.ChiVolumeClaimTemplate) bool {
-	if volumeClaimTemplate.PVCProvisioner == chiv1.PVCProvisionerOperator {
-		return true
-	}
-	return false
+	return getPVCProvisioner(host, volumeClaimTemplate) == chiv1.PVCProvisionerOperator
 }
 
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet

@@ -964,12 +964,12 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 		return err
 	}
 
-	w.reconcilePersistentVolumes(ctx, host)
+	//w.reconcilePersistentVolumes(ctx, host)
 	_ = w.reconcilePVCs(ctx, host)
-
 	if err := w.reconcileHostStatefulSet(ctx, host); err != nil {
 		return err
 	}
+	_ = w.reconcilePVCs(ctx, host)
 
 	_ = w.reconcileHostService(ctx, host)
 
@@ -2195,8 +2195,8 @@ func (w *worker) reconcilePVC(
 		return nil, fmt.Errorf("ctx is done")
 	}
 
-	pvc = w.ctx.creator.PreparePersistentVolumeClaim(pvc, host, template)
 	w.applyPVCResourcesRequests(pvc, template)
+	pvc = w.ctx.creator.PreparePersistentVolumeClaim(pvc, host, template)
 	return w.c.updatePersistentVolumeClaim(ctx, pvc)
 }
 

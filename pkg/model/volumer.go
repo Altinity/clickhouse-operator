@@ -26,10 +26,26 @@ func getPVCReclaimPolicy(host *v1.ChiHost, template *v1.ChiVolumeClaimTemplate) 
 		return template.PVCReclaimPolicy
 	}
 
-	//if host.Templates.PVCReclaimPolicy != v1.PVCReclaimPolicyUnspecified {
-	//	return host.Templates.PVCReclaimPolicy
-	//}
+	if host.CHI.Spec.Defaults.StorageManagement.PVCReclaimPolicy != v1.PVCReclaimPolicyUnspecified {
+		return host.CHI.Spec.Defaults.StorageManagement.PVCReclaimPolicy
+	}
 
 	// Default value
 	return v1.PVCReclaimPolicyDelete
+}
+
+func getPVCProvisioner(host *v1.ChiHost, template *v1.ChiVolumeClaimTemplate) v1.PVCProvisioner {
+	// Order by priority
+
+	// VolumeClaimTemplate.PVCProvisioner, in case specified
+	if template.PVCProvisioner != v1.PVCProvisionerUnspecified {
+		return template.PVCProvisioner
+	}
+
+	if host.CHI.Spec.Defaults.StorageManagement.PVCProvisioner != v1.PVCProvisionerUnspecified {
+		return host.CHI.Spec.Defaults.StorageManagement.PVCProvisioner
+	}
+
+	// Default value
+	return v1.PVCProvisionerStatefulSet
 }
