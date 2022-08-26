@@ -349,7 +349,7 @@ spec:
                   properties:
                     # Need to be StringBool
                     replicasUseFQDN:
-                      << : *TypeStringBool
+                      <<: *TypeStringBool
                       description: |
                         define should replicas be specified by FQDN in `<host></host>`.
                         In case of "no" will use short hostname and clickhouse-server will use kubernetes default suffixes for DNS lookup
@@ -486,7 +486,7 @@ spec:
                         Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationquotas
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
-                    settings:
+                    settings: &TypeSettings
                       type: object
                       description: |
                         allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
@@ -494,7 +494,7 @@ spec:
                         Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
-                    files:
+                    files: &TypeFiles
                       type: object
                       description: |
                         allows define content of any setting file inside each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
@@ -532,20 +532,16 @@ spec:
                               optional, allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` only in current ClickHouse cluster, during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
                               override top-level `chi.spec.configuration.zookeeper` settings
                           settings:
-                            type: object
+                            <<: *TypeSettings
                             description: |
                               optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                               override top-level `chi.spec.configuration.settings`
                               More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           files:
-                            type: object
+                            <<: *TypeFiles
                             description: |
                               optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                               override top-level `chi.spec.configuration.files`
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           templates:
                             <<: *TypeTemplateNames
                             description: |
@@ -601,7 +597,6 @@ spec:
                                       # See namePartShardMaxLen const
                                       maxLength: 15
                                       pattern: "^[a-zA-Z0-9-]{0,15}$"
-
                                     definitionType:
                                       type: string
                                       description: "DEPRECATED - to be removed soon"
@@ -613,27 +608,23 @@ spec:
                                         More details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
                                     # Need to be StringBool
                                     internalReplication:
-                                      << : *TypeStringBool
+                                      <<: *TypeStringBool
                                       description: |
                                         optional, `true` by default when `chi.spec.configuration.clusters[].layout.ReplicaCount` > 1 and 0 otherwise
                                         allows setup <internal_replication> setting which will use during insert into tables with `Distributed` engine for insert only in one live replica and other replicas will download inserted data during replication,
                                         will apply in <remote_servers> inside ConfigMap which will mount in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml
                                         More details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
                                     settings:
-                                      type: object
-                                      # nullable: true
+                                      <<: *TypeSettings
                                       description: |
                                         optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one shard during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                                         override top-level `chi.spec.configuration.settings` and cluster-level `chi.spec.configuration.clusters.settings`
                                         More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                      x-kubernetes-preserve-unknown-fields: true
                                     files:
-                                      type: object
-                                      # nullable: true
+                                      <<: *TypeFiles
                                       description: |
                                         optional, allows define content of any setting file inside each `Pod` only in one shard during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                         override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`
-                                      x-kubernetes-preserve-unknown-fields: true
                                     templates:
                                       <<: *TypeTemplateNames
                                       description: |
@@ -684,20 +675,16 @@ spec:
                                             minimum: 1
                                             maximum: 65535
                                           settings:
-                                            type: object
-                                            # nullable: true
+                                            <<: *TypeSettings
                                             description: |
                                               optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                               override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and shard-level `chi.spec.configuration.clusters.layout.shards.settings`
                                               More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                            x-kubernetes-preserve-unknown-fields: true
                                           files:
-                                            type: object
-                                            # nullable: true
+                                            <<: *TypeFiles
                                             description: |
                                               optional, allows define content of any setting file inside `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                               override top-level `chi.spec.configuration.files`, cluster-level `chi.spec.configuration.clusters.files` and shard-level `chi.spec.configuration.clusters.layout.shards.files`
-                                            x-kubernetes-preserve-unknown-fields: true
                                           templates:
                                             <<: *TypeTemplateNames
                                             description: |
@@ -718,20 +705,16 @@ spec:
                                       maxLength: 15
                                       pattern: "^[a-zA-Z0-9-]{0,15}$"
                                     settings:
-                                      type: object
+                                      <<: *TypeSettings
                                       description: |
                                         optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                         override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and will ignore if shard-level `chi.spec.configuration.clusters.layout.shards` present
                                         More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                      # nullable: true
-                                      x-kubernetes-preserve-unknown-fields: true
                                     files:
-                                      type: object
-                                      # nullable: true
+                                      <<: *TypeFiles
                                       description: |
                                         optional, allows define content of any setting file inside each `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                         override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
-                                      x-kubernetes-preserve-unknown-fields: true
                                     templates:
                                       <<: *TypeTemplateNames
                                       description: |
@@ -778,20 +761,16 @@ spec:
                                             minimum: 1
                                             maximum: 65535
                                           settings:
-                                            type: object
+                                            <<: *TypeSettings
                                             description: |
                                               optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                               override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and replica-level `chi.spec.configuration.clusters.layout.replicas.settings`
                                               More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                            # nullable: true
-                                            x-kubernetes-preserve-unknown-fields: true
                                           files:
-                                            type: object
+                                            <<: *TypeFiles
                                             description: |
                                               optional, allows define content of any setting file inside each `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                               override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
-                                            # nullable: true
-                                            x-kubernetes-preserve-unknown-fields: true
                                           templates:
                                             <<: *TypeTemplateNames
                                             description: |
@@ -867,18 +846,14 @@ spec:
                                 minimum: 1
                                 maximum: 65535
                               settings:
-                                type: object
+                                <<: *TypeSettings
                                 description: |
                                   optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                   More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                # nullable: true
-                                x-kubernetes-preserve-unknown-fields: true
                               files:
-                                type: object
+                                <<: *TypeFiles
                                 description: |
                                   optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
-                                # nullable: true
-                                x-kubernetes-preserve-unknown-fields: true
                               templates:
                                 <<: *TypeTemplateNames
                                 description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
