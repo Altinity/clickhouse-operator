@@ -1,32 +1,21 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test-021-1-rescale-volume"
+  name: "test-021-2-rescale-volume"
 spec:
   configuration:
     clusters:
     - name: simple
       layout:
         shardsCount: 1
-    settings:
-      storage_configuration/disks/disk2/path: /var/lib/clickhouse2/
-      storage_configuration/policies/default/volumes/default/disk: default
-      storage_configuration/policies/default/volumes/disk2/disk: disk2
   defaults:
-#    storageManagement:
-#      provisioner: StatefulSet
+    storageManagement:
+      provisioner: Operator
     templates:
       podTemplate: multi-volume
   templates:
     volumeClaimTemplates:
       - name: disk1
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
-      - name: disk2
         spec:
           accessModes:
             - ReadWriteOnce
@@ -42,9 +31,3 @@ spec:
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse
-                - name: disk2
-                  mountPath: /var/lib/clickhouse2
-              command:
-                - /bin/bash
-                - '-c'
-                - chown clickhouse /var/lib/clickhouse2 && /entrypoint.sh
