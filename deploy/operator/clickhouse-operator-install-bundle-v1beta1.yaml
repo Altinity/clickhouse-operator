@@ -298,67 +298,40 @@ spec:
                       description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
                       # nullable: true
                       properties:
-                        statefulSet:
+                        statefulSet: &TypeObjectsCleanup
                           type: string
                           description: "behavior policy for unknown StatefulSet, Delete by default"
                           enum:
                             # List ObjectsCleanupXXX constants from model
                             - "Retain"
-                            - "Dele te"
+                            - "Delete"
                         pvc:
                           type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for unknown PVC, Delete by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         configMap:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for unknown ConfigMap, Delete by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         service:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for unknown Service, Delete by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                     reconcileFailedObjects:
                       type: object
                       description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
                       # nullable: true
                       properties:
                         statefulSet:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed StatefulSet reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         pvc:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed PVC reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         configMap:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed ConfigMap reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         service:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed Service reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
             defaults:
               type: object
               description: |
@@ -403,7 +376,7 @@ spec:
                         - ""
                         - "Retain"
                         - "Delete"
-                templates:
+                templates: &TypeTemplateNames
                   type: object
                   description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
                   # nullable: true
@@ -440,7 +413,7 @@ spec:
               description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
               # nullable: true
               properties:
-                zookeeper:
+                zookeeper: &TypeZookeeperConfig
                   type: object
                   description: |
                     allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
@@ -505,7 +478,7 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationquotas
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
-                settings:
+                settings: &TypeSettings
                   type: object
                   description: |
                     allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
@@ -513,7 +486,7 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
-                files:
+                files: &TypeFiles
                   type: object
                   description: |
                     allows define content of any setting file inside each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
@@ -546,90 +519,26 @@ spec:
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                       zookeeper:
-                        type: object
+                        !!merge <<: *TypeZookeeperConfig
                         description: |
                           optional, allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` only in current ClickHouse cluster, during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
                           override top-level `chi.spec.configuration.zookeeper` settings
-                        # nullable: true
-                        properties:
-                          nodes:
-                            type: array
-                            description: "describe every available zookeeper cluster node for interaction"
-                            # nullable: true
-                            items:
-                              type: object
-                              #required:
-                              #  - host
-                              properties:
-                                host:
-                                  type: string
-                                  description: "dns name or ip address for Zookeeper node"
-                                port:
-                                  type: integer
-                                  description: "TCP port which used to connect to Zookeeper node"
-                                  minimum: 0
-                                  maximum: 65535
-                          session_timeout_ms:
-                            type: integer
-                            description: "session timeout during connect to Zookeeper"
-                          operation_timeout_ms:
-                            type: integer
-                            description: "one operation timeout during Zookeeper transactions"
-                          root:
-                            type: string
-                            description: "optional root znode path inside zookeeper to store ClickHouse related data (replication queue or distributed DDL)"
-                          identity:
-                            type: string
-                            description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
                       settings:
-                        type: object
+                        !!merge <<: *TypeSettings
                         description: |
                           optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                           override top-level `chi.spec.configuration.settings`
                           More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                        # nullable: true
-                        x-kubernetes-preserve-unknown-fields: true
                       files:
-                        type: object
+                        !!merge <<: *TypeFiles
                         description: |
                           optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                           override top-level `chi.spec.configuration.files`
-                        # nullable: true
-                        x-kubernetes-preserve-unknown-fields: true
                       templates:
-                        type: object
+                        !!merge <<: *TypeTemplateNames
                         description: |
                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
                           override top-level `chi.spec.configuration.templates`
-                        # nullable: true
-                        properties:
-                          hostTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one cluster"
-                          podTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                          dataVolumeClaimTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                          logVolumeClaimTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                          serviceTemplate:
-                            type: string
-                            description: "optional, fully ignores for cluster-level"
-                          clusterServiceTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                          shardServiceTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                          replicaServiceTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                          volumeClaimTemplate:
-                            type: string
-                            description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                       schemaPolicy:
                         type: object
                         description: |
@@ -698,54 +607,21 @@ spec:
                                     will apply in <remote_servers> inside ConfigMap which will mount in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml
                                     More details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
                                 settings:
-                                  type: object
-                                  # nullable: true
+                                  !!merge <<: *TypeSettings
                                   description: |
                                     optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one shard during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                                     override top-level `chi.spec.configuration.settings` and cluster-level `chi.spec.configuration.clusters.settings`
                                     More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                  x-kubernetes-preserve-unknown-fields: true
                                 files:
-                                  type: object
-                                  # nullable: true
+                                  !!merge <<: *TypeFiles
                                   description: |
                                     optional, allows define content of any setting file inside each `Pod` only in one shard during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                     override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`
-                                  x-kubernetes-preserve-unknown-fields: true
                                 templates:
-                                  type: object
+                                  !!merge <<: *TypeTemplateNames
                                   description: |
                                     optional, configuration of the templates names which will use for generate Kubernetes resources according to selected shard
                                     override top-level `chi.spec.configuration.templates` and cluster-level `chi.spec.configuration.clusters.templates`
-                                  # nullable: true
-                                  properties:
-                                    hostTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one shard"
-                                    podTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    dataVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    logVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    serviceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for shard-level"
-                                    clusterServiceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for shard-level"
-                                    shardServiceTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                    replicaServiceTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                    volumeClaimTemplate:
-                                      type: string
-                                      description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                                 replicasCount:
                                   type: integer
                                   description: |
@@ -791,54 +667,21 @@ spec:
                                         minimum: 1
                                         maximum: 65535
                                       settings:
-                                        type: object
-                                        # nullable: true
+                                        !!merge <<: *TypeSettings
                                         description: |
                                           optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                           override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and shard-level `chi.spec.configuration.clusters.layout.shards.settings`
                                           More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                        x-kubernetes-preserve-unknown-fields: true
                                       files:
-                                        type: object
-                                        # nullable: true
+                                        !!merge <<: *TypeFiles
                                         description: |
                                           optional, allows define content of any setting file inside `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                           override top-level `chi.spec.configuration.files`, cluster-level `chi.spec.configuration.clusters.files` and shard-level `chi.spec.configuration.clusters.layout.shards.files`
-                                        x-kubernetes-preserve-unknown-fields: true
                                       templates:
-                                        type: object
+                                        !!merge <<: *TypeTemplateNames
                                         description: |
                                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                           override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates` and shard-level `chi.spec.configuration.clusters.layout.shards.templates`
-                                        # nullable: true
-                                        properties:
-                                          hostTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one replica"
-                                          podTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one replica"
-                                          dataVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          logVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          serviceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for replica-level"
-                                          clusterServiceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for replica-level"
-                                          shardServiceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for replica-level"
-                                          replicaServiceTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one replica"
-                                          volumeClaimTemplate:
-                                            type: string
-                                            description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                           replicas:
                             type: array
                             description: "optional, allows override top-level `chi.spec.configuration` and cluster-level `chi.spec.configuration.clusters` configuration for each replica and each shard relates to selected replica, use it only if you fully understand what you do"
@@ -854,54 +697,21 @@ spec:
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 settings:
-                                  type: object
+                                  !!merge <<: *TypeSettings
                                   description: |
                                     optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                     override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and will ignore if shard-level `chi.spec.configuration.clusters.layout.shards` present
                                     More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                  # nullable: true
-                                  x-kubernetes-preserve-unknown-fields: true
                                 files:
-                                  type: object
-                                  # nullable: true
+                                  !!merge <<: *TypeFiles
                                   description: |
                                     optional, allows define content of any setting file inside each `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                     override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
-                                  x-kubernetes-preserve-unknown-fields: true
                                 templates:
-                                  type: object
+                                  !!merge <<: *TypeTemplateNames
                                   description: |
                                     optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                     override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
-                                  # nullable: true
-                                  properties:
-                                    hostTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one replica"
-                                    podTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one replica"
-                                    dataVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    logVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    serviceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for replica-level"
-                                    clusterServiceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for replica-level"
-                                    shardServiceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for replica-level"
-                                    replicaServiceTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one replica"
-                                    volumeClaimTemplate:
-                                      type: string
-                                      description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                                 shardsCount:
                                   type: integer
                                   description: "optional, count of shards related to current replica, you can override each shard behavior on low-level `chi.spec.configuration.clusters.layout.replicas.shards`"
@@ -943,54 +753,21 @@ spec:
                                         minimum: 1
                                         maximum: 65535
                                       settings:
-                                        type: object
+                                        !!merge <<: *TypeSettings
                                         description: |
                                           optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                           override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and replica-level `chi.spec.configuration.clusters.layout.replicas.settings`
                                           More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                        # nullable: true
-                                        x-kubernetes-preserve-unknown-fields: true
                                       files:
-                                        type: object
+                                        !!merge <<: *TypeFiles
                                         description: |
                                           optional, allows define content of any setting file inside each `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                           override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
-                                        # nullable: true
-                                        x-kubernetes-preserve-unknown-fields: true
                                       templates:
-                                        type: object
+                                        !!merge <<: *TypeTemplateNames
                                         description: |
                                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                           override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
-                                        # nullable: true
-                                        properties:
-                                          hostTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one shard"
-                                          podTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          dataVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          logVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          serviceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for shard-level"
-                                          clusterServiceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for shard-level"
-                                          shardServiceTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                          replicaServiceTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                          volumeClaimTemplate:
-                                            type: string
-                                            description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
             templates:
               type: object
               description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -1061,39 +838,17 @@ spec:
                             minimum: 1
                             maximum: 65535
                           settings:
-                            type: object
+                            !!merge <<: *TypeSettings
                             description: |
                               optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                               More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           files:
-                            type: object
+                            !!merge <<: *TypeFiles
                             description: |
                               optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           templates:
-                            type: object
-                            description: "be carefull, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
-                            # nullable: true
-                            properties:
-                              hostTemplate:
-                                type: string
-                              podTemplate:
-                                type: string
-                              dataVolumeClaimTemplate:
-                                type: string
-                              logVolumeClaimTemplate:
-                                type: string
-                              serviceTemplate:
-                                type: string
-                              clusterServiceTemplate:
-                                type: string
-                              shardServiceTemplate:
-                                type: string
-                              replicaServiceTemplate:
-                                type: string
+                            !!merge <<: *TypeTemplateNames
+                            description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
                 podTemplates:
                   type: array
                   description: |
@@ -1590,67 +1345,40 @@ spec:
                       description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
                       # nullable: true
                       properties:
-                        statefulSet:
+                        statefulSet: &TypeObjectsCleanup
                           type: string
                           description: "behavior policy for unknown StatefulSet, Delete by default"
                           enum:
                             # List ObjectsCleanupXXX constants from model
                             - "Retain"
-                            - "Dele te"
+                            - "Delete"
                         pvc:
                           type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for unknown PVC, Delete by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         configMap:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for unknown ConfigMap, Delete by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         service:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for unknown Service, Delete by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                     reconcileFailedObjects:
                       type: object
                       description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
                       # nullable: true
                       properties:
                         statefulSet:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed StatefulSet reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         pvc:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed PVC reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         configMap:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed ConfigMap reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
                         service:
-                          type: string
+                          !!merge <<: *TypeObjectsCleanup
                           description: "behavior policy for failed Service reconciling, Retain by default"
-                          enum:
-                            # List ObjectsCleanupXXX constants from model
-                            - "Retain"
-                            - "Delete"
             defaults:
               type: object
               description: |
@@ -1695,7 +1423,7 @@ spec:
                         - ""
                         - "Retain"
                         - "Delete"
-                templates:
+                templates: &TypeTemplateNames
                   type: object
                   description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
                   # nullable: true
@@ -1732,7 +1460,7 @@ spec:
               description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
               # nullable: true
               properties:
-                zookeeper:
+                zookeeper: &TypeZookeeperConfig
                   type: object
                   description: |
                     allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
@@ -1797,7 +1525,7 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationquotas
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
-                settings:
+                settings: &TypeSettings
                   type: object
                   description: |
                     allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
@@ -1805,7 +1533,7 @@ spec:
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
-                files:
+                files: &TypeFiles
                   type: object
                   description: |
                     allows define content of any setting file inside each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
@@ -1838,90 +1566,26 @@ spec:
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                       zookeeper:
-                        type: object
+                        !!merge <<: *TypeZookeeperConfig
                         description: |
                           optional, allows configure <yandex><zookeeper>..</zookeeper></yandex> section in each `Pod` only in current ClickHouse cluster, during generate `ConfigMap` which will mounted in `/etc/clickhouse-server/config.d/`
                           override top-level `chi.spec.configuration.zookeeper` settings
-                        # nullable: true
-                        properties:
-                          nodes:
-                            type: array
-                            description: "describe every available zookeeper cluster node for interaction"
-                            # nullable: true
-                            items:
-                              type: object
-                              #required:
-                              #  - host
-                              properties:
-                                host:
-                                  type: string
-                                  description: "dns name or ip address for Zookeeper node"
-                                port:
-                                  type: integer
-                                  description: "TCP port which used to connect to Zookeeper node"
-                                  minimum: 0
-                                  maximum: 65535
-                          session_timeout_ms:
-                            type: integer
-                            description: "session timeout during connect to Zookeeper"
-                          operation_timeout_ms:
-                            type: integer
-                            description: "one operation timeout during Zookeeper transactions"
-                          root:
-                            type: string
-                            description: "optional root znode path inside zookeeper to store ClickHouse related data (replication queue or distributed DDL)"
-                          identity:
-                            type: string
-                            description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
                       settings:
-                        type: object
+                        !!merge <<: *TypeSettings
                         description: |
                           optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                           override top-level `chi.spec.configuration.settings`
                           More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                        # nullable: true
-                        x-kubernetes-preserve-unknown-fields: true
                       files:
-                        type: object
+                        !!merge <<: *TypeFiles
                         description: |
                           optional, allows define content of any setting file inside each `Pod` on current cluster during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                           override top-level `chi.spec.configuration.files`
-                        # nullable: true
-                        x-kubernetes-preserve-unknown-fields: true
                       templates:
-                        type: object
+                        !!merge <<: *TypeTemplateNames
                         description: |
                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
                           override top-level `chi.spec.configuration.templates`
-                        # nullable: true
-                        properties:
-                          hostTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one cluster"
-                          podTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                          dataVolumeClaimTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                          logVolumeClaimTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one cluster"
-                          serviceTemplate:
-                            type: string
-                            description: "optional, fully ignores for cluster-level"
-                          clusterServiceTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                          shardServiceTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                          replicaServiceTemplate:
-                            type: string
-                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters` only for one cluster"
-                          volumeClaimTemplate:
-                            type: string
-                            description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                       schemaPolicy:
                         type: object
                         description: |
@@ -1990,54 +1654,21 @@ spec:
                                     will apply in <remote_servers> inside ConfigMap which will mount in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml
                                     More details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
                                 settings:
-                                  type: object
-                                  # nullable: true
+                                  !!merge <<: *TypeSettings
                                   description: |
                                     optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` only in one shard during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
                                     override top-level `chi.spec.configuration.settings` and cluster-level `chi.spec.configuration.clusters.settings`
                                     More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                  x-kubernetes-preserve-unknown-fields: true
                                 files:
-                                  type: object
-                                  # nullable: true
+                                  !!merge <<: *TypeFiles
                                   description: |
                                     optional, allows define content of any setting file inside each `Pod` only in one shard during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                     override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`
-                                  x-kubernetes-preserve-unknown-fields: true
                                 templates:
-                                  type: object
+                                  !!merge <<: *TypeTemplateNames
                                   description: |
                                     optional, configuration of the templates names which will use for generate Kubernetes resources according to selected shard
                                     override top-level `chi.spec.configuration.templates` and cluster-level `chi.spec.configuration.clusters.templates`
-                                  # nullable: true
-                                  properties:
-                                    hostTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one shard"
-                                    podTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    dataVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    logVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    serviceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for shard-level"
-                                    clusterServiceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for shard-level"
-                                    shardServiceTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                    replicaServiceTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                    volumeClaimTemplate:
-                                      type: string
-                                      description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                                 replicasCount:
                                   type: integer
                                   description: |
@@ -2083,54 +1714,21 @@ spec:
                                         minimum: 1
                                         maximum: 65535
                                       settings:
-                                        type: object
-                                        # nullable: true
+                                        !!merge <<: *TypeSettings
                                         description: |
                                           optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                           override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and shard-level `chi.spec.configuration.clusters.layout.shards.settings`
                                           More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                        x-kubernetes-preserve-unknown-fields: true
                                       files:
-                                        type: object
-                                        # nullable: true
+                                        !!merge <<: *TypeFiles
                                         description: |
                                           optional, allows define content of any setting file inside `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                           override top-level `chi.spec.configuration.files`, cluster-level `chi.spec.configuration.clusters.files` and shard-level `chi.spec.configuration.clusters.layout.shards.files`
-                                        x-kubernetes-preserve-unknown-fields: true
                                       templates:
-                                        type: object
+                                        !!merge <<: *TypeTemplateNames
                                         description: |
                                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                           override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates` and shard-level `chi.spec.configuration.clusters.layout.shards.templates`
-                                        # nullable: true
-                                        properties:
-                                          hostTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one replica"
-                                          podTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one replica"
-                                          dataVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          logVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          serviceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for replica-level"
-                                          clusterServiceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for replica-level"
-                                          shardServiceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for replica-level"
-                                          replicaServiceTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one replica"
-                                          volumeClaimTemplate:
-                                            type: string
-                                            description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                           replicas:
                             type: array
                             description: "optional, allows override top-level `chi.spec.configuration` and cluster-level `chi.spec.configuration.clusters` configuration for each replica and each shard relates to selected replica, use it only if you fully understand what you do"
@@ -2146,54 +1744,21 @@ spec:
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 settings:
-                                  type: object
+                                  !!merge <<: *TypeSettings
                                   description: |
                                     optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                     override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and will ignore if shard-level `chi.spec.configuration.clusters.layout.shards` present
                                     More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                  # nullable: true
-                                  x-kubernetes-preserve-unknown-fields: true
                                 files:
-                                  type: object
-                                  # nullable: true
+                                  !!merge <<: *TypeFiles
                                   description: |
                                     optional, allows define content of any setting file inside each `Pod` only in one replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                     override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
-                                  x-kubernetes-preserve-unknown-fields: true
                                 templates:
-                                  type: object
+                                  !!merge <<: *TypeTemplateNames
                                   description: |
                                     optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                     override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
-                                  # nullable: true
-                                  properties:
-                                    hostTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one replica"
-                                    podTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one replica"
-                                    dataVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    logVolumeClaimTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                    serviceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for replica-level"
-                                    clusterServiceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for replica-level"
-                                    shardServiceTemplate:
-                                      type: string
-                                      description: "optional, fully ignores for replica-level"
-                                    replicaServiceTemplate:
-                                      type: string
-                                      description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one replica"
-                                    volumeClaimTemplate:
-                                      type: string
-                                      description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
                                 shardsCount:
                                   type: integer
                                   description: "optional, count of shards related to current replica, you can override each shard behavior on low-level `chi.spec.configuration.clusters.layout.replicas.shards`"
@@ -2235,54 +1800,21 @@ spec:
                                         minimum: 1
                                         maximum: 65535
                                       settings:
-                                        type: object
+                                        !!merge <<: *TypeSettings
                                         description: |
                                           optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                                           override top-level `chi.spec.configuration.settings`, cluster-level `chi.spec.configuration.clusters.settings` and replica-level `chi.spec.configuration.clusters.layout.replicas.settings`
                                           More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                                        # nullable: true
-                                        x-kubernetes-preserve-unknown-fields: true
                                       files:
-                                        type: object
+                                        !!merge <<: *TypeFiles
                                         description: |
                                           optional, allows define content of any setting file inside each `Pod` only in one shard related to current replica during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
                                           override top-level `chi.spec.configuration.files` and cluster-level `chi.spec.configuration.clusters.files`, will ignore if `chi.spec.configuration.clusters.layout.shards` presents
-                                        # nullable: true
-                                        x-kubernetes-preserve-unknown-fields: true
                                       templates:
-                                        type: object
+                                        !!merge <<: *TypeTemplateNames
                                         description: |
                                           optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                           override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
-                                        # nullable: true
-                                        properties:
-                                          hostTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.hostTemplates, which will apply to configure each `clickhouse-server` instance during render ConfigMap resources which will mount into `Pod` only for one shard"
-                                          podTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.podTemplates, allows customization each `Pod` resource during render and reconcile each StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          dataVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          logVolumeClaimTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse log directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters` only for one shard"
-                                          serviceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for shard-level"
-                                          clusterServiceTemplate:
-                                            type: string
-                                            description: "optional, fully ignores for shard-level"
-                                          shardServiceTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                          replicaServiceTemplate:
-                                            type: string
-                                            description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside clickhouse cluster described in `chi.spec.configuration.clusters` only for one shard"
-                                          volumeClaimTemplate:
-                                            type: string
-                                            description: "DEPRECATED! VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate"
             templates:
               type: object
               description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
@@ -2353,39 +1885,17 @@ spec:
                             minimum: 1
                             maximum: 65535
                           settings:
-                            type: object
+                            !!merge <<: *TypeSettings
                             description: |
                               optional, allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/conf.d/`
                               More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           files:
-                            type: object
+                            !!merge <<: *TypeFiles
                             description: |
                               optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           templates:
-                            type: object
-                            description: "be carefull, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
-                            # nullable: true
-                            properties:
-                              hostTemplate:
-                                type: string
-                              podTemplate:
-                                type: string
-                              dataVolumeClaimTemplate:
-                                type: string
-                              logVolumeClaimTemplate:
-                                type: string
-                              serviceTemplate:
-                                type: string
-                              clusterServiceTemplate:
-                                type: string
-                              shardServiceTemplate:
-                                type: string
-                              replicaServiceTemplate:
-                                type: string
+                            !!merge <<: *TypeTemplateNames
+                            description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
                 podTemplates:
                   type: array
                   description: |
