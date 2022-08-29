@@ -74,6 +74,12 @@ const (
 	defaultRevisionHistoryLimit = 10
 )
 
+// Username/password replacers
+const (
+	UsernameReplacer = "***"
+	PasswordReplacer = "***"
+)
+
 // OperatorConfig specifies operator configuration
 // !!! IMPORTANT !!!
 // !!! IMPORTANT !!!
@@ -164,6 +170,8 @@ type OperatorConfigClickHouse struct {
 				// extracted from k8s secret specified above.
 				Username string
 				Password string
+				Fetched  bool
+				Error    string
 			}
 		} `json:"secret" yaml:"secret"`
 
@@ -807,11 +815,17 @@ func (c *OperatorConfig) String(hideCredentials bool) string {
 	conf := c
 	if hideCredentials {
 		conf = c.DeepCopy()
-		conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
-		conf.ClickHouse.Access.Username = UsernameReplacer
-		conf.ClickHouse.Access.Password = PasswordReplacer
-		conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
-		conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
+		if conf.ClickHouse.Config.User.Default.Password != "" {
+			conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
+		}
+		//conf.ClickHouse.Access.Username = UsernameReplacer
+		if conf.ClickHouse.Access.Password != "" {
+			conf.ClickHouse.Access.Password = PasswordReplacer
+		}
+		//conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
+		if conf.ClickHouse.Access.Secret.Runtime.Password != "" {
+			conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
+		}
 
 		// DEPRECATED
 		conf.CHConfigUserDefaultPassword = PasswordReplacer
