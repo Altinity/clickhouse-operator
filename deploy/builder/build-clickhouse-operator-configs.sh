@@ -51,10 +51,12 @@ EOF
     fi
     # Render file body
     cat "${src}" | \
-        watchNamespaces="${watchNamespaces:-""}" \
-        chUsername="${chUsername:-"clickhouse_operator"}" \
-        chPassword="${chPassword:-"clickhouse_operator_password"}" \
-        password_sha256_hex="${password_sha256_hex:-"716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448"}" \
+        WATCH_NAMESPACES="${WATCH_NAMESPACES:-""}" \
+        CH_USERNAME_PLAIN="${CH_USERNAME_PLAIN:-""}" \
+        CH_PASSWORD_PLAIN="${CH_PASSWORD_PLAIN:-""}" \
+        CH_CREDENTIALS_SECRET_NAMESPACE="${CH_CREDENTIALS_SECRET_NAMESPACE:-""}" \
+        CH_CREDENTIALS_SECRET_NAME="${CH_CREDENTIALS_SECRET_NAME:-"clickhouse-operator"}" \
+        PASSWORD_SHA256_HEX="${PASSWORD_SHA256_HEX:-"716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448"}" \
         envsubst \
         >> "${dst}"
 }

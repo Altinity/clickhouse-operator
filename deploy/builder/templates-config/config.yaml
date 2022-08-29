@@ -1,9 +1,10 @@
 #
 # Template parameters available:
-#   watchNamespaces
-#   chUsername
-#   chPassword
-#
+#   WATCH_NAMESPACES=${WATCH_NAMESPACES}
+#   CH_USERNAME_PLAIN=${CH_USERNAME_PLAIN}
+#   CH_PASSWORD_PLAIN=${CH_PASSWORD_PLAIN}
+#   CH_CREDENTIALS_SECRET_NAMESPACE=${CH_CREDENTIALS_SECRET_NAMESPACE}
+#   CH_CREDENTIALS_SECRET_NAME=${CH_CREDENTIALS_SECRET_NAME}
 
 ################################################
 ##
@@ -14,7 +15,7 @@ watch:
   # List of namespaces where clickhouse-operator watches for events.
   # Concurrently running operators should watch on different namespaces.
   #namespaces: ["dev", "test"]
-  namespaces: [${watchNamespaces}]
+  namespaces: [${WATCH_NAMESPACES}]
 
 clickhouse:
   configuration:
@@ -75,8 +76,8 @@ clickhouse:
     # 3. DROP DNS CACHE
     # User with these credentials can be specified in additional ClickHouse .xml config files,
     # located in `clickhouse.configuration.file.path.user` folder
-    username: "${chUsername}"
-    password: "${chPassword}"
+    username: "${CH_USERNAME_PLAIN}"
+    password: "${CH_PASSWORD_PLAIN}"
     rootCA: ""
 
     # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
@@ -88,9 +89,9 @@ clickhouse:
     # 2. password
     secret:
       # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
-      namespace: ""
+      namespace: "${CH_CREDENTIALS_SECRET_NAMESPACE}"
       # Empty `name` means no k8s Secret would be looked for
-      name: ""
+      name: "${CH_CREDENTIALS_SECRET_NAME}"
     # Port where to connect to ClickHouse instances to
     port: 8123
 
