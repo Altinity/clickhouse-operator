@@ -852,12 +852,14 @@ def test_014(self):
         'a_view_014',
         'test_local2_014',
         'test_local_uuid_014',
-        'test_uuid_014'
+        'test_uuid_014',
+        'test_mv2_014'
     ]
     replicated_tables = [
         'default.test_local_014',
         'test_atomic_014.test_local2_014',
-        'test_atomic_014.test_local_uuid_014'
+        'test_atomic_014.test_local_uuid_014',
+        'test_atomic_014.test_mv2_014'
     ]
     create_ddls = [
         "CREATE TABLE test_local_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
@@ -869,8 +871,9 @@ def test_014(self):
         "CREATE TABLE test_buffer_014(a Int8) Engine = Buffer(default, test_local_014, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
         "CREATE DATABASE test_atomic_014 ON CLUSTER '{cluster}' Engine = Atomic",
         "CREATE TABLE test_atomic_014.test_local2_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
-        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{uuid}', '{replica}') ORDER BY tuple()",
-        "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())"
+        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
+        "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
+        "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014"
     ]
     with Given("Create schema objects"):
         for q in create_ddls:
@@ -878,8 +881,9 @@ def test_014(self):
 
     with Given("Replicated table is created on a first replica and data is inserted"):
         for table in replicated_tables:
-            clickhouse.query(chi, f"INSERT INTO {table} values(0)", host=f"chi-{chi}-{cluster}-0-0")
-            clickhouse.query(chi, f"INSERT INTO {table} values(1)", host=f"chi-{chi}-{cluster}-1-0")
+            if table != 'test_atomic_014.test_mv2_014':
+                clickhouse.query(chi, f"INSERT INTO {table} values(0)", host=f"chi-{chi}-{cluster}-0-0")
+                clickhouse.query(chi, f"INSERT INTO {table} values(1)", host=f"chi-{chi}-{cluster}-1-0")
 
     def check_schema_propagation(replicas):
         with Then("Schema objects should be migrated to the new replicas"):
@@ -888,6 +892,7 @@ def test_014(self):
                 print(f"Checking replica {host}")
                 print("Checking tables and views")
                 for obj in schema_objects:
+                    print(f"Checking {obj}")
                     out = clickhouse.query(
                         chi,
                         f"SELECT count() FROM system.tables WHERE name = '{obj}'",
@@ -912,15 +917,17 @@ def test_014(self):
             for replica in replicas:
                 for shard in shards:
                     for table in replicated_tables:
+                        print(f"Checking {table}")
                         out = clickhouse.query(chi, f"SELECT a FROM {table} where a = {shard}", host=f"chi-{chi}-{cluster}-{shard}-{replica}")
                         assert out == f"{shard}"
-                        print(f"{table} is ok")
 
-    with When("Add more replicas"):
+    # replicas = [1]
+    replicas = [1,2]
+    with When(f"Add {len(replicas)} more replicas"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-014-replication-3.yaml",
+            manifest=f"manifests/chi/test-014-replication-{1+len(replicas)}.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 2 + 2*len(replicas),
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -931,7 +938,7 @@ def test_014(self):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
-        check_schema_propagation([1,2])
+        check_schema_propagation(replicas)
 
     with When("Remove replicas"):
         kubectl.create_and_check(
@@ -946,11 +953,9 @@ def test_014(self):
 
         with Then("Replica needs to be removed from the Keeper as well"):
             for shard in shards:
-                for table in replicated_tables:
-                    out = clickhouse.query(chi, f"SELECT total_replicas FROM system.replicas WHERE concat(database, '.', table) = '{table}'",
+                out = clickhouse.query(chi, f"SELECT max(total_replicas) FROM system.replicas",
                                             host=f"chi-{chi}-{cluster}-{shard}-0")
-                    note(f"Found {out} total replicas of {table} at shard {shard}")
-                    assert out == "1"
+                assert out == "1"
 
     with When("Restart keeper pod"):
         with Then("Delete Zookeeper pod"):
@@ -2608,7 +2613,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.19.0"
+    self.context.test_009_version_from = "0.19.1"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):
