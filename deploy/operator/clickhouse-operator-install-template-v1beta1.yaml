@@ -2597,10 +2597,11 @@ data:
     # IMPORTANT
     #
     # Template parameters available:
-    #   watchNamespaces
-    #   chUsername
-    #   chPassword
-    #
+    #   WATCH_NAMESPACES=
+    #   CH_USERNAME_PLAIN=
+    #   CH_PASSWORD_PLAIN=
+    #   CH_CREDENTIALS_SECRET_NAMESPACE=
+    #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
 
     ################################################
     ##
@@ -2672,8 +2673,8 @@ data:
         # 3. DROP DNS CACHE
         # User with these credentials can be specified in additional ClickHouse .xml config files,
         # located in `clickhouse.configuration.file.path.user` folder
-        username: "clickhouse_operator"
-        password: "clickhouse_operator_password"
+        username: ""
+        password: ""
         rootCA: ""
 
         # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
@@ -2687,7 +2688,7 @@ data:
           # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
           namespace: ""
           # Empty `name` means no k8s Secret would be looked for
-          name: ""
+          name: "clickhouse-operator"
         # Port where to connect to ClickHouse instances to
         port: 8123
 
@@ -3038,7 +3039,7 @@ data:
     <!--
     #
     # Template parameters available:
-    #   password_sha256_hex
+    #   PASSWORD_SHA256_HEX=716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
     #
     -->
     <yandex>
@@ -3092,6 +3093,26 @@ data:
             </default>
         </profiles>
     </yandex>
+---
+#
+# Template parameters available:
+#   NAMESPACE=${OPERATOR_NAMESPACE}
+#   COMMENT=
+#   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
+#   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
+#
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-operator
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop:
+    app: clickhouse-operator
+type: Opaque
+stringData:
+  username: clickhouse_operator
+  password: clickhouse_operator_password
 ---
 # Template Parameters:
 #
@@ -3220,6 +3241,55 @@ spec:
               mountPath: /etc/clickhouse-operator/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/users.d
+          env:
+            # Pod-specific
+            # spec.nodeName: ip-172-20-52-62.ec2.internal
+            - name: OPERATOR_POD_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # metadata.name: clickhouse-operator-6f87589dbb-ftcsf
+            - name: OPERATOR_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            # metadata.namespace: kube-system
+            - name: OPERATOR_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            # status.podIP: 100.96.3.2
+            - name: OPERATOR_POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # spec.serviceAccount: clickhouse-operator
+            # spec.serviceAccountName: clickhouse-operator
+            - name: OPERATOR_POD_SERVICE_ACCOUNT
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            # Container-specific
+            - name: OPERATOR_CONTAINER_CPU_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: requests.cpu
+            - name: OPERATOR_CONTAINER_CPU_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: limits.cpu
+            - name: OPERATOR_CONTAINER_MEM_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: requests.memory
+            - name: OPERATOR_CONTAINER_MEM_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: clickhouse-operator
+                  resource: limits.memory
           ports:
             - containerPort: 8888
               name: metrics

@@ -6,10 +6,11 @@
 # IMPORTANT
 #
 # Template parameters available:
-#   watchNamespaces
-#   chUsername
-#   chPassword
-#
+#   WATCH_NAMESPACES=
+#   CH_USERNAME_PLAIN=
+#   CH_PASSWORD_PLAIN=
+#   CH_CREDENTIALS_SECRET_NAMESPACE=
+#   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
 
 ################################################
 ##
@@ -81,8 +82,8 @@ clickhouse:
     # 3. DROP DNS CACHE
     # User with these credentials can be specified in additional ClickHouse .xml config files,
     # located in `clickhouse.configuration.file.path.user` folder
-    username: "clickhouse_operator"
-    password: "clickhouse_operator_password"
+    username: ""
+    password: ""
     rootCA: ""
 
     # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
@@ -96,7 +97,7 @@ clickhouse:
       # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
       namespace: ""
       # Empty `name` means no k8s Secret would be looked for
-      name: ""
+      name: "clickhouse-operator"
     # Port where to connect to ClickHouse instances to
     port: 8123
 
