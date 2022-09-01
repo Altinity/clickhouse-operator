@@ -223,7 +223,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
             tables = clickhouse.query(chi, "SHOW TABLES")
             assert "test_local" in tables
             out = clickhouse.query(chi, "SELECT count() FROM test_local")
-            assert "1" == out
+            assert out == "1"
 
         with Then("ClickHouse pods should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
@@ -2003,7 +2003,7 @@ def test_027(self):
             )
             with And("We can exec to the pod"):
                 out = kubectl.launch(f"exec chi-{chi}-default-0-0-0 -- bash -c \"echo Success\"")
-                assert "Success" == out
+                assert out == "Success"
 
         with Then("We can start in normal mode after correcting the problem"):
             kubectl.create_and_check(
@@ -2366,14 +2366,54 @@ def test_032(self):
 
 
 @TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
-@Name("test_033. Check HTTPS support for health check")
+@Name("test_033. Test installing with TLS")
 def test_033(self):
+    """Test installing with TLS."""
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    shell = Shell()
+
+    manifest = "manifests/chi/test-033-tls.yaml"
+    chi = "test-033-tls"
+
+    # generate certs for installing clickhouse with TLS
+    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+    shell(f"""
+        openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+            -keyout clickhouse-key.pem -out clickhouse-cert.pem \
+            -subj "/CN=clickhouse-test-033-tls" \
+            -addext "subjectAltName=DNS:clickhouse-{chi},DNS:clickhouse-{chi}.clickhouse-test,DNS:clickhouse-{chi}.test.svc.cluster.local"
+    """)
+    # create secrets for the certs
+    shell("kubectl -n test create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
+    # create a configmap with the CA to validate the cert
+    shell("kubectl -n test create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
+
+    # deploy clickhouse
+    kubectl.apply(util.get_full_path(manifest, lookup_in_host=False))
+
+    kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=1)
+    time.sleep(300)
+
+    with And("ClickHouse should be queryable and running on port 9440"):
+        # connect on the TLS port and verify the node registered itself in the cluster with port 9440
+        out = clickhouse.query(chi, "select count() from system.clusters WHERE cluster='default' AND port=9440;", port=9440)
+        print(f"out: {out}")
+        assert out == "2"
+
+    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+    kubectl.delete_chi(chi)
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
+@Name("test_034. Check HTTPS support for health check")
+def test_034(self):
     """Check ClickHouse-Operator HTTPS support by switching configuration to HTTPS using the chopconf file and
     creating a ClickHouse-Installation with HTTPS enabled and confirming the secure connectivity between them by
     monitoring the metrics endpoint on port 8888.
     """
-    chopconf_file = "manifests/chopconf/test-033-chopconf.yaml"
+    chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
 
     def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=10):
         with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
@@ -2521,8 +2561,8 @@ def test_033(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps("1.0"))
-@Name("test_034. Check CHI HTTPS connection from local client")
-def test_034(self):
+@Name("test_035. Check CHI HTTPS connection from local client")
+def test_035(self):
     """Check ClickHouse server can be deployed by ClickHouse Operator with the support for `HTTPS` connection
     by creating a ClickHouse installation with HTTPS enabled and executing a simple query from a local ClickHouse client 
     with the`--secure` option when port forwarding is enabled.
@@ -2590,44 +2630,6 @@ def test_034(self):
             self.context.shell.close()
 
 
-
-@TestScenario
-@Name("test_033. Test installing with TLS")
-def test_033(self):
-    """Test installing with TLS."""
-    util.require_keeper(keeper_type=self.context.keeper_type)
-
-    shell = Shell()
-
-    manifest = "manifests/chi/test-033-tls.yaml"
-    chi = "test-033-tls"
-
-    # generate certs for installing clickhouse with TLS
-    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
-    shell(f"""
-        openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
-            -keyout clickhouse-key.pem -out clickhouse-cert.pem \
-            -subj "/CN=clickhouse-test-033-tls" \
-            -addext "subjectAltName=DNS:clickhouse-{chi},DNS:clickhouse-{chi}.clickhouse-test,DNS:clickhouse-{chi}.test.svc.cluster.local"
-    """)
-    # create secrets for the certs
-    shell("kubectl -n test create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
-    # create a configmap with the CA to validate the cert
-    shell("kubectl -n test create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
-
-    # deploy clickhouse
-    kubectl.apply(util.get_full_path(manifest, lookup_in_host=False))
-
-    kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=1)
-    time.sleep(10)
-
-    with And("ClickHouse should be queryable and running on port 9440"):
-        # connect on the TLS port and verify the node registered itself in the cluster with port 9440
-        out = clickhouse.query(chi, "select count() from system.clusters WHERE cluster='default' AND port=9440;", port=9440)
-        assert "2" == out
-
-    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
-    kubectl.delete_chi(chi)
 
 @TestModule
 @Name("e2e.test_operator")
