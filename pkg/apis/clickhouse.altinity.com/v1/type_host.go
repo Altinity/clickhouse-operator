@@ -24,8 +24,8 @@ type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
 	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
+	Secure              *Secure           `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
-	Secure              bool              `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
@@ -45,6 +45,36 @@ type ChiHost struct {
 	// DesiredStatefulSet is a desired stateful set - reconcile target
 	DesiredStatefulSet *appsv1.StatefulSet     `json:"-" yaml:"-" testdiff:"ignore"`
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+type Secure bool
+
+// Value gets bool value of secure
+func (s *Secure) Value() bool {
+	if s == nil {
+		return false
+	}
+
+	return *s == true
+}
+
+// MergeFrom merges value from specified Secure
+func (s *Secure) MergeFrom(from *Secure) *Secure {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return s
+	}
+
+	// From now on we have `from` specified
+
+	if s == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to pick one value.
+	// Prefer local value
+	return s
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
@@ -91,12 +121,11 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if (host == nil) || (from == nil) {
 		return
 	}
-	if !host.Secure {
-		host.Secure = from.Secure
-	}
 	if host.Port == 0 {
 		host.Port = from.Port
 	}
+
+	host.Secure = host.Secure.MergeFrom(from.Secure)
 	if host.TCPPort == 0 {
 		host.TCPPort = from.TCPPort
 	}
@@ -222,4 +251,12 @@ func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMo
 		}
 	})
 	return
+}
+
+// IsSecure checks whether host requires secure communication
+func (host *ChiHost) IsSecure() bool {
+	if host == nil {
+		return false
+	}
+	return host.Secure.Value()
 }
