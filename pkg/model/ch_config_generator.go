@@ -317,9 +317,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 					util.Iline(b, 16, "<replica>")
 					util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
 					util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-					if host.Secure {
-						util.Iline(b, 16, "    <secure>1</secure>")
-					}
+					util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
 					util.Iline(b, 16, "</replica>")
 				}
 				return nil
@@ -360,9 +358,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 				util.Iline(b, 16, "<replica>")
 				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
 				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-				if host.Secure {
-					util.Iline(b, 16, "    <secure>1</secure>")
-				}
+				util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
 				util.Iline(b, 16, "</replica>")
 			}
 			return nil
@@ -392,9 +388,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 				util.Iline(b, 16, "<replica>")
 				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
 				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-				if host.Secure {
-					util.Iline(b, 16, "    <secure>1</secure>")
-				}
+				util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
 				util.Iline(b, 16, "</replica>")
 
 				// </shard>
@@ -509,6 +503,14 @@ func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.ChiHost) string {
 	return CreateInstanceHostname(host)
+}
+
+// getSecure gets config-usable value for host secure flag
+func (c *ClickHouseConfigGenerator) getSecure(host *chiv1.ChiHost) int {
+	if host.IsSecure() {
+		return 1
+	}
+	return 0
 }
 
 // getMacrosInstallation returns macros value for <installation-name> macros
