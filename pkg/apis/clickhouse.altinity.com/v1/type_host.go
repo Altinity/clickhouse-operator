@@ -25,6 +25,7 @@ type ChiHost struct {
 	// DEPRECATED - to be removed soon
 	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	Secure              bool              `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
@@ -90,7 +91,9 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if (host == nil) || (from == nil) {
 		return
 	}
-
+	if !host.Secure {
+		host.Secure = from.Secure
+	}
 	if host.Port == 0 {
 		host.Port = from.Port
 	}
