@@ -223,7 +223,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
             tables = clickhouse.query(chi, "SHOW TABLES")
             assert "test_local" in tables
             out = clickhouse.query(chi, "SELECT count() FROM test_local")
-            assert "1" == out
+            assert out == "1"
 
         with Then("ClickHouse pods should not be restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
@@ -874,7 +874,6 @@ def test_014(self):
         "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014"
-        
     ]
     with Given("Create schema objects"):
         for q in create_ddls:
@@ -1325,14 +1324,10 @@ def test_018(self):
     kubectl.delete_chi(chi)
 
 
-@TestScenario
-@Name("test_019. Test that volume is correctly retained and can be re-attached")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
-)
-def test_019(self):
+@TestCheck
+def test_019(self, step=1):
     util.require_keeper(keeper_type=self.context.keeper_type)
-    manifest = "manifests/chi/test-019-retain-volume-1.yaml"
+    manifest = f"manifests/chi/test-019-{step}-retain-volume-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1384,7 +1379,7 @@ def test_019(self):
 
     with When("Stop the Installation"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-019-retain-volume-2.yaml",
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-2.yaml",
             check={
                 "object_counts": {
                     "statefulset": 1,  # When stopping, pod is removed but StatefulSet and all volumes are in place
@@ -1397,7 +1392,7 @@ def test_019(self):
 
         with And("Re-start the Installation"):
             kubectl.create_and_check(
-                manifest="manifests/chi/test-019-retain-volume-1.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1415,7 +1410,7 @@ def test_019(self):
 
     with When("Add a second replica"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-019-retain-volume-3.yaml",
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-3.yaml",
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
@@ -1430,7 +1425,7 @@ def test_019(self):
             pv_count = kubectl.get_count("pv")
 
             kubectl.create_and_check(
-                manifest="manifests/chi/test-019-retain-volume-1.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                 check={
                     "pod_count": 1,
                     "do_not_delete": 1,
@@ -1446,7 +1441,7 @@ def test_019(self):
 
     with When("Add a second replica one more time"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-019-retain-volume-3.yaml",
+            manifest=f"manifests/chi/test-019-{step}-retain-volume-3.yaml",
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
@@ -1459,7 +1454,7 @@ def test_019(self):
 
         with When("Set reclaim policy to Delete but do not wait for completion"):
             kubectl.create_and_check(
-                manifest="manifests/chi/test-019-retain-volume-4.yaml",
+                manifest=f"manifests/chi/test-019-{step}-retain-volume-4.yaml",
                 check={
                     "pod_count": 2,
                     "do_not_delete": 1,
@@ -1472,7 +1467,7 @@ def test_019(self):
                 pv_count = kubectl.get_count("pv")
 
                 kubectl.create_and_check(
-                    manifest="manifests/chi/test-019-retain-volume-1.yaml",
+                    manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
                     check={
                         "pod_count": 1,
                         "do_not_delete": 1,
@@ -1491,12 +1486,26 @@ def test_019(self):
 
 
 @TestScenario
-@Name("test_020. Test multi-volume configuration")
+@Name("test_019_1. Test that volume is correctly retained and can be re-attached. Provisioner: StatefulSet")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+    RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
 )
-def test_020(self):
-    manifest = "manifests/chi/test-020-multi-volume.yaml"
+def test_019_1(self):
+    test_019(step=1)
+
+
+@TestScenario
+@Name("test_019_2. Test that volume is correctly retained and can be re-attached. Provisioner: Operator")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0")
+)
+def test_019_2(self):
+    test_019(step=2)
+
+
+@TestCheck
+def test_020(self, step=1):
+    manifest = f"manifests/chi/test-020-{step}-multi-volume.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1529,12 +1538,26 @@ def test_020(self):
 
 
 @TestScenario
-@Name("test_021. Test rescaling storage")
+@Name("test_020_1. Test multi-volume configuration. Provisioner: StatefulSet")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0")
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
 )
-def test_021(self):
-    manifest = "manifests/chi/test-021-rescale-volume-01.yaml"
+def test_020_1(self):
+    test_020(step=1)
+
+
+@TestScenario
+@Name("test_020_2. Test multi-volume configuration. Provisioner: Operators")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+)
+def test_020_2(self):
+    test_020(step=2)
+
+
+@TestCheck
+def test_021(self, step=1):
+    manifest = f"manifests/chi/test-021-{step}-rescale-volume-01.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
     with Given("Default storage class is expandable"):
@@ -1554,7 +1577,8 @@ def test_021(self):
     )
 
     with Then("Storage size should be 1Gi"):
-        size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+        size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+        print(f"size: {size}")
         assert size == "1Gi"
 
     with Then("Create a table with a single row"):
@@ -1562,7 +1586,7 @@ def test_021(self):
 
     with When("Re-scale volume configuration to 2Gi"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-02-enlarge-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-02-enlarge-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1570,9 +1594,10 @@ def test_021(self):
         )
 
         with Then("Storage size should be 2Gi"):
-            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0",
+            kubectl.wait_field("pvc", f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0",
                                ".spec.resources.requests.storage", "2Gi")
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "2Gi"
 
         with And("Table should exist"):
@@ -1581,7 +1606,7 @@ def test_021(self):
 
     with When("Add a second disk"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-03-add-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1590,15 +1615,16 @@ def test_021(self):
         # Adding new volume takes time, so pod_volumes check does not work
 
         with Then("There should be two PVC"):
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             assert size == "2Gi"
-            kubectl.wait_object("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0")
-            kubectl.wait_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase", "Bound")
-            size = kubectl.get_pvc_size("disk2-chi-test-021-rescale-volume-simple-0-0-0")
+            kubectl.wait_object("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            kubectl.wait_field("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0", ".status.phase", "Bound")
+            size = kubectl.get_pvc_size(f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "1Gi"
 
         with And("There should be two disks recognized by ClickHouse"):
-            kubectl.wait_pod_status("chi-test-021-rescale-volume-simple-0-0-0", "Running")
+            kubectl.wait_pod_status(f"chi-test-021-{step}-rescale-volume-simple-0-0-0", "Running")
             # ClickHouse requires some time to mount volume. Race conditions.
             # TODO: wait for proper pod state and check the liveness probe probably. This is better than waiting
             out = ""
@@ -1616,7 +1642,7 @@ def test_021(self):
 
     with When("Try reducing the disk size and also change a version to recreate the stateful set"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-04-decrease-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-04-decrease-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1624,7 +1650,8 @@ def test_021(self):
         )
 
         with Then("Storage size should be unchanged 2Gi"):
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "2Gi"
 
         with And("Table should exist"):
@@ -1632,12 +1659,12 @@ def test_021(self):
             assert out == "1"
 
         with And("PVC status should not be Terminating"):
-            status = kubectl.get_field("pvc", "disk2-chi-test-021-rescale-volume-simple-0-0-0", ".status.phase")
+            status = kubectl.get_field("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0", ".status.phase")
             assert status != "Terminating"
 
     with When("Revert disk size back to 2Gi"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-021-rescale-volume-03-add-disk.yaml",
+            manifest=f"manifests/chi/test-021-{step}-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
                 "do_not_delete": 1,
@@ -1645,9 +1672,10 @@ def test_021(self):
         )
 
         with Then("Storage size should be 2Gi"):
-            kubectl.wait_field("pvc", "disk1-chi-test-021-rescale-volume-simple-0-0-0",
+            kubectl.wait_field("pvc", f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0",
                                ".spec.resources.requests.storage", "2Gi")
-            size = kubectl.get_pvc_size("disk1-chi-test-021-rescale-volume-simple-0-0-0")
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
+            print(f"size: {size}")
             assert size == "2Gi"
 
         with And("Table should exist"):
@@ -1655,6 +1683,22 @@ def test_021(self):
             assert out == "1"
 
     kubectl.delete_chi(chi)
+
+@TestScenario
+@Name("test_021_1. Test rescaling storage. Provisioner: StatefulSet")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0")
+)
+def test_021_1(self):
+    test_021(step=1)
+
+@TestScenario
+@Name("test_021_2. Test rescaling storage. Provisioner: Operator")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0")
+)
+def test_021_2(self):
+    test_021(step=2)
 
 
 @TestScenario
@@ -1959,7 +2003,7 @@ def test_027(self):
             )
             with And("We can exec to the pod"):
                 out = kubectl.launch(f"exec chi-{chi}-default-0-0-0 -- bash -c \"echo Success\"")
-                assert "Success" == out
+                assert out == "Success"
 
         with Then("We can start in normal mode after correcting the problem"):
             kubectl.create_and_check(
@@ -2322,14 +2366,54 @@ def test_032(self):
 
 
 @TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
-@Name("test_033. Check HTTPS support for health check")
+@Name("test_033. Test installing with TLS")
 def test_033(self):
+    """Test installing with TLS."""
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    shell = Shell()
+
+    manifest = "manifests/chi/test-033-tls.yaml"
+    chi = "test-033-tls"
+
+    # generate certs for installing clickhouse with TLS
+    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+    shell(f"""
+        openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+            -keyout clickhouse-key.pem -out clickhouse-cert.pem \
+            -subj "/CN=clickhouse-test-033-tls" \
+            -addext "subjectAltName=DNS:clickhouse-{chi},DNS:clickhouse-{chi}.clickhouse-test,DNS:clickhouse-{chi}.test.svc.cluster.local"
+    """)
+    # create secrets for the certs
+    shell("kubectl -n test create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
+    # create a configmap with the CA to validate the cert
+    shell("kubectl -n test create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
+
+    # deploy clickhouse
+    kubectl.apply(util.get_full_path(manifest, lookup_in_host=False))
+
+    kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=1)
+    time.sleep(300)
+
+    with And("ClickHouse should be queryable and running on port 9440"):
+        # connect on the TLS port and verify the node registered itself in the cluster with port 9440
+        out = clickhouse.query(chi, "select count() from system.clusters WHERE cluster='default' AND port=9440;", port=9440)
+        print(f"out: {out}")
+        assert out == "2"
+
+    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+    kubectl.delete_chi(chi)
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
+@Name("test_034. Check HTTPS support for health check")
+def test_034(self):
     """Check ClickHouse-Operator HTTPS support by switching configuration to HTTPS using the chopconf file and
     creating a ClickHouse-Installation with HTTPS enabled and confirming the secure connectivity between them by
     monitoring the metrics endpoint on port 8888.
     """
-    chopconf_file = "manifests/chopconf/test-033-chopconf.yaml"
+    chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
 
     def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=10):
         with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
@@ -2382,10 +2466,15 @@ def test_033(self):
         kubectl.wait_jsonpath("pod", "chi-test-operator-http-connection-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end 1"):
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
+        check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
+
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration"):
+    with And("reboot metrics exporter to update the configuration 1"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
@@ -2396,7 +2485,7 @@ def test_033(self):
     with When("remove the ClickHouseOperatorConfiguration"):
         kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration"):
+    with And("reboot metrics exporter to update the configuration 2"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
@@ -2426,24 +2515,28 @@ def test_033(self):
             timeout=600,
         )
         kubectl.create_and_check(
-        manifest=manifest,
-        check={
-            "pod_count": 1,
-            "pod_volumes": {
-                "/var/lib/clickhouse",
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "pod_volumes": {
+                    "/var/lib/clickhouse",
+                },
+                "do_not_delete": 1,
             },
-            "do_not_delete": 1,
-        },
-        timeout=1200,
+            timeout=1200,
         )
-
-        kubectl.wait_jsonpath("pod", "chi-test-operator-https-connection-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
-                            ns=kubectl.namespace)
+        
+        kubectl.wait_jsonpath(
+            "pod",
+            "chi-test-operator-https-connection-t1-0-0-0",
+            "{.status.containerStatuses[0].ready}",
+            "true",
+            ns=kubectl.namespace)
 
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration"):
+    with And("reboot metrics exporter to update the configuration 3"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
@@ -2454,20 +2547,21 @@ def test_033(self):
     with When("remove the ClickHouseOperatorConfiguration"):
         kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration"):
+    with And("reboot metrics exporter to update the configuration 4"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end and delete the chi "):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
-        kubectl.delete_chi(chi)
+
+    kubectl.delete_chi(chi)
 
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps("1.0"))
-@Name("test_034. Check CHI HTTPS connection from local client")
-def test_034(self):
+@Name("test_035. Check CHI HTTPS connection from local client")
+def test_035(self):
     """Check ClickHouse server can be deployed by ClickHouse Operator with the support for `HTTPS` connection
     by creating a ClickHouse installation with HTTPS enabled and executing a simple query from a local ClickHouse client
     with the`--secure` option when port forwarding is enabled.
@@ -2535,6 +2629,7 @@ def test_034(self):
             self.context.shell.close()
 
 
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
@@ -2558,7 +2653,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.19.0"
+    self.context.test_009_version_from = "0.19.1"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):

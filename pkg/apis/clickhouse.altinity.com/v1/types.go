@@ -478,13 +478,6 @@ func (t *ChiReconciling) GetCleanup() *ChiCleanup {
 	return t.Cleanup
 }
 
-// ChiDefaults defines defaults section of .spec
-type ChiDefaults struct {
-	ReplicasUseFQDN string             `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN,omitempty"`
-	DistributedDDL  *ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL,omitempty"`
-	Templates       *ChiTemplateNames  `json:"templates,omitempty"       yaml:"templates,omitempty"`
-}
-
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
 	HostTemplate            string `json:"hostTemplate,omitempty"            yaml:"hostTemplate,omitempty"`
@@ -718,44 +711,6 @@ type ChiPodDistribution struct {
 	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
 	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`
 	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
-}
-
-// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
-type ChiVolumeClaimTemplate struct {
-	Name             string                           `json:"name"                    yaml:"name"`
-	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
-	ObjectMeta       metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
-	Spec             corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
-}
-
-// PVCReclaimPolicy defines PVC reclaim policy
-type PVCReclaimPolicy string
-
-// Possible values of PVC reclaim policy
-const (
-	PVCReclaimPolicyRetain PVCReclaimPolicy = "Retain"
-	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
-)
-
-// NewPVCReclaimPolicyFromString creates new PVCReclaimPolicy from string
-func NewPVCReclaimPolicyFromString(s string) PVCReclaimPolicy {
-	return PVCReclaimPolicy(s)
-}
-
-// IsValid checks whether PVCReclaimPolicy is valid
-func (v PVCReclaimPolicy) IsValid() bool {
-	switch v {
-	case PVCReclaimPolicyRetain:
-		return true
-	case PVCReclaimPolicyDelete:
-		return true
-	}
-	return false
-}
-
-// String returns string value for PVCReclaimPolicy
-func (v PVCReclaimPolicy) String() string {
-	return string(v)
 }
 
 // ChiServiceTemplate defines CHI service template

@@ -18,10 +18,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 	"sort"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
 	"github.com/sanity-io/litter"
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"

@@ -1,11 +1,11 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "test-019-retain-volume"
+  name: "test-019-1-retain-volume"
   labels:
     test: test
 spec:
-
+  stop: "yes"
   useTemplates:
     - name: clickhouse-version
   configuration:
@@ -16,15 +16,17 @@ spec:
     clusters:
       - name: simple
         layout:
-          replicasCount: 2
+          replicasCount: 1
   defaults:
+#    storageManagement:
+#      provisioner: StatefulSet
     templates:
       volumeClaimTemplate: default
       podTemplate: default
   templates:
     volumeClaimTemplates:
       - name: default
-        reclaimPolicy: Delete
+        reclaimPolicy: Retain
         spec:
           accessModes:
             - ReadWriteOnce

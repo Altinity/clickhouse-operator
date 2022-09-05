@@ -103,9 +103,3 @@ const (
 	PortDistributionUnspecified       = "Unspecified"
 	PortDistributionClusterScopeIndex = "ClusterScopeIndex"
 )
-
-// Username/password replacers
-const (
-	UsernameReplacer = "***"
-	PasswordReplacer = "***"
-)

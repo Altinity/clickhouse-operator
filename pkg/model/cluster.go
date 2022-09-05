@@ -89,7 +89,7 @@ func (c *Cluster) QueryUnzipAndApplyUUIDs(ctx context.Context, endpoints []strin
 	if err := c.queryUnzipColumns(ctx, endpoints, sql, &column1, &column2, &column3, &column4); err != nil {
 		return nil, nil, err
 	}
-	for i := 0; i < len(column1); i++  {
+	for i := 0; i < len(column1); i++ {
 		if column4[i] != "" { // inner_uuid
 			column2[i] = strings.ReplaceAll(column2[i], "{uuid}", column4[i])
 		} else if column3[i] != "" { // uuid

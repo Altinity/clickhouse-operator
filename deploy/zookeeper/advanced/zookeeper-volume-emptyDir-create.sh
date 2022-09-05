@@ -5,7 +5,6 @@ YAML_FILES_LIST="\
 01-service-client-access.yaml \
 02-headless-service.yaml \
 03-pod-disruption-budget.yaml \
-04-storageclass-zookeeper.yaml \
 05-stateful-set-volume-emptyDir.yaml\
 "
 

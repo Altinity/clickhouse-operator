@@ -289,6 +289,8 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 		host.Name = template.Spec.Name
 	}
 
+	host.Secure = host.Secure.MergeFrom(template.Spec.Secure)
+
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case chiV1.PortDistributionUnspecified:
@@ -457,6 +459,10 @@ func (n *Normalizer) normalizeDefaults(defaults *chiV1.ChiDefaults) *chiV1.ChiDe
 	// Ensure field
 	if defaults.DistributedDDL == nil {
 		//defaults.DistributedDDL = chiV1.NewChiDistributedDDL()
+	}
+	// Ensure field
+	if defaults.StorageManagement == nil {
+		defaults.StorageManagement = chiV1.NewStorageManagement()
 	}
 	// Ensure field
 	if defaults.Templates == nil {
@@ -741,14 +747,29 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *chiV1.ChiPodDistr
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaimTemplate) {
 	// Check name
-	// Check PVCReclaimPolicy
-	if !template.PVCReclaimPolicy.IsValid() {
-		template.PVCReclaimPolicy = chiV1.PVCReclaimPolicyDelete
-	}
+	// Skip for now
+
+	// StorageManagement
+	n.normalizeStorageManagement(&template.StorageManagement)
+
 	// Check Spec
+	// Skip for now
 
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+}
+
+// normalizeStorageManagement normalizes StorageManagement
+func (n *Normalizer) normalizeStorageManagement(storage *chiV1.StorageManagement) {
+	// Check PVCProvisioner
+	if !storage.PVCProvisioner.IsValid() {
+		storage.PVCProvisioner = chiV1.PVCProvisionerUnspecified
+	}
+
+	// Check PVCReclaimPolicy
+	if !storage.PVCReclaimPolicy.IsValid() {
+		storage.PVCReclaimPolicy = chiV1.PVCReclaimPolicyUnspecified
+	}
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates

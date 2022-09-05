@@ -1066,15 +1066,19 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 		}
 	}
 
+	// Provided VolumeClaimTemplate is not listed neither in
+	// statefulSet.Spec.Template.Spec.Volumes
+	// nor in
+	// statefulSet.Spec.VolumeClaimTemplates
+	// so, let's add it
+
 	if c.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-		// Provided VolumeClaimTemplate is not listed in statefulSet.Spec.Template.Spec.Volumes - let's add it
 		claimName := CreatePVCName(host, nil, volumeClaimTemplate)
 		statefulSet.Spec.Template.Spec.Volumes = append(
 			statefulSet.Spec.Template.Spec.Volumes,
 			newVolumeForPVC(volumeClaimTemplate.Name, claimName),
 		)
 	} else {
-		// Provided VolumeClaimTemplate is not listed in statefulSet.Spec.VolumeClaimTemplates - let's add it
 		statefulSet.Spec.VolumeClaimTemplates = append(
 			statefulSet.Spec.VolumeClaimTemplates,
 			c.createPVC(volumeClaimTemplate.Name, host, &volumeClaimTemplate.Spec),
@@ -1082,8 +1086,9 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	}
 }
 
+// OperatorShouldCreatePVC checks whether operator should create PVC for specified volumeCLimaTemplate
 func (c *Creator) OperatorShouldCreatePVC(host *chiv1.ChiHost, volumeClaimTemplate *chiv1.ChiVolumeClaimTemplate) bool {
-	return true
+	return getPVCProvisioner(host, volumeClaimTemplate) == chiv1.PVCProvisionerOperator
 }
 
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet

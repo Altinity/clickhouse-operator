@@ -65,26 +65,35 @@ func NewEndpointCredentials(scheme, hostname, username, password, rootCA string,
 	return params
 }
 
-// makeUsernamePassword makes "username:password" pair for connection
-func (c *EndpointCredentials) makeUsernamePassword(hidden bool) string {
-
-	// In case of hidden username+password pair we'd just return replacement
-	if hidden {
-		return fmt.Sprintf(dsnUsernamePasswordPairPattern, usernameReplacer, passwordReplacer)
-	}
-
+// formatUsernamePassword formats username and password pair
+func (c *EndpointCredentials) formatUsernamePassword(username, password string) string {
 	// We may have neither username nor password
-	if c.username == "" && c.password == "" {
+	if username == "" && password == "" {
 		return ""
 	}
 
 	// Password may be omitted
-	if c.password == "" {
-		return fmt.Sprintf(dsnUsernamePasswordPairUsernameOnlyPattern, c.username)
+	if password == "" {
+		return fmt.Sprintf(dsnUsernamePasswordPairUsernameOnlyPattern, username)
 	}
 
 	// Expecting both username and password to be in place
-	return fmt.Sprintf(dsnUsernamePasswordPairPattern, c.username, c.password)
+	return fmt.Sprintf(dsnUsernamePasswordPairPattern, username, password)
+}
+
+// makeUsernamePassword makes "username:password" pair for connection
+func (c *EndpointCredentials) makeUsernamePassword(hidden bool) string {
+	// In case of hidden username+password pair we'd just return replacement
+	if hidden {
+		//return c.usernamePassword(usernameReplacer, passwordReplacer)
+		pwd := c.password
+		if c.password != "" {
+			pwd = passwordReplacer
+		}
+		return c.formatUsernamePassword(c.username, pwd)
+	}
+
+	return c.formatUsernamePassword(c.username, c.password)
 }
 
 // makeDSN makes ClickHouse DSN

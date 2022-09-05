@@ -197,10 +197,10 @@ fi
 # data:
 function render_configmap_header() {
     # ConfigMap name
-    CM_NAME="${1}"
+    local CM_NAME="${1}"
     # Template file with ConfigMap header/beginning
 
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-03-section-configmap-header.yaml"
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-03-section-env-01-configmap-header.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     # Render ConfigMap header template with vars substitution
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
@@ -225,7 +225,7 @@ function render_configmap_header() {
 #   ui.properties: |
 #     color.good=purple
 function render_configmap_data_section_file() {
-    FILE_PATH="${1}"
+    local FILE_PATH="${1}"
 
     # ConfigMap .data section looks like
     #  config.yaml: |
@@ -235,7 +235,9 @@ function render_configmap_data_section_file() {
     # Add some spaces to the beginning of each line - proper indent for .yaml file
     # Build ConfigMap section
     FILE_NAME="$(basename "${FILE_PATH}")"
+    # Render file name aligned
     echo "  ${FILE_NAME}: |"
+    # Render file content aligned
     cat "${FILE_PATH}" | sed 's/^/    /'
     echo ""
 }
@@ -324,6 +326,18 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             download_file "${CUR_DIR}" "01-clickhouse-user.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/users.d"
             render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-user.xml"
         fi
+
+        # Render secret
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-03-section-env-02-secret.yaml"
+        ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
+        # Render Secret template with vars substitution
+        render_separator
+        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
+                COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
+                NAMESPACE="${OPERATOR_NAMESPACE}"      \
+                CH_USERNAME_SECRET_PLAIN="${CH_USERNAME_SECRET_PLAIN}" \
+                CH_PASSWORD_SECRET_PLAIN="${CH_PASSWORD_SECRET_PLAIN}" \
+                envsubst
 
         # Render Deployment
         SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml"

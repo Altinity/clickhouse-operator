@@ -1,10 +1,16 @@
+<!--
+#
+# Template parameters available:
+#   PASSWORD_SHA256_HEX=${PASSWORD_SHA256_HEX}
+#
+-->
 <yandex>
     <users>
         <clickhouse_operator>
             <networks>
                 <ip>127.0.0.1</ip>
             </networks>
-            <password_sha256_hex>${password_sha256_hex}</password_sha256_hex>
+            <password_sha256_hex>${PASSWORD_SHA256_HEX}</password_sha256_hex>
             <profile>clickhouse_operator</profile>
             <quota>default</quota>
         </clickhouse_operator>
