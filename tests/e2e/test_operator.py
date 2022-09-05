@@ -852,12 +852,14 @@ def test_014(self):
         'a_view_014',
         'test_local2_014',
         'test_local_uuid_014',
-        'test_uuid_014'
+        'test_uuid_014',
+        'test_mv2_014'
     ]
     replicated_tables = [
         'default.test_local_014',
         'test_atomic_014.test_local2_014',
-        'test_atomic_014.test_local_uuid_014'
+        'test_atomic_014.test_local_uuid_014',
+        'test_atomic_014.test_mv2_014'
     ]
     create_ddls = [
         "CREATE TABLE test_local_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
@@ -869,8 +871,10 @@ def test_014(self):
         "CREATE TABLE test_buffer_014(a Int8) Engine = Buffer(default, test_local_014, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
         "CREATE DATABASE test_atomic_014 ON CLUSTER '{cluster}' Engine = Atomic",
         "CREATE TABLE test_atomic_014.test_local2_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
-        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{uuid}', '{replica}') ORDER BY tuple()",
-        "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())"
+        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
+        "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
+        "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014"
+        
     ]
     with Given("Create schema objects"):
         for q in create_ddls:
@@ -878,8 +882,9 @@ def test_014(self):
 
     with Given("Replicated table is created on a first replica and data is inserted"):
         for table in replicated_tables:
-            clickhouse.query(chi, f"INSERT INTO {table} values(0)", host=f"chi-{chi}-{cluster}-0-0")
-            clickhouse.query(chi, f"INSERT INTO {table} values(1)", host=f"chi-{chi}-{cluster}-1-0")
+            if table != 'test_atomic_014.test_mv2_014':
+                clickhouse.query(chi, f"INSERT INTO {table} values(0)", host=f"chi-{chi}-{cluster}-0-0")
+                clickhouse.query(chi, f"INSERT INTO {table} values(1)", host=f"chi-{chi}-{cluster}-1-0")
 
     def check_schema_propagation(replicas):
         with Then("Schema objects should be migrated to the new replicas"):
@@ -888,6 +893,7 @@ def test_014(self):
                 print(f"Checking replica {host}")
                 print("Checking tables and views")
                 for obj in schema_objects:
+                    print(f"Checking {obj}")
                     out = clickhouse.query(
                         chi,
                         f"SELECT count() FROM system.tables WHERE name = '{obj}'",
@@ -912,15 +918,17 @@ def test_014(self):
             for replica in replicas:
                 for shard in shards:
                     for table in replicated_tables:
+                        print(f"Checking {table}")
                         out = clickhouse.query(chi, f"SELECT a FROM {table} where a = {shard}", host=f"chi-{chi}-{cluster}-{shard}-{replica}")
                         assert out == f"{shard}"
-                        print(f"{table} is ok")
 
-    with When("Add more replicas"):
+    # replicas = [1]
+    replicas = [1,2]
+    with When(f"Add {len(replicas)} more replicas"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-014-replication-3.yaml",
+            manifest=f"manifests/chi/test-014-replication-{1+len(replicas)}.yaml",
             check={
-                "pod_count": 6,
+                "pod_count": 2 + 2*len(replicas),
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -931,7 +939,7 @@ def test_014(self):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
-        check_schema_propagation([1,2])
+        check_schema_propagation(replicas)
 
     with When("Remove replicas"):
         kubectl.create_and_check(
@@ -946,11 +954,9 @@ def test_014(self):
 
         with Then("Replica needs to be removed from the Keeper as well"):
             for shard in shards:
-                for table in replicated_tables:
-                    out = clickhouse.query(chi, f"SELECT total_replicas FROM system.replicas WHERE concat(database, '.', table) = '{table}'",
+                out = clickhouse.query(chi, f"SELECT max(total_replicas) FROM system.replicas",
                                             host=f"chi-{chi}-{cluster}-{shard}-0")
-                    note(f"Found {out} total replicas of {table} at shard {shard}")
-                    assert out == "1"
+                assert out == "1"
 
     with When("Restart keeper pod"):
         with Then("Delete Zookeeper pod"):
@@ -2332,7 +2338,7 @@ def test_033(self):
                 out = kubectl.launch(
                     f"exec {operator_pod} -c metrics-exporter -- {url_cmd}",
                     ns=operator_namespace
-                )                
+                )
                 rx = re.compile(expect_pattern,re.MULTILINE)
                 matches = rx.findall(out)
                 expected_pattern_found = False
@@ -2372,7 +2378,7 @@ def test_033(self):
             },
             timeout=600,
         )
-        
+
         kubectl.wait_jsonpath("pod", "chi-test-operator-http-connection-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
@@ -2430,7 +2436,7 @@ def test_033(self):
         },
         timeout=1200,
         )
-        
+
         kubectl.wait_jsonpath("pod", "chi-test-operator-https-connection-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
@@ -2441,7 +2447,7 @@ def test_033(self):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
-    
+
     with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
 
@@ -2463,7 +2469,7 @@ def test_033(self):
 @Name("test_034. Check CHI HTTPS connection from local client")
 def test_034(self):
     """Check ClickHouse server can be deployed by ClickHouse Operator with the support for `HTTPS` connection
-    by creating a ClickHouse installation with HTTPS enabled and executing a simple query from a local ClickHouse client 
+    by creating a ClickHouse installation with HTTPS enabled and executing a simple query from a local ClickHouse client
     with the`--secure` option when port forwarding is enabled.
     """
     self.context.shell = Shell()
@@ -2506,7 +2512,7 @@ def test_034(self):
             },
             timeout=1200,
             )
-            
+
             kubectl.wait_jsonpath("pod", "chi-test-operator-https-connection-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                                 ns=kubectl.namespace)
 
@@ -2524,7 +2530,7 @@ def test_034(self):
             kubectl.delete_chi(chi)
 
     finally:
-        with Finally("I remove the port forwarding and close the shell"): 
+        with Finally("I remove the port forwarding and close the shell"):
             self.context.shell("pkill -f 'port-forward'", timeout=5)
             self.context.shell.close()
 
