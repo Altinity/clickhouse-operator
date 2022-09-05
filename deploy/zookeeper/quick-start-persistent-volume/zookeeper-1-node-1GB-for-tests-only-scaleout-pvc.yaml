@@ -352,8 +352,8 @@ data:
     LOG4J_CONF=/conf/log4j-quiet.properties
 
     # Wait for client connections to drain. Kubernetes will wait until the confiugred
-    # "terminationGracePeriodSeconds" before focibly killing the container
-    CONN_COUNT=`echo cons | nc localhost 2181 | grep -v "^$" |grep -v "/127.0.0.1:" | wc -l`
+    # "terminationGracePeriodSeconds" before forcibly killing the container
+    CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" |grep -v "/127.0.0.1:" | wc -l`
     for (( i = 0; i < 6; i++ )); do
       if [[ "$CONN_COUNT" -gt 0 ]]; then
         echo "$CONN_COUNT non-local connections still connected."
@@ -390,7 +390,7 @@ data:
     #     https://www.apache.org/licenses/LICENSE-2.0
     set -ex
     source /conf/env.sh
-    OK=$(echo ruok | nc 127.0.0.1 $CLIENT_PORT)
+    OK=$(exec 3<>/dev/tcp/127.0.0.1/${CLIENT_PORT} ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;)
     # Check to see if zookeeper service answers
     if [[ "$OK" == "imok" ]]; then
       exit 0
@@ -416,7 +416,7 @@ data:
     LOG4J_CONF=/conf/log4j-quiet.properties
     STATIC_CONFIG=/data/conf/zoo.cfg
 
-    OK=$(echo ruok | nc 127.0.0.1 $CLIENT_PORT)
+    OK=$(exec 3<>/dev/tcp/127.0.0.1/${CLIENT_PORT} ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;)
 
     # Check to see if zookeeper service answers
     if [[ "$OK" == "imok" ]]; then

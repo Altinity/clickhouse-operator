@@ -35,7 +35,7 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     for i in range(retries):
         readonly_replicas = clickhouse.query(
             chi['metadata']['name'],
-            "SELECT groupArray(value) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'"
+            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'"
         )
         if readonly_replicas == expected_replicas:
             message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
@@ -62,41 +62,47 @@ def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_table
                 pod=pod_for_insert_data
             )
 
-def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=5):
+def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
     for pod_num in range(pod_count):
-        out = ""
-        expected_out = ""
+        found = False
         for i in range(retry_count):
             if keeper_type == "zookeeper-operator":
-                expected_out = "[clickhouse, zookeeper, zookeeper-operator]"
+                expected_outs = ("[clickhouse, zookeeper, zookeeper-operator]", )
                 keeper_cmd = './bin/zkCli.sh ls /'
                 pod_prefix = "zookeeper"
             elif keeper_type == "zookeeper":
-                expected_out = "[clickhouse, zookeeper]"
+                expected_outs = ("[clickhouse, zookeeper]", )
                 keeper_cmd = './bin/zkCli.sh ls /'
                 pod_prefix = "zookeeper"
             else:
-                expected_out = "clickhouse"
-                keeper_cmd = "if [[ ! $(command -v zookeepercli) ]]; then "
-                keeper_cmd += "wget -q -O /tmp/zookeepercli.deb https://github.com/outbrain/zookeepercli/releases/download/v1.0.12/zookeepercli_1.0.12_amd64.deb; "
-                keeper_cmd += "dpkg -i /tmp/zookeepercli.deb; "
+                expected_outs = ("[keeper, clickhouse]", "[clickhouse, keeper]", "[keeper]")
+                keeper_cmd = "if [[ ! $(command -v zkcli) ]]; then "
+                keeper_cmd += "wget -q -O /tmp/zkcli.tar.gz https://github.com/let-us-go/zkcli/releases/download/v0.4.0/zkcli-0.4.0-linux-amd64.tar.gz; "
+                keeper_cmd += "cd /tmp; tar -xf zkcli.tar.gz; "
+                keeper_cmd += "mv -fv ./zkcli-0.4.0-linux-amd64/zkcli /bin/zkcli; "
                 keeper_cmd += "fi; "
-                keeper_cmd += "zookeepercli -servers 127.0.0.1:2181 -c ls /"
+                keeper_cmd += "zkcli -s 127.0.0.1:2181 ls /"
                 pod_prefix = "clickhouse-keeper"
 
             out = kubectl.launch(f"exec {pod_prefix}-{pod_num} -- bash -ce '{keeper_cmd}'", ns=settings.test_namespace, ok_to_fail=True)
-            if expected_out in out:
+            found = False
+            for expected_out in expected_outs:
+                if expected_out in out:
+                    found = True
+                    break
+            if found:
                 break
             else:
                 with Then(f"{keeper_type} ROOT NODE not ready, wait {(i + 1) * 3} sec"):
                     time.sleep((i + 1) * 3)
-        assert expected_out in out, f"Unexpected {keeper_type} `ls /` output"
+
+        assert found, f"Unexpected {keeper_type} `ls /` output"
 
     out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
     expected_out = {
         "zookeeper": "2",
         "zookeeper-operator": "3",
-        "clickhouse-keeper": "1",
+        "clickhouse-keeper": "2",
     }
     assert expected_out[keeper_type] == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 
@@ -104,7 +110,8 @@ def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, kee
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f'manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml',
-        chi_template_file='manifests/chit/tpl-clickhouse-latest.yaml',
+        # chi_template_file='manifests/chit/tpl-clickhouse-latest.yaml',
+        chi_template_file='manifests/chit/tpl-clickhouse-stable.yaml',
         chi_name='test-cluster-for-zk',
         keeper_manifest=keeper_manifest,
         keeper_type=keeper_type,
@@ -208,7 +215,7 @@ def test_zookeeper_operator_rescale(self):
         keeper_type="zookeeper-operator",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node='zookeeper-operator-1-node.yaml',
-        keeper_manifest_3_node='zookeeper-operator-3-node.yaml',
+        keeper_manifest_3_node='zookeeper-operator-3-nodes.yaml',
     )
 
 @TestScenario
@@ -239,11 +246,11 @@ def test_keeper_probes_outline(
         check_zk_root_znode(chi, keeper_type, pod_count=3)
         wait_clickhouse_no_readonly_replicas(chi)
 
-    with Then("Create zookeeper_bench table"):
-        clickhouse.query(chi['metadata']['name'],"DROP DATABASE IF EXISTS zookeeper_bench SYNC")
-        clickhouse.query(chi['metadata']['name'],"CREATE DATABASE zookeeper_bench")
+    with Then("Create keeper_bench table"):
+        clickhouse.query(chi['metadata']['name'],"DROP DATABASE IF EXISTS keeper_bench SYNC")
+        clickhouse.query(chi['metadata']['name'],"CREATE DATABASE keeper_bench")
         clickhouse.query(chi['metadata']['name'],"""
-            CREATE TABLE zookeeper_bench.zookeeper_bench (p UInt64, x UInt64)
+            CREATE TABLE keeper_bench.keeper_bench (p UInt64, x UInt64)
             ENGINE=ReplicatedSummingMergeTree('/clickhouse/tables/{database}/{table}', '{replica}' )
             ORDER BY tuple()
             PARTITION BY p
@@ -254,12 +261,12 @@ def test_keeper_probes_outline(
                 parts_to_throw_insert=1000000,
                 max_parts_in_total=1000000;        
         """)
-    with Then("Insert data to zookeeper_bench for make zookeeper workload"):
+    with Then("Insert data to keeper_bench for make zookeeper workload"):
         pod_prefix="chi-test-cluster-for-zk-default"
         rows = 100000
         for pod in ("0-0-0", "0-1-0"):
             clickhouse.query(chi['metadata']['name'],"""
-                INSERT INTO zookeeper_bench.zookeeper_bench SELECT rand(1)%100, rand(2) FROM numbers(100000)
+                INSERT INTO keeper_bench.keeper_bench SELECT rand(1)%100, rand(2) FROM numbers(100000)
                 SETTINGS max_block_size=1,
                   min_insert_block_size_bytes=1,
                   min_insert_block_size_rows=1,
@@ -288,6 +295,15 @@ def test_zookeeper_probes_workload(self):
         keeper_manifest_3_node='zookeeper-3-nodes-for-test-probes.yaml',
     )
 
+@TestScenario
+@Name('test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
+def test_zookeeper_pvc_probes_workload(self):
+    test_keeper_probes_outline(
+        keeper_type="zookeeper",
+        keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml',
+        keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml',
+    )
+
 
 @TestScenario
 @Name('test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
@@ -295,7 +311,10 @@ def test_zookeeper_operator_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="zookeeper-operator",
         keeper_manifest_1_node='zookeeper-operator-1-node.yaml',
-        keeper_manifest_3_node='zookeeper-operator-3-node.yaml',
+        keeper_manifest_3_node='zookeeper-operator-3-nodes.yaml',
+        # uncomment
+        # keeper_manifest_1_node='zookeeper-operator-1-node-with-custom-probes.yaml',
+        # keeper_manifest_3_node='zookeeper-operator-3-nodes-with-custom-probes.yaml',
     )
 
 @TestScenario
@@ -315,7 +334,9 @@ def test(self):
         test_clickhouse_keeper_rescale,
         test_zookeeper_pvc_scaleout_rescale,
         test_zookeeper_rescale,
+
         test_zookeeper_probes_workload,
+        test_zookeeper_pvc_probes_workload,
         test_zookeeper_operator_probes_workload,
         test_clickhouse_keeper_probes_workload,
     ]

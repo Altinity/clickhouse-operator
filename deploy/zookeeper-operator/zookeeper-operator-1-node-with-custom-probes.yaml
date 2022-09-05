@@ -1,81 +1,10 @@
-# Following scripts based from https://github.com/pravega/zookeeper-operator/
----
-# service for REST administration and reconfiguration
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: zookeeper
-  name: zookeeper-admin-server
-spec:
-  type: ClusterIP
-  ports:
-    - name: tcp-admin-server
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-  selector:
-    app: zookeeper
-
----
-# service for clickhouse zookeeper client connections
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: zookeeper
-  name: zookeeper
-spec:
-  type: ClusterIP
-  ports:
-    - name: tcp-client
-      port: 2181
-      protocol: TCP
-      targetPort: 2181
-  selector:
-    app: zookeeper
-    what: node
----
-# headless service for Zookeeper Quorum Election and service name
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    app: zookeeper
-  name: zookeeper-headless
-spec:
-  type: ClusterIP
-  clusterIP: None
-  ports:
-    - name: tcp-client
-      port: 2181
-      protocol: TCP
-      targetPort: 2181
-    - name: tcp-quorum
-      port: 2888
-      protocol: TCP
-      targetPort: 2888
-    - name: tcp-leader-election
-      port: 3888
-      protocol: TCP
-      targetPort: 3888
-    - name: tcp-metrics
-      port: 7000
-      protocol: TCP
-      targetPort: 7000
-    - name: tcp-admin-server
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-  selector:
-    app: zookeeper
 ---
 # ConfigMap with common startup scripts and base config
 apiVersion: v1
 kind: ConfigMap
 metadata:
   labels:
-    app: zookeeper
+    app: zookeeper-operator
   name: zookeeper-scripts
 data:
   env.sh: |
@@ -116,8 +45,8 @@ data:
         </appender>
         <root level="INFO">
             <appender-ref ref="CONSOLE" />
-        </root>        
-    </configuration>    
+        </root>
+    </configuration>
 
   zoo.cfg: |
     4lw.commands.whitelist=*
@@ -302,7 +231,7 @@ data:
         ROLE=observer
         ZKURL=$(zkConnectionString)
         ZKCONFIG=$(zkConfig)
-        
+    
         set -e
         echo Registering node and writing local configuration to disk.
         zkCli.sh -server ${ZKURL} reconfig -add "\nserver.$MYID=$ZKCONFIG" | grep -E '^server\.[0-9]+='  > $DYNCONFIG
@@ -379,7 +308,7 @@ data:
 
     # Kill the primary process ourselves to circumvent the terminationGracePeriodSeconds
     ps -ef | grep zoo.cfg | grep -v grep | awk '{print $2}' | xargs kill
-    
+  
 
   zookeeperLive.sh: |
     #!/usr/bin/env bash
@@ -493,137 +422,80 @@ kind: ConfigMap
 metadata:
   name: zookeeper-cluster-size
   labels:
-    app: zookeeper
+    app: zookeeper-operator
 data:
   cluster-size.sh: |
     #!/usr/bin/env bash
-    CLUSTER_SIZE=3
-
+    CLUSTER_SIZE=1
 ---
-# Main StatefulSet
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: zookeeper.pravega.io/v1beta1
+kind: ZookeeperCluster
 metadata:
-  labels:
-    app: zookeeper
   name: zookeeper
-
+  labels:
+    app: zookeeper-operator
 spec:
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Delete
-    whenScaled: Delete
-  podManagementPolicy: OrderedReady
-  replicas: 3
-  selector:
-    matchLabels:
-      app: zookeeper
-  serviceName: zookeeper-headless
-  template:
-    metadata:
-      generateName: zookeeper
-      labels:
-        app: zookeeper
-        what: node
-      annotations:
-        prometheus.io/port: '7000'
-        prometheus.io/scrape: 'true'
-    spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - zookeeper
-                topologyKey: kubernetes.io/hostname
-              weight: 20
-      containers:
-        - name: zookeeper
+  replicas: 1
+  labels:
+    app: zookeeper-operator
+  pod:
+    annotations:
+      prometheus.io/port: '7000'
+      prometheus.io/scrape: 'true'
+  containers:
+    - name: zookeeper
+      command:
+        - /conf/zookeeperStart.sh
+      env:
+        - name: ENVOY_SIDECAR_STATUS
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.annotations['sidecar.istio.io/status']
+      image: zookeeper:3.8.0
+      imagePullPolicy: Always
+      lifecycle:
+        preStop:
+          exec:
+            command:
+              - /conf/zookeeperTeardown.sh
+      livenessProbe:
+        exec:
           command:
-            - /conf/zookeeperStart.sh
-          env:
-            - name: ENVOY_SIDECAR_STATUS
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.annotations['sidecar.istio.io/status']
-          image: zookeeper:3.8.0
-          imagePullPolicy: Always
-          lifecycle:
-            preStop:
-              exec:
-                command:
-                  - /conf/zookeeperTeardown.sh
-          livenessProbe:
-            exec:
-              command:
-                - /conf/zookeeperLive.sh
-            failureThreshold: 3
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 10
-          readinessProbe:
-            exec:
-              command:
-                - /conf/zookeeperReady.sh
-            failureThreshold: 3
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            successThreshold: 1
-            timeoutSeconds: 10
-          ports:
-            - containerPort: 2181
-              name: client
-              protocol: TCP
-            - containerPort: 2888
-              name: quorum
-              protocol: TCP
-            - containerPort: 3888
-              name: leader-election
-              protocol: TCP
-            - containerPort: 7000
-              name: metrics
-              protocol: TCP
-            - containerPort: 8080
-              name: admin-server
-              protocol: TCP
-          volumeMounts:
-            - mountPath: /data
-              name: data
-            - mountPath: /conf
-              name: conf
-            - mountPath: /cluster-size
-              name: cluster-size
-      restartPolicy: Always
-      schedulerName: default-scheduler
-      terminationGracePeriodSeconds: 30
-      volumes:
-        - configMap:
-            name: zookeeper-scripts
-            defaultMode: 0755
-          name: conf
-        - configMap:
-            name: zookeeper-cluster-size
-            defaultMode: 0755
-          name: cluster-size
-  updateStrategy:
-    type: RollingUpdate
-  volumeClaimTemplates:
-    - apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        labels:
-          app: zookeeper
-        name: data
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        storageClassName: standard
-        volumeMode: Filesystem
+            - /conf/zookeeperLive.sh
+        failureThreshold: 3
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 10
+      readinessProbe:
+        exec:
+          command:
+            - /conf/zookeeperReady.sh
+        failureThreshold: 3
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 10
+  volumeMounts:
+    - mountPath: /conf
+      name: conf
+    - mountPath: /cluster-size
+      name: cluster-size
+  volumes:
+    - configMap:
+        name: zookeeper-scripts
+        defaultMode: 0755
+      name: conf
+    - configMap:
+        name: zookeeper-cluster-size
+        defaultMode: 0755
+      name: cluster-size
+  storageType: persistence
+  persistence:
+    reclaimPolicy: Delete
+    spec:
+      storageClassName: "standard"
+      resources:
+        requests:
+          storage: 1Gi

@@ -871,7 +871,7 @@ def test_014(self):
         "CREATE TABLE test_buffer_014(a Int8) Engine = Buffer(default, test_local_014, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
         "CREATE DATABASE test_atomic_014 ON CLUSTER '{cluster}' Engine = Atomic",
         "CREATE TABLE test_atomic_014.test_local2_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}', '{replica}') ORDER BY tuple()",
-        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
+        "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014"
     ]
@@ -2423,8 +2423,7 @@ def test_034(self):
                     f"exec {operator_pod} -c metrics-exporter -- {url_cmd}",
                     ns=operator_namespace
                 )
-                #print(f"out:{out}")
-                rx = re.compile(expect_pattern, re.MULTILINE)
+                rx = re.compile(expect_pattern,re.MULTILINE)
                 matches = rx.findall(out)
                 expected_pattern_found = False
                 if matches:
@@ -2463,7 +2462,7 @@ def test_034(self):
             },
             timeout=600,
         )
-        
+
         kubectl.wait_jsonpath("pod", "chi-test-operator-http-connection-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                             ns=kubectl.namespace)
 
@@ -2541,7 +2540,7 @@ def test_034(self):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
-    
+
     with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
 
@@ -2564,7 +2563,7 @@ def test_034(self):
 @Name("test_035. Check CHI HTTPS connection from local client")
 def test_035(self):
     """Check ClickHouse server can be deployed by ClickHouse Operator with the support for `HTTPS` connection
-    by creating a ClickHouse installation with HTTPS enabled and executing a simple query from a local ClickHouse client 
+    by creating a ClickHouse installation with HTTPS enabled and executing a simple query from a local ClickHouse client
     with the`--secure` option when port forwarding is enabled.
     """
     self.context.shell = Shell()
@@ -2607,7 +2606,7 @@ def test_035(self):
             },
             timeout=1200,
             )
-            
+
             kubectl.wait_jsonpath("pod", "chi-test-operator-https-connection-t1-0-0-0", "{.status.containerStatuses[0].ready}", "true",
                                 ns=kubectl.namespace)
 
@@ -2625,7 +2624,7 @@ def test_035(self):
             kubectl.delete_chi(chi)
 
     finally:
-        with Finally("I remove the port forwarding and close the shell"): 
+        with Finally("I remove the port forwarding and close the shell"):
             self.context.shell("pkill -f 'port-forward'", timeout=5)
             self.context.shell.close()
 

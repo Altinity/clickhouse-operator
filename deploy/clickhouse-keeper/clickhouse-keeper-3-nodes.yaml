@@ -117,7 +117,7 @@ spec:
       containers:
         - name: clickhouse-keeper
           imagePullPolicy: IfNotPresent
-          image: "clickhouse/clickhouse-server:latest"
+          image: "clickhouse/clickhouse-keeper:latest"
           resources:
             requests:
               memory: "256M"
@@ -163,9 +163,9 @@ spec:
               } > /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml &&
               cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml && 
               if [[ "1" == "$MY_ID" ]]; then
-                clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml --force-recovery
+                clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml --force-recovery
               else
-                clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
+                clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
               fi
           readinessProbe:
             tcpSocket:

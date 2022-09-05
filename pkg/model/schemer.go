@@ -412,7 +412,7 @@ func createTableReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS'),
 			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
 			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
 		FROM
