@@ -21,10 +21,11 @@ jobs:
         if: |
           steps.cache-python.outputs.cache-hit != 'true'
 
-      - name: Setup conntrack for minikube
+      - name: Setup required Ubuntu packages
         run: |
+          echo "deb https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
           sudo apt-get update
-          sudo apt-get install -y conntrack
+          sudo apt-get install -y conntrack clickhouse-client
 
       - uses: medyagh/setup-minikube@latest
         with:
