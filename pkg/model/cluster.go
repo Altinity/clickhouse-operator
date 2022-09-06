@@ -16,11 +16,12 @@ package model
 
 import (
 	"context"
+	"strings"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"strings"
 )
 
 // Cluster specifies ClickHouse cluster
