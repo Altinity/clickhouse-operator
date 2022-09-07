@@ -67,12 +67,12 @@ def get_prometheus_and_alertmanager_spec():
 
         alertmanager_spec = kubectl.get(
             "pod", ns=settings.prometheus_namespace, name="",
-            label="-l app=alertmanager,alertmanager=alertmanager"
+            label="-l app.kubernetes.io/managed-by=prometheus-operator,alertmanager=alertmanager"
         )
 
         prometheus_spec = kubectl.get(
             "pod", ns=settings.prometheus_namespace, name="",
-            label="-l app=prometheus,prometheus=prometheus"
+            label="-l app.kubernetes.io/managed-by=prometheus-operator,prometheus=prometheus"
         )
         if not ("items" in prometheus_spec and len(prometheus_spec["items"]) and "metadata" in prometheus_spec["items"][0]):
             fail("invalid prometheus_spec, please run create-prometheus.sh")

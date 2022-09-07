@@ -2250,10 +2250,10 @@ def test_031(self):
 def run_select_query(self, host, user, password, query, res1, res2, trigger_event):
     """Run a select query in parallel until the stop signal is received."""
 
+    client_pod = "clickhouse-client"
     try:
         self.context.shell = Shell()
 
-        client_pod = "clickhouse-client"
         kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
         kubectl.wait_pod_status(client_pod, "Running")
 
