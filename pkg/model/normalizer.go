@@ -940,30 +940,64 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 
 	// ENV VAR name and value
 	envVarName := username + "_" + userSettingsField
-
-	for _, envVar := range n.ctx.chi.Attributes.ExchangeEnv {
-		if envVar.Name == envVarName {
-			// Such a variable already exists
-			return false
-		}
-	}
-
-	envVar := corev1.EnvVar{
-		Name: envVarName,
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretName,
+	n.appendEnvVar(
+		corev1.EnvVar{
+			Name: envVarName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: key,
 				},
-				Key: key,
 			},
 		},
-	}
-	n.ctx.chi.Attributes.ExchangeEnv = append(n.ctx.chi.Attributes.ExchangeEnv, envVar)
+	)
 
 	// Replace setting with empty value and reference to ENV VAR
 	users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar("").SetAttribute("from_env", envVarName))
 	return true
+}
+
+const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
+
+func (n *Normalizer) createClusterSecretEnv(cluster *chiV1.ChiCluster) {
+	if cluster.Secret.HasValue() {
+		// Secret has explicit value, it is not passed via ENV vars
+		return
+	}
+
+	if !cluster.Secret.HasSecretKeyRef() {
+		// Secret has no SecretKeyRef, nothing to create ENV VAR from
+		return
+	}
+
+	// Set the password for internode communication using an ENV VAR
+	// instead of supplying as plaintext in the configuration.
+	n.appendEnvVar(
+		corev1.EnvVar{
+			Name: internodeClusterSecretEnvName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: cluster.Secret.GetSecretKeyRef(),
+			},
+		},
+	)
+}
+
+func (n *Normalizer) appendEnvVar(envVar corev1.EnvVar) {
+	// Sanity check
+	if envVar.Name == "" {
+		return
+	}
+
+	for _, existingEnvVar := range n.ctx.chi.Attributes.ExchangeEnv {
+		if existingEnvVar.Name == envVar.Name {
+			// Such a variable already exists
+			return
+		}
+	}
+
+	n.ctx.chi.Attributes.ExchangeEnv = append(n.ctx.chi.Attributes.ExchangeEnv, envVar)
 }
 
 var (
@@ -1272,6 +1306,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
 	n.createHostsField(cluster)
+	n.createClusterSecretEnv(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	cluster.WalkShards(func(index int, shard *chiV1.ChiShard) error {

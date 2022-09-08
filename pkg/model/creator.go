@@ -451,6 +451,7 @@ func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chi
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
+// setupEnvVars setup ENV vars for clickhouse container
 func setupEnvVars(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
