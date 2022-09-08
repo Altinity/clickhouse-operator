@@ -291,6 +291,17 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		// <my_cluster_name>
 		util.Iline(b, 8, "<%s>", cluster.Name)
 
+		// <secret>VALUE</secret>
+		secretValue, useSecretKeyRef := cluster.Secret.Get()
+		switch {
+		case secretValue != "":
+			// Secret value is explicitly specified
+			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret)
+		case useSecretKeyRef:
+			// SecretKeyRef is specified, will use it in generating ENV vars
+			util.Iline(b, 12, `<secret from_env="%s" />`, internodeClusterSecretEnvName)
+		}
+
 		// Build each shard XML
 		cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
 			if c.ShardHostsNum(shard, options) < 1 {
