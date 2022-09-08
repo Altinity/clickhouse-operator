@@ -3190,6 +3190,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
+#   OPERATOR_VERSION=0.20.0
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -3199,7 +3200,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop:
+    clickhouse.altinity.com/chop: 0.20.0
     app: clickhouse-operator
 type: Opaque
 stringData:
