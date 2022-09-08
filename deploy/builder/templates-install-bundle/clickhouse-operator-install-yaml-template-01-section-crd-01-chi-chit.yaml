@@ -567,6 +567,37 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          secret:
+                            type: object
+                            description: "optional, shared secret value to secure cluster communications"
+                            properties:
+                              value:
+                                description: "Cluster shared secret value in plain text"
+                                type: string
+                              valueFrom:
+                                description: "Cluster shared secret source"
+                                type: object
+                                properties:
+                                  secretKeyRef:
+                                    description: |
+                                      Selects a key of a secret in the clickhouse installation namespace.
+                                      Should not be used if value is not empty.
+                                    type: object
+                                    properties:
+                                      name:
+                                        description: |
+                                          Name of the referent. More info:
+                                          https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                        type: string
+                                      key:
+                                        description: The key of the secret to select from. Must be a valid secret key.
+                                        type: string
+                                      optional:
+                                        description: Specify whether the Secret or its key must be defined
+                                        type: boolean
+                                    required:
+                                      - name
+                                      - key
                           layout:
                             type: object
                             description: |
