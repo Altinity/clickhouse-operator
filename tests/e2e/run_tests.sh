@@ -8,7 +8,7 @@ export IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"Always"}"
 
 ONLY="${ONLY:-"*"}"
 
-python3 "$CUR_DIR/../regression.py" --only=""/regression/e2e.test_operator/${ONLY}" -o short --trim-results on --debug --native
+python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_operator/${ONLY}" -o short --trim-results on --debug --native
 #python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/* -o short --trim-results on --debug --native --native
 #python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/* --trim-results on --debug --native --native
 #python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/test_008_2* --trim-results on --debug --native --native
