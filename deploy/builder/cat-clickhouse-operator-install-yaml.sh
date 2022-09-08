@@ -332,11 +332,12 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
         ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
         # Render Secret template with vars substitution
         render_separator
-        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
+        cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |                          \
                 COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
-                NAMESPACE="${OPERATOR_NAMESPACE}"      \
-                CH_USERNAME_SECRET_PLAIN="${CH_USERNAME_SECRET_PLAIN}" \
-                CH_PASSWORD_SECRET_PLAIN="${CH_PASSWORD_SECRET_PLAIN}" \
+                NAMESPACE="${OPERATOR_NAMESPACE}"                              \
+                OPERATOR_VERSION="${OPERATOR_VERSION}"                         \
+                CH_USERNAME_SECRET_PLAIN="${CH_USERNAME_SECRET_PLAIN}"         \
+                CH_PASSWORD_SECRET_PLAIN="${CH_PASSWORD_SECRET_PLAIN}"         \
                 envsubst
 
         # Render Deployment
