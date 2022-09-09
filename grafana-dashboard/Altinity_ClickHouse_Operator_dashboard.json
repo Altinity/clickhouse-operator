@@ -2977,7 +2977,7 @@
       },
       "yaxes": [
         {
-          "format": "short",
+          "format": "bytes",
           "label": null,
           "logBase": 1,
           "max": null,
@@ -4381,7 +4381,7 @@
       "links": [
         {
           "targetBlank": true,
-          "title": "Howto show detail statsistic on grafana for golang process",
+          "title": "Howto show detail statistic on grafana for golang process",
           "url": "https://grafana.com/grafana/dashboards/6671"
         }
       ],
