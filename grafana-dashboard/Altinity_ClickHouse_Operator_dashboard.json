@@ -4498,48 +4498,7 @@
       "pointradius": 2,
       "points": false,
       "renderer": "flot",
-      "seriesOverrides": [
-        {
-          "alias": "/^Disk Read.+/",
-          "color": "#FF9830"
-        },
-        {
-          "alias": "/^Disk Write.+/",
-          "color": "#E0B400"
-        },
-        {
-          "alias": "/^Real Time.+/",
-          "color": "#73BF69"
-        },
-        {
-          "alias": "/^User Time.+/",
-          "color": "#FFF899"
-        },
-        {
-          "alias": "/^System Time.+/",
-          "color": "#F2495C"
-        },
-        {
-          "alias": "/^OS IO Wait.+/",
-          "color": "#C4162A"
-        },
-        {
-          "alias": "/^OS CPU Wait.+/",
-          "color": "rgb(95, 29, 29)"
-        },
-        {
-          "alias": "/^OS CPU Virtual.+/",
-          "color": "#B877D9"
-        },
-        {
-          "alias": "/^Network Receive.+/",
-          "color": "#C0D8FF"
-        },
-        {
-          "alias": "/^Network Send.+/",
-          "color": "#8AB8FF"
-        }
-      ],
+      "seriesOverrides": [],
       "spaceLength": 10,
       "stack": false,
       "steppedLine": true,
