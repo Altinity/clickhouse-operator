@@ -207,7 +207,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
               host = service,
               user = "test_009",
               password = "test_009",
-              query = "select count() from cluster('all-sharded', system.one)",
+              query = "select count() from cluster('{cluster}', system.one)",
               res1 = "2",
               res2 = "1",
               trigger_event = trigger_event,
@@ -270,6 +270,11 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
                 "do_not_delete": 1,
             })
 
+    with Then("Create tables"):
+        for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
+            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host = h)
+            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)", host = h)
+
     trigger_event = threading.Event()
 
     Check("run query until receive stop event",
@@ -278,9 +283,19 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
               host = service,
               user = "test_008",
               password = "test_008",
-              query = "select count() from cluster('all-sharded', system.one)",
+              query = "select count() from cluster('{cluster}', system.one)",
               res1 = "2",
               res2 = "1",
+              trigger_event = trigger_event,
+        )
+
+    Check("insert into distributed table until receive stop event",
+        test=run_insert_query,
+        parallel=True)(
+              host = service,
+              user = "test_008",
+              password = "test_008",
+              query = "insert into test_dist select number from numbers(2)",
               trigger_event = trigger_event,
         )
 
@@ -288,6 +303,12 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
                                pod=f"chi-{chi}-{cluster}-0-0-0")
     trigger_event.set()
     join()
+
+    with Then("Local tables should have exactly the same number of rows"):
+        cnt0 = clickhouse.query(chi, "select count() from test_local", host = f'chi-{chi}-{cluster}-0-0-0')
+        cnt1 = clickhouse.query(chi, "select count() from test_local", host = f'chi-{chi}-{cluster}-1-0-0')
+        print(f"{cnt0} {cnt1}")
+        assert cnt0 == cnt1 and cnt0 != "0"
 
     kubectl.delete_chi(chi)
 
@@ -2279,6 +2300,33 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
         if hasattr(self.context, "shell"):
             self.context.shell.close()
 
+@TestCheck
+def run_insert_query(self, host, user, password, query, trigger_event):
+    """Run an insert query in parallel until the stop signal is received."""
+
+    client_pod = "clickhouse-insert"
+    try:
+        self.context.shell = Shell()
+
+        kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
+        kubectl.wait_pod_status(client_pod, "Running")
+
+        ok = 0
+        errors = 0
+
+        cmd = f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q \"{query}\""
+        while not trigger_event.is_set():
+            res = kubectl.launch(cmd, ok_to_fail = True)
+            if res == "":
+                ok += 1
+            else:
+                errors += 1
+        with By(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
+            assert errors == 0
+    finally:
+        kubectl.launch(f"delete pod {client_pod}")
+        if hasattr(self.context, "shell"):
+            self.context.shell.close()
 
 @TestScenario
 @Name("test_032. Test rolling update logic")
@@ -2525,7 +2573,7 @@ def test_034(self):
             },
             timeout=1200,
         )
-        
+
         kubectl.wait_jsonpath(
             "pod",
             "chi-test-operator-https-connection-t1-0-0-0",

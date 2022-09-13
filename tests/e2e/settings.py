@@ -35,7 +35,7 @@ operator_version = os.getenv('OPERATOR_VERSION') \
     else open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t")
 operator_namespace = os.getenv('OPERATOR_NAMESPACE') \
     if 'OPERATOR_NAMESPACE' in os.environ \
-    else 'kube-system'
+    else 'TEST_NAMESPACE'
 operator_install = os.getenv('OPERATOR_INSTALL') \
     if 'OPERATOR_INSTALL' in os.environ \
     else 'yes'
@@ -61,7 +61,7 @@ image_pull_policy = os.getenv('IMAGE_PULL_POLICY') \
 # clickhouse_template = "manifests/chit/tpl-clickhouse-20.8.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-21.3.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-22.7.yaml"
-clickhouse_template = "manifests/chit/tpl-clickhouse-22.8.yaml"
+clickhouse_template = "manifests/chit/tpl-clickhouse-22.7.yaml"
 clickhouse_template_old = "manifests/chit/tpl-clickhouse-22.3.yaml"
 
 clickhouse_version = get_ch_version(clickhouse_template)
