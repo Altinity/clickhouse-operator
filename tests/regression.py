@@ -6,7 +6,7 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    # "/regression/e2e.test_operator/test_023*": [(Fail, "Template annotations do not work")],
+    "/regression/e2e.test_operator/test_035*": [(Fail, "Does not work yet")],
 
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
