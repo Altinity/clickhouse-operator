@@ -2625,7 +2625,7 @@ def test_035(self):
 
     finally:
         with Finally("I remove the port forwarding and close the shell"):
-            self.context.shell("pkill -f 'port-forward'", timeout=5)
+            self.context.shell("timeout 3 killall -vws2 kubectl || killall -vws9 kubectl", timeout=5)
             self.context.shell.close()
 
 
