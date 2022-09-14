@@ -35,7 +35,7 @@ operator_version = os.getenv('OPERATOR_VERSION') \
     else open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t")
 operator_namespace = os.getenv('OPERATOR_NAMESPACE') \
     if 'OPERATOR_NAMESPACE' in os.environ \
-    else 'TEST_NAMESPACE'
+    else 'kube-system'
 operator_install = os.getenv('OPERATOR_INSTALL') \
     if 'OPERATOR_INSTALL' in os.environ \
     else 'yes'
