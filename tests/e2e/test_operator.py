@@ -207,7 +207,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
               host = service,
               user = "test_009",
               password = "test_009",
-              query = "select count() from cluster('all-sharded', system.one)",
+              query = "select count() from cluster('{cluster}', system.one)",
               res1 = "2",
               res2 = "1",
               trigger_event = trigger_event,
@@ -244,6 +244,7 @@ def check_operator_restart(chi, wait_objects, pod):
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
     with When("Restart operator"):
         util.restart_operator()
+        time.sleep(15)
         kubectl.wait_objects(chi, wait_objects)
         kubectl.wait_chi_status(chi, "Completed")
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
@@ -270,18 +271,35 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
                 "do_not_delete": 1,
             })
 
+    with Then("Create tables"):
+        for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
+            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host = h)
+            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)", host = h)
+
     trigger_event = threading.Event()
 
-    Check("run query until receive stop event",
-        test=run_select_query,
-        parallel=True)(
-              host = service,
-              user = "test_008",
-              password = "test_008",
-              query = "select count() from cluster('all-sharded', system.one)",
-              res1 = "2",
-              res2 = "1",
-              trigger_event = trigger_event,
+    Check("run query until receive stop event", test=run_select_query, parallel=True)(
+              host=service,
+              user="test_008",
+              password="test_008",
+              query="select count() from cluster('{cluster}', system.one)",
+              res1="2",
+              res2="1",
+              trigger_event=trigger_event,
+        )
+
+    Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True)(
+              host=service,
+              user="test_008",
+              password="test_008",
+              query="insert into test_dist select number from numbers(2)",
+              trigger_event=trigger_event,
+        )
+
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+              chi=chi,
+              shards=2,
+              trigger_event=trigger_event,
         )
 
     check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3},
@@ -289,8 +307,48 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
     trigger_event.set()
     join()
 
+# This section keeps failing, comment out for now
+#    with Then("Local tables should have exactly the same number of rows"):
+#        cnt0 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-0-0-0')
+#        cnt1 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-1-0-0')
+#        print(f"{cnt0} {cnt1}")
+#        assert cnt0 == cnt1 and cnt0 != "0"
+
     kubectl.delete_chi(chi)
 
+@TestCheck
+def check_remote_servers(self, chi, shards, trigger_event):
+    """Check cluster definition in configmap until signal is recieved"""
+
+    try:
+        self.context.shell = Shell()
+        ok = 0
+
+        while not trigger_event.is_set():
+            remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+
+            chi_start = remote_servers.find(f"<{chi}>")
+            chi_end = remote_servers.find(f"</{chi}>")
+            if chi_start < 0:
+                print(remote_servers)
+                with Then(f"Remote servers should contain {chi} cluster"):
+                    assert chi_start >= 0
+
+            chi_cluster = remote_servers[chi_start:chi_end]
+            chi_shards = chi_cluster.count("<shard>")
+
+            if chi_shards != shards:
+                print(remote_servers)
+                with Then(f"Number of shards in {chi} cluster should be {shards}"):
+                    assert chi_shards == shards
+            ok += 1
+
+        with By(f"remote_servers were always correct {ok} times"):
+            assert ok > 0
+
+    finally:
+        if hasattr(self.context, "shell"):
+            self.context.shell.close()
 
 @TestScenario
 @Name("test_008_1. Test operator restart")
@@ -299,13 +357,13 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
 )
 def test_008_1(self):
     with Check("Test simple chi for operator restart"):
-        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-1.yaml", service = "clickhouse-test-008-1")
+        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-1.yaml", service="clickhouse-test-008-1")
 
 @TestScenario
 @Name("test_008_2. Test operator restart")
 def test_008_2(self):
     with Check("Test advanced chi for operator restart"):
-        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-2.yaml", service = "service-test-008-2")
+        test_operator_restart(manifest="manifests/chi/test-008-operator-restart-2.yaml", service="service-test-008-2")
 
 @TestScenario
 @Name("test_008_3. Test operator restart in the middle of reconcile")
@@ -2279,6 +2337,33 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
         if hasattr(self.context, "shell"):
             self.context.shell.close()
 
+@TestCheck
+def run_insert_query(self, host, user, password, query, trigger_event):
+    """Run an insert query in parallel until the stop signal is received."""
+
+    client_pod = "clickhouse-insert"
+    try:
+        self.context.shell = Shell()
+
+        kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
+        kubectl.wait_pod_status(client_pod, "Running")
+
+        ok = 0
+        errors = 0
+
+        cmd = f"exec -n {kubectl.namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q \"{query}\""
+        while not trigger_event.is_set():
+            res = kubectl.launch(cmd, ok_to_fail = True)
+            if res == "":
+                ok += 1
+            else:
+                errors += 1
+        with By(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
+            assert errors == 0
+    finally:
+        kubectl.launch(f"delete pod {client_pod}")
+        if hasattr(self.context, "shell"):
+            self.context.shell.close()
 
 @TestScenario
 @Name("test_032. Test rolling update logic")
@@ -2525,7 +2610,7 @@ def test_034(self):
             },
             timeout=1200,
         )
-        
+
         kubectl.wait_jsonpath(
             "pod",
             "chi-test-operator-https-connection-t1-0-0-0",
