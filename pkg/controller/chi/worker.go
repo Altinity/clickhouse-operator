@@ -344,8 +344,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_IP)
-	if (time.Since(w.start) < 1*time.Minute) && (new.Generation == new.Status.Generation) && (ip == new.Status.CHOpIP) {
+	if w.isCleanRestartOnTheSameIP(new) {
 		// First minute after restart do not reconcile already reconciled generations
 		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
 		return nil
@@ -355,7 +354,21 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 	return w.reconcileCHI(ctx, old, new)
 }
 
+// isCleanRestartOnTheSameIP checks whether it is just a restart of the operator on the same IP
+func (w *worker) isCleanRestartOnTheSameIP(chi *chiv1.ClickHouseInstallation) bool {
+	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_IP)
+	return w.isCleanRestart(chi) && (ip == chi.Status.CHOpIP)
+}
+
+// isCleanRestart checks whether it is just a restart of the operator and CHI has no changes since last processed
+func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
+	return (time.Since(w.start) < 1*time.Minute) && (chi.Generation == chi.Status.Generation)
+}
+
 func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
+	if (old == nil) && w.isCleanRestart(new) {
+		old = new.Status.NormalizedCHI
+	}
 	old = w.normalize(old)
 	new = w.normalize(new)
 	actionPlan := chopmodel.NewActionPlan(old, new)
