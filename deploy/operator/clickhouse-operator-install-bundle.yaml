@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1372,7 +1372,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2731,7 +2731,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -3031,7 +3031,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
 ---
 # Template Parameters:
 #
@@ -3048,7 +3048,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
 rules:
 - apiGroups:
     - ""
@@ -3205,7 +3205,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -3227,7 +3227,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3461,7 +3461,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
     app: clickhouse-operator
 data:
 ---
@@ -3477,7 +3477,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3560,7 +3560,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3660,7 +3660,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
     app: clickhouse-operator
 data:
   01-clickhouse-user.xml: |
@@ -3727,9 +3727,9 @@ data:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.19.1
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.19.2
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.19.1
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.19.2
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -3740,7 +3740,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3774,7 +3774,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.19.1
+          image: altinity/clickhouse-operator:0.19.2
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3839,7 +3839,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.19.1
+          image: altinity/metrics-exporter:0.19.2
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3872,7 +3872,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.19.1
+    clickhouse.altinity.com/chop: 0.19.2
     app: clickhouse-operator
 spec:
   ports:
