@@ -244,6 +244,7 @@ def check_operator_restart(chi, wait_objects, pod):
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
     with When("Restart operator"):
         util.restart_operator()
+        time.sleep(15)
         kubectl.wait_objects(chi, wait_objects)
         kubectl.wait_chi_status(chi, "Completed")
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
@@ -299,6 +300,14 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
               trigger_event = trigger_event,
         )
 
+    Check("Check that cluster definition does not change during restart",
+        test=check_remote_servers,
+        parallel=True)(
+              chi = chi,
+              shards = 2,
+              trigger_event = trigger_event,
+        )
+
     check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3},
                                pod=f"chi-{chi}-{cluster}-0-0-0")
     trigger_event.set()
@@ -312,6 +321,39 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
 
     kubectl.delete_chi(chi)
 
+@TestCheck
+def check_remote_servers(self, chi, shards, trigger_event):
+    """Check cluster definition in configmap until signal is recieved"""
+
+    try:
+        self.context.shell = Shell()
+        ok = 0
+
+        while not trigger_event.is_set():
+            remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+
+            chi_start = remote_servers.find(f"<{chi}>")
+            chi_end   = remote_servers.find(f"</{chi}>")
+            if chi_start<0:
+                print(remote_servers)
+                with Then(f"Remote servers should contain {chi} cluster"):
+                    assert chi_start>0
+
+            chi_cluster = remote_servers[chi_start:chi_end]
+            chi_shards = chi_cluster.count("<shard>")
+
+            if chi_shards != shards:
+                print(remote_servers)
+                with Then(f"Number of shards in {chi} cluster should be {shards}"):
+                    assert chi_shards == shards
+            ok += 1
+
+        with By(f"remote_servers were always correct {ok} times"):
+            assert ok > 0
+
+    finally:
+        if hasattr(self.context, "shell"):
+            self.context.shell.close()
 
 @TestScenario
 @Name("test_008_1. Test operator restart")
