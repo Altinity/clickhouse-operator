@@ -505,7 +505,7 @@ func CreateHostName(host *chop.ChiHost, shard *chop.ChiShard, shardIndex int, re
 // any other places
 // Function operations are based on .Spec.Defaults.ReplicasUseFQDN
 func CreateInstanceHostname(host *chop.ChiHost) string {
-	if util.IsStringBoolTrue(host.GetCHI().Spec.Defaults.ReplicasUseFQDN) {
+	if host.GetCHI().Spec.Defaults.ReplicasUseFQDN.IsTrue() {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local

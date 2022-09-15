@@ -243,7 +243,7 @@ type OperatorConfigLabel struct {
 	Exclude []string `json:"exclude" yaml:"exclude"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	AppendScopeString string `json:"appendScope" yaml:"appendScope"`
+	AppendScopeString StringBool `json:"appendScope" yaml:"appendScope"`
 
 	Runtime struct {
 		AppendScope bool
@@ -368,7 +368,7 @@ type OperatorConfig struct {
 	ExcludeFromPropagationLabels []string `json:"excludeFromPropagationLabels" yaml:"excludeFromPropagationLabels"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	AppendScopeLabelsString string `json:"appendScopeLabels" yaml:"appendScopeLabels"`
+	AppendScopeLabelsString StringBool `json:"appendScopeLabels" yaml:"appendScopeLabels"`
 
 	// Grace period for Pod termination.
 	TerminationGracePeriod int `json:"terminationGracePeriod" yaml:"terminationGracePeriod"`
@@ -708,7 +708,7 @@ func (c *OperatorConfig) normalizeLabelsSection() {
 	//config.IncludeIntoPropagationLabels
 	//config.ExcludeFromPropagationLabels
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	c.Label.Runtime.AppendScope = util.IsStringBoolTrue(c.Label.AppendScopeString)
+	c.Label.Runtime.AppendScope = c.Label.AppendScopeString.Value()
 }
 
 func (c *OperatorConfig) normalizePodManagementSection() {

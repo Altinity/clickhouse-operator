@@ -677,7 +677,7 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 
 // IsStopped checks whether CHI is stopped
 func (chi *ClickHouseInstallation) IsStopped() bool {
-	return util.IsStringBoolTrue(chi.Spec.Stop)
+	return chi.Spec.Stop.Value()
 }
 
 // Restart const presents possible values for .spec.restart
@@ -700,7 +700,7 @@ func (chi *ClickHouseInstallation) IsNoRestartSpecified() bool {
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
 func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
-	return util.IsStringBoolTrue(chi.Spec.Troubleshoot)
+	return chi.Spec.Troubleshoot.Value()
 }
 
 // GetReconciling gets reconciling spec

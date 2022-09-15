@@ -407,14 +407,14 @@ func (n *Normalizer) normalizeTaskID(taskID *string) *string {
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop string) string {
-	if util.IsStringBool(stop) {
+func (n *Normalizer) normalizeStop(stop chiV1.StringBool) chiV1.StringBool {
+	if stop.IsValid() {
 		// It is bool, use as it is
 		return stop
 	}
 
 	// In case it is unknown value - just use set it to false
-	return util.StringBoolFalseLowercase
+	return chiV1.StringBoolFalseLowercase
 }
 
 // normalizeRestart normalizes .spec.restart
@@ -431,14 +431,14 @@ func (n *Normalizer) normalizeRestart(restart string) string {
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
-func (n *Normalizer) normalizeTroubleshoot(troubleshoot string) string {
-	if util.IsStringBool(troubleshoot) {
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot chiV1.StringBool) chiV1.StringBool {
+	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
-	return util.StringBoolFalseLowercase
+	return chiV1.StringBoolFalseLowercase
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
@@ -455,7 +455,7 @@ func (n *Normalizer) normalizeDefaults(defaults *chiV1.ChiDefaults) *chiV1.ChiDe
 		defaults = chiV1.NewChiDefaults()
 	}
 	// Set defaults for CHI object properties
-	defaults.ReplicasUseFQDN = util.CastStringBoolToStringTrueFalse(defaults.ReplicasUseFQDN, false)
+	defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.Normalize(false)
 	// Ensure field
 	if defaults.DistributedDDL == nil {
 		//defaults.DistributedDDL = chiV1.NewChiDistributedDDL()
@@ -1678,5 +1678,5 @@ func (n *Normalizer) normalizeShardInternalReplication(shard *chiV1.ChiShard) {
 	if shard.ReplicasCount > 1 {
 		defaultInternalReplication = true
 	}
-	shard.InternalReplication = util.CastStringBoolToStringTrueFalse(shard.InternalReplication, defaultInternalReplication)
+	shard.InternalReplication = shard.InternalReplication.Normalize(defaultInternalReplication)
 }

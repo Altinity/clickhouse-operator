@@ -71,9 +71,9 @@ type ClickHouseOperatorConfiguration struct {
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
 	TaskID                 *string          `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	Stop                   string           `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Stop                   StringBool       `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                string           `json:"restart,omitempty"                yaml:"restart,omitempty"`
-	Troubleshoot           string           `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	Troubleshoot           StringBool       `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
@@ -499,7 +499,7 @@ type ChiTemplateNames struct {
 type ChiShard struct {
 	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
 	Weight              int               `json:"weight,omitempty"              yaml:"weight,omitempty"`
-	InternalReplication string            `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
+	InternalReplication StringBool        `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`

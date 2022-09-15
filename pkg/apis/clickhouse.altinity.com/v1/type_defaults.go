@@ -16,7 +16,7 @@ package v1
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	ReplicasUseFQDN   string             `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
+	ReplicasUseFQDN   StringBool         `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
 	DistributedDDL    *ChiDistributedDDL `json:"distributedDDL,omitempty"     yaml:"distributedDDL,omitempty"`
 	StorageManagement *StorageManagement `json:"storageManagement,omitempty"  yaml:"storageManagement,omitempty"`
 	Templates         *ChiTemplateNames  `json:"templates,omitempty"          yaml:"templates,omitempty"`
