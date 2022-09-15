@@ -2454,7 +2454,7 @@ spec:
                       description: |
                         When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
                         exclude labels from the following list
-                    appendScope:
+                    appendScope: &TypeStringBool
                       type: string
                       description: |
                         Whether to append *Scope* labels to StatefulSet and Pod
@@ -2495,7 +2495,7 @@ spec:
                         - "enabled"
                 statefulSet:
                   type: object
-                  description: "define statefulset specific parameters"
+                  description: "define StatefulSet-specific parameters"
                   properties:
                     revisionHistoryLimit:
                       type: integer
