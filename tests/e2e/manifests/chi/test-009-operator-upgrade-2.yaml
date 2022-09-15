@@ -9,7 +9,7 @@ spec:
       profile: default
     templates:
       podTemplate: clickhouse-template
-      volumeClaimTemplate: aws-ebs-volume-claim
+      dataVolumeClaimTemplate: aws-ebs-volume-claim
       serviceTemplate: chi-service-template
 
   configuration:
