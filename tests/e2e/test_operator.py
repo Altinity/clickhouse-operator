@@ -125,8 +125,8 @@ def test_005(self):
     RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0")
 )
 def test_006(self):
-    old_version = "clickhouse/clickhouse-server:21.8"
-    new_version = "clickhouse/clickhouse-server:22.3"
+    old_version = "clickhouse/clickhouse-server:22.3"
+    new_version = "clickhouse/clickhouse-server:22.8"
     with Then("Create initial position"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
@@ -230,7 +230,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
             if start_time != new_start_time:
                 kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
                 kubectl.launch(
-                    f"logs -n {settings.test_namespace} pod/$(kubectl get pods -o name | grep clickhouse-operator) -c clickhouse-operator"
+                    f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
                 )
             assert start_time == new_start_time, error(
                 f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
@@ -401,16 +401,17 @@ def test_008_3(self):
 def test_009_1(self):
     with Check("Test simple chi for operator upgrade"):
         test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-1.yaml",
-                              service = "clickhouse-test-009-1",
+                              service="clickhouse-test-009-1",
                               version_from=self.context.test_009_version_from,
                               version_to=self.context.test_009_version_to)
+
 
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 def test_009_2(self):
     with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(manifest="manifests/chi/test-009-operator-upgrade-2.yaml",
-                              service = "service-test-009-2",
+                              service="service-test-009-2",
                               version_from=self.context.test_009_version_from,
                               version_to=self.context.test_009_version_to)
 
@@ -2328,6 +2329,7 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
                 partial += 1
             if cnt_test != res1 and cnt_test != res2:
                 errors += 1
+            time.sleep(0.5)
         with By(f"{ok} queries have been executed with no errors, {partial} queries returned incomplete results. {errors} queries have failed"):
             assert errors == 0
             if partial > 0:
@@ -2738,7 +2740,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.19.1"
+    self.context.test_009_version_from = "0.19.2"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):
