@@ -263,20 +263,20 @@ def test_keeper_probes_outline(
         """)
     with Then("Insert data to keeper_bench for make zookeeper workload"):
         pod_prefix="chi-test-cluster-for-zk-default"
-        rows = 100000
+        rows = 1000
         for pod in ("0-0-0", "0-1-0"):
             clickhouse.query(chi['metadata']['name'],"""
-                INSERT INTO keeper_bench.keeper_bench SELECT rand(1)%100, rand(2) FROM numbers(100000)
+                INSERT INTO keeper_bench.keeper_bench SELECT rand(1)%100, rand(2) FROM numbers({rows})
                 SETTINGS max_block_size=1,
                   min_insert_block_size_bytes=1,
                   min_insert_block_size_rows=1,
                   insert_deduplicate=0,
                   max_threads=128,
                   max_insert_threads=128
-            """, pod=f"{pod_prefix}{pod}", timeout=rows )
+            """, pod=f"{pod_prefix}-{pod}", timeout=rows )
 
     with Then("Check liveness and readiness probes fail"):
-        zk_pod_prefix = "zookeeper"
+        zk_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
         for zk_pod in range(3):
             out = kubectl.launch(f"describe pod {zk_pod_prefix}-{zk_pod}")
             assert "probe failed" not in out, "all probes shall be successful"
