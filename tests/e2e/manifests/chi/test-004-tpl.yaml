@@ -10,7 +10,7 @@ spec:
       - name: single
   defaults:
     templates:
-      volumeClaimTemplate: default
+      dataVolumeClaimTemplate: default
   templates:
     volumeClaimTemplates:
       - name: default

@@ -9,7 +9,7 @@ spec:
       profile: default
     templates:
       podTemplate: clickhouse-template
-      volumeClaimTemplate: aws-ebs-volume-claim
+      dataVolumeClaimTemplate: aws-ebs-volume-claim
       serviceTemplate: chi-service-template
 
   configuration:
@@ -32,7 +32,7 @@ spec:
       - name: test-008-2
         templates:
           podTemplate: clickhouse-template
-          volumeClaimTemplate: aws-ebs-volume-claim
+          dataVolumeClaimTemplate: aws-ebs-volume-claim
         layout:
           shardsCount: 2
   templates:
@@ -64,7 +64,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:22.8
               ports:
                 - name: http
                   containerPort: 8123

@@ -1,5 +1,5 @@
 apiVersion: "clickhouse.altinity.com/v1"
-kind: "ClickHouseInstallation"
+kind: ClickHouseInstallation
 metadata:
   name: "test-019-2-retain-volume"
   labels:
@@ -21,7 +21,7 @@ spec:
     storageManagement:
       provisioner: Operator
     templates:
-      volumeClaimTemplate: default
+      dataVolumeClaimTemplate: default
       podTemplate: default
   templates:
     volumeClaimTemplates:

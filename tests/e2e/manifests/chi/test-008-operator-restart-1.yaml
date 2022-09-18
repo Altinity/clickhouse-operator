@@ -17,7 +17,7 @@ spec:
       test_008/networks/ip: 0.0.0.0/0
   defaults:
     templates:
-      volumeClaimTemplate: default
+      dataVolumeClaimTemplate: default
       podTemplate: default
   templates:
     volumeClaimTemplates:

@@ -21,7 +21,7 @@ spec:
     storageManagement:
       provisioner: Operator
     templates:
-      volumeClaimTemplate: default
+      dataVolumeClaimTemplate: default
       podTemplate: default
   templates:
     volumeClaimTemplates:

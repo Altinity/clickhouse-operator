@@ -16,7 +16,7 @@ spec:
           fsGroup: 101
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.3
+          image: clickhouse/clickhouse-server:22.8
           ports:
           - name: http
             containerPort: 8123
@@ -68,7 +68,7 @@ spec:
   defaults:
     templates:
       podTemplate: clickhouse-replica-1
-      volumeClaimTemplate: default-gp2
+      dataVolumeClaimTemplate: default-gp2
       serviceTemplate: default-service-template      
   configuration:
     files:
