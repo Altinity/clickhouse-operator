@@ -62,10 +62,6 @@ spec:
       # 2. Delete
       reclaimPolicy: Retain
 
-      reclaimPolicy: Delete
-      reclaimPolicy: Retain
-      pvcPrivisioner: StatefulSet
-      pvcPrivisioner: Operator
     templates:
       hostTemplate: host-template-custom-ports
       podTemplate: clickhouse-v22.2
@@ -222,6 +218,21 @@ spec:
                     dataVolumeClaimTemplate: default-volume-claim
                     logVolumeClaimTemplate: default-volume-claim
                     replicaServiceTemplate: replica-service-template
+
+      - name: with-secret
+        # shared secret value to secure cluster communications
+        secret:
+          # Auto-generate shared secret value to secure cluster communications
+          auto: "True"
+          # Cluster shared secret value in plain text
+          value: "plaintext secret"
+          # Cluster shared secret source
+          valueFrom:
+            secretKeyRef:
+              name: "SecretName"
+              key: "Key"
+        layout:
+          shardsCount: 2
 
   templates:
     hostTemplates:
