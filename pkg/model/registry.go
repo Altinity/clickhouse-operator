@@ -30,6 +30,7 @@ const (
 	StatefulSet EntityType = "StatefulSet"
 	ConfigMap   EntityType = "ConfigMap"
 	Service     EntityType = "Service"
+	Secret      EntityType = "Secret"
 	PVC         EntityType = "PVC"
 	PV          EntityType = "PV"
 )
@@ -144,6 +145,21 @@ func (r *Registry) HasService(meta v1.ObjectMeta) bool {
 // NumService gets number of Service
 func (r *Registry) NumService() int {
 	return r.Len(Service)
+}
+
+// RegisterSecret register Secret
+func (r *Registry) RegisterSecret(meta v1.ObjectMeta) {
+	r.registerEntity(Secret, meta)
+}
+
+// HasSecret checks whether registry has specified Secret
+func (r *Registry) HasSecret(meta v1.ObjectMeta) bool {
+	return r.hasEntity(Secret, meta)
+}
+
+// NumSecret gets number of Secret
+func (r *Registry) NumSecret() int {
+	return r.Len(Secret)
 }
 
 // RegisterPVC register PVC
