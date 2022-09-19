@@ -608,6 +608,13 @@ func purgeService(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmo
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == chiv1.ObjectsCleanupDelete
 }
 
+func purgeSecret(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+	if reconcileFailedObjs.HasSecret(m) {
+		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetSecret() == chiv1.ObjectsCleanupDelete
+	}
+	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == chiv1.ObjectsCleanupDelete
+}
+
 // purge
 func (w *worker) purge(
 	ctx context.Context,
@@ -651,6 +658,13 @@ func (w *worker) purge(
 				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
 				if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
 					w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
+			}
+		case chopmodel.Secret:
+			if purgeSecret(chi, reconcileFailedObjs, m) {
+				w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
+				if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
 				}
 			}
 		}
@@ -911,18 +925,26 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiv1.ChiCluster
 	defer w.a.V(2).M(cluster).E().P()
 
 	// Add Cluster's Service
-	service := w.ctx.creator.CreateServiceCluster(cluster)
-	if service == nil {
-		// This is not a problem, ServiceCluster may be omitted
-		return nil
+	if service := w.ctx.creator.CreateServiceCluster(cluster); service != nil {
+		if err := w.reconcileService(ctx, cluster.CHI, service); err == nil {
+			w.ctx.registryReconciled.RegisterService(service.ObjectMeta)
+		} else {
+			w.ctx.registryFailed.RegisterService(service.ObjectMeta)
+		}
 	}
-	err := w.reconcileService(ctx, cluster.CHI, service)
-	if err == nil {
-		w.ctx.registryReconciled.RegisterService(service.ObjectMeta)
-	} else {
-		w.ctx.registryFailed.RegisterService(service.ObjectMeta)
+
+	// Add Cluster's Auto Secret
+	if cluster.Secret.Source() == chiv1.ClusterSecretSourceAuto {
+		if secret := w.ctx.creator.CreateClusterSecret(chopmodel.CreateClusterAutoSecretName(cluster)); secret != nil {
+			if err := w.reconcileSecret(ctx, cluster.CHI, secret); err == nil {
+				w.ctx.registryReconciled.RegisterSecret(secret.ObjectMeta)
+			} else {
+				w.ctx.registryFailed.RegisterSecret(secret.ObjectMeta)
+			}
+		}
 	}
-	return err
+
+	return nil
 }
 
 // reconcileShard reconciles Shard, excluding nested replicas
@@ -976,7 +998,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
 		return err
 	}
-
 	//w.reconcilePersistentVolumes(ctx, host)
 	_ = w.reconcilePVCs(ctx, host)
 	if err := w.reconcileHostStatefulSet(ctx, host); err != nil {
@@ -1610,6 +1631,12 @@ func (w *worker) deleteCluster(ctx context.Context, chi *chiv1.ClickHouseInstall
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(ctx, cluster)
 
+	// Delete Cluster's Auto Secret
+	if cluster.Secret.Source() == chiv1.ClusterSecretSourceAuto {
+		// Delete Cluster Secret
+		_ = w.c.deleteSecretCluster(ctx, cluster)
+	}
+
 	// Delete all shards
 	cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
 		return w.deleteShard(ctx, chi, shard)
@@ -1872,6 +1899,61 @@ func (w *worker) reconcileService(ctx context.Context, chi *chiv1.ClickHouseInst
 			WithStatusError(chi).
 			M(chi).F().
 			Error("FAILED to reconcile Service: %s CHI: %s ", service.Name, chi.Name)
+	}
+
+	return err
+}
+
+// createSecret
+func (w *worker) createSecret(ctx context.Context, chi *chiv1.ClickHouseInstallation, secret *core.Secret) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	_, err := w.c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, newCreateOptions())
+	if err == nil {
+		w.a.V(1).
+			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(chi).
+			M(chi).F().
+			Info("Create Secret %s/%s", secret.Namespace, secret.Name)
+	} else {
+		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			M(chi).F().
+			Error("Create Secret %s/%s failed with error %v", secret.Namespace, secret.Name, err)
+	}
+
+	return err
+}
+
+// reconcileSecret reconciles core.Secret
+func (w *worker) reconcileSecret(ctx context.Context, chi *chiv1.ClickHouseInstallation, secret *core.Secret) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	w.a.V(2).M(chi).S().Info(secret.Name)
+	defer w.a.V(2).M(chi).E().Info(secret.Name)
+
+	// Check whether this object already exists
+	if _, err := w.c.getSecret(secret); err == nil {
+		// We have Secret - try to update it
+		return nil
+	}
+
+	// Secret not found or broken. Try to recreate
+	_ = w.c.deleteSecretIfExists(ctx, secret.Namespace, secret.Name)
+	err := w.createSecret(ctx, chi, secret)
+	if err != nil {
+		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			M(chi).F().
+			Error("FAILED to reconcile Secret: %s CHI: %s ", secret.Name, chi.Name)
 	}
 
 	return err
