@@ -20,9 +20,32 @@ import (
 	// It is good enough for string ID
 	"crypto/sha1"
 	"encoding/hex"
+	"math/rand"
+	"time"
 )
 
-// CreateStringID creates HEX hash ID out of string.
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+// randStringBytes specifies bytes that could be used by RandString generator
+const randStringBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+// RandString generates random string of specified length
+func RandString(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = randStringBytes[rand.Intn(len(randStringBytes))]
+	}
+	return string(b)
+}
+
+// RandStringRange specifies random string with length in specified range
+func RandStringRange(minLength, maxLength int) string {
+	return RandString(rand.Intn(maxLength-minLength+1) + minLength)
+}
+
+// CreateStringID creates HEX hash ID out of a string.
 // In case maxHashLen == 0 the whole hash is returned
 func CreateStringID(str string, maxHashLen int) string {
 	// #nosec
