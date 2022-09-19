@@ -154,6 +154,7 @@ type ChiObjectsCleanup struct {
 	PVC         string `json:"pvc,omitempty"         yaml:"pvc,omitempty"`
 	ConfigMap   string `json:"configMap,omitempty"   yaml:"configMap,omitempty"`
 	Service     string `json:"service,omitempty"     yaml:"service,omitempty"`
+	Secret      string `json:"secret,omitempty"      yaml:"secret,omitempty"`
 }
 
 // NewChiObjectsCleanup creates new object cleanup
@@ -185,6 +186,9 @@ func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) 
 		if c.Service == "" {
 			c.Service = from.Service
 		}
+		if c.Secret == "" {
+			c.Secret = from.Secret
+		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.StatefulSet != "" {
 			// Override by non-empty values only
@@ -201,6 +205,10 @@ func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) 
 		if from.Service != "" {
 			// Override by non-empty values only
 			c.Service = from.Service
+		}
+		if from.Secret != "" {
+			// Override by non-empty values only
+			c.Secret = from.Secret
 		}
 	}
 
@@ -272,6 +280,23 @@ func (c *ChiObjectsCleanup) SetService(v string) *ChiObjectsCleanup {
 		return nil
 	}
 	c.Service = v
+	return c
+}
+
+// GetSecret gets secret
+func (c *ChiObjectsCleanup) GetSecret() string {
+	if c == nil {
+		return ""
+	}
+	return c.Secret
+}
+
+// SetSecret sets service
+func (c *ChiObjectsCleanup) SetSecret(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.Secret = v
 	return c
 }
 
