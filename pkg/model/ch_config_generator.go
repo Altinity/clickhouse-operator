@@ -292,13 +292,12 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		util.Iline(b, 8, "<%s>", cluster.Name)
 
 		// <secret>VALUE</secret>
-		secretValue, useSecretKeyRef := cluster.Secret.Get()
-		switch {
-		case secretValue != "":
+		switch cluster.Secret.Source() {
+		case chiv1.ClusterSecretSourcePlaintext:
 			// Secret value is explicitly specified
-			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret)
-		case useSecretKeyRef:
-			// SecretKeyRef is specified, will use it in generating ENV vars
+			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret.Value)
+		case chiv1.ClusterSecretSourceSecretRef, chiv1.ClusterSecretSourceAuto:
+			// Use secret via ENV var from secret
 			util.Iline(b, 12, `<secret from_env="%s" />`, internodeClusterSecretEnvName)
 		}
 
