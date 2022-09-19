@@ -1092,6 +1092,20 @@ func (c *Creator) OperatorShouldCreatePVC(host *chiv1.ChiHost, volumeClaimTempla
 	return getPVCProvisioner(host, volumeClaimTemplate) == chiv1.PVCProvisionerOperator
 }
 
+// CreateClusterSecret creates cluster secret
+func (c *Creator) CreateClusterSecret(name string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: c.chi.Namespace,
+			Name:      name,
+		},
+		StringData: map[string]string{
+			"secret": util.RandStringRange(10, 20),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+}
+
 // newDefaultHostTemplate returns default Host Template to be used with StatefulSet
 func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 	return &chiv1.ChiHostTemplate{
