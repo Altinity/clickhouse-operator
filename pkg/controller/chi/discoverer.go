@@ -36,6 +36,7 @@ func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstalla
 	c.discoveryStatefulSet(ctx, r, chi, opts)
 	c.discoveryConfigMap(ctx, r, chi, opts)
 	c.discoveryService(ctx, r, chi, opts)
+	c.discoverySecret(ctx, r, chi, opts)
 	c.discoveryPVC(ctx, r, chi, opts)
 	c.discoveryPV(ctx, r, chi, opts)
 	return r
@@ -83,6 +84,21 @@ func (c *Controller) discoveryService(ctx context.Context, r *chopmodel.Registry
 	}
 	for _, obj := range list.Items {
 		r.RegisterService(obj.ObjectMeta)
+	}
+}
+
+func (c *Controller) discoverySecret(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+	list, err := c.kubeClient.CoreV1().Secrets(chi.Namespace).List(ctx, opts)
+	if err != nil {
+		log.M(chi).F().Error("FAIL list Secret err:%v", err)
+		return
+	}
+	if list == nil {
+		log.M(chi).F().Error("FAIL list Secret list is nil")
+		return
+	}
+	for _, obj := range list.Items {
+		r.RegisterSecret(obj.ObjectMeta)
 	}
 }
 
