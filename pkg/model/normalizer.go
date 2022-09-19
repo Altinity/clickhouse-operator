@@ -961,27 +961,34 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 
 const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
 
-func (n *Normalizer) createClusterSecretEnv(cluster *chiV1.ChiCluster) {
-	if cluster.Secret.HasValue() {
+func (n *Normalizer) appendClusterSecretEnvVar(cluster *chiV1.ChiCluster) {
+	switch cluster.Secret.Source() {
+	case chiV1.ClusterSecretSourcePlaintext:
 		// Secret has explicit value, it is not passed via ENV vars
-		return
-	}
-
-	if !cluster.Secret.HasSecretKeyRef() {
-		// Secret has no SecretKeyRef, nothing to create ENV VAR from
-		return
-	}
-
-	// Set the password for internode communication using an ENV VAR
-	// instead of supplying as plaintext in the configuration.
-	n.appendEnvVar(
-		corev1.EnvVar{
-			Name: internodeClusterSecretEnvName,
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: cluster.Secret.GetSecretKeyRef(),
+		// Do nothing here
+	case chiV1.ClusterSecretSourceSecretRef:
+		// Secret has explicit SecretKeyRef
+		// Set the password for internode communication using an ENV VAR
+		n.appendEnvVar(
+			corev1.EnvVar{
+				Name: internodeClusterSecretEnvName,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: cluster.Secret.GetSecretKeyRef(),
+				},
 			},
-		},
-	)
+		)
+	case chiV1.ClusterSecretSourceAuto:
+		// Secret is auto-generated
+		// Set the password for internode communication using an ENV VAR
+		n.appendEnvVar(
+			corev1.EnvVar{
+				Name: internodeClusterSecretEnvName,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: cluster.Secret.GetAutoSecretKeyRef(CreateClusterAutoSecretName(cluster)),
+				},
+			},
+		)
+	}
 }
 
 func (n *Normalizer) appendEnvVar(envVar corev1.EnvVar) {
@@ -1284,6 +1291,8 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 		cluster = n.newDefaultCluster()
 	}
 
+	cluster.CHI = n.ctx.chi
+
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.ctx.chi)
 	// Inherit from .spec.configuration.files
@@ -1306,7 +1315,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
 	n.createHostsField(cluster)
-	n.createClusterSecretEnv(cluster)
+	n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	cluster.WalkShards(func(index int, shard *chiV1.ChiShard) error {
