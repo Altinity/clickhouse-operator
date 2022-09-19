@@ -272,3 +272,21 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 	// Do not continue update
 	return errStop
 }
+
+func (c *Controller) createSecret(ctx context.Context, secret *v1.Secret) error {
+	log.V(1).M(secret).F().P()
+
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	log.V(1).Info("Create Secret %s/%s", secret.Namespace, secret.Name)
+	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, newCreateOptions()); err != nil {
+		// Unable to create StatefulSet at all
+		log.V(1).Error("Create Secret %s/%s failed err:%v", secret.Namespace, secret.Name, err)
+		return err
+	}
+
+	return nil
+}
