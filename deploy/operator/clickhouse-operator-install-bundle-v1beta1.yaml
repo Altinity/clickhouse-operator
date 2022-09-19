@@ -563,6 +563,9 @@ spec:
                         type: object
                         description: "optional, shared secret value to secure cluster communications"
                         properties:
+                          auto:
+                            !!merge <<: *TypeStringBool
+                            description: "Auto-generate shared secret value to secure cluster communications"
                           value:
                             description: "Cluster shared secret value in plain text"
                             type: string
@@ -1656,6 +1659,9 @@ spec:
                         type: object
                         description: "optional, shared secret value to secure cluster communications"
                         properties:
+                          auto:
+                            !!merge <<: *TypeStringBool
+                            description: "Auto-generate shared secret value to secure cluster communications"
                           value:
                             description: "Cluster shared secret value in plain text"
                             type: string
