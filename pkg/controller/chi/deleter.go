@@ -328,3 +328,42 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 
 	return err
 }
+
+// deleteSecretCluster
+func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chop.ChiCluster) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	secretName := chopmodel.CreateClusterAutoSecretName(cluster)
+	namespace := cluster.Address.Namespace
+	log.V(1).M(cluster).F().Info("%s/%s", namespace, secretName)
+	return c.deleteSecretIfExists(ctx, namespace, secretName)
+}
+
+// deleteSecretIfExists deletes Secret in case it does not exist
+func (c *Controller) deleteSecretIfExists(ctx context.Context, namespace, name string) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	// Check specified service exists
+	_, err := c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, newGetOptions())
+
+	if err != nil {
+		// No such a service, nothing to delete
+		return nil
+	}
+
+	// Delete
+	err = c.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, name, newDeleteOptions())
+	if err == nil {
+		log.V(1).M(namespace, name).Info("OK delete Secret/%s", namespace, name)
+	} else {
+		log.V(1).M(namespace, name).F().Error("FAIL delete Secret %s/%s err:%v", namespace, name, err)
+	}
+
+	return err
+}
