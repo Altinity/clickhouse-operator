@@ -205,7 +205,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("table sizes")
 		writer.WriteSystemParts(systemPartsData)
 		writer.WriteOKFetch("system parts")
-
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying system.parts for %s: %s\n", hostname, err)
