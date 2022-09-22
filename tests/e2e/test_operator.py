@@ -213,6 +213,12 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
               trigger_event = trigger_event,
         )
 
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+        chi=chi,
+        shards=2,
+        trigger_event=trigger_event,
+    )
+
     with When(f"upgrade operator to {version_to}"):
         util.set_operator_version(version_to, timeout=120)
         kubectl.wait_chi_status(chi, "Completed", retries=20)
@@ -368,16 +374,21 @@ def test_008_2(self):
 @TestScenario
 @Name("test_008_3. Test operator restart in the middle of reconcile")
 def test_008_3(self):
-    manifest = "manifests/chi/test-003-complex-layout.yaml"
+    manifest = "manifests/chi/test-008-operator-restart-3-1.yaml"
+    manifest_2 = "manifests/chi/test-008-operator-restart-3-2.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = chi
 
-    full_cluster = {"statefulset": 4, "pod": 4, "service": 5}
+    util.require_keeper(keeper_type=self.context.keeper_type)
 
     with Given("4-node CHI creation started"):
         with Then("Wait for a half of the cluster to start"):
             kubectl.create_and_check(
                 manifest,
                 check={
+                    "apply_templates": {
+                        "manifests/chit/tpl-persistent-volume-100Mi.yaml",
+                    },
                     "pod_count": 2,
                     "do_not_delete": 1,
                     "chi_status": "InProgress"
@@ -387,8 +398,30 @@ def test_008_3(self):
             with Then("Cluster creation should continue after a restart"):
                 # Fail faster
                 kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=5)
-                kubectl.wait_objects(chi, full_cluster)
+                kubectl.wait_objects(chi, {"statefulset": 4, "pod": 4, "service": 5})
                 kubectl.wait_chi_status(chi, "Completed")
+
+    with Then("Upgrade ClickHouse version to run a reconcile"):
+        kubectl.create_and_check(
+                manifest_2,
+                check={
+                    "do_not_delete": 1,
+                    "chi_status": "InProgress"
+                })
+
+    trigger_event = threading.Event()
+
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+          chi=chi,
+          shards=2,
+          trigger_event=trigger_event,
+    )
+
+    check_operator_restart(chi=chi, wait_objects={"statefulset": 4, "pod": 4, "service": 5},
+                           pod=f"chi-{chi}-{cluster}-0-0-0")
+    trigger_event.set()
+    join()
+
 
     kubectl.delete_chi(chi)
 
