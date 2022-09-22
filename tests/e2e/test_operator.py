@@ -198,6 +198,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
                 clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host = h)
             clickhouse.query(chi, "INSERT INTO test_dist SELECT * from numbers(2)")
 
+
     trigger_event = threading.Event()
 
     Check("run query until receive stop event", test=run_select_query, parallel=True)(
@@ -242,7 +243,6 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
     join()
 
     kubectl.delete_chi(chi)
-
 
 def check_operator_restart(chi, wait_objects, pod):
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
@@ -320,10 +320,11 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
 
     kubectl.delete_chi(chi)
 
-
 @TestCheck
-def check_remote_servers(self, chi, shards, trigger_event):
+def check_remote_servers(self, chi, shards, trigger_event, cluster = ''):
     """Check cluster definition in configmap until signal is recieved"""
+    if cluster == '':
+        cluster = chi
 
     try:
         self.context.shell = Shell()
@@ -332,19 +333,19 @@ def check_remote_servers(self, chi, shards, trigger_event):
         while not trigger_event.is_set():
             remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
 
-            chi_start = remote_servers.find(f"<{chi}>")
-            chi_end = remote_servers.find(f"</{chi}>")
+            chi_start = remote_servers.find(f"<{cluster}>")
+            chi_end = remote_servers.find(f"</{cluster}>")
             if chi_start < 0:
                 print(remote_servers)
-            with Then(f"Remote servers should contain {chi} cluster"):
-                assert chi_start >= 0
+                with Then(f"Remote servers should contain {cluster} cluster"):
+                    assert chi_start >= 0
 
             chi_cluster = remote_servers[chi_start:chi_end]
             chi_shards = chi_cluster.count("<shard>")
 
             if chi_shards != shards:
                 print(remote_servers)
-                with Then(f"Number of shards in {chi} cluster should be {shards}"):
+                with Then(f"Number of shards in {cluster} cluster should be {shards}"):
                     assert chi_shards == shards
             ok += 1
 
@@ -355,7 +356,6 @@ def check_remote_servers(self, chi, shards, trigger_event):
         if hasattr(self.context, "shell"):
             self.context.shell.close()
 
-
 @TestScenario
 @Name("test_008_1. Test operator restart")
 @Requirements(
@@ -365,13 +365,11 @@ def test_008_1(self):
     with Check("Test simple chi for operator restart"):
         test_operator_restart(manifest="manifests/chi/test-008-operator-restart-1.yaml", service="clickhouse-test-008-1")
 
-
 @TestScenario
 @Name("test_008_2. Test operator restart")
 def test_008_2(self):
     with Check("Test advanced chi for operator restart"):
         test_operator_restart(manifest="manifests/chi/test-008-operator-restart-2.yaml", service="service-test-008-2")
-
 
 @TestScenario
 @Name("test_008_3. Test operator restart in the middle of reconcile")
@@ -399,7 +397,7 @@ def test_008_3(self):
             util.restart_operator()
             with Then("Cluster creation should continue after a restart"):
                 # Fail faster
-                kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=5)
+                # kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=5)
                 kubectl.wait_objects(chi, {"statefulset": 4, "pod": 4, "service": 5})
                 kubectl.wait_chi_status(chi, "Completed")
 
@@ -483,7 +481,6 @@ def get_user_xml_from_configmap(chi, user):
     root_node = etree.fromstring(users_xml)
     return root_node.find(f"users/{user}")
 
-
 @TestScenario
 @Name("test_011. Test user security and network isolation")
 @Requirements(
@@ -549,6 +546,7 @@ def test_011(self):
                     host="chi-test-011-secured-cluster-default-1-0"
                 )
                 assert out != 'OK'
+
 
         test_default_user()
 
@@ -1778,7 +1776,6 @@ def test_021(self, step=1):
 
     kubectl.delete_chi(chi)
 
-
 @TestScenario
 @Name("test_021_1. Test rescaling storage. Provisioner: StatefulSet")
 @Requirements(
@@ -1786,7 +1783,6 @@ def test_021(self, step=1):
 )
 def test_021_1(self):
     test_021(step=1)
-
 
 @TestScenario
 @Name("test_021_2. Test rescaling storage. Provisioner: Operator")
@@ -2160,20 +2156,8 @@ def test_028(self):
             chi_downtime = 0
             with And("Queries keep running"):
                 while kubectl.get_field("chi", chi, ".status.status") == "InProgress":
-                    ch1 = clickhouse.query_with_error(
-                        chi,
-                        sql,
-                        pod="chi-test-014-replication-default-0-0-0",
-                        host="chi-test-014-replication-default-0-0",
-                        advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10"
-                    )
-                    ch2 = clickhouse.query_with_error(
-                        chi,
-                        sql,
-                        pod="chi-test-014-replication-default-1-0-0",
-                        host="chi-test-014-replication-default-1-0",
-                        advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10"
-                    )
+                    ch1 = clickhouse.query_with_error(chi, sql, pod="chi-test-014-replication-default-0-0-0", host="chi-test-014-replication-default-0-0", advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10")
+                    ch2 = clickhouse.query_with_error(chi, sql, pod="chi-test-014-replication-default-1-0-0", host="chi-test-014-replication-default-1-0", advanced_params="--connect_timeout=1 --send_timeout=10 --receive_timeout=10")
 
                     if "error" in ch1 or "Exception" in ch1 or ch2.endswith("1"):
                         ch1_downtime = ch1_downtime + 5
@@ -2388,7 +2372,6 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
         if hasattr(self.context, "shell"):
             self.context.shell.close()
 
-
 @TestCheck
 def run_insert_query(self, host, user, password, query, trigger_event):
     """Run an insert query in parallel until the stop signal is received."""
@@ -2416,7 +2399,6 @@ def run_insert_query(self, host, user, password, query, trigger_event):
         kubectl.launch(f"delete pod {client_pod}")
         if hasattr(self.context, "shell"):
             self.context.shell.close()
-
 
 @TestScenario
 @Name("test_032. Test rolling update logic")
@@ -2476,6 +2458,13 @@ def test_032(self):
             res2=str(numbers // 2),
             trigger_event=trigger_event,
             )
+
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+        chi=chi,
+        cluster="default",
+        shards=2,
+        trigger_event=trigger_event,
+    )
 
     with When("Change the image in the podTemplate by updating the chi version to test the rolling update logic"):
         kubectl.create_and_check(
