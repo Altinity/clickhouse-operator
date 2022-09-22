@@ -14,7 +14,7 @@
 
 # Prerequisites
 
-1. Kubernetes instance with the following version considerations:
+1. Kubernetes cluster that observes the following version considerations:
     1. `clickhouse-operator` versions **before** `0.16.0` is compatible with [Kubenetes after `1.16` and prior `1.22`](https://kubernetes.io/releases/).
     1. `clickhouse-operator` versions `0.16.0` **and after** is compatible [Kubernetes version `1.16` and after](https://kubernetes.io/releases/).
 1. Properly configured `kubectl`
@@ -24,20 +24,20 @@
 
 Apply `clickhouse-operator` installation manifest. The simplest way - directly from `github`.
 
-## **In case you are convenient to install operator into `kube-system` namespace**
+## **In case you are OK to install operator into `kube-system` namespace**
 
 just run:
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle.yaml
 ```
-## **If you want to install operator on kubernetes version prior `1.17` in `kube-system` namespace**
+## **If you want to install operator on kubernetes version prior to `1.17` in `kube-system` namespace**
 
 just run:
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle-v1beta1.yaml
 ```
 
-## **In case you'd like to customize installation parameters**,
+## **In case you would like to customize installation parameters**,
 
 such as namespace where to install operator or operator's image, use the special installer script.
 ```bash
@@ -59,7 +59,7 @@ curl -s https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/de
 installer will install **clickhouse-operator** into `kube-system` namespace and will watch custom resources like a `kind: ClickhouseInstallation` in all available namespaces.
 
 
-## **In case you can not run scripts from internet in your protected environment**,
+## **In case you can not run scripts from the Internet in your protected environment**,
 
 you can download manually [this template file][clickhouse-operator-install-template.yaml]
 and edit it according to your choice. After that apply it with `kubectl`. Or you can use this snippet instead:
@@ -116,7 +116,7 @@ Complete instructions on how to build ClickHouse operator from sources as well a
 
 # Examples
 
-There are several ready-to-use [ClickHouseInstallation examples][chi-examples]. Below are few ones to start with.
+There are several ready-to-use [ClickHouseInstallation examples][chi-examples]. Below are a few to start with.
 
 ## Create Custom Namespace
 It is a good practice to have all components run in dedicated namespaces. Let's run examples in `test` namespace
@@ -131,7 +131,7 @@ namespace/test created
 
 This is the trivial [1 shard 1 replica][01-simple-layout-01-1shard-1repl.yaml] example.
 
-**WARNING**: Do not use it for anything other than 'Hello, world!', it does not have persistent storage!
+**WARNING**: Do not use it for anything other than 'Hello, world!'. It does not have persistent storage!
  
 ```bash
 kubectl apply -n test-clickhouse-operator -f https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml
@@ -162,7 +162,7 @@ NAME                    READY   STATUS    RESTARTS   AGE
 chi-b3d29f-a242-0-0-0   1/1     Running   0          10m
 ```
 
-Watch out for 'Running' status. Also check services created by an operator:
+Ensure you see the 'Running' status. Also check services created by an operator:
 
 ```bash
 kubectl get service -n test-clickhouse-operator
@@ -177,9 +177,9 @@ ClickHouse is up and running!
 
 ## Connect to ClickHouse Database
 
-There are several ways to connect to ClickHouse database
+There are several ways to connect to ClickHouse on Kubenetes.
 
-1. In case previous command `kubectl get service -n test-clickhouse-operator` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
+1. In case the previous command `kubectl get service -n test-clickhouse-operator` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
 clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com -u clickhouse_operator --password clickhouse_operator_password 
 ```
@@ -188,7 +188,7 @@ ClickHouse client version 18.14.12.
 Connecting to abc-123.us-east-1.elb.amazonaws.com:9000.
 Connected to ClickHouse server version 19.4.3 revision 54416.
 ``` 
-2. In case there is not **EXTERNAL-IP** available, we can access ClickHouse from inside Kubernetes cluster
+2. In case there is no **EXTERNAL-IP** available, we can access ClickHouse from inside Kubernetes cluster
 ```bash
 kubectl -n test-clickhouse-operator exec -it chi-b3d29f-a242-0-0-0 -- clickhouse-client
 ```
@@ -210,7 +210,7 @@ Connected to ClickHouse server version 19.4.3 revision 54416.
 
 ## Simple Persistent Volume Example
 
-In case of having Dynamic Volume Provisioning available - ex.: running on AWS - we are able to use PersistentVolumeClaims
+In cases where Dynamic Volume Provisioning is available - ex.: running on AWS - we are able to use PersistentVolumeClaims
 Manifest is [available in examples][03-persistent-volume-01-default-volume.yaml]
 
 ```yaml
