@@ -334,6 +334,25 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
     kubectl.delete_chi(chi)
 
 
+def get_shards_from_remote_servers(chi, cluster):
+    if cluster == '':
+        cluster = chi
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+
+    chi_start = remote_servers.find(f"<{cluster}>")
+    chi_end = remote_servers.find(f"</{cluster}>")
+    if chi_start < 0:
+        print(f"unable to find '<{cluster}>' in:")
+        print(remote_servers)
+        with Then(f"Remote servers should contain {cluster} cluster"):
+            assert chi_start >= 0
+
+    chi_cluster = remote_servers[chi_start:chi_end]
+    # print(chi_cluster)
+    chi_shards = chi_cluster.count("<shard>")
+
+    return chi_shards
+
 @TestCheck
 def check_remote_servers(self, chi, shards, trigger_event, cluster=''):
     """Check cluster definition in configmap until signal is received"""
@@ -345,18 +364,7 @@ def check_remote_servers(self, chi, shards, trigger_event, cluster=''):
         ok = 0
 
         while not trigger_event.is_set():
-            remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
-
-            chi_start = remote_servers.find(f"<{cluster}>")
-            chi_end = remote_servers.find(f"</{cluster}>")
-            if chi_start < 0:
-                print(f"unable to find '<{cluster}>' in:")
-                print(remote_servers)
-                with Then(f"Remote servers should contain {cluster} cluster"):
-                    assert chi_start >= 0
-
-            chi_cluster = remote_servers[chi_start:chi_end]
-            chi_shards = chi_cluster.count("<shard>")
+            chi_shards = get_shards_from_remote_servers(chi, cluster)
 
             if chi_shards != shards:
                 print(remote_servers)
@@ -941,6 +949,7 @@ def test_014(self):
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
     shards = [0, 1]
+    n_shards = len(shards)
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -993,9 +1002,22 @@ def test_014(self):
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014"
     ]
-    with Given("Create schema objects"):
-        for q in create_ddls:
-            clickhouse.query(chi, q, host=f"chi-{chi}-{cluster}-0-0")
+    with Given(f"Cluster {cluster} is properly configured"):
+        with By(f"remote_servers have {n_shards} shards"):
+            assert n_shards == get_shards_from_remote_servers(chi, cluster)
+        with By(f"ClickHouse recognizes {n_shards} shards in the cluster"):
+            cnt = ""
+            for i in range(1,10):
+                cnt = clickhouse.query(chi, f"select count() from system.clusters where cluster ='{cluster}'", host=f"chi-{chi}-{cluster}-0-0")
+                if cnt == str(n_shards):
+                    break
+                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                    time.sleep(i * 5)
+            assert str(n_shards) == clickhouse.query(chi, f"select count() from system.clusters where cluster ='{cluster}'", host=f"chi-{chi}-{cluster}-0-0")
+
+        with Then("Create schema objects"):
+            for q in create_ddls:
+                clickhouse.query(chi, q, host=f"chi-{chi}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
         for table in replicated_tables:
