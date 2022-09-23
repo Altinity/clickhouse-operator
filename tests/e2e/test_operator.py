@@ -341,19 +341,19 @@ def check_remote_servers(self, chi, shards, trigger_event):
         while not trigger_event.is_set():
             remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
 
-            chi_start = remote_servers.find(f"<{chi}>")
-            chi_end = remote_servers.find(f"</{chi}>")
+            chi_start = remote_servers.find(f"<{cluster}>")
+            chi_end = remote_servers.find(f"</{cluster}>")
             if chi_start < 0:
                 print(remote_servers)
-                with Then(f"Remote servers should contain {chi} cluster"):
-                    assert chi_start >= 0
+            with Then(f"Remote servers should contain {chi} cluster"):
+                assert chi_start >= 0
 
             chi_cluster = remote_servers[chi_start:chi_end]
             chi_shards = chi_cluster.count("<shard>")
 
             if chi_shards != shards:
                 print(remote_servers)
-                with Then(f"Number of shards in {chi} cluster should be {shards}"):
+                with Then(f"Number of shards in {cluster} cluster should be {shards}"):
                     assert chi_shards == shards
             ok += 1
 
