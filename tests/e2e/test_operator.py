@@ -244,6 +244,14 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
     kubectl.delete_chi(chi)
 
 
+def wait_operator_restart(chi, wait_objects):
+    with When("Restart operator"):
+        util.restart_operator()
+        time.sleep(15)
+        kubectl.wait_objects(chi, wait_objects)
+        kubectl.wait_chi_status(chi, "Completed")
+
+
 def check_operator_restart(chi, wait_objects, pod):
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
     with When("Restart operator"):
@@ -254,6 +262,7 @@ def check_operator_restart(chi, wait_objects, pod):
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
         with Then("ClickHouse pods should not be restarted during operator's restart"):
+            print(f"pod start_time'{start_time} vs {new_start_time}")
             assert start_time == new_start_time
 
 
@@ -336,8 +345,8 @@ def check_remote_servers(self, chi, shards, trigger_event):
             chi_end = remote_servers.find(f"</{chi}>")
             if chi_start < 0:
                 print(remote_servers)
-            with Then(f"Remote servers should contain {chi} cluster"):
-                assert chi_start >= 0
+                with Then(f"Remote servers should contain {chi} cluster"):
+                    assert chi_start >= 0
 
             chi_cluster = remote_servers[chi_start:chi_end]
             chi_shards = chi_cluster.count("<shard>")
@@ -398,10 +407,8 @@ def test_008_3(self):
         with When("Restart operator"):
             util.restart_operator()
             with Then("Cluster creation should continue after a restart"):
-                # Fail faster
-                kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=5)
                 kubectl.wait_objects(chi, {"statefulset": 4, "pod": 4, "service": 5})
-                kubectl.wait_chi_status(chi, "Completed")
+        kubectl.wait_chi_status(chi, "Completed")
 
     with Then("Upgrade ClickHouse version to run a reconcile"):
         kubectl.create_and_check(
@@ -418,12 +425,17 @@ def test_008_3(self):
           shards=2,
           trigger_event=trigger_event,
     )
-
-    check_operator_restart(chi=chi, wait_objects={"statefulset": 4, "pod": 4, "service": 5},
-                           pod=f"chi-{chi}-{cluster}-0-0-0")
+    # Just wait for restart operator. After restart it will update cluster with new ClickHouse version
+    wait_operator_restart(
+        chi=chi,
+        wait_objects={
+            "statefulset": 4,
+            "pod": 4,
+            "service": 5
+        },
+    )
     trigger_event.set()
     join()
-
 
     kubectl.delete_chi(chi)
 
