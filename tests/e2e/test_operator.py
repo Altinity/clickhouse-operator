@@ -177,7 +177,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
     with Given(f"clickhouse-operator from {version_from}"):
         util.set_operator_version(version_from)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
-        cluster = "test-009"
+        cluster = chi
 
         kubectl.create_and_check(
             manifest=manifest,
@@ -194,8 +194,8 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
 
         with Then("Create tables"):
             for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
-                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host = h)
-                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host = h)
+                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host=h)
+                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host=h)
             clickhouse.query(chi, "INSERT INTO test_dist SELECT * from numbers(2)")
 
     trigger_event = threading.Event()
@@ -207,7 +207,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
               query="select count() from cluster('{cluster}', system.one)",
               res1="2",
               res2="1",
-              trigger_event = trigger_event,
+              trigger_event=trigger_event,
         )
 
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
@@ -262,7 +262,8 @@ def check_operator_restart(chi, wait_objects, pod):
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
 
         with Then("ClickHouse pods should not be restarted during operator's restart"):
-            print(f"pod start_time'{start_time} vs {new_start_time}")
+            print(f"pod start_time old: {start_time}'")
+            print(f"pod start_time new: {new_start_time}")
             assert start_time == new_start_time
 
 
@@ -286,8 +287,8 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
 
     with Then("Create tables"):
         for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
-            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host = h)
-            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)", host = h)
+            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host=h)
+            clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)", host=h)
 
     trigger_event = threading.Event()
 
@@ -315,8 +316,11 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
               trigger_event=trigger_event,
         )
 
-    check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3},
-                               pod=f"chi-{chi}-{cluster}-0-0-0")
+    check_operator_restart(
+        chi=chi,
+        wait_objects={"statefulset": 2, "pod": 2, "service": 3},
+        pod=f"chi-{chi}-{cluster}-0-0-0"
+    )
     trigger_event.set()
     join()
 
@@ -331,8 +335,10 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
 
 
 @TestCheck
-def check_remote_servers(self, chi, shards, trigger_event):
-    """Check cluster definition in configmap until signal is recieved"""
+def check_remote_servers(self, chi, shards, trigger_event, cluster=''):
+    """Check cluster definition in configmap until signal is received"""
+    if cluster == '':
+        cluster = chi
 
     try:
         self.context.shell = Shell()
@@ -344,9 +350,10 @@ def check_remote_servers(self, chi, shards, trigger_event):
             chi_start = remote_servers.find(f"<{cluster}>")
             chi_end = remote_servers.find(f"</{cluster}>")
             if chi_start < 0:
+                print(f"unable to find '<{cluster}>' in:")
                 print(remote_servers)
-            with Then(f"Remote servers should contain {chi} cluster"):
-                assert chi_start >= 0
+                with Then(f"Remote servers should contain {cluster} cluster"):
+                    assert chi_start >= 0
 
             chi_cluster = remote_servers[chi_start:chi_end]
             chi_shards = chi_cluster.count("<shard>")
@@ -551,14 +558,18 @@ def test_011(self):
                 assert out == 'OK'
 
             with And("Connection from secured to secured host should succeed"):
-                out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'",
-                    host="chi-test-011-secured-cluster-default-1-0"
+                out = clickhouse.query_with_error(
+                    "test-011-secured-cluster",
+                    "select 'OK'",
+                    host="chi-test-011-secured-cluster-default-1-0",
                 )
                 assert out == 'OK'
 
             with And("Connection from insecured to secured host should fail for default user"):
-                out = clickhouse.query_with_error("test-011-insecured-cluster", "select 'OK'",
-                    host="chi-test-011-secured-cluster-default-1-0"
+                out = clickhouse.query_with_error(
+                    "test-011-insecured-cluster",
+                    "select 'OK'",
+                    host="chi-test-011-secured-cluster-default-1-0",
                 )
                 assert out != 'OK'
 
@@ -929,7 +940,7 @@ def test_014(self):
     manifest = "manifests/chi/test-014-replication-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
-    shards = [0,1]
+    shards = [0, 1]
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -2488,6 +2499,13 @@ def test_032(self):
             res2=str(numbers // 2),
             trigger_event=trigger_event,
             )
+
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+        chi=chi,
+        cluster="default",
+        shards=2,
+        trigger_event=trigger_event,
+    )
 
     with When("Change the image in the podTemplate by updating the chi version to test the rolling update logic"):
         kubectl.create_and_check(

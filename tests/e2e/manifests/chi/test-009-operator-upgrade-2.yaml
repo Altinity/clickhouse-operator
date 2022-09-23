@@ -29,7 +29,7 @@ spec:
       default/max_query_size: 41943040
       default/max_ast_elements: 100000
     clusters:
-      - name: test-009
+      - name: test-009-2
         templates:
           podTemplate: clickhouse-template
           dataVolumeClaimTemplate: aws-ebs-volume-claim
