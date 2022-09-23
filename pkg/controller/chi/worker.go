@@ -305,7 +305,9 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			w.reconcileCHIConfigMapUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				TolerateAbsence: true,
-				Normalized:      true,
+				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+					Normalized: true,
+				},
 			})
 		} else {
 			w.a.M(&new.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", new.Labels, err)
@@ -357,18 +359,45 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 // isCleanRestartOnTheSameIP checks whether it is just a restart of the operator on the same IP
 func (w *worker) isCleanRestartOnTheSameIP(chi *chiv1.ClickHouseInstallation) bool {
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_IP)
-	return w.isCleanRestart(chi) && (ip == chi.Status.CHOpIP)
+	ipIsTheSame := ip == chi.Status.CHOpIP
+	return w.isCleanRestart(chi) && ipIsTheSame
 }
 
 // isCleanRestart checks whether it is just a restart of the operator and CHI has no changes since last processed
 func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
-	return (time.Since(w.start) < 1*time.Minute) && (chi.Generation == chi.Status.Generation)
+	// Nothing has changed in CHI spec
+	generationIsOk := (chi.Status.NormalizedCHICompleted != nil) && (chi.Generation == chi.Status.NormalizedCHICompleted.Generation)
+	// And operator just recently started
+	timeIsOk := time.Since(w.start) < 1*time.Minute
+	return timeIsOk && generationIsOk
+}
+
+func (w *worker) isAfterFinalizerInstalled(old, new *chiv1.ClickHouseInstallation) bool {
+	if old == nil || new == nil {
+		return false
+	}
+	generationIsTheSame := old.Generation == new.Generation
+	finalizerIsInstalled := len(old.Finalizers) == 0 && len(new.Finalizers) > 0
+	return generationIsTheSame && finalizerIsInstalled
+}
+
+func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) bool {
+	if old == nil || new == nil {
+		return false
+	}
+	return old.Generation == new.Generation
 }
 
 func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
-	if (old == nil) && w.isCleanRestart(new) {
-		old = new.Status.NormalizedCHI
+	switch {
+	case w.isAfterFinalizerInstalled(old, new):
+		old = nil
+	case w.isGenerationTheSame(old, new):
+		return nil
+	case new.Status.NormalizedCHICompleted != nil:
+		old = new.Status.NormalizedCHICompleted
 	}
+
 	old = w.normalize(old)
 	new = w.normalize(new)
 	actionPlan := chopmodel.NewActionPlan(old, new)
@@ -479,7 +508,9 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	(&chi.Status).ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		WholeStatus: true,
+		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+			MainFields: true,
+		},
 	})
 
 	w.a.V(1).
@@ -502,7 +533,9 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 			w.a.V(1).M(chi).Info("Update users IPS")
 			(&chi.Status).ReconcileComplete(chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-				WholeStatus: true,
+				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+					WholeStatus: true,
+				},
 			})
 		} else {
 			w.a.M(&_chi.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", _chi.Labels, err)
@@ -1375,7 +1408,9 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	(&chi.Status).DeleteStart()
 	if err := w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence: true,
-		WholeStatus:     true,
+		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+			MainFields: true,
+		},
 	}); err != nil {
 		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err:%q", err)
 		return nil
@@ -1537,7 +1572,9 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 	chi.Status.DeletedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence: true,
-		WholeStatus:     true,
+		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+			MainFields: true,
+		},
 	})
 
 	if err == nil {
@@ -1990,7 +2027,9 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 
 	host.CHI.Status.AddedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-		WholeStatus: true,
+		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+			MainFields: true,
+		},
 	})
 
 	if err == nil {
@@ -2089,7 +2128,9 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		if err == nil {
 			host.CHI.Status.UpdatedHostsCount++
 			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-				WholeStatus: true,
+				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+					MainFields: true,
+				},
 			})
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
