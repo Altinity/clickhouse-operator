@@ -1040,7 +1040,7 @@ def test_014(self):
                         assert out == f"{shard}"
 
     # replicas = [1]
-    replicas = [1,2]
+    replicas = [1, 2]
     with When(f"Add {len(replicas)} more replicas"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-014-replication-{1+len(replicas)}.yaml",
@@ -1969,8 +1969,7 @@ def test_025(self):
 
     with Given("Create replicated table and populate it"):
         clickhouse.query(chi, create_table)
-        clickhouse.query(chi,
-                         "CREATE TABLE test_distr_025 AS test_local_025 Engine = Distributed('default', default, test_local_025)")
+        clickhouse.query(chi, "CREATE TABLE test_distr_025 AS test_local_025 Engine = Distributed('default', default, test_local_025)")
         clickhouse.query(chi, f"INSERT INTO test_local_025 SELECT * FROM numbers({numbers})", timeout=120)
 
     with When("Add one more replica, but do not wait for completion"):
@@ -2273,14 +2272,21 @@ def test_029(self):
         },
     )
 
-    kubectl.check_pod_antiaffinity(chi, "chi-test-029-distribution-t1-0-0-0", topologyKey="kubernetes.io/hostname")
-    kubectl.check_pod_antiaffinity(chi, "chi-test-029-distribution-t1-0-1-0",
-                                   match_labels={
-                                       "clickhouse.altinity.com/chi": f"{chi}",
-                                       "clickhouse.altinity.com/namespace": f"{kubectl.namespace}",
-                                       "clickhouse.altinity.com/replica": "1",
-                                   },
-                                   topologyKey="kubernetes.io/os")
+    kubectl.check_pod_antiaffinity(
+        chi,
+        "chi-test-029-distribution-t1-0-0-0",
+        topologyKey="kubernetes.io/hostname",
+    )
+    kubectl.check_pod_antiaffinity(
+        chi,
+        "chi-test-029-distribution-t1-0-1-0",
+        match_labels={
+           "clickhouse.altinity.com/chi": f"{chi}",
+           "clickhouse.altinity.com/namespace": f"{kubectl.namespace}",
+           "clickhouse.altinity.com/replica": "1",
+        },
+        topologyKey="kubernetes.io/os",
+    )
 
     kubectl.delete_chi(chi)
 
@@ -2484,21 +2490,21 @@ def test_032(self):
 
     with When("check the initial select query count before rolling update"):
         with By("executing query in the clickhouse installation"):
-                cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_distr", with_error=True)
+            cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_distr", with_error=True)
         with Then("checking expected result"):
             assert cnt_test_local == str(numbers), error()
 
     trigger_event = threading.Event()
 
     Check("run query until receive stop event", test=run_select_query, parallel=True)(
-            host="clickhouse-test-032-rescaling",
-            user="test_032",
-            password="test_032",
-            query="select count() from test_distr",
-            res1=str(numbers),
-            res2=str(numbers // 2),
-            trigger_event=trigger_event,
-            )
+        host="clickhouse-test-032-rescaling",
+        user="test_032",
+        password="test_032",
+        query="select count() from test_distr",
+        res1=str(numbers),
+        res2=str(numbers // 2),
+        trigger_event=trigger_event,
+    )
 
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
@@ -2736,8 +2742,12 @@ def test_035(self):
 
     try:
         with Given("clickhouse-operator pod exists"):
-            kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
-                            ns=settings.operator_namespace)
+            kubectl.wait_field(
+                "pods",
+                util.operator_label,
+                ".status.containerStatuses[*].ready",
+                "true,true",
+                ns=settings.operator_namespace)
             assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
             out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
 
@@ -2797,7 +2807,6 @@ def test_035(self):
         with Finally("I remove the port forwarding and close the shell"):
             self.context.shell("timeout 3 killall -vws2 kubectl || killall -vws9 kubectl", timeout=5)
             self.context.shell.close()
-
 
 
 @TestModule
