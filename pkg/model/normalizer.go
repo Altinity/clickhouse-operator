@@ -385,13 +385,8 @@ func (n *Normalizer) fillStatus() {
 		fqdns = append(fqdns, CreateFQDN(host))
 		return nil
 	})
-	// Spam normalized config in high-verbose modes only
-	normalized := false
-	if v, err := chop.Config().GetLogLevel(); (err == nil) && (v >= 1) {
-		normalized = true
-	}
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
-	n.ctx.chi.FillStatus(endpoint, pods, fqdns, ip, normalized)
+	n.ctx.chi.FillStatus(endpoint, pods, fqdns, ip)
 }
 
 // normalizeTaskID normalizes .spec.taskID
