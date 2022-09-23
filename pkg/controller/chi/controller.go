@@ -18,8 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
-	"sort"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -28,6 +26,7 @@ import (
 	core "k8s.io/api/core/v1"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeinformers "k8s.io/client-go/informers"
@@ -739,11 +738,8 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 }
 
 type UpdateCHIStatusOptions struct {
+	chi.CopyCHIStatusOptions
 	TolerateAbsence bool
-	Actions         bool
-	Errors          bool
-	Normalized      bool
-	WholeStatus     bool
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
@@ -792,39 +788,8 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 	}
 
 	// Update status of a real object.
-	// TODO DeepCopy depletes stack here
-
-	if opts.Actions {
-		cur.Status.Action = chi.Status.Action
-		cur.Status.Actions = util.MergeStringArrays(cur.Status.Actions, chi.Status.Actions)
-		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Actions)))
-
-	}
-
-	if opts.Errors {
-		cur.Status.Error = chi.Status.Error
-		cur.Status.Errors = util.MergeStringArrays(cur.Status.Errors, chi.Status.Errors)
-		sort.Sort(sort.Reverse(sort.StringSlice(cur.Status.Errors)))
-	}
-
-	if opts.Normalized {
-		cur.Status.NormalizedCHI = chi.Status.NormalizedCHI
-	}
-
-	if opts.WholeStatus {
-		cur.Status = chi.Status
-	}
-
+	(&cur.Status).CopyFrom(&chi.Status, opts.CopyCHIStatusOptions)
 	cur.Status.PodIPs = c.getPodsIPs(chi)
-
-	// TODO fix this with verbosity update
-	// Start Debug object
-	//js, err := json.MarshalIndent(chi, "", "  ")
-	//if err != nil {
-	//	log.V(1).M(chi).F().Error("%q", err)
-	//}
-	//log.V(3).M(chi).F().Info("\n%s\n", js)
-	// End Debug object
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
 	if err != nil {
