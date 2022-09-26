@@ -290,7 +290,7 @@ def test_008_2(self):
             util.restart_operator()
             with Then("Cluster creation should continue after a restart"):
                 # Fail faster
-                kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=5)
+                kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=10)
                 kubectl.wait_objects(chi, full_cluster)
                 kubectl.wait_chi_status(chi, "Completed")
 
