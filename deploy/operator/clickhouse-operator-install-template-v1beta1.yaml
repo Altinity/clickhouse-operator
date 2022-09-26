@@ -202,7 +202,11 @@ spec:
               description: "Generation"
             normalized:
               type: object
-              description: "Normalized CHI"
+              description: "Normalized CHI requested"
+              x-kubernetes-preserve-unknown-fields: true
+            normalizedCompleted:
+              type: object
+              description: "Normalized CHI completed"
               x-kubernetes-preserve-unknown-fields: true
         spec:
           type: object
@@ -1551,7 +1555,11 @@ spec:
               description: "Generation"
             normalized:
               type: object
-              description: "Normalized CHI"
+              description: "Normalized CHI requested"
+              x-kubernetes-preserve-unknown-fields: true
+            normalizedCompleted:
+              type: object
+              description: "Normalized CHI completed"
               x-kubernetes-preserve-unknown-fields: true
         spec:
           type: object
