@@ -967,6 +967,7 @@ def test_014(self):
         },
         timeout=600,
     )
+    kubectl.wait_chi_status(chi, "Completed", retries=20)
 
     start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
@@ -1007,7 +1008,7 @@ def test_014(self):
             assert n_shards == get_shards_from_remote_servers(chi, cluster)
         with By(f"ClickHouse recognizes {n_shards} shards in the cluster"):
             cnt = ""
-            for i in range(1,10):
+            for i in range(1, 10):
                 cnt = clickhouse.query(chi, f"select count() from system.clusters where cluster ='{cluster}'", host=f"chi-{chi}-{cluster}-0-0")
                 if cnt == str(n_shards):
                     break
@@ -1064,14 +1065,17 @@ def test_014(self):
     # replicas = [1]
     replicas = [1, 2]
     with When(f"Add {len(replicas)} more replicas"):
+        manifest = f"manifests/chi/test-014-replication-{1+len(replicas)}.yaml"
+        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
         kubectl.create_and_check(
-            manifest=f"manifests/chi/test-014-replication-{1+len(replicas)}.yaml",
+            manifest=manifest,
             check={
                 "pod_count": 2 + 2*len(replicas),
                 "do_not_delete": 1,
             },
             timeout=600,
         )
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
 
@@ -1081,12 +1085,15 @@ def test_014(self):
         check_schema_propagation(replicas)
 
     with When("Remove replicas"):
+        manifest = "manifests/chi/test-014-replication-1.yaml"
+        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
             })
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
 
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
@@ -1118,14 +1125,17 @@ def test_014(self):
             clickhouse.query(chi, "INSERT INTO test_local_014 VALUES(3)")
 
     with When("Add replica one more time"):
+        manifest = "manifests/chi/test-014-replication-2.yaml"
+        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
         kubectl.create_and_check(
-            manifest="manifests/chi/test-014-replication-2.yaml",
+            manifest=manifest,
             check={
                 "pod_count": 4,
                 "do_not_delete": 1,
             },
             timeout=600,
         )
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
         check_schema_propagation([1])
@@ -1133,14 +1143,15 @@ def test_014(self):
     with When("Delete chi"):
         kubectl.delete_chi("test-014-replication")
 
-        with Then(
-                f"Tables should be deleted in {self.context.keeper_type}. We can test it re-creating the chi and checking {self.context.keeper_type} contents"):
+        with Then(f"Tables should be deleted in {self.context.keeper_type}. We can test it re-creating the chi and checking {self.context.keeper_type} contents"):
+            manifest = "manifests/chi/test-014-replication-1.yaml"
             kubectl.create_and_check(
                 manifest=manifest,
                 check={
                     "pod_count": 2,
                     "do_not_delete": 1,
                 })
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
             with Then("Tables are deleted in ZooKeeper"):
                 out = clickhouse.query_with_error(
                     chi,
@@ -1175,7 +1186,7 @@ def test_014_1(self):
 
     create_table = "CREATE TABLE test_local_014_1 ON CLUSTER '{cluster}' (a Int8, r UInt64) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/{table}', '{replica}') ORDER BY tuple()"
     table = "test_local_014_1"
-    replicas = [0,1]
+    replicas = [0, 1]
 
     with Given("Create schema objects"):
         clickhouse.query(chi, create_table)
@@ -1657,6 +1668,7 @@ def test_020(self, step=1):
             "do_not_delete": 1,
         },
     )
+    kubectl.wait_chi_status(chi, "Completed", retries=20)
 
     with When("Create a table and insert 1 row"):
         clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
@@ -1664,6 +1676,8 @@ def test_020(self, step=1):
 
         with Then("Data should be placed on default disk"):
             out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
+            print(f"out : {out}")
+            print(f"want: default")
             assert out == 'default'
 
     with When("alter table test_disks move partition tuple() to disk 'disk2'"):
@@ -1671,6 +1685,8 @@ def test_020(self, step=1):
 
         with Then("Data should be placed on disk2"):
             out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
+            print(f"out : {out}")
+            print(f"want: disk2")
             assert out == 'disk2'
 
     kubectl.delete_chi(chi)
