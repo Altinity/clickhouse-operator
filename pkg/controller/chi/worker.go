@@ -435,6 +435,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 	w.clear(ctx, new)
 	w.dropReplicas(ctx, new, actionPlan)
 	w.includeStopped(new)
+	time.Sleep(60 * time.Second)
 	w.markReconcileComplete(ctx, new)
 
 	return nil
