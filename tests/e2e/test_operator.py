@@ -967,7 +967,6 @@ def test_014(self):
         },
         timeout=600,
     )
-    kubectl.wait_chi_status(chi, "Completed", retries=20)
 
     start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
@@ -1075,7 +1074,6 @@ def test_014(self):
             },
             timeout=600,
         )
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
 
@@ -1093,7 +1091,6 @@ def test_014(self):
                 "pod_count": 2,
                 "do_not_delete": 1,
             })
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
 
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
@@ -1135,7 +1132,6 @@ def test_014(self):
             },
             timeout=600,
         )
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
         check_schema_propagation([1])
