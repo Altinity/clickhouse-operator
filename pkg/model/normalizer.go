@@ -1111,9 +1111,9 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		//
 
 		// CHOp user does not handle password here
-		if username == chopUsername {
-			continue // move to the next user
-		}
+		//if username == chopUsername {
+		//	continue // move to the next user
+		//}
 
 		// Values from the secret have higher priority
 		n.substWithSecretField(users, username, "password", "k8s_secret_password")
