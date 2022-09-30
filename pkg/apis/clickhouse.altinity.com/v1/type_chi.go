@@ -26,7 +26,7 @@ import (
 )
 
 // FillStatus fills .Status
-func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string, normalized bool) {
+func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string) {
 	chi.Status.CHOpVersion = version.Version
 	chi.Status.CHOpCommit = version.GitSHA
 	chi.Status.CHOpDate = version.BuiltAt
@@ -41,17 +41,13 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.Status.Pods = pods
 	chi.Status.FQDNs = fqdns
 	chi.Status.Endpoint = endpoint
-	chi.Status.Generation = 0
-	if normalized {
-		chi.Status.NormalizedCHI = &ClickHouseInstallation{
-			TypeMeta:   chi.TypeMeta,
-			ObjectMeta: chi.ObjectMeta,
-			Spec:       chi.Spec,
-			// Skip status
-		}
-	} else {
-		chi.Status.NormalizedCHI = nil
+	chi.Status.NormalizedCHI = &ClickHouseInstallation{
+		TypeMeta:   chi.TypeMeta,
+		ObjectMeta: chi.ObjectMeta,
+		Spec:       chi.Spec,
+		// Skip status
 	}
+	chi.Status.NormalizedCHICompleted = chi.Status.NormalizedCHI
 }
 
 // FillSelfCalculatedAddressInfo calculates and fills address info

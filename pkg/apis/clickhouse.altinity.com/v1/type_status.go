@@ -14,34 +14,40 @@
 
 package v1
 
+import (
+	"sort"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
+)
+
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	CHOpVersion       string                  `json:"chop-version,omitempty"     yaml:"chop-version,omitempty"`
-	CHOpCommit        string                  `json:"chop-commit,omitempty"      yaml:"chop-commit,omitempty"`
-	CHOpDate          string                  `json:"chop-date,omitempty"        yaml:"chop-date,omitempty"`
-	CHOpIP            string                  `json:"chop-ip,omitempty"          yaml:"chop-ip,omitempty"`
-	ClustersCount     int                     `json:"clusters"                   yaml:"clusters"`
-	ShardsCount       int                     `json:"shards"                     yaml:"shards"`
-	ReplicasCount     int                     `json:"replicas"                   yaml:"replicas"`
-	HostsCount        int                     `json:"hosts"                      yaml:"hosts"`
-	Status            string                  `json:"status"                     yaml:"status"`
-	TaskID            string                  `json:"taskID,omitempty"           yaml:"taskID,omitempty"`
-	TaskIDsStarted    []string                `json:"taskIDsStarted,omitempty"   yaml:"taskIDsStarted,omitempty"`
-	TaskIDsCompleted  []string                `json:"taskIDsCompleted,omitempty" yaml:"taskIDsCompleted,omitempty"`
-	Action            string                  `json:"action,omitempty"           yaml:"action,omitempty"`
-	Actions           []string                `json:"actions,omitempty"          yaml:"actions,omitempty"`
-	Error             string                  `json:"error,omitempty"            yaml:"error,omitempty"`
-	Errors            []string                `json:"errors,omitempty"           yaml:"errors,omitempty"`
-	UpdatedHostsCount int                     `json:"updated,omitempty"          yaml:"updated,omitempty"`
-	AddedHostsCount   int                     `json:"added,omitempty"            yaml:"added,omitempty"`
-	DeletedHostsCount int                     `json:"deleted,omitempty"          yaml:"deleted,omitempty"`
-	DeleteHostsCount  int                     `json:"delete,omitempty"           yaml:"delete,omitempty"`
-	Pods              []string                `json:"pods,omitempty"             yaml:"pods,omitempty"`
-	PodIPs            []string                `json:"pod-ips,omitempty"          yaml:"pod-ips,omitempty"`
-	FQDNs             []string                `json:"fqdns,omitempty"            yaml:"fqdns,omitempty"`
-	Endpoint          string                  `json:"endpoint,omitempty"         yaml:"endpoint,omitempty"`
-	Generation        int64                   `json:"generation,omitempty"       yaml:"generation,omitempty"`
-	NormalizedCHI     *ClickHouseInstallation `json:"normalized,omitempty"       yaml:"normalized,omitempty"`
+	CHOpVersion            string                  `json:"chop-version,omitempty"        yaml:"chop-version,omitempty"`
+	CHOpCommit             string                  `json:"chop-commit,omitempty"         yaml:"chop-commit,omitempty"`
+	CHOpDate               string                  `json:"chop-date,omitempty"           yaml:"chop-date,omitempty"`
+	CHOpIP                 string                  `json:"chop-ip,omitempty"             yaml:"chop-ip,omitempty"`
+	ClustersCount          int                     `json:"clusters"                      yaml:"clusters"`
+	ShardsCount            int                     `json:"shards"                        yaml:"shards"`
+	ReplicasCount          int                     `json:"replicas"                      yaml:"replicas"`
+	HostsCount             int                     `json:"hosts"                         yaml:"hosts"`
+	Status                 string                  `json:"status"                        yaml:"status"`
+	TaskID                 string                  `json:"taskID,omitempty"              yaml:"taskID,omitempty"`
+	TaskIDsStarted         []string                `json:"taskIDsStarted,omitempty"      yaml:"taskIDsStarted,omitempty"`
+	TaskIDsCompleted       []string                `json:"taskIDsCompleted,omitempty"    yaml:"taskIDsCompleted,omitempty"`
+	Action                 string                  `json:"action,omitempty"              yaml:"action,omitempty"`
+	Actions                []string                `json:"actions,omitempty"             yaml:"actions,omitempty"`
+	Error                  string                  `json:"error,omitempty"               yaml:"error,omitempty"`
+	Errors                 []string                `json:"errors,omitempty"              yaml:"errors,omitempty"`
+	UpdatedHostsCount      int                     `json:"updated,omitempty"             yaml:"updated,omitempty"`
+	AddedHostsCount        int                     `json:"added,omitempty"               yaml:"added,omitempty"`
+	DeletedHostsCount      int                     `json:"deleted,omitempty"             yaml:"deleted,omitempty"`
+	DeleteHostsCount       int                     `json:"delete,omitempty"              yaml:"delete,omitempty"`
+	Pods                   []string                `json:"pods,omitempty"                yaml:"pods,omitempty"`
+	PodIPs                 []string                `json:"pod-ips,omitempty"             yaml:"pod-ips,omitempty"`
+	FQDNs                  []string                `json:"fqdns,omitempty"               yaml:"fqdns,omitempty"`
+	Endpoint               string                  `json:"endpoint,omitempty"            yaml:"endpoint,omitempty"`
+	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"          yaml:"normalized,omitempty"`
+	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty" yaml:"normalizedCompleted,omitempty"`
 }
 
 const (
@@ -106,7 +112,6 @@ func (s *ChiStatus) ReconcileComplete(chi *ClickHouseInstallation) {
 	s.Status = StatusCompleted
 	s.Action = ""
 	s.PushTaskIDCompleted()
-	s.Generation = chi.Generation
 }
 
 // DeleteStart marks deletion start
@@ -117,4 +122,88 @@ func (s *ChiStatus) DeleteStart() {
 	s.DeletedHostsCount = 0
 	s.DeleteHostsCount = 0
 	s.PushTaskIDStarted()
+}
+
+type CopyCHIStatusOptions struct {
+	Actions     bool
+	Errors      bool
+	Normalized  bool
+	MainFields  bool
+	WholeStatus bool
+}
+
+func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
+	if opts.Actions {
+		s.Action = from.Action
+		s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
+		sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
+	}
+
+	if opts.Errors {
+		s.Error = from.Error
+		s.Errors = util.MergeStringArrays(s.Errors, from.Errors)
+		sort.Sort(sort.Reverse(sort.StringSlice(s.Errors)))
+	}
+
+	if opts.Normalized {
+		s.NormalizedCHI = from.NormalizedCHI
+	}
+
+	if opts.MainFields {
+		s.CHOpVersion = from.CHOpVersion
+		s.CHOpCommit = from.CHOpCommit
+		s.CHOpDate = from.CHOpDate
+		s.CHOpIP = from.CHOpIP
+		s.ClustersCount = from.ClustersCount
+		s.ShardsCount = from.ShardsCount
+		s.ReplicasCount = from.ReplicasCount
+		s.HostsCount = from.HostsCount
+		s.Status = from.Status
+		s.TaskID = from.TaskID
+		s.TaskIDsStarted = from.TaskIDsStarted
+		s.TaskIDsCompleted = from.TaskIDsCompleted
+		s.Action = from.Action
+		s.Actions = from.Actions
+		s.Error = from.Error
+		s.Errors = from.Errors
+		s.UpdatedHostsCount = from.UpdatedHostsCount
+		s.AddedHostsCount = from.AddedHostsCount
+		s.DeletedHostsCount = from.DeletedHostsCount
+		s.DeleteHostsCount = from.DeleteHostsCount
+		s.Pods = from.Pods
+		s.PodIPs = from.PodIPs
+		s.FQDNs = from.FQDNs
+		s.Endpoint = from.Endpoint
+		s.NormalizedCHI = from.NormalizedCHI
+
+	}
+
+	if opts.WholeStatus {
+		s.CHOpVersion = from.CHOpVersion
+		s.CHOpCommit = from.CHOpCommit
+		s.CHOpDate = from.CHOpDate
+		s.CHOpIP = from.CHOpIP
+		s.ClustersCount = from.ClustersCount
+		s.ShardsCount = from.ShardsCount
+		s.ReplicasCount = from.ReplicasCount
+		s.HostsCount = from.HostsCount
+		s.Status = from.Status
+		s.TaskID = from.TaskID
+		s.TaskIDsStarted = from.TaskIDsStarted
+		s.TaskIDsCompleted = from.TaskIDsCompleted
+		s.Action = from.Action
+		s.Actions = from.Actions
+		s.Error = from.Error
+		s.Errors = from.Errors
+		s.UpdatedHostsCount = from.UpdatedHostsCount
+		s.AddedHostsCount = from.AddedHostsCount
+		s.DeletedHostsCount = from.DeletedHostsCount
+		s.DeleteHostsCount = from.DeleteHostsCount
+		s.Pods = from.Pods
+		s.PodIPs = from.PodIPs
+		s.FQDNs = from.FQDNs
+		s.Endpoint = from.Endpoint
+		s.NormalizedCHI = from.NormalizedCHI
+		s.NormalizedCHICompleted = from.NormalizedCHICompleted
+	}
 }
