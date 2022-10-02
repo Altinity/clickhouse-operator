@@ -1172,11 +1172,6 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		// Deal with passwords
 		//
 
-		// CHOp user does not handle password here
-		//if username == chopUsername {
-		//	continue // move to the next user
-		//}
-
 		// Values from the secret have higher priority
 		n.substWithSecretField(users, username, "password", "k8s_secret_password")
 		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
@@ -1214,8 +1209,15 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		passwordPlaintext := users.Get(username + "/password").String()
 
 		// Apply default password for password-less non-default users
-		if (passwordPlaintext == "") && (username != defaultUsername) {
-			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
+		if passwordPlaintext == "" {
+			switch username {
+			case defaultUsername:
+				// NB "default" user may keep empty password in here.
+			case chopUsername:
+				passwordPlaintext = chop.Config().ClickHouse.Access.Password
+			default:
+				passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
+			}
 		}
 
 		// NB "default" user may keep empty password in here.
@@ -1235,6 +1237,12 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
 		// thus we need to overwrite it.
 		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
+	}
+	if users.Has(chopUsername+"/password_double_sha1_hex") || users.Has(chopUsername+"/password_sha256_hex") {
+		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
+		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
+		// thus we need to overwrite it.
+		users.Set(chopUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 
 	return users
