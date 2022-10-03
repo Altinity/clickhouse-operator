@@ -1,3 +1,3 @@
 #!/bin/bash
-minikube delete; minikube start; k9s -c ns
+minikube delete && docker system prune -f && minikube start && k9s -c ns
 
