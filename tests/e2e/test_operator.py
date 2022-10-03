@@ -503,6 +503,14 @@ def test_011(self):
             )
             assert out != 'OK'
 
+        with And("User 'clickhouse_operator' with can login with custom password"):
+            out = clickhouse.query_with_error(
+                "test-011-insecured-cluster",
+                "select 'OK'",
+                user="clickhouse_operator", pwd="operator_secret"
+            )
+            assert out != 'OK'
+
         kubectl.delete_chi("test-011-secured-cluster")
         kubectl.delete_chi("test-011-insecured-cluster")
 
