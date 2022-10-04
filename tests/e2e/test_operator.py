@@ -2425,7 +2425,7 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
     try:
         self.context.shell = Shell()
 
-        kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
+        kubectl.launch(f"run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c \"sleep 3600\"")
         kubectl.wait_pod_status(client_pod, "Running")
 
         ok = 0
@@ -2460,7 +2460,7 @@ def run_insert_query(self, host, user, password, query, trigger_event):
     try:
         self.context.shell = Shell()
 
-        kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
+        kubectl.launch(f"run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c \"sleep 3600\"")
         kubectl.wait_pod_status(client_pod, "Running")
 
         ok = 0
