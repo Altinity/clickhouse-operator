@@ -218,8 +218,9 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
 
     with When(f"upgrade operator to {version_to}"):
         util.set_operator_version(version_to, timeout=120)
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
+        time.sleep(15)
 
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
         kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
         with Then("Check that table is here"):
