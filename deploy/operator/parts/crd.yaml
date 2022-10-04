@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.19.2
+    clickhouse.altinity.com/chop: 0.19.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -210,7 +210,11 @@ spec:
                   description: "Generation"
                 normalized:
                   type: object
-                  description: "Normalized CHI"
+                  description: "Normalized CHI requested"
+                  x-kubernetes-preserve-unknown-fields: true
+                normalizedCompleted:
+                  type: object
+                  description: "Normalized CHI completed"
                   x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
@@ -1372,7 +1376,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.19.2
+    clickhouse.altinity.com/chop: 0.19.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1572,7 +1576,11 @@ spec:
                   description: "Generation"
                 normalized:
                   type: object
-                  description: "Normalized CHI"
+                  description: "Normalized CHI requested"
+                  x-kubernetes-preserve-unknown-fields: true
+                normalizedCompleted:
+                  type: object
+                  description: "Normalized CHI completed"
                   x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
@@ -2731,7 +2739,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.19.2
+    clickhouse.altinity.com/chop: 0.19.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced

@@ -45,6 +45,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     code = cmd.exitcode
     if not ok_to_fail:
         if code != 0:
+            print(f"command failed, output:\n{cmd.output}")
             debug(f"command failed, output:\n{cmd.output}")
         assert code == 0, error()
     # Command test result
