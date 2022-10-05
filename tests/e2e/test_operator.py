@@ -234,7 +234,9 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
             if start_time != new_start_time:
                 kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
                 kubectl.launch(
-                    f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+                    # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator)
+                    #f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+                    f"logs -n {settings.operator_namespace} $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
                 )
             assert start_time == new_start_time, error(
                 f"{start_time} != {new_start_time}, pod restarted after operator upgrade")

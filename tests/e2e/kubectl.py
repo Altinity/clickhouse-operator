@@ -33,6 +33,8 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     if len(cmd_args) > 1:
         cmd += " ".join(cmd_args[1:])
 
+    # save command for debug purposes
+    command = cmd
     # print(f"run command: {cmd}")
 
     # Run command
@@ -45,8 +47,10 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     code = cmd.exitcode
     if not ok_to_fail:
         if code != 0:
-            print(f"command failed, output:\n{cmd.output}")
-            debug(f"command failed, output:\n{cmd.output}")
+            print(f"command failed, command:\n{command}")
+            print(f"command failed, output :\n{cmd.output}")
+            debug(f"command failed, command:\n{command}")
+            debug(f"command failed, output :\n{cmd.output}")
         assert code == 0, error()
     # Command test result
     return cmd.output if (code == 0) or ok_to_fail else ""
