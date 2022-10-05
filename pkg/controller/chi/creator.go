@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gopkg.in/d4l3k/messagediff.v1"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -75,6 +76,31 @@ func (c *Controller) updateStatefulSet(
 	if err != nil {
 		// Update failed
 		log.V(1).M(host).F().Error("%v", err)
+		diff, equal := messagediff.DeepDiff(oldStatefulSet.Spec, newStatefulSet.Spec)
+
+		str := ""
+		if equal {
+			str += "EQUAL: "
+		} else {
+			str += "NOT EQUAL: "
+		}
+
+		if len(diff.Added) > 0 {
+			// Something added
+			str += util.MessageDiffItemString("added spec items", diff.Added)
+		}
+
+		if len(diff.Removed) > 0 {
+			// Something removed
+			str += util.MessageDiffItemString("removed spec items", diff.Removed)
+		}
+
+		if len(diff.Modified) > 0 {
+			// Something modified
+			str += util.MessageDiffItemString("modified spec items", diff.Modified)
+		}
+		log.V(1).M(host).F().Error("%s", str)
+
 		return err
 	}
 
