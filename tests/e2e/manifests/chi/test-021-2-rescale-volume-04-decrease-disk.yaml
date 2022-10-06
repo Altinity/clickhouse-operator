@@ -3,6 +3,8 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-021-2-rescale-volume"
 spec:
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
     - name: simple
@@ -38,7 +40,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+              image: clickhouse/clickhouse-server:22.8.6.71
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse
