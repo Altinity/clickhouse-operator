@@ -410,6 +410,8 @@ def test_008_3(self):
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
+    full_cluster = {"statefulset": 4, "pod": 4, "service": 5}
+
     with Given("4-node CHI creation started"):
         with Then("Wait for a half of the cluster to start"):
             kubectl.create_and_check(
@@ -425,8 +427,10 @@ def test_008_3(self):
         with When("Restart operator"):
             util.restart_operator()
             with Then("Cluster creation should continue after a restart"):
-                kubectl.wait_objects(chi, {"statefulset": 4, "pod": 4, "service": 5})
-        kubectl.wait_chi_status(chi, "Completed")
+                # Fail faster
+                kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=3, retries=10)
+                kubectl.wait_objects(chi, full_cluster)
+                kubectl.wait_chi_status(chi, "Completed")
 
     with Then("Upgrade ClickHouse version to run a reconcile"):
         kubectl.create_and_check(
@@ -672,6 +676,14 @@ def test_011(self):
                 "test-011-insecured-cluster",
                 "select 'OK'",
                 user="user5", pwd="secret"
+            )
+            assert out != 'OK'
+
+        with And("User 'clickhouse_operator' with can login with custom password"):
+            out = clickhouse.query_with_error(
+                "test-011-insecured-cluster",
+                "select 'OK'",
+                user="clickhouse_operator", pwd="operator_secret"
             )
             assert out != 'OK'
 
@@ -939,6 +951,26 @@ def test_013(self):
     kubectl.delete_chi(chi)
 
 
+def get_shards_from_remote_servers(chi, cluster):
+    if cluster == '':
+        cluster = chi
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+
+    chi_start = remote_servers.find(f"<{cluster}>")
+    chi_end = remote_servers.find(f"</{cluster}>")
+    if chi_start < 0:
+        print(f"unable to find '<{cluster}>' in:")
+        print(remote_servers)
+        with Then(f"Remote servers should contain {cluster} cluster"):
+            assert chi_start >= 0
+
+    chi_cluster = remote_servers[chi_start:chi_end]
+    # print(chi_cluster)
+    chi_shards = chi_cluster.count("<shard>")
+
+    return chi_shards
+
+
 @TestScenario
 @Name("test_014. Test that schema is correctly propagated on replicas")
 @Requirements(
@@ -970,6 +1002,7 @@ def test_014(self):
         },
         timeout=600,
     )
+    kubectl.wait_chi_status(chi, "Completed", retries=20)
 
     start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
@@ -1077,6 +1110,7 @@ def test_014(self):
             },
             timeout=600,
         )
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
 
@@ -1094,6 +1128,7 @@ def test_014(self):
                 "pod_count": 2,
                 "do_not_delete": 1,
             })
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
 
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
@@ -1135,6 +1170,7 @@ def test_014(self):
             },
             timeout=600,
         )
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
         check_schema_propagation([1])
@@ -1650,6 +1686,44 @@ def test_019_1(self):
 )
 def test_019_2(self):
     test_019(step=2)
+
+@TestScenario
+@Name("test_020. Test multi-volume configuration")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+)
+def test_020(self):
+    manifest = "manifests/chi/test-020-multi-volume.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    kubectl.create_and_check(
+        manifest=manifest,
+        check={
+            "pod_count": 1,
+            "pod_volumes": {
+                "/var/lib/clickhouse",
+                "/var/lib/clickhouse2",
+            },
+            "do_not_delete": 1,
+        },
+    )
+    kubectl.wait_chi_status(chi, "Completed", retries=20)
+    with When("Create a table and insert 1 row"):
+        clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
+        clickhouse.query(chi, "insert into test_disks values (1)")
+
+        with Then("Data should be placed on default disk"):
+            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'default'
+
+    with When("alter table test_disks move partition tuple() to disk 'disk2'"):
+        clickhouse.query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
+
+        with Then("Data should be placed on disk2"):
+            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
+            assert out == 'disk2'
+
+    kubectl.delete_chi(chi)
+
 
 @TestCheck
 def test_021(self, step=1):
@@ -2845,7 +2919,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.19.2"
+    self.context.test_009_version_from = "0.19.3"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):

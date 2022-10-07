@@ -33,6 +33,8 @@ spec:
       user5/password: secret
       user5/networks/ip: "::/0"
       user5/networks/host: www.google.com
+      # clickhouse_operator password should be accepted and encrypted
+      clickhuse_operator/password: operator_secret
     clusters:
     - name: default
       layout:
