@@ -218,8 +218,9 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
 
     with When(f"upgrade operator to {version_to}"):
         util.set_operator_version(version_to, timeout=120)
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
+        time.sleep(15)
 
+        kubectl.wait_chi_status(chi, "Completed", retries=20)
         kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
         with Then("Check that table is here"):
@@ -233,7 +234,9 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
             if start_time != new_start_time:
                 kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
                 kubectl.launch(
-                    f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+                    # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator)
+                    #f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+                    f"logs -n {settings.operator_namespace} $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
                 )
             assert start_time == new_start_time, error(
                 f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
@@ -1648,68 +1651,11 @@ def test_019_1(self):
 def test_019_2(self):
     test_019(step=2)
 
-
-@TestCheck
-def test_020(self, step=1):
-    manifest = f"manifests/chi/test-020-{step}-multi-volume.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-    kubectl.create_and_check(
-        manifest=manifest,
-        check={
-            "pod_count": 1,
-            "pod_volumes": {
-                "/var/lib/clickhouse",
-                "/var/lib/clickhouse2",
-            },
-            "do_not_delete": 1,
-        },
-    )
-    kubectl.wait_chi_status(chi, "Completed", retries=20)
-
-    with When("Create a table and insert 1 row"):
-        clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
-        clickhouse.query(chi, "insert into test_disks values (1)")
-
-        with Then("Data should be placed on default disk"):
-            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
-            print(f"out : {out}")
-            print(f"want: default")
-            assert out == 'default'
-
-    with When("alter table test_disks move partition tuple() to disk 'disk2'"):
-        clickhouse.query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
-
-        with Then("Data should be placed on disk2"):
-            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
-            print(f"out : {out}")
-            print(f"want: disk2")
-            assert out == 'disk2'
-
-    kubectl.delete_chi(chi)
-
-
-@TestScenario
-@Name("test_020_1. Test multi-volume configuration. Provisioner: StatefulSet")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
-)
-def test_020_1(self):
-    test_020(step=1)
-
-
-@TestScenario
-@Name("test_020_2. Test multi-volume configuration. Provisioner: Operators")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
-)
-def test_020_2(self):
-    test_020(step=2)
-
-
 @TestCheck
 def test_021(self, step=1):
     manifest = f"manifests/chi/test-021-{step}-rescale-volume-01.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "simple"
 
     with Given("Default storage class is expandable"):
         default_storage_class = kubectl.get_default_storage_class()
@@ -1722,6 +1668,7 @@ def test_021(self, step=1):
     kubectl.create_and_check(
         manifest=manifest,
         check={
+            "apply_templates": { settings.clickhouse_template },
             "pod_count": 1,
             "do_not_delete": 1,
         },
@@ -1733,7 +1680,10 @@ def test_021(self, step=1):
         assert size == "1Gi"
 
     with Then("Create a table with a single row"):
-        clickhouse.query(chi, "CREATE TABLE test_local_021 Engine = Log as SELECT 1 AS wtf")
+        clickhouse.query(chi, "create table test_local_021(a Int8) Engine = MergeTree() order by a")
+        clickhouse.query(chi, "insert into test_local_021 values (1)")
+
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
     with When("Re-scale volume configuration to 2Gi"):
         kubectl.create_and_check(
@@ -1755,11 +1705,24 @@ def test_021(self, step=1):
             out = clickhouse.query(chi, "select * from test_local_021")
             assert out == "1"
 
+        with And("Check if pod has been restarted"):
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+            if step == 1:
+                with Then("Storage provisioner is StatefulSet. Pod should be restarted"):
+                    assert start_time != new_start_time
+            if step == 2:
+                with Then("Storage provisioner is Operator. Pod should not be restarted"):
+                    assert start_time == new_start_time
+
     with When("Add a second disk"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-021-{step}-rescale-volume-03-add-disk.yaml",
             check={
                 "pod_count": 1,
+                "pod_volumes": {
+                    "/var/lib/clickhouse",
+                    "/var/lib/clickhouse2",
+                },
                 "do_not_delete": 1,
             },
         )
@@ -1790,6 +1753,22 @@ def test_021(self, step=1):
         with And("Table should exist"):
             out = clickhouse.query(chi, "select * from test_local_021")
             assert out == "1"
+
+    with When("There are two disks test the move"):
+        with Then("Data should be initially on a default disk"):
+            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_local_021'")
+            print(f"out : {out}")
+            print(f"want: default")
+            assert out == 'default'
+
+        with When("alter table test_local_021 move partition tuple() to disk 'disk2'"):
+            clickhouse.query(chi, "alter table test_local_021 move partition tuple() to disk 'disk2'")
+
+            with Then("Data should be moved to disk2"):
+                out = clickhouse.query(chi, "select disk_name from system.parts where table='test_local_021'")
+                print(f"out : {out}")
+                print(f"want: disk2")
+                assert out == 'disk2'
 
     with When("Try reducing the disk size and also change a version to recreate the stateful set"):
         kubectl.create_and_check(
@@ -2425,7 +2404,7 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
     try:
         self.context.shell = Shell()
 
-        kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
+        kubectl.launch(f"run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c \"sleep 3600\"")
         kubectl.wait_pod_status(client_pod, "Running")
 
         ok = 0
@@ -2460,7 +2439,7 @@ def run_insert_query(self, host, user, password, query, trigger_event):
     try:
         self.context.shell = Shell()
 
-        kubectl.launch(f"run {client_pod} --image=clickhouse/clickhouse-server:21.8 -- /bin/sh -c \"sleep 3600\"")
+        kubectl.launch(f"run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c \"sleep 3600\"")
         kubectl.wait_pod_status(client_pod, "Running")
 
         ok = 0

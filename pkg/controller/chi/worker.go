@@ -365,13 +365,38 @@ func (w *worker) isCleanRestartOnTheSameIP(chi *chiv1.ClickHouseInstallation) bo
 
 // isCleanRestart checks whether it is just a restart of the operator and CHI has no changes since last processed
 func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
-	// Nothing has changed in CHI spec
-	generationIsOk := (chi.Status.NormalizedCHICompleted != nil) && (chi.Generation == chi.Status.NormalizedCHICompleted.Generation)
-	// And operator just recently started
+	// Operator just recently started
 	timeIsOk := time.Since(w.start) < 1*time.Minute
-	return timeIsOk && generationIsOk
+
+	if !timeIsOk {
+		// Need to have operator recently started
+		return false
+	}
+
+	// Migration support
+	// Do we have have previously completed CHI?
+	// In case no - this means that CHI has either not completed or we are migrating from
+	// such a version of the operator, where there is no completed CHI at all
+	noCompletedCHI := chi.Status.NormalizedCHICompleted == nil
+	// Having status completed and not having completed CHI suggests we are migrating operator version
+	statusIsCompleted := chi.Status.Status == chiv1.StatusCompleted
+	if noCompletedCHI && statusIsCompleted {
+		// In case of a restart - assume that normalized is already completed
+		chi.Status.NormalizedCHICompleted = chi.Status.NormalizedCHI
+	}
+
+	// Check whether anything has changed in CHI spec
+	// In case the generation is the same as already completed - it is clean restart
+	generationIsOk := false
+	// However, NormalizedCHICompleted still can be missing, for example, in newly requested CHI
+	if chi.Status.NormalizedCHICompleted != nil {
+		generationIsOk = chi.Generation == chi.Status.NormalizedCHICompleted.Generation
+	}
+
+	return generationIsOk
 }
 
+// isAfterFinalizerInstalled checks whether we are just installed finalizer
 func (w *worker) isAfterFinalizerInstalled(old, new *chiv1.ClickHouseInstallation) bool {
 	if old == nil || new == nil {
 		return false
@@ -381,6 +406,7 @@ func (w *worker) isAfterFinalizerInstalled(old, new *chiv1.ClickHouseInstallatio
 	return generationIsTheSame && finalizerIsInstalled
 }
 
+// isGenerationTheSame checks whether old ans new CHI have the same generation
 func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) bool {
 	if old == nil || new == nil {
 		return false

@@ -1001,7 +1001,12 @@ func (c *Creator) containerAppendVolumeMount(container *corev1.Container, volume
 }
 
 // createPVC
-func (c *Creator) createPVC(name string, host *chiv1.ChiHost, spec *corev1.PersistentVolumeClaimSpec) corev1.PersistentVolumeClaim {
+func (c *Creator) createPVC(
+	name string,
+	namespace string,
+	host *chiv1.ChiHost,
+	spec *corev1.PersistentVolumeClaimSpec,
+) corev1.PersistentVolumeClaim {
 	persistentVolumeClaim := corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -1009,7 +1014,7 @@ func (c *Creator) createPVC(name string, host *chiv1.ChiHost, spec *corev1.Persi
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: host.Address.Namespace,
+			Namespace: namespace,
 			// TODO
 			//  this has to wait until proper disk inheritance procedure will be available
 			// UPDATE
@@ -1032,7 +1037,7 @@ func (c *Creator) createPVC(name string, host *chiv1.ChiHost, spec *corev1.Persi
 
 // CreatePVC
 func (c *Creator) CreatePVC(name string, host *chiv1.ChiHost, spec *corev1.PersistentVolumeClaimSpec) *corev1.PersistentVolumeClaim {
-	pvc := c.createPVC(name, host, spec)
+	pvc := c.createPVC(name, host.Address.Namespace, host, spec)
 	return &pvc
 }
 
@@ -1082,7 +1087,8 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	} else {
 		statefulSet.Spec.VolumeClaimTemplates = append(
 			statefulSet.Spec.VolumeClaimTemplates,
-			c.createPVC(volumeClaimTemplate.Name, host, &volumeClaimTemplate.Spec),
+			// For templates we should not specify namespace where PVC would be located
+			c.createPVC(volumeClaimTemplate.Name, "", host, &volumeClaimTemplate.Spec),
 		)
 	}
 }
