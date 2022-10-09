@@ -48,9 +48,8 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     if not ok_to_fail:
         if code != 0:
             print(f"command failed, command:\n{command}")
+            print(f"command failed, exit code:\n{code}")
             print(f"command failed, output :\n{cmd.output}")
-            debug(f"command failed, command:\n{command}")
-            debug(f"command failed, output :\n{cmd.output}")
         assert code == 0, error()
     # Command test result
     return cmd.output if (code == 0) or ok_to_fail else ""
@@ -58,7 +57,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
 
 def delete_chi(chi, ns=namespace, wait=True, ok_to_fail=False):
     with When(f"Delete chi {chi}"):
-        launch(f"delete chi {chi}", ns=ns, timeout=600, ok_to_fail=ok_to_fail)
+        launch(f"delete chi {chi} -v 5 --now --timeout=600s", ns=ns, timeout=600, ok_to_fail=ok_to_fail)
         if wait:
             wait_objects(
                 chi,
@@ -161,7 +160,7 @@ def create_ns(ns):
 
 
 def delete_ns(ns, ok_to_fail=False, timeout=600):
-    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
+    launch(f"delete ns {ns} -v 5 --now --timeout={timeout}s", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
 
 
 def get_count(kind, name="", label="", ns=namespace):

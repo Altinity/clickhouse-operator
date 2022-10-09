@@ -370,10 +370,10 @@ def check_remote_servers(self, chi, shards, trigger_event, cluster=''):
             chi_shards = get_shards_from_remote_servers(chi, cluster)
 
             if chi_shards != shards:
-                print(remote_servers)
                 with Then(f"Number of shards in {cluster} cluster should be {shards}"):
                     assert chi_shards == shards
             ok += 1
+            time.sleep(1)
 
         with By(f"remote_servers were always correct {ok} times"):
             assert ok > 0
@@ -761,7 +761,7 @@ def test_011_1(self):
 )
 def test_011_2(self):
     with Given("test-011-secrets.yaml with secret storage"):
-        kubectl.apply(util.get_full_path("manifests/chi/test-011-secret.yaml", False),
+        kubectl.apply(util.get_full_path("manifests/secret/test-011-secret.yaml", False),
                       ns=settings.test_namespace, timeout=300)
 
         kubectl.create_and_check(
@@ -1687,13 +1687,9 @@ def test_019_1(self):
 def test_019_2(self):
     test_019(step=2)
 
-@TestScenario
-@Name("test_020. Test multi-volume configuration")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
-)
-def test_020(self):
-    manifest = "manifests/chi/test-020-multi-volume.yaml"
+@TestCheck
+def test_020(self, step=1):
+    manifest = f"manifests/chi/test-020-{step}-multi-volume.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
@@ -1724,6 +1720,21 @@ def test_020(self):
 
     kubectl.delete_chi(chi)
 
+@TestScenario
+@Name("test_020_1. Test multi-volume configuration, step=1")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+)
+def test_020_1(self):
+    test_020(step=1)
+
+@TestScenario
+@Name("test_020_2. Test multi-volume configuration, step=2")
+@Requirements(
+    RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0")
+)
+def test_020_2(self):
+    test_020(step=2)
 
 @TestCheck
 def test_021(self, step=1):
@@ -1754,6 +1765,7 @@ def test_021(self, step=1):
         assert size == "1Gi"
 
     with Then("Create a table with a single row"):
+        clickhouse.query(chi, "drop table if exists test_local_021;")
         clickhouse.query(chi, "create table test_local_021(a Int8) Engine = MergeTree() order by a")
         clickhouse.query(chi, "insert into test_local_021 values (1)")
 
@@ -2141,29 +2153,29 @@ def test_026(self):
     with When("Create a table and generate several inserts"):
         clickhouse.query(
             chi,
-            sql="create table test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') partition by (a%10) order by a"
+            sql="DROP TABLE IF EXISTS test_disks ON CLUSTER '{cluster}' SYNC; CREATE TABLE test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') PARTITION BY (a%10) ORDER BY a"
         )
         clickhouse.query(
             chi, host="chi-test-026-mixed-replicas-default-0-0",
-            sql="insert into test_disks select * from numbers(100) settings max_block_size=1"
+            sql="INSERT INTO test_disks SELECT * FROM numbers(100) SETTINGS max_block_size=1"
         )
         clickhouse.query(
             chi, host="chi-test-026-mixed-replicas-default-0-0",
-            sql="insert into test_disks select * from numbers(100) settings max_block_size=1"
+            sql="INSERT INTO test_disks SELECT * FROM numbers(100) SETTINGS max_block_size=1"
         )
         time.sleep(5)
 
         with Then("Data should be placed on a single disk on a first replica"):
             out = clickhouse.query(
                 chi, host="chi-test-026-mixed-replicas-default-0-0",
-                sql="select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'"
+                sql="SELECT arraySort(groupUniqArray(disk_name)) FROM system.parts WHERE table='test_disks'"
             )
             assert out == "['default']"
 
         with And("Data should be placed on a second disk on a second replica"):
             out = clickhouse.query(
                 chi, host="chi-test-026-mixed-replicas-default-0-1",
-                sql="select arraySort(groupUniqArray(disk_name)) from system.parts where table='test_disks'"
+                sql="SELECT arraySort(groupUniqArray(disk_name)) FROM system.parts WHERE table='test_disks'"
             )
             assert out == "['disk2']"
 
@@ -2697,8 +2709,7 @@ def test_034(self):
     with Given("clickhouse-operator pod exists"):
         kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
                            ns=settings.operator_namespace)
-        assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
-        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        assert kubectl.get_count("pod", ns=settings.operator_namespace, label=util.operator_label) > 0, error()
         operator_namespace = settings.operator_namespace
 
     with When("create the chi without secure connection"):
