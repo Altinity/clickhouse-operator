@@ -175,7 +175,7 @@ def test_007(self):
 @TestCheck
 def test_operator_upgrade(self, manifest, service, version_from, version_to=settings.operator_version):
     with Given(f"clickhouse-operator from {version_from}"):
-        util.set_operator_version(version_from)
+        util.install_operator_version(version_from)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
         cluster = chi
 
@@ -217,7 +217,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
     )
 
     with When(f"upgrade operator to {version_to}"):
-        util.set_operator_version(version_to, timeout=120)
+        util.install_operator_version(version_to)
         time.sleep(15)
 
         kubectl.wait_chi_status(chi, "Completed", retries=20)
@@ -1536,13 +1536,14 @@ def test_019(self, step=1):
 
     with When("CHI with retained volume is deleted"):
         pvc_count = kubectl.get_count("pvc")
-        pv_count = kubectl.get_count("pv")
+        # pv is not namespace based and get_count can't be use for parallel execution
+        pv_count = kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l")
 
         kubectl.delete_chi(chi)
 
         with Then("PVC should be retained"):
             assert kubectl.get_count("pvc") == pvc_count
-            assert kubectl.get_count("pv") == pv_count
+            assert kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l") == pv_count
 
     with When("Re-create CHI"):
         kubectl.create_and_check(
@@ -1607,7 +1608,8 @@ def test_019(self, step=1):
 
         with When("Remove a replica"):
             pvc_count = kubectl.get_count("pvc")
-            pv_count = kubectl.get_count("pv")
+            # pv is not namespace based and get_count can't be use for parallel execution
+            pv_count = kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l")
 
             kubectl.create_and_check(
                 manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
@@ -1618,7 +1620,7 @@ def test_019(self, step=1):
             )
             with Then("Replica PVC should be retained"):
                 assert kubectl.get_count("pvc") == pvc_count
-                assert kubectl.get_count("pv") == pv_count
+                assert kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l") == pv_count
 
             with And("Replica should NOT be removed from ZooKeeper"):
                 out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
@@ -1649,7 +1651,8 @@ def test_019(self, step=1):
 
             with And("Remove a replica"):
                 pvc_count = kubectl.get_count("pvc")
-                pv_count = kubectl.get_count("pv")
+                # pv is not namespace based and get_count can't be use for parallel execution
+                pv_count = kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l")
 
                 kubectl.create_and_check(
                     manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
@@ -1661,7 +1664,7 @@ def test_019(self, step=1):
                 # Not implemented yet
                 with Then("Replica PVC should be deleted"):
                     assert kubectl.get_count("pvc") < pvc_count
-                    assert kubectl.get_count("pv") < pv_count
+                    assert kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l") < pv_count
 
                 with And("Replica should be removed from ZooKeeper"):
                     out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
@@ -2258,9 +2261,9 @@ def test_028(self):
         },
     )
 
-    sql = """select getMacro('replica') as replica, uptime() as uptime,
-     (select count() from system.clusters where cluster='all-sharded') as total_hosts,
-     (select count() online_hosts from cluster('all-sharded', system.one) settings skip_unavailable_shards=1) as online_hosts
+    sql = """SET skip_unavailable_shards=1; SYSTEM DROP DNS CACHE; SELECT getMacro('replica') AS replica, uptime() AS uptime,
+     (SELECT count() FROM system.clusters WHERE cluster='all-sharded') AS total_hosts,
+     (SELECT count() online_hosts FROM cluster('all-sharded', system.one) ) AS online_hosts
      FORMAT JSONEachRow"""
     note("Before restart")
     out = clickhouse.query_with_error(chi, sql)
@@ -2506,6 +2509,8 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
                 partial += 1
             if cnt_test != res1 and cnt_test != res2:
                 errors += 1
+                print("*** RUN_QUERY ERROR ***")
+                print(cnt_test)
             time.sleep(0.5)
         with By(f"{ok} queries have been executed with no errors, {partial} queries returned incomplete results. {errors} queries have failed"):
             assert errors == 0
@@ -2553,7 +2558,7 @@ def test_032(self):
 
     util.require_keeper(keeper_type=self.context.keeper_type)
     create_table = """
-    CREATE TABLE test_local ON CLUSTER 'default' (a UInt32)
+    CREATE TABLE test_local_032 ON CLUSTER 'default' (a UInt32)
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
     PARTITION BY tuple()
     ORDER BY a
@@ -2584,12 +2589,12 @@ def test_032(self):
 
     with Given("Create replicated and distributed tables"):
         clickhouse.query(chi, create_table)
-        clickhouse.query(chi, "CREATE TABLE test_distr ON CLUSTER 'default' as test_local Engine = Distributed('default', default, test_local, a%2)")
-        clickhouse.query(chi, f"INSERT INTO test_distr select * from numbers({numbers})")
+        clickhouse.query(chi, "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)")
+        clickhouse.query(chi, f"INSERT INTO test_distr_032 select * from numbers({numbers})")
 
     with When("check the initial select query count before rolling update"):
         with By("executing query in the clickhouse installation"):
-            cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_distr", with_error=True)
+            cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_distr_032", with_error=True)
         with Then("checking expected result"):
             assert cnt_test_local == str(numbers), error()
 
@@ -2599,7 +2604,7 @@ def test_032(self):
         host="clickhouse-test-032-rescaling",
         user="test_032",
         password="test_032",
-        query="select count() from test_distr",
+        query="SELECT count() FROM test_distr_032",
         res1=str(numbers),
         res2=str(numbers // 2),
         trigger_event=trigger_event,
@@ -2656,9 +2661,9 @@ def test_033(self):
             -addext "subjectAltName=DNS:clickhouse-{chi},DNS:clickhouse-{chi}.clickhouse-test,DNS:clickhouse-{chi}.test.svc.cluster.local"
     """)
     # create secrets for the certs
-    shell("kubectl -n test create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
+    shell(f"kubectl -n {settings.test_namespace} create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
     # create a configmap with the CA to validate the cert
-    shell("kubectl -n test create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
+    shell(f"kubectl -n {settings.test_namespace} create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
 
     # deploy clickhouse
     kubectl.apply(util.get_full_path(manifest, lookup_in_host=False))
@@ -2846,8 +2851,7 @@ def test_035(self):
                 ".status.containerStatuses[*].ready",
                 "true,true",
                 ns=settings.operator_namespace)
-            assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
-            out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+            assert kubectl.get_count("pod", ns=settings.operator_namespace, label=util.operator_label) > 0, error()
 
         with When("create the chi with secure connection"):
             manifest = "manifests/chi/test-operator-https-connection.yaml"
@@ -2860,6 +2864,9 @@ def test_035(self):
                         settings.clickhouse_template,
                         "manifests/chit/tpl-persistent-volume-100Mi.yaml",
                     },
+                    "pod_volumes": {
+                        "/var/lib/clickhouse",
+                    },
                     "object_counts": {
                         "statefulset": 1,
                         "pod": 1,
@@ -2869,27 +2876,16 @@ def test_035(self):
                 },
                 timeout=600,
             )
-            kubectl.create_and_check(
-                manifest=manifest,
-                check={
-                    "pod_count": 1,
-                    "pod_volumes": {
-                        "/var/lib/clickhouse",
-                    },
-                    "do_not_delete": 1,
-                },
-                timeout=1200,
-            )
-
             kubectl.wait_jsonpath(
                 "pod",
                 "chi-test-operator-https-connection-t1-0-0-0",
                 "{.status.containerStatuses[0].ready}",
                 "true",
-                ns=kubectl.namespace)
+                ns=kubectl.namespace
+            )
 
         with When("I enable port forwarding to the service port 9440"):
-            self.context.shell("kubectl port-forward -n test service/clickhouse-test-operator-https-connection 9440:9440 --address 0.0.0.0 &")
+            self.context.shell(f"kubectl port-forward -n {settings.test_namespace} service/clickhouse-test-operator-https-connection 9440:9440 --address 0.0.0.0 &")
 
         with And("I send secure connection request to clickhouse pod"):
             for attempt in retries(timeout=30, delay=3, count=10):
@@ -2903,7 +2899,7 @@ def test_035(self):
 
     finally:
         with Finally("I remove the port forwarding and close the shell"):
-            self.context.shell("timeout 3 killall -vws2 kubectl || killall -vws9 kubectl", timeout=5)
+            self.context.shell(f"pkill -e -f 'port\-forward \-n {settings.test_namespace} kubeservice/clickhouse\-test\-operator\-https\-connection'", timeout=5)
             self.context.shell.close()
 
 

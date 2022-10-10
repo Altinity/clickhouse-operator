@@ -206,3 +206,25 @@ def install_operator_if_not_exist(reinstall=False, manifest=get_full_path(settin
                 validate=False
             )
         set_operator_version(settings.operator_version)
+
+
+def install_operator_version(version):
+    if version == settings.operator_version:
+        manifest = get_full_path(settings.clickhouse_operator_install_manifest)
+        manifest = f"cat {manifest}"
+    else:
+        manifest = f"https://github.com/Altinity/clickhouse-operator/raw/{version}/deploy/operator/clickhouse-operator-install-template.yaml"
+        manifest = f"curl -sL {manifest}"
+
+    kubectl.apply(
+        ns=settings.operator_namespace,
+        manifest=f"<({manifest} | "
+                 f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
+                 f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{version}\" "
+                 f"OPERATOR_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
+                 f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
+                 f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{version}\" "
+                 f"METRICS_EXPORTER_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
+                 f"envsubst)",
+        validate=False
+    )
