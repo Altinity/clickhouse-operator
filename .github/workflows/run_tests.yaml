@@ -17,7 +17,6 @@ jobs:
         run: |
           set -x
           python3 -m venv ~/venv/qa
-          ~/venv/qa/bin/activate
           ~/venv/qa/bin/pip3 install -U -r ./tests/image/requirements.txt
         if: |
           steps.cache-python.outputs.cache-hit != 'true'
@@ -51,7 +50,7 @@ jobs:
           # docker-compose -f ./tests/docker-compose/docker-compose.yml pull runner
           # bash -xe ./tests/image/build_docker.sh
 
-          ~/venv/qa/bin/activate
+          source ~/venv/qa/bin/activate
           bash ./tests/e2e/run_tests_parallel.sh
 #          sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
 #          ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --trim-results on --debug --native --log ./tests/raw.log
