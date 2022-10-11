@@ -38,6 +38,7 @@ jobs:
 
       - name: Run Tests
         run: |
+          source ~/venv/qa/bin/activate
           set -x
 
           # bash -xe ./deploy/prometheus/create-prometheus.sh
@@ -50,7 +51,6 @@ jobs:
           # docker-compose -f ./tests/docker-compose/docker-compose.yml pull runner
           # bash -xe ./tests/image/build_docker.sh
 
-          source ~/venv/qa/bin/activate
           bash ./tests/e2e/run_tests_parallel.sh
 #          sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
 #          ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --trim-results on --debug --native --log ./tests/raw.log
