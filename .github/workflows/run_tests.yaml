@@ -33,6 +33,8 @@ jobs:
           driver: docker
           container-runtime: containerd
           kubernetes-version: v1.23.12
+          cpu: max
+          memory: max
 
       - name: Run Tests
         run: |
