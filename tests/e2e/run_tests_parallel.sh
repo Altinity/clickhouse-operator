@@ -20,7 +20,7 @@ function run_test_parallel() {
     create_ns_cmd+="kubectl create ns $ns;"
     # TODO randomization, currently need to avoid same 'No such file or directory: '/tmp/testflows.x.x.x.x.log'
     # sleep $(echo "scale=2; $((1 + $RANDOM % 100)) / 100" | bc -l) &&
-    run_test_cmd+="( OPERATOR_NAMESPACE=${ns} TEST_NAMESPACE=${ns} python3 $CUR_DIR/../regression.py --only=/regression/e2e.test_operator/${test_name}* --no-color --native &>/tmp/${test_name}.log && echo ${test_name} PASS && kubectl delete ns $ns --timeout=600s) || (echo \"TEST ${test_name} FAILED EXIT_CODE=\$?\" && cat /tmp/${test_name}.log && exit 255);"
+    run_test_cmd+="( OPERATOR_NAMESPACE=${ns} TEST_NAMESPACE=${ns} python3 $CUR_DIR/../regression.py --only=/regression/e2e.test_operator/${test_name}* --no-color --native &>/tmp/${test_name}.log && date && echo ${test_name} PASS && kubectl delete ns $ns --timeout=600s) || (echo \"TEST ${test_name} FAILED EXIT_CODE=\$?\" && cat /tmp/${test_name}.log && exit 255);"
   done
   echo "${delete_ns_cmd}" | xargs -P 0 -r --verbose -d ";" -n 1 bash -ce
   echo "${create_ns_cmd}" | xargs -P 0 -r --verbose -d ";" -n 1 bash -ce
@@ -52,7 +52,7 @@ test_ids=(34 6 35 11 32 1 2 3 4 5 7 10 12 13 15 17 18 22 24 25 26 27 29 33 16 23
 for i in "${test_ids[@]}"; do
   test_list+=( "test_${pad:${#i}}${i}" )
 done
-MAX_PARALLEL=8
+MAX_PARALLEL=5
 run_test_parallel "${test_list[@]}"
 
 # allow parallel long test_XXX_X
@@ -65,5 +65,6 @@ test_list=("test_009" "test_030" "test_031")
 MAX_PARALLEL=1
 run_test_parallel "${test_list[@]}"
 
+date
 echo "ALL TESTS PASSED"
 
