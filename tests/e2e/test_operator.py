@@ -2490,8 +2490,8 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
     """Run a select query in parallel until the stop signal is received."""
 
     client_pod = "clickhouse-client"
+    self.context.shell = Shell()
     try:
-        self.context.shell = Shell()
 
         kubectl.launch(f"run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c \"sleep 3600\"")
         kubectl.wait_pod_status(client_pod, "Running")
@@ -2527,8 +2527,8 @@ def run_insert_query(self, host, user, password, query, trigger_event):
     """Run an insert query in parallel until the stop signal is received."""
 
     client_pod = "clickhouse-insert"
+    self.context.shell = Shell()
     try:
-        self.context.shell = Shell()
 
         kubectl.launch(f"run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c \"sleep 3600\"")
         kubectl.wait_pod_status(client_pod, "Running")
