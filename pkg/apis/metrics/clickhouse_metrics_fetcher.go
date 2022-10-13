@@ -128,13 +128,13 @@ const (
 
 // ClickHouseMetricsFetcher specifies clickhouse fetcher object
 type ClickHouseMetricsFetcher struct {
-	connectionParams *clickhouse.ConnectionParams
+	connectionParams *clickhouse.EndpointConnectionParams
 }
 
 // NewClickHouseFetcher creates new clickhouse fetcher object
-func NewClickHouseFetcher(scheme, hostname, username, password, rootCA string, port int) *ClickHouseMetricsFetcher {
+func NewClickHouseFetcher(endpointConnectionParams *clickhouse.EndpointConnectionParams) *ClickHouseMetricsFetcher {
 	return &ClickHouseMetricsFetcher{
-		connectionParams: clickhouse.NewConnectionParams(scheme, hostname, username, password, rootCA, port),
+		connectionParams: endpointConnectionParams,
 	}
 }
 

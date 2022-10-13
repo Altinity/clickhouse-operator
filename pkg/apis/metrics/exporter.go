@@ -39,10 +39,10 @@ const (
 
 // Exporter implements prometheus.Collector interface
 type Exporter struct {
+	clusterConnectionParams *clickhouse.ClusterConnectionParams
+
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
-	chAccessInfo    *CHAccessInfo
-	timeouts        *clickhouse.Timeouts
 
 	mutex               sync.RWMutex
 	toRemoveFromWatched sync.Map
@@ -62,11 +62,10 @@ func (i chInstallationsIndex) Slice() []*WatchedCHI {
 }
 
 // NewExporter returns a new instance of Exporter type
-func NewExporter(chAccess *CHAccessInfo) *Exporter {
+func NewExporter(connectionParams *clickhouse.ClusterConnectionParams) *Exporter {
 	return &Exporter{
-		chInstallations: make(map[string]*WatchedCHI),
-		chAccessInfo:    chAccess,
-		timeouts:        clickhouse.NewTimeouts(),
+		chInstallations:         make(map[string]*WatchedCHI),
+		clusterConnectionParams: connectionParams,
 	}
 }
 
@@ -163,16 +162,7 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 
 // newFetcher returns new Metrics Fetcher for specified host
 func (e *Exporter) newFetcher(hostname string) *ClickHouseMetricsFetcher {
-	return NewClickHouseFetcher(
-		e.chAccessInfo.Scheme,
-		hostname,
-		e.chAccessInfo.Username,
-		e.chAccessInfo.Password,
-		e.chAccessInfo.RootCA,
-		e.chAccessInfo.Port,
-	).
-		SetConnectTimeout(e.timeouts.GetConnectTimeout()).
-		SetQueryTimeout(e.timeouts.GetQueryTimeout())
+	return NewClickHouseFetcher(e.clusterConnectionParams.NewEndpointConnectionParams(hostname))
 }
 
 // UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
