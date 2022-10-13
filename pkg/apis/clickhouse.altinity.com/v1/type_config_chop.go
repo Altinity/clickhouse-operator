@@ -57,6 +57,10 @@ const (
 	defaultChPort     = 8123
 	defaultChRootCA   = ""
 
+	// Timeouts used to limit connection and queries from the operator to ClickHouse instances. In seconds
+	defaultTimeoutConnect = 2
+	defaultTimeoutQuery   = 5
+
 	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
 	defaultReconcileThreadsNumber = 1
@@ -177,6 +181,12 @@ type OperatorConfigClickHouse struct {
 
 		// Port where to connect to ClickHouse instances to
 		Port int `json:"port" yaml:"port"`
+
+		// Timeouts used to limit connection and queries from the operator to ClickHouse instances
+		Timeouts struct {
+			Connect time.Duration `json:"connect" yaml:"connect"`
+			Query   time.Duration `json:"query"   yaml:"query"`
+		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"access" yaml:"access"`
 }
 
@@ -682,6 +692,20 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	if c.ClickHouse.Access.Port == 0 {
 		c.ClickHouse.Access.Port = defaultChPort
 	}
+
+	// Timeouts
+
+	if c.ClickHouse.Access.Timeouts.Connect == 0 {
+		c.ClickHouse.Access.Timeouts.Connect = defaultTimeoutConnect
+	}
+	// Adjust seconds to time.Duration
+	c.ClickHouse.Access.Timeouts.Connect = c.ClickHouse.Access.Timeouts.Connect * time.Second
+
+	if c.ClickHouse.Access.Timeouts.Query == 0 {
+		c.ClickHouse.Access.Timeouts.Query = defaultTimeoutQuery
+	}
+	// Adjust seconds to time.Duration
+	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
 }
 
 func (c *OperatorConfig) normalizeLogSection() {
