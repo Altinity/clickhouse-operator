@@ -36,3 +36,11 @@ func (p *ClusterConnectionParams) SetTimeouts(timeouts *Timeouts) *ClusterConnec
 	p.Timeouts = timeouts
 	return p
 }
+
+// NewEndpointConnectionParams creates endpoint connection params for a specified host in cluster
+func (p *ClusterConnectionParams) NewEndpointConnectionParams(host string) *EndpointConnectionParams {
+	if p == nil {
+		return nil
+	}
+	return NewEndpointConnectionParams(p.Scheme, host, p.Username, p.Password, p.RootCA, p.Port).SetTimeouts(p.Timeouts)
+}

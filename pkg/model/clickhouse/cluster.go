@@ -67,7 +67,7 @@ func (c *Cluster) SetHosts(hosts []string) *Cluster {
 
 // getConnection gets connection
 func (c *Cluster) getConnection(host string) *Connection {
-	return GetPooledDBConnection(NewEndpointConnectionParams(c.Scheme, host, c.Username, c.Password, c.RootCA, c.Port)).SetLog(c.l)
+	return GetPooledDBConnection(c.NewEndpointConnectionParams(host)).SetLog(c.l)
 }
 
 // QueryAny walks over all endpoints and runs query sequentially on each of them.
