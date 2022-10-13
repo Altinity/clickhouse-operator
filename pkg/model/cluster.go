@@ -36,12 +36,12 @@ func NewCluster() *Cluster {
 	}
 }
 
-// SetEndpointCredentials sets endpoint credentials
-func (c *Cluster) SetEndpointCredentials(endpointCredentials *clickhouse.ClusterEndpointCredentials) *Cluster {
+// SetCredentials sets endpoint credentials
+func (c *Cluster) SetCredentials(clusterCredentials *clickhouse.ClusterCredentials) *Cluster {
 	if c == nil {
 		return nil
 	}
-	c.ClusterEndpointCredentials = endpointCredentials
+	c.ClusterCredentials = clusterCredentials
 	return c
 }
 

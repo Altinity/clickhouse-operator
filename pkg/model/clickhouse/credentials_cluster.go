@@ -14,8 +14,8 @@
 
 package clickhouse
 
-// ClusterEndpointCredentials specifies cluster endpoint credentials
-type ClusterEndpointCredentials struct {
+// ClusterCredentials specifies cluster endpoint credentials
+type ClusterCredentials struct {
 	Scheme   string
 	Username string
 	Password string
@@ -23,8 +23,8 @@ type ClusterEndpointCredentials struct {
 	Port     int
 }
 
-func NewClusterEndpointCredentials(scheme, username, password, rootCA string, port int) *ClusterEndpointCredentials {
-	return &ClusterEndpointCredentials{
+func NewClusterCredentials(scheme, username, password, rootCA string, port int) *ClusterCredentials {
+	return &ClusterCredentials{
 		Scheme:   scheme,
 		Username: username,
 		Password: password,
