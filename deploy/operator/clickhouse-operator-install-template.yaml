@@ -2361,7 +2361,7 @@ spec:
                           type: integer
                           minimum: 1
                           maximum: 65535
-                          description: "port to be used by operator to connect to ClickHouse instances"
+                          description: "Port to be used by operator to connect to ClickHouse instances"
                         timeouts:
                           type: object
                           description: "Timeouts used to limit connection and queries from the operator to ClickHouse instances, In seconds"
@@ -2369,16 +2369,16 @@ spec:
                             connect:
                               type: integer
                               minimum: 1
-                              maximum: 5
-                              description: "Connect timeout"
+                              maximum: 10
+                              description: "Connect timeout. In seconds."
                             query:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Query timeout"
+                              description: "Query timeout. In seconds."
                 template:
                   type: object
-                  description: "parameters which use if you want generate ClickHouseInstallationTemplate custom resources from files which stored inside clickhouse-operator deployment"
+                  description: "Parameters which are used if you want to generate ClickHouseInstallationTemplate custom resources from files which are stored inside clickhouse-operator deployment"
                   properties:
                     chi:
                       type: object
@@ -2874,6 +2874,7 @@ data:
         port: 8123
     
         # Timeouts used to limit connection and queries from the operator to ClickHouse instances
+        # Specified in seconds.
         timeouts:
           connect: 2
           query: 5
