@@ -35,13 +35,13 @@ func init() {
 
 // Connection specifies clickhouse database connection object
 type Connection struct {
-	params *ConnectionParams
+	params *EndpointConnectionParams
 	conn   *databasesql.DB
 	l      log.Announcer
 }
 
 // NewConnection creates new clickhouse connection
-func NewConnection(params *ConnectionParams) *Connection {
+func NewConnection(params *EndpointConnectionParams) *Connection {
 	// Do not establish connection immediately, do it in l lazy manner
 	return &Connection{
 		params: params,
@@ -51,7 +51,7 @@ func NewConnection(params *ConnectionParams) *Connection {
 }
 
 // Params gets connection params
-func (c *Connection) Params() *ConnectionParams {
+func (c *Connection) Params() *EndpointConnectionParams {
 	if c == nil {
 		return nil
 	}
