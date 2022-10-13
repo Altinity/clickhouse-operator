@@ -14,7 +14,7 @@
 
 package clickhouse
 
-// EndpointConnectionParams represents connection parameters
+// ClusterConnectionParams represents connection parameters to the whole cluster
 type ClusterConnectionParams struct {
 	*ClusterCredentials
 	*Timeouts
@@ -37,7 +37,7 @@ func (p *ClusterConnectionParams) SetTimeouts(timeouts *Timeouts) *ClusterConnec
 	return p
 }
 
-// NewEndpointConnectionParams creates endpoint connection params for a specified host in cluster
+// NewEndpointConnectionParams creates endpoint connection params for a specified host in the cluster
 func (p *ClusterConnectionParams) NewEndpointConnectionParams(host string) *EndpointConnectionParams {
 	if p == nil {
 		return nil
