@@ -22,3 +22,13 @@ type ClusterEndpointCredentials struct {
 	RootCA   string
 	Port     int
 }
+
+func NewClusterEndpointCredentials(scheme, username, password, rootCA string, port int) *ClusterEndpointCredentials {
+	return &ClusterEndpointCredentials{
+		Scheme:   scheme,
+		Username: username,
+		Password: password,
+		RootCA:   rootCA,
+		Port:     port,
+	}
+}

@@ -14,15 +14,15 @@
 
 package clickhouse
 
-// ConnectionParams represents connection parameters
-type ConnectionParams struct {
+// EndpointConnectionParams represents connection parameters
+type EndpointConnectionParams struct {
 	*EndpointCredentials
 	*Timeouts
 }
 
-// NewConnectionParams creates new ConnectionParams
-func NewConnectionParams(scheme, hostname, username, password, rootCA string, port int) *ConnectionParams {
-	return &ConnectionParams{
+// NewEndpointConnectionParams creates new EndpointConnectionParams
+func NewEndpointConnectionParams(scheme, hostname, username, password, rootCA string, port int) *EndpointConnectionParams {
+	return &EndpointConnectionParams{
 		NewEndpointCredentials(scheme, hostname, username, password, rootCA, port),
 		NewTimeouts(),
 	}
