@@ -30,6 +30,7 @@ import (
 
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
 const (
@@ -41,7 +42,7 @@ type Exporter struct {
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
 	chAccessInfo    *CHAccessInfo
-	timeout         time.Duration
+	timeouts        *clickhouse.Timeouts
 
 	mutex               sync.RWMutex
 	toRemoveFromWatched sync.Map
@@ -65,7 +66,7 @@ func NewExporter(chAccess *CHAccessInfo) *Exporter {
 	return &Exporter{
 		chInstallations: make(map[string]*WatchedCHI),
 		chAccessInfo:    chAccess,
-		timeout:         defaultTimeout,
+		timeouts:        clickhouse.NewTimeouts(),
 	}
 }
 
@@ -169,7 +170,9 @@ func (e *Exporter) newFetcher(hostname string) *ClickHouseMetricsFetcher {
 		e.chAccessInfo.Password,
 		e.chAccessInfo.RootCA,
 		e.chAccessInfo.Port,
-	).SetQueryTimeout(e.timeout)
+	).
+		SetConnectTimeout(e.timeouts.GetConnectTimeout()).
+		SetQueryTimeout(e.timeouts.GetQueryTimeout())
 }
 
 // UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
