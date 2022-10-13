@@ -26,7 +26,7 @@ import (
 
 // Cluster specifies clickhouse cluster object
 type Cluster struct {
-	*ClusterCredentials
+	*ClusterConnectionParams
 	Hosts []string
 	l     log.Announcer
 }
@@ -48,13 +48,13 @@ func (c *Cluster) SetLog(a log.Announcer) *Cluster {
 }
 
 // SetCredentials sets endpoint credentials
-func (c *Cluster) SetCredentials(clusterCredentials *ClusterCredentials) *Cluster {
-	if c == nil {
-		return nil
-	}
-	c.ClusterCredentials = clusterCredentials
-	return c
-}
+//func (c *Cluster) SetCredentials(clusterCredentials *ClusterCredentials) *Cluster {
+//	if c == nil {
+//		return nil
+//	}
+//	c.ClusterCredentials = clusterCredentials
+//	return c
+//}
 
 // SetHosts sets hosts
 func (c *Cluster) SetHosts(hosts []string) *Cluster {
