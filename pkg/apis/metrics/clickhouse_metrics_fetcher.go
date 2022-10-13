@@ -126,30 +126,36 @@ const (
     `
 )
 
-// ClickHouseFetcher specifies clickhouse fetcher object
-type ClickHouseFetcher struct {
+// ClickHouseMetricsFetcher specifies clickhouse fetcher object
+type ClickHouseMetricsFetcher struct {
 	connectionParams *clickhouse.ConnectionParams
 }
 
 // NewClickHouseFetcher creates new clickhouse fetcher object
-func NewClickHouseFetcher(scheme, hostname, username, password, rootCA string, port int) *ClickHouseFetcher {
-	return &ClickHouseFetcher{
+func NewClickHouseFetcher(scheme, hostname, username, password, rootCA string, port int) *ClickHouseMetricsFetcher {
+	return &ClickHouseMetricsFetcher{
 		connectionParams: clickhouse.NewConnectionParams(scheme, hostname, username, password, rootCA, port),
 	}
 }
 
+// SetConnectTimeout sets connect timeout
+func (f *ClickHouseMetricsFetcher) SetConnectTimeout(timeout time.Duration) *ClickHouseMetricsFetcher {
+	f.connectionParams.SetConnectTimeout(timeout)
+	return f
+}
+
 // SetQueryTimeout sets query timeout
-func (f *ClickHouseFetcher) SetQueryTimeout(timeout time.Duration) *ClickHouseFetcher {
+func (f *ClickHouseMetricsFetcher) SetQueryTimeout(timeout time.Duration) *ClickHouseMetricsFetcher {
 	f.connectionParams.SetQueryTimeout(timeout)
 	return f
 }
 
-func (f *ClickHouseFetcher) getConnection() *clickhouse.Connection {
+func (f *ClickHouseMetricsFetcher) getConnection() *clickhouse.Connection {
 	return clickhouse.GetPooledDBConnection(f.connectionParams)
 }
 
 // getClickHouseQueryMetrics requests metrics data from ClickHouse
-func (f *ClickHouseFetcher) getClickHouseQueryMetrics() ([][]string, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryMetricsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
@@ -163,7 +169,7 @@ func (f *ClickHouseFetcher) getClickHouseQueryMetrics() ([][]string, error) {
 }
 
 // getClickHouseSystemParts requests data sizes from ClickHouse
-func (f *ClickHouseFetcher) getClickHouseSystemParts() ([][]string, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		querySystemPartsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
@@ -184,7 +190,7 @@ func (f *ClickHouseFetcher) getClickHouseSystemParts() ([][]string, error) {
 }
 
 // getClickHouseQuerySystemReplicas requests replica information from ClickHouse
-func (f *ClickHouseFetcher) getClickHouseQuerySystemReplicas() ([][]string, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		querySystemReplicasSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
@@ -198,7 +204,7 @@ func (f *ClickHouseFetcher) getClickHouseQuerySystemReplicas() ([][]string, erro
 }
 
 // getClickHouseQueryMutations requests mutations information from ClickHouse
-func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryMutationsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
@@ -212,7 +218,7 @@ func (f *ClickHouseFetcher) getClickHouseQueryMutations() ([][]string, error) {
 }
 
 // getClickHouseQuerySystemDisks requests used disks information from ClickHouse
-func (f *ClickHouseFetcher) getClickHouseQuerySystemDisks() ([][]string, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		querySystemDisksSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
@@ -226,7 +232,7 @@ func (f *ClickHouseFetcher) getClickHouseQuerySystemDisks() ([][]string, error) 
 }
 
 // getClickHouseQueryDetachedParts requests detached parts reasons from ClickHouse
-func (f *ClickHouseFetcher) getClickHouseQueryDetachedParts() ([][]string, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts() ([][]string, error) {
 	return f.clickHouseQueryScanRows(
 		queryDetachedPartsSQL,
 		func(rows *sqlmodule.Rows, data *[][]string) error {
@@ -240,7 +246,7 @@ func (f *ClickHouseFetcher) getClickHouseQueryDetachedParts() ([][]string, error
 }
 
 // clickHouseQueryScanRows scan all rows by external scan function
-func (f *ClickHouseFetcher) clickHouseQueryScanRows(
+func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(
 	sql string,
 	scan func(
 		rows *sqlmodule.Rows,
