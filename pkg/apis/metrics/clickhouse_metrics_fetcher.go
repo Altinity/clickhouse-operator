@@ -252,6 +252,10 @@ type scanFunction func(
 
 type table [][]string
 
+func newTable() table {
+	return make(table, 0)
+}
+
 // clickHouseQueryScanRows scan all rows by external scan function
 func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(sql string, scan scanFunction) (table, error) {
 	query, err := f.getConnection().Query(heredoc.Doc(sql))
@@ -259,7 +263,7 @@ func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(sql string, scan scan
 		return nil, err
 	}
 	defer query.Close()
-	data := make(table, 0)
+	data := newTable()
 	for query.Rows.Next() {
 		_ = scan(query.Rows, &data)
 	}
