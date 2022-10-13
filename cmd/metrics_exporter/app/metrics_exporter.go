@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"os"
 	"os/signal"
 	"syscall"
@@ -96,14 +97,18 @@ func Run() {
 	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.Info(chop.Config().String(true))
 
+	params := clickhouse.NewClusterConnectionParams(
+		chop.Config().ClickHouse.Access.Scheme,
+		chop.Config().ClickHouse.Access.Username,
+		chop.Config().ClickHouse.Access.Password,
+		chop.Config().ClickHouse.Access.RootCA,
+		chop.Config().ClickHouse.Access.Port,
+	)
+	params.SetConnectTimeout(chop.Config().ClickHouse.Access.Timeouts.Connect)
+	params.SetQueryTimeout(chop.Config().ClickHouse.Access.Timeouts.Query)
+
 	exporter := metrics.StartMetricsREST(
-		metrics.NewCHAccessInfo(
-			chop.Config().ClickHouse.Access.Scheme,
-			chop.Config().ClickHouse.Access.Username,
-			chop.Config().ClickHouse.Access.Password,
-			chop.Config().ClickHouse.Access.RootCA,
-			chop.Config().ClickHouse.Access.Port,
-		),
+		params,
 
 		metricsEP,
 		metricsPath,
