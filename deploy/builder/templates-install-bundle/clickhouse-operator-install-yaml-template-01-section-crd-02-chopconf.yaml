@@ -145,13 +145,13 @@ spec:
                             connect:
                               type: integer
                               minimum: 1
-                              maximum: 5
-                              description: "Connect timeout"
+                              maximum: 10
+                              description: "Connect timeout. In seconds."
                             query:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Query timeout"
+                              description: "Query timeout. In seconds."
                 template:
                   type: object
                   description: "parameters which use if you want generate ClickHouseInstallationTemplate custom resources from files which stored inside clickhouse-operator deployment"

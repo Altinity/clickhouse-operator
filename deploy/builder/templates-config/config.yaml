@@ -96,6 +96,7 @@ clickhouse:
     port: 8123
 
     # Timeouts used to limit connection and queries from the operator to ClickHouse instances
+    # Specified in seconds.
     timeouts:
       connect: 2
       query: 5
