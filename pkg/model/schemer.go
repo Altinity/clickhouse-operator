@@ -37,7 +37,9 @@ const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 // NewSchemer creates new Schemer object
 func NewSchemer(scheme, username, password, rootCA string, port int) *Schemer {
 	return &Schemer{
-		NewCluster().SetCredentials(clickhouse.NewClusterCredentials(scheme, username, password, rootCA, port)),
+		NewCluster().SetClusterConnectionParams(
+			clickhouse.NewClusterConnectionParams(scheme, username, password, rootCA, port),
+		),
 	}
 }
 
