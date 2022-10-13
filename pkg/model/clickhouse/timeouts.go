@@ -32,10 +32,18 @@ type Timeouts struct {
 }
 
 // NewTimeouts creates new set of timeouts
-func NewTimeouts() *Timeouts {
+func NewTimeouts(timeouts ...time.Duration) *Timeouts {
+	connectTimeout := defaultConnectTimeout
+	queryTimeout := defaultQueryTimeout
+	if len(timeouts) > 0 {
+		connectTimeout = timeouts[0]
+	}
+	if len(timeouts) > 1 {
+		queryTimeout = timeouts[1]
+	}
 	return &Timeouts{
-		connect: defaultConnectTimeout,
-		query:   defaultQueryTimeout,
+		connect: connectTimeout,
+		query:   queryTimeout,
 	}
 }
 
