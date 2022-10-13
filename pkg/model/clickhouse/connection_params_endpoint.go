@@ -27,3 +27,12 @@ func NewEndpointConnectionParams(scheme, hostname, username, password, rootCA st
 		NewTimeouts(),
 	}
 }
+
+// SetTimeouts
+func (p *EndpointConnectionParams) SetTimeouts(timeouts *Timeouts) *EndpointConnectionParams {
+	if p == nil {
+		return nil
+	}
+	p.Timeouts = timeouts
+	return p
+}
