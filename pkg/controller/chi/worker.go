@@ -396,24 +396,37 @@ func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
 	return generationIsOk
 }
 
-// isAfterFinalizerInstalled checks whether we are just installed finalizer
-func (w *worker) isAfterFinalizerInstalled(old, new *chiv1.ClickHouseInstallation) bool {
-	if old == nil || new == nil {
+// areUsableOldAndNew checks whether there are old and new usable
+func (w *worker) areUsableOldAndNew(old, new *chiv1.ClickHouseInstallation) bool {
+	if old == nil {
 		return false
 	}
-	generationIsTheSame := old.Generation == new.Generation
+	if new == nil {
+		return false
+	}
+	return true
+}
+
+// isAfterFinalizerInstalled checks whether we are just installed finalizer
+func (w *worker) isAfterFinalizerInstalled(old, new *chiv1.ClickHouseInstallation) bool {
+	if !w.areUsableOldAndNew(old, new) {
+		return false
+	}
+
 	finalizerIsInstalled := len(old.Finalizers) == 0 && len(new.Finalizers) > 0
-	return generationIsTheSame && finalizerIsInstalled
+	return w.isGenerationTheSame(old, new) && finalizerIsInstalled
 }
 
 // isGenerationTheSame checks whether old ans new CHI have the same generation
 func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) bool {
-	if old == nil || new == nil {
+	if !w.areUsableOldAndNew(old, new) {
 		return false
 	}
+
 	return old.Generation == new.Generation
 }
 
+// reconcileCHI run reconcile cycle for a CHI
 func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
