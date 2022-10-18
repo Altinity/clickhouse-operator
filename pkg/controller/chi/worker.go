@@ -426,28 +426,63 @@ func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) boo
 	return old.Generation == new.Generation
 }
 
+// logCHI writes a CHI into the log
+func (w *worker) logCHI(name string, chi *chiv1.ClickHouseInstallation) {
+	var jsonString string
+
+	bytes, err := json.MarshalIndent(chi, "", "  ")
+	if err == nil {
+		jsonString = string(bytes)
+	} else {
+		jsonString = fmt.Sprintf("unable to parse %s. err: %v", name, err)
+	}
+
+	w.a.M(chi).Info(
+		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
+		name,
+		name,
+		jsonString,
+	)
+}
+
+// logActionPlan logs action plan
+func (w *worker) logActionPlan(ap *chopmodel.ActionPlan) {
+	w.a.Info(
+		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
+		ap,
+	)
+}
+
+// logOldAndNew writes old and new CHIs into the log
+func (w *worker) logOldAndNew(name string, old, new *chiv1.ClickHouseInstallation) {
+	w.logCHI(name+" old", old)
+	w.logCHI(name+" new", new)
+}
+
 // reconcileCHI run reconcile cycle for a CHI
 func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
+	w.logOldAndNew("original", old, new)
+
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
+		w.a.M(new).F().Info("isAfterFinalizerInstalled() -  zeroing old one")
 		old = nil
 	case w.isGenerationTheSame(old, new):
+		w.a.M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
 		return nil
 	case new.Status.NormalizedCHICompleted != nil:
+		w.a.M(new).F().Info("has NormalizedCHICompleted, use it as a base for reconcile")
 		old = new.Status.NormalizedCHICompleted
 	}
 
 	old = w.normalize(old)
 	new = w.normalize(new)
+	w.logOldAndNew("normalized", old, new)
+
 	actionPlan := chopmodel.NewActionPlan(old, new)
-	oldjson, _ := json.MarshalIndent(old, "", "  ")
-	newjson, _ := json.MarshalIndent(new, "", "  ")
-	w.a.V(3).M(new).F().Info("AP worker---------------------------------------------:\n%s\n", actionPlan)
-	w.a.V(3).M(new).F().Info("old worker--------------------------------------------:\n%s\n", string(oldjson))
-	w.a.V(3).M(new).F().Info("new worker--------------------------------------------:\n%s\n", string(newjson))
+	w.logActionPlan(actionPlan)
 	if !actionPlan.HasActionsToDo() {
-		// Nothing to do - no changes found - no need to react
-		w.a.V(3).M(new).F().Info("ResourceVersion changed, but no actual changes found")
+		w.a.M(new).F().Info("ActionPlan has no actions - nothing to do")
 		return nil
 	}
 
