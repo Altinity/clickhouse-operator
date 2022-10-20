@@ -169,13 +169,23 @@ func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
-// ExcludeHost specifies to exclude host
+// ExcludeHost specifies to exclude a host
 func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
 	if (o == nil) || (host == nil) {
 		return o
 	}
 
 	o.exclude.hosts = append(o.exclude.hosts, host)
+	return o
+}
+
+// ExcludeHosts specifies to exclude list of hosts
+func (o *RemoteServersGeneratorOptions) ExcludeHosts(hosts ...*chiv1.ChiHost) *RemoteServersGeneratorOptions {
+	if (o == nil) || (len(hosts) == 0) {
+		return o
+	}
+
+	o.exclude.hosts = append(o.exclude.hosts, hosts...)
 	return o
 }
 
@@ -189,17 +199,19 @@ func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.
 	return o
 }
 
-// Skip specifies to skip the host
-func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
+// Exclude tells whether to exclude the host
+func (o *RemoteServersGeneratorOptions) Exclude(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
 	}
 
 	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+		// Reconcile attributes specify to exclude this host
 		return true
 	}
 
 	for _, val := range o.exclude.hosts {
+		// Host is in the list to be excluded
 		if val == host {
 			return true
 		}
@@ -208,17 +220,19 @@ func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
 	return false
 }
 
-// Include specifies to include the host
+// Include tells whether to include the host
 func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
 	}
 
 	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+		// Reconcile attributes specify to exclude this host
 		return false
 	}
 
 	for _, val := range o.exclude.hosts {
+		// Host is in the list to be excluded
 		if val == host {
 			return false
 		}
