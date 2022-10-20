@@ -3240,7 +3240,6 @@ data:
     <!--
     #
     # Template parameters available:
-    #   PASSWORD_SHA256_HEX=${sha256(password)}
     #
     -->
     <yandex>
@@ -3249,7 +3248,6 @@ data:
                 <networks>
                     <ip>127.0.0.1</ip>
                 </networks>
-                <password_sha256_hex>${sha256(password)}</password_sha256_hex>
                 <profile>clickhouse_operator</profile>
                 <quota>default</quota>
             </clickhouse_operator>
