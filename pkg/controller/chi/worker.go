@@ -828,10 +828,11 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 
 	// 2. CHI common ConfigMap without added hosts
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
-			ExcludeReconcileAttributes(
-				chiv1.NewChiHostReconcileAttributes().SetAdd(),
-			),
+		SetRemoteServersGeneratorOptions(
+			chopmodel.NewRemoteServersGeneratorOptions().
+				ExcludeReconcileAttributes(
+					chiv1.NewChiHostReconcileAttributes().SetAdd(),
+				),
 		)
 	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
@@ -1278,10 +1279,11 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 	}
 
 	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(chopmodel.NewRemoteServersGeneratorOptions().
-			ExcludeReconcileAttributes(
-				chiv1.NewChiHostReconcileAttributes().SetAdd(),
-			),
+		SetRemoteServersGeneratorOptions(
+			chopmodel.NewRemoteServersGeneratorOptions().
+				ExcludeReconcileAttributes(
+					chiv1.NewChiHostReconcileAttributes().SetAdd(),
+				),
 		)
 	// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
