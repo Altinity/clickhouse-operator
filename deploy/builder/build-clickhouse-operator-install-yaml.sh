@@ -68,7 +68,6 @@ CH_PASSWORD_PLAIN="" \
 CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
 CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
 CH_PASSWORD_SECRET_PLAIN="\${password}" \
-PASSWORD_SHA256_HEX="\${sha256(password)}" \
 OPERATOR_NAMESPACE="\${namespace}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" >> "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
@@ -89,7 +88,6 @@ CH_PASSWORD_PLAIN="" \
 CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
 CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
 CH_PASSWORD_SECRET_PLAIN="{{ password }}" \
-PASSWORD_SHA256_HEX="{{ password | password_hash('sha256') }}" \
 OPERATOR_NAMESPACE="{{ namespace }}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" >> "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"
