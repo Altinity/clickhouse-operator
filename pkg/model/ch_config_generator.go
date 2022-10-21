@@ -159,8 +159,8 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 // RemoteServersGeneratorOptions specifies options for remote-servers generator
 type RemoteServersGeneratorOptions struct {
 	exclude struct {
-		reconcileAttributes *chiv1.ChiHostReconcileAttributes
-		hosts               []*chiv1.ChiHost
+		attributes *chiv1.ChiHostReconcileAttributes
+		hosts      []*chiv1.ChiHost
 	}
 }
 
@@ -195,7 +195,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.
 		return o
 	}
 
-	o.exclude.reconcileAttributes = attrs
+	o.exclude.attributes = attrs
 	return o
 }
 
@@ -205,7 +205,7 @@ func (o *RemoteServersGeneratorOptions) Exclude(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.ReconcileAttributes) {
 		// Reconcile attributes specify to exclude this host
 		return true
 	}
@@ -226,7 +226,7 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.ReconcileAttributes) {
 		// Reconcile attributes specify to exclude this host
 		return false
 	}
@@ -239,6 +239,14 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	}
 
 	return true
+}
+
+// String returns string representation
+func (o *RemoteServersGeneratorOptions) String() string {
+	if o == nil {
+		return ""
+	}
+	return fmt.Sprintf("exclude hosts: %v, attributes: %s", o.exclude.hosts, o.exclude.attributes)
 }
 
 // defaultRemoteServersGeneratorOptions
