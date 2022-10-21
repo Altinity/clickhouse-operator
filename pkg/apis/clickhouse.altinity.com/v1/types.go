@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
@@ -697,6 +698,22 @@ func (s *ChiHostReconcileAttributes) IsModify() bool {
 // IsUnclear checks whether 'unclear' attribute is set
 func (s *ChiHostReconcileAttributes) IsUnclear() bool {
 	return s.unclear
+}
+
+// String returns string form
+func (s *ChiHostReconcileAttributes) String() string {
+	if s == nil {
+		return ""
+	}
+
+	return fmt.Sprintf(
+		"status: %s, add: %t, remove: %t, modify: %t, unclear: %t",
+		s.status,
+		s.add,
+		s.remove,
+		s.modify,
+		s.unclear,
+	)
 }
 
 // ChiTemplates defines templates section of .spec
