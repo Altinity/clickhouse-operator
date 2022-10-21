@@ -801,6 +801,24 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 	)
 }
 
+// baseRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
+// which are applied on each remote_serves reconfiguration during reconcile cycle
+func (w *worker) baseRemoteServersGeneratorOptions() *chopmodel.RemoteServersGeneratorOptions {
+	rs := chopmodel.NewRemoteServersGeneratorOptions()
+	rs.ExcludeReconcileAttributes(
+		chiv1.NewChiHostReconcileAttributes().SetAdd(),
+	)
+
+	return rs
+}
+
+// options build ClickHouseConfigFilesGeneratorOptions
+func (w *worker) options(hosts ...*chiv1.ChiHost) *chopmodel.ClickHouseConfigFilesGeneratorOptions {
+	rs := w.baseRemoteServersGeneratorOptions().ExcludeHosts(hosts...)
+	w.a.Info("RemoteServersGeneratorOptions: %s", rs)
+	return chopmodel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(rs)
+}
+
 // reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
 func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chiv1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
@@ -827,13 +845,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 	}
 
 	// 2. CHI common ConfigMap without added hosts
-	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(
-			chopmodel.NewRemoteServersGeneratorOptions().
-				ExcludeReconcileAttributes(
-					chiv1.NewChiHostReconcileAttributes().SetAdd(),
-				),
-		)
+	options := w.options()
 	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
 	}
@@ -1254,19 +1266,12 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chi
 		return
 	}
 
-	// Specify in options to exclude host from ClickHouse config file
-	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(
-			chopmodel.NewRemoteServersGeneratorOptions().
-				ExcludeHost(host).
-				ExcludeReconcileAttributes(
-					chiv1.NewChiHostReconcileAttributes().SetAdd(),
-				),
-		)
-
 	// Remove host from cluster config and wait for ClickHouse to pick-up the change
 	if w.shouldWaitExcludeHost(host) {
+		// Specify in options to exclude host from ClickHouse config file
+		options := w.options(host)
 		_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
+		// Wait for ClickHouse to pick-up the change
 		_ = w.waitHostNotInCluster(ctx, host)
 	}
 }
@@ -1278,15 +1283,10 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 		return
 	}
 
-	options := chopmodel.NewClickHouseConfigFilesGeneratorOptions().
-		SetRemoteServersGeneratorOptions(
-			chopmodel.NewRemoteServersGeneratorOptions().
-				ExcludeReconcileAttributes(
-					chiv1.NewChiHostReconcileAttributes().SetAdd(),
-				),
-		)
-	// Add host to the cluster config (always) and wait for ClickHouse to pick-up the change
+	// Add host to the cluster config
+	options := w.options()
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
+	// Wait for ClickHouse to pick-up the change
 	if w.shouldWaitIncludeHost(host) {
 		_ = w.waitHostInCluster(ctx, host)
 	}
