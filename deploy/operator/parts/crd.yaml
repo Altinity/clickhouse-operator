@@ -2442,10 +2442,10 @@ spec:
                           properties:
                             exclude:
                               type: string
-                              description: "wait when pod will remove from cluster"
+                              description: "wait when a pod will be removed from the cluster"
                             include:
                               type: string
-                              description: "wait when pod will add to cluster"
+                              description: "wait when a pod will be added to the cluster"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
