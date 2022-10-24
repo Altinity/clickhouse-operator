@@ -703,7 +703,7 @@ func (s *ChiHostReconcileAttributes) IsUnclear() bool {
 // String returns string form
 func (s *ChiHostReconcileAttributes) String() string {
 	if s == nil {
-		return ""
+		return "(nil)"
 	}
 
 	return fmt.Sprintf(
