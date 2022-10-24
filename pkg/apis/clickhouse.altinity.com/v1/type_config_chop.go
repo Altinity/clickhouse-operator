@@ -119,15 +119,15 @@ type OperatorConfigFile struct {
 		User   string `json:"user"   yaml:"user"`
 	} `json:"path" yaml:"path"`
 
-	Runtime OperatorConfigFileRuntime
+	Runtime OperatorConfigFileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 }
 
 // OperatorConfigFileRuntime specifies runtime section
 type OperatorConfigFileRuntime struct {
 	// OperatorConfig files fetched from paths specified above. Maps "file name->file content"
-	CommonConfigFiles map[string]string
-	HostConfigFiles   map[string]string
-	UsersConfigFiles  map[string]string
+	CommonConfigFiles map[string]string `json:"commonConfigFiles,omitempty" yaml:"commonConfigFiles,omitempty"`
+	HostConfigFiles   map[string]string `json:"hostConfigFiles,omitempty"   yaml:"hostConfigFiles,omitempty"`
+	UsersConfigFiles  map[string]string `json:"usersConfigFiles,omitempty"  yaml:"usersConfigFiles,omitempty"`
 }
 
 // OperatorConfigUser specifies User section
@@ -200,13 +200,13 @@ type OperatorConfigCHI struct {
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	Path string `json:"path" yaml:"path"`
 
-	Runtime OperatorConfigCHIRuntime
+	Runtime OperatorConfigCHIRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 }
 
 // OperatorConfigCHIRuntime specifies chi runtime section
 type OperatorConfigCHIRuntime struct {
 	// CHI template files fetched from the path specified above. Maps "file name->file content"
-	TemplateFiles map[string]string
+	TemplateFiles map[string]string `json:"templateFiles,omitempty" yaml:"templateFiles,omitempty"`
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
 	// ClickHouseInstallation template
@@ -235,7 +235,7 @@ type OperatorConfigReconcile struct {
 		Wait struct {
 			Exclude StringBool `json:"exclude" yaml:"exclude"`
 			Include StringBool `json:"include" yaml:"include"`
-		} `json:"host" yaml:"host"`
+		} `json:"wait" yaml:"wait"`
 	} `json:"host" yaml:"host"`
 }
 
@@ -256,8 +256,8 @@ type OperatorConfigLabel struct {
 	AppendScopeString StringBool `json:"appendScope" yaml:"appendScope"`
 
 	Runtime struct {
-		AppendScope bool
-	}
+		AppendScope bool `json:"appendScope" yaml:"appendScope"`
+	} `json:"runtime" yaml:"runtime"`
 }
 
 // OperatorConfig specifies operator config
