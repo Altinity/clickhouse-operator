@@ -233,8 +233,8 @@ type OperatorConfigReconcile struct {
 
 	Host struct {
 		Wait struct {
-			Exclude bool `json:"exclude" yaml:"exclude"`
-			Include bool `json:"include" yaml:"include"`
+			Exclude StringBool `json:"exclude" yaml:"exclude"`
+			Include StringBool `json:"include" yaml:"include"`
 		} `json:"host" yaml:"host"`
 	} `json:"host" yaml:"host"`
 }
@@ -1036,10 +1036,10 @@ func (c *OperatorConfig) move() {
 		c.Reconcile.Runtime.ThreadsNumber = c.ReconcileThreadsNumber
 	}
 	if c.ReconcileWaitExclude {
-		c.Reconcile.Host.Wait.Exclude = c.ReconcileWaitExclude
+		c.Reconcile.Host.Wait.Exclude = c.Reconcile.Host.Wait.Exclude.From(c.ReconcileWaitExclude)
 	}
 	if c.ReconcileWaitInclude {
-		c.Reconcile.Host.Wait.Include = c.ReconcileWaitInclude
+		c.Reconcile.Host.Wait.Include = c.Reconcile.Host.Wait.Include.From(c.ReconcileWaitInclude)
 	}
 
 	// When transferring annotations from the chi/chit.metadata to CHI objects, use these filters.
