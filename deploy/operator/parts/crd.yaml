@@ -2441,10 +2441,10 @@ spec:
                           type: object
                           properties:
                             exclude:
-                              type: boolean
+                              type: string
                               description: "wait when pod will remove from cluster"
                             include:
-                              type: boolean
+                              type: string
                               description: "wait when pod will add to cluster"
                 annotation:
                   type: object
