@@ -44,6 +44,15 @@ const (
 	StringBoolEnabledLowercase     = "enabled"
 )
 
+// From casts bool to StringBool
+func (s StringBool) From(value bool) StringBool {
+	if value {
+		return StringBoolTrueFirstCapital
+	}
+
+	return StringBoolFalseFirstCapital
+}
+
 // String casts StringBool to string
 func (s StringBool) String() string {
 	return string(s)
