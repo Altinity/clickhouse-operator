@@ -2396,7 +2396,7 @@ def test_029(self):
 @TestScenario
 @Name("test_030. Test CRD deletion")
 def test_030(self):
-    manifest = "manifests/chi/test-013-add-shards-2.yaml"
+    manifest = "manifests/chi/test-030.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     object_counts = {"statefulset": 2, "pod": 2, "service": 3}
 
