@@ -244,7 +244,7 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 // String returns string representation
 func (o *RemoteServersGeneratorOptions) String() string {
 	if o == nil {
-		return ""
+		return "(nil)"
 	}
 	return fmt.Sprintf("exclude hosts: %v, attributes: %s", o.exclude.hosts, o.exclude.attributes)
 }
