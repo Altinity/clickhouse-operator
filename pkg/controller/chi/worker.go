@@ -1326,7 +1326,7 @@ func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 	}
 
 	// Fallback to operator's settings
-	return chop.Config().Reconcile.Host.Wait.Exclude
+	return chop.Config().Reconcile.Host.Wait.Exclude.Value()
 }
 
 // shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
@@ -1350,7 +1350,7 @@ func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
 	}
 
 	// Fallback to operator's settings
-	return chop.Config().Reconcile.Host.Wait.Include
+	return chop.Config().Reconcile.Host.Wait.Include.Value()
 }
 
 // waitHostInCluster
