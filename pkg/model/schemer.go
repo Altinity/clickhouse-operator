@@ -52,11 +52,11 @@ func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
 		return false
 	}
 	if len(hosts) <= 1 {
-		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
+		log.V(1).M(host).F().Info("Nothing to create a schema from - single host in the cluster: %v", hosts)
 		return false
 	}
 
-	log.V(1).M(host).F().Info("Should create distributed objects the cluster: %v", hosts)
+	log.V(1).M(host).F().Info("Should create distributed objects in the cluster: %v", hosts)
 	return true
 }
 
