@@ -804,19 +804,25 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 // baseRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
 // which are applied on each remote_serves reconfiguration during reconcile cycle
 func (w *worker) baseRemoteServersGeneratorOptions() *chopmodel.RemoteServersGeneratorOptions {
-	rs := chopmodel.NewRemoteServersGeneratorOptions()
-	rs.ExcludeReconcileAttributes(
-		chiv1.NewChiHostReconcileAttributes().SetAdd(),
-	)
+	opts := chopmodel.NewRemoteServersGeneratorOptions()
+	//	rs.ExcludeReconcileAttributes(
+	//		chiv1.NewChiHostReconcileAttributes().SetAdd(),
+	//	)
 
-	return rs
+	return opts
 }
 
 // options build ClickHouseConfigFilesGeneratorOptions
-func (w *worker) options(hosts ...*chiv1.ChiHost) *chopmodel.ClickHouseConfigFilesGeneratorOptions {
-	rs := w.baseRemoteServersGeneratorOptions().ExcludeHosts(hosts...)
-	w.a.Info("RemoteServersGeneratorOptions: %s", rs)
-	return chopmodel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(rs)
+func (w *worker) options(excludeHosts ...*chiv1.ChiHost) *chopmodel.ClickHouseConfigFilesGeneratorOptions {
+	// Stringify
+	str := ""
+	for _, host := range excludeHosts {
+		str += fmt.Sprintf("name: '%s' sts: '%s'", host.Name, host.Address.StatefulSet)
+	}
+
+	opts := w.baseRemoteServersGeneratorOptions().ExcludeHosts(excludeHosts...)
+	w.a.Info("RemoteServersGeneratorOptions: %s, excluded host(s): %s", opts, str)
+	return chopmodel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
 }
 
 // reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
@@ -1268,6 +1274,10 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chi
 
 	// Remove host from cluster config and wait for ClickHouse to pick-up the change
 	if w.shouldWaitExcludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("going to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
 		// Specify in options to exclude host from ClickHouse config file
 		options := w.options(host)
 		_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
@@ -1297,21 +1307,36 @@ func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	switch {
 	case host.GetCHI().IsStopped():
-		// No need to exclude stopped host
+		w.a.V(1).
+			M(host).F().
+			Info("No need to exclude stopped host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case host.GetCHI().IsRollingUpdate():
-		// While rolling update host would be restarted
+		w.a.V(1).
+			M(host).F().
+			Info("While rolling update host would be restarted host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
 	case status == chiv1.StatefulSetStatusNew:
-		// Nothing to exclude, host is not yet in the cluster
+		w.a.V(1).
+			M(host).F().
+			Info("Nothing to exclude, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case status == chiv1.StatefulSetStatusSame:
-		// The same host would not be updated
+		w.a.V(1).
+			M(host).F().
+			Info("The same host would not be updated host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case host.GetShard().HostsCount() == 1:
-		// In case shard where current host is located has only one host (means no replication), no need to exclude
+		w.a.V(1).
+			M(host).F().
+			Info("In case shard where current host is located has only one host (means no replication), no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
 	return true
 }
 
@@ -1320,12 +1345,20 @@ func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 	// Check CHI settings
 	switch {
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
+		w.a.V(1).
+			M(host).F().
+			Info("IsReconcilingPolicyWait() need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyNoWait():
+		w.a.V(1).
+			M(host).F().
+			Info("IsReconcilingPolicyNoWait() need NOT to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	}
 
-	// Fallback to operator's settings
+	w.a.V(1).
+		M(host).F().
+		Info("fallback to operator's settings. host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	return chop.Config().Reconcile.Host.Wait.Exclude.Value()
 }
 
