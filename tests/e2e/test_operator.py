@@ -2396,9 +2396,9 @@ def test_029(self):
 @TestScenario
 @Name("test_030. Test CRD deletion")
 def test_030(self):
-    manifest = "manifests/chi/test-001.yaml"
+    manifest = "manifests/chi/test-013-add-shards-2.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-    object_counts = {"statefulset": 1, "pod": 1, "service": 2}
+    object_counts = {"statefulset": 2, "pod": 2, "service": 3}
 
     kubectl.create_and_check(
         manifest,
@@ -2408,10 +2408,18 @@ def test_030(self):
         }
     )
 
+    trigger_event = threading.Event()
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
+        chi=chi,
+        cluster="default",
+        shards=2,
+        trigger_event=trigger_event,
+    )
+
     with When("Delete CRD"):
         kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com")
         with Then("CHI should be deleted"):
-            kubectl.wait_object("chi", "test-001", count=0)
+            kubectl.wait_object("chi", chi, count=0)
             with And("CHI objects SHOULD NOT be deleted"):
                 assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}") == object_counts
 
@@ -2431,6 +2439,10 @@ def test_030(self):
         with Then("Pods should not be restarted"):
             new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
             assert start_time == new_start_time
+
+    trigger_event.set()
+    join()
+
     kubectl.delete_chi(chi)
 
 
