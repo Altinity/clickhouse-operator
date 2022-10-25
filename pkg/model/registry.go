@@ -71,6 +71,20 @@ func (r *Registry) Walk(f func(entityType EntityType, meta v1.ObjectMeta)) {
 	}
 }
 
+// WalkEntityType walks over registry
+func (r *Registry) WalkEntityType(entityType EntityType, f func(meta v1.ObjectMeta)) {
+	if r == nil {
+		return
+	}
+	for et := range r.r {
+		for _, m := range r.r[et] {
+			if et == entityType {
+				f(m)
+			}
+		}
+	}
+}
+
 // String makes string representation of the registry
 func (r *Registry) String() string {
 	if r == nil {
@@ -117,6 +131,11 @@ func (r *Registry) NumStatefulSet() int {
 	return r.Len(StatefulSet)
 }
 
+// WalkStatefulSet walk over specified entity types
+func (r *Registry) WalkStatefulSet(f func(meta v1.ObjectMeta)) {
+	r.WalkEntityType(StatefulSet, f)
+}
+
 // RegisterConfigMap register ConfigMap
 func (r *Registry) RegisterConfigMap(meta v1.ObjectMeta) {
 	r.registerEntity(ConfigMap, meta)
@@ -130,6 +149,11 @@ func (r *Registry) HasConfigMap(meta v1.ObjectMeta) bool {
 // NumConfigMap gets number of ConfigMap
 func (r *Registry) NumConfigMap() int {
 	return r.Len(ConfigMap)
+}
+
+// WalkConfigMap walk over specified entity types
+func (r *Registry) WalkConfigMap(f func(meta v1.ObjectMeta)) {
+	r.WalkEntityType(ConfigMap, f)
 }
 
 // RegisterService register Service
@@ -147,6 +171,11 @@ func (r *Registry) NumService() int {
 	return r.Len(Service)
 }
 
+// WalkService walk over specified entity types
+func (r *Registry) WalkService(f func(meta v1.ObjectMeta)) {
+	r.WalkEntityType(Service, f)
+}
+
 // RegisterSecret register Secret
 func (r *Registry) RegisterSecret(meta v1.ObjectMeta) {
 	r.registerEntity(Secret, meta)
@@ -160,6 +189,11 @@ func (r *Registry) HasSecret(meta v1.ObjectMeta) bool {
 // NumSecret gets number of Secret
 func (r *Registry) NumSecret() int {
 	return r.Len(Secret)
+}
+
+// WalkSecret walk over specified entity types
+func (r *Registry) WalkSecret(f func(meta v1.ObjectMeta)) {
+	r.WalkEntityType(Secret, f)
 }
 
 // RegisterPVC register PVC
@@ -177,6 +211,11 @@ func (r *Registry) NumPVC() int {
 	return r.Len(PVC)
 }
 
+// WalkPVC walk over specified entity types
+func (r *Registry) WalkPVC(f func(meta v1.ObjectMeta)) {
+	r.WalkEntityType(PVC, f)
+}
+
 // RegisterPV register PV
 func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
 	r.registerEntity(PV, meta)
@@ -190,6 +229,11 @@ func (r *Registry) HasPV(meta v1.ObjectMeta) bool {
 // NumPV gets number of PV
 func (r *Registry) NumPV() int {
 	return r.Len(PV)
+}
+
+// WalkPV walk over specified entity types
+func (r *Registry) WalkPV(f func(meta v1.ObjectMeta)) {
+	r.WalkEntityType(PV, f)
 }
 
 // hasEntity
