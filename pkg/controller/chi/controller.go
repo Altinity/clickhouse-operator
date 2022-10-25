@@ -760,7 +760,10 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 		}
 
 		if retry {
-			time.Sleep(5 * time.Second)
+			log.V(2).M(chi).F().Warning("got error, will retry. err: %q", err)
+			time.Sleep(1 * time.Second)
+		} else {
+			log.V(1).M(chi).F().Error("got error, all retries are exhausted. err: %q", err)
 		}
 	}
 	return
@@ -775,6 +778,8 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).M(chi).F().Info("Update CHI status")
+
+	podIPs := c.getPodsIPs(chi)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
@@ -794,12 +799,12 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 
 	// Update status of a real object.
 	(&cur.Status).CopyFrom(&chi.Status, opts.CopyCHIStatusOptions)
-	cur.Status.PodIPs = c.getPodsIPs(chi)
+	cur.Status.PodIPs = podIPs
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
 	if err != nil {
 		// Error update
-		log.V(1).M(chi).F().Error("%q", err)
+		log.V(2).M(chi).F().Info("Got error upon update, may retry. err: %q", err)
 		return err
 	}
 
