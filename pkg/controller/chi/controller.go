@@ -744,6 +744,11 @@ type UpdateCHIStatusOptions struct {
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	for retry, attempt := true, 1; retry; attempt++ {
 		if attempt >= 5 {
 			retry = false

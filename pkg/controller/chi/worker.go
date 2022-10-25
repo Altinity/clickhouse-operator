@@ -336,8 +336,13 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
-	if w.ensureFinalizer(ctx, new) {
+	if w.ensureFinalizer(context.Background(), new) {
 		// Finalizer installed, let's restart reconcile cycle
+		return nil
+	}
+
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
@@ -346,9 +351,19 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	if w.isCleanRestartOnTheSameIP(new) {
 		// First minute after restart do not reconcile already reconciled generations
 		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
+		return nil
+	}
+
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
 		return nil
 	}
 
@@ -461,6 +476,11 @@ func (w *worker) logOldAndNew(name string, old, new *chiv1.ClickHouseInstallatio
 
 // reconcileCHI run reconcile cycle for a CHI
 func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	w.logOldAndNew("original", old, new)
 
 	switch {
@@ -474,6 +494,9 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 		w.a.M(new).F().Info("has NormalizedCHICompleted, use it as a base for reconcile")
 		old = new.Status.NormalizedCHICompleted
 	}
+
+	w.a.M(new).S().P()
+	defer w.a.M(new).E().P()
 
 	old = w.normalize(old)
 	new = w.normalize(new)
@@ -539,6 +562,11 @@ func (w *worker) includeStopped(chi *chiv1.ClickHouseInstallation) {
 }
 
 func (w *worker) clear(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
 	// Remove deleted items
 	objs := w.c.discovery(ctx, chi)
 	need := w.ctx.registryReconciled
@@ -559,6 +587,11 @@ func (w *worker) clear(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
 }
 
 func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
 	w.a.V(1).M(chi).F().S().Info("drop replicas based on AP")
 	cnt := 0
 	ap.WalkRemoved(
@@ -580,6 +613,11 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiv1.ClickHouseInstalla
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	(&chi.Status).ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
@@ -597,6 +635,11 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 }
 
 func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
 	// Update CHI object
 	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, chopmodel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(chi).Info("updating endpoints for CHI %s", chi.Name)
@@ -624,7 +667,6 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 		WithStatusActions(_chi).
 		M(_chi).F().
 		Info("reconcile completed")
-
 }
 
 func (w *worker) walkHosts(chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
