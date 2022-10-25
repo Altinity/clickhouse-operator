@@ -516,7 +516,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.excludeStopped(new)
-	w.walkHosts(new, actionPlan)
+	w.walkHosts(ctx, new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
@@ -672,11 +672,40 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 		Info("reconcile completed")
 }
 
-func (w *worker) walkHosts(chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
+	objs := w.c.discovery(ctx, chi)
 	ap.WalkAdded(
 		func(cluster *chiv1.ChiCluster) {
 			cluster.WalkHosts(func(host *chiv1.ChiHost) error {
-				(&host.ReconcileAttributes).SetAdd()
+
+				// Name of the StatefulSet for this host
+				name := chopmodel.CreateStatefulSetName(host)
+				// Have we found this StatefulSet
+				found := false
+
+				objs.WalkStatefulSet(func(meta meta.ObjectMeta) {
+					if name == meta.Name {
+						// StatefulSet of this host already exist
+						found = true
+					}
+				})
+
+				if found {
+					// StatefulSet of this host already exist, we can't ADD it for sure
+					// It looks like UNCLEAR is the most correct approach
+					(&host.ReconcileAttributes).SetUnclear()
+					w.a.V(1).M(chi).Info("Add host as UNCLEAR. Host was found as sts %s", host.Name)
+				} else {
+					// StatefulSet of this host does not exist, looks like we need to ADD it
+					(&host.ReconcileAttributes).SetAdd()
+					w.a.V(1).M(chi).Info("Add host as ADD. Host was not found as sts %s", host.Name)
+				}
+
 				return nil
 			})
 		},
@@ -850,9 +879,9 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 // which are applied on each remote_serves reconfiguration during reconcile cycle
 func (w *worker) baseRemoteServersGeneratorOptions() *chopmodel.RemoteServersGeneratorOptions {
 	opts := chopmodel.NewRemoteServersGeneratorOptions()
-	//	rs.ExcludeReconcileAttributes(
-	//		chiv1.NewChiHostReconcileAttributes().SetAdd(),
-	//	)
+	opts.ExcludeReconcileAttributes(
+		chiv1.NewChiHostReconcileAttributes().SetAdd(),
+	)
 
 	return opts
 }
