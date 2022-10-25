@@ -228,7 +228,6 @@ spec:
                   description: |
                     Allows to define custom taskID for named update operation and watch status of this update execution in .status.taskIDs field.
                     By default every update of chi manifest will generate random taskID
-                # Need to be StringBool
                 stop: &TypeStringBool
                   type: string
                   description: |
@@ -267,7 +266,6 @@ spec:
                   enum:
                     - ""
                     - "RollingUpdate"
-                # Need to be StringBool
                 troubleshoot:
                   <<: *TypeStringBool
                   description: "allows troubleshoot Pods during CrashLoopBack state, when you apply wrong configuration, `clickhouse-server` wouldn't startup"
@@ -351,7 +349,6 @@ spec:
                     More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specdefaults
                   # nullable: true
                   properties:
-                    # Need to be StringBool
                     replicasUseFQDN:
                       <<: *TypeStringBool
                       description: |
@@ -644,7 +641,6 @@ spec:
                                         optional, 1 by default, allows setup shard <weight> setting which will use during insert into tables with `Distributed` engine,
                                         will apply in <remote_servers> inside ConfigMap which will mount in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml
                                         More details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
-                                    # Need to be StringBool
                                     internalReplication:
                                       <<: *TypeStringBool
                                       description: |

@@ -216,11 +216,36 @@ spec:
                         wait:
                           type: object
                           properties:
-                            exclude:
+                            exclude:  &TypeStringBool
                               type: string
                               description: "wait when a pod will be removed from the cluster"
+                              enum:
+                                # List StringBoolXXX constants from model
+                                - ""
+                                - "0"
+                                - "1"
+                                - "False"
+                                - "false"
+                                - "True"
+                                - "true"
+                                - "No"
+                                - "no"
+                                - "Yes"
+                                - "yes"
+                                - "Off"
+                                - "off"
+                                - "On"
+                                - "on"
+                                - "Disable"
+                                - "disable"
+                                - "Enable"
+                                - "enable"
+                                - "Disabled"
+                                - "disabled"
+                                - "Enabled"
+                                - "enabled"
                             include:
-                              type: string
+                              <<: *TypeStringBool
                               description: "wait when a pod will be added to the cluster"
                 annotation:
                   type: object
@@ -258,8 +283,8 @@ spec:
                       description: |
                         When propagating labels from the chi's `metadata.labels` section to child objects' `metadata.labels`,
                         exclude labels from the following list
-                    appendScope: &TypeStringBool
-                      type: string
+                    appendScope:
+                      <<: *TypeStringBool
                       description: |
                         Whether to append *Scope* labels to StatefulSet and Pod
                         - "LabelShardScopeIndex"
@@ -272,31 +297,6 @@ spec:
                         - "LabelClusterScopeCycleSize"
                         - "LabelClusterScopeCycleIndex"
                         - "LabelClusterScopeCycleOffset"
-                      enum:
-                        # List StringBoolXXX constants from model
-                        - ""
-                        - "0"
-                        - "1"
-                        - "False"
-                        - "false"
-                        - "True"
-                        - "true"
-                        - "No"
-                        - "no"
-                        - "Yes"
-                        - "yes"
-                        - "Off"
-                        - "off"
-                        - "On"
-                        - "on"
-                        - "Disable"
-                        - "disable"
-                        - "Enable"
-                        - "enable"
-                        - "Disabled"
-                        - "disabled"
-                        - "Enabled"
-                        - "enabled"
                 statefulSet:
                   type: object
                   description: "define StatefulSet-specific parameters"
