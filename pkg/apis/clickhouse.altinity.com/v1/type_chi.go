@@ -47,7 +47,6 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 		Spec:       chi.Spec,
 		// Skip status
 	}
-	chi.Status.NormalizedCHICompleted = chi.Status.NormalizedCHI
 }
 
 // FillSelfCalculatedAddressInfo calculates and fills address info

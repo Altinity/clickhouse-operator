@@ -294,13 +294,13 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 
 	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, chopmodel.NewNormalizerOptions()); err == nil {
-		w.a.V(2).M(chi).Info("updating endpoints for CHI %s", chi.Name)
+		w.a.V(2).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
-		w.a.V(1).M(chi).Info("IPs of the CHI %v", ips)
+		w.a.V(1).M(chi).Info("IPs of the CHI-1 %v", ips)
 		opts := chopmodel.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, opts); err == nil {
-			w.a.V(1).M(chi).Info("Update users IPS")
+			w.a.V(1).M(chi).Info("Update users IPS-1")
 			w.newContext(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
@@ -642,13 +642,13 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 
 	// Update CHI object
 	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, chopmodel.NewNormalizerOptions()); err == nil {
-		w.a.V(2).M(chi).Info("updating endpoints for CHI %s", chi.Name)
+		w.a.V(2).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
-		w.a.V(1).M(chi).Info("IPs of the CHI %v", ips)
+		w.a.V(1).M(chi).Info("IPs of the CHI-2 %v", ips)
 		opts := chopmodel.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
-			w.a.V(1).M(chi).Info("Update users IPS")
+			w.a.V(1).M(chi).Info("Update users IPS-2")
 			(&chi.Status).ReconcileComplete(chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{

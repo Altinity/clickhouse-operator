@@ -145,10 +145,6 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		sort.Sort(sort.Reverse(sort.StringSlice(s.Errors)))
 	}
 
-	if opts.Normalized {
-		s.NormalizedCHI = from.NormalizedCHI
-	}
-
 	if opts.MainFields {
 		s.CHOpVersion = from.CHOpVersion
 		s.CHOpCommit = from.CHOpCommit
@@ -176,6 +172,11 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.Endpoint = from.Endpoint
 		s.NormalizedCHI = from.NormalizedCHI
 
+	}
+
+	if opts.Normalized {
+		s.NormalizedCHI = from.NormalizedCHI
+		s.NormalizedCHICompleted = from.NormalizedCHICompleted
 	}
 
 	if opts.WholeStatus {

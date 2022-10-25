@@ -46,6 +46,8 @@ case "${DEPLOY_OPERATOR}" in
             OPERATOR_VERSION="${OPERATOR_VERSION}"                                     \
             OPERATOR_IMAGE="${OPERATOR_IMAGE}"                                         \
             OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY}"                 \
+            CH_USERNAME_SECRET_PLAIN="clickhouse_operator"                             \
+            CH_PASSWORD_SECRET_PLAIN="clickhouse_operator_password"                    \
             METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}"                 \
             METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}"                         \
             METRICS_EXPORTER_IMAGE_PULL_POLICY=""${METRICS_EXPORTER_IMAGE_PULL_POLICY} \
