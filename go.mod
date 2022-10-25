@@ -2,9 +2,31 @@ module github.com/altinity/clickhouse-operator
 
 go 1.17
 
+replace (
+	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
+	golang.org/x/text => golang.org/x/text v0.3.7
+)
+
+replace (
+	k8s.io/api => k8s.io/api v0.21.7
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.7
+	k8s.io/apimachinery => k8s.io/apimachinery v0.21.7
+	k8s.io/client-go => k8s.io/client-go v0.21.7
+	k8s.io/code-generator => k8s.io/code-generator v0.21.7
+)
+
+require github.com/altinity/queue v0.0.0-20210114142043-ddb7da66064f
+
+require (
+	k8s.io/api v0.23.1
+	k8s.io/apiextensions-apiserver v0.23.1
+	k8s.io/apimachinery v0.23.1
+	k8s.io/client-go v0.23.1
+	k8s.io/code-generator v0.23.1
+)
+
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
-	github.com/altinity/queue v0.0.0-20210114142043-ddb7da66064f
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/gosimple/slug v1.12.0
@@ -13,17 +35,10 @@ require (
 	github.com/kubernetes-sigs/yaml v1.1.0
 	github.com/mailru/go-clickhouse v1.6.0
 	github.com/prometheus/client_golang v1.12.2
-	github.com/r3labs/diff v0.0.0-20191120142937-b4ed99a31f5a
 	github.com/sanity-io/litter v1.3.0
 	github.com/securego/gosec/v2 v2.8.1
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
-	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0
-	k8s.io/api v0.23.1
-	k8s.io/apiextensions-apiserver v0.23.1
-	k8s.io/apimachinery v0.23.1
-	k8s.io/client-go v0.23.1
-	k8s.io/code-generator v0.23.1
 )
 
 require (
@@ -74,20 +89,11 @@ require (
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027 // indirect
 	k8s.io/klog/v2 v2.9.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20211110012726-3cc51fd1e909 // indirect
 	k8s.io/utils v0.0.0-20210521133846-da695404a2bc // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
-)
-
-replace (
-	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
-	golang.org/x/text => golang.org/x/text v0.3.7
-	k8s.io/api => k8s.io/api v0.21.7
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.21.7
-	k8s.io/apimachinery => k8s.io/apimachinery v0.21.7
-	k8s.io/client-go => k8s.io/client-go v0.21.7
-	k8s.io/code-generator => k8s.io/code-generator v0.21.7
 )
