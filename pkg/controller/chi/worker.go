@@ -336,8 +336,11 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 		return nil
 	}
 
+	w.a.V(1).M(new).S().P()
+	defer w.a.V(1).M(new).E().P()
+
 	if w.ensureFinalizer(context.Background(), new) {
-		// Finalizer installed, let's restart reconcile cycle
+		w.a.M(new).F().Info("finalizer installed, let's restart reconcile cycle")
 		return nil
 	}
 
@@ -481,7 +484,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 		return nil
 	}
 
-	w.logOldAndNew("original", old, new)
+	w.logOldAndNew("non-normalized yet", old, new)
 
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
