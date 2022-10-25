@@ -142,10 +142,10 @@ type OperatorConfigDefault struct {
 	// 2. user/quota - string
 	// 3. user/networks/ip - multiple strings
 	// 4. user/password - string
-	Profile    string   `json:"profile"   yaml:"profile"`
-	Quota      string   `json:"quota"     yaml:"quota"`
+	Profile    string   `json:"profile"    yaml:"profile"`
+	Quota      string   `json:"quota"      yaml:"quota"`
 	NetworksIP []string `json:"networksIP" yaml:"networksIP"`
-	Password   string   `json:"password"  yaml:"password"`
+	Password   string   `json:"password"   yaml:"password"`
 }
 
 // OperatorConfigClickHouse specifies ClickHouse section
@@ -158,16 +158,16 @@ type OperatorConfigClickHouse struct {
 		// 1. Metrics requests
 		// 2. Schema maintenance
 		// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-		Scheme   string `json:"scheme"   yaml:"scheme"`
-		Username string `json:"username" yaml:"username"`
-		Password string `json:"password" yaml:"password"`
-		RootCA   string `json:"rootCA"   yaml:"rootCA"`
+		Scheme   string `json:"scheme,omitempty"   yaml:"scheme,omitempty"`
+		Username string `json:"username,omitempty" yaml:"username,omitempty"`
+		Password string `json:"password,omitempty" yaml:"password,omitempty"`
+		RootCA   string `json:"rootCA,omitempty"   yaml:"rootCA,omitempty"`
 
 		// Location of k8s Secret with username and password to be used by the operator to connect to ClickHouse instances
 		// Can be used instead of explicitly specified (above) username and password
 		Secret struct {
-			Namespace string `json:"namespace" yaml:"namespace"`
-			Name      string `json:"name"      yaml:"name"`
+			Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+			Name      string `json:"name,omitempty"      yaml:"name,omitempty"`
 
 			Runtime struct {
 				// Username and Password to be used by operator to connect to ClickHouse instances
