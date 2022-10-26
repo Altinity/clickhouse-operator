@@ -176,7 +176,6 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 
 	if opts.Normalized {
 		s.NormalizedCHI = from.NormalizedCHI
-		s.NormalizedCHICompleted = from.NormalizedCHICompleted
 	}
 
 	if opts.WholeStatus {
