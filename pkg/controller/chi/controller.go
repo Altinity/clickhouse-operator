@@ -305,7 +305,7 @@ func updated(old, new *core.Endpoints) bool {
 	}
 
 	if assigned {
-		log.V(1).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
+		log.V(2).M(old).Info("endpointsInformer.UpdateFunc: IP ASSIGNED: %s", litter.Sdump(new.Subsets))
 		return true
 	}
 
