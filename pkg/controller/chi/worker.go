@@ -22,6 +22,7 @@ import (
 
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
+	"gopkg.in/yaml.v3"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -446,20 +447,30 @@ func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) boo
 
 // logCHI writes a CHI into the log
 func (w *worker) logCHI(name string, chi *chiv1.ClickHouseInstallation) {
-	var jsonString string
+	var str string
 
-	bytes, err := json.MarshalIndent(chi, "", "  ")
-	if err == nil {
-		jsonString = string(bytes)
+	jsonBytes, err := json.MarshalIndent(chi, "", "  ")
+	if err != nil {
+		str = fmt.Sprintf("unable to parse %s. err: %v", name, err)
 	} else {
-		jsonString = fmt.Sprintf("unable to parse %s. err: %v", name, err)
+		var chi2 chiv1.ClickHouseInstallation
+		if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+			str = fmt.Sprintf("unable to parse %s. err: %v", name, err)
+		} else {
+			chi2.ObjectMeta.ManagedFields = nil
+			if yamlBytes, err := yaml.Marshal(&chi2); err != nil {
+				str = fmt.Sprintf("unable to parse %s. err: %v", name, err)
+			} else {
+				str = string(yamlBytes)
+			}
+		}
 	}
 
 	w.a.M(chi).Info(
 		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
 		name,
 		name,
-		jsonString,
+		str,
 	)
 }
 
@@ -486,7 +497,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 
 	w.logOldAndNew("non-normalized yet", old, new)
 
-	switch{
+	switch {
 	case w.isAfterFinalizerInstalled(old, new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
 	case w.isGenerationTheSame(old, new):
