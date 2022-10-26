@@ -486,20 +486,21 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 
 	w.logOldAndNew("non-normalized yet", old, new)
 
-	switch {
+	switch{
 	case w.isAfterFinalizerInstalled(old, new):
-		w.a.M(new).F().Info("isAfterFinalizerInstalled() -  zeroing old one")
-		old = nil
+		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-1")
 	case w.isGenerationTheSame(old, new):
 		w.a.M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
 		return nil
-	case new.Status.NormalizedCHICompleted != nil:
-		w.a.M(new).F().Info("has NormalizedCHICompleted, use it as a base for reconcile")
-		old = new.Status.NormalizedCHICompleted
 	}
 
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
+
+	if new.Status.NormalizedCHICompleted != nil {
+		w.a.M(new).F().Info("has NormalizedCHICompleted, use it as a base for reconcile")
+		old = new.Status.NormalizedCHICompleted
+	}
 
 	old = w.normalize(old)
 	new = w.normalize(new)
@@ -507,8 +508,14 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 
 	actionPlan := chopmodel.NewActionPlan(old, new)
 	w.logActionPlan(actionPlan)
-	if !actionPlan.HasActionsToDo() {
-		w.a.M(new).F().Info("ActionPlan has no actions - nothing to do")
+
+	switch {
+	case actionPlan.HasActionsToDo():
+		w.a.M(new).F().Info("ActionPlan has actions - continue reconcile")
+	case w.isAfterFinalizerInstalled(old, new):
+		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
+	default:
+		w.a.M(new).F().Info("ActionPlan has no actions and not finalizer - nothing to do")
 		return nil
 	}
 
@@ -653,6 +660,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
 			(&chi.Status).ReconcileComplete(chi)
+			chi.Status.NormalizedCHICompleted = chi.Status.NormalizedCHI
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
 					WholeStatus: true,
