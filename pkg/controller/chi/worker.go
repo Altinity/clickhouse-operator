@@ -466,7 +466,7 @@ func (w *worker) logCHI(name string, chi *chiv1.ClickHouseInstallation) {
 		}
 	}
 
-	w.a.M(chi).Info(
+	w.a.V(2).M(chi).Info(
 		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
 		name,
 		name,
