@@ -71,12 +71,17 @@ func MessageDiffItemString(banner, defaultPath string, items map[*messagediff.Pa
 			path = defaultPath
 		}
 		str += fmt.Sprintf("ap item path [%d]:'%s'\n", i, path)
-		str += fmt.Sprintf("ap item value[%d]:'%s'\n", i, Dump(items[pathPtr]))
-		//str += fmt.Sprintf("ap item value[%d]:", i)
-		//str += fmt.Sprintf("'%+v'\n", items[pathPtr])
+
+		short := fmt.Sprintf("ap item value[%d]:'%+v'\n", i, items[pathPtr])
+		full := fmt.Sprintf("ap item value[%d]:'%s'\n", i, Dump(items[pathPtr]))
+		if len(full) < 300 {
+			str += full
+		} else {
+			str += short
+		}
 		i++
 	}
-	str += fmt.Sprintf("AP item end -------------------------\n")
+	str += fmt.Sprintf("AP item end -------------------------")
 
 	return str
 }
