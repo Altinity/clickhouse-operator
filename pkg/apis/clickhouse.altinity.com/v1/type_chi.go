@@ -30,21 +30,21 @@ import (
 
 // FillStatus fills .Status
 func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string) {
-	chi.Status.CHOpVersion = version.Version
-	chi.Status.CHOpCommit = version.GitSHA
-	chi.Status.CHOpDate = version.BuiltAt
-	chi.Status.CHOpIP = ip
-	chi.Status.ClustersCount = chi.ClustersCount()
-	chi.Status.ShardsCount = chi.ShardsCount()
-	chi.Status.HostsCount = chi.HostsCount()
-	chi.Status.TaskID = *chi.Spec.TaskID
-	chi.Status.UpdatedHostsCount = 0
-	chi.Status.DeleteHostsCount = 0
-	chi.Status.DeletedHostsCount = 0
-	chi.Status.Pods = pods
-	chi.Status.FQDNs = fqdns
-	chi.Status.Endpoint = endpoint
-	chi.Status.NormalizedCHI = chi.CopyFiltered(true, true)
+	chi.EnsureStatus().CHOpVersion = version.Version
+	chi.EnsureStatus().CHOpCommit = version.GitSHA
+	chi.EnsureStatus().CHOpDate = version.BuiltAt
+	chi.EnsureStatus().CHOpIP = ip
+	chi.EnsureStatus().ClustersCount = chi.ClustersCount()
+	chi.EnsureStatus().ShardsCount = chi.ShardsCount()
+	chi.EnsureStatus().HostsCount = chi.HostsCount()
+	chi.EnsureStatus().TaskID = *chi.Spec.TaskID
+	chi.EnsureStatus().UpdatedHostsCount = 0
+	chi.EnsureStatus().DeleteHostsCount = 0
+	chi.EnsureStatus().DeletedHostsCount = 0
+	chi.EnsureStatus().Pods = pods
+	chi.EnsureStatus().FQDNs = fqdns
+	chi.EnsureStatus().Endpoint = endpoint
+	chi.EnsureStatus().NormalizedCHI = chi.CopyFiltered(true, true)
 }
 
 // FillSelfCalculatedAddressInfo calculates and fills address info
@@ -469,9 +469,6 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	// Do actual merge for Spec
 	(&chi.Spec).MergeFrom(&from.Spec, _type)
 
-	// Copy Status for now
-	chi.Status = from.Status
-
 	// Copy service attributes
 	chi.Attributes = from.Attributes
 }
@@ -719,7 +716,7 @@ func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *Cli
 	}
 
 	if status {
-		chi2.Status = ChiStatus{}
+		chi2.Status = nil
 	}
 
 	if managedFields {
@@ -754,4 +751,15 @@ func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
 		return fmt.Sprintf("unable to parse. err: %v", err)
 	}
 	return string(yamlBytes)
+}
+
+func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
+	if chi == nil {
+		return nil
+	}
+	if chi.Status == nil {
+		chi.Status = &ChiStatus{}
+	}
+
+	return chi.Status
 }
