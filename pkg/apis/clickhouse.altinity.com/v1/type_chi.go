@@ -16,10 +16,13 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 
 	"github.com/imdario/mergo"
+	"gopkg.in/yaml.v3"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
@@ -704,4 +707,56 @@ func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 		return nil
 	}
 	return chi.Spec.Reconciling
+}
+
+func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *ClickHouseInstallation {
+	if chi == nil {
+		return nil
+	}
+	jsonBytes, err := json.Marshal(chi)
+	if err != nil {
+		return nil
+	}
+
+	var chi2 ClickHouseInstallation
+	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+		return nil
+	}
+
+	if status {
+		chi2.Status = ChiStatus{}
+	}
+
+	if managedFields {
+		chi2.ObjectMeta.ManagedFields = nil
+	}
+
+	return &chi2
+}
+
+func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
+	if chi == nil {
+		return ""
+	}
+
+	filtered := chi.CopyFiltered(status, managedFields)
+	jsonBytes, err := json.MarshalIndent(filtered, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("unable to parse. err: %v", err)
+	}
+	return string(jsonBytes)
+
+}
+
+func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
+	if chi == nil {
+		return ""
+	}
+
+	filtered := chi.CopyFiltered(status, managedFields)
+	yamlBytes, err := yaml.Marshal(filtered)
+	if err != nil {
+		return fmt.Sprintf("unable to parse. err: %v", err)
+	}
+	return string(yamlBytes)
 }
