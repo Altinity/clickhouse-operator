@@ -58,6 +58,9 @@ const (
 
 // PushAction pushes action into status
 func (s *ChiStatus) PushAction(action string) {
+	if s == nil {
+		return
+	}
 	s.Actions = append([]string{action}, s.Actions...)
 	if len(s.Actions) > maxActions {
 		s.Actions = s.Actions[:maxActions]
@@ -66,6 +69,9 @@ func (s *ChiStatus) PushAction(action string) {
 
 // PushError sets and pushes error into status
 func (s *ChiStatus) PushError(error string) {
+	if s == nil {
+		return
+	}
 	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
 		s.Errors = s.Errors[:maxErrors]
@@ -74,6 +80,9 @@ func (s *ChiStatus) PushError(error string) {
 
 // SetAndPushError sets and pushes error into status
 func (s *ChiStatus) SetAndPushError(error string) {
+	if s == nil {
+		return
+	}
 	s.Error = error
 	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
@@ -83,6 +92,9 @@ func (s *ChiStatus) SetAndPushError(error string) {
 
 // PushTaskIDStarted pushes task id into status
 func (s *ChiStatus) PushTaskIDStarted() {
+	if s == nil {
+		return
+	}
 	s.TaskIDsStarted = append([]string{s.TaskID}, s.TaskIDsStarted...)
 	if len(s.TaskIDsStarted) > maxTaskIDs {
 		s.TaskIDsStarted = s.TaskIDsStarted[:maxTaskIDs]
@@ -91,6 +103,9 @@ func (s *ChiStatus) PushTaskIDStarted() {
 
 // PushTaskIDCompleted pushes task id into status
 func (s *ChiStatus) PushTaskIDCompleted() {
+	if s == nil {
+		return
+	}
 	s.TaskIDsCompleted = append([]string{s.TaskID}, s.TaskIDsCompleted...)
 	if len(s.TaskIDsCompleted) > maxTaskIDs {
 		s.TaskIDsCompleted = s.TaskIDsCompleted[:maxTaskIDs]
@@ -99,6 +114,9 @@ func (s *ChiStatus) PushTaskIDCompleted() {
 
 // ReconcileStart marks reconcile start
 func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
+	if s == nil {
+		return
+	}
 	s.Status = StatusInProgress
 	s.UpdatedHostsCount = 0
 	s.AddedHostsCount = 0
@@ -109,6 +127,9 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 
 // ReconcileComplete marks reconcile completion
 func (s *ChiStatus) ReconcileComplete(chi *ClickHouseInstallation) {
+	if s == nil {
+		return
+	}
 	s.Status = StatusCompleted
 	s.Action = ""
 	s.PushTaskIDCompleted()
@@ -116,6 +137,9 @@ func (s *ChiStatus) ReconcileComplete(chi *ClickHouseInstallation) {
 
 // DeleteStart marks deletion start
 func (s *ChiStatus) DeleteStart() {
+	if s == nil {
+		return
+	}
 	s.Status = StatusTerminating
 	s.UpdatedHostsCount = 0
 	s.AddedHostsCount = 0
@@ -133,6 +157,14 @@ type CopyCHIStatusOptions struct {
 }
 
 func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
+	if s == nil {
+		return
+	}
+
+	if from == nil {
+		return
+	}
+
 	if opts.Actions {
 		s.Action = from.Action
 		s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
@@ -206,4 +238,39 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.NormalizedCHI = from.NormalizedCHI
 		s.NormalizedCHICompleted = from.NormalizedCHICompleted
 	}
+}
+
+func (s *ChiStatus) GetFQDNs() []string {
+	if s == nil {
+		return nil
+	}
+	return s.FQDNs
+}
+
+func (s *ChiStatus) GetCHOpIP() string {
+	if s == nil {
+		return ""
+	}
+	return s.CHOpIP
+}
+
+func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
+	if s == nil {
+		return nil
+	}
+	return s.NormalizedCHICompleted
+}
+
+func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
+	if s == nil {
+		return nil
+	}
+	return s.NormalizedCHI
+}
+
+func (s *ChiStatus) GetStatus() string {
+	if s == nil {
+		return ""
+	}
+	return s.Status
 }
