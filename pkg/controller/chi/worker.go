@@ -16,13 +16,11 @@ package chi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
-	"gopkg.in/yaml.v3"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -447,30 +445,11 @@ func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) boo
 
 // logCHI writes a CHI into the log
 func (w *worker) logCHI(name string, chi *chiv1.ClickHouseInstallation) {
-	var str string
-
-	jsonBytes, err := json.MarshalIndent(chi, "", "  ")
-	if err != nil {
-		str = fmt.Sprintf("unable to parse %s. err: %v", name, err)
-	} else {
-		var chi2 chiv1.ClickHouseInstallation
-		if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
-			str = fmt.Sprintf("unable to parse %s. err: %v", name, err)
-		} else {
-			chi2.ObjectMeta.ManagedFields = nil
-			if yamlBytes, err := yaml.Marshal(&chi2); err != nil {
-				str = fmt.Sprintf("unable to parse %s. err: %v", name, err)
-			} else {
-				str = string(yamlBytes)
-			}
-		}
-	}
-
 	w.a.V(2).M(chi).Info(
 		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
 		name,
 		name,
-		str,
+		chi.YAML(true, true),
 	)
 }
 
