@@ -51,9 +51,9 @@ type ChiStatus struct {
 }
 
 const (
-	maxActions = 100
-	maxErrors  = 100
-	maxTaskIDs = 100
+	maxActions = 10
+	maxErrors  = 10
+	maxTaskIDs = 10
 )
 
 // PushAction pushes action into status
