@@ -4,13 +4,13 @@ def argparser(parser):
     parser.add_argument(
         "--native",
         action="store_true",
-        help="run tests without docker-compose, require only worked kubectl + python",
+        help="run tests without docker-compose, require only working kubectl + python",
         default=False
     )
     parser.add_argument(
         "--keeper-type",
         type=str,
-        help="which type of keeper will use for test",
+        help="type of keeper to use for tests",
         choices=["zookeeper", "clickhouse-keeper"],
         default="zookeeper"
     )
