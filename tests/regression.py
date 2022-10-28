@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from testflows.core import *
 
 from helpers.argparser import argparser

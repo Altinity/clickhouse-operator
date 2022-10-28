@@ -79,27 +79,27 @@ class Cluster(object):
             for attempt in range(max_attempts):
                 with When(f"attempt {attempt}/{max_attempts}"):
                     with By("checking if any containers are already running"):
-                        self.shell(f"{self.docker_compose} ps | tee")
+                        self.shell(f"set -o pipefail && {self.docker_compose} ps | tee")
 
                     with And("executing docker-compose down just in case it is up"):
-                        cmd = self.shell(f"{self.docker_compose} down -v --remove-orphans 2>&1 | tee")
+                        cmd = self.shell(f"set -o pipefail && {self.docker_compose} down -v --remove-orphans 2>&1 | tee")
                         if cmd.exitcode != 0:
                             continue
 
                     with And("checking if any containers are still left running"):
-                        self.shell(f"{self.docker_compose} ps | tee")
+                        self.shell(f"set -o pipefail && {self.docker_compose} ps | tee")
 
                     with And("executing docker-compose up"):
                         for up_attempt in range(max_up_attempts):
                             with By(f"attempt {up_attempt}/{max_up_attempts}"):
-                                cmd = self.shell(f"{self.docker_compose} up --force-recreate --timeout {timeout} -d 2>&1 | tee")
+                                cmd = self.shell(f"set -o pipefail && {self.docker_compose} up --force-recreate --timeout {timeout} -d 2>&1 | tee")
                                 if "is unhealthy" not in cmd.output:
                                     break
 
                     with Then("check there are no unhealthy containers"):
-                        ps_cmd = self.shell(f"{self.docker_compose} ps | tee | grep -v \"Exit 0\"")
+                        ps_cmd = self.shell(f"set -o pipefail && {self.docker_compose} ps | tee | grep -v \"Exit 0\"")
                         if "is unhealthy" in cmd.output or "Exit" in ps_cmd.output:
-                            self.shell(f"{self.docker_compose} logs | tee")
+                            self.shell(f"set -o pipefail && {self.docker_compose} logs | tee")
                             continue
 
                     if cmd.exitcode == 0 and "is unhealthy" not in cmd.output and "Exit" not in ps_cmd.output:
