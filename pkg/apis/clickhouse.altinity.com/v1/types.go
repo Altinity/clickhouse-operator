@@ -38,8 +38,8 @@ const (
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"            yaml:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
-	Status            ChiStatus `json:"status"   yaml:"status"`
+	Spec              ChiSpec    `json:"spec"               yaml:"spec"`
+	Status            *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
 	Attributes ComparableAttributes `json:"-" yaml:"-"`
 }
