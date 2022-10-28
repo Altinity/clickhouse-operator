@@ -649,8 +649,9 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
-			chi.EnsureStatus().ReconcileComplete(chi)
 			chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
+			chi.EnsureStatus().NormalizedCHI = nil
+			chi.EnsureStatus().ReconcileComplete()
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
 					WholeStatus: true,

@@ -126,7 +126,7 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 }
 
 // ReconcileComplete marks reconcile completion
-func (s *ChiStatus) ReconcileComplete(chi *ClickHouseInstallation) {
+func (s *ChiStatus) ReconcileComplete() {
 	if s == nil {
 		return
 	}
