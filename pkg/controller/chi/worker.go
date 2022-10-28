@@ -666,7 +666,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 
 	w.a.V(1).
 		WithEvent(_chi, eventActionReconcile, eventReasonReconcileCompleted).
-		WithStatusActions(_chi).
+		WithStatusAction(_chi).
 		M(_chi).F().
 		Info("reconcile completed")
 }
