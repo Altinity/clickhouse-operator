@@ -26,11 +26,11 @@ type ChiStatus struct {
 	CHOpCommit             string                  `json:"chop-commit,omitempty"         yaml:"chop-commit,omitempty"`
 	CHOpDate               string                  `json:"chop-date,omitempty"           yaml:"chop-date,omitempty"`
 	CHOpIP                 string                  `json:"chop-ip,omitempty"             yaml:"chop-ip,omitempty"`
-	ClustersCount          int                     `json:"clusters"                      yaml:"clusters"`
-	ShardsCount            int                     `json:"shards"                        yaml:"shards"`
-	ReplicasCount          int                     `json:"replicas"                      yaml:"replicas"`
-	HostsCount             int                     `json:"hosts"                         yaml:"hosts"`
-	Status                 string                  `json:"status"                        yaml:"status"`
+	ClustersCount          int                     `json:"clusters,omitempty"            yaml:"clusters,omitempty"`
+	ShardsCount            int                     `json:"shards,omitempty"              yaml:"shards,omitempty"`
+	ReplicasCount          int                     `json:"replicas,omitempty"            yaml:"replicas,omitempty"`
+	HostsCount             int                     `json:"hosts,omitempty"               yaml:"hosts,omitempty"`
+	Status                 string                  `json:"status,omitempty"              yaml:"status,omitempty"`
 	TaskID                 string                  `json:"taskID,omitempty"              yaml:"taskID,omitempty"`
 	TaskIDsStarted         []string                `json:"taskIDsStarted,omitempty"      yaml:"taskIDsStarted,omitempty"`
 	TaskIDsCompleted       []string                `json:"taskIDsCompleted,omitempty"    yaml:"taskIDsCompleted,omitempty"`
