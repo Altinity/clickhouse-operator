@@ -695,9 +695,9 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 
 				if found {
 					// StatefulSet of this host already exist, we can't ADD it for sure
-					// It looks like UNCLEAR is the most correct approach
-					(&host.ReconcileAttributes).SetUnclear()
-					w.a.V(1).M(chi).Info("Add host as UNCLEAR. Host was found as sts %s", host.Name)
+					// It looks like FOUND is the most correct approach
+					(&host.ReconcileAttributes).SetFound()
+					w.a.V(1).M(chi).Info("Add host as FOUND. Host was found as sts %s", host.Name)
 				} else {
 					// StatefulSet of this host does not exist, looks like we need to ADD it
 					(&host.ReconcileAttributes).SetAdd()
@@ -738,7 +738,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 			return nil
 		}
 		// Not clear yet
-		(&host.ReconcileAttributes).SetUnclear()
+		(&host.ReconcileAttributes).SetFound()
 		return nil
 	})
 
@@ -751,8 +751,8 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 			w.a.M(host).Info("MODIFY host: %s", host.Address.CompactString())
 			return nil
 		}
-		if host.ReconcileAttributes.IsUnclear() {
-			w.a.M(host).Info("UNCLEAR host: %s", host.Address.CompactString())
+		if host.ReconcileAttributes.IsFound() {
+			w.a.M(host).Info("FOUND host: %s", host.Address.CompactString())
 			return nil
 		}
 		w.a.M(host).Info("UNTOUCHED host: %s", host.Address.CompactString())

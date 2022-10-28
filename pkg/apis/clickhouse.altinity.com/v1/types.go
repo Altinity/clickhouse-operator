@@ -611,11 +611,11 @@ const (
 
 // ChiHostReconcileAttributes defines host reconcile status
 type ChiHostReconcileAttributes struct {
-	status  StatefulSetStatus
-	add     bool
-	remove  bool
-	modify  bool
-	unclear bool
+	status StatefulSetStatus
+	add    bool
+	remove bool
+	modify bool
+	found  bool
 }
 
 // NewChiHostReconcileAttributes creates new reconcile attributes
@@ -628,7 +628,7 @@ func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.unclear == to.unclear)
+	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.found == to.found)
 }
 
 // Any checks whether any of the attributes is set
@@ -636,7 +636,7 @@ func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.unclear && to.unclear)
+	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.found && to.found)
 }
 
 // SetStatus sets status
@@ -674,9 +674,9 @@ func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
 	return s
 }
 
-// SetUnclear sets 'unclear' attribute
-func (s *ChiHostReconcileAttributes) SetUnclear() *ChiHostReconcileAttributes {
-	s.unclear = true
+// SetFound sets 'found' attribute
+func (s *ChiHostReconcileAttributes) SetFound() *ChiHostReconcileAttributes {
+	s.found = true
 	return s
 }
 
@@ -695,9 +695,9 @@ func (s *ChiHostReconcileAttributes) IsModify() bool {
 	return s.modify
 }
 
-// IsUnclear checks whether 'unclear' attribute is set
-func (s *ChiHostReconcileAttributes) IsUnclear() bool {
-	return s.unclear
+// IsFound checks whether 'found' attribute is set
+func (s *ChiHostReconcileAttributes) IsFound() bool {
+	return s.found
 }
 
 // String returns string form
@@ -707,12 +707,12 @@ func (s *ChiHostReconcileAttributes) String() string {
 	}
 
 	return fmt.Sprintf(
-		"status: %s, add: %t, remove: %t, modify: %t, unclear: %t",
+		"status: %s, add: %t, remove: %t, modify: %t, found: %t",
 		s.status,
 		s.add,
 		s.remove,
 		s.modify,
-		s.unclear,
+		s.found,
 	)
 }
 
