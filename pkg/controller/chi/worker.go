@@ -376,7 +376,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 // isCleanRestartOnTheSameIP checks whether it is just a restart of the operator on the same IP
 func (w *worker) isCleanRestartOnTheSameIP(chi *chiv1.ClickHouseInstallation) bool {
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_IP)
-	ipIsTheSame := ip == chi.Status.CHOpIP
+	ipIsTheSame := ip == chi.Status.GetCHOpIP()
 	return w.isCleanRestart(chi) && ipIsTheSame
 }
 
@@ -394,20 +394,20 @@ func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
 	// Do we have have previously completed CHI?
 	// In case no - this means that CHI has either not completed or we are migrating from
 	// such a version of the operator, where there is no completed CHI at all
-	noCompletedCHI := chi.Status.NormalizedCHICompleted == nil
+	noCompletedCHI := chi.Status.GetNormalizedCHICompleted() == nil
 	// Having status completed and not having completed CHI suggests we are migrating operator version
-	statusIsCompleted := chi.Status.Status == chiv1.StatusCompleted
+	statusIsCompleted := chi.Status.GetStatus() == chiv1.StatusCompleted
 	if noCompletedCHI && statusIsCompleted {
 		// In case of a restart - assume that normalized is already completed
-		chi.Status.NormalizedCHICompleted = chi.Status.NormalizedCHI
+		chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
 	}
 
 	// Check whether anything has changed in CHI spec
 	// In case the generation is the same as already completed - it is clean restart
 	generationIsOk := false
 	// However, NormalizedCHICompleted still can be missing, for example, in newly requested CHI
-	if chi.Status.NormalizedCHICompleted != nil {
-		generationIsOk = chi.Generation == chi.Status.NormalizedCHICompleted.Generation
+	if chi.Status.GetNormalizedCHICompleted() != nil {
+		generationIsOk = chi.Generation == chi.Status.GetNormalizedCHICompleted().Generation
 	}
 
 	return generationIsOk
@@ -487,9 +487,9 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
-	if new.Status.NormalizedCHICompleted != nil {
+	if new.Status.GetNormalizedCHICompleted() != nil {
 		w.a.M(new).F().Info("has NormalizedCHICompleted, use it as a base for reconcile")
-		old = new.Status.NormalizedCHICompleted
+		old = new.Status.GetNormalizedCHICompleted()
 	}
 
 	old = w.normalize(old)
@@ -619,7 +619,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	}
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
-	(&chi.Status).ReconcileStart(ap.GetRemovedHostsNum())
+	chi.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
 			MainFields: true,
@@ -649,8 +649,8 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
-			(&chi.Status).ReconcileComplete(chi)
-			chi.Status.NormalizedCHICompleted = chi.Status.NormalizedCHI
+			chi.EnsureStatus().ReconcileComplete(chi)
+			chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
 					WholeStatus: true,
@@ -1608,7 +1608,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 		M(chi).F().
 		Info("Delete CHI started")
 
-	(&chi.Status).DeleteStart()
+	chi.EnsureStatus().DeleteStart()
 	if err := w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence: true,
 		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
@@ -1772,7 +1772,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallati
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
-	chi.Status.DeletedHostsCount++
+	chi.EnsureStatus().DeletedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence: true,
 		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
@@ -2289,7 +2289,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 
 	err := w.c.createStatefulSet(ctx, host)
 
-	host.CHI.Status.AddedHostsCount++
+	host.CHI.EnsureStatus().AddedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
 			MainFields: true,
@@ -2390,7 +2390,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 	if chopmodel.IsStatefulSetReady(curStatefulSet) {
 		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 		if err == nil {
-			host.CHI.Status.UpdatedHostsCount++
+			host.CHI.EnsureStatus().UpdatedHostsCount++
 			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
 					MainFields: true,
