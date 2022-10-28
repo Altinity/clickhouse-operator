@@ -305,13 +305,13 @@ func (e *Exporter) DiscoveryWatchedCHIs(chopClient *chopclientset.Clientset) {
 	for i := range list.Items {
 		chi := &list.Items[i]
 		if chi.IsStopped() {
-			log.V(1).Infof("Skip stopped CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+			log.V(1).Infof("Skip stopped CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.GetFQDNs()))
 		} else {
-			log.V(1).Infof("Add explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+			log.V(1).Infof("Add explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.GetFQDNs()))
 			watchedCHI := &WatchedCHI{
 				Namespace: chi.Namespace,
 				Name:      chi.Name,
-				Hostnames: chi.Status.FQDNs,
+				Hostnames: chi.Status.GetFQDNs(),
 			}
 			e.updateWatched(watchedCHI)
 		}
