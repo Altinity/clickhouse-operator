@@ -284,25 +284,25 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	if a.writeStatusAction {
 		if len(args) > 0 {
-			a.chi.Status.Action = fmt.Sprintf(format, args...)
+			a.chi.EnsureStatus().Action = fmt.Sprintf(format, args...)
 		} else {
-			a.chi.Status.Action = fmt.Sprint(format)
+			a.chi.EnsureStatus().Action = fmt.Sprint(format)
 		}
 	}
 	if a.writeStatusActions {
 		if len(args) > 0 {
-			(&a.chi.Status).PushAction(prefix + fmt.Sprintf(format, args...))
+			a.chi.EnsureStatus().PushAction(prefix + fmt.Sprintf(format, args...))
 		} else {
-			(&a.chi.Status).PushAction(prefix + fmt.Sprint(format))
+			a.chi.EnsureStatus().PushAction(prefix + fmt.Sprint(format))
 		}
 	}
 	if a.writeStatusError {
 		if len(args) > 0 {
-			a.chi.Status.Error = fmt.Sprintf(format, args...)
-			(&a.chi.Status).PushError(prefix + fmt.Sprintf(format, args...))
+			a.chi.EnsureStatus().Error = fmt.Sprintf(format, args...)
+			a.chi.EnsureStatus().PushError(prefix + fmt.Sprintf(format, args...))
 		} else {
-			a.chi.Status.Error = fmt.Sprint(format)
-			(&a.chi.Status).PushError(prefix + fmt.Sprint(format))
+			a.chi.EnsureStatus().Error = fmt.Sprint(format)
+			a.chi.EnsureStatus().PushError(prefix + fmt.Sprint(format))
 		}
 	}
 
