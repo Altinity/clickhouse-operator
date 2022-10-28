@@ -990,7 +990,7 @@ func (c *Creator) containerAppendVolumeMount(container *corev1.Container, volume
 		volumeMount,
 	)
 
-	c.a.V(1).F().Info(
+	c.a.V(2).F().Info(
 		"container:%s volumeMount added: %s on %s",
 		container.Name,
 		volumeMount.Name,
