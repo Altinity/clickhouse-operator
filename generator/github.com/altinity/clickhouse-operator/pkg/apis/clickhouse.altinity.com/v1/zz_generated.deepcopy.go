@@ -883,7 +883,11 @@ func (in *ClickHouseInstallation) DeepCopyInto(out *ClickHouseInstallation) {
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
-	in.Status.DeepCopyInto(&out.Status)
+	if in.Status != nil {
+		in, out := &in.Status, &out.Status
+		*out = new(ChiStatus)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Attributes.DeepCopyInto(&out.Attributes)
 	return
 }
@@ -945,7 +949,11 @@ func (in *ClickHouseInstallationTemplate) DeepCopyInto(out *ClickHouseInstallati
 	out.TypeMeta = in.TypeMeta
 	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.Spec.DeepCopyInto(&out.Spec)
-	in.Status.DeepCopyInto(&out.Status)
+	if in.Status != nil {
+		in, out := &in.Status, &out.Status
+		*out = new(ChiStatus)
+		(*in).DeepCopyInto(*out)
+	}
 	in.Attributes.DeepCopyInto(&out.Attributes)
 	return
 }
