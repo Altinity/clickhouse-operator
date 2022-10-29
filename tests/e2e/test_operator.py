@@ -554,9 +554,9 @@ def test_011(self):
             with Then("Default user should have 5 allowed ips"):
                 # Check normalized CHI
                 chi = kubectl.get("chi", "test-011-secured-cluster")
-                ips = chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/networks/ip"]
+                ips = chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/networks/ip"]
                 # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
-                print(f"normalized: {ips}")
+                print(f"normalizedCompleted: {ips}")
                 assert len(ips) == 5
 
             with And("Configmap should be updated"):
@@ -708,8 +708,8 @@ def test_011_1(self):
 
         with Then("Default user plain password should be removed"):
             chi = kubectl.get("chi", "test-011-secured-default")
-            assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-            assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
+            assert "default/password" in chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]
+            assert chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/password"] == ""
 
             cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
             assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
@@ -731,8 +731,8 @@ def test_011_1(self):
             )
             with Then("Default user plain password should be removed"):
                 chi = kubectl.get("chi", "test-011-secured-default")
-                assert "default/password" in chi["status"]["normalized"]["spec"]["configuration"]["users"]
-                assert chi["status"]["normalized"]["spec"]["configuration"]["users"]["default/password"] == ""
+                assert "default/password" in chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]
+                assert chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/password"] == ""
 
                 cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
                 assert "<password remove=\"1\"></password>" in cfm["data"]["chop-generated-users.xml"]
@@ -1977,7 +1977,7 @@ def test_023(self):
         }
     )
     with Then("Annotation from a template should be populated"):
-        assert kubectl.get_field("chi", chi, ".status.normalized.metadata.annotations.test") == "test"
+        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
     with Then("Pod annotation should populated from template"):
         assert kubectl.get_field("pod", "chi-test-001-single-0-0-0", ".metadata.annotations.test") == "test"
 
