@@ -44,13 +44,16 @@ RUN apt-get update \
         /tmp/* \
     && apt-get clean
 
+RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64 \
+    && add-apt-repository ppa:rmescandon/yq \
+    && apt install --no-install-recommends -y yq
 
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
     && apt-get update \
     && apt-get install --yes docker-ce docker-ce-cli containerd.io
 
-ENV MINIKUBE_VERSION 1.23.2
+ENV MINIKUBE_VERSION 1.27.1
 
 RUN curl -fsSLo /usr/share/keyrings/kubernetes-archive-keyring.gpg https://packages.cloud.google.com/apt/doc/apt-key.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main" | tee /etc/apt/sources.list.d/kubernetes.list \
@@ -62,10 +65,6 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 COPY requirements.txt /home/master/requirements.txt
 RUN pip3 install -U -r /home/master/requirements.txt
-
-RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64 \
-    && add-apt-repository ppa:rmescandon/yq \
-    && apt install --no-install-recommends -y yq
 
 RUN set -x \
   && addgroup --system dockremap \
@@ -79,7 +78,7 @@ EXPOSE 2375
 
 ENV MINIKUBE_HOME /home/master/.minikube
 
-ENV K8S_VERSION=${K8S_VERSION:-1.21.6}
+ENV K8S_VERSION=${K8S_VERSION:-1.25.3}
 
 RUN wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/v${K8S_VERSION}/bin/linux/amd64/kubectl \
    && chmod +x /usr/local/bin/kubectl
@@ -101,8 +100,8 @@ ENV KUBECONFIG /home/master/.kube/config
 COPY ./modprobe.sh /usr/local/bin/modprobe
 COPY ./dockerd-start.sh /usr/local/bin/
 COPY cache/*.dockerimage /var/lib/docker/
-COPY cache/preloaded-images-k8s-v13-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4 /home/master/.minikube/cache/preloaded-tarball/
-RUN mkdir -p  /home/master/.minikube/cache/kic/ && ln -nsfv /var/lib/docker/kicbase.dockerimage /home/master/.minikube/cache/kic/kicbase_v0.0.27@sha256_89b4738ee74ba28684676e176752277f0db46f57d27f0e08c3feec89311e22de.tar
+COPY cache/preloaded-images-k8s-v18-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4 /home/master/.minikube/cache/preloaded-tarball/
+RUN mkdir -p  /home/master/.minikube/cache/kic/ && ln -nsfv /var/lib/docker/kicbase.dockerimage /home/master/.minikube/cache/kic/kicbase_v0.0.35@sha256_e6f9b2700841634f3b94907f9cfa6785ca4409ef8e428a0322c1781e809d311b.tar
 
 RUN chmod +x /usr/local/bin/dockerd-start.sh && mkdir -p /home/master/.minikube/cache/kic && chown -R master /home/master/.minikube \
     && chmod -R u+wrx /home/master/.minikube
