@@ -70,9 +70,12 @@ for item in  "${ALL_IMAGES[@]}"; do
   then
       docker pull "${img}"
   fi
-  docker save "${img}" -o "${CUR_DIR}/cache/${file}.dockerimage"
+  if [[ ! -f "${CUR_DIR}/cache/${file}.txt" || "${img}" != $(cat "${CUR_DIR}/cache/${file}.txt") ]]; then
+    docker save "${img}" -o "${CUR_DIR}/cache/${file}.dockerimage"
+    echo "${img}" > "${CUR_DIR}/cache/${file}.txt"
+  fi
 done
 
 echo "Build ${CLICKHOUSE_OPERATOR_TESTS_IMAGE}"
-docker buildx build --platform=linux/amd64 --progress=plain -f "${CUR_DIR}/Dockerfile" -t "${CLICKHOUSE_OPERATOR_TESTS_IMAGE}" "${CUR_DIR}" --push --load
+docker buildx build --platform=linux/amd64 --progress=plain -f "${CUR_DIR}/Dockerfile" --output="type=image,name=${CLICKHOUSE_OPERATOR_TESTS_IMAGE}" "${CUR_DIR}" --push
 echo "All done"
