@@ -1,5 +1,5 @@
-# docker build -t registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest .
-FROM ubuntu:20.04
+# look `build_docker.sh`
+FROM ubuntu:22.04
 
 RUN apt-get update \
     && env DEBIAN_FRONTEND=noninteractive apt-get install --yes \
@@ -37,7 +37,9 @@ RUN apt-get update \
     luajit \
     libssl-dev \
     libcurl4-openssl-dev \
-    gdb \
+    gdb  \
+    sudo \
+    uidmap \
     && rm -rf \
         /var/lib/apt/lists/* \
         /var/cache/debconf \
@@ -49,9 +51,9 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys CC86BB64 \
     && apt install --no-install-recommends -y yq
 
 RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
-    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) test" | tee /etc/apt/sources.list.d/docker.list > /dev/null \
     && apt-get update \
-    && apt-get install --yes docker-ce docker-ce-cli containerd.io
+    && apt-get install --no-install-recommends --yes docker-ce docker-ce-cli containerd.io docker-ce-rootless-extras
 
 ENV MINIKUBE_VERSION 1.27.1
 
@@ -98,12 +100,20 @@ RUN ln -svf /home/master/.minikube /root/.minikube && mkdir -p /home/master/.min
 ENV KUBECONFIG /home/master/.kube/config
 
 COPY ./modprobe.sh /usr/local/bin/modprobe
-COPY ./dockerd-start.sh /usr/local/bin/
 COPY cache/*.dockerimage /var/lib/docker/
 COPY cache/preloaded-images-k8s-v18-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4 /home/master/.minikube/cache/preloaded-tarball/
 RUN mkdir -p  /home/master/.minikube/cache/kic/ && ln -nsfv /var/lib/docker/kicbase.dockerimage /home/master/.minikube/cache/kic/kicbase_v0.0.35@sha256_e6f9b2700841634f3b94907f9cfa6785ca4409ef8e428a0322c1781e809d311b.tar
 
+RUN update-alternatives --set iptables /usr/sbin/iptables-legacy && \
+    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+
+COPY ./dockerd-start.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/dockerd-start.sh && mkdir -p /home/master/.minikube/cache/kic && chown -R master /home/master/.minikube \
     && chmod -R u+wrx /home/master/.minikube
+
+VOLUME /var/lib/docker
+VOLUME /home/master/.docker
+RUN chmod -Rv 0777 /home/master && chown -R master:docker /home/master && sudo -u master bash -xe dockerd-rootless-setuptool.sh install --skip-iptables
+RUN chmod -Rv 0777 /home/master
 
 ENTRYPOINT ["dockerd-start.sh"]
