@@ -831,12 +831,14 @@ func (c *Controller) poll(ctx context.Context, chi *chiV1.ClickHouseInstallation
 	for {
 		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
 		if f(cur, err) {
+			// Continue polling
 			if util.IsContextDone(ctx) {
 				log.V(2).Info("ctx is done")
 				return
 			}
-			time.Sleep(5 * time.Second)
+			time.Sleep(15 * time.Second)
 		} else {
+			// Stop polling
 			return
 		}
 	}
