@@ -18,6 +18,10 @@ def get_docker_compose_path():
     docker_compose_file_path = os.path.join(docker_compose_project_dir, "docker-compose.yml")
     return docker_compose_file_path, docker_compose_project_dir
 
+# apply | replace
+kubectl_mode = os.getenv('KUBECTL_MODE') \
+    if 'KUBECTL_MODE' in os.environ \
+    else 'apply'
 
 kubectl_cmd = "kubectl" \
     if current().context.native \
