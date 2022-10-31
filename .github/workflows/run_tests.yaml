@@ -48,8 +48,8 @@ jobs:
           # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
           # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
           
-          # docker-compose -f ./tests/docker-compose/docker-compose.yml pull runner
-          # bash -xe ./tests/image/build_docker.sh
+          # docker compose -f ./tests/docker-compose/docker-compose.yml pull runner
+          # ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --trim-results on --debug --log ./tests/raw.log
 
           # bash ./tests/e2e/run_tests_parallel.sh
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
