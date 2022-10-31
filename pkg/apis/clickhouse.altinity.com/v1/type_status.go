@@ -274,3 +274,17 @@ func (s *ChiStatus) GetStatus() string {
 	}
 	return s.Status
 }
+
+func (s *ChiStatus) GetPods() []string {
+	if s == nil {
+		return nil
+	}
+	return s.Pods
+}
+
+func (s *ChiStatus) GetPodIPS() []string {
+	if s == nil {
+		return nil
+	}
+	return s.PodIPs
+}
