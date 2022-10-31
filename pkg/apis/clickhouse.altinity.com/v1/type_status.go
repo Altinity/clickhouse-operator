@@ -62,6 +62,14 @@ func (s *ChiStatus) PushAction(action string) {
 		return
 	}
 	s.Actions = append([]string{action}, s.Actions...)
+	s.TrimActions()
+}
+
+// TripActions trims actions
+func (s *ChiStatus) TrimActions() {
+	if s == nil {
+		return
+	}
 	if len(s.Actions) > maxActions {
 		s.Actions = s.Actions[:maxActions]
 	}
@@ -156,6 +164,18 @@ type CopyCHIStatusOptions struct {
 	WholeStatus bool
 }
 
+func (s *ChiStatus) MergeActions(from *ChiStatus) {
+	if s == nil {
+		return
+	}
+	if from == nil {
+		return
+	}
+	s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
+	sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
+	s.TrimActions()
+}
+
 func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 	if s == nil {
 		return
@@ -167,8 +187,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 
 	if opts.Actions {
 		s.Action = from.Action
-		s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
-		sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
+		s.MergeActions(from)
 	}
 
 	if opts.Errors {
@@ -191,7 +210,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.TaskIDsStarted = from.TaskIDsStarted
 		s.TaskIDsCompleted = from.TaskIDsCompleted
 		s.Action = from.Action
-		s.Actions = from.Actions
+		s.MergeActions(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
 		s.UpdatedHostsCount = from.UpdatedHostsCount
@@ -224,7 +243,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.TaskIDsStarted = from.TaskIDsStarted
 		s.TaskIDsCompleted = from.TaskIDsCompleted
 		s.Action = from.Action
-		s.Actions = from.Actions
+		s.MergeActions(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
 		s.UpdatedHostsCount = from.UpdatedHostsCount
