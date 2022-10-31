@@ -558,16 +558,19 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiv1.ClickHouseIn
 	}
 	start := time.Now()
 	w.c.poll(ctx, chi, func(c *chiv1.ClickHouseInstallation, e error) bool {
-		if len(c.Status.GetPodIPS()) < len(c.Status.GetPods()) {
-			w.a.V(1).M(c).Warning("Not all IP addresses are in place and was time has elapsed")
-			return true
+		if len(c.Status.GetPodIPS()) >= len(c.Status.GetPods()) {
+			// Stop polling
+			w.a.V(1).M(c).Info("all IP addresses are in place")
+			return false
 		}
 		if time.Now().Sub(start) > 1*time.Minute {
-			w.a.V(1).M(c).Warning("Not all IP addresses are in place and was time has elapsed")
-			return true
+			// Stop polling
+			w.a.V(1).M(c).Warning("Not all IP addresses are in place but time has elapsed")
+			return false
 		}
-		w.a.V(1).M(c).Info("all IP addresses are in place")
-		return false
+		// Continue polling
+		w.a.V(1).M(c).Warning("Not all IP addresses are in place")
+		return true
 	})
 }
 
@@ -662,6 +665,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	w.a.V(1).
 		WithEvent(chi, eventActionReconcile, eventReasonReconcileStarted).
 		WithStatusAction(chi).
+		WithStatusActions(chi).
 		M(chi).F().
 		Info("reconcile started")
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
@@ -700,6 +704,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 	w.a.V(1).
 		WithEvent(_chi, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(_chi).
+		WithStatusActions(_chi).
 		M(_chi).F().
 		Info("reconcile completed")
 }
