@@ -195,14 +195,14 @@ def install_operator_if_not_exist(reinstall=False, manifest=get_full_path(settin
         if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0 or reinstall:
             kubectl.apply(
                 ns=settings.operator_namespace,
-                manifest=f"<(cat {manifest} | "
+                manifest=f"cat {manifest} | "
                        f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
                        f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{settings.operator_version}\" "
                        f"OPERATOR_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
                        f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
                        f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{settings.operator_version}\" "
                        f"METRICS_EXPORTER_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
-                       f"envsubst)",
+                       f"envsubst",
                 validate=False
             )
         set_operator_version(settings.operator_version)
@@ -218,13 +218,13 @@ def install_operator_version(version):
 
     kubectl.apply(
         ns=settings.operator_namespace,
-        manifest=f"<({manifest} | "
+        manifest=f"{manifest} | "
                  f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
                  f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{version}\" "
                  f"OPERATOR_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
                  f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
                  f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{version}\" "
                  f"METRICS_EXPORTER_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
-                 f"envsubst)",
+                 f"envsubst",
         validate=False
     )

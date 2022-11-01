@@ -37,22 +37,25 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     command = cmd
     # print(f"run command: {cmd}")
 
+    return run_shell(cmd, timeout, ok_to_fail)
+
+
+def run_shell(cmd, timeout=600, ok_to_fail=False):
     # Run command
     if hasattr(current().context, "shell"):
-        cmd = current().context.shell(cmd, timeout=timeout)
+        res_cmd = current().context.shell(cmd, timeout=timeout)
     else:
-        cmd = shell(cmd, timeout=timeout)
-
+        res_cmd = shell(cmd, timeout=timeout)
     # Check command failure
-    code = cmd.exitcode
+    code = res_cmd.exitcode
     if not ok_to_fail:
         if code != 0:
-            print(f"command failed, command:\n{command}")
+            print(f"command failed, command:\n{cmd}")
             print(f"command failed, exit code:\n{code}")
-            print(f"command failed, output :\n{cmd.output}")
+            print(f"command failed, output :\n{res_cmd.output}")
         assert code == 0, error()
     # Command test result
-    return cmd.output if (code == 0) or ok_to_fail else ""
+    return res_cmd.output if (code == 0) or ok_to_fail else ""
 
 
 def delete_chi(chi, ns=namespace, wait=True, ok_to_fail=False):
@@ -180,16 +183,20 @@ def count_objects(label="", ns=namespace):
 
 def apply(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is applied"):
-        if "<(" not in manifest:
+        if " | " not in manifest:
             manifest = f"\"{manifest}\""
-        launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
+            launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
+        else:
+            run_shell(f"{manifest} | {kubectl_cmd} apply --namespace={ns} --validate={validate} -f -", timeout=timeout)
 
 
 def delete(manifest, ns=namespace, timeout=600):
     with When(f"{manifest} is deleted"):
-        if "<(" not in manifest:
+        if " | " not in manifest:
             manifest = f"\"{manifest}\""
-        launch(f"delete -f {manifest}", ns=ns, timeout=timeout)
+            return launch(f"delete -f {manifest}", ns=ns, timeout=timeout)
+        else:
+            run_shell(f"{manifest} | {kubectl_cmd} delete -f -", timeout=timeout)
 
 
 def wait_objects(chi, object_counts, ns=namespace):

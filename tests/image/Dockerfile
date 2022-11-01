@@ -40,6 +40,7 @@ RUN apt-get update \
     gdb  \
     sudo \
     uidmap \
+    slirp4netns \
     && rm -rf \
         /var/lib/apt/lists/* \
         /var/cache/debconf \
@@ -69,10 +70,10 @@ COPY requirements.txt /home/master/requirements.txt
 RUN pip3 install -U -r /home/master/requirements.txt
 
 RUN set -x \
-  && addgroup --system dockremap \
+    && addgroup --system dockremap \
     && adduser --system dockremap \
-  && adduser dockremap dockremap \
-  && echo 'dockremap:165536:65536' >> /etc/subuid \
+    && adduser dockremap dockremap \
+    && echo 'dockremap:165536:65536' >> /etc/subuid \
     && echo 'dockremap:165536:65536' >> /etc/subgid
 
 VOLUME /var/lib/docker
@@ -86,12 +87,12 @@ RUN wget -c --progress=bar:force:noscroll -O /usr/local/bin/kubectl https://stor
    && chmod +x /usr/local/bin/kubectl
 
 # need for debug internal minikube
-RUN K9S_VERSION=$(curl -sL https://github.com/derailed/k9s/releases/latest -H "Accept: application/json" | jq -r .tag_name) && \
-    wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_x86_64.tar.gz && \
-    curl -sL https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/checksums.txt | grep Linux_x86_64.tar.gz > /usr/local/bin/k9s.sha256 && \
-    sed -i -e "s/k9s_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_${K9S_VERSION}_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256 && \
-    sha256sum -c /usr/local/bin/k9s.sha256 && \
-    tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
+RUN K9S_VERSION=$(curl -sL https://github.com/derailed/k9s/releases/latest -H "Accept: application/json" | jq -r .tag_name)  \
+    && wget -c --progress=bar:force:noscroll -O /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_x86_64.tar.gz  \
+    && curl -sL https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/checksums.txt | grep Linux_x86_64.tar.gz > /usr/local/bin/k9s.sha256  \
+    && sed -i -e "s/k9s_Linux_x86_64\.tar\.gz/\\/usr\\/local\\/bin\\/k9s_${K9S_VERSION}_Linux_x86_64\\.tar\\.gz/g" /usr/local/bin/k9s.sha256  \
+    && sha256sum -c /usr/local/bin/k9s.sha256  \
+    && tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
 RUN adduser --disabled-password --gecos "" master && usermod -a -G docker master
 
@@ -101,19 +102,21 @@ ENV KUBECONFIG /home/master/.kube/config
 
 COPY ./modprobe.sh /usr/local/bin/modprobe
 COPY cache/*.dockerimage /var/lib/docker/
+COPY cache/*.txt /var/lib/docker/
+
 COPY cache/preloaded-images-k8s-v18-v${K8S_VERSION}-docker-overlay2-amd64.tar.lz4 /home/master/.minikube/cache/preloaded-tarball/
-RUN mkdir -p  /home/master/.minikube/cache/kic/ && ln -nsfv /var/lib/docker/kicbase.dockerimage /home/master/.minikube/cache/kic/kicbase_v0.0.35@sha256_e6f9b2700841634f3b94907f9cfa6785ca4409ef8e428a0322c1781e809d311b.tar
-
-RUN update-alternatives --set iptables /usr/sbin/iptables-legacy && \
-    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
-
-COPY ./dockerd-start.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/dockerd-start.sh && mkdir -p /home/master/.minikube/cache/kic && chown -R master /home/master/.minikube \
+RUN mkdir -p  /home/master/.minikube/cache/kic/  \
+    &&  ln -nsfv /var/lib/docker/kicbase.dockerimage /home/master/.minikube/cache/kic/kicbase_v0.0.35@sha256_e6f9b2700841634f3b94907f9cfa6785ca4409ef8e428a0322c1781e809d311b.tar  \
+    && mkdir -p /home/master/.minikube/cache/kic  \
+    && chown -R master:docker /home/master/  \
     && chmod -R u+wrx /home/master/.minikube
 
-VOLUME /var/lib/docker
-VOLUME /home/master/.docker
-RUN chmod -Rv 0777 /home/master && chown -R master:docker /home/master && sudo -u master bash -xe dockerd-rootless-setuptool.sh install --skip-iptables
-RUN chmod -Rv 0777 /home/master
+RUN update-alternatives --set iptables /usr/sbin/iptables-legacy  \
+    && update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+
+# RUN sudo -u master bash -xe dockerd-rootless-setuptool.sh install --skip-iptables
+
+COPY ./dockerd-start.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/dockerd-start.sh
 
 ENTRYPOINT ["dockerd-start.sh"]

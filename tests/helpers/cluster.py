@@ -67,11 +67,11 @@ class Cluster(object):
         with Finally("I clean up"):
             self.down()
 
-    def down(self, timeout=600):
+    def down(self, timeout=3600):
         """Bring cluster down by executing docker-compose down."""
         return self.shell(f"{self.docker_compose} down --timeout {timeout}  -v --remove-orphans")
 
-    def up(self, timeout=600):
+    def up(self, timeout=3600):
         with Given("docker-compose"):
             max_attempts = 5
             max_up_attempts = 1
@@ -82,7 +82,7 @@ class Cluster(object):
                         self.shell(f"set -o pipefail && {self.docker_compose} ps | tee")
 
                     with And("executing docker-compose down just in case it is up"):
-                        cmd = self.shell(f"set -o pipefail && {self.docker_compose} down -v --remove-orphans 2>&1 | tee")
+                        cmd = self.shell(f"set -o pipefail && {self.docker_compose} down --timeout={timeout} -v --remove-orphans 2>&1 | tee")
                         if cmd.exitcode != 0:
                             continue
 
