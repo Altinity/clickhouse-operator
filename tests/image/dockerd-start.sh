@@ -22,24 +22,24 @@ iptables-save \
     `# we need to also apply these rules to non-local traffic (from pods)` \
     -e 's/-A OUTPUT \(.*\) -j DOCKER_OUTPUT/\0\n-A PREROUTING \1 -j DOCKER_OUTPUT/' \
     `# switch docker DNS SNAT rules rules to our chosen IP` \
-    -e "s/--to-source :53/--to-source ${docker=/_host_ip}:53/g"\
+    -e "s/--to-source :53/--to-source ${docker_host_ip}:53/g"\
   | iptables-restore
 
 # now we can ensure that DNS is configured to use our IP
 cp /etc/resolv.conf /etc/resolv.conf.original
 sed -e "s/${docker_embedded_dns_ip}/${docker_host_ip}/g" /etc/resolv.conf.original >/etc/resolv.conf
 
-sudo -u master dockerd-rootless-setuptool.sh install --skip-iptables
-
-export XDG_RUNTIME_DIR=/home/master/.docker/run/
-ls -la /home/master/.docker/run/
-sudo -u master dockerd-rootless.sh --host=unix:///home/master/.docker/run/docker.sock &>/var/log/docker.log &
-
+touch /var/log/docker.log
+chmod 0777 /var/log/docker.log
+# sudo -u master dockerd-rootless-setuptool.sh install --skip-iptables
+# whereis dockerd-rootless.sh
+# sudo -u master bash -xce "PATH=\"/usr/bin:$PATH\" XDG_RUNTIME_DIR=/home/master/.docker/run DOCKER_HOST=unix:///home/master/.docker/run/docker.sock dockerd-rootless.sh"
+dockerd --host=unix:///var/run/docker.sock &>/var/log/docker.log &
 
 set +e
 retries=0
 while true; do
-    sudo -u master docker info &>/dev/null && break
+    docker info && break
     retries=$((retries+1))
     if [[ $retries -ge 300 ]]
     then
@@ -52,7 +52,10 @@ done
 set -e
 
 for img in /var/lib/docker/*.dockerimage; do
-  sudo -u master docker load < "${img}"
+  txt=${img/dockerimage/txt}
+  if [[ "$(docker images -q "$(cat ${txt})" 2> /dev/null)" == "" ]]; then
+    docker load < "${img}"
+  fi
 done
 
 chown -R master /home/master/.kube
@@ -63,8 +66,11 @@ chmod -R u+wrx /home/master/.minikube
 
 sudo -u master bash -c "minikube start --kubernetes-version=1.25.3 --base-image='gcr.io/k8s-minikube/kicbase:v0.0.35' --feature-gates=StatefulSetAutoDeletePVC=true --memory=max --cpus=max"
 for img in /var/lib/docker/*.dockerimage; do
-  echo minikube image load "${img}"
-  sudo -u master minikube image load "${img}"
+  txt=${img/dockerimage/txt}
+  if [[ $( sudo -u master minikube image ls | grep -c "$(cat ${txt})" ) == "0" ]]; then
+    echo minikube image load "${img}"
+    sudo -u master minikube image load "${img}"
+  fi
 done
 
 sed -e 's/imagePullPolicy: Always/imagePullPolicy: IfNotPresent/' < /home/master/clickhouse-operator/deploy/operator/clickhouse-operator-install-bundle.yaml | sudo -u master kubectl apply -f -
