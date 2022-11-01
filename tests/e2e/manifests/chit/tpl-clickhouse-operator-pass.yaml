@@ -1,0 +1,13 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: clickhouse-operator-password
+spec:
+  templating:
+    policy: auto
+  configuration:
+    users:
+      # THIS IS NEEDED FOR TESTING 0.18.3 and earlier releases with 0.20+ tests codebase
+      # since password is not stored in operator config anymore
+      clickhouse_operator/password: clickhouse_operator_password
