@@ -5,9 +5,9 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Cache python
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         id: cache-python
         with:
           path: ~/venv/qa
@@ -28,11 +28,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y conntrack clickhouse-client
 
-      - uses: medyagh/setup-minikube@latest
+      - uses: medyagh/setup-minikube@master
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.23.12
+          kubernetes-version: v1.25.3
           cpus: max
           memory: max
 
