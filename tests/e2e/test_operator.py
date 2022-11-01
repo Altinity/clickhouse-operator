@@ -552,14 +552,6 @@ def test_011(self):
         # Tests default user security
         def test_default_user():
             with Then("Default user should have 5 allowed ips"):
-                # Check normalized CHI
-                chi = kubectl.get("chi", "test-011-secured-cluster")
-                ips = chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/networks/ip"]
-                # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
-                print(f"normalizedCompleted: {ips}")
-                assert len(ips) == 5
-
-            with And("Configmap should be updated"):
                 ips = get_user_xml_from_configmap("test-011-secured-cluster", "default").findall('networks/ip')
                 ips_l = []
                 for ip in ips:

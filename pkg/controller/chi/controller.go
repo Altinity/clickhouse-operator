@@ -820,6 +820,30 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chiV1.Cli
 	return nil
 }
 
+func (c *Controller) poll(ctx context.Context, chi *chiV1.ClickHouseInstallation, f func(c *chiV1.ClickHouseInstallation, e error) bool) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
+
+	for {
+		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
+		if f(cur, err) {
+			// Continue polling
+			if util.IsContextDone(ctx) {
+				log.V(2).Info("ctx is done")
+				return
+			}
+			time.Sleep(15 * time.Second)
+		} else {
+			// Stop polling
+			return
+		}
+	}
+}
+
 // installFinalizer
 func (c *Controller) installFinalizer(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {

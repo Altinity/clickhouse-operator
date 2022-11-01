@@ -233,11 +233,9 @@ func (a Announcer) WithStatusAction(chi *chop.ClickHouseInstallation) Announcer 
 	if chi == nil {
 		b.chi = nil
 		b.writeStatusAction = false
-		b.writeStatusActions = false
 	} else {
 		b.chi = chi
 		b.writeStatusAction = true
-		b.writeStatusActions = true
 	}
 	return b
 }

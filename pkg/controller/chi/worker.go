@@ -509,8 +509,12 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 		return nil
 	}
 
-	w.newContext(new)
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
 
+	w.newContext(new)
 	w.markReconcileStart(ctx, new, actionPlan)
 	w.excludeStopped(new)
 	w.walkHosts(ctx, new, actionPlan)
@@ -523,6 +527,11 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 		return nil
 	}
 
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	// Post-process added items
 	w.a.V(1).
 		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
@@ -532,10 +541,37 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 	w.clear(ctx, new)
 	w.dropReplicas(ctx, new, actionPlan)
 	w.includeStopped(new)
-	time.Sleep(60 * time.Second)
+	w.waitForIPAddresses(ctx, new)
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
 	w.markReconcileComplete(ctx, new)
 
 	return nil
+}
+
+func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+	start := time.Now()
+	w.c.poll(ctx, chi, func(c *chiv1.ClickHouseInstallation, e error) bool {
+		if len(c.Status.GetPodIPS()) >= len(c.Status.GetPods()) {
+			// Stop polling
+			w.a.V(1).M(c).Info("all IP addresses are in place")
+			return false
+		}
+		if time.Now().Sub(start) > 1*time.Minute {
+			// Stop polling
+			w.a.V(1).M(c).Warning("Not all IP addresses are in place but time has elapsed")
+			return false
+		}
+		// Continue polling
+		w.a.V(1).M(c).Warning("Not all IP addresses are in place")
+		return true
+	})
 }
 
 func (w *worker) excludeStopped(chi *chiv1.ClickHouseInstallation) {
@@ -629,6 +665,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	w.a.V(1).
 		WithEvent(chi, eventActionReconcile, eventReasonReconcileStarted).
 		WithStatusAction(chi).
+		WithStatusActions(chi).
 		M(chi).F().
 		Info("reconcile started")
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
@@ -667,6 +704,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 	w.a.V(1).
 		WithEvent(_chi, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(_chi).
+		WithStatusActions(_chi).
 		M(_chi).F().
 		Info("reconcile completed")
 }
