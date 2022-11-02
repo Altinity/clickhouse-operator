@@ -11,10 +11,11 @@ import e2e.util as util
 import xml.etree.ElementTree as etree
 
 
+from e2e.steps import *
 from testflows.core import *
 from testflows.asserts import error
-from requirements.requirements import *
 from testflows.connect import Shell
+from requirements.requirements import *
 
 
 @TestScenario
@@ -2905,6 +2906,80 @@ def test_035(self):
         with Finally("I remove the port forwarding and close the shell"):
             self.context.shell(f"pkill -e -f 'port\-forward \-n {settings.test_namespace} kubeservice/clickhouse\-test\-operator\-https\-connection'", timeout=5)
             self.context.shell.close()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
+@Name("test_036. Check operator volume re-provisioning")
+def test_036(self, num_retries=100):
+    """Check clickhouse operator recreates volumes and schema if volume is broken."""
+    cluster = "simple"
+    manifest = f"manifests/chi/test-036-volume-re-provisioning.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("I get terminal shell"):
+        self.context.shell = get_shell()
+
+    with And("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {settings.clickhouse_template},
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I create replicated table with some data"):
+        create_table = """
+            CREATE TABLE test_local_036 ON CLUSTER 'simple' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace('\r', '').replace('\n', '')
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
+
+    with When("I delete PV", description="delete PV on replica 1"):
+        pv_name = self.context.shell("kubectl get pv | grep test/disk1-chi-test-036-volume-re-provisioning-simple-0-1-0").output.split()[0]
+
+        self.context.shell(f"kubectl delete pv {pv_name} --force &")
+        self.context.shell("""kubectl patch pv $(kubectl get pv | grep test/disk1-chi-test-036-volume-re-provisioning-simple-0-1-0 
+            | awk '{print $1}') -p '{"metadata":{"finalizers":null}}' """.replace('\r', '').replace('\n', ''))
+
+    with And("I check replica is deleted and recreated"):
+        replica_is_deleted = False
+        i = 0
+        with By("checking data from zookeeper table in cycle", description="I check replica 1 is disappeares and appeares in system.zookeeper table"):
+            while (i < num_retries) and not(replica_is_deleted and (r.output == "1")):
+                with When(f"try number {i}"):
+                    r = self.context.shell("""
+                        kubectl exec --namespace=test chi-test-036-volume-re-provisioning-simple-0-0-0 -n test -c clickhouse-pod 
+                        -- clickhouse-client -mn -h 127.0.0.1 --port=9000   
+                        --query="select count() from system.zookeeper where 
+                        path='/clickhouse/test-036-volume-re-provisioning/tables/0/default/test_local_036/replicas/' 
+                        and name='chi-test-036-volume-re-provisioning-simple-0-1'" """.replace('\r', '').replace('\n', ''))
+                    if r.output == "0":
+                        replica_is_deleted=True
+                    i += 1
+                    time.sleep(5)
+
+        assert replica_is_deleted and (r.output == "1"), error()
+
+    with Then("I check PVC is recreated"):
+        r = kubectl.get_pvc_size("disk1-chi-test-036-volume-re-provisioning-simple-0-1-0")
+        assert r == "1Gi", error()
+
+    with And("I check data on each replica"):
+        with By("checking data on the replica 0"):
+            r = clickhouse.query(chi, pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                                 sql="SELECT count(*) FROM test_local_036")
+            assert r == "10000", error()
+        with And("checking data on the replica 1"):
+            r = clickhouse.query(chi, pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
+                                 sql="SELECT count(*) FROM test_local_036")
+            assert r == "10000", error()
 
 
 @TestModule
