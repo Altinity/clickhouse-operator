@@ -15,7 +15,7 @@ Run [install-grafana-operator.sh][install_grafana_operator_script] for setup CNC
 bash install-grafana-operator.sh
 ```
 
-Run [install-grafana-with-operator.sh][install_grafana_dashboard_script] for setup Grafana deployment, service, recomended Dashboard and Prometheus datasource (see [how to install prometheus][prometheus_setup_doc]) 
+Run [install-grafana-with-operator.sh][install_grafana_dashboard_script] for setup Grafana deployment, service, recommended Dashboard and Prometheus datasource (see [how to install prometheus][prometheus_setup_doc]) 
 ```bash
 bash install-grafana-with-operator.sh
 ```
