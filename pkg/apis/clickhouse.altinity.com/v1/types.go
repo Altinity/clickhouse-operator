@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
@@ -37,8 +38,8 @@ const (
 type ClickHouseInstallation struct {
 	metav1.TypeMeta   `json:",inline"            yaml:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec              ChiSpec   `json:"spec"     yaml:"spec"`
-	Status            ChiStatus `json:"status"   yaml:"status"`
+	Spec              ChiSpec    `json:"spec"               yaml:"spec"`
+	Status            *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
 	Attributes ComparableAttributes `json:"-" yaml:"-"`
 }
@@ -71,9 +72,9 @@ type ClickHouseOperatorConfiguration struct {
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
 	TaskID                 *string          `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	Stop                   string           `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Stop                   StringBool       `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                string           `json:"restart,omitempty"                yaml:"restart,omitempty"`
-	Troubleshoot           string           `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	Troubleshoot           StringBool       `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
@@ -154,6 +155,7 @@ type ChiObjectsCleanup struct {
 	PVC         string `json:"pvc,omitempty"         yaml:"pvc,omitempty"`
 	ConfigMap   string `json:"configMap,omitempty"   yaml:"configMap,omitempty"`
 	Service     string `json:"service,omitempty"     yaml:"service,omitempty"`
+	Secret      string `json:"secret,omitempty"      yaml:"secret,omitempty"`
 }
 
 // NewChiObjectsCleanup creates new object cleanup
@@ -185,6 +187,9 @@ func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) 
 		if c.Service == "" {
 			c.Service = from.Service
 		}
+		if c.Secret == "" {
+			c.Secret = from.Secret
+		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.StatefulSet != "" {
 			// Override by non-empty values only
@@ -201,6 +206,10 @@ func (c *ChiObjectsCleanup) MergeFrom(from *ChiObjectsCleanup, _type MergeType) 
 		if from.Service != "" {
 			// Override by non-empty values only
 			c.Service = from.Service
+		}
+		if from.Secret != "" {
+			// Override by non-empty values only
+			c.Secret = from.Secret
 		}
 	}
 
@@ -272,6 +281,23 @@ func (c *ChiObjectsCleanup) SetService(v string) *ChiObjectsCleanup {
 		return nil
 	}
 	c.Service = v
+	return c
+}
+
+// GetSecret gets secret
+func (c *ChiObjectsCleanup) GetSecret() string {
+	if c == nil {
+		return ""
+	}
+	return c.Secret
+}
+
+// SetSecret sets service
+func (c *ChiObjectsCleanup) SetSecret(v string) *ChiObjectsCleanup {
+	if c == nil {
+		return nil
+	}
+	c.Secret = v
 	return c
 }
 
@@ -408,7 +434,7 @@ func (t *ChiReconciling) SetDefaults() *ChiReconciling {
 		return nil
 	}
 	t.Policy = ReconcilingPolicyUnspecified
-	t.ConfigMapPropagationTimeout = 60
+	t.ConfigMapPropagationTimeout = 10
 	t.Cleanup = NewChiCleanup().SetDefaults()
 	return t
 }
@@ -478,13 +504,6 @@ func (t *ChiReconciling) GetCleanup() *ChiCleanup {
 	return t.Cleanup
 }
 
-// ChiDefaults defines defaults section of .spec
-type ChiDefaults struct {
-	ReplicasUseFQDN string             `json:"replicasUseFQDN,omitempty" yaml:"replicasUseFQDN,omitempty"`
-	DistributedDDL  *ChiDistributedDDL `json:"distributedDDL,omitempty"  yaml:"distributedDDL,omitempty"`
-	Templates       *ChiTemplateNames  `json:"templates,omitempty"       yaml:"templates,omitempty"`
-}
-
 // ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
 type ChiTemplateNames struct {
 	HostTemplate            string `json:"hostTemplate,omitempty"            yaml:"hostTemplate,omitempty"`
@@ -506,7 +525,7 @@ type ChiTemplateNames struct {
 type ChiShard struct {
 	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
 	Weight              int               `json:"weight,omitempty"              yaml:"weight,omitempty"`
-	InternalReplication string            `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
+	InternalReplication StringBool        `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
@@ -592,11 +611,11 @@ const (
 
 // ChiHostReconcileAttributes defines host reconcile status
 type ChiHostReconcileAttributes struct {
-	status  StatefulSetStatus
-	add     bool
-	remove  bool
-	modify  bool
-	unclear bool
+	status StatefulSetStatus
+	add    bool
+	remove bool
+	modify bool
+	found  bool
 }
 
 // NewChiHostReconcileAttributes creates new reconcile attributes
@@ -609,7 +628,7 @@ func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.unclear == to.unclear)
+	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.found == to.found)
 }
 
 // Any checks whether any of the attributes is set
@@ -617,7 +636,7 @@ func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.unclear && to.unclear)
+	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.found && to.found)
 }
 
 // SetStatus sets status
@@ -655,9 +674,9 @@ func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
 	return s
 }
 
-// SetUnclear sets 'unclear' attribute
-func (s *ChiHostReconcileAttributes) SetUnclear() *ChiHostReconcileAttributes {
-	s.unclear = true
+// SetFound sets 'found' attribute
+func (s *ChiHostReconcileAttributes) SetFound() *ChiHostReconcileAttributes {
+	s.found = true
 	return s
 }
 
@@ -676,9 +695,25 @@ func (s *ChiHostReconcileAttributes) IsModify() bool {
 	return s.modify
 }
 
-// IsUnclear checks whether 'unclear' attribute is set
-func (s *ChiHostReconcileAttributes) IsUnclear() bool {
-	return s.unclear
+// IsFound checks whether 'found' attribute is set
+func (s *ChiHostReconcileAttributes) IsFound() bool {
+	return s.found
+}
+
+// String returns string form
+func (s *ChiHostReconcileAttributes) String() string {
+	if s == nil {
+		return "(nil)"
+	}
+
+	return fmt.Sprintf(
+		"status: %s, add: %t, remove: %t, modify: %t, found: %t",
+		s.status,
+		s.add,
+		s.remove,
+		s.modify,
+		s.found,
+	)
 }
 
 // ChiTemplates defines templates section of .spec
@@ -718,44 +753,6 @@ type ChiPodDistribution struct {
 	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
 	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`
 	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
-}
-
-// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template, directly used by StatefulSet
-type ChiVolumeClaimTemplate struct {
-	Name             string                           `json:"name"                    yaml:"name"`
-	PVCReclaimPolicy PVCReclaimPolicy                 `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
-	ObjectMeta       metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
-	Spec             corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
-}
-
-// PVCReclaimPolicy defines PVC reclaim policy
-type PVCReclaimPolicy string
-
-// Possible values of PVC reclaim policy
-const (
-	PVCReclaimPolicyRetain PVCReclaimPolicy = "Retain"
-	PVCReclaimPolicyDelete PVCReclaimPolicy = "Delete"
-)
-
-// NewPVCReclaimPolicyFromString creates new PVCReclaimPolicy from string
-func NewPVCReclaimPolicyFromString(s string) PVCReclaimPolicy {
-	return PVCReclaimPolicy(s)
-}
-
-// IsValid checks whether PVCReclaimPolicy is valid
-func (v PVCReclaimPolicy) IsValid() bool {
-	switch v {
-	case PVCReclaimPolicyRetain:
-		return true
-	case PVCReclaimPolicyDelete:
-		return true
-	}
-	return false
-}
-
-// String returns string value for PVCReclaimPolicy
-func (v PVCReclaimPolicy) String() string {
-	return string(v)
 }
 
 // ChiServiceTemplate defines CHI service template

@@ -168,6 +168,11 @@ func (c *Controller) getStatefulSetByHost(host *chiv1.ChiHost) (*apps.StatefulSe
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, newGetOptions())
 }
 
+// getSecret gets secret
+func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
+	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(newContext(), secret.Name, newGetOptions())
+}
+
 // getPod gets pod. Accepted types:
 //   1. *apps.StatefulSet
 //   2. *chop.ChiHost

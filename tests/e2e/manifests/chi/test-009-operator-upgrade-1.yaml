@@ -9,12 +9,15 @@ spec:
     - name: clickhouse-version
   configuration:
     clusters:
-      - name: test-009
+      - name: test-009-1
         layout:
-          shardsCount: 1
+          shardsCount: 2
+    users:
+      test_009/password: test_009
+      test_009/networks/ip: 0.0.0.0/0
   defaults:
     templates:
-      volumeClaimTemplate: default
+      dataVolumeClaimTemplate: default
       podTemplate: default
   templates:
     volumeClaimTemplates:

@@ -18,9 +18,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gopkg.in/d4l3k/messagediff.v1"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -74,6 +76,31 @@ func (c *Controller) updateStatefulSet(
 	if err != nil {
 		// Update failed
 		log.V(1).M(host).F().Error("%v", err)
+		diff, equal := messagediff.DeepDiff(oldStatefulSet.Spec, newStatefulSet.Spec)
+
+		str := ""
+		if equal {
+			str += "EQUAL: "
+		} else {
+			str += "NOT EQUAL: "
+		}
+
+		if len(diff.Added) > 0 {
+			// Something added
+			str += util.MessageDiffItemString("added spec items", "", diff.Added)
+		}
+
+		if len(diff.Removed) > 0 {
+			// Something removed
+			str += util.MessageDiffItemString("removed spec items", "", diff.Removed)
+		}
+
+		if len(diff.Modified) > 0 {
+			// Something modified
+			str += util.MessageDiffItemString("modified spec items", "", diff.Modified)
+		}
+		log.V(1).M(host).F().Error("%s", str)
+
 		return err
 	}
 
@@ -97,7 +124,7 @@ func (c *Controller) updateStatefulSet(
 	return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
 }
 
-// updateStatefulSet is an internal function, used in reconcileStatefulSet only
+// updatePersistentVolume
 func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	log.V(2).M(pv).F().P()
 	if util.IsContextDone(ctx) {
@@ -116,6 +143,7 @@ func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.Persiste
 	return pv, err
 }
 
+// updatePersistentVolumeClaim
 func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
@@ -123,13 +151,29 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.Pe
 		return nil, fmt.Errorf("ctx is done")
 	}
 
-	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
+	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			// This is not an error per se, means PVC is not created (yet)?
+			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, newCreateOptions())
+			if err != nil {
+				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)
+			}
+			return pvc, err
+		} else {
+			// Any non-NotFound API error - unable to proceed
+			log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
+			return nil, err
+		}
+	}
+
+	_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
 	if err != nil {
 		// Update failed
 		//if strings.Contains(err.Error(), "field can not be less than previous value") {
 		//	return pvc, nil
 		//} else {
-		log.V(1).M(pvc).F().Error("unable to update PVC %v", err)
+		log.V(1).M(pvc).F().Error("unable to Update PVC err: %v", err)
 		//	return nil, err
 		//}
 	}
@@ -253,4 +297,22 @@ func (c *Controller) shouldContinueOnUpdateFailed() error {
 
 	// Do not continue update
 	return errStop
+}
+
+func (c *Controller) createSecret(ctx context.Context, secret *v1.Secret) error {
+	log.V(1).M(secret).F().P()
+
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
+	log.V(1).Info("Create Secret %s/%s", secret.Namespace, secret.Name)
+	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, newCreateOptions()); err != nil {
+		// Unable to create StatefulSet at all
+		log.V(1).Error("Create Secret %s/%s failed err:%v", secret.Namespace, secret.Name, err)
+		return err
+	}
+
+	return nil
 }

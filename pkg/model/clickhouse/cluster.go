@@ -26,7 +26,7 @@ import (
 
 // Cluster specifies clickhouse cluster object
 type Cluster struct {
-	*ClusterEndpointCredentials
+	*ClusterConnectionParams
 	Hosts []string
 	l     log.Announcer
 }
@@ -47,14 +47,14 @@ func (c *Cluster) SetLog(a log.Announcer) *Cluster {
 	return c
 }
 
-// SetEndpointCredentials sets endpoint credentials
-func (c *Cluster) SetEndpointCredentials(endpointCredentials *ClusterEndpointCredentials) *Cluster {
-	if c == nil {
-		return nil
-	}
-	c.ClusterEndpointCredentials = endpointCredentials
-	return c
-}
+// SetCredentials sets endpoint credentials
+//func (c *Cluster) SetCredentials(clusterCredentials *ClusterCredentials) *Cluster {
+//	if c == nil {
+//		return nil
+//	}
+//	c.ClusterCredentials = clusterCredentials
+//	return c
+//}
 
 // SetHosts sets hosts
 func (c *Cluster) SetHosts(hosts []string) *Cluster {
@@ -67,7 +67,7 @@ func (c *Cluster) SetHosts(hosts []string) *Cluster {
 
 // getConnection gets connection
 func (c *Cluster) getConnection(host string) *Connection {
-	return GetPooledDBConnection(NewConnectionParams(c.Scheme, host, c.Username, c.Password, c.RootCA, c.Port)).SetLog(c.l)
+	return GetPooledDBConnection(c.NewEndpointConnectionParams(host)).SetLog(c.l)
 }
 
 // QueryAny walks over all endpoints and runs query sequentially on each of them.

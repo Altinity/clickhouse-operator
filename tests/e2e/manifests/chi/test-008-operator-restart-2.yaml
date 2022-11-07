@@ -9,7 +9,7 @@ spec:
       profile: default
     templates:
       podTemplate: clickhouse-template
-      volumeClaimTemplate: aws-ebs-volume-claim
+      dataVolumeClaimTemplate: aws-ebs-volume-claim
       serviceTemplate: chi-service-template
 
   configuration:
@@ -23,6 +23,8 @@ spec:
       user1/profile: "default"
       user1/allow_databases/database:
         - "test"
+      test_008/password: test_008
+      test_008/networks/ip: 0.0.0.0/0
     profiles:
       default/max_query_size: 41943040
       default/max_ast_elements: 100000
@@ -30,9 +32,9 @@ spec:
       - name: test-008-2
         templates:
           podTemplate: clickhouse-template
-          volumeClaimTemplate: aws-ebs-volume-claim
+          dataVolumeClaimTemplate: aws-ebs-volume-claim
         layout:
-          replicasCount: 1
+          shardsCount: 2
   templates:
     serviceTemplates:
       - name: chi-service-template
@@ -40,10 +42,10 @@ spec:
         spec:
           ports:
             - name: http
-              port: 8443
+              port: 8123
               targetPort: 8123
             - name: client
-              port: 9440
+              port: 9000
               targetPort: 9000
           type: LoadBalancer
     volumeClaimTemplates:
@@ -62,7 +64,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:22.8
               ports:
                 - name: http
                   containerPort: 8123

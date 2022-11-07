@@ -14,6 +14,14 @@
 
 package v1
 
+// ChiDefaults defines defaults section of .spec
+type ChiDefaults struct {
+	ReplicasUseFQDN   StringBool         `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
+	DistributedDDL    *ChiDistributedDDL `json:"distributedDDL,omitempty"     yaml:"distributedDDL,omitempty"`
+	StorageManagement *StorageManagement `json:"storageManagement,omitempty"  yaml:"storageManagement,omitempty"`
+	Templates         *ChiTemplateNames  `json:"templates,omitempty"          yaml:"templates,omitempty"`
+}
+
 // NewChiDefaults creates new ChiDefaults object
 func NewChiDefaults() *ChiDefaults {
 	return new(ChiDefaults)
@@ -42,6 +50,7 @@ func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) *ChiD
 	}
 
 	defaults.DistributedDDL = defaults.DistributedDDL.MergeFrom(from.DistributedDDL, _type)
+	defaults.StorageManagement = defaults.StorageManagement.MergeFrom(from.StorageManagement, _type)
 	defaults.Templates = defaults.Templates.MergeFrom(from.Templates, _type)
 
 	return defaults

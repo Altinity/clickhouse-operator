@@ -1,0 +1,35 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-021-2-rescale-volume"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+    - name: simple
+      layout:
+        shardsCount: 1
+  defaults:
+    storageManagement:
+      provisioner: Operator
+    templates:
+      podTemplate: multi-volume
+  templates:
+    volumeClaimTemplates:
+      - name: disk1
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
+    podTemplates:
+      - name: multi-volume
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.8.6.71
+              volumeMounts:
+                - name: disk1
+                  mountPath: /var/lib/clickhouse

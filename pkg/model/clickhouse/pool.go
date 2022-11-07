@@ -27,7 +27,7 @@ var (
 
 // GetPooledDBConnection gets connection out of the pool.
 // In case no connection available new connection is created and returned.
-func GetPooledDBConnection(params *ConnectionParams) *Connection {
+func GetPooledDBConnection(params *EndpointConnectionParams) *Connection {
 	key := makePoolKey(params)
 
 	if connection, existed := dbConnectionPool.Load(key); existed {
@@ -65,6 +65,6 @@ func DropHost(host string) {
 }
 
 // makePoolKey makes key out of connection params to be used by the pool
-func makePoolKey(params *ConnectionParams) string {
+func makePoolKey(params *EndpointConnectionParams) string {
 	return params.GetDSN()
 }

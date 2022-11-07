@@ -79,7 +79,7 @@ def require_keeper(keeper_manifest='', keeper_type='zookeeper', force_install=Fa
         expected_docs = {
             "zookeeper": 6 if 'scaleout-pvc' in keeper_manifest else 4,
             "clickhouse-keeper": 6,
-            "zookeeper-operator": 1,
+            "zookeeper-operator": 3 if 'probes' in keeper_manifest else 1,
         }
         expected_pod_prefix = {
             "zookeeper": "zookeeper",
@@ -195,14 +195,36 @@ def install_operator_if_not_exist(reinstall=False, manifest=get_full_path(settin
         if kubectl.get_count("pod", ns=settings.operator_namespace, label="-l app=clickhouse-operator") == 0 or reinstall:
             kubectl.apply(
                 ns=settings.operator_namespace,
-                manifest=f"<(cat {manifest} | "
+                manifest=f"cat {manifest} | "
                        f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
                        f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{settings.operator_version}\" "
                        f"OPERATOR_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
                        f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
                        f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{settings.operator_version}\" "
                        f"METRICS_EXPORTER_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
-                       f"envsubst)",
+                       f"envsubst",
                 validate=False
             )
         set_operator_version(settings.operator_version)
+
+
+def install_operator_version(version):
+    if version == settings.operator_version:
+        manifest = get_full_path(settings.clickhouse_operator_install_manifest)
+        manifest = f"cat {manifest}"
+    else:
+        manifest = f"https://github.com/Altinity/clickhouse-operator/raw/{version}/deploy/operator/clickhouse-operator-install-template.yaml"
+        manifest = f"curl -sL {manifest}"
+
+    kubectl.apply(
+        ns=settings.operator_namespace,
+        manifest=f"{manifest} | "
+                 f"OPERATOR_NAMESPACE=\"{settings.operator_namespace}\" "
+                 f"OPERATOR_IMAGE=\"{settings.operator_docker_repo}:{version}\" "
+                 f"OPERATOR_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
+                 f"METRICS_EXPORTER_NAMESPACE=\"{settings.operator_namespace}\" "
+                 f"METRICS_EXPORTER_IMAGE=\"{settings.metrics_exporter_docker_repo}:{version}\" "
+                 f"METRICS_EXPORTER_IMAGE_PULL_POLICY=\"{settings.image_pull_policy}\" "
+                 f"envsubst",
+        validate=False
+    )

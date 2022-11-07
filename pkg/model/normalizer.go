@@ -289,6 +289,8 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 		host.Name = template.Spec.Name
 	}
 
+	host.Secure = host.Secure.MergeFrom(template.Spec.Secure)
+
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case chiV1.PortDistributionUnspecified:
@@ -400,14 +402,14 @@ func (n *Normalizer) normalizeTaskID(taskID *string) *string {
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop string) string {
-	if util.IsStringBool(stop) {
+func (n *Normalizer) normalizeStop(stop chiV1.StringBool) chiV1.StringBool {
+	if stop.IsValid() {
 		// It is bool, use as it is
 		return stop
 	}
 
 	// In case it is unknown value - just use set it to false
-	return util.StringBoolFalseLowercase
+	return chiV1.StringBoolFalseLowercase
 }
 
 // normalizeRestart normalizes .spec.restart
@@ -424,14 +426,14 @@ func (n *Normalizer) normalizeRestart(restart string) string {
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
-func (n *Normalizer) normalizeTroubleshoot(troubleshoot string) string {
-	if util.IsStringBool(troubleshoot) {
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot chiV1.StringBool) chiV1.StringBool {
+	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
-	return util.StringBoolFalseLowercase
+	return chiV1.StringBoolFalseLowercase
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
@@ -448,10 +450,14 @@ func (n *Normalizer) normalizeDefaults(defaults *chiV1.ChiDefaults) *chiV1.ChiDe
 		defaults = chiV1.NewChiDefaults()
 	}
 	// Set defaults for CHI object properties
-	defaults.ReplicasUseFQDN = util.CastStringBoolToStringTrueFalse(defaults.ReplicasUseFQDN, false)
+	defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.Normalize(false)
 	// Ensure field
 	if defaults.DistributedDDL == nil {
 		//defaults.DistributedDDL = chiV1.NewChiDistributedDDL()
+	}
+	// Ensure field
+	if defaults.StorageManagement == nil {
+		defaults.StorageManagement = chiV1.NewStorageManagement()
 	}
 	// Ensure field
 	if defaults.Templates == nil {
@@ -736,14 +742,29 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *chiV1.ChiPodDistr
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *chiV1.ChiVolumeClaimTemplate) {
 	// Check name
-	// Check PVCReclaimPolicy
-	if !template.PVCReclaimPolicy.IsValid() {
-		template.PVCReclaimPolicy = chiV1.PVCReclaimPolicyDelete
-	}
+	// Skip for now
+
+	// StorageManagement
+	n.normalizeStorageManagement(&template.StorageManagement)
+
 	// Check Spec
+	// Skip for now
 
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+}
+
+// normalizeStorageManagement normalizes StorageManagement
+func (n *Normalizer) normalizeStorageManagement(storage *chiV1.StorageManagement) {
+	// Check PVCProvisioner
+	if !storage.PVCProvisioner.IsValid() {
+		storage.PVCProvisioner = chiV1.PVCProvisionerUnspecified
+	}
+
+	// Check PVCReclaimPolicy
+	if !storage.PVCReclaimPolicy.IsValid() {
+		storage.PVCReclaimPolicy = chiV1.PVCReclaimPolicyUnspecified
+	}
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
@@ -914,30 +935,71 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 
 	// ENV VAR name and value
 	envVarName := username + "_" + userSettingsField
-
-	for _, envVar := range n.ctx.chi.Attributes.ExchangeEnv {
-		if envVar.Name == envVarName {
-			// Such a variable already exists
-			return false
-		}
-	}
-
-	envVar := corev1.EnvVar{
-		Name: envVarName,
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretName,
+	n.appendEnvVar(
+		corev1.EnvVar{
+			Name: envVarName,
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: secretName,
+					},
+					Key: key,
 				},
-				Key: key,
 			},
 		},
-	}
-	n.ctx.chi.Attributes.ExchangeEnv = append(n.ctx.chi.Attributes.ExchangeEnv, envVar)
+	)
 
 	// Replace setting with empty value and reference to ENV VAR
 	users.Set(username+"/"+userSettingsField, chiV1.NewSettingScalar("").SetAttribute("from_env", envVarName))
 	return true
+}
+
+const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
+
+func (n *Normalizer) appendClusterSecretEnvVar(cluster *chiV1.ChiCluster) {
+	switch cluster.Secret.Source() {
+	case chiV1.ClusterSecretSourcePlaintext:
+		// Secret has explicit value, it is not passed via ENV vars
+		// Do nothing here
+	case chiV1.ClusterSecretSourceSecretRef:
+		// Secret has explicit SecretKeyRef
+		// Set the password for internode communication using an ENV VAR
+		n.appendEnvVar(
+			corev1.EnvVar{
+				Name: internodeClusterSecretEnvName,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: cluster.Secret.GetSecretKeyRef(),
+				},
+			},
+		)
+	case chiV1.ClusterSecretSourceAuto:
+		// Secret is auto-generated
+		// Set the password for internode communication using an ENV VAR
+		n.appendEnvVar(
+			corev1.EnvVar{
+				Name: internodeClusterSecretEnvName,
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: cluster.Secret.GetAutoSecretKeyRef(CreateClusterAutoSecretName(cluster)),
+				},
+			},
+		)
+	}
+}
+
+func (n *Normalizer) appendEnvVar(envVar corev1.EnvVar) {
+	// Sanity check
+	if envVar.Name == "" {
+		return
+	}
+
+	for _, existingEnvVar := range n.ctx.chi.Attributes.ExchangeEnv {
+		if existingEnvVar.Name == envVar.Name {
+			// Such a variable already exists
+			return
+		}
+	}
+
+	n.ctx.chi.Attributes.ExchangeEnv = append(n.ctx.chi.Attributes.ExchangeEnv, envVar)
 }
 
 var (
@@ -1232,6 +1294,8 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 		cluster = n.newDefaultCluster()
 	}
 
+	cluster.CHI = n.ctx.chi
+
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.ctx.chi)
 	// Inherit from .spec.configuration.files
@@ -1254,6 +1318,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
 	n.createHostsField(cluster)
+	n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
 	cluster.WalkShards(func(index int, shard *chiV1.ChiShard) error {
@@ -1625,5 +1690,5 @@ func (n *Normalizer) normalizeShardInternalReplication(shard *chiV1.ChiShard) {
 	if shard.ReplicasCount > 1 {
 		defaultInternalReplication = true
 	}
-	shard.InternalReplication = util.CastStringBoolToStringTrueFalse(shard.InternalReplication, defaultInternalReplication)
+	shard.InternalReplication = shard.InternalReplication.Normalize(defaultInternalReplication)
 }

@@ -39,7 +39,7 @@ import (
 	"github.com/altinity/queue"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
@@ -105,13 +105,13 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < chop.Config().Reconcile.Runtime.ThreadsNumber+chi.DefaultReconcileSystemThreadsNumber; i++ {
+	for i := 0; i < chop.Config().Reconcile.Runtime.ThreadsNumber+chiV1.DefaultReconcileSystemThreadsNumber; i++ {
 		c.queues = append(
 			c.queues,
 			queue.New(),
 			//workqueue.NewNamedRateLimitingQueue(
 			//	workqueue.DefaultControllerRateLimiter(),
-			//	fmt.Sprintf("chi%d", i),
+			//	fmt.Sprintf("chiV1%d", i),
 			//),
 		)
 	}
@@ -122,7 +122,7 @@ func (c *Controller) addEventHandlersCHI(
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			chi := obj.(*chi.ClickHouseInstallation)
+			chi := obj.(*chiV1.ClickHouseInstallation)
 			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
@@ -130,8 +130,8 @@ func (c *Controller) addEventHandlersCHI(
 			c.enqueueObject(NewReconcileCHI(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			oldChi := old.(*chi.ClickHouseInstallation)
-			newChi := new.(*chi.ClickHouseInstallation)
+			oldChi := old.(*chiV1.ClickHouseInstallation)
+			newChi := new.(*chiV1.ClickHouseInstallation)
 			if !chop.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
@@ -139,7 +139,7 @@ func (c *Controller) addEventHandlersCHI(
 			c.enqueueObject(NewReconcileCHI(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chi := obj.(*chi.ClickHouseInstallation)
+			chi := obj.(*chiV1.ClickHouseInstallation)
 			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
@@ -154,7 +154,7 @@ func (c *Controller) addEventHandlersCHIT(
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			chit := obj.(*chi.ClickHouseInstallationTemplate)
+			chit := obj.(*chiV1.ClickHouseInstallationTemplate)
 			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
@@ -162,8 +162,8 @@ func (c *Controller) addEventHandlersCHIT(
 			c.enqueueObject(NewReconcileCHIT(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			oldChit := old.(*chi.ClickHouseInstallationTemplate)
-			newChit := new.(*chi.ClickHouseInstallationTemplate)
+			oldChit := old.(*chiV1.ClickHouseInstallationTemplate)
+			newChit := new.(*chiV1.ClickHouseInstallationTemplate)
 			if !chop.Config().IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
@@ -171,7 +171,7 @@ func (c *Controller) addEventHandlersCHIT(
 			c.enqueueObject(NewReconcileCHIT(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chit := obj.(*chi.ClickHouseInstallationTemplate)
+			chit := obj.(*chiV1.ClickHouseInstallationTemplate)
 			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
@@ -186,7 +186,7 @@ func (c *Controller) addEventHandlersChopConfig(
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			chopConfig := obj.(*chi.ClickHouseOperatorConfiguration)
+			chopConfig := obj.(*chiV1.ClickHouseOperatorConfiguration)
 			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
@@ -194,8 +194,8 @@ func (c *Controller) addEventHandlersChopConfig(
 			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			newChopConfig := new.(*chi.ClickHouseOperatorConfiguration)
-			oldChopConfig := old.(*chi.ClickHouseOperatorConfiguration)
+			newChopConfig := new.(*chiV1.ClickHouseOperatorConfiguration)
+			oldChopConfig := old.(*chiV1.ClickHouseOperatorConfiguration)
 			if !chop.Config().IsWatchedNamespace(newChopConfig.Namespace) {
 				return
 			}
@@ -203,7 +203,7 @@ func (c *Controller) addEventHandlersChopConfig(
 			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
-			chopConfig := obj.(*chi.ClickHouseOperatorConfiguration)
+			chopConfig := obj.(*chiV1.ClickHouseOperatorConfiguration)
 			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
@@ -497,7 +497,7 @@ func (c *Controller) Run(ctx context.Context) {
 	for i := 0; i < workersNum; i++ {
 		log.V(1).F().Info("ClickHouseInstallation controller: starting worker %d out of %d", i+1, workersNum)
 		sys := false
-		if i < chi.DefaultReconcileSystemThreadsNumber {
+		if i < chiV1.DefaultReconcileSystemThreadsNumber {
 			sys = true
 		}
 		worker := c.newWorker(c.queues[i], sys)
@@ -511,10 +511,10 @@ func (c *Controller) Run(ctx context.Context) {
 
 func prepareCHIAdd(command *ReconcileCHI) bool {
 	newjs, _ := json.Marshal(command.new)
-	newchi := chi.ClickHouseInstallation{
+	newchi := chiV1.ClickHouseInstallation{
 		TypeMeta: meta.TypeMeta{
-			APIVersion: chi.SchemeGroupVersion.String(),
-			Kind:       chi.ClickHouseInstallationCRDResourceKind,
+			APIVersion: chiV1.SchemeGroupVersion.String(),
+			Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
 		},
 	}
 	_ = json.Unmarshal(newjs, &newchi)
@@ -536,11 +536,11 @@ func prepareCHIUpdate(command *ReconcileCHI) bool {
 
 	oldjs, _ := json.Marshal(command.old)
 	newjs, _ := json.Marshal(command.new)
-	oldchi := chi.ClickHouseInstallation{}
-	newchi := chi.ClickHouseInstallation{
+	oldchi := chiV1.ClickHouseInstallation{}
+	newchi := chiV1.ClickHouseInstallation{
 		TypeMeta: meta.TypeMeta{
-			APIVersion: chi.SchemeGroupVersion.String(),
-			Kind:       chi.ClickHouseInstallationCRDResourceKind,
+			APIVersion: chiV1.SchemeGroupVersion.String(),
+			Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
 		},
 	}
 	_ = json.Unmarshal(oldjs, &oldchi)
@@ -572,8 +572,8 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 	enqueue := false
 	switch command := obj.(type) {
 	case *ReconcileCHI:
-		variants := len(c.queues) - chi.DefaultReconcileSystemThreadsNumber
-		index = chi.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
+		variants := len(c.queues) - chiV1.DefaultReconcileSystemThreadsNumber
+		index = chiV1.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
 		switch command.cmd {
 		case reconcileAdd:
 			enqueue = prepareCHIAdd(command)
@@ -585,7 +585,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		*ReconcileChopConfig,
 		*ReconcileEndpoints,
 		*DropDns:
-		variants := chi.DefaultReconcileSystemThreadsNumber
+		variants := chiV1.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
 		enqueue = true
 	}
@@ -624,14 +624,14 @@ func (c *Controller) deleteWatchAsync(namespace, name string) {
 }
 
 // addChit sync new CHIT - creates all its resources
-func (c *Controller) addChit(chit *chi.ClickHouseInstallationTemplate) error {
+func (c *Controller) addChit(chit *chiV1.ClickHouseInstallationTemplate) error {
 	log.V(1).M(chit).F().P()
-	chop.Config().AddCHITemplate((*chi.ClickHouseInstallation)(chit))
+	chop.Config().AddCHITemplate((*chiV1.ClickHouseInstallation)(chit))
 	return nil
 }
 
 // updateChit sync CHIT which was already created earlier
-func (c *Controller) updateChit(old, new *chi.ClickHouseInstallationTemplate) error {
+func (c *Controller) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
 		// No need to react
@@ -639,19 +639,19 @@ func (c *Controller) updateChit(old, new *chi.ClickHouseInstallationTemplate) er
 	}
 
 	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
-	chop.Config().UpdateCHITemplate((*chi.ClickHouseInstallation)(new))
+	chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
 	return nil
 }
 
 // deleteChit deletes CHIT
-func (c *Controller) deleteChit(chit *chi.ClickHouseInstallationTemplate) error {
+func (c *Controller) deleteChit(chit *chiV1.ClickHouseInstallationTemplate) error {
 	log.V(2).M(chit).F().P()
-	chop.Config().DeleteCHITemplate((*chi.ClickHouseInstallation)(chit))
+	chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
 	return nil
 }
 
 // addChopConfig
-func (c *Controller) addChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
+func (c *Controller) addChopConfig(chopConfig *chiV1.ClickHouseOperatorConfiguration) error {
 	if chop.Get().ConfigManager.IsConfigListed(chopConfig) {
 		log.V(1).M(chopConfig).F().Info("already known config - do nothing")
 	} else {
@@ -665,7 +665,7 @@ func (c *Controller) addChopConfig(chopConfig *chi.ClickHouseOperatorConfigurati
 }
 
 // updateChopConfig
-func (c *Controller) updateChopConfig(old, new *chi.ClickHouseOperatorConfiguration) error {
+func (c *Controller) updateChopConfig(old, new *chiV1.ClickHouseOperatorConfiguration) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
 		// No need to react
@@ -681,7 +681,7 @@ func (c *Controller) updateChopConfig(old, new *chi.ClickHouseOperatorConfigurat
 }
 
 // deleteChit deletes CHIT
-func (c *Controller) deleteChopConfig(chopConfig *chi.ClickHouseOperatorConfiguration) error {
+func (c *Controller) deleteChopConfig(chopConfig *chiV1.ClickHouseOperatorConfiguration) error {
 	log.V(2).M(chopConfig).F().P()
 	// TODO
 	// NEED REFACTORING
@@ -697,7 +697,7 @@ type patchFinalizers struct {
 }
 
 // patchCHIFinalizers patch ClickHouseInstallation finalizers
-func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouseInstallation) error {
+func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -705,11 +705,11 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 
 	// TODO fix this with verbosity update
 	// Start Debug object
-	//js, err := json.MarshalIndent(chi, "", "  ")
+	//js, err := json.MarshalIndent(chiV1, "", "  ")
 	//if err != nil {
-	//	log.V(1).M(chi).F().Error("%q", err)
+	//	log.V(1).M(chiV1).F().Error("%q", err)
 	//}
-	//log.V(3).M(chi).F().Info("\n%s\n", js)
+	//log.V(3).M(chiV1).F().Info("\n%s\n", js)
 	// End Debug object
 
 	payload, _ := json.Marshal([]patchFinalizers{{
@@ -738,12 +738,17 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chi.ClickHouse
 }
 
 type UpdateCHIStatusOptions struct {
-	chi.CopyCHIStatusOptions
+	chiV1.CopyCHIStatusOptions
 	TolerateAbsence bool
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chiV1.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+
 	for retry, attempt := true, 1; retry; attempt++ {
 		if attempt >= 5 {
 			retry = false
@@ -755,14 +760,17 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chi.ClickHo
 		}
 
 		if retry {
-			time.Sleep(5 * time.Second)
+			log.V(2).M(chi).F().Warning("got error, will retry. err: %q", err)
+			time.Sleep(1 * time.Second)
+		} else {
+			log.V(1).M(chi).F().Error("got error, all retries are exhausted. err: %q", err)
 		}
 	}
 	return
 }
 
 // doUpdateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.ClickHouseInstallation, opts UpdateCHIStatusOptions) error {
+func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chiV1.ClickHouseInstallation, opts UpdateCHIStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -770,6 +778,8 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
 	log.V(2).M(chi).F().Info("Update CHI status")
+
+	podIPs := c.getPodsIPs(chi)
 
 	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
@@ -788,17 +798,17 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 	}
 
 	// Update status of a real object.
-	(&cur.Status).CopyFrom(&chi.Status, opts.CopyCHIStatusOptions)
-	cur.Status.PodIPs = c.getPodsIPs(chi)
+	cur.EnsureStatus().CopyFrom(chi.Status, opts.CopyCHIStatusOptions)
+	cur.EnsureStatus().PodIPs = podIPs
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
 	if err != nil {
 		// Error update
-		log.V(1).M(chi).F().Error("%q", err)
+		log.V(2).M(chi).F().Info("Got error upon update, may retry. err: %q", err)
 		return err
 	}
 
-	// Propagate updated ResourceVersion into chi
+	// Propagate updated ResourceVersion into chiV1
 	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
 		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
 		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
@@ -810,8 +820,32 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chi.Click
 	return nil
 }
 
+func (c *Controller) poll(ctx context.Context, chi *chiV1.ClickHouseInstallation, f func(c *chiV1.ClickHouseInstallation, e error) bool) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return
+	}
+
+	namespace, name := util.NamespaceName(chi.ObjectMeta)
+
+	for {
+		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
+		if f(cur, err) {
+			// Continue polling
+			if util.IsContextDone(ctx) {
+				log.V(2).Info("ctx is done")
+				return
+			}
+			time.Sleep(15 * time.Second)
+		} else {
+			// Stop polling
+			return
+		}
+	}
+}
+
 // installFinalizer
-func (c *Controller) installFinalizer(ctx context.Context, chi *chi.ClickHouseInstallation) error {
+func (c *Controller) installFinalizer(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -839,7 +873,7 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *chi.ClickHouseIn
 }
 
 // uninstallFinalizer
-func (c *Controller) uninstallFinalizer(ctx context.Context, chi *chi.ClickHouseInstallation) error {
+func (c *Controller) uninstallFinalizer(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -888,14 +922,14 @@ func (c *Controller) handleObject(obj interface{}) {
 	}
 
 	// Ensure owner is of a proper kind
-	if ownerRef.Kind != chi.ClickHouseInstallationCRDResourceKind {
+	if ownerRef.Kind != chiV1.ClickHouseInstallationCRDResourceKind {
 		return
 	}
 
 	log.V(1).Info("Processing object: %s", object.GetName())
 
 	// Get owner - it is expected to be CHI
-	// TODO chi, err := c.chi.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
+	// TODO chiV1, err := c.chiV1.ClickHouseInstallations(object.GetNamespace()).Get(ownerRef.Name)
 
 	// TODO
 	//if err != nil {
@@ -904,7 +938,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	//}
 
 	// Add CHI object into reconcile loop
-	// TODO c.enqueueObject(chi.Namespace, chi.Name, chi)
+	// TODO c.enqueueObject(chiV1.Namespace, chiV1.Name, chiV1)
 }
 
 // waitForCacheSync is a logger-wrapper over cache.WaitForCacheSync() and it waits for caches to populate

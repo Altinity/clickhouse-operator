@@ -29,6 +29,11 @@ METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:${O
 #
 
 # Build namespace:kube-system installation .yaml manifest
+CH_USERNAME_PLAIN="" \
+CH_PASSWORD_PLAIN="" \
+CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
+CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
+CH_PASSWORD_SECRET_PLAIN="clickhouse_operator_password" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-bundle.yaml"
 
 # Build templated installation .yaml manifest
@@ -37,6 +42,11 @@ OPERATOR_IMAGE_PULL_POLICY="\${OPERATOR_IMAGE_PULL_POLICY}" \
 METRICS_EXPORTER_IMAGE="\${METRICS_EXPORTER_IMAGE}" \
 METRICS_EXPORTER_IMAGE_PULL_POLICY="\${METRICS_EXPORTER_IMAGE_PULL_POLICY}" \
 OPERATOR_NAMESPACE="\${OPERATOR_NAMESPACE}" \
+CH_USERNAME_PLAIN="" \
+CH_PASSWORD_PLAIN="" \
+CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
+CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
+CH_PASSWORD_SECRET_PLAIN="clickhouse_operator_password" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-template.yaml"
 
 # Build v1beta1 bundle and template manifests
@@ -52,9 +62,12 @@ cat <<EOF > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
 #
 #
 EOF
-watchNamespaces="\${namespace}" \
-password_sha256_hex="\${sha256(password)}" \
-chPassword="\${password}" \
+WATCH_NAMESPACES="\${namespace}" \
+CH_USERNAME_PLAIN="" \
+CH_PASSWORD_PLAIN="" \
+CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
+CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
+CH_PASSWORD_SECRET_PLAIN="\${password}" \
 OPERATOR_NAMESPACE="\${namespace}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" >> "${MANIFEST_ROOT}/operator/clickhouse-operator-install-tf.yaml"
@@ -69,9 +82,12 @@ cat <<EOF > "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"
 #
 #
 EOF
-watchNamespaces="{{ namespace }}" \
-password_sha256_hex="{{ password | password_hash('sha256') }}" \
-chPassword="{{ password }}" \
+WATCH_NAMESPACES="{{ namespace }}" \
+CH_USERNAME_PLAIN="" \
+CH_PASSWORD_PLAIN="" \
+CH_CREDENTIALS_SECRET_NAME="clickhouse-operator" \
+CH_USERNAME_SECRET_PLAIN="clickhouse_operator" \
+CH_PASSWORD_SECRET_PLAIN="{{ password }}" \
 OPERATOR_NAMESPACE="{{ namespace }}" \
 MANIFEST_PRINT_RBAC_NAMESPACED=yes \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" >> "${MANIFEST_ROOT}/operator/clickhouse-operator-install-ansible.yaml"

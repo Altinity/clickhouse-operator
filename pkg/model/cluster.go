@@ -16,11 +16,12 @@ package model
 
 import (
 	"context"
+	"strings"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"strings"
 )
 
 // Cluster specifies ClickHouse cluster
@@ -35,12 +36,12 @@ func NewCluster() *Cluster {
 	}
 }
 
-// SetEndpointCredentials sets endpoint credentials
-func (c *Cluster) SetEndpointCredentials(endpointCredentials *clickhouse.ClusterEndpointCredentials) *Cluster {
+// SetClusterConnectionParams sets endpoint credentials
+func (c *Cluster) SetClusterConnectionParams(clusterConnectionParams *clickhouse.ClusterConnectionParams) *Cluster {
 	if c == nil {
 		return nil
 	}
-	c.ClusterEndpointCredentials = endpointCredentials
+	c.ClusterConnectionParams = clusterConnectionParams
 	return c
 }
 
@@ -89,7 +90,7 @@ func (c *Cluster) QueryUnzipAndApplyUUIDs(ctx context.Context, endpoints []strin
 	if err := c.queryUnzipColumns(ctx, endpoints, sql, &column1, &column2, &column3, &column4); err != nil {
 		return nil, nil, err
 	}
-	for i := 0; i < len(column1); i++  {
+	for i := 0; i < len(column1); i++ {
 		if column4[i] != "" { // inner_uuid
 			column2[i] = strings.ReplaceAll(column2[i], "{uuid}", column4[i])
 		} else if column3[i] != "" { // uuid

@@ -78,6 +78,9 @@
       * 4.8.2.1 [RQ.SRS-026.ClickHouseOperator.DefaultUsers](#rqsrs-026clickhouseoperatordefaultusers)
     * 4.8.3 [Secrets](#secrets)
       * 4.8.3.1 [RQ.SRS-026.ClickHouseOperator.Secrets](#rqsrs-026clickhouseoperatorsecrets)
+    * 4.8.4 [Secure Connection](#secure-connection)
+      * 4.8.4.1 [RQ.SRS-026.ClickHouseOperator.EnableHttps](#rqsrs-026clickhouseoperatorenablehttps)
+      * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
   * 4.9 [Default Templates](#default-templates)
     * 4.9.1 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates](#rqsrs-026clickhouseoperatordefaulttemplates)
     * 4.9.2 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates](#rqsrs-026clickhouseoperatordefaulttemplatesmergingwithuserdefinedtemplates)
@@ -867,6 +870,33 @@ templates:
                     name: secret-passwords
                     key: pwduser1
 ```
+
+#### Secure Connection
+
+##### RQ.SRS-026.ClickHouseOperator.EnableHttps
+version: 1.0
+
+[ClickHouse Operator] SHALL support secure `HTTPS` connection with [ClickHouse] server by changing the configuration. Configurations can be updated at run time using a `chopconf` file.
+
+For example,
+
+```yaml
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-xxx-chopconf"
+spec:
+  clickhouse:
+    access:
+      scheme: https
+      port: 8443
+```
+
+##### RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps
+version: 1.0
+
+[ClickHouse] server deployed by [ClickHouse Operator] SHALL support secure `HTTPS` connection from local [ClickHouse] client.
 
 ### Default Templates
 

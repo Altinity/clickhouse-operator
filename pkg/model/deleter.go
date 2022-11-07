@@ -36,12 +36,25 @@ func HostCanDeletePVC(host *chiv1.ChiHost, pvcName string) bool {
 
 		if pvcName == CreatePVCName(host, volumeMount, volumeClaimTemplate) {
 			// This PVC is made from these host, VolumeMount and VolumeClaimTemplate
-			// So, what policy does this VolumeClaimTemplate have?
-			policy = volumeClaimTemplate.PVCReclaimPolicy
+			// So, what policy does this PVC have?
+			policy = getPVCReclaimPolicy(host, volumeClaimTemplate)
 			return
 		}
 	})
 
 	// Delete all explicitly specified as deletable PVCs and all PVCs of un-templated or unclear origin
 	return policy == chiv1.PVCReclaimPolicyDelete
+}
+
+// HostCanDeleteAllPVCs checks whether all PVCs can be deleted
+func HostCanDeleteAllPVCs(host *chiv1.ChiHost) bool {
+	canDeleteAllPVCs := true
+	host.CHI.WalkVolumeClaimTemplates(func(template *chiv1.ChiVolumeClaimTemplate) {
+		if getPVCReclaimPolicy(host, template) == chiv1.PVCReclaimPolicyRetain {
+			// At least one template wants to keep its PVC
+			canDeleteAllPVCs = false
+		}
+	})
+
+	return canDeleteAllPVCs
 }

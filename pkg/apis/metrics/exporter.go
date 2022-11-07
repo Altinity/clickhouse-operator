@@ -30,6 +30,7 @@ import (
 
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
 const (
@@ -38,10 +39,10 @@ const (
 
 // Exporter implements prometheus.Collector interface
 type Exporter struct {
+	clusterConnectionParams *clickhouse.ClusterConnectionParams
+
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
-	chAccessInfo    *CHAccessInfo
-	timeout         time.Duration
 
 	mutex               sync.RWMutex
 	toRemoveFromWatched sync.Map
@@ -61,11 +62,10 @@ func (i chInstallationsIndex) Slice() []*WatchedCHI {
 }
 
 // NewExporter returns a new instance of Exporter type
-func NewExporter(chAccess *CHAccessInfo) *Exporter {
+func NewExporter(connectionParams *clickhouse.ClusterConnectionParams) *Exporter {
 	return &Exporter{
-		chInstallations: make(map[string]*WatchedCHI),
-		chAccessInfo:    chAccess,
-		timeout:         defaultTimeout,
+		chInstallations:         make(map[string]*WatchedCHI),
+		clusterConnectionParams: connectionParams,
 	}
 }
 
@@ -161,15 +161,8 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 }
 
 // newFetcher returns new Metrics Fetcher for specified host
-func (e *Exporter) newFetcher(hostname string) *ClickHouseFetcher {
-	return NewClickHouseFetcher(
-		e.chAccessInfo.Scheme,
-		hostname,
-		e.chAccessInfo.Username,
-		e.chAccessInfo.Password,
-		e.chAccessInfo.RootCA,
-		e.chAccessInfo.Port,
-	).SetQueryTimeout(e.timeout)
+func (e *Exporter) newFetcher(hostname string) *ClickHouseMetricsFetcher {
+	return NewClickHouseFetcher(e.clusterConnectionParams.NewEndpointConnectionParams(hostname))
 }
 
 // UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
@@ -205,7 +198,6 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("table sizes")
 		writer.WriteSystemParts(systemPartsData)
 		writer.WriteOKFetch("system parts")
-
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
 		log.V(2).Infof("Error querying system.parts for %s: %s\n", hostname, err)
@@ -313,13 +305,13 @@ func (e *Exporter) DiscoveryWatchedCHIs(chopClient *chopclientset.Clientset) {
 	for i := range list.Items {
 		chi := &list.Items[i]
 		if chi.IsStopped() {
-			log.V(1).Infof("Skip stopped CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+			log.V(1).Infof("Skip stopped CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.GetFQDNs()))
 		} else {
-			log.V(1).Infof("Add explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.FQDNs))
+			log.V(1).Infof("Add explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.GetFQDNs()))
 			watchedCHI := &WatchedCHI{
 				Namespace: chi.Namespace,
 				Name:      chi.Name,
-				Hostnames: chi.Status.FQDNs,
+				Hostnames: chi.Status.GetFQDNs(),
 			}
 			e.updateWatched(watchedCHI)
 		}

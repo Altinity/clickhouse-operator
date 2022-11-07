@@ -27,10 +27,10 @@ def test_prometheus_setup(self, prometheus_operator_spec, clickhouse_operator_sp
                                  label="-l app.kubernetes.io/component=controller,app.kubernetes.io/name=prometheus-operator") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
         assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
-                                 label="-l app=prometheus,prometheus=prometheus") > 0, error(
+                                 label="-l app.kubernetes.io/managed-by=prometheus-operator,prometheus=prometheus") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
         assert kubectl.get_count("pod", ns=settings.prometheus_namespace,
-                                 label="-l app=alertmanager,alertmanager=alertmanager") > 0, error(
+                                 label="-l app.kubernetes.io/managed-by=prometheus-operator,alertmanager=alertmanager") > 0, error(
             "please run deploy/promehteus/create_prometheus.sh before test run")
         prometheus_operator_exptected_version = f"quay.io/prometheus-operator/prometheus-operator:v{settings.prometheus_operator_version}"
         actual_image = prometheus_operator_spec["items"][0]["spec"]["containers"][0]["image"]
@@ -474,7 +474,7 @@ def test_too_many_connections(self, prometheus_operator_spec, clickhouse_operato
                 # long_cmd += f"nc -vv 127.0.0.1 {port} <( printf \"POST / HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Length: 34\\r\\n\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\");"
                 long_cmd += 'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
             elif port == "9000":
-                long_cmd += 'clickhouse-client --send_logs_level information --idle_connection_timeout 70 --receive_timeout 70 -q "SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
+                long_cmd += 'clickhouse-client --send_logs_level trace --idle_connection_timeout 70 --receive_timeout 70 -q "SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
             # elif port == "3306":
             #     long_cmd += 'mysql -u default -h 127.0.0.1 -e "SELECT sleepEachRow(1),number, now() FROM numbers(30)";'
             else:
@@ -520,7 +520,7 @@ def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_ope
         for _ in range(90):
             port = random.choice(["8123", "3306", "9000"])
             if port == "9000":
-                long_cmd += 'clickhouse-client -q "SELECT sleepEachRow(1),now() FROM numbers(60)";'
+                long_cmd += 'clickhouse-client --send_logs_level trace -q "SELECT sleepEachRow(1),now() FROM numbers(60)";'
             if port == "3306":
                 long_cmd += 'mysql -h 127.0.0.1 -P 3306 -u default -e "SELECT sleepEachRow(1),now() FROM numbers(60)";'
             if port == "8123":

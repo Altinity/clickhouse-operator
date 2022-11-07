@@ -16,6 +16,7 @@ package chop
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/user"
@@ -86,8 +87,9 @@ func (cm *ConfigManager) Init() error {
 	if err != nil {
 		return err
 	}
-	log.V(1).Info("File-based ClickHouseOperatorConfigurations")
+	log.V(1).Info("File-based CHOP config start:")
 	log.V(1).Info(cm.fileConfig.String(true))
+	log.V(1).Info("File-based CHOP config end.")
 
 	// Get configs from all config Custom Resources
 	watchedNamespace := cm.fileConfig.GetInformerNamespace()
@@ -100,15 +102,17 @@ func (cm *ConfigManager) Init() error {
 	cm.fetchSecretCredentials()
 
 	// From now on we have one unified CHOP config
-	log.V(1).Info("Unified (but not post-processed yet) CHOP config")
+	log.V(1).Info("Unified CHOP config (but not post-processed yet) start:")
 	log.V(1).Info(cm.config.String(true))
+	log.V(1).Info("Unified CHOP config (but not post-processed yet) end.")
 
 	// Finalize config by post-processing
 	cm.Postprocess()
 
 	// OperatorConfig is ready
-	log.V(1).Info("Final CHOP config")
+	log.V(1).Info("Final CHOP config start:")
 	log.V(1).Info(cm.config.String(true))
+	log.V(1).Info("Final CHOP config end.")
 
 	return nil
 }
@@ -360,14 +364,19 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	}
 
 	// Sanity check
-	if (namespace == "") || (name == "") {
+	if namespace == "" {
+		// We've already checked that name is not empty
+		cm.config.ClickHouse.Access.Secret.Runtime.Error = fmt.Sprintf("Still empty namespace for secret '%s'", name)
 		return
 	}
 
 	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
+		cm.config.ClickHouse.Access.Secret.Runtime.Error = err.Error()
 		return
 	}
+
+	cm.config.ClickHouse.Access.Secret.Runtime.Fetched = true
 
 	// Find username and password from credentials
 	for key, value := range secret.Data {

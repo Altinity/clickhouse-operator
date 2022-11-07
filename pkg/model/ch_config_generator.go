@@ -159,8 +159,8 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 // RemoteServersGeneratorOptions specifies options for remote-servers generator
 type RemoteServersGeneratorOptions struct {
 	exclude struct {
-		reconcileAttributes *chiv1.ChiHostReconcileAttributes
-		hosts               []*chiv1.ChiHost
+		attributes *chiv1.ChiHostReconcileAttributes
+		hosts      []*chiv1.ChiHost
 	}
 }
 
@@ -169,7 +169,7 @@ func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return &RemoteServersGeneratorOptions{}
 }
 
-// ExcludeHost specifies to exclude host
+// ExcludeHost specifies to exclude a host
 func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *RemoteServersGeneratorOptions {
 	if (o == nil) || (host == nil) {
 		return o
@@ -179,27 +179,39 @@ func (o *RemoteServersGeneratorOptions) ExcludeHost(host *chiv1.ChiHost) *Remote
 	return o
 }
 
+// ExcludeHosts specifies to exclude list of hosts
+func (o *RemoteServersGeneratorOptions) ExcludeHosts(hosts ...*chiv1.ChiHost) *RemoteServersGeneratorOptions {
+	if (o == nil) || (len(hosts) == 0) {
+		return o
+	}
+
+	o.exclude.hosts = append(o.exclude.hosts, hosts...)
+	return o
+}
+
 // ExcludeReconcileAttributes specifies to exclude reconcile attributes
 func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *chiv1.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
 	if (o == nil) || (attrs == nil) {
 		return o
 	}
 
-	o.exclude.reconcileAttributes = attrs
+	o.exclude.attributes = attrs
 	return o
 }
 
-// Skip specifies to skip the host
-func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
+// Exclude tells whether to exclude the host
+func (o *RemoteServersGeneratorOptions) Exclude(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
 	}
 
-	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.ReconcileAttributes) {
+		// Reconcile attributes specify to exclude this host
 		return true
 	}
 
 	for _, val := range o.exclude.hosts {
+		// Host is in the list to be excluded
 		if val == host {
 			return true
 		}
@@ -208,23 +220,33 @@ func (o *RemoteServersGeneratorOptions) Skip(host *chiv1.ChiHost) bool {
 	return false
 }
 
-// Include specifies to include the host
+// Include tells whether to include the host
 func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 	if o == nil {
 		return false
 	}
 
-	if o.exclude.reconcileAttributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.ReconcileAttributes) {
+		// Reconcile attributes specify to exclude this host
 		return false
 	}
 
 	for _, val := range o.exclude.hosts {
+		// Host is in the list to be excluded
 		if val == host {
 			return false
 		}
 	}
 
 	return true
+}
+
+// String returns string representation
+func (o *RemoteServersGeneratorOptions) String() string {
+	if o == nil {
+		return "(nil)"
+	}
+	return fmt.Sprintf("exclude hosts: %v, attributes: %s", o.exclude.hosts, o.exclude.attributes)
 }
 
 // defaultRemoteServersGeneratorOptions
@@ -291,6 +313,16 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		// <my_cluster_name>
 		util.Iline(b, 8, "<%s>", cluster.Name)
 
+		// <secret>VALUE</secret>
+		switch cluster.Secret.Source() {
+		case chiv1.ClusterSecretSourcePlaintext:
+			// Secret value is explicitly specified
+			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret.Value)
+		case chiv1.ClusterSecretSourceSecretRef, chiv1.ClusterSecretSourceAuto:
+			// Use secret via ENV var from secret
+			util.Iline(b, 12, `<secret from_env="%s" />`, internodeClusterSecretEnvName)
+		}
+
 		// Build each shard XML
 		cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
 			if c.ShardHostsNum(shard, options) < 1 {
@@ -317,6 +349,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 					util.Iline(b, 16, "<replica>")
 					util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
 					util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+					util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
 					util.Iline(b, 16, "</replica>")
 				}
 				return nil
@@ -357,6 +390,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 				util.Iline(b, 16, "<replica>")
 				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
 				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+				util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
 				util.Iline(b, 16, "</replica>")
 			}
 			return nil
@@ -386,6 +420,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 				util.Iline(b, 16, "<replica>")
 				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
 				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+				util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
 				util.Iline(b, 16, "</replica>")
 
 				// </shard>
@@ -500,6 +535,14 @@ func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.ChiHost) string {
 	return CreateInstanceHostname(host)
+}
+
+// getSecure gets config-usable value for host secure flag
+func (c *ClickHouseConfigGenerator) getSecure(host *chiv1.ChiHost) int {
+	if host.IsSecure() {
+		return 1
+	}
+	return 0
 }
 
 // getMacrosInstallation returns macros value for <installation-name> macros

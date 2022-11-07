@@ -36,7 +36,8 @@ To execute the test suite (that currently involves only operator tests, not test
 
 ```bash
 pip3 install -U -r ./tests/image/requirements.txt
-python3 ./tests/regression.py --only "/regression/e2e.test_operator/*"
+docker pull registry.gitlab.com/altinity-public/container-images/clickhouse-operator-test-runner:latest
+COMPOSE_HTTP_TIMEOUT=1800 python3 ./tests/regression.py --only "/regression/e2e.test_operator/*"
 ```
 
 To execute tests natively (not in docker), you need to add `--native` parameter
@@ -44,7 +45,7 @@ To execute tests natively (not in docker), you need to add `--native` parameter
 If you need only one certain test, you may execute
 
 ```bash
-python3 ./tests/regression.py --only "/regression/e2e.test_operator/test_009*"
+COMPOSE_HTTP_TIMEOUT=1800 python3 ./tests/regression.py --only "/regression/e2e.test_operator/test_009*"
 ```
 
-where `009` may be substituted by the number of the test you need. Tests --- numbers correspondence may be found in `tests/test.py` and `tests/test_operator.py` source code files.
+where `009` may be substituted by the number of the test you need. Tests --- numbers and names correspondence may be found in `tests/regression.py` and `tests/test_*.py` source code files.

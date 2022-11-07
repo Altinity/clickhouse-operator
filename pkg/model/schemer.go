@@ -36,15 +36,10 @@ const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 
 // NewSchemer creates new Schemer object
 func NewSchemer(scheme, username, password, rootCA string, port int) *Schemer {
-	credentials := &clickhouse.ClusterEndpointCredentials{
-		Scheme:   scheme,
-		Username: username,
-		Password: password,
-		RootCA:   rootCA,
-		Port:     port,
-	}
 	return &Schemer{
-		NewCluster().SetEndpointCredentials(credentials),
+		NewCluster().SetClusterConnectionParams(
+			clickhouse.NewClusterConnectionParams(scheme, username, password, rootCA, port),
+		),
 	}
 }
 
@@ -57,11 +52,11 @@ func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
 		return false
 	}
 	if len(hosts) <= 1 {
-		log.V(1).M(host).F().Info("Single host in a cluster. Nothing to create a schema from.")
+		log.V(1).M(host).F().Info("Nothing to create a schema from - single host in the cluster: %v", hosts)
 		return false
 	}
 
-	log.V(1).M(host).F().Info("Should create distributed objects the cluster: %v", hosts)
+	log.V(1).M(host).F().Info("Should create distributed objects in the cluster: %v", hosts)
 	return true
 }
 
@@ -412,7 +407,7 @@ func createTableReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
+			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS'),
 			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
 			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
 		FROM

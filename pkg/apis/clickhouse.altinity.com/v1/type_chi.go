@@ -16,10 +16,13 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math"
 	"strings"
 
 	"github.com/imdario/mergo"
+	"gopkg.in/yaml.v3"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
@@ -27,27 +30,21 @@ import (
 
 // FillStatus fills .Status
 func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string) {
-	chi.Status.CHOpVersion = version.Version
-	chi.Status.CHOpCommit = version.GitSHA
-	chi.Status.CHOpDate = version.BuiltAt
-	chi.Status.CHOpIP = ip
-	chi.Status.ClustersCount = chi.ClustersCount()
-	chi.Status.ShardsCount = chi.ShardsCount()
-	chi.Status.HostsCount = chi.HostsCount()
-	chi.Status.TaskID = *chi.Spec.TaskID
-	chi.Status.UpdatedHostsCount = 0
-	chi.Status.DeleteHostsCount = 0
-	chi.Status.DeletedHostsCount = 0
-	chi.Status.Pods = pods
-	chi.Status.FQDNs = fqdns
-	chi.Status.Endpoint = endpoint
-	chi.Status.NormalizedCHI = &ClickHouseInstallation{
-		TypeMeta:   chi.TypeMeta,
-		ObjectMeta: chi.ObjectMeta,
-		Spec:       chi.Spec,
-		// Skip status
-	}
-	chi.Status.NormalizedCHICompleted = chi.Status.NormalizedCHI
+	chi.EnsureStatus().CHOpVersion = version.Version
+	chi.EnsureStatus().CHOpCommit = version.GitSHA
+	chi.EnsureStatus().CHOpDate = version.BuiltAt
+	chi.EnsureStatus().CHOpIP = ip
+	chi.EnsureStatus().ClustersCount = chi.ClustersCount()
+	chi.EnsureStatus().ShardsCount = chi.ShardsCount()
+	chi.EnsureStatus().HostsCount = chi.HostsCount()
+	chi.EnsureStatus().TaskID = *chi.Spec.TaskID
+	chi.EnsureStatus().UpdatedHostsCount = 0
+	chi.EnsureStatus().DeleteHostsCount = 0
+	chi.EnsureStatus().DeletedHostsCount = 0
+	chi.EnsureStatus().Pods = pods
+	chi.EnsureStatus().FQDNs = fqdns
+	chi.EnsureStatus().Endpoint = endpoint
+	chi.EnsureStatus().NormalizedCHI = chi.CopyFiltered(true, true)
 }
 
 // FillSelfCalculatedAddressInfo calculates and fills address info
@@ -472,9 +469,6 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	// Do actual merge for Spec
 	(&chi.Spec).MergeFrom(&from.Spec, _type)
 
-	// Copy Status for now
-	chi.Status = from.Status
-
 	// Copy service attributes
 	chi.Attributes = from.Attributes
 }
@@ -673,7 +667,7 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 
 // IsStopped checks whether CHI is stopped
 func (chi *ClickHouseInstallation) IsStopped() bool {
-	return util.IsStringBoolTrue(chi.Spec.Stop)
+	return chi.Spec.Stop.Value()
 }
 
 // Restart const presents possible values for .spec.restart
@@ -696,7 +690,7 @@ func (chi *ClickHouseInstallation) IsNoRestartSpecified() bool {
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
 func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
-	return util.IsStringBoolTrue(chi.Spec.Troubleshoot)
+	return chi.Spec.Troubleshoot.Value()
 }
 
 // GetReconciling gets reconciling spec
@@ -705,4 +699,67 @@ func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 		return nil
 	}
 	return chi.Spec.Reconciling
+}
+
+func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *ClickHouseInstallation {
+	if chi == nil {
+		return nil
+	}
+	jsonBytes, err := json.Marshal(chi)
+	if err != nil {
+		return nil
+	}
+
+	var chi2 ClickHouseInstallation
+	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+		return nil
+	}
+
+	if status {
+		chi2.Status = nil
+	}
+
+	if managedFields {
+		chi2.ObjectMeta.ManagedFields = nil
+	}
+
+	return &chi2
+}
+
+func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
+	if chi == nil {
+		return ""
+	}
+
+	filtered := chi.CopyFiltered(status, managedFields)
+	jsonBytes, err := json.MarshalIndent(filtered, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("unable to parse. err: %v", err)
+	}
+	return string(jsonBytes)
+
+}
+
+func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
+	if chi == nil {
+		return ""
+	}
+
+	filtered := chi.CopyFiltered(status, managedFields)
+	yamlBytes, err := yaml.Marshal(filtered)
+	if err != nil {
+		return fmt.Sprintf("unable to parse. err: %v", err)
+	}
+	return string(yamlBytes)
+}
+
+func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
+	if chi == nil {
+		return nil
+	}
+	if chi.Status == nil {
+		chi.Status = &ChiStatus{}
+	}
+
+	return chi.Status
 }

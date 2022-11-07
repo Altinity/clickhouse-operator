@@ -1,0 +1,10 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-034-chopconf"
+spec:
+  clickhouse:
+    access:
+      # Port where to connect to ClickHouse instances to
+      scheme: https
+      port: 8443

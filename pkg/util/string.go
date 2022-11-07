@@ -20,142 +20,32 @@ import (
 	// It is good enough for string ID
 	"crypto/sha1"
 	"encoding/hex"
-	"strings"
+	"math/rand"
+	"time"
 )
 
-// Set of string boolean constants
-const (
-	StringBool0                    = "0"
-	StringBool1                    = "1"
-	StringBoolFalseFirstCapital    = "False"
-	StringBoolFalseLowercase       = "false"
-	StringBoolTrueFirstCapital     = "True"
-	StringBoolTrueLowercase        = "true"
-	StringBoolNoFirstCapital       = "No"
-	StringBoolNoLowercase          = "no"
-	StringBoolYesFirstCapital      = "Yes"
-	StringBoolYesLowercase         = "yes"
-	StringBoolOffFirstCapital      = "Off"
-	StringBoolOffLowercase         = "off"
-	StringBoolOnFirstCapital       = "On"
-	StringBoolOnLowercase          = "on"
-	StringBoolDisableFirstCapital  = "Disable"
-	StringBoolDisableLowercase     = "disable"
-	StringBoolEnableFirstCapital   = "Enable"
-	StringBoolEnableLowercase      = "enable"
-	StringBoolDisabledFirstCapital = "Disabled"
-	StringBoolDisabledLowercase    = "disabled"
-	StringBoolEnabledFirstCapital  = "Enabled"
-	StringBoolEnabledLowercase     = "enabled"
-)
-
-// IsStringBool checks whether str is a string as bool value
-func IsStringBool(str string) bool {
-	switch strings.ToLower(str) {
-	case
-		StringBool0,
-		StringBool1,
-
-		StringBoolFalseLowercase,
-		StringBoolTrueLowercase,
-
-		StringBoolNoLowercase,
-		StringBoolYesLowercase,
-
-		StringBoolOffLowercase,
-		StringBoolOnLowercase,
-
-		StringBoolDisableLowercase,
-		StringBoolEnableLowercase,
-
-		StringBoolDisabledLowercase,
-		StringBoolEnabledLowercase:
-		return true
-
-	default:
-		return false
-	}
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }
 
-// IsStringBoolFalse checks whether str is a string as bool "false" value
-func IsStringBoolFalse(str string) bool {
-	switch strings.ToLower(str) {
-	case
-		StringBool0,
-		StringBoolFalseLowercase,
-		StringBoolNoLowercase,
-		StringBoolOffLowercase,
-		StringBoolDisableLowercase,
-		StringBoolDisabledLowercase:
-		return true
+// randStringBytes specifies bytes that could be used by RandString generator
+const randStringBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-	default:
-		return false
+// RandString generates random string of specified length
+func RandString(length int) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = randStringBytes[rand.Intn(len(randStringBytes))]
 	}
+	return string(b)
 }
 
-// IsStringBoolTrue checks whether str is a string as bool "true" value
-func IsStringBoolTrue(str string) bool {
-	switch strings.ToLower(str) {
-	case
-		StringBool1,
-		StringBoolTrueLowercase,
-		StringBoolYesLowercase,
-		StringBoolOnLowercase,
-		StringBoolEnableLowercase,
-		StringBoolEnabledLowercase:
-		return true
-
-	default:
-		return false
-	}
+// RandStringRange specifies random string with length in specified range
+func RandStringRange(minLength, maxLength int) string {
+	return RandString(rand.Intn(maxLength-minLength+1) + minLength)
 }
 
-// CastStringBoolTo01 casts string-bool into string "0/1"
-func CastStringBoolTo01(str string, defaultValue bool) string {
-	// True and False string values
-	_true := StringBool1
-	_false := StringBool0
-
-	if IsStringBoolTrue(str) {
-		return _true
-	}
-	if IsStringBoolFalse(str) {
-		return _false
-	}
-
-	// String value unrecognized, return default value
-
-	if defaultValue {
-		return _true
-	}
-
-	return _false
-}
-
-// CastStringBoolToStringTrueFalse casts string-bool into string "true/false"
-func CastStringBoolToStringTrueFalse(str string, defaultValue bool) string {
-	// True and False values
-	_true := StringBoolTrueLowercase
-	_false := StringBoolFalseLowercase
-
-	if IsStringBoolTrue(str) {
-		return _true
-	}
-	if IsStringBoolFalse(str) {
-		return _false
-	}
-
-	// String value unrecognized, return default value
-
-	if defaultValue {
-		return _true
-	}
-
-	return _false
-}
-
-// CreateStringID creates HEX hash ID out of string.
+// CreateStringID creates HEX hash ID out of a string.
 // In case maxHashLen == 0 the whole hash is returned
 func CreateStringID(str string, maxHashLen int) string {
 	// #nosec

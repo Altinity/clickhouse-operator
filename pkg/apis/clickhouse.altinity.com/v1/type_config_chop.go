@@ -57,6 +57,10 @@ const (
 	defaultChPort     = 8123
 	defaultChRootCA   = ""
 
+	// Timeouts used to limit connection and queries from the operator to ClickHouse instances. In seconds
+	defaultTimeoutConnect = 2
+	defaultTimeoutQuery   = 5
+
 	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
 	defaultReconcileThreadsNumber = 1
@@ -72,6 +76,12 @@ const (
 	defaultTerminationGracePeriod = 30
 	// defaultRevisionHistoryLimit specifies default value for RevisionHistoryLimit
 	defaultRevisionHistoryLimit = 10
+)
+
+// Username/password replacers
+const (
+	UsernameReplacer = "***"
+	PasswordReplacer = "***"
 )
 
 // OperatorConfig specifies operator configuration
@@ -109,15 +119,15 @@ type OperatorConfigFile struct {
 		User   string `json:"user"   yaml:"user"`
 	} `json:"path" yaml:"path"`
 
-	Runtime OperatorConfigFileRuntime
+	Runtime OperatorConfigFileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 }
 
 // OperatorConfigFileRuntime specifies runtime section
 type OperatorConfigFileRuntime struct {
 	// OperatorConfig files fetched from paths specified above. Maps "file name->file content"
-	CommonConfigFiles map[string]string
-	HostConfigFiles   map[string]string
-	UsersConfigFiles  map[string]string
+	CommonConfigFiles map[string]string `json:"commonConfigFiles,omitempty" yaml:"commonConfigFiles,omitempty"`
+	HostConfigFiles   map[string]string `json:"hostConfigFiles,omitempty"   yaml:"hostConfigFiles,omitempty"`
+	UsersConfigFiles  map[string]string `json:"usersConfigFiles,omitempty"  yaml:"usersConfigFiles,omitempty"`
 }
 
 // OperatorConfigUser specifies User section
@@ -132,10 +142,10 @@ type OperatorConfigDefault struct {
 	// 2. user/quota - string
 	// 3. user/networks/ip - multiple strings
 	// 4. user/password - string
-	Profile    string   `json:"profile"   yaml:"profile"`
-	Quota      string   `json:"quota"     yaml:"quota"`
+	Profile    string   `json:"profile"    yaml:"profile"`
+	Quota      string   `json:"quota"      yaml:"quota"`
 	NetworksIP []string `json:"networksIP" yaml:"networksIP"`
-	Password   string   `json:"password"  yaml:"password"`
+	Password   string   `json:"password"   yaml:"password"`
 }
 
 // OperatorConfigClickHouse specifies ClickHouse section
@@ -148,27 +158,35 @@ type OperatorConfigClickHouse struct {
 		// 1. Metrics requests
 		// 2. Schema maintenance
 		// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-		Scheme   string `json:"scheme"   yaml:"scheme"`
-		Username string `json:"username" yaml:"username"`
-		Password string `json:"password" yaml:"password"`
-		RootCA   string `json:"rootCA"   yaml:"rootCA"`
+		Scheme   string `json:"scheme,omitempty"   yaml:"scheme,omitempty"`
+		Username string `json:"username,omitempty" yaml:"username,omitempty"`
+		Password string `json:"password,omitempty" yaml:"password,omitempty"`
+		RootCA   string `json:"rootCA,omitempty"   yaml:"rootCA,omitempty"`
 
 		// Location of k8s Secret with username and password to be used by the operator to connect to ClickHouse instances
 		// Can be used instead of explicitly specified (above) username and password
 		Secret struct {
-			Namespace string `json:"namespace" yaml:"namespace"`
-			Name      string `json:"name"      yaml:"name"`
+			Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+			Name      string `json:"name,omitempty"      yaml:"name,omitempty"`
 
 			Runtime struct {
 				// Username and Password to be used by operator to connect to ClickHouse instances
 				// extracted from k8s secret specified above.
 				Username string
 				Password string
+				Fetched  bool
+				Error    string
 			}
 		} `json:"secret" yaml:"secret"`
 
 		// Port where to connect to ClickHouse instances to
 		Port int `json:"port" yaml:"port"`
+
+		// Timeouts used to limit connection and queries from the operator to ClickHouse instances
+		Timeouts struct {
+			Connect time.Duration `json:"connect" yaml:"connect"`
+			Query   time.Duration `json:"query"   yaml:"query"`
+		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"access" yaml:"access"`
 }
 
@@ -182,13 +200,13 @@ type OperatorConfigCHI struct {
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	Path string `json:"path" yaml:"path"`
 
-	Runtime OperatorConfigCHIRuntime
+	Runtime OperatorConfigCHIRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
 }
 
 // OperatorConfigCHIRuntime specifies chi runtime section
 type OperatorConfigCHIRuntime struct {
 	// CHI template files fetched from the path specified above. Maps "file name->file content"
-	TemplateFiles map[string]string
+	TemplateFiles map[string]string `json:"templateFiles,omitempty" yaml:"templateFiles,omitempty"`
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
 	// ClickHouseInstallation template
@@ -215,9 +233,9 @@ type OperatorConfigReconcile struct {
 
 	Host struct {
 		Wait struct {
-			Exclude bool `json:"exclude" yaml:"exclude"`
-			Include bool `json:"include" yaml:"include"`
-		} `json:"host" yaml:"host"`
+			Exclude StringBool `json:"exclude" yaml:"exclude"`
+			Include StringBool `json:"include" yaml:"include"`
+		} `json:"wait" yaml:"wait"`
 	} `json:"host" yaml:"host"`
 }
 
@@ -235,11 +253,11 @@ type OperatorConfigLabel struct {
 	Exclude []string `json:"exclude" yaml:"exclude"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	AppendScopeString string `json:"appendScope" yaml:"appendScope"`
+	AppendScopeString StringBool `json:"appendScope" yaml:"appendScope"`
 
 	Runtime struct {
-		AppendScope bool
-	}
+		AppendScope bool `json:"appendScope" yaml:"appendScope"`
+	} `json:"runtime" yaml:"runtime"`
 }
 
 // OperatorConfig specifies operator config
@@ -360,7 +378,7 @@ type OperatorConfig struct {
 	ExcludeFromPropagationLabels []string `json:"excludeFromPropagationLabels" yaml:"excludeFromPropagationLabels"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	AppendScopeLabelsString string `json:"appendScopeLabels" yaml:"appendScopeLabels"`
+	AppendScopeLabelsString StringBool `json:"appendScopeLabels" yaml:"appendScopeLabels"`
 
 	// Grace period for Pod termination.
 	TerminationGracePeriod int `json:"terminationGracePeriod" yaml:"terminationGracePeriod"`
@@ -674,6 +692,20 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	if c.ClickHouse.Access.Port == 0 {
 		c.ClickHouse.Access.Port = defaultChPort
 	}
+
+	// Timeouts
+
+	if c.ClickHouse.Access.Timeouts.Connect == 0 {
+		c.ClickHouse.Access.Timeouts.Connect = defaultTimeoutConnect
+	}
+	// Adjust seconds to time.Duration
+	c.ClickHouse.Access.Timeouts.Connect = c.ClickHouse.Access.Timeouts.Connect * time.Second
+
+	if c.ClickHouse.Access.Timeouts.Query == 0 {
+		c.ClickHouse.Access.Timeouts.Query = defaultTimeoutQuery
+	}
+	// Adjust seconds to time.Duration
+	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
 }
 
 func (c *OperatorConfig) normalizeLogSection() {
@@ -700,7 +732,7 @@ func (c *OperatorConfig) normalizeLabelsSection() {
 	//config.IncludeIntoPropagationLabels
 	//config.ExcludeFromPropagationLabels
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	c.Label.Runtime.AppendScope = util.IsStringBoolTrue(c.Label.AppendScopeString)
+	c.Label.Runtime.AppendScope = c.Label.AppendScopeString.Value()
 }
 
 func (c *OperatorConfig) normalizePodManagementSection() {
@@ -807,11 +839,17 @@ func (c *OperatorConfig) String(hideCredentials bool) string {
 	conf := c
 	if hideCredentials {
 		conf = c.DeepCopy()
-		conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
-		conf.ClickHouse.Access.Username = UsernameReplacer
-		conf.ClickHouse.Access.Password = PasswordReplacer
-		conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
-		conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
+		if conf.ClickHouse.Config.User.Default.Password != "" {
+			conf.ClickHouse.Config.User.Default.Password = PasswordReplacer
+		}
+		//conf.ClickHouse.Access.Username = UsernameReplacer
+		if conf.ClickHouse.Access.Password != "" {
+			conf.ClickHouse.Access.Password = PasswordReplacer
+		}
+		//conf.ClickHouse.Access.Secret.Runtime.Username = UsernameReplacer
+		if conf.ClickHouse.Access.Secret.Runtime.Password != "" {
+			conf.ClickHouse.Access.Secret.Runtime.Password = PasswordReplacer
+		}
 
 		// DEPRECATED
 		conf.CHConfigUserDefaultPassword = PasswordReplacer
@@ -998,10 +1036,10 @@ func (c *OperatorConfig) move() {
 		c.Reconcile.Runtime.ThreadsNumber = c.ReconcileThreadsNumber
 	}
 	if c.ReconcileWaitExclude {
-		c.Reconcile.Host.Wait.Exclude = c.ReconcileWaitExclude
+		c.Reconcile.Host.Wait.Exclude = c.Reconcile.Host.Wait.Exclude.From(c.ReconcileWaitExclude)
 	}
 	if c.ReconcileWaitInclude {
-		c.Reconcile.Host.Wait.Include = c.ReconcileWaitInclude
+		c.Reconcile.Host.Wait.Include = c.Reconcile.Host.Wait.Include.From(c.ReconcileWaitInclude)
 	}
 
 	// When transferring annotations from the chi/chit.metadata to CHI objects, use these filters.

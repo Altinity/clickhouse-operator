@@ -31,21 +31,19 @@ type Timeouts struct {
 	query time.Duration
 }
 
-// TimeLimitedConnector specifies interface to operate with timeouts on connection
-type TimeLimitedConnector interface {
-	GetConnectTimeout() time.Duration
-	SetConnectTimeout(timeout time.Duration)
-	GetQueryTimeout() time.Duration
-	SetQueryTimeout(timeout time.Duration)
-}
-
-var _ TimeLimitedConnector = &Timeouts{}
-
 // NewTimeouts creates new set of timeouts
-func NewTimeouts() *Timeouts {
+func NewTimeouts(timeouts ...time.Duration) *Timeouts {
+	connectTimeout := defaultConnectTimeout
+	queryTimeout := defaultQueryTimeout
+	if len(timeouts) > 0 {
+		connectTimeout = timeouts[0]
+	}
+	if len(timeouts) > 1 {
+		queryTimeout = timeouts[1]
+	}
 	return &Timeouts{
-		connect: defaultConnectTimeout,
-		query:   defaultQueryTimeout,
+		connect: connectTimeout,
+		query:   queryTimeout,
 	}
 }
 
@@ -58,11 +56,12 @@ func (t *Timeouts) GetConnectTimeout() time.Duration {
 }
 
 // SetConnectTimeout sets connect timeout
-func (t *Timeouts) SetConnectTimeout(timeout time.Duration) {
+func (t *Timeouts) SetConnectTimeout(timeout time.Duration) *Timeouts {
 	if t == nil {
-		return
+		return nil
 	}
 	t.connect = timeout
+	return t
 }
 
 // GetQueryTimeout gets query timeout
@@ -74,9 +73,10 @@ func (t *Timeouts) GetQueryTimeout() time.Duration {
 }
 
 // SetQueryTimeout sets query timeout
-func (t *Timeouts) SetQueryTimeout(timeout time.Duration) {
+func (t *Timeouts) SetQueryTimeout(timeout time.Duration) *Timeouts {
 	if t == nil {
-		return
+		return nil
 	}
 	t.query = timeout
+	return t
 }

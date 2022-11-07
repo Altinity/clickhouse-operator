@@ -31,11 +31,12 @@ kubectl create namespace "${PROMETHEUS_NAMESPACE}" || true
 BASE_PATH="https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/${PROMETHEUS_OPERATOR_BRANCH}"
 
 echo "Setup prometheus-operator into '${PROMETHEUS_NAMESPACE}' namespace."
+# whole bundle
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f  <( \
     wget -qO- "${BASE_PATH}"/bundle.yaml | \
     sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" \
 )
-
+# modify deployment
 kubectl --namespace="${PROMETHEUS_NAMESPACE}" apply --server-side --validate="${VALIDATE_YAML}" -f  <( \
     wget -qO- "${BASE_PATH}"/bundle.yaml | \
     sed "s/namespace: default/namespace: ${PROMETHEUS_NAMESPACE}/" | \

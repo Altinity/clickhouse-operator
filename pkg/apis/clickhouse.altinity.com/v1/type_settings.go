@@ -17,13 +17,14 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"math"
 	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (

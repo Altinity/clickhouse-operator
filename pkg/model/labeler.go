@@ -195,7 +195,7 @@ func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
 	return appendKeyReady(getSelectorClusterScope(cluster))
 }
 
-// getLabelsShardScope gets labels for Shard-scoped object
+// getShardScope gets labels for Shard-scoped object
 func (l *Labeler) getShardScope(shard *chiv1.ChiShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorShardScope(shard)))
@@ -250,10 +250,10 @@ func (l *Labeler) getHostScopeReady(host *chiv1.ChiHost, applySupplementaryServi
 	return appendKeyReady(l.getHostScope(host, applySupplementaryServiceLabels))
 }
 
-// getHostScopeReclaimPolicy
+// getHostScopeReclaimPolicy gets host scope labels with PVCReclaimPolicy from template
 func (l *Labeler) getHostScopeReclaimPolicy(host *chiv1.ChiHost, template *chiv1.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
 	return util.MergeStringMapsOverwrite(l.getHostScope(host, applySupplementaryServiceLabels), map[string]string{
-		LabelPVCReclaimPolicyName: template.PVCReclaimPolicy.String(),
+		LabelPVCReclaimPolicyName: getPVCReclaimPolicy(host, template).String(),
 	})
 }
 

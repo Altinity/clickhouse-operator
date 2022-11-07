@@ -50,6 +50,18 @@ spec:
     replicasUseFQDN: "no"
     distributedDDL:
       profile: default
+    storageManagement:
+      # Specify PVC provisioner.
+      # 1. StatefulSet. PVC would be provisioned by the StatefulSet
+      # 2. Operator. PVC would be provisioned by the operator
+      provisioner: StatefulSet
+
+      # Specify PVC reclaim policy.
+      # 1. Retain. Keep PVC from being deleted
+      #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+      # 2. Delete
+      reclaimPolicy: Retain
+
     templates:
       hostTemplate: host-template-custom-ports
       podTemplate: clickhouse-v22.2
@@ -207,13 +219,33 @@ spec:
                     logVolumeClaimTemplate: default-volume-claim
                     replicaServiceTemplate: replica-service-template
 
+      - name: with-secret
+        # shared secret value to secure cluster communications
+        secret:
+          # Auto-generate shared secret value to secure cluster communications
+          auto: "True"
+          # Cluster shared secret value in plain text
+          value: "plaintext secret"
+          # Cluster shared secret source
+          valueFrom:
+            secretKeyRef:
+              name: "SecretName"
+              key: "Key"
+        layout:
+          shardsCount: 2
+
   templates:
     hostTemplates:
       - name: host-template-custom-ports
+        portDistribution:
+          - type: "ClusterScopeIndex"
         spec:
           tcpPort: 7000
           httpPort: 7001
           interserverHTTPPort: 7002
+          #settings:
+          #files:
+          #templates:
 
     serviceTemplates:
       - name: chi-service-template
@@ -319,6 +351,21 @@ spec:
 
     volumeClaimTemplates:
       - name: default-volume-claim
+        # Specify PVC provisioner.
+        # 1. StatefulSet. PVC would be provisioned by the StatefulSet
+        # 2. Operator. PVC would be provisioned by the operator
+        provisioner: StatefulSet
+
+        # Specify PVC reclaim policy.
+        # 1. Retain. Keep PVC from being deleted
+        #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        # 2. Delete
+        reclaimPolicy: Retain
+
+        # type ObjectMeta struct from k8s.io/core/v1
+        metadata:
+          labels:
+            a: "b"
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass
@@ -332,10 +379,23 @@ spec:
           resources:
             requests:
               storage: 1Gi
+
       - name: volume-claim-retain-pvc
-        # Keep PVC from being deleted
-        # Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        # Specify PVC provisioner.
+        # 1. StatefulSet. PVC would be provisioned by the StatefulSet
+        # 2. Operator. PVC would be provisioned by the operator
+        provisioner: StatefulSet
+
+        # Specify PVC reclaim policy.
+        # 1. Retain. Keep PVC from being deleted
+        #    Retaining PVC will also keep backing PV from deletion. This is useful in case we need to keep data intact.
+        # 2. Delete
         reclaimPolicy: Retain
+
+        # type ObjectMeta struct from k8s.io/core/v1
+        metadata:
+          labels:
+            a: "b"
         # type PersistentVolumeClaimSpec struct from k8s.io/core/v1
         spec:
           # 1. If storageClassName is not specified, default StorageClass

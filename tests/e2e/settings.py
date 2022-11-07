@@ -18,10 +18,14 @@ def get_docker_compose_path():
     docker_compose_file_path = os.path.join(docker_compose_project_dir, "docker-compose.yml")
     return docker_compose_file_path, docker_compose_project_dir
 
+# apply | replace
+kubectl_mode = os.getenv('KUBECTL_MODE') \
+    if 'KUBECTL_MODE' in os.environ \
+    else 'apply'
 
 kubectl_cmd = "kubectl" \
     if current().context.native \
-    else f"docker-compose -f {get_docker_compose_path()[0]} exec runner kubectl"
+    else f"docker-compose -f {get_docker_compose_path()[0]} exec -T runner kubectl"
 
 kubectl_cmd = os.getenv('KUBECTL_CMD') \
     if 'KUBECTL_CMD' in os.environ \
@@ -35,7 +39,7 @@ operator_version = os.getenv('OPERATOR_VERSION') \
     else open(os.path.join(pathlib.Path(__file__).parent.absolute(), "../../release")).read(1024).strip(" \r\n\t")
 operator_namespace = os.getenv('OPERATOR_NAMESPACE') \
     if 'OPERATOR_NAMESPACE' in os.environ \
-    else 'kube-system'
+    else test_namespace
 operator_install = os.getenv('OPERATOR_INSTALL') \
     if 'OPERATOR_INSTALL' in os.environ \
     else 'yes'
@@ -60,15 +64,16 @@ image_pull_policy = os.getenv('IMAGE_PULL_POLICY') \
 # clickhouse_template = "manifests/chit/tpl-clickhouse-20.3.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-20.8.yaml"
 # clickhouse_template = "manifests/chit/tpl-clickhouse-21.3.yaml"
-# clickhouse_template = "manifests/chit/tpl-clickhouse-22.7.yaml"
-clickhouse_template = "manifests/chit/tpl-clickhouse-22.7.yaml"
+# clickhouse_template = "manifests/chit/tpl-clickhouse-21.8.yaml"
+# clickhouse_template = "manifests/chit/tpl-clickhouse-22.3.yaml"
+clickhouse_template = "manifests/chit/tpl-clickhouse-22.8.yaml"
 clickhouse_template_old = "manifests/chit/tpl-clickhouse-22.3.yaml"
 
 clickhouse_version = get_ch_version(clickhouse_template)
 clickhouse_version_old = get_ch_version(clickhouse_template_old)
 
 prometheus_namespace = "prometheus"
-prometheus_operator_version = "0.50"
+prometheus_operator_version = "0.57"
 prometheus_scrape_interval = 10
 
 minio_version = "latest"

@@ -26,11 +26,11 @@ type ChiStatus struct {
 	CHOpCommit             string                  `json:"chop-commit,omitempty"         yaml:"chop-commit,omitempty"`
 	CHOpDate               string                  `json:"chop-date,omitempty"           yaml:"chop-date,omitempty"`
 	CHOpIP                 string                  `json:"chop-ip,omitempty"             yaml:"chop-ip,omitempty"`
-	ClustersCount          int                     `json:"clusters"                      yaml:"clusters"`
-	ShardsCount            int                     `json:"shards"                        yaml:"shards"`
-	ReplicasCount          int                     `json:"replicas"                      yaml:"replicas"`
-	HostsCount             int                     `json:"hosts"                         yaml:"hosts"`
-	Status                 string                  `json:"status"                        yaml:"status"`
+	ClustersCount          int                     `json:"clusters,omitempty"            yaml:"clusters,omitempty"`
+	ShardsCount            int                     `json:"shards,omitempty"              yaml:"shards,omitempty"`
+	ReplicasCount          int                     `json:"replicas,omitempty"            yaml:"replicas,omitempty"`
+	HostsCount             int                     `json:"hosts,omitempty"               yaml:"hosts,omitempty"`
+	Status                 string                  `json:"status,omitempty"              yaml:"status,omitempty"`
 	TaskID                 string                  `json:"taskID,omitempty"              yaml:"taskID,omitempty"`
 	TaskIDsStarted         []string                `json:"taskIDsStarted,omitempty"      yaml:"taskIDsStarted,omitempty"`
 	TaskIDsCompleted       []string                `json:"taskIDsCompleted,omitempty"    yaml:"taskIDsCompleted,omitempty"`
@@ -51,14 +51,25 @@ type ChiStatus struct {
 }
 
 const (
-	maxActions = 100
-	maxErrors  = 100
-	maxTaskIDs = 100
+	maxActions = 10
+	maxErrors  = 10
+	maxTaskIDs = 10
 )
 
 // PushAction pushes action into status
 func (s *ChiStatus) PushAction(action string) {
+	if s == nil {
+		return
+	}
 	s.Actions = append([]string{action}, s.Actions...)
+	s.TrimActions()
+}
+
+// TripActions trims actions
+func (s *ChiStatus) TrimActions() {
+	if s == nil {
+		return
+	}
 	if len(s.Actions) > maxActions {
 		s.Actions = s.Actions[:maxActions]
 	}
@@ -66,6 +77,9 @@ func (s *ChiStatus) PushAction(action string) {
 
 // PushError sets and pushes error into status
 func (s *ChiStatus) PushError(error string) {
+	if s == nil {
+		return
+	}
 	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
 		s.Errors = s.Errors[:maxErrors]
@@ -74,6 +88,9 @@ func (s *ChiStatus) PushError(error string) {
 
 // SetAndPushError sets and pushes error into status
 func (s *ChiStatus) SetAndPushError(error string) {
+	if s == nil {
+		return
+	}
 	s.Error = error
 	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
@@ -83,6 +100,9 @@ func (s *ChiStatus) SetAndPushError(error string) {
 
 // PushTaskIDStarted pushes task id into status
 func (s *ChiStatus) PushTaskIDStarted() {
+	if s == nil {
+		return
+	}
 	s.TaskIDsStarted = append([]string{s.TaskID}, s.TaskIDsStarted...)
 	if len(s.TaskIDsStarted) > maxTaskIDs {
 		s.TaskIDsStarted = s.TaskIDsStarted[:maxTaskIDs]
@@ -91,6 +111,9 @@ func (s *ChiStatus) PushTaskIDStarted() {
 
 // PushTaskIDCompleted pushes task id into status
 func (s *ChiStatus) PushTaskIDCompleted() {
+	if s == nil {
+		return
+	}
 	s.TaskIDsCompleted = append([]string{s.TaskID}, s.TaskIDsCompleted...)
 	if len(s.TaskIDsCompleted) > maxTaskIDs {
 		s.TaskIDsCompleted = s.TaskIDsCompleted[:maxTaskIDs]
@@ -99,6 +122,9 @@ func (s *ChiStatus) PushTaskIDCompleted() {
 
 // ReconcileStart marks reconcile start
 func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
+	if s == nil {
+		return
+	}
 	s.Status = StatusInProgress
 	s.UpdatedHostsCount = 0
 	s.AddedHostsCount = 0
@@ -108,7 +134,10 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 }
 
 // ReconcileComplete marks reconcile completion
-func (s *ChiStatus) ReconcileComplete(chi *ClickHouseInstallation) {
+func (s *ChiStatus) ReconcileComplete() {
+	if s == nil {
+		return
+	}
 	s.Status = StatusCompleted
 	s.Action = ""
 	s.PushTaskIDCompleted()
@@ -116,6 +145,9 @@ func (s *ChiStatus) ReconcileComplete(chi *ClickHouseInstallation) {
 
 // DeleteStart marks deletion start
 func (s *ChiStatus) DeleteStart() {
+	if s == nil {
+		return
+	}
 	s.Status = StatusTerminating
 	s.UpdatedHostsCount = 0
 	s.AddedHostsCount = 0
@@ -132,21 +164,36 @@ type CopyCHIStatusOptions struct {
 	WholeStatus bool
 }
 
+func (s *ChiStatus) MergeActions(from *ChiStatus) {
+	if s == nil {
+		return
+	}
+	if from == nil {
+		return
+	}
+	s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
+	sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
+	s.TrimActions()
+}
+
 func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
+	if s == nil {
+		return
+	}
+
+	if from == nil {
+		return
+	}
+
 	if opts.Actions {
 		s.Action = from.Action
-		s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
-		sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
+		s.MergeActions(from)
 	}
 
 	if opts.Errors {
 		s.Error = from.Error
 		s.Errors = util.MergeStringArrays(s.Errors, from.Errors)
 		sort.Sort(sort.Reverse(sort.StringSlice(s.Errors)))
-	}
-
-	if opts.Normalized {
-		s.NormalizedCHI = from.NormalizedCHI
 	}
 
 	if opts.MainFields {
@@ -163,7 +210,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.TaskIDsStarted = from.TaskIDsStarted
 		s.TaskIDsCompleted = from.TaskIDsCompleted
 		s.Action = from.Action
-		s.Actions = from.Actions
+		s.MergeActions(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
 		s.UpdatedHostsCount = from.UpdatedHostsCount
@@ -176,6 +223,10 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.Endpoint = from.Endpoint
 		s.NormalizedCHI = from.NormalizedCHI
 
+	}
+
+	if opts.Normalized {
+		s.NormalizedCHI = from.NormalizedCHI
 	}
 
 	if opts.WholeStatus {
@@ -192,7 +243,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.TaskIDsStarted = from.TaskIDsStarted
 		s.TaskIDsCompleted = from.TaskIDsCompleted
 		s.Action = from.Action
-		s.Actions = from.Actions
+		s.MergeActions(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
 		s.UpdatedHostsCount = from.UpdatedHostsCount
@@ -206,4 +257,53 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.NormalizedCHI = from.NormalizedCHI
 		s.NormalizedCHICompleted = from.NormalizedCHICompleted
 	}
+}
+
+func (s *ChiStatus) GetFQDNs() []string {
+	if s == nil {
+		return nil
+	}
+	return s.FQDNs
+}
+
+func (s *ChiStatus) GetCHOpIP() string {
+	if s == nil {
+		return ""
+	}
+	return s.CHOpIP
+}
+
+func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
+	if s == nil {
+		return nil
+	}
+	return s.NormalizedCHICompleted
+}
+
+func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
+	if s == nil {
+		return nil
+	}
+	return s.NormalizedCHI
+}
+
+func (s *ChiStatus) GetStatus() string {
+	if s == nil {
+		return ""
+	}
+	return s.Status
+}
+
+func (s *ChiStatus) GetPods() []string {
+	if s == nil {
+		return nil
+	}
+	return s.Pods
+}
+
+func (s *ChiStatus) GetPodIPS() []string {
+	if s == nil {
+		return nil
+	}
+	return s.PodIPs
 }

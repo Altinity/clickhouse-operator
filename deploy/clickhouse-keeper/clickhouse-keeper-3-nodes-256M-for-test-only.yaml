@@ -136,7 +136,7 @@ spec:
       containers:
         - name: clickhouse-keeper
           imagePullPolicy: Always
-          image: "clickhouse/clickhouse-server:head"
+          image: "clickhouse/clickhouse-keeper:head-alpine"
           resources:
             requests:
               memory: "256M"
@@ -182,21 +182,16 @@ spec:
               } > /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml &&
               cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml && 
               if [[ "1" == "$MY_ID" ]]; then
-                clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml --force-recovery
+                clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml --force-recovery
               else
-                clickhouse keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
+                clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
               fi
-          readinessProbe:
-            tcpSocket:
-              port: 9444
-            timeoutSeconds: 5
-            periodSeconds: 60
-            failureThreshold: 3
-          livenessProbe:
-            tcpSocket:
-              port: 2181
-            timeoutSeconds: 5
-            periodSeconds: 30
+#          readinessProbe:
+#            tcpSocket:
+#              port: 9444
+#            timeoutSeconds: 5
+#            periodSeconds: 60
+#            failureThreshold: 3
         - name: zookeeper-exporter
           imagePullPolicy: IfNotPresent
           image: dabealu/zookeeper-exporter:latest

@@ -33,28 +33,34 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
     if len(cmd_args) > 1:
         cmd += " ".join(cmd_args[1:])
 
+    # save command for debug purposes
+    command = cmd
     # print(f"run command: {cmd}")
 
+    return run_shell(cmd, timeout, ok_to_fail)
+
+
+def run_shell(cmd, timeout=600, ok_to_fail=False):
     # Run command
     if hasattr(current().context, "shell"):
-        cmd = current().context.shell(cmd, timeout=timeout)
+        res_cmd = current().context.shell(cmd, timeout=timeout)
     else:
-        cmd = shell(cmd, timeout=timeout)
-
+        res_cmd = shell(cmd, timeout=timeout)
     # Check command failure
-    code = cmd.exitcode
+    code = res_cmd.exitcode
     if not ok_to_fail:
         if code != 0:
-            print(f"command failed, output:\n{cmd.output}")
-            debug(f"command failed, output:\n{cmd.output}")
+            print(f"command failed, command:\n{cmd}")
+            print(f"command failed, exit code:\n{code}")
+            print(f"command failed, output :\n{res_cmd.output}")
         assert code == 0, error()
     # Command test result
-    return cmd.output if (code == 0) or ok_to_fail else ""
+    return res_cmd.output if (code == 0) or ok_to_fail else ""
 
 
 def delete_chi(chi, ns=namespace, wait=True, ok_to_fail=False):
     with When(f"Delete chi {chi}"):
-        launch(f"delete chi {chi}", ns=ns, timeout=600, ok_to_fail=ok_to_fail)
+        launch(f"delete chi {chi} -v 5 --now --timeout=600s", ns=ns, timeout=600, ok_to_fail=ok_to_fail)
         if wait:
             wait_objects(
                 chi,
@@ -107,7 +113,7 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
             apply(util.get_full_path(t, False), ns=ns)
         time.sleep(5)
 
-    apply(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
+    apply_chi(util.get_full_path(manifest, False), ns=ns, timeout=timeout)
 
     # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
     # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
@@ -157,7 +163,7 @@ def create_ns(ns):
 
 
 def delete_ns(ns, ok_to_fail=False, timeout=600):
-    launch(f"delete ns {ns}", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
+    launch(f"delete ns {ns} -v 5 --now --timeout={timeout}s", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
 
 
 def get_count(kind, name="", label="", ns=namespace):
@@ -174,19 +180,44 @@ def count_objects(label="", ns=namespace):
         "service": get_count("service", ns=ns, label=label),
     }
 
-
 def apply(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is applied"):
+        if " | " not in manifest:
+            manifest = f"\"{manifest}\""
+            launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
+        else:
+            run_shell(f"{manifest} | {kubectl_cmd} apply --namespace={ns} --validate={validate} -f -", timeout=timeout)
+
+def apply_chi(manifest, ns=namespace, validate=True, timeout=600):
+    chi_name = yaml_manifest.get_chi_name(manifest)
+    with When(f"CHI {chi_name} is applied"):
+        if settings.kubectl_mode == "replace":
+            if get_count("chi", chi_name, ns=namespace) == 0:
+                create(manifest, ns=ns, validate=validate, timeout=timeout)
+            else:
+                replace(manifest, ns=ns, validate=validate, timeout=timeout)
+        else:
+            apply(manifest, ns=ns, validate=validate, timeout=timeout)
+
+def create(manifest, ns=namespace, validate=True, timeout=600):
+    with When(f"{manifest} is created"):
         if "<(" not in manifest:
             manifest = f"\"{manifest}\""
-        launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
+        launch(f"create --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
+def replace(manifest, ns=namespace, validate=True, timeout=600):
+    with When(f"{manifest} is replaced"):
+        if "<(" not in manifest:
+            manifest = f"\"{manifest}\""
+        launch(f"replace --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
 def delete(manifest, ns=namespace, timeout=600):
     with When(f"{manifest} is deleted"):
-        if "<(" not in manifest:
+        if " | " not in manifest:
             manifest = f"\"{manifest}\""
-        launch(f"delete -f {manifest}", ns=ns, timeout=timeout)
+            return launch(f"delete -f {manifest}", ns=ns, timeout=timeout)
+        else:
+            run_shell(f"{manifest} | {kubectl_cmd} delete -f -", timeout=timeout)
 
 
 def wait_objects(chi, object_counts, ns=namespace):
