@@ -2927,7 +2927,7 @@ def test_037(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
-                "pod_count": 1,
+                "pod_count": 2,
                 "do_not_delete": 1,
             },
         )
