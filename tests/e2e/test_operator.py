@@ -2948,7 +2948,7 @@ def test_037(self):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
             check={
-                "pod_count": 1,
+                "pod_count": 2,
                 "do_not_delete": 1,
             },
         )
@@ -2962,7 +2962,7 @@ def test_037(self):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
             check={
-                "pod_count": 1,
+                "pod_count": 2,
                 "do_not_delete": 1,
             },
         )
