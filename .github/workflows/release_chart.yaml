@@ -1,7 +1,8 @@
 name: release_chart
 
 on:
-  release: { }
+  release:
+    types: [ published ]
 
 jobs:
   release_chart:
