@@ -72,9 +72,9 @@ spec:
               `increase(chi_clickhouse_event_DNSError[1m])` = {{ with printf "increase(chi_clickhouse_event_DNSError{hostname='%s',exported_namespace='%s'}[1m]) or increase(chi_clickhouse_event_NetworkErrors{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} errors{{ end }}
               Please check DNS settings in `/etc/resolve.conf` and `<remote_servers>` part of `/etc/clickhouse-server/`
               See documentation:
-              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
-              - https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-disable-internal-dns-cache
-              - https://clickhouse.tech/docs/en/query_language/system/#query_language-system-drop-dns-cache
+              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#server-settings-disable-internal-dns-cache
+              - https://clickhouse.com/docs/en/sql-reference/statements/system/
 
         - alert: ClickHouseDistributedFilesToInsertHigh
           expr: chi_clickhouse_metric_DistributedFilesToInsert > 50
@@ -89,7 +89,7 @@ spec:
               Check not synced .bin files via ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- ls -la /var/lib/clickhouse/data/*/*/*/*.bin```
 
               Also, check documentation:
-              https://clickhouse.tech/docs/en/operations/table_engines/distributed/
+              https://clickhouse.com/docs/en/engines/table-engines/special/distributed/
               When you insert data to `Distributed` table.
               Data is written to target `*MergreTree` tables asynchronously.
               When inserted in the table, the data block is just written to the local file system.
@@ -98,7 +98,7 @@ spec:
               The Distributed engine sends each file with inserted data separately, but you can enable batch sending of files with the `distributed_directory_monitor_batch_inserts` setting
 
               Also, you can manage distributed tables:
-              https://clickhouse.tech/docs/en/sql-reference/statements/system/#query-language-system-distributed
+              https://clickhouse.com/docs/en/sql-reference/statements/system/#managing-distributed-tables
 
         - alert: ClickHouseDistributedConnectionExceptions
           expr: increase(chi_clickhouse_event_DistributedConnectionFailTry[1m]) > 0 or increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m]) > 0
@@ -112,7 +112,7 @@ spec:
               `increase(chi_clickhouse_event_DistributedConnectionFailAtAll[1m])` = {{ with printf "increase(chi_clickhouse_event_DistributedConnectionFailAtAll{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} errors{{ end }}
 
               Please, check communications between clickhouse server and host `remote_servers` in `/etc/clickhouse-server/`
-              https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
+              https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#server-settings-remote-servers
 
               Also, you can check logs:
               ```kubectl logs -n {{ $labels.exported_namespace }} $( echo {{ $labels.hostname }} | cut -d '.' -f 1)-0 -f```
@@ -128,11 +128,11 @@ spec:
               `increase(chi_clickhouse_event_RejectedInserts[1m])` = {{ with printf "increase(chi_clickhouse_event_RejectedInserts{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} queries{{ end }}
               `clickhouse-server` have INSERT queries that are rejected due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
               MergeTreeArchitecture
-              https://clickhouse.tech/docs/en/development/architecture/#merge-tree
-              system.parts_log
-              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log
+              https://clickhouse.com/docs/en/development/architecture/#merge-tree
+              system.part_log
+              https://clickhouse.com/docs/en/operations/system-tables/part_log
               system.merge_tree_settings
-              https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings
+              https://clickhouse.com/docs/en/operations/system-tables/merge_tree_settings
 
 
         - alert: ClickHouseDelayedInsertThrottling
@@ -145,7 +145,7 @@ spec:
             description: |-
               `increase(chi_clickhouse_event_DelayedInserts[1m])` = {{ with printf "increase(chi_clickhouse_event_DelayedInserts{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} queries{{ end }}
               `clickhouse-server` have INSERT queries that are throttled due to high number of active data parts for partition in a MergeTree, please decrease INSERT frequency
-              https://clickhouse.tech/docs/en/development/architecture/#merge-tree
+              https://clickhouse.com/docs/en/development/architecture/#merge-tree
 
         - alert: ClickHouseMaxPartCountForPartition
           expr: chi_clickhouse_metric_MaxPartCountForPartition > 100
@@ -172,15 +172,13 @@ spec:
             description: |-
               `increase(chi_clickhouse_event_InsertedRows[1m]) / increase(chi_clickhouse_event_InsertQuery[1m])` = {{ with printf "increase(chi_clickhouse_event_InsertedRows{hostname='%s',exported_namespace='%s'}[1m]) / increase(chi_clickhouse_event_InsertQuery{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} rows per query{{ end }}
               `clickhouse-server` have low insert speed.
-              https://clickhouse.tech/docs/en/introduction/performance/#performance-when-inserting-data
+              https://clickhouse.com/docs/en/about-us/performance/#performance-when-inserting-data
               Clickhouse team recommends inserting data in packets of at least 1000 rows or no more than a single request per second.
 
               Please use Buffer table
-              https://clickhouse.tech/docs/en/operations/table_engines/buffer/
+              https://clickhouse.com/docs/en/engines/table-engines/special/buffer/
               or
-              https://github.com/nikepan/clickhouse-bulk
-              or
-              https://github.com/VKCOM/kittenhouse
+              https://clickhouse.com/docs/en/operations/settings/settings/#async-insert
 
         - alert: ClickHouseLongestRunningQuery
           expr: chi_clickhouse_metric_LongestRunningQuery > 600
@@ -192,7 +190,7 @@ spec:
             description: |-
               `clickhouse-server` have queries that running more than `chi_clickhouse_metric_LongestRunningQuery` = {{ with printf "chi_clickhouse_metric_LongestRunningQuery{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} seconds{{ end }}
               try look to system.processes with long queries
-              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-processes
+              https://clickhouse.com/docs/en/operations/system-tables/processes
               ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.processes WHERE elapsed >= 600 FORMAT Vertical" | less```
 
         - alert: ClickHouseQueryPreempted
@@ -206,7 +204,7 @@ spec:
               `clickhouse-server` have `chi_clickhouse_metric_QueryPreempted` = {{ with printf "chi_clickhouse_metric_QueryPreempted{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} queries{{ end }}
               It mean queries that are stopped and waiting due to 'priority' setting.
               try look to system.processes
-              https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-processes
+              https://clickhouse.com/docs/en/operations/system-tables/processes
               ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.processes FORMAT Vertical" | less```
 
 
@@ -227,7 +225,7 @@ spec:
               - connection between clickhouse-server pods via kubernetes services ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT host_name, errors_count FROM system.clusters WHERE errors_count > 0 FORMAT PrettyCompactMonoBlock"```
               - status of PersistentVolumeClaims for pods ```kubectl get pvc -n {{ $labels.exported_namespace }}```
               Also read documentation:
-              https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures
+              https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/replication/#recovery-after-failures
 
         - alert: ClickHouseReplicasMaxAbsoluteDelay
           expr: chi_clickhouse_metric_ReplicasMaxAbsoluteDelay > 300
@@ -239,11 +237,11 @@ spec:
             description: |-
               `clickhouse-server` have replication lag `chi_clickhouse_metric_ReplicasMaxAbsoluteDelay` = {{ with printf "chi_clickhouse_metric_ReplicasMaxAbsoluteDelay{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }} seconds{{ end }}.
               When replica have too much lag, it can be skipped from Distributed SELECT Queries without errors and you will have wrong query results.
-              Check free disk space disks and network connection between clickhouse pod and zookeeper on monitored clickhouse-server pods
-
+              Check system.replicas, system.replication_queue and free disk space, network connection between clickhouse pod and zookeeper on monitored clickhouse-server pods
+      
               Also read documentation:
-              - https://clickhouse.tech/docs/en/operations/table_engines/replication/#recovery-after-failures
-              - https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries
+                - https://clickhouse.com/docs/en/operations/system-tables/replicas/
+                - https://clickhouse.com/docs/en/operations/system-tables/replication_queue/
 
         - alert: ClickHouseTooManyConnections
           expr: chi_clickhouse_metric_HTTPConnection + chi_clickhouse_metric_TCPConnection + chi_clickhouse_metric_MySQLConnection > 100
@@ -261,7 +259,7 @@ spec:
               The ClickHouse is adapted to run not a very large number of parallel SQL requests, not every HTTP/TCP(Native)/MySQL protocol connection means a running SQL request, but a large number of open connections can cause a spike in sudden SQL requests, resulting in performance degradation.
 
               Also read documentation:
-              - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
+              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#max-concurrent-queries
 
 
         - alert: ClickHouseTooManyRunningQueries
@@ -278,10 +276,10 @@ spec:
               Each concurrent INSERT query, allocate around 1MB per each column in an inserted table and utilize disk I/O.
 
               Look at following documentation parts:
-              - https://clickhouse.tech/docs/en/operations/settings/query_complexity/
-              - https://clickhouse.tech/docs/en/operations/quotas/
-              - https://clickhouse.tech/docs/en/operations/server_settings/settings/#max-concurrent-queries
-              - https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-query_log
+              - https://clickhouse.com/docs/en/operations/settings/query-complexity/
+              - https://clickhouse.com/docs/en/operations/quotas/
+              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings/#max-concurrent-queries
+              - https://clickhouse.com/docs/en/operations/system-tables/query_log/
 
         - alert: ClickHouseSystemSettingsChanged
           expr: delta(chi_clickhouse_metric_ChangedSettingsHash[5m]) != 0
@@ -345,8 +343,8 @@ spec:
               please read documentation:
               - https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
               - https://github.com/Altinity/clickhouse-operator/blob/master/docs/storage.md
-              - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes
-              - https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/mergetree/#mergetree-table-ttl
+              - https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes
+              - https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree/#mergetree-table-ttl
 
 # not well tested alerts which can't be triggered on e2e tests
         - alert: ClickHouseReplicatedPartChecksFailed
@@ -444,7 +442,7 @@ spec:
               `increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded[1m])` = {{ with printf "increase(chi_clickhouse_event_DistributedSyncInsertionTimeoutExceeded{hostname='%s',exported_namespace='%s'}[1m])" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.2f" }}{{ end }}
               `clickhouse-server` increase DistributedSyncInsertionTimeoutExceeded in `system.events` table.
               It mean Synchronous distributed insert timeout exceeded after successfull distributed connection.
-              Please check documentation https://clickhouse.tech/docs/en/operations/settings/settings/#insert_distributed_sync
+              Please check documentation https://clickhouse.com/docs/en/operations/settings/settings/#insert_distributed_sync
               And check connection between `{{ $labels.hostname }}` and all nodes in shards from remote_servers config section
 
         - alert: ClickHouseFileDescriptorBufferReadOrWriteFailed
@@ -490,7 +488,7 @@ spec:
               It mean something wrong with ALTER TABLE DELETE/UPDATE queries.
               Please check mutations errors ```kubectl exec -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -- clickhouse-client -q "SELECT * FROM system.mutations WHERE is_done=0 FORMAT Vertical"```
               Read about how to run KILL MUTATION
-              https://clickhouse.tech/docs/en/sql-reference/statements/kill/#kill-mutation
+              https://clickhouse.com/docs/en/sql-reference/statements/kill/#kill-mutation
 
         - alert: ClickHouseDetachedParts
           expr: chi_clickhouse_metric_DetachedParts > 0
@@ -504,7 +502,7 @@ spec:
               `system.detached_parts` show have detached parts.
               Please check detached parts in log ```kubectl logs -n {{ $labels.exported_namespace }} pod/$(kubectl get pods -n {{ $labels.exported_namespace }} | grep $( echo {{ $labels.hostname }} | cut -d '.' -f 1) | cut -d " " -f 1) -c clickhouse-pod --since=1h | grep -i detach```
               Read about how ATTACH / DROP detached parts
-              https://clickhouse.tech/docs/en/operations/system-tables/detached_parts/
+              https://clickhouse.com/docs/en/operations/system-tables/detached_parts/
               https://kb.altinity.com/altinity-kb-useful-queries/detached-parts/
               Legend for reason:
               `detached_by_user` - part was detached via ALTER TABLE ... DETACH ... query.
