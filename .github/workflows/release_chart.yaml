@@ -23,13 +23,20 @@ jobs:
           rm -f cr chart-releaser_1.4.1_linux_amd64.tar.gz
       - name: Package Chart
         run: cr package deploy/helm
-      - name: Upload Release artifacts
-        uses: skx/github-action-publish-binaries@release-2.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: '.cr-release-packages/*.tgz'
-      - name: Release chart
+      - name: Upload Release Artifacts
+        run: |
+          CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/gzip" \
+            -T "${CHART_PATH}" \
+            "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ github.event.release.id }}/assets?name=$(basename ${CHART_PATH})"
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+      - name: Release Chart
         run: |
           git remote add httpsorigin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch httpsorigin
