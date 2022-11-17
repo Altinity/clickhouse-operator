@@ -417,7 +417,7 @@ func createTableReplicated(cluster string) string {
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
 			database NOT IN (%s) AND
-			database IN (select name from system.databases where engine in ($s)) AND
+			database IN (select name from system.databases where engine in (%s)) AND
 			create_table_query != '' AND
 			name NOT LIKE '.inner.%%' AND
 			name NOT LIKE '.inner_id.%%'
