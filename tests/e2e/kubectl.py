@@ -418,6 +418,13 @@ def check_pod_volumes(chi_name, volumes, ns=namespace):
 def get_pvc_size(pvc_name, ns=namespace):
     return get_field("pvc", pvc_name, ".spec.resources.requests.storage", ns)
 
+def get_pv_name(pvc_name, ns=namespace):
+    return get_field("pvc", pvc_name, ".spec.volumeName", ns)
+
+def get_pv_size(pvc_name, ns=namespace):
+    return get_field("pv", get_pv_name(pvc_name, ns), ".spec.capacity.storage", ns)
+
+
 
 def check_pod_antiaffinity(chi_name, pod_name="", match_labels={}, topologyKey="kubernetes.io/hostname", ns=namespace):
     pod_spec = get_pod_spec(chi_name, pod_name, ns)
