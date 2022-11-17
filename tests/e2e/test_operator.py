@@ -2911,7 +2911,7 @@ def test_035(self):
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
 @Name("test_036. Check operator volume re-provisioning")
-def test_036(self, num_retries=100):
+def test_036(self):
     """Check clickhouse operator recreates volumes and schema if volume is broken."""
     cluster = "simple"
     manifest = f"manifests/chi/test-036-volume-re-provisioning.yaml"
@@ -2951,7 +2951,8 @@ def test_036(self, num_retries=100):
     with Then("I check PVC is recreated"):
         kubectl.wait_field("pvc", "disk1-chi-test-036-volume-re-provisioning-simple-0-0-0",
                            ".spec.resources.requests.storage", "1Gi")
-        r = self.context.shell("kubectl get pv | grep test/disk1-chi-test-036-volume-re-provisioning-simple-0-0-0").output.split()
+        r = self.context.shell(
+            "kubectl get pv | grep test/disk1-chi-test-036-volume-re-provisioning-simple-0-0-0").output.split()
         assert len(r) > 0, error()
         size = r[1]
         assert size == "1Gi", error()
