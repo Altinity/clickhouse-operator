@@ -33,6 +33,7 @@ type Schemer struct {
 }
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
+const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
 // NewSchemer creates new Schemer object
 func NewSchemer(scheme, username, password, rootCA string, port int) *Schemer {
@@ -379,11 +380,13 @@ func createTableDistributed(cluster string) string {
 				engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
+		WHERE database IN (select name from system.databases where engine in (%s))
 		ORDER BY order
 		`,
 		cluster,
 		cluster,
 		cluster,
+		createTableDBEngines,
 	)
 }
 
@@ -414,6 +417,7 @@ func createTableReplicated(cluster string) string {
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
 			database NOT IN (%s) AND
+			database IN (select name from system.databases where engine in ($s)) AND
 			create_table_query != '' AND
 			name NOT LIKE '.inner.%%' AND
 			name NOT LIKE '.inner_id.%%'
@@ -421,6 +425,7 @@ func createTableReplicated(cluster string) string {
 		`,
 		cluster,
 		ignoredDBs,
+		createTableDBEngines,
 	)
 }
 
