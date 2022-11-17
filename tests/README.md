@@ -15,7 +15,7 @@ To execute tests, you will need:
 * To run tests natively on your machine:
     - `kubectl`
     - `python3`
-
+    - `jq`
 ## Build test image
 
 In order to run tests in docker, you will need a base image. By default, it will be pulled from GitLab registry.
