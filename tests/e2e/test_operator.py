@@ -11,10 +11,11 @@ import e2e.util as util
 import xml.etree.ElementTree as etree
 
 
+from e2e.steps import *
 from testflows.core import *
 from testflows.asserts import error
-from requirements.requirements import *
 from testflows.connect import Shell
+from requirements.requirements import *
 
 
 @TestScenario
@@ -1595,8 +1596,10 @@ def test_019(self, step=1):
             },
         )
         with Then("Replicated table should have two replicas now"):
-            out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
-            assert out == "2"
+            for attempt in retries(timeout=100, delay=1):
+                with attempt:
+                    out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
+                    assert out == "2"
 
         with When("Remove a replica"):
             pvc_count = kubectl.get_count("pvc")
@@ -1781,7 +1784,7 @@ def test_021(self, step=1):
             size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             print(f"size: {size}")
             assert size == "2Gi"
-
+            
         with And("Table should exist"):
             out = clickhouse.query(chi, "select * from test_local_021")
             assert out == "1"
@@ -2905,6 +2908,80 @@ def test_035(self):
         with Finally("I remove the port forwarding and close the shell"):
             self.context.shell(f"pkill -e -f 'port\-forward \-n {settings.test_namespace} kubeservice/clickhouse\-test\-operator\-https\-connection'", timeout=5)
             self.context.shell.close()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
+@Name("test_037. storageManagement switch")
+def test_037(self):
+    """Check clickhouse operator supports switching storageManagement from default to Operator"""
+    cluster = "simple"
+    manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("I get terminal shell"):
+        self.context.shell = get_shell()
+
+    with And("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+
+    with And("I create replicated table with some data"):
+        create_table = """
+            CREATE TABLE test_local_037 ON CLUSTER 'simple' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace('\r', '').replace('\n', '')
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
+
+    with And("I switch storageManagement to Operator"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I check cluster is restarted"):
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time != start_time_new, error()
+
+    start_time = start_time_new
+    with When("Re-scale volume configuration to 2Gi"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Storage size should be 2Gi"):
+            kubectl.wait_field("pvc", f"disk1-chi-test-037-storagemanagement-switch-simple-0-0-0",
+                               ".spec.resources.requests.storage", "2Gi")
+            size = self.context.shell(
+                "kubectl get pv | grep test/disk1-chi-test-037-storagemanagement-switch-simple-0-0-0").output.split()[0]
+            assert size == "2Gi"
+
+    with And("Check if pod has been restarted"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        with Then("Storage provisioner is Operator. Pod should not be restarted"):
+            assert start_time == new_start_time
+
+    with And("Check data in the table"):
+        r = clickhouse.query("SELECT count(*) from test_local_037")
+        assert r.output == "10000"
 
 
 @TestModule
