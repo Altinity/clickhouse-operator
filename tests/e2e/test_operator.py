@@ -2913,7 +2913,7 @@ def test_035(self):
 def test_038(self):
     """Check clickhouse operator supports automatic schema propagation."""
     cluster = "simple"
-    manifest = f"manifests/chi/test-038-schema-propagation.yaml"
+    manifest = f"manifests/chi/test-038-1-schema-propagation.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -2924,7 +2924,7 @@ def test_038(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
-                "pod_count": 2,
+                "pod_count": 1,
                 "do_not_delete": 1,
             },
         )
@@ -2942,10 +2942,10 @@ def test_038(self):
         "ENGINE = CollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
         "CREATE TABLE versionedcollapsing_mergetree_table (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
         "sign Int8 DEFAULT 1) ENGINE = VersionedCollapsingMergeTree(sign, version) PARTITION BY y ORDER BY d",
-        # "CREATE TABLE graphite_mergetree_table (d Date, a String, b UInt8, x String, y Int8, Path String, "
-        # "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))"
-        # "ENGINE = GraphiteMergeTree('graphite_rollup_example')PARTITION BY y ORDER BY d "
-        # "SETTINGS index_granularity = 8192",
+        "CREATE TABLE graphite_mergetree_table (d Date, a String, b UInt8, x String, y Int8, Path String, "
+        "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))"
+        "ENGINE = GraphiteMergeTree('graphite_rollup_example')PARTITION BY y ORDER BY d "
+        "SETTINGS index_granularity = 8192",
         "CREATE TABLE replicated_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
         "ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_table', "
         "'{replica}') PARTITION BY y ORDER BY d",
@@ -2963,10 +2963,10 @@ def test_038(self):
         "CREATE TABLE replicated_versionedcollapsing_table ON CLUSTER 'simple' (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
         " sign Int8 DEFAULT 1) ENGINE = ReplicatedVersionedCollapsingMergeTree(sign, version) PARTITION "
         "BY y ORDER BY d",
-        # "CREATE TABLE replicated_graphite_table on cluster 'simple'(d Date, a String, b UInt8, x String, y Int8, Path String, "
-        # "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))ENGINE = "
-        # "ReplicatedGraphiteMergeTree('graphite_rollup_example')PARTITION BY y ORDER BY d "
-        # "SETTINGS index_granularity = 8192",
+        "CREATE TABLE replicated_graphite_table on cluster 'simple'(d Date, a String, b UInt8, x String, y Int8, Path String, "
+        "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))ENGINE = "
+        "ReplicatedGraphiteMergeTree('graphite_rollup_example')PARTITION BY y ORDER BY d "
+        "SETTINGS index_granularity = 8192",
         "CREATE TABLE table_for_dict ( key_column UInt64, third_column String ) "
         "ENGINE = MergeTree() ORDER BY key_column",
         "CREATE DICTIONARY ndict ON CLUSTER 'simple' ( key_column UInt64 DEFAULT 0, "
@@ -3057,8 +3057,8 @@ def test_038(self):
             with attempt:
                 for table_name in table_names:
                     expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-0-0-0")
-                    actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-1-0-0")
-                    assert expected_describe == actual_describe, error()
+                    # actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-1-0-0")
+                    # assert expected_describe == actual_describe, error()
 
 
 @TestModule

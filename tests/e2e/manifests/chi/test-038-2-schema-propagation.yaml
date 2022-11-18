@@ -1,0 +1,77 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-038-schema-propagation"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+    - name: simple
+      schemaPolicy:
+        replica: All
+        shard: All
+      layout:
+        shardsCount: 2
+        replicasCount: 1
+    files:
+      configd/graphite_rollup.xml: |
+        <yandex>
+          <graphite_rollup>
+            <version_column_name>Version</version_column_name>
+            <pattern>
+                <regexp>click_cost</regexp>
+                <function>any</function>
+                <retention>
+                    <age>0</age>
+                    <precision>5</precision>
+                </retention>
+                <retention>
+                    <age>86400</age>
+                    <precision>60</precision>
+                </retention>
+            </pattern>
+            <default>
+                <function>max</function>
+                <retention>
+                    <age>0</age>
+                    <precision>60</precision>
+                </retention>
+                <retention>
+                    <age>3600</age>
+                    <precision>300</precision>
+                </retention>
+                <retention>
+                    <age>86400</age>
+                    <precision>3600</precision>
+                </retention>
+            </default>
+          </graphite_rollup>
+        <yandex>
+  defaults:
+    storageManagement:
+      provisioner: Operator
+    templates:
+      podTemplate: multi-volume
+  templates:
+    volumeClaimTemplates:
+      - name: disk1
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+    podTemplates:
+      - name: multi-volume
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.8.6.71
+              volumeMounts:
+                - name: disk1
+                  mountPath: /var/lib/clickhouse
