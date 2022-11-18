@@ -1332,6 +1332,13 @@ version: 1.0
 
 [ClickHouse Operator] SHALL support switching storageManagement from default to Operator.
 
+```
+defaults:
+  storageManagement:
+  # provisioner: StatefulSet # this is default
+    provisioner: Operator
+```
+
 #### Stopping And Starting
 
 ##### RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting

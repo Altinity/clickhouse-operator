@@ -1203,6 +1203,13 @@ RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch = Requirement(
     description=(
         '[ClickHouse Operator] SHALL support switching storageManagement from default to Operator.\n'
         '\n'
+        '```\n'
+        'defaults:\n'
+        '  storageManagement:\n'
+        '  # provisioner: StatefulSet # this is default\n'
+        '    provisioner: Operator\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
@@ -8344,6 +8351,13 @@ version: 1.0
 version: 1.0
 
 [ClickHouse Operator] SHALL support switching storageManagement from default to Operator.
+
+```
+defaults:
+  storageManagement:
+  # provisioner: StatefulSet # this is default
+    provisioner: Operator
+```
 
 #### Stopping And Starting
 
