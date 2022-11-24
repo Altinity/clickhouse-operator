@@ -19,22 +19,13 @@ spec:
     storageManagement:
       provisioner: Operator
     templates:
-      podTemplate: multi-volume
+      volumeClaimTemplate: default
   templates:
     volumeClaimTemplates:
-      - name: disk1
+      - name: default
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
               storage: 1Gi
-    podTemplates:
-      - name: multi-volume
-        spec:
-          containers:
-            - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8.6.71
-              volumeMounts:
-                - name: disk1
-                  mountPath: /var/lib/clickhouse
