@@ -2604,6 +2604,7 @@ rules:
     - configmaps
     - services
     - persistentvolumeclaims
+    - secrets
   verbs:
     - get
     - list
