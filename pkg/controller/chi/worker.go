@@ -68,7 +68,7 @@ func newWorkerContext(creator *chopmodel.Creator) workerContext {
 }
 
 // newWorker
-//func (c *Controller) newWorker(q workqueue.RateLimitingInterface) *worker {
+// func (c *Controller) newWorker(q workqueue.RateLimitingInterface) *worker {
 func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	start := time.Now()
 	if !sys {
