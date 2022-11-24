@@ -27,13 +27,20 @@ type EntityType string
 
 // Possible entity types
 const (
+	// StatefulSet describes StatefulSet entity type
 	StatefulSet EntityType = "StatefulSet"
-	ConfigMap   EntityType = "ConfigMap"
-	Service     EntityType = "Service"
-	Secret      EntityType = "Secret"
-	PVC         EntityType = "PVC"
-	PV          EntityType = "PV"
-	PDB         EntityType = "PDB"
+	// ConfigMap describes ConfigMap entity type
+	ConfigMap EntityType = "ConfigMap"
+	// Service describes Service entity type
+	Service EntityType = "Service"
+	// Secret describes Secret entity type
+	Secret EntityType = "Secret"
+	// PVC describes PersistentVolumeClaim entity type
+	PVC EntityType = "PVC"
+	// PV describes PersistentVolume entity type
+	PV EntityType = "PV"
+	// PDB describes PodDisruptionBudget entity type
+	PDB EntityType = "PDB"
 )
 
 // Registry specifies registry struct
