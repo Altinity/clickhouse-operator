@@ -2967,7 +2967,7 @@ def test_036(self):
 def test_037(self):
     """Check clickhouse-operator supports switching storageManagement
     config option from default (StatefulSet) to Operator"""
-    cluster = "simple"
+    cluster = "default"
     manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -2976,6 +2976,9 @@ def test_037(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
                 "pod_count": 1,
                 "do_not_delete": 1,
             },
@@ -2997,6 +3000,9 @@ def test_037(self):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
             check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
                 "pod_count": 1,
                 "do_not_delete": 1,
             },
@@ -3004,22 +3010,24 @@ def test_037(self):
 
     with And("I check cluster is restarted and time up new pod start time"):
         start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        assert start_time != start_time_new, error()
-        start_time = start_time_new
+        assert start_time == start_time_new, error()
 
     with And("I rescale volume configuration to 2Gi to check that storage management is switched"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
             check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
                 "pod_count": 1,
                 "do_not_delete": 1,
             },
         )
 
     with Then("storage size should be 2Gi"):
-        kubectl.wait_field("pvc", f"disk1-chi-test-037-storagemanagement-switch-simple-0-0-0",
+        kubectl.wait_field("pvc", f"disk1-chi-test-037-storagemanagement-switch-{cluster}-0-0-0",
                            ".spec.resources.requests.storage", "2Gi")
-        size = kubectl.get_pvc_size("disk1-chi-test-037-storagemanagement-switch-simple-0-0-0")
+        size = kubectl.get_pvc_size(f"disk1-chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
         assert size == "2Gi", error()
 
     with And("check the pod's start time to see if it has been restarted"):
@@ -3029,7 +3037,7 @@ def test_037(self):
 
     with And("check data in the table"):
         r = clickhouse.query(chi, "SELECT count(*) from test_local_037",
-                             pod="chi-test-037-storagemanagement-switch-simple-0-0-0")
+                             pod=f"chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
         assert r == "10000"
 
 

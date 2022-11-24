@@ -3,14 +3,14 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-037-storagemanagement-switch"
 spec:
+  useTemplates:
+    - name: clickhouse-version
   configuration:
     clusters:
-    - name: simple
+    - name: default
   defaults:
     storageManagement:
       provisioner: Operator
-    templates:
-      podTemplate: multi-volume
   templates:
     volumeClaimTemplates:
       - name: disk1
@@ -20,12 +20,3 @@ spec:
           resources:
             requests:
               storage: 1Gi
-    podTemplates:
-      - name: multi-volume
-        spec:
-          containers:
-            - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8.6.71
-              volumeMounts:
-                - name: disk1
-                  mountPath: /var/lib/clickhouse
