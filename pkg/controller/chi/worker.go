@@ -22,6 +22,7 @@ import (
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
 	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -834,6 +835,10 @@ func purgeSecret(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmod
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == chiv1.ObjectsCleanupDelete
 }
 
+func purgePDB(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+	return true
+}
+
 // purge
 func (w *worker) purge(
 	ctx context.Context,
@@ -886,6 +891,13 @@ func (w *worker) purge(
 					w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
 				}
 			}
+		case chopmodel.PDB:
+			if purgePDB(chi, reconcileFailedObjs, m) {
+				w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
+				if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
+			}
 		}
 	})
 	return cnt
@@ -901,7 +913,6 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
 
-	w.createPodDisruptionBudget(ctx, chi)
 	return chi.WalkTillError(
 		ctx,
 		w.reconcileCHIAuxObjectsPreliminary,
@@ -1180,6 +1191,13 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiv1.ChiCluster
 				w.ctx.registryFailed.RegisterSecret(secret.ObjectMeta)
 			}
 		}
+	}
+
+	pdb := w.ctx.creator.NewPodDisruptionBudget(cluster)
+	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
+		w.ctx.registryReconciled.RegisterPDB(pdb.ObjectMeta)
+	} else {
+		w.ctx.registryFailed.RegisterPDB(pdb.ObjectMeta)
 	}
 
 	return nil
@@ -1517,19 +1535,22 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiv1.ChiHos
 	})
 }
 
-// createPodDisruptionBudget creates PodDisruptionBudget
-func (w *worker) createPodDisruptionBudget(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	pdb, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.ctx.creator.NewPodDisruptionBudget(), newCreateOptions())
-	if err != nil {
-		log.V(1).Warning("unable to create PDB %v", err)
-		return
+// reconcilePDB creates PodDisruptionBudget
+func (w *worker) reconcilePDB(ctx context.Context, cluster *chiv1.ChiCluster, pdb *v1.PodDisruptionBudget) error {
+	_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, newGetOptions())
+	switch {
+	case err == nil:
+		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, newUpdateOptions())
+		if err == nil {
+			log.V(1).Info("PDB updated %s/%s", pdb.Namespace, pdb.Name)
+		}
+	case (err != nil) && apierrors.IsNotFound(err):
+		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, newCreateOptions())
+		if err == nil {
+			log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
+		}
 	}
-	log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
-}
-
-// deletePodDisruptionBudget deletes PodDisruptionBudget
-func (w *worker) deletePodDisruptionBudget(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	_ = w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Delete(ctx, chi.Name, newDeleteOptions())
+	return nil
 }
 
 // deleteCHI
@@ -1659,8 +1680,6 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	}
 
 	// Start delete protocol
-
-	w.deletePodDisruptionBudget(ctx, chi)
 
 	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)
