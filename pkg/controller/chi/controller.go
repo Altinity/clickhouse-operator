@@ -296,7 +296,7 @@ func updated(old, new *core.Endpoints) bool {
 			}
 		}
 	}
-	for path, _ := range diff.Removed {
+	for path := range diff.Removed {
 		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: removed %v", path)
 	}
 	for path, iValue := range diff.Modified {
@@ -737,6 +737,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chiV1.ClickHou
 	return nil
 }
 
+// UpdateCHIStatusOptions defines how to update CHI status
 type UpdateCHIStatusOptions struct {
 	chiV1.CopyCHIStatusOptions
 	TolerateAbsence bool

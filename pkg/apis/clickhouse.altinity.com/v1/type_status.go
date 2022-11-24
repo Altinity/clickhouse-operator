@@ -65,7 +65,7 @@ func (s *ChiStatus) PushAction(action string) {
 	s.TrimActions()
 }
 
-// TripActions trims actions
+// TrimActions trims actions
 func (s *ChiStatus) TrimActions() {
 	if s == nil {
 		return
@@ -156,6 +156,7 @@ func (s *ChiStatus) DeleteStart() {
 	s.PushTaskIDStarted()
 }
 
+// CopyCHIStatusOptions specifies what to copy in CHI status options
 type CopyCHIStatusOptions struct {
 	Actions     bool
 	Errors      bool
@@ -164,6 +165,7 @@ type CopyCHIStatusOptions struct {
 	WholeStatus bool
 }
 
+// MergeActions merges actions
 func (s *ChiStatus) MergeActions(from *ChiStatus) {
 	if s == nil {
 		return
@@ -176,6 +178,7 @@ func (s *ChiStatus) MergeActions(from *ChiStatus) {
 	s.TrimActions()
 }
 
+// CopyFrom copies
 func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 	if s == nil {
 		return
@@ -259,6 +262,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 	}
 }
 
+// GetFQDNs is a getter
 func (s *ChiStatus) GetFQDNs() []string {
 	if s == nil {
 		return nil
@@ -266,6 +270,7 @@ func (s *ChiStatus) GetFQDNs() []string {
 	return s.FQDNs
 }
 
+// GetCHOpIP is a getter
 func (s *ChiStatus) GetCHOpIP() string {
 	if s == nil {
 		return ""
@@ -273,6 +278,7 @@ func (s *ChiStatus) GetCHOpIP() string {
 	return s.CHOpIP
 }
 
+// GetNormalizedCHICompleted is a getter
 func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	if s == nil {
 		return nil
@@ -280,6 +286,7 @@ func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	return s.NormalizedCHICompleted
 }
 
+// GetNormalizedCHI is a getter
 func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	if s == nil {
 		return nil
@@ -287,6 +294,7 @@ func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	return s.NormalizedCHI
 }
 
+// GetStatus is a getter
 func (s *ChiStatus) GetStatus() string {
 	if s == nil {
 		return ""
@@ -294,6 +302,7 @@ func (s *ChiStatus) GetStatus() string {
 	return s.Status
 }
 
+// GetPods is a getter
 func (s *ChiStatus) GetPods() []string {
 	if s == nil {
 		return nil
@@ -301,6 +310,7 @@ func (s *ChiStatus) GetPods() []string {
 	return s.Pods
 }
 
+// GetPodIPS is a getter
 func (s *ChiStatus) GetPodIPS() []string {
 	if s == nil {
 		return nil

@@ -16,6 +16,7 @@ package v1
 
 import "strings"
 
+// StringBool defines string representation of a bool type
 type StringBool string
 
 // Set of string boolean constants
@@ -178,7 +179,7 @@ func (s StringBool) CastToStringTrueFalse(defaultValue bool) string {
 	return _false
 }
 
-// Normalize
+// Normalize normalizes
 func (s StringBool) Normalize(defaultValue bool) StringBool {
 	// True and False values
 	_true := StringBoolTrueLowercase

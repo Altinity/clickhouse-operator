@@ -701,6 +701,7 @@ func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 	return chi.Spec.Reconciling
 }
 
+// CopyFiltered make copy filtering some fields
 func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *ClickHouseInstallation {
 	if chi == nil {
 		return nil
@@ -726,6 +727,7 @@ func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *Cli
 	return &chi2
 }
 
+// JSON returns JSON string
 func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
 	if chi == nil {
 		return ""
@@ -740,6 +742,7 @@ func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
 
 }
 
+// YAML return YAML string
 func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
 	if chi == nil {
 		return ""
@@ -753,6 +756,7 @@ func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
 	return string(yamlBytes)
 }
 
+// EnsureStatus ensures status
 func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	if chi == nil {
 		return nil

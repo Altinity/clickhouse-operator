@@ -164,7 +164,7 @@ func NewReconcileChopConfig(cmd string, old, new *chi.ClickHouseOperatorConfigur
 	}
 }
 
-// ReconcileChopConfig specifies CHOp config queue item
+// ReconcileEndpoints specifies endpoint
 type ReconcileEndpoints struct {
 	PriorityQueueItem
 	cmd string

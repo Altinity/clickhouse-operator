@@ -1034,7 +1034,7 @@ func (c *Creator) createPVC(
 	return persistentVolumeClaim
 }
 
-// CreatePVC
+// CreatePVC creates PVC
 func (c *Creator) CreatePVC(name string, host *chiv1.ChiHost, spec *corev1.PersistentVolumeClaimSpec) *corev1.PersistentVolumeClaim {
 	pvc := c.createPVC(name, host.Address.Namespace, host, spec)
 	return &pvc

@@ -14,12 +14,13 @@
 
 package v1
 
+// StorageManagement defines storage management config
 type StorageManagement struct {
 	PVCProvisioner   PVCProvisioner   `json:"provisioner,omitempty"   yaml:"provisioner,omitempty"`
 	PVCReclaimPolicy PVCReclaimPolicy `json:"reclaimPolicy,omitempty" yaml:"reclaimPolicy,omitempty"`
 }
 
-// NewStorageManagement
+// NewStorageManagement creates new StorageManagement
 func NewStorageManagement() *StorageManagement {
 	return new(StorageManagement)
 }
