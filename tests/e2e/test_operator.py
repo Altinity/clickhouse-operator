@@ -2972,10 +2972,7 @@ def test_037(self):
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
-    with Given("I get terminal shell"):
-        self.context.shell = get_shell()
-
-    with And("chi exists"):
+    with Given("chi exists"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -2987,7 +2984,7 @@ def test_037(self):
     with And("I time up pod start time"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
-    with And("I create replicated table with some data"):
+    with And("I create a table with some data"):
         create_table = """
             CREATE TABLE test_local_037 (a UInt32)
             Engine = MergeTree()
@@ -2996,7 +2993,7 @@ def test_037(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
 
-    with And("I switch storageManagement to Operator"):
+    with When("I switch storageManagement to Operator"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
             check={
@@ -3005,12 +3002,12 @@ def test_037(self):
             },
         )
 
-    with And("I check cluster is restarted and time up pod start time"):
+    with And("I check cluster is restarted and time up new pod start time"):
         start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time != start_time_new, error()
         start_time = start_time_new
 
-    with When("rescale volume configuration to 2Gi to check that storage management is switched"):
+    with And("I rescale volume configuration to 2Gi to check that storage management is switched"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
             check={
@@ -3019,11 +3016,11 @@ def test_037(self):
             },
         )
 
-        with Then("storage size should be 2Gi"):
-            kubectl.wait_field("pvc", f"disk1-chi-test-037-storagemanagement-switch-simple-0-0-0",
-                               ".spec.resources.requests.storage", "2Gi")
-            size = kubectl.get_pvc_size("disk1-chi-test-037-storagemanagement-switch-simple-0-0-0")
-            assert size == "2Gi", error()
+    with Then("storage size should be 2Gi"):
+        kubectl.wait_field("pvc", f"disk1-chi-test-037-storagemanagement-switch-simple-0-0-0",
+                           ".spec.resources.requests.storage", "2Gi")
+        size = kubectl.get_pvc_size("disk1-chi-test-037-storagemanagement-switch-simple-0-0-0")
+        assert size == "2Gi", error()
 
     with And("check the pod's start time to see if it has been restarted"):
         start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
