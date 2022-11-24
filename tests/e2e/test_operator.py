@@ -2910,7 +2910,6 @@ def test_035(self):
 @Name("test_036. Check operator volume re-provisioning")
 def test_036(self):
     """Check clickhouse operator recreates volumes and schema if volume is broken."""
-    cluster = "simple"
     manifest = f"manifests/chi/test-036-volume-re-provisioning.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -2927,7 +2926,7 @@ def test_036(self):
 
     with And("I create replicated table with some data"):
         create_table = """
-            CREATE TABLE test_local_036 ON CLUSTER 'simple' (a UInt32)
+            CREATE TABLE test_local_036 ON CLUSTER '{cluster}' (a UInt32)
             Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
             PARTITION BY tuple()
             ORDER BY a
@@ -2936,16 +2935,20 @@ def test_036(self):
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
     with When("I delete PV", description="delete PV on replica 0"):
-        pv_name = kubectl.get_pv_name("disk1-chi-test-036-volume-re-provisioning-simple-0-0-0")
+        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
 
         kubectl.launch(f"delete pv {pv_name} --force &")
-        kubectl.launch(f"""patch pv {pv_name} """ +
-                       """ -p '{"metadata":{"finalizers":null}}' """.replace('\r', '').replace('\n', ''))
+        kubectl.launch(f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""")
+
+    with And("Wait for PVC to detect PV is lost"):
+        kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                            ".status.phase", "Lost")
 
     with Then("I check PV is recreated"):
-        kubectl.wait_field("pvc", "disk1-chi-test-036-volume-re-provisioning-simple-0-0-0",
-                           ".spec.resources.requests.storage", "1Gi")
-        size = kubectl.get_pv_size("disk1-chi-test-036-volume-re-provisioning-simple-0-0-0")
+        kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                           ".status.phase", "Bound")
+        kubectl.wait_object("pv", kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0"))
+        size = kubectl.get_pv_size("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
         assert size == "1Gi", error()
 
     with And("I check data on each replica"):
