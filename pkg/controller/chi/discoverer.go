@@ -39,6 +39,7 @@ func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstalla
 	c.discoverySecret(ctx, r, chi, opts)
 	c.discoveryPVC(ctx, r, chi, opts)
 	c.discoveryPV(ctx, r, chi, opts)
+	c.discoveryPDB(ctx, r, chi, opts)
 	return r
 }
 
@@ -129,5 +130,20 @@ func (c *Controller) discoveryPV(ctx context.Context, r *chopmodel.Registry, chi
 	}
 	for _, obj := range list.Items {
 		r.RegisterPV(obj.ObjectMeta)
+	}
+}
+
+func (c *Controller) discoveryPDB(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).List(ctx, opts)
+	if err != nil {
+		log.M(chi).F().Error("FAIL list PDB err:%v", err)
+		return
+	}
+	if list == nil {
+		log.M(chi).F().Error("FAIL list PDB list is nil")
+		return
+	}
+	for _, obj := range list.Items {
+		r.RegisterPDB(obj.ObjectMeta)
 	}
 }
