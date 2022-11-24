@@ -16,7 +16,6 @@ package model
 
 import (
 	"fmt"
-
 	"github.com/gosimple/slug"
 
 	apps "k8s.io/api/apps/v1"
@@ -804,19 +803,19 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 }
 
 // NewPodDisruptionBudget creates new PodDisruptionBudget
-func (c *Creator) NewPodDisruptionBudget() *policyv1.PodDisruptionBudget {
+func (c *Creator) NewPodDisruptionBudget(cluster *chiv1.ChiCluster) *policyv1.PodDisruptionBudget {
 	ownerReferences := getOwnerReferences(c.chi)
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            c.chi.Name,
+			Name:            fmt.Sprintf("%s-%s", cluster.Address.CHIName, cluster.Address.ClusterName),
 			Namespace:       c.chi.Namespace,
-			Labels:          macro(c.chi).Map(c.labels.getCHIScope()),
-			Annotations:     macro(c.chi).Map(c.annotations.getCHIScope()),
+			Labels:          macro(c.chi).Map(c.labels.getClusterScope(cluster)),
+			Annotations:     macro(c.chi).Map(c.annotations.getClusterScope(cluster)),
 			OwnerReferences: ownerReferences,
 		},
 		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector: &metav1.LabelSelector{
-				MatchLabels: c.labels.GetSelectorCHIScope(),
+				MatchLabels: getSelectorClusterScope(cluster),
 			},
 			MaxUnavailable: &intstr.IntOrString{
 				Type:   intstr.Int,
