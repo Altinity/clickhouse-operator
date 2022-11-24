@@ -2915,10 +2915,7 @@ def test_036(self):
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
-    with Given("I get terminal shell"):
-        self.context.shell = get_shell()
-
-    with And("chi exists"):
+    with Given("chi exists"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -2939,19 +2936,16 @@ def test_036(self):
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
     with When("I delete PV", description="delete PV on replica 0"):
-        pv_name = self.context.shell("kubectl get pv | grep test/disk1-chi-test-036-volume-re-provisioning-simple-0-0-0").output.split()[0]
+        pv_name = kubectl.get_pv_name("disk1-chi-test-036-volume-re-provisioning-simple-0-0-0")
 
-        self.context.shell(f"kubectl delete pv {pv_name} --force &")
-        self.context.shell("""kubectl patch pv $(kubectl get pv | grep test/disk1-chi-test-036-volume-re-provisioning-simple-0-0-0 
-            | awk '{print $1}') -p '{"metadata":{"finalizers":null}}' """.replace('\r', '').replace('\n', ''))
+        kubectl.launch(f"delete pv {pv_name} --force &")
+        kubectl.launch(f"""patch pv {pv_name} """ +
+                       """ -p '{"metadata":{"finalizers":null}}' """.replace('\r', '').replace('\n', ''))
 
-    with Then("I check PVC is recreated"):
+    with Then("I check PV is recreated"):
         kubectl.wait_field("pvc", "disk1-chi-test-036-volume-re-provisioning-simple-0-0-0",
                            ".spec.resources.requests.storage", "1Gi")
-        r = self.context.shell(
-            "kubectl get pv | grep test/disk1-chi-test-036-volume-re-provisioning-simple-0-0-0").output.split()
-        assert len(r) > 0, error()
-        size = r[1]
+        size = kubectl.get_pv_size("disk1-chi-test-036-volume-re-provisioning-simple-0-0-0")
         assert size == "1Gi", error()
 
     with And("I check data on each replica"):
