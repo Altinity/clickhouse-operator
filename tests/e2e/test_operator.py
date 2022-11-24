@@ -2926,7 +2926,7 @@ def test_037(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
-                "pod_count": 2,
+                "pod_count": 1,
                 "do_not_delete": 1,
             },
         )
@@ -2936,20 +2936,18 @@ def test_037(self):
 
     with And("I create replicated table with some data"):
         create_table = """
-            CREATE TABLE test_local_037 ON CLUSTER 'simple' (a UInt32)
-            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-            PARTITION BY tuple()
+            CREATE TABLE test_local_037 (a UInt32)
+            Engine = MergeTree()
             ORDER BY a
             """.replace('\r', '').replace('\n', '')
         clickhouse.query(chi, create_table)
-        clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)",
-                         pod="chi-test-037-storagemanagement-switch-simple-0-0-0")
+        clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
 
     with And("I switch storageManagement to Operator"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
             check={
-                "pod_count": 2,
+                "pod_count": 1,
                 "do_not_delete": 1,
             },
         )
@@ -2963,7 +2961,7 @@ def test_037(self):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
             check={
-                "pod_count": 2,
+                "pod_count": 1,
                 "do_not_delete": 1,
             },
         )

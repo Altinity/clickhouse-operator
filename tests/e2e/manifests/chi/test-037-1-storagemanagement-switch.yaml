@@ -3,18 +3,9 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-037-storagemanagement-switch"
 spec:
-  useTemplates:
-    - name: clickhouse-version
   configuration:
-    zookeeper:
-      nodes:
-        - host: zookeeper
-          port: 2181
     clusters:
     - name: simple
-      layout:
-        shardsCount: 1
-        replicasCount: 2
   defaults:
 #    storageManagement:
 #      provisioner: StatefulSet
