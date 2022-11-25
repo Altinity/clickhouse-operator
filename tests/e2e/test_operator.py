@@ -11,7 +11,9 @@ import e2e.kubectl as kubectl
 import e2e.util as util
 
 from requirements.requirements import *
+from testflows.connect import Shell
 from testflows.asserts import error
+from testflows.core import *
 from e2e.steps import *
 
 
@@ -2960,6 +2962,87 @@ def test_036(self):
             r = clickhouse.query(chi, pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
                                  sql="SELECT count(*) FROM test_local_036")
             assert r == "10000", error()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
+@Name("test_037. storageManagement switch")
+def test_037(self):
+    """Check clickhouse-operator supports switching storageManagement
+    config option from default (StatefulSet) to Operator"""
+    cluster = "default"
+    manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I time up pod start time"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+
+    with And("I create a table with some data"):
+        create_table = """
+            CREATE TABLE test_local_037 (a UInt32)
+            Engine = MergeTree()
+            ORDER BY a
+            """.replace('\r', '').replace('\n', '')
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
+
+    with When("I switch storageManagement to Operator"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I check cluster is restarted and time up new pod start time"):
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time != start_time_new, error()
+        start_time = start_time_new
+
+    with And("I rescale volume configuration to 2Gi to check that storage management is switched"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("storage size should be 2Gi"):
+        kubectl.wait_field("pvc", f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0",
+                           ".spec.resources.requests.storage", "2Gi")
+        size = kubectl.get_pvc_size(f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
+        assert size == "2Gi", error()
+
+    with And("check the pod's start time to see if it has been restarted"):
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        with Then("storage provisioner is operator, pod should not be restarted"):
+            assert start_time == start_time_new, error()
+
+    with And("check data in the table"):
+        r = clickhouse.query(chi, "SELECT count(*) from test_local_037",
+                             pod=f"chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
+        assert r == "10000"
 
 
 @TestModule

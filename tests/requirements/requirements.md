@@ -173,22 +173,24 @@
       * 4.24.9.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate](#rqsrs-026clickhouseoperatormanagingreprovisioningpodsusingdifferenttemplate)
     * 4.24.10 [Re-provisioning Volume](#re-provisioning-volume)
       * 4.24.10.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume](#rqsrs-026clickhouseoperatormanagingreprovisioningvolume)
-    * 4.24.11 [Stopping And Starting](#stopping-and-starting)
-      * 4.24.11.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting](#rqsrs-026clickhouseoperatormanagingstoppingandstarting)
-    * 4.24.12 [Stopping Specific ClickHouse Pods](#stopping-specific-clickhouse-pods)
-      * 4.24.12.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousepods)
-    * 4.24.13 [Stopping Specific ClickHouse Hosts](#stopping-specific-clickhouse-hosts)
-      * 4.24.13.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousehosts)
-    * 4.24.14 [Exporting Metrics](#exporting-metrics)
-      * 4.24.14.1 [RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics](#rqsrs-026clickhouseoperatormanagingexportingmetrics)
-    * 4.24.15 [Monitoring](#monitoring)
-      * 4.24.15.1 [RQ.SRS-026.ClickHouseOperator.Managing.Monitoring](#rqsrs-026clickhouseoperatormanagingmonitoring)
-    * 4.24.16 [Rolling Update](#rolling-update)
-      * 4.24.16.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate](#rqsrs-026clickhouseoperatormanagingrollingupdate)
+    * 4.24.11 [StorageManagement switch](#storagemanagement-switch)
+      * 4.24.11.1 [RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch](#rqsrs-026clickhouseoperatormanagingstoragemanagementswitch)
+    * 4.24.12 [Stopping And Starting](#stopping-and-starting)
+      * 4.24.12.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting](#rqsrs-026clickhouseoperatormanagingstoppingandstarting)
+    * 4.24.13 [Stopping Specific ClickHouse Pods](#stopping-specific-clickhouse-pods)
+      * 4.24.13.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousepods)
+    * 4.24.14 [Stopping Specific ClickHouse Hosts](#stopping-specific-clickhouse-hosts)
+      * 4.24.14.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousehosts)
+    * 4.24.15 [Exporting Metrics](#exporting-metrics)
+      * 4.24.15.1 [RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics](#rqsrs-026clickhouseoperatormanagingexportingmetrics)
+    * 4.24.16 [Monitoring](#monitoring)
+      * 4.24.16.1 [RQ.SRS-026.ClickHouseOperator.Managing.Monitoring](#rqsrs-026clickhouseoperatormanagingmonitoring)
+    * 4.24.17 [Rolling Update](#rolling-update)
+      * 4.24.17.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate](#rqsrs-026clickhouseoperatormanagingrollingupdate)
   * 4.25 [Logging](#logging)
-      * 4.25.16.1 [RQ.SRS-026.ClickHouseOperator.Logging](#rqsrs-026clickhouseoperatorlogging)
-      * 4.25.16.2 [High Level Status](#high-level-status)
-        * 4.25.16.2.1 [RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus](#rqsrs-026clickhouseoperatorlogginghighlevelstatus)
+      * 4.25.17.1 [RQ.SRS-026.ClickHouseOperator.Logging](#rqsrs-026clickhouseoperatorlogging)
+      * 4.25.17.2 [High Level Status](#high-level-status)
+        * 4.25.17.2.1 [RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus](#rqsrs-026clickhouseoperatorlogginghighlevelstatus)
   * 4.26 [Valid Installation](#valid-installation)
     * 4.26.1 [RQ.SRS-026.ClickHouseOperator.ValidInstallation](#rqsrs-026clickhouseoperatorvalidinstallation)
   * 4.27 [Operator Settings](#operator-settings)
@@ -1331,6 +1333,20 @@ version: 1.0
 version: 1.0
 
 [ClickHouse Operator] SHALL support re-provisioning Volume by deleting [PVC], recreating [PVC] and recreating [StatefullSet].
+
+#### StorageManagement switch
+
+##### RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch
+version: 1.0
+
+[ClickHouse Operator] SHALL support switching storageManagement from default to Operator.
+
+```
+defaults:
+  storageManagement:
+  # provisioner: StatefulSet # this is default
+    provisioner: Operator
+```
 
 #### Stopping And Starting
 
