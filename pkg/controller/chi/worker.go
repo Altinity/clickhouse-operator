@@ -22,6 +22,7 @@ import (
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
 	core "k8s.io/api/core/v1"
+	v1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -68,7 +69,7 @@ func newWorkerContext(creator *chopmodel.Creator) workerContext {
 }
 
 // newWorker
-//func (c *Controller) newWorker(q workqueue.RateLimitingInterface) *worker {
+// func (c *Controller) newWorker(q workqueue.RateLimitingInterface) *worker {
 func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	start := time.Now()
 	if !sys {
@@ -799,39 +800,43 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 	})
 }
 
-func purgeStatefulSet(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+func shouldPurgeStatefulSet(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
 	if reconcileFailedObjs.HasStatefulSet(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == chiv1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == chiv1.ObjectsCleanupDelete
 }
 
-func purgePVC(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+func shouldPurgePVC(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
 	if reconcileFailedObjs.HasPVC(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == chiv1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == chiv1.ObjectsCleanupDelete
 }
 
-func purgeConfigMap(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+func shouldPurgeConfigMap(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
 	if reconcileFailedObjs.HasConfigMap(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == chiv1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == chiv1.ObjectsCleanupDelete
 }
 
-func purgeService(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+func shouldPurgeService(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
 	if reconcileFailedObjs.HasService(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == chiv1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == chiv1.ObjectsCleanupDelete
 }
 
-func purgeSecret(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+func shouldPurgeSecret(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
 	if reconcileFailedObjs.HasSecret(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetSecret() == chiv1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == chiv1.ObjectsCleanupDelete
+}
+
+func shouldPurgePDB(chi *chiv1.ClickHouseInstallation, reconcileFailedObjs *chopmodel.Registry, m meta.ObjectMeta) bool {
+	return true
 }
 
 // purge
@@ -849,7 +854,7 @@ func (w *worker) purge(
 	reg.Walk(func(entityType chopmodel.EntityType, m meta.ObjectMeta) {
 		switch entityType {
 		case chopmodel.StatefulSet:
-			if purgeStatefulSet(chi, reconcileFailedObjs, m) {
+			if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
 				if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
 					w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
@@ -857,7 +862,7 @@ func (w *worker) purge(
 				cnt++
 			}
 		case chopmodel.PVC:
-			if purgePVC(chi, reconcileFailedObjs, m) {
+			if shouldPurgePVC(chi, reconcileFailedObjs, m) {
 				if chopmodel.GetReclaimPolicy(m) == chiv1.PVCReclaimPolicyDelete {
 					w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
 					if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
@@ -866,24 +871,31 @@ func (w *worker) purge(
 				}
 			}
 		case chopmodel.ConfigMap:
-			if purgeConfigMap(chi, reconcileFailedObjs, m) {
+			if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
 				if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
 					w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
 				}
 			}
 		case chopmodel.Service:
-			if purgeService(chi, reconcileFailedObjs, m) {
+			if shouldPurgeService(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
 				if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
 					w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
 				}
 			}
 		case chopmodel.Secret:
-			if purgeSecret(chi, reconcileFailedObjs, m) {
+			if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
 				w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
 				if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
 					w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
+				}
+			}
+		case chopmodel.PDB:
+			if shouldPurgePDB(chi, reconcileFailedObjs, m) {
+				w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
+				if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+					w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
 				}
 			}
 		}
@@ -901,7 +913,6 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
 
-	w.createPodDisruptionBudget(ctx, chi)
 	return chi.WalkTillError(
 		ctx,
 		w.reconcileCHIAuxObjectsPreliminary,
@@ -1180,6 +1191,13 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiv1.ChiCluster
 				w.ctx.registryFailed.RegisterSecret(secret.ObjectMeta)
 			}
 		}
+	}
+
+	pdb := w.ctx.creator.NewPodDisruptionBudget(cluster)
+	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
+		w.ctx.registryReconciled.RegisterPDB(pdb.ObjectMeta)
+	} else {
+		w.ctx.registryFailed.RegisterPDB(pdb.ObjectMeta)
 	}
 
 	return nil
@@ -1517,19 +1535,22 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiv1.ChiHos
 	})
 }
 
-// createPodDisruptionBudget creates PodDisruptionBudget
-func (w *worker) createPodDisruptionBudget(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	pdb, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Create(ctx, w.ctx.creator.NewPodDisruptionBudget(), newCreateOptions())
-	if err != nil {
-		log.V(1).Warning("unable to create PDB %v", err)
-		return
+// reconcilePDB creates PodDisruptionBudget
+func (w *worker) reconcilePDB(ctx context.Context, cluster *chiv1.ChiCluster, pdb *v1.PodDisruptionBudget) error {
+	_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, newGetOptions())
+	switch {
+	case err == nil:
+		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, newUpdateOptions())
+		if err == nil {
+			log.V(1).Info("PDB updated %s/%s", pdb.Namespace, pdb.Name)
+		}
+	case (err != nil) && apierrors.IsNotFound(err):
+		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, newCreateOptions())
+		if err == nil {
+			log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
+		}
 	}
-	log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
-}
-
-// deletePodDisruptionBudget deletes PodDisruptionBudget
-func (w *worker) deletePodDisruptionBudget(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
-	_ = w.c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).Delete(ctx, chi.Name, newDeleteOptions())
+	return nil
 }
 
 // deleteCHI
@@ -1659,8 +1680,6 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiv1.ClickHouseIns
 	}
 
 	// Start delete protocol
-
-	w.deletePodDisruptionBudget(ctx, chi)
 
 	// Exclude this CHI from monitoring
 	w.c.deleteWatch(chi.Namespace, chi.Name)

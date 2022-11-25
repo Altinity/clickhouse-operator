@@ -30,6 +30,7 @@ type ChiCluster struct {
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+// SchemaPolicy defines schema management policy - replica or shard-based
 type SchemaPolicy struct {
 	Replica string `json:"replica" yaml:"replica"`
 	Shard   string `json:"shard"   yaml:"shard"`

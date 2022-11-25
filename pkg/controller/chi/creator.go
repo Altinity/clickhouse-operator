@@ -160,11 +160,10 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.Pe
 				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)
 			}
 			return pvc, err
-		} else {
-			// Any non-NotFound API error - unable to proceed
-			log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
-			return nil, err
 		}
+		// Any non-NotFound API error - unable to proceed
+		log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
+		return nil, err
 	}
 
 	_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
