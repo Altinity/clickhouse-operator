@@ -3013,7 +3013,8 @@ def test_037(self):
 
     with And("I check cluster is restarted and time up new pod start time"):
         start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-        assert start_time == start_time_new, error()
+        assert start_time != start_time_new, error()
+        start_time = start_time_new
 
     with And("I rescale volume configuration to 2Gi to check that storage management is switched"):
         kubectl.create_and_check(
@@ -3028,9 +3029,9 @@ def test_037(self):
         )
 
     with Then("storage size should be 2Gi"):
-        kubectl.wait_field("pvc", f"disk1-chi-test-037-storagemanagement-switch-{cluster}-0-0-0",
+        kubectl.wait_field("pvc", f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0",
                            ".spec.resources.requests.storage", "2Gi")
-        size = kubectl.get_pvc_size(f"disk1-chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
+        size = kubectl.get_pvc_size(f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
         assert size == "2Gi", error()
 
     with And("check the pod's start time to see if it has been restarted"):
