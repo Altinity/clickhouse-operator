@@ -948,7 +948,7 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 }
 
 // baseRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
-// which are applied on each remote_serves reconfiguration during reconcile cycle
+// which are applied on each of `remote_servers` reconfiguration during reconcile cycle
 func (w *worker) baseRemoteServersGeneratorOptions() *chopmodel.RemoteServersGeneratorOptions {
 	opts := chopmodel.NewRemoteServersGeneratorOptions()
 	opts.ExcludeReconcileAttributes(
@@ -1321,7 +1321,7 @@ func (w *worker) shouldMigrateTables(host *chiv1.ChiHost) bool {
 	return true
 }
 
-// Exclude host from ClickHouse clusters if required
+// excludeHost excludes host from ClickHouse clusters if required
 func (w *worker) excludeHost(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -1534,7 +1534,7 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiv1.ChiHos
 	})
 }
 
-// reconcilePDB creates PodDisruptionBudget
+// reconcilePDB reconciles PodDisruptionBudget
 func (w *worker) reconcilePDB(ctx context.Context, cluster *chiv1.ChiCluster, pdb *v1.PodDisruptionBudget) error {
 	_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, newGetOptions())
 	switch {
@@ -1762,7 +1762,6 @@ func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiv1.C
 }
 
 // deleteTables
-// chi is the new CHI in which there will be no more this tabled
 func (w *worker) deleteTables(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -1791,7 +1790,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiv1.ChiHost) error {
 	return err
 }
 
-// deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
+// deleteHost deletes all kubernetes resources related to host
 // chi is the new CHI in which there will be no more this host
 func (w *worker) deleteHost(ctx context.Context, chi *chiv1.ClickHouseInstallation, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
