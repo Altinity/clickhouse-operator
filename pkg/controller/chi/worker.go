@@ -57,6 +57,7 @@ type workerContext struct {
 	registryReconciled *chopmodel.Registry
 	registryFailed     *chopmodel.Registry
 	cmUpdate           time.Time
+	start time.Time
 }
 
 func newWorkerContext(creator *chopmodel.Creator) workerContext {
@@ -65,6 +66,7 @@ func newWorkerContext(creator *chopmodel.Creator) workerContext {
 		registryReconciled: chopmodel.NewRegistry(),
 		registryFailed:     chopmodel.NewRegistry(),
 		cmUpdate:           time.Time{},
+		start: time.Now(),
 	}
 }
 
@@ -93,6 +95,24 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 func (w *worker) newContext(chi *chiv1.ClickHouseInstallation) {
 	w.ctx = newWorkerContext(chopmodel.NewCreator(chi))
+}
+
+func (w * worker) isJustStarted() bool {
+	return time.Since(w.start) < 1*time.Minute
+}
+
+func (w *worker) shouldForceRestartHost(host *chiv1.ChiHost) bool {
+	// For 
+	if w.isEarlyContext() {
+		return false
+	}
+	// RollingUpdate purpose is to always shut the host down.
+	// It is such an interesting policy.
+	return host.GetCHI().IsRollingUpdate()
+}
+
+func (w *worker) isEarlyContext() bool {
+	return w.ctx.start.Sub(w.start) < 1*time.Minute
 }
 
 // run is an endless work loop, expected to be run in a thread
@@ -384,9 +404,7 @@ func (w *worker) isCleanRestartOnTheSameIP(chi *chiv1.ClickHouseInstallation) bo
 // isCleanRestart checks whether it is just a restart of the operator and CHI has no changes since last processed
 func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
 	// Operator just recently started
-	timeIsOk := time.Since(w.start) < 1*time.Minute
-
-	if !timeIsOk {
+	if !w.isJustStarted() {
 		// Need to have operator recently started
 		return false
 	}
@@ -1119,10 +1137,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiv1.ChiHo
 		return nil
 	}
 
-	// RollingUpdate is made with always shutting the host down.
-	// It is such an interesting policy.
+	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
-	if host.CHI.IsRollingUpdate() {
+	if w.shouldForceRestartHost(host) {
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host)
 		// At this moment StatefulSet has 0 replicas.
@@ -1440,7 +1457,7 @@ func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 			M(host).F().
 			Info("No need to exclude stopped host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
-	case host.GetCHI().IsRollingUpdate():
+	case w.shouldForceRestartHost(host):
 		w.a.V(1).
 			M(host).F().
 			Info("While rolling update host would be restarted host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
