@@ -52,6 +52,7 @@ type worker struct {
 	ctx        workerContext
 }
 
+// workerContext represents context of a worker. This also can be called "a reconcile task"
 type workerContext struct {
 	creator            *chopmodel.Creator
 	registryReconciled *chopmodel.Registry
@@ -60,6 +61,7 @@ type workerContext struct {
 	start              time.Time
 }
 
+// newWorkerContext creates new context
 func newWorkerContext(creator *chopmodel.Creator) workerContext {
 	return workerContext{
 		creator:            creator,
@@ -93,14 +95,17 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	}
 }
 
+// newContext creates new context
 func (w *worker) newContext(chi *chiv1.ClickHouseInstallation) {
 	w.ctx = newWorkerContext(chopmodel.NewCreator(chi))
 }
 
+// isJustStarted checks whether worked just started
 func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < 1*time.Minute
 }
 
+// shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *chiv1.ChiHost) bool {
 	// For recent tasks should not do force restart
 	if w.isEarlyContext() {
@@ -111,6 +116,7 @@ func (w *worker) shouldForceRestartHost(host *chiv1.ChiHost) bool {
 	return host.GetCHI().IsRollingUpdate()
 }
 
+// isEarlyContext checks whether this context/task has been started after worker start
 func (w *worker) isEarlyContext() bool {
 	return w.ctx.start.Sub(w.start) < 1*time.Minute
 }
