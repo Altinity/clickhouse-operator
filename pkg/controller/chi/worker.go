@@ -1023,30 +1023,6 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiv1.Cli
 	return w.reconcileCHIConfigMapCommon(ctx, chi, nil)
 }
 
-// reconcileCHIConfigMaps reconciles all CHI's ConfigMaps
-/*
-func (w *worker) reconcileCHIConfigMaps(
-	task context.Context,
-	chi *chiv1.ClickHouseInstallation,
-	options *chopmodel.ClickHouseConfigFilesGeneratorOptions,
-	update bool,
-) error {
-	if util.IsContextDone(task) {
-		return nil
-	}
-
-	if err := w.reconcileCHIConfigMapCommon(task, chi, options, update); err != nil {
-		return err
-	}
-
-	if err := w.reconcileCHIConfigMapUsers(task, chi, options, update); err != nil {
-		return err
-	}
-
-	return nil
-}
-*/
-
 // reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
 func (w *worker) reconcileCHIConfigMapCommon(
 	ctx context.Context,
