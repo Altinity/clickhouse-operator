@@ -57,7 +57,7 @@ type workerContext struct {
 	registryReconciled *chopmodel.Registry
 	registryFailed     *chopmodel.Registry
 	cmUpdate           time.Time
-	start time.Time
+	start              time.Time
 }
 
 func newWorkerContext(creator *chopmodel.Creator) workerContext {
@@ -66,7 +66,7 @@ func newWorkerContext(creator *chopmodel.Creator) workerContext {
 		registryReconciled: chopmodel.NewRegistry(),
 		registryFailed:     chopmodel.NewRegistry(),
 		cmUpdate:           time.Time{},
-		start: time.Now(),
+		start:              time.Now(),
 	}
 }
 
@@ -97,12 +97,12 @@ func (w *worker) newContext(chi *chiv1.ClickHouseInstallation) {
 	w.ctx = newWorkerContext(chopmodel.NewCreator(chi))
 }
 
-func (w * worker) isJustStarted() bool {
+func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < 1*time.Minute
 }
 
 func (w *worker) shouldForceRestartHost(host *chiv1.ChiHost) bool {
-	// For 
+	// For recent tasks should not do force restart
 	if w.isEarlyContext() {
 		return false
 	}
