@@ -35,7 +35,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiv1.ChiHost)
 	log.V(1).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -67,7 +67,7 @@ func (c *Controller) updateStatefulSet(
 	log.V(2).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -128,8 +128,8 @@ func (c *Controller) updateStatefulSet(
 func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	log.V(2).M(pv).F().P()
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil, fmt.Errorf("ctx is done")
+		log.V(2).Info("task is done")
+		return nil, fmt.Errorf("task is done")
 	}
 
 	var err error
@@ -147,8 +147,8 @@ func (c *Controller) updatePersistentVolume(ctx context.Context, pv *v1.Persiste
 func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
-		return nil, fmt.Errorf("ctx is done")
+		log.V(2).Info("task is done")
+		return nil, fmt.Errorf("task is done")
 	}
 
 	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
@@ -188,7 +188,7 @@ var errUnexpectedFlow = errors.New("unexpected flow")
 // It can just delete failed StatefulSet or do nothing
 func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return errIgnore
 	}
 
@@ -222,7 +222,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiv1.
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
 func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return errIgnore
 	}
 
@@ -302,7 +302,7 @@ func (c *Controller) createSecret(ctx context.Context, secret *v1.Secret) error 
 	log.V(1).M(secret).F().P()
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 

@@ -91,7 +91,7 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 		namespace = typedObj.Address.Namespace
 	}
 	return c.serviceLister.Services(namespace).Get(name)
-	//return c.kubeClient.CoreV1().Services(namespace).Get(newContext(), name, newGetOptions())
+	//return c.kubeClient.CoreV1().Services(namespace).Get(newTask(), name, newGetOptions())
 }
 
 // getStatefulSet gets StatefulSet. Accepted types:

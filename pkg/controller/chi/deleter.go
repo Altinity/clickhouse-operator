@@ -46,7 +46,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *chop.ChiHost) error {
 // deleteConfigMapsCHI
 func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -89,7 +89,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
 func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -111,7 +111,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -166,7 +166,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 func (c *Controller) syncStatefulSet(ctx context.Context, host *chop.ChiHost) {
 	for {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return
 		}
 		// TODO
@@ -184,7 +184,7 @@ func (c *Controller) syncStatefulSet(ctx context.Context, host *chop.ChiHost) {
 // deletePVC deletes PersistentVolumeClaim
 func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -194,7 +194,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 	namespace := host.Address.Namespace
 	c.walkDiscoveredPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return
 		}
 
@@ -220,7 +220,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 // deleteConfigMap deletes ConfigMap
 func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -240,7 +240,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 	//namespace = host.Address.Namespace
 	//log.V(1).M(host).F().Info("%s/%s", namespace, name)
 	//
-	//if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
+	//if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(task, name, newDeleteOptions()); err == nil {
 	//	log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
 	//} else if apierrors.IsNotFound(err) {
 	//	log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
@@ -254,7 +254,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 // deleteServiceHost deletes Service
 func (c *Controller) deleteServiceHost(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -267,7 +267,7 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *chop.ChiHost) 
 // deleteServiceShard
 func (c *Controller) deleteServiceShard(ctx context.Context, shard *chop.ChiShard) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -280,7 +280,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *chop.ChiShar
 // deleteServiceCluster
 func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chop.ChiCluster) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -293,7 +293,7 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chop.Chi
 // deleteServiceCHI
 func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -306,7 +306,7 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chop.ClickHouseI
 // deleteServiceIfExists deletes Service in case it does not exist
 func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name string) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -332,7 +332,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 // deleteSecretCluster
 func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chop.ChiCluster) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -345,7 +345,7 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chop.ChiC
 // deleteSecretIfExists deletes Secret in case it does not exist
 func (c *Controller) deleteSecretIfExists(ctx context.Context, namespace, name string) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 

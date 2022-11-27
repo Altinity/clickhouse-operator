@@ -190,7 +190,7 @@ func (c *Controller) pollStatefulSet(
 	backFn func(),
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 	opts = opts.Ensure().FromConfig(chop.Config())
@@ -213,7 +213,7 @@ func (c *Controller) pollStatefulSet(
 	start := time.Now()
 	for {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return nil
 		}
 
@@ -297,7 +297,7 @@ func (c *Controller) pollHostContext(
 	f func(ctx context.Context, host *chiv1.ChiHost) bool,
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -309,7 +309,7 @@ func (c *Controller) pollHostContext(
 	start := time.Now()
 	for {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return nil
 		}
 
@@ -320,7 +320,7 @@ func (c *Controller) pollHostContext(
 		}
 
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return nil
 		}
 

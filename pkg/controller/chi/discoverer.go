@@ -27,7 +27,7 @@ import (
 
 func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstallation) *chopmodel.Registry {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
