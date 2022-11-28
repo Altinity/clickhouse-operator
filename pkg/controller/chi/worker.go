@@ -21,18 +21,18 @@ import (
 
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
-	core "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	coreV1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/altinity/queue"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -45,27 +45,27 @@ type worker struct {
 	a Announcer
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
-	normalizer *chopmodel.Normalizer
-	schemer    *chopmodel.Schemer
+	normalizer *chopModel.Normalizer
+	schemer    *chopModel.Schemer
 	start      time.Time
 	task       task
 }
 
 // task represents context of a worker. This also can be called "a reconcile task"
 type task struct {
-	creator            *chopmodel.Creator
-	registryReconciled *chopmodel.Registry
-	registryFailed     *chopmodel.Registry
+	creator            *chopModel.Creator
+	registryReconciled *chopModel.Registry
+	registryFailed     *chopModel.Registry
 	cmUpdate           time.Time
 	start              time.Time
 }
 
 // newTask creates new context
-func newTask(creator *chopmodel.Creator) task {
+func newTask(creator *chopModel.Creator) task {
 	return task{
 		creator:            creator,
-		registryReconciled: chopmodel.NewRegistry(),
-		registryFailed:     chopmodel.NewRegistry(),
+		registryReconciled: chopModel.NewRegistry(),
+		registryFailed:     chopModel.NewRegistry(),
 		cmUpdate:           time.Time{},
 		start:              time.Now(),
 	}
@@ -76,14 +76,14 @@ func newTask(creator *chopmodel.Creator) task {
 func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	start := time.Now()
 	if !sys {
-		start = start.Add(chiv1.DefaultReconcileThreadsWarmup)
+		start = start.Add(chiV1.DefaultReconcileThreadsWarmup)
 	}
 	return &worker{
 		c:          c,
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
-		normalizer: chopmodel.NewNormalizer(c.kubeClient),
-		schemer: chopmodel.NewSchemer(
+		normalizer: chopModel.NewNormalizer(c.kubeClient),
+		schemer: chopModel.NewSchemer(
 			chop.Config().ClickHouse.Access.Scheme,
 			chop.Config().ClickHouse.Access.Username,
 			chop.Config().ClickHouse.Access.Password,
@@ -95,8 +95,8 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 }
 
 // newContext creates new reconcile task
-func (w *worker) newTask(chi *chiv1.ClickHouseInstallation) {
-	w.task = newTask(chopmodel.NewCreator(chi))
+func (w *worker) newTask(chi *chiV1.ClickHouseInstallation) {
+	w.task = newTask(chopModel.NewCreator(chi))
 }
 
 // isJustStarted checks whether worked just started
@@ -105,7 +105,7 @@ func (w *worker) isJustStarted() bool {
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
-func (w *worker) shouldForceRestartHost(host *chiv1.ChiHost) bool {
+func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
 	// For recent tasks should not do force restart
 	if w.isEarlyContext() {
 		return false
@@ -145,7 +145,7 @@ func (w *worker) run() {
 		if err := w.processItem(ctx, item); err != nil {
 			// Item not processed
 			// this code cannot return an error and needs to indicate error has been ignored
-			utilruntime.HandleError(err)
+			utilRuntime.HandleError(err)
 		}
 
 		// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
@@ -170,7 +170,7 @@ func (w *worker) processReconcileCHI(ctx context.Context, cmd *ReconcileCHI) err
 
 	// Unknown item type, don't know what to do with it
 	// Just skip it and behave like it never existed
-	utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
 	return nil
 }
 
@@ -186,7 +186,7 @@ func (w *worker) processReconcileCHIT(cmd *ReconcileCHIT) error {
 
 	// Unknown item type, don't know what to do with it
 	// Just skip it and behave like it never existed
-	utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
 	return nil
 }
 
@@ -202,7 +202,7 @@ func (w *worker) processReconcileChopConfig(cmd *ReconcileChopConfig) error {
 
 	// Unknown item type, don't know what to do with it
 	// Just skip it and behave like it never existed
-	utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
 	return nil
 }
 
@@ -214,12 +214,12 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 
 	// Unknown item type, don't know what to do with it
 	// Just skip it and behave like it never existed
-	utilruntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
 	return nil
 }
 
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
-	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopmodel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.schemer.CHIDropDnsCache(ctx, chi)
 	} else {
@@ -253,16 +253,16 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 
 	// Unknown item type, don't know what to do with it
 	// Just skip it and behave like it never existed
-	utilruntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
+	utilRuntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
 	return nil
 }
 
 // normalize
-func (w *worker) normalize(c *chiv1.ClickHouseInstallation) *chiv1.ClickHouseInstallation {
+func (w *worker) normalize(c *chiV1.ClickHouseInstallation) *chiV1.ClickHouseInstallation {
 	w.a.V(3).M(c).S().P()
 	defer w.a.V(3).M(c).E().P()
 
-	chi, err := w.normalizer.CreateTemplatedCHI(c, chopmodel.NewNormalizerOptions())
+	chi, err := w.normalizer.CreateTemplatedCHI(c, chopModel.NewNormalizerOptions())
 	if err != nil {
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -272,7 +272,7 @@ func (w *worker) normalize(c *chiv1.ClickHouseInstallation) *chiv1.ClickHouseIns
 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI %s/%s: %v", chi.Namespace, chi.Name, ips)
-	opts := chopmodel.NewNormalizerOptions()
+	opts := chopModel.NewNormalizerOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
 	chi, err = w.normalizer.CreateTemplatedCHI(c, opts)
@@ -287,7 +287,7 @@ func (w *worker) normalize(c *chiv1.ClickHouseInstallation) *chiv1.ClickHouseIns
 }
 
 // ensureFinalizer
-func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInstallation) bool {
+func (w *worker) ensureFinalizer(ctx context.Context, chi *chiV1.ClickHouseInstallation) bool {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return false
@@ -316,13 +316,13 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiv1.ClickHouseInsta
 }
 
 // updateEndpoints updates endpoints
-func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
+func (w *worker) updateEndpoints(ctx context.Context, old, new *coreV1.Endpoints) error {
 
-	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, chopmodel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-1 %v", ips)
-		opts := chopmodel.NewNormalizerOptions()
+		opts := chopModel.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
@@ -330,7 +330,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			w.reconcileCHIConfigMapUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				TolerateAbsence: true,
-				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 					Normalized: true,
 				},
 			})
@@ -344,7 +344,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 }
 
 // updateCHI sync CHI which was already created earlier
-func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
+func (w *worker) updateCHI(ctx context.Context, old, new *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -400,14 +400,14 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiv1.ClickHouseInstal
 }
 
 // isCleanRestartOnTheSameIP checks whether it is just a restart of the operator on the same IP
-func (w *worker) isCleanRestartOnTheSameIP(chi *chiv1.ClickHouseInstallation) bool {
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_IP)
+func (w *worker) isCleanRestartOnTheSameIP(chi *chiV1.ClickHouseInstallation) bool {
+	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
 	ipIsTheSame := ip == chi.Status.GetCHOpIP()
 	return w.isCleanRestart(chi) && ipIsTheSame
 }
 
 // isCleanRestart checks whether it is just a restart of the operator and CHI has no changes since last processed
-func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
+func (w *worker) isCleanRestart(chi *chiV1.ClickHouseInstallation) bool {
 	// Operator just recently started
 	if !w.isJustStarted() {
 		// Need to have operator recently started
@@ -420,7 +420,7 @@ func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
 	// such a version of the operator, where there is no completed CHI at all
 	noCompletedCHI := chi.Status.GetNormalizedCHICompleted() == nil
 	// Having status completed and not having completed CHI suggests we are migrating operator version
-	statusIsCompleted := chi.Status.GetStatus() == chiv1.StatusCompleted
+	statusIsCompleted := chi.Status.GetStatus() == chiV1.StatusCompleted
 	if noCompletedCHI && statusIsCompleted {
 		// In case of a restart - assume that normalized is already completed
 		chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
@@ -438,7 +438,7 @@ func (w *worker) isCleanRestart(chi *chiv1.ClickHouseInstallation) bool {
 }
 
 // areUsableOldAndNew checks whether there are old and new usable
-func (w *worker) areUsableOldAndNew(old, new *chiv1.ClickHouseInstallation) bool {
+func (w *worker) areUsableOldAndNew(old, new *chiV1.ClickHouseInstallation) bool {
 	if old == nil {
 		return false
 	}
@@ -449,7 +449,7 @@ func (w *worker) areUsableOldAndNew(old, new *chiv1.ClickHouseInstallation) bool
 }
 
 // isAfterFinalizerInstalled checks whether we are just installed finalizer
-func (w *worker) isAfterFinalizerInstalled(old, new *chiv1.ClickHouseInstallation) bool {
+func (w *worker) isAfterFinalizerInstalled(old, new *chiV1.ClickHouseInstallation) bool {
 	if !w.areUsableOldAndNew(old, new) {
 		return false
 	}
@@ -459,7 +459,7 @@ func (w *worker) isAfterFinalizerInstalled(old, new *chiv1.ClickHouseInstallatio
 }
 
 // isGenerationTheSame checks whether old ans new CHI have the same generation
-func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) bool {
+func (w *worker) isGenerationTheSame(old, new *chiV1.ClickHouseInstallation) bool {
 	if !w.areUsableOldAndNew(old, new) {
 		return false
 	}
@@ -468,7 +468,7 @@ func (w *worker) isGenerationTheSame(old, new *chiv1.ClickHouseInstallation) boo
 }
 
 // logCHI writes a CHI into the log
-func (w *worker) logCHI(name string, chi *chiv1.ClickHouseInstallation) {
+func (w *worker) logCHI(name string, chi *chiV1.ClickHouseInstallation) {
 	w.a.V(2).M(chi).Info(
 		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
 		name,
@@ -478,7 +478,7 @@ func (w *worker) logCHI(name string, chi *chiv1.ClickHouseInstallation) {
 }
 
 // logActionPlan logs action plan
-func (w *worker) logActionPlan(ap *chopmodel.ActionPlan) {
+func (w *worker) logActionPlan(ap *chopModel.ActionPlan) {
 	w.a.Info(
 		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
 		ap,
@@ -486,18 +486,18 @@ func (w *worker) logActionPlan(ap *chopmodel.ActionPlan) {
 }
 
 // logOldAndNew writes old and new CHIs into the log
-func (w *worker) logOldAndNew(name string, old, new *chiv1.ClickHouseInstallation) {
+func (w *worker) logOldAndNew(name string, old, new *chiV1.ClickHouseInstallation) {
 	w.logCHI(name+" old", old)
 	w.logCHI(name+" new", new)
 }
 
-func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiv1.ClickHouseInstallation) {
+func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 	start := time.Now()
-	w.c.poll(ctx, chi, func(c *chiv1.ClickHouseInstallation, e error) bool {
+	w.c.poll(ctx, chi, func(c *chiV1.ClickHouseInstallation, e error) bool {
 		if len(c.Status.GetPodIPS()) >= len(c.Status.GetPods()) {
 			// Stop polling
 			w.a.V(1).M(c).Info("all IP addresses are in place")
@@ -514,7 +514,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiv1.ClickHouseIn
 	})
 }
 
-func (w *worker) excludeStopped(chi *chiv1.ClickHouseInstallation) {
+func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
 	// Exclude stopped CHI from monitoring
 	if chi.IsStopped() {
 		w.a.V(1).
@@ -526,18 +526,18 @@ func (w *worker) excludeStopped(chi *chiv1.ClickHouseInstallation) {
 	}
 }
 
-func (w *worker) includeStopped(chi *chiv1.ClickHouseInstallation) {
+func (w *worker) includeStopped(chi *chiV1.ClickHouseInstallation) {
 	if !chi.IsStopped() {
 		w.a.V(1).
 			WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("add CHI to monitoring")
-		w.c.updateWatch(chi.Namespace, chi.Name, chopmodel.CreateFQDNs(chi, nil, false))
+		w.c.updateWatch(chi.Namespace, chi.Name, chopModel.CreateFQDNs(chi, nil, false))
 	}
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -546,7 +546,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	chi.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 			MainFields: true,
 		},
 	})
@@ -560,18 +560,18 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiv1.ClickHouseIn
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
-func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHouseInstallation) {
+func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, chopmodel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-2 %v", ips)
-		opts := chopmodel.NewNormalizerOptions()
+		opts := chopModel.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
@@ -579,7 +579,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 			chi.EnsureStatus().NormalizedCHI = nil
 			chi.EnsureStatus().ReconcileComplete()
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 					WholeStatus: true,
 				},
 			})
@@ -598,7 +598,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiv1.ClickHou
 		Info("reconcile completed")
 }
 
-func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallation, ap *chopmodel.ActionPlan) {
+func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -606,15 +606,15 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 
 	objs := w.c.discovery(ctx, chi)
 	ap.WalkAdded(
-		func(cluster *chiv1.ChiCluster) {
-			cluster.WalkHosts(func(host *chiv1.ChiHost) error {
+		func(cluster *chiV1.ChiCluster) {
+			cluster.WalkHosts(func(host *chiV1.ChiHost) error {
 
 				// Name of the StatefulSet for this host
-				name := chopmodel.CreateStatefulSetName(host)
+				name := chopModel.CreateStatefulSetName(host)
 				// Have we found this StatefulSet
 				found := false
 
-				objs.WalkStatefulSet(func(meta meta.ObjectMeta) {
+				objs.WalkStatefulSet(func(meta metaV1.ObjectMeta) {
 					if name == meta.Name {
 						// StatefulSet of this host already exist
 						found = true
@@ -635,28 +635,28 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 				return nil
 			})
 		},
-		func(shard *chiv1.ChiShard) {
-			shard.WalkHosts(func(host *chiv1.ChiHost) error {
+		func(shard *chiV1.ChiShard) {
+			shard.WalkHosts(func(host *chiV1.ChiHost) error {
 				(&host.ReconcileAttributes).SetAdd()
 				return nil
 			})
 		},
-		func(host *chiv1.ChiHost) {
+		func(host *chiV1.ChiHost) {
 			(&host.ReconcileAttributes).SetAdd()
 		},
 	)
 
 	ap.WalkModified(
-		func(cluster *chiv1.ChiCluster) {
+		func(cluster *chiV1.ChiCluster) {
 		},
-		func(shard *chiv1.ChiShard) {
+		func(shard *chiV1.ChiShard) {
 		},
-		func(host *chiv1.ChiHost) {
+		func(host *chiV1.ChiHost) {
 			(&host.ReconcileAttributes).SetModify()
 		},
 	)
 
-	chi.WalkHosts(func(host *chiv1.ChiHost) error {
+	chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		if host.ReconcileAttributes.IsAdd() {
 			// Already added
 			return nil
@@ -670,7 +670,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 		return nil
 	})
 
-	chi.WalkHosts(func(host *chiv1.ChiHost) error {
+	chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		if host.ReconcileAttributes.IsAdd() {
 			w.a.M(host).Info("ADD host: %s", host.Address.CompactString())
 			return nil
@@ -690,17 +690,17 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 
 // baseRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
 // which are applied on each of `remote_servers` reconfiguration during reconcile cycle
-func (w *worker) baseRemoteServersGeneratorOptions() *chopmodel.RemoteServersGeneratorOptions {
-	opts := chopmodel.NewRemoteServersGeneratorOptions()
+func (w *worker) baseRemoteServersGeneratorOptions() *chopModel.RemoteServersGeneratorOptions {
+	opts := chopModel.NewRemoteServersGeneratorOptions()
 	opts.ExcludeReconcileAttributes(
-		chiv1.NewChiHostReconcileAttributes().SetAdd(),
+		chiV1.NewChiHostReconcileAttributes().SetAdd(),
 	)
 
 	return opts
 }
 
 // options build ClickHouseConfigFilesGeneratorOptions
-func (w *worker) options(excludeHosts ...*chiv1.ChiHost) *chopmodel.ClickHouseConfigFilesGeneratorOptions {
+func (w *worker) options(excludeHosts ...*chiV1.ChiHost) *chopModel.ClickHouseConfigFilesGeneratorOptions {
 	// Stringify
 	str := ""
 	for _, host := range excludeHosts {
@@ -709,11 +709,11 @@ func (w *worker) options(excludeHosts ...*chiv1.ChiHost) *chopmodel.ClickHouseCo
 
 	opts := w.baseRemoteServersGeneratorOptions().ExcludeHosts(excludeHosts...)
 	w.a.Info("RemoteServersGeneratorOptions: %s, excluded host(s): %s", opts, str)
-	return chopmodel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
+	return chopModel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status
-func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chiv1.ChiHost, shutdown bool) {
+func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chiV1.ChiHost, shutdown bool) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -725,7 +725,7 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chi
 }
 
 // migrateTables
-func (w *worker) migrateTables(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -753,12 +753,12 @@ func (w *worker) migrateTables(ctx context.Context, host *chiv1.ChiHost) error {
 }
 
 // shouldMigrateTables
-func (w *worker) shouldMigrateTables(host *chiv1.ChiHost) bool {
+func (w *worker) shouldMigrateTables(host *chiV1.ChiHost) bool {
 	switch {
 	case host.GetCHI().IsStopped():
 		// Stopped host is not able to receive data
 		return false
-	case host.ReconcileAttributes.GetStatus() == chiv1.StatefulSetStatusSame:
+	case host.ReconcileAttributes.GetStatus() == chiV1.StatefulSetStatusSame:
 		// No need to migrate on the same host
 		return false
 	}
@@ -766,7 +766,7 @@ func (w *worker) shouldMigrateTables(host *chiv1.ChiHost) bool {
 }
 
 // excludeHost excludes host from ClickHouse clusters if required
-func (w *worker) excludeHost(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) excludeHost(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -785,7 +785,7 @@ func (w *worker) excludeHost(ctx context.Context, host *chiv1.ChiHost) error {
 }
 
 // shouldIncludeHost determines whether host to be included into cluster after reconciling
-func (w *worker) shouldIncludeHost(host *chiv1.ChiHost) bool {
+func (w *worker) shouldIncludeHost(host *chiV1.ChiHost) bool {
 	switch {
 	case host.GetCHI().IsStopped():
 		// No need to include stopped host
@@ -795,7 +795,7 @@ func (w *worker) shouldIncludeHost(host *chiv1.ChiHost) bool {
 }
 
 // includeHost includes host back back into ClickHouse clusters
-func (w *worker) includeHost(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) includeHost(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -814,7 +814,7 @@ func (w *worker) includeHost(ctx context.Context, host *chiv1.ChiHost) error {
 }
 
 // excludeHostFromService
-func (w *worker) excludeHostFromService(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) excludeHostFromService(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -826,7 +826,7 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *chiv1.ChiHost
 }
 
 // includeHostIntoService
-func (w *worker) includeHostIntoService(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) includeHostIntoService(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -838,7 +838,7 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *chiv1.ChiHost
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
-func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chiv1.ChiHost) {
+func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chiV1.ChiHost) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -859,7 +859,7 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *chi
 }
 
 // includeHostIntoClickHouseCluster includes host into ClickHouse configuration
-func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chiv1.ChiHost) {
+func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chiV1.ChiHost) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -875,7 +875,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
-func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
+func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	switch {
 	case host.GetCHI().IsStopped():
@@ -888,12 +888,12 @@ func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 			M(host).F().
 			Info("While rolling update host would be restarted host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
-	case status == chiv1.StatefulSetStatusNew:
+	case status == chiV1.StatefulSetStatusNew:
 		w.a.V(1).
 			M(host).F().
 			Info("Nothing to exclude, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
-	case status == chiv1.StatefulSetStatusSame:
+	case status == chiV1.StatefulSetStatusSame:
 		w.a.V(1).
 			M(host).F().
 			Info("The same host would not be updated host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
@@ -913,7 +913,7 @@ func (w *worker) shouldExcludeHost(host *chiv1.ChiHost) bool {
 }
 
 // shouldWaitExcludeHost determines whether reconciler should wait for host to be excluded from cluster
-func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
+func (w *worker) shouldWaitExcludeHost(host *chiV1.ChiHost) bool {
 	// Check CHI settings
 	switch {
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
@@ -935,12 +935,12 @@ func (w *worker) shouldWaitExcludeHost(host *chiv1.ChiHost) bool {
 }
 
 // shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
-func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
+func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
 	status := host.ReconcileAttributes.GetStatus()
 	switch {
-	case status == chiv1.StatefulSetStatusNew:
+	case status == chiV1.StatefulSetStatusNew:
 		return false
-	case status == chiv1.StatefulSetStatusSame:
+	case status == chiV1.StatefulSetStatusSame:
 		// The same host was not modified and no need to wait it to be included - it already is
 		return false
 	case host.GetShard().HostsCount() == 1:
@@ -959,27 +959,27 @@ func (w *worker) shouldWaitIncludeHost(host *chiv1.ChiHost) bool {
 }
 
 // waitHostInCluster
-func (w *worker) waitHostInCluster(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) waitHostInCluster(ctx context.Context, host *chiV1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, w.schemer.IsHostInCluster)
 }
 
 // waitHostNotInCluster
-func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiv1.ChiHost) error {
-	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiv1.ChiHost) bool {
+func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiV1.ChiHost) error {
+	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
 		return !w.schemer.IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
-func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiv1.ChiHost) error {
-	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiv1.ChiHost) bool {
+func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiV1.ChiHost) error {
+	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
 		n, _ := w.schemer.HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool, options *chopmodel.NormalizerOptions) (*chiv1.ClickHouseInstallation, error) {
+func (w *worker) createCHIFromObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI bool, options *chopModel.NormalizerOptions) (*chiV1.ClickHouseInstallation, error) {
 	w.a.V(3).M(objectMeta).S().P()
 	defer w.a.V(3).M(objectMeta).E().P()
 
@@ -997,7 +997,7 @@ func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool
 }
 
 // updateConfigMap
-func (w *worker) updateConfigMap(ctx context.Context, chi *chiv1.ClickHouseInstallation, configMap *core.ConfigMap) error {
+func (w *worker) updateConfigMap(ctx context.Context, chi *chiV1.ClickHouseInstallation, configMap *coreV1.ConfigMap) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1025,7 +1025,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 }
 
 // createConfigMap
-func (w *worker) createConfigMap(ctx context.Context, chi *chiv1.ClickHouseInstallation, configMap *core.ConfigMap) error {
+func (w *worker) createConfigMap(ctx context.Context, chi *chiV1.ClickHouseInstallation, configMap *coreV1.ConfigMap) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1052,9 +1052,9 @@ func (w *worker) createConfigMap(ctx context.Context, chi *chiv1.ClickHouseInsta
 // updateService
 func (w *worker) updateService(
 	ctx context.Context,
-	chi *chiv1.ClickHouseInstallation,
-	curService *core.Service,
-	newService *core.Service,
+	chi *chiV1.ClickHouseInstallation,
+	curService *coreV1.Service,
+	newService *coreV1.Service,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -1071,8 +1071,8 @@ func (w *worker) updateService(
 	// if unused or else creation of the service will fail.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
-	if ((curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)) ||
-		((curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)) {
+	if ((curService.Spec.Type == coreV1.ServiceTypeNodePort) && (newService.Spec.Type == coreV1.ServiceTypeNodePort)) ||
+		((curService.Spec.Type == coreV1.ServiceTypeLoadBalancer) && (newService.Spec.Type == coreV1.ServiceTypeLoadBalancer)) {
 		// No changes in service type and service type assumes NodePort to be allocated.
 		// !!! IMPORTANT !!!
 		// The same exposed port details can not be changed. This is important limitation
@@ -1101,8 +1101,8 @@ func (w *worker) updateService(
 	// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
 	// In case ExternalTrafficPolicy is changed it seems to be irrelevant
 	// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-	if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
-		(newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
+	if (curService.Spec.ExternalTrafficPolicy == coreV1.ServiceExternalTrafficPolicyTypeLocal) &&
+		(newService.Spec.ExternalTrafficPolicy == coreV1.ServiceExternalTrafficPolicyTypeLocal) {
 		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
 	}
 
@@ -1134,7 +1134,7 @@ func (w *worker) updateService(
 }
 
 // createService
-func (w *worker) createService(ctx context.Context, chi *chiv1.ClickHouseInstallation, service *core.Service) error {
+func (w *worker) createService(ctx context.Context, chi *chiV1.ClickHouseInstallation, service *coreV1.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1159,7 +1159,7 @@ func (w *worker) createService(ctx context.Context, chi *chiv1.ClickHouseInstall
 }
 
 // createSecret
-func (w *worker) createSecret(ctx context.Context, chi *chiv1.ClickHouseInstallation, secret *core.Secret) error {
+func (w *worker) createSecret(ctx context.Context, chi *chiV1.ClickHouseInstallation, secret *coreV1.Secret) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1184,7 +1184,7 @@ func (w *worker) createSecret(ctx context.Context, chi *chiv1.ClickHouseInstalla
 }
 
 // getStatefulSetStatus
-func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) chiv1.StatefulSetStatus {
+func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetStatus {
 	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
 	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
 
@@ -1201,7 +1201,7 @@ func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) chiv1.StatefulSetSta
 					"cur and new StatefulSets ARE EQUAL based on labels. No reconcile is required for: %s",
 					util.NamespaceNameString(meta),
 				)
-				return chiv1.StatefulSetStatusSame
+				return chiV1.StatefulSetStatusSame
 			}
 			//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
 			//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
@@ -1214,23 +1214,23 @@ func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) chiv1.StatefulSetSta
 				"cur and new StatefulSets ARE DIFFERENT based on labels. Reconcile is required for: %s",
 				util.NamespaceNameString(meta),
 			)
-			return chiv1.StatefulSetStatusModified
+			return chiV1.StatefulSetStatusModified
 		}
 		// No labels to compare, we can not say for sure what exactly is going on
-		return chiv1.StatefulSetStatusUnknown
+		return chiV1.StatefulSetStatusUnknown
 	}
 
 	// No cur StatefulSet available
 
-	if apierrors.IsNotFound(err) {
-		return chiv1.StatefulSetStatusNew
+	if apiErrors.IsNotFound(err) {
+		return chiV1.StatefulSetStatusNew
 	}
 
-	return chiv1.StatefulSetStatusUnknown
+	return chiV1.StatefulSetStatusUnknown
 }
 
 // createStatefulSet
-func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1251,7 +1251,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 
 	host.CHI.EnsureStatus().AddedHostsCount++
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-		CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 			MainFields: true,
 		},
 	})
@@ -1279,7 +1279,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 }
 
 // waitConfigMapPropagation
-func (w *worker) waitConfigMapPropagation(ctx context.Context, host *chiv1.ChiHost) bool {
+func (w *worker) waitConfigMapPropagation(ctx context.Context, host *chiV1.ChiHost) bool {
 	// No need to wait for ConfigMap propagation on stopped host
 	if host.GetCHI().IsStopped() {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
@@ -1320,7 +1320,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *chiv1.ChiHo
 }
 
 // updateStatefulSet
-func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1347,12 +1347,12 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 		return nil
 	}
 
-	if chopmodel.IsStatefulSetReady(curStatefulSet) {
+	if chopModel.IsStatefulSetReady(curStatefulSet) {
 		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 		if err == nil {
 			host.CHI.EnsureStatus().UpdatedHostsCount++
 			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: chiv1.CopyCHIStatusOptions{
+				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 					MainFields: true,
 				},
 			})
@@ -1381,7 +1381,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiv1.ChiHost) err
 }
 
 // recreateStatefulSet
-func (w *worker) recreateStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) recreateStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1395,23 +1395,23 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *chiv1.ChiHost) e
 
 // applyPVCResourcesRequests
 func (w *worker) applyPVCResourcesRequests(
-	pvc *core.PersistentVolumeClaim,
-	template *chiv1.ChiVolumeClaimTemplate,
+	pvc *coreV1.PersistentVolumeClaim,
+	template *chiV1.ChiVolumeClaimTemplate,
 ) bool {
 	return w.applyResourcesList(pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
 }
 
 // applyResourcesList
 func (w *worker) applyResourcesList(
-	curResourceList core.ResourceList,
-	desiredResourceList core.ResourceList,
+	curResourceList coreV1.ResourceList,
+	desiredResourceList coreV1.ResourceList,
 ) bool {
 	// Prepare lists of resource names
-	var curResourceNames []core.ResourceName
+	var curResourceNames []coreV1.ResourceName
 	for resourceName := range curResourceList {
 		curResourceNames = append(curResourceNames, resourceName)
 	}
-	var desiredResourceNames []core.ResourceName
+	var desiredResourceNames []coreV1.ResourceName
 	for resourceName := range desiredResourceList {
 		desiredResourceNames = append(desiredResourceNames, resourceName)
 	}
@@ -1419,16 +1419,16 @@ func (w *worker) applyResourcesList(
 	resourceNames := intersect.Simple(curResourceNames, desiredResourceNames)
 	updated := false
 	for _, resourceName := range resourceNames.([]interface{}) {
-		updated = updated || w.applyResource(curResourceList, desiredResourceList, resourceName.(core.ResourceName))
+		updated = updated || w.applyResource(curResourceList, desiredResourceList, resourceName.(coreV1.ResourceName))
 	}
 	return updated
 }
 
 // applyResource
 func (w *worker) applyResource(
-	curResourceList core.ResourceList,
-	desiredResourceList core.ResourceList,
-	resourceName core.ResourceName,
+	curResourceList coreV1.ResourceList,
+	desiredResourceList coreV1.ResourceList,
+	resourceName coreV1.ResourceName,
 ) bool {
 	if (curResourceList == nil) || (desiredResourceList == nil) {
 		// Nowhere or nothing to apply

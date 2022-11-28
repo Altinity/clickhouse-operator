@@ -18,18 +18,18 @@ import (
 	"context"
 	"fmt"
 
-	core "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	coreV1 "k8s.io/api/core/v1"
+	policyV1 "k8s.io/api/policy/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // reconcileCHI run reconcile cycle for a CHI
-func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseInstallation) error {
+func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -57,7 +57,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 	new = w.normalize(new)
 	w.logOldAndNew("normalized", old, new)
 
-	actionPlan := chopmodel.NewActionPlan(old, new)
+	actionPlan := chopModel.NewActionPlan(old, new)
 	w.logActionPlan(actionPlan)
 
 	switch {
@@ -113,7 +113,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiv1.ClickHouseIns
 }
 
 // reconcile reconciles ClickHouseInstallation
-func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallation) error {
+func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -133,7 +133,7 @@ func (w *worker) reconcile(ctx context.Context, chi *chiv1.ClickHouseInstallatio
 }
 
 // reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
-func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chiv1.ClickHouseInstallation) error {
+func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -171,7 +171,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
-func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiv1.ClickHouseInstallation) error {
+func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -187,8 +187,8 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiv1.Cli
 // reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
 func (w *worker) reconcileCHIConfigMapCommon(
 	ctx context.Context,
-	chi *chiv1.ClickHouseInstallation,
-	options *chopmodel.ClickHouseConfigFilesGeneratorOptions,
+	chi *chiV1.ClickHouseInstallation,
+	options *chopModel.ClickHouseConfigFilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -210,7 +210,7 @@ func (w *worker) reconcileCHIConfigMapCommon(
 
 // reconcileCHIConfigMapUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
-func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *chiv1.ClickHouseInstallation) error {
+func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -228,7 +228,7 @@ func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *chiv1.Clic
 }
 
 // reconcileHostConfigMap reconciles host's personal ConfigMap
-func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -262,7 +262,7 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiv1.ChiHost
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -292,7 +292,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiv1.ChiHo
 }
 
 // reconcileHostService reconciles host's Service
-func (w *worker) reconcileHostService(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) reconcileHostService(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -312,7 +312,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *chiv1.ChiHost) 
 }
 
 // reconcileCluster reconciles Cluster, excluding nested shards
-func (w *worker) reconcileCluster(ctx context.Context, cluster *chiv1.ChiCluster) error {
+func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.ChiCluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -331,8 +331,8 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiv1.ChiCluster
 	}
 
 	// Add Cluster's Auto Secret
-	if cluster.Secret.Source() == chiv1.ClusterSecretSourceAuto {
-		if secret := w.task.creator.CreateClusterSecret(chopmodel.CreateClusterAutoSecretName(cluster)); secret != nil {
+	if cluster.Secret.Source() == chiV1.ClusterSecretSourceAuto {
+		if secret := w.task.creator.CreateClusterSecret(chopModel.CreateClusterAutoSecretName(cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.CHI, secret); err == nil {
 				w.task.registryReconciled.RegisterSecret(secret.ObjectMeta)
 			} else {
@@ -352,7 +352,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiv1.ChiCluster
 }
 
 // reconcileShard reconciles Shard, excluding nested replicas
-func (w *worker) reconcileShard(ctx context.Context, shard *chiv1.ChiShard) error {
+func (w *worker) reconcileShard(ctx context.Context, shard *chiV1.ChiShard) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -377,7 +377,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chiv1.ChiShard) erro
 }
 
 // reconcileHost reconciles ClickHouse host
-func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -430,7 +430,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiv1.ChiHost) error {
 }
 
 // reconcilePDB reconciles PodDisruptionBudget
-func (w *worker) reconcilePDB(ctx context.Context, cluster *chiv1.ChiCluster, pdb *policy.PodDisruptionBudget) error {
+func (w *worker) reconcilePDB(ctx context.Context, cluster *chiV1.ChiCluster, pdb *policyV1.PodDisruptionBudget) error {
 	_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, newGetOptions())
 	switch {
 	case err == nil:
@@ -438,7 +438,7 @@ func (w *worker) reconcilePDB(ctx context.Context, cluster *chiv1.ChiCluster, pd
 		if err == nil {
 			log.V(1).Info("PDB updated %s/%s", pdb.Namespace, pdb.Name)
 		}
-	case (err != nil) && apierrors.IsNotFound(err):
+	case (err != nil) && apiErrors.IsNotFound(err):
 		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, newCreateOptions())
 		if err == nil {
 			log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
@@ -450,8 +450,8 @@ func (w *worker) reconcilePDB(ctx context.Context, cluster *chiv1.ChiCluster, pd
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
 func (w *worker) reconcileConfigMap(
 	ctx context.Context,
-	chi *chiv1.ClickHouseInstallation,
-	configMap *core.ConfigMap,
+	chi *chiV1.ClickHouseInstallation,
+	configMap *coreV1.ConfigMap,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -469,7 +469,7 @@ func (w *worker) reconcileConfigMap(
 		err = w.updateConfigMap(ctx, chi, configMap)
 	}
 
-	if apierrors.IsNotFound(err) {
+	if apiErrors.IsNotFound(err) {
 		// ConfigMap not found - even during Update process - try to create it
 		err = w.createConfigMap(ctx, chi, configMap)
 	}
@@ -486,7 +486,7 @@ func (w *worker) reconcileConfigMap(
 }
 
 // reconcileService reconciles core.Service
-func (w *worker) reconcileService(ctx context.Context, chi *chiv1.ClickHouseInstallation, service *core.Service) error {
+func (w *worker) reconcileService(ctx context.Context, chi *chiV1.ClickHouseInstallation, service *coreV1.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -521,7 +521,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *chiv1.ClickHouseInst
 }
 
 // reconcileSecret reconciles core.Secret
-func (w *worker) reconcileSecret(ctx context.Context, chi *chiv1.ClickHouseInstallation, secret *core.Secret) error {
+func (w *worker) reconcileSecret(ctx context.Context, chi *chiV1.ClickHouseInstallation, secret *coreV1.Secret) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -551,7 +551,7 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *chiv1.ClickHouseInsta
 }
 
 // reconcileStatefulSet reconciles apps.StatefulSet
-func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -562,7 +562,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiv1.ChiHost) 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
-	if host.ReconcileAttributes.GetStatus() == chiv1.StatefulSetStatusSame {
+	if host.ReconcileAttributes.GetStatus() == chiV1.StatefulSetStatusSame {
 		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
 		return nil
 	}
@@ -576,7 +576,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiv1.ChiHost) 
 		err = w.updateStatefulSet(ctx, host)
 	}
 
-	if apierrors.IsNotFound(err) {
+	if apiErrors.IsNotFound(err) {
 		// StatefulSet not found - even during Update process - try to create it
 		err = w.createStatefulSet(ctx, host)
 	}
@@ -596,19 +596,19 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiv1.ChiHost) 
 }
 
 // reconcilePersistentVolumes
-func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiv1.ChiHost) {
+func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiV1.ChiHost) {
 	if util.IsContextDone(ctx) {
 		return
 	}
 
-	w.c.walkPVs(host, func(pv *core.PersistentVolume) {
+	w.c.walkPVs(host, func(pv *coreV1.PersistentVolume) {
 		pv = w.task.creator.PreparePersistentVolume(pv, host)
 		_, _ = w.c.updatePersistentVolume(ctx, pv)
 	})
 }
 
 // reconcilePVCs
-func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
+func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		return nil
 	}
@@ -617,7 +617,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 	w.a.V(2).M(host).S().Info("host %s/%s", namespace, host.Name)
 	defer w.a.V(2).M(host).E().Info("host %s/%s", namespace, host.Name)
 
-	host.WalkVolumeMounts(func(volumeMount *core.VolumeMount) {
+	host.WalkVolumeMounts(func(volumeMount *coreV1.VolumeMount) {
 		if util.IsContextDone(ctx) {
 			return
 		}
@@ -629,13 +629,13 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 			return
 		}
 
-		pvcName := chopmodel.CreatePVCName(host, volumeMount, volumeClaimTemplate)
+		pvcName := chopModel.CreatePVCName(host, volumeMount, volumeClaimTemplate)
 		w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - start", namespace, host.Name, volumeMount.Name, pvcName)
 		defer w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - end", namespace, host.Name, volumeMount.Name, pvcName)
 
 		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, newGetOptions())
 		if err != nil {
-			if apierrors.IsNotFound(err) {
+			if apiErrors.IsNotFound(err) {
 				// This is not an error per se, means PVC is not created (yet)?
 				if w.task.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 					pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
@@ -666,10 +666,10 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiv1.ChiHost) error {
 // reconcilePVC
 func (w *worker) reconcilePVC(
 	ctx context.Context,
-	pvc *core.PersistentVolumeClaim,
-	host *chiv1.ChiHost,
-	template *chiv1.ChiVolumeClaimTemplate,
-) (*core.PersistentVolumeClaim, error) {
+	pvc *coreV1.PersistentVolumeClaim,
+	host *chiV1.ChiHost,
+	template *chiV1.ChiVolumeClaimTemplate,
+) (*coreV1.PersistentVolumeClaim, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil, fmt.Errorf("task is done")
