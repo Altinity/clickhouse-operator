@@ -3,19 +3,19 @@ import yaml
 import threading
 import re
 
-import e2e.clickhouse as clickhouse
-import e2e.kubectl as kubectl
 import e2e.yaml_manifest as yaml_manifest
-import e2e.settings as settings
-import e2e.util as util
 import xml.etree.ElementTree as etree
+import e2e.clickhouse as clickhouse
+import e2e.settings as settings
+import e2e.kubectl as kubectl
+import e2e.util as util
 
-
-from e2e.steps import *
-from testflows.core import *
-from testflows.asserts import error
-from testflows.connect import Shell
 from requirements.requirements import *
+from testflows.connect import Shell
+from testflows.asserts import error
+from testflows.core import *
+from e2e.steps import *
+
 
 @TestScenario
 @Name("test_001. 1 node")
@@ -2908,6 +2908,144 @@ def test_035(self):
 
 
 @TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
+@Name("test_036. Check operator volume re-provisioning")
+def test_036(self):
+    """Check clickhouse operator recreates volumes and schema if volume is broken."""
+    manifest = f"manifests/chi/test-036-volume-re-provisioning.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {settings.clickhouse_template},
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I create replicated table with some data"):
+        create_table = """
+            CREATE TABLE test_local_036 ON CLUSTER '{cluster}' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace('\r', '').replace('\n', '')
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
+
+    with When("I delete PV", description="delete PV on replica 0"):
+        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+
+        kubectl.launch(f"delete pv {pv_name} --force &")
+        kubectl.launch(f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""")
+
+    with And("Wait for PVC to detect PV is lost"):
+        kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                            ".status.phase", "Lost")
+
+    with Then("I check PV is recreated"):
+        kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                           ".status.phase", "Bound")
+        kubectl.wait_object("pv", kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0"))
+        size = kubectl.get_pv_size("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+        assert size == "1Gi", error()
+
+    with And("I check data on each replica"):
+        with By("checking data on the replica 0"):
+            r = clickhouse.query(chi, pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                                 sql="SELECT count(*) FROM test_local_036")
+            assert r == "10000", error()
+        with And("checking data on the replica 1"):
+            r = clickhouse.query(chi, pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
+                                 sql="SELECT count(*) FROM test_local_036")
+            assert r == "10000", error()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
+@Name("test_037. storageManagement switch")
+def test_037(self):
+    """Check clickhouse-operator supports switching storageManagement
+    config option from default (StatefulSet) to Operator"""
+    cluster = "default"
+    manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I time up pod start time"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+
+    with And("I create a table with some data"):
+        create_table = """
+            CREATE TABLE test_local_037 (a UInt32)
+            Engine = MergeTree()
+            ORDER BY a
+            """.replace('\r', '').replace('\n', '')
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
+
+    with When("I switch storageManagement to Operator"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I check cluster is restarted and time up new pod start time"):
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time != start_time_new, error()
+        start_time = start_time_new
+
+    with And("I rescale volume configuration to 2Gi to check that storage management is switched"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("storage size should be 2Gi"):
+        kubectl.wait_field("pvc", f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0",
+                           ".spec.resources.requests.storage", "2Gi")
+        size = kubectl.get_pvc_size(f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
+        assert size == "2Gi", error()
+
+    with And("check the pod's start time to see if it has been restarted"):
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        with Then("storage provisioner is operator, pod should not be restarted"):
+            assert start_time == start_time_new, error()
+
+    with And("check data in the table"):
+        r = clickhouse.query(chi, "SELECT count(*) from test_local_037",
+                             pod=f"chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
+        assert r == "10000"
+
+
+@TestScenario
 @Requirements()#todo
 @Name("test_038. Automatic schema propagation")
 def test_038(self):
@@ -3084,7 +3222,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.19.3"
+    self.context.test_009_version_from = "0.20.0"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):

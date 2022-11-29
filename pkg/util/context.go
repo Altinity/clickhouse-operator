@@ -21,9 +21,10 @@ import (
 
 // IsContextDone is a non-blocking one-word syntactic sugar to check whether context is done.
 // Convenient to be used as
-// if IsContextDone(ctx) {
-//   ... do something ...
-// }
+//
+//	if IsContextDone(ctx) {
+//	  ... do something ...
+//	}
 func IsContextDone(ctx context.Context) bool {
 	if ctx == nil {
 		// In case there is no context, it can not be done

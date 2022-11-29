@@ -47,6 +47,7 @@ type ChiHost struct {
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+// Secure specifies secure type
 type Secure bool
 
 // Value gets bool value of secure

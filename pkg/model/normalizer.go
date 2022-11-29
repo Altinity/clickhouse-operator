@@ -1357,6 +1357,7 @@ func (n *Normalizer) createHostsField(cluster *chiV1.ChiCluster) {
 	cluster.WalkHostsByReplicas(hostMergeFunc)
 }
 
+// Values for Schema Policy
 const (
 	SchemaPolicyReplicaNone                = "None"
 	SchemaPolicyReplicaAll                 = "All"

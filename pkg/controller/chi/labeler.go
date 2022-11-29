@@ -64,7 +64,7 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 	//    uid: a275a8a0-83ae-11e9-b92d-0208b778ea1a
 
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -249,7 +249,7 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 // appendLabelReadyPod appends Label "Ready" to the pod of the specified host
 func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -274,7 +274,7 @@ func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiv1.ChiHos
 // deleteLabelReadyPod deletes Label "Ready" from the pod of the specified host
 func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -308,7 +308,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiv1.ChiHos
 // appendAnnotationReadyService appends Annotation "Ready" to the service of the specified host
 func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -333,7 +333,7 @@ func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chi
 // deleteAnnotationReadyService deletes Annotation "Ready" from the service of the specified host
 func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chiv1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 

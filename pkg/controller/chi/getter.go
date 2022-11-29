@@ -78,8 +78,8 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 }
 
 // getService gets Service. Accepted types:
-//   1. *core.Service
-//   2. *chop.ChiHost
+//  1. *core.Service
+//  2. *chop.ChiHost
 func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
@@ -91,12 +91,12 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 		namespace = typedObj.Address.Namespace
 	}
 	return c.serviceLister.Services(namespace).Get(name)
-	//return c.kubeClient.CoreV1().Services(namespace).Get(newContext(), name, newGetOptions())
+	//return c.kubeClient.CoreV1().Services(namespace).Get(newTask(), name, newGetOptions())
 }
 
 // getStatefulSet gets StatefulSet. Accepted types:
-//   1. *meta.ObjectMeta
-//   2. *chop.ChiHost
+//  1. *meta.ObjectMeta
+//  2. *chop.ChiHost
 func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.StatefulSet, error) {
 	switch typedObj := obj.(type) {
 	case *meta.ObjectMeta:
@@ -174,8 +174,8 @@ func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
 }
 
 // getPod gets pod. Accepted types:
-//   1. *apps.StatefulSet
-//   2. *chop.ChiHost
+//  1. *apps.StatefulSet
+//  2. *chop.ChiHost
 func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {

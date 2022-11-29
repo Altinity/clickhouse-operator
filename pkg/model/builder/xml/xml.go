@@ -150,7 +150,9 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 
 // writeTagNoValue prints tag which has no value, But it may have nested tags
 // <a>
-//  <b>...</b>
+//
+//	<b>...</b>
+//
 // </a>
 func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabsize uint8) {
 	n.writeTagOpen(w, indent, attributes, eol)

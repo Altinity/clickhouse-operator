@@ -296,7 +296,7 @@ func updated(old, new *core.Endpoints) bool {
 			}
 		}
 	}
-	for path, _ := range diff.Removed {
+	for path := range diff.Removed {
 		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: removed %v", path)
 	}
 	for path, iValue := range diff.Modified {
@@ -699,7 +699,7 @@ type patchFinalizers struct {
 // patchCHIFinalizers patch ClickHouseInstallation finalizers
 func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -737,6 +737,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chiV1.ClickHou
 	return nil
 }
 
+// UpdateCHIStatusOptions defines how to update CHI status
 type UpdateCHIStatusOptions struct {
 	chiV1.CopyCHIStatusOptions
 	TolerateAbsence bool
@@ -745,7 +746,7 @@ type UpdateCHIStatusOptions struct {
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chiV1.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -772,7 +773,7 @@ func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *chiV1.Click
 // doUpdateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chiV1.ClickHouseInstallation, opts UpdateCHIStatusOptions) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -822,7 +823,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chiV1.Cli
 
 func (c *Controller) poll(ctx context.Context, chi *chiV1.ClickHouseInstallation, f func(c *chiV1.ClickHouseInstallation, e error) bool) {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return
 	}
 
@@ -833,7 +834,7 @@ func (c *Controller) poll(ctx context.Context, chi *chiV1.ClickHouseInstallation
 		if f(cur, err) {
 			// Continue polling
 			if util.IsContextDone(ctx) {
-				log.V(2).Info("ctx is done")
+				log.V(2).Info("task is done")
 				return
 			}
 			time.Sleep(15 * time.Second)
@@ -847,7 +848,7 @@ func (c *Controller) poll(ctx context.Context, chi *chiV1.ClickHouseInstallation
 // installFinalizer
 func (c *Controller) installFinalizer(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -875,7 +876,7 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *chiV1.ClickHouse
 // uninstallFinalizer
 func (c *Controller) uninstallFinalizer(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 

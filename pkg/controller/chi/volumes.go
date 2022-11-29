@@ -15,16 +15,16 @@
 package chi
 
 import (
-	"k8s.io/api/core/v1"
+	coreV1 "k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
-func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
+func (c *Controller) walkPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.PersistentVolumeClaim)) {
 	namespace := host.Address.Namespace
-	name := chopmodel.CreatePodName(host)
+	name := chopModel.CreatePodName(host)
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s/%s err:%v", namespace, host.Name, err)
@@ -48,10 +48,10 @@ func (c *Controller) walkPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolum
 	}
 }
 
-func (c *Controller) walkDiscoveredPVCs(host *chop.ChiHost, f func(pvc *v1.PersistentVolumeClaim)) {
+func (c *Controller) walkDiscoveredPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.PersistentVolumeClaim)) {
 	namespace := host.Address.Namespace
 
-	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newContext(), newListOptions(chopmodel.GetSelectorHostScope(host)))
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newContext(), newListOptions(chopModel.GetSelectorHostScope(host)))
 	if err != nil {
 		log.M(host).F().Error("FAIL get list of PVC for host %s/%s err:%v", namespace, host.Name, err)
 		return
@@ -65,8 +65,8 @@ func (c *Controller) walkDiscoveredPVCs(host *chop.ChiHost, f func(pvc *v1.Persi
 	}
 }
 
-func (c *Controller) walkPVs(host *chop.ChiHost, f func(pv *v1.PersistentVolume)) {
-	c.walkPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
+func (c *Controller) walkPVs(host *chiV1.ChiHost, f func(pv *coreV1.PersistentVolume)) {
+	c.walkPVCs(host, func(pvc *coreV1.PersistentVolumeClaim) {
 		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(newContext(), pvc.Spec.VolumeName, newGetOptions())
 		if err != nil {
 			log.M(host).F().Error("FAIL get PV %s err:%v", pvc.Spec.VolumeName, err)

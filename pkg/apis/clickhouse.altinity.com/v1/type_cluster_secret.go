@@ -25,7 +25,7 @@ type ClusterSecret struct {
 	ValueFrom *ClusterSecretSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }
 
-// ClusterSecretSource
+// ClusterSecretSource mirrors k8s SecretSource type
 type ClusterSecretSource struct {
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty"`
 }

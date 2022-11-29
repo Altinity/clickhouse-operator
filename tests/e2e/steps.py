@@ -12,9 +12,3 @@ def get_shell(self, timeout=300):
     finally:
         with Finally("I close shell"):
             shell.close()
-
-
-@TestStep(Given)
-def add_kafka_config(self, timeout=300):
-    """Add config with kafka configuration."""
-    pass

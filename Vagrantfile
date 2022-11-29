@@ -111,7 +111,7 @@ Vagrant.configure(2) do |config|
     apt-get install --no-install-recommends -y clickhouse-client
 
     # golang
-    export GOLANG_VERSION=1.17
+    export GOLANG_VERSION=1.19
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys F6BC817356A3D45E
     add-apt-repository ppa:longsleep/golang-backports
     apt-get install --no-install-recommends -y golang-${GOLANG_VERSION}-go
@@ -140,14 +140,15 @@ Vagrant.configure(2) do |config|
     tar --verbose -zxvf /usr/local/bin/k9s_${K9S_VERSION}_Linux_x86_64.tar.gz -C /usr/local/bin k9s
 
     # audit2rbac
-    AUDIT2RBAC_VERSION=0.8.0
+    AUDIT2RBAC_VERSION=0.9.0
     curl -sL https://github.com/liggitt/audit2rbac/releases/download/v${AUDIT2RBAC_VERSION}/audit2rbac-linux-amd64.tar.gz | tar -zxvf - -C /usr/local/bin
 
     # minikube
     # MINIKUBE_VERSION=1.18.1
     # MINIKUBE_VERSION=1.19.0
     # MINIKUBE_VERSION=1.20.0
-    MINIKUBE_VERSION=1.23.2
+    # MINIKUBE_VERSION=1.23.2
+    MINIKUBE_VERSION=1.28.0
     wget -c --progress=bar:force:noscroll -O /usr/local/bin/minikube https://github.com/kubernetes/minikube/releases/download/v${MINIKUBE_VERSION}/minikube-linux-amd64
     chmod +x /usr/local/bin/minikube
     # required for k8s 1.18+
@@ -165,7 +166,9 @@ Vagrant.configure(2) do |config|
 #    K8S_VERSION=${K8S_VERSION:-1.20.14}
 #    K8S_VERSION=${K8S_VERSION:-1.21.8}
 #    K8S_VERSION=${K8S_VERSION:-1.22.5}
-    K8S_VERSION=${K8S_VERSION:-1.23.1}
+#    K8S_VERSION=${K8S_VERSION:-1.23.1}
+#    K8S_VERSION=${K8S_VERSION:-1.24.8}
+    K8S_VERSION=${K8S_VERSION:-1.25.4}
     export VALIDATE_YAML=true
 
     killall kubectl || true
@@ -304,7 +307,7 @@ EOF
         docker pull ${image}
     done
 
-    pip3 install -r /vagrant/tests/requirements.txt
+    pip3 install -r /vagrant/tests/image/requirements.txt
 
     python3 /vagrant/tests/regression.py --native
 
