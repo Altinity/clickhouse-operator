@@ -38,9 +38,11 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.EnsureStatus().ShardsCount = chi.ShardsCount()
 	chi.EnsureStatus().HostsCount = chi.HostsCount()
 	chi.EnsureStatus().TaskID = *chi.Spec.TaskID
-	chi.EnsureStatus().UpdatedHostsCount = 0
-	chi.EnsureStatus().DeleteHostsCount = 0
-	chi.EnsureStatus().DeletedHostsCount = 0
+	chi.EnsureStatus().HostsUpdatedCount = 0
+	chi.EnsureStatus().HostsAddedCount = 0
+	chi.EnsureStatus().HostsCompletedCount = 0
+	chi.EnsureStatus().HostsDeleteCount = 0
+	chi.EnsureStatus().HostsDeletedCount = 0
 	chi.EnsureStatus().Pods = pods
 	chi.EnsureStatus().FQDNs = fqdns
 	chi.EnsureStatus().Endpoint = endpoint
