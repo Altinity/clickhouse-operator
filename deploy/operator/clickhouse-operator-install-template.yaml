@@ -55,27 +55,27 @@ spec:
           description: CHI status
           priority: 0 # show in standard view
           jsonPath: .status.status
-        - name: hostsUpdated
+        - name: hosts-updated
           type: integer
           description: Updated hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsUpdated
-        - name: hostsAdded
+        - name: hosts-added
           type: integer
           description: Added hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsAdded
-        - name: hostsCompleted
+        - name: hosts-completed
           type: integer
           description: Completed hosts count
           priority: 0 # show in standard view
           jsonPath: .status.hostsCompleted
-        - name: hostsDeleted
+        - name: hosts-deleted
           type: integer
           description: Hosts deleted count
           priority: 1 # show in wide view
           jsonPath: .status.hostsDeleted
-        - name: hostsDelete
+        - name: hosts-delete
           type: integer
           description: Hosts to be deleted count
           priority: 1 # show in wide view
@@ -1168,27 +1168,27 @@ spec:
           description: CHI status
           priority: 0 # show in standard view
           jsonPath: .status.status
-        - name: hostsUpdated
+        - name: hosts-updated
           type: integer
           description: Updated hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsUpdated
-        - name: hostsAdded
+        - name: hosts-added
           type: integer
           description: Added hosts count
           priority: 1 # show in wide view
           jsonPath: .status.hostsAdded
-        - name: hostsCompleted
+        - name: hosts-completed
           type: integer
           description: Completed hosts count
           priority: 0 # show in standard view
           jsonPath: .status.hostsCompleted
-        - name: hostsDeleted
+        - name: hosts-deleted
           type: integer
           description: Hosts deleted count
           priority: 1 # show in wide view
           jsonPath: .status.hostsDeleted
-        - name: hostsDelete
+        - name: hosts-delete
           type: integer
           description: Hosts to be deleted count
           priority: 1 # show in wide view
