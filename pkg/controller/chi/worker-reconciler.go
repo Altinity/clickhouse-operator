@@ -550,7 +550,7 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *chiV1.ClickHouseInsta
 	return err
 }
 
-// reconcileStatefulSet reconciles apps.StatefulSet
+// reconcileStatefulSet reconciles StatefulSet of a host
 func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -595,7 +595,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	return err
 }
 
-// reconcilePersistentVolumes
+// reconcilePersistentVolumes reconciles all PVs of a host
 func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiV1.ChiHost) {
 	if util.IsContextDone(ctx) {
 		return
@@ -607,7 +607,7 @@ func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiV1.Chi
 	})
 }
 
-// reconcilePVCs
+// reconcilePVCs reconciles all PVCs of a host
 func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		return nil
@@ -663,7 +663,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 	return nil
 }
 
-// reconcilePVC
+// reconcilePVC reconciles specified PVC
 func (w *worker) reconcilePVC(
 	ctx context.Context,
 	pvc *coreV1.PersistentVolumeClaim,

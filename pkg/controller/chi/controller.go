@@ -22,17 +22,17 @@ import (
 
 	"github.com/sanity-io/litter"
 	"gopkg.in/d4l3k/messagediff.v1"
-	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsV1 "k8s.io/api/apps/v1"
+	coreV1 "k8s.io/api/core/v1"
+	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kubeinformers "k8s.io/client-go/informers"
+	kubeInformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	typedcore "k8s.io/client-go/kubernetes/typed/core/v1"
+	typedCoreV1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
@@ -42,36 +42,36 @@ import (
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	chopclientsetscheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
-	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	chopmodels "github.com/altinity/clickhouse-operator/pkg/model"
+	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
+	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chopModels "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // NewController creates instance of Controller
 func NewController(
-	chopClient chopclientset.Interface,
-	extClient apiextensions.Interface,
+	chopClient chopClientSet.Interface,
+	extClient apiExtensions.Interface,
 	kubeClient kube.Interface,
-	chopInformerFactory chopinformers.SharedInformerFactory,
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
+	chopInformerFactory chopInformers.SharedInformerFactory,
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) *Controller {
 
 	// Initializations
-	_ = chopclientsetscheme.AddToScheme(scheme.Scheme)
+	_ = chopClientSetScheme.AddToScheme(scheme.Scheme)
 
 	// Setup events
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(log.Info)
 	eventBroadcaster.StartRecordingToSink(
-		&typedcore.EventSinkImpl{
+		&typedCoreV1.EventSinkImpl{
 			Interface: kubeClient.CoreV1().Events(""),
 		},
 	)
 	recorder := eventBroadcaster.NewRecorder(
 		scheme.Scheme,
-		core.EventSource{
+		coreV1.EventSource{
 			Component: componentName,
 		},
 	)
@@ -118,7 +118,7 @@ func (c *Controller) initQueues() {
 }
 
 func (c *Controller) addEventHandlersCHI(
-	chopInformerFactory chopinformers.SharedInformerFactory,
+	chopInformerFactory chopInformers.SharedInformerFactory,
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -150,7 +150,7 @@ func (c *Controller) addEventHandlersCHI(
 }
 
 func (c *Controller) addEventHandlersCHIT(
-	chopInformerFactory chopinformers.SharedInformerFactory,
+	chopInformerFactory chopInformers.SharedInformerFactory,
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -182,7 +182,7 @@ func (c *Controller) addEventHandlersCHIT(
 }
 
 func (c *Controller) addEventHandlersChopConfig(
-	chopInformerFactory chopinformers.SharedInformerFactory,
+	chopInformerFactory chopInformers.SharedInformerFactory,
 ) {
 	chopInformerFactory.Clickhouse().V1().ClickHouseOperatorConfigurations().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -214,25 +214,25 @@ func (c *Controller) addEventHandlersChopConfig(
 }
 
 func (c *Controller) addEventHandlersService(
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Core().V1().Services().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			service := obj.(*core.Service)
+			service := obj.(*coreV1.Service)
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
 			log.V(3).M(service).Info("serviceInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
-			oldService := old.(*core.Service)
+			oldService := old.(*coreV1.Service)
 			if !c.isTrackedObject(&oldService.ObjectMeta) {
 				return
 			}
 			log.V(3).M(oldService).Info("serviceInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
-			service := obj.(*core.Service)
+			service := obj.(*coreV1.Service)
 			if !c.isTrackedObject(&service.ObjectMeta) {
 				return
 			}
@@ -241,17 +241,17 @@ func (c *Controller) addEventHandlersService(
 	})
 }
 
-func normalizeEndpoints(e *core.Endpoints) *core.Endpoints {
+func normalizeEndpoints(e *coreV1.Endpoints) *coreV1.Endpoints {
 	if e == nil {
-		e = &core.Endpoints{}
+		e = &coreV1.Endpoints{}
 	}
 	if len(e.Subsets) == 0 {
-		e.Subsets = []core.EndpointSubset{
+		e.Subsets = []coreV1.EndpointSubset{
 			{},
 		}
 	}
 	if len(e.Subsets[0].Addresses) == 0 {
-		e.Subsets[0].Addresses = []core.EndpointAddress{
+		e.Subsets[0].Addresses = []coreV1.EndpointAddress{
 			{},
 		}
 	}
@@ -276,7 +276,7 @@ func checkIP(path *messagediff.Path, iValue interface{}) bool {
 	return false
 }
 
-func updated(old, new *core.Endpoints) bool {
+func updated(old, new *coreV1.Endpoints) bool {
 	oldSubsets := normalizeEndpoints(old).Subsets
 	newSubsets := normalizeEndpoints(new).Subsets
 
@@ -290,7 +290,7 @@ func updated(old, new *core.Endpoints) bool {
 	assigned := false
 	for path, iValue := range diff.Added {
 		log.V(3).M(old).Info("endpointsInformer.UpdateFunc: added %v", path)
-		if address, ok := iValue.(core.EndpointAddress); ok {
+		if address, ok := iValue.(coreV1.EndpointAddress); ok {
 			if address.IP != "" {
 				assigned = true
 			}
@@ -313,19 +313,19 @@ func updated(old, new *core.Endpoints) bool {
 }
 
 func (c *Controller) addEventHandlersEndpoint(
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Core().V1().Endpoints().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			endpoints := obj.(*core.Endpoints)
+			endpoints := obj.(*coreV1.Endpoints)
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
 			log.V(2).M(endpoints).Info("endpointsInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
-			oldEndpoints := old.(*core.Endpoints)
-			newEndpoints := new.(*core.Endpoints)
+			oldEndpoints := old.(*coreV1.Endpoints)
+			newEndpoints := new.(*coreV1.Endpoints)
 			if !c.isTrackedObject(&oldEndpoints.ObjectMeta) {
 				return
 			}
@@ -336,7 +336,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			endpoints := obj.(*core.Endpoints)
+			endpoints := obj.(*coreV1.Endpoints)
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
@@ -346,25 +346,25 @@ func (c *Controller) addEventHandlersEndpoint(
 }
 
 func (c *Controller) addEventHandlersConfigMap(
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Core().V1().ConfigMaps().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			configMap := obj.(*core.ConfigMap)
+			configMap := obj.(*coreV1.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			log.V(3).M(configMap).Info("configMapInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
-			configMap := old.(*core.ConfigMap)
+			configMap := old.(*coreV1.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
 			log.V(3).M(configMap).Info("configMapInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
-			configMap := obj.(*core.ConfigMap)
+			configMap := obj.(*coreV1.ConfigMap)
 			if !c.isTrackedObject(&configMap.ObjectMeta) {
 				return
 			}
@@ -374,11 +374,11 @@ func (c *Controller) addEventHandlersConfigMap(
 }
 
 func (c *Controller) addEventHandlersStatefulSet(
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Apps().V1().StatefulSets().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			statefulSet := obj.(*apps.StatefulSet)
+			statefulSet := obj.(*appsV1.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
@@ -386,14 +386,14 @@ func (c *Controller) addEventHandlersStatefulSet(
 			//controller.handleObject(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			statefulSet := old.(*apps.StatefulSet)
+			statefulSet := old.(*appsV1.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
 			log.V(3).M(statefulSet).Info("statefulSetInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
-			statefulSet := obj.(*apps.StatefulSet)
+			statefulSet := obj.(*appsV1.StatefulSet)
 			if !c.isTrackedObject(&statefulSet.ObjectMeta) {
 				return
 			}
@@ -404,25 +404,25 @@ func (c *Controller) addEventHandlersStatefulSet(
 }
 
 func (c *Controller) addEventHandlersPod(
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	kubeInformerFactory.Core().V1().Pods().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			pod := obj.(*core.Pod)
+			pod := obj.(*coreV1.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
-			pod := old.(*core.Pod)
+			pod := old.(*coreV1.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.UpdateFunc")
 		},
 		DeleteFunc: func(obj interface{}) {
-			pod := obj.(*core.Pod)
+			pod := obj.(*coreV1.Pod)
 			if !c.isTrackedObject(&pod.ObjectMeta) {
 				return
 			}
@@ -433,8 +433,8 @@ func (c *Controller) addEventHandlersPod(
 
 // addEventHandlers
 func (c *Controller) addEventHandlers(
-	chopInformerFactory chopinformers.SharedInformerFactory,
-	kubeInformerFactory kubeinformers.SharedInformerFactory,
+	chopInformerFactory chopInformers.SharedInformerFactory,
+	kubeInformerFactory kubeInformers.SharedInformerFactory,
 ) {
 	c.addEventHandlersCHI(chopInformerFactory)
 	c.addEventHandlersCHIT(chopInformerFactory)
@@ -447,13 +447,13 @@ func (c *Controller) addEventHandlers(
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
-func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
-	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && chopmodels.IsCHOPGeneratedObject(objectMeta)
+func (c *Controller) isTrackedObject(objectMeta *metaV1.ObjectMeta) bool {
+	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && chopModels.IsCHOPGeneratedObject(objectMeta)
 }
 
 // Run syncs caches, starts workers
 func (c *Controller) Run(ctx context.Context) {
-	defer utilruntime.HandleCrash()
+	defer utilRuntime.HandleCrash()
 	defer func() {
 		for i := range c.queues {
 			//c.queues[i].ShutDown()
@@ -512,7 +512,7 @@ func (c *Controller) Run(ctx context.Context) {
 func prepareCHIAdd(command *ReconcileCHI) bool {
 	newjs, _ := json.Marshal(command.new)
 	newchi := chiV1.ClickHouseInstallation{
-		TypeMeta: meta.TypeMeta{
+		TypeMeta: metaV1.TypeMeta{
 			APIVersion: chiV1.SchemeGroupVersion.String(),
 			Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
 		},
@@ -524,7 +524,7 @@ func prepareCHIAdd(command *ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *ReconcileCHI) bool {
-	actionPlan := chopmodels.NewActionPlan(command.old, command.new)
+	actionPlan := chopModels.NewActionPlan(command.old, command.new)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}
@@ -538,7 +538,7 @@ func prepareCHIUpdate(command *ReconcileCHI) bool {
 	newjs, _ := json.Marshal(command.new)
 	oldchi := chiV1.ClickHouseInstallation{}
 	newchi := chiV1.ClickHouseInstallation{
-		TypeMeta: meta.TypeMeta{
+		TypeMeta: metaV1.TypeMeta{
 			APIVersion: chiV1.SchemeGroupVersion.String(),
 			Kind:       chiV1.ClickHouseInstallationCRDResourceKind,
 		},
@@ -899,16 +899,16 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *chiV1.ClickHou
 // handleObject enqueues CHI which is owner of `obj` into reconcile loop
 func (c *Controller) handleObject(obj interface{}) {
 	// TODO review
-	object, ok := obj.(meta.Object)
+	object, ok := obj.(metaV1.Object)
 	if !ok {
 		ts, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf(messageUnableToDecode))
+			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
 			return
 		}
-		object, ok = ts.Obj.(meta.Object)
+		object, ok = ts.Obj.(metaV1.Object)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf(messageUnableToDecode))
+			utilRuntime.HandleError(fmt.Errorf(messageUnableToDecode))
 			return
 		}
 	}
@@ -916,7 +916,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	// object is an instance of meta.Object
 
 	// Checking that we control current StatefulSet Object
-	ownerRef := meta.GetControllerOf(object)
+	ownerRef := metaV1.GetControllerOf(object)
 	if ownerRef == nil {
 		// No owner
 		return
@@ -946,7 +946,7 @@ func (c *Controller) handleObject(obj interface{}) {
 func waitForCacheSync(ctx context.Context, name string, cacheSyncs ...cache.InformerSynced) bool {
 	log.V(1).F().Info("Syncing caches for %s controller", name)
 	if !cache.WaitForCacheSync(ctx.Done(), cacheSyncs...) {
-		utilruntime.HandleError(fmt.Errorf(messageUnableToSync, name))
+		utilRuntime.HandleError(fmt.Errorf(messageUnableToSync, name))
 		return false
 	}
 	log.V(1).F().Info("Caches are synced for %s controller", name)

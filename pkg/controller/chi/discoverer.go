@@ -17,22 +17,22 @@ package chi
 import (
 	"context"
 
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstallation) *chopmodel.Registry {
+func (c *Controller) discovery(ctx context.Context, chi *chiV1.ClickHouseInstallation) *chopModel.Registry {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	opts := newListOptions(chopmodel.NewLabeler(chi).GetSelectorCHIScope())
-	r := chopmodel.NewRegistry()
+	opts := newListOptions(chopModel.NewLabeler(chi).GetSelectorCHIScope())
+	r := chopModel.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, chi, opts)
 	c.discoveryConfigMaps(ctx, r, chi, opts)
 	c.discoveryServices(ctx, r, chi, opts)
@@ -43,7 +43,7 @@ func (c *Controller) discovery(ctx context.Context, chi *chop.ClickHouseInstalla
 	return r
 }
 
-func (c *Controller) discoveryStatefulSets(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+func (c *Controller) discoveryStatefulSets(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(ctx, opts)
 	if err != nil {
 		log.M(chi).F().Error("FAIL list StatefulSet err:%v", err)
@@ -58,7 +58,7 @@ func (c *Controller) discoveryStatefulSets(ctx context.Context, r *chopmodel.Reg
 	}
 }
 
-func (c *Controller) discoveryConfigMaps(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+func (c *Controller) discoveryConfigMaps(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).List(ctx, opts)
 	if err != nil {
 		log.M(chi).F().Error("FAIL list ConfigMap err:%v", err)
@@ -73,7 +73,7 @@ func (c *Controller) discoveryConfigMaps(ctx context.Context, r *chopmodel.Regis
 	}
 }
 
-func (c *Controller) discoveryServices(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+func (c *Controller) discoveryServices(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().Services(chi.Namespace).List(ctx, opts)
 	if err != nil {
 		log.M(chi).F().Error("FAIL list Service err:%v", err)
@@ -88,7 +88,7 @@ func (c *Controller) discoveryServices(ctx context.Context, r *chopmodel.Registr
 	}
 }
 
-func (c *Controller) discoverySecrets(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+func (c *Controller) discoverySecrets(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().Secrets(chi.Namespace).List(ctx, opts)
 	if err != nil {
 		log.M(chi).F().Error("FAIL list Secret err:%v", err)
@@ -103,7 +103,7 @@ func (c *Controller) discoverySecrets(ctx context.Context, r *chopmodel.Registry
 	}
 }
 
-func (c *Controller) discoveryPVCs(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+func (c *Controller) discoveryPVCs(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(chi.Namespace).List(ctx, opts)
 	if err != nil {
 		log.M(chi).F().Error("FAIL list PVC err:%v", err)
@@ -118,7 +118,7 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *chopmodel.Registry, c
 	}
 }
 
-func (c *Controller) discoveryPVs(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+func (c *Controller) discoveryPVs(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts)
 	if err != nil {
 		log.M(chi).F().Error("FAIL list PV err:%v", err)
@@ -133,7 +133,7 @@ func (c *Controller) discoveryPVs(ctx context.Context, r *chopmodel.Registry, ch
 	}
 }
 
-func (c *Controller) discoveryPDBs(ctx context.Context, r *chopmodel.Registry, chi *chop.ClickHouseInstallation, opts v1.ListOptions) {
+func (c *Controller) discoveryPDBs(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).List(ctx, opts)
 	if err != nil {
 		log.M(chi).F().Error("FAIL list PDB err:%v", err)

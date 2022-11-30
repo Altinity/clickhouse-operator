@@ -22,7 +22,7 @@ import (
 	log "github.com/golang/glog"
 
 	a "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // Announcer handler all log/event/status messages going outside of controller/worker
@@ -30,7 +30,7 @@ type Announcer struct {
 	a.Announcer
 
 	ctrl *Controller
-	chi  *chop.ClickHouseInstallation
+	chi  *chiV1.ClickHouseInstallation
 
 	// writeEvent specifies whether to produce k8s event into chi, therefore requires chi to be specified
 	// See k8s event for details.
@@ -208,7 +208,7 @@ func (a Announcer) WithController(ctrl *Controller) Announcer {
 
 // WithEvent is used in chained calls in order to produce event into `chi`
 func (a Announcer) WithEvent(
-	chi *chop.ClickHouseInstallation,
+	chi *chiV1.ClickHouseInstallation,
 	action string,
 	reason string,
 ) Announcer {
@@ -228,7 +228,7 @@ func (a Announcer) WithEvent(
 }
 
 // WithStatusAction is used in chained calls in order to produce action into `ClickHouseInstallation.Status.Action`
-func (a Announcer) WithStatusAction(chi *chop.ClickHouseInstallation) Announcer {
+func (a Announcer) WithStatusAction(chi *chiV1.ClickHouseInstallation) Announcer {
 	b := a
 	if chi == nil {
 		b.chi = nil
@@ -241,7 +241,7 @@ func (a Announcer) WithStatusAction(chi *chop.ClickHouseInstallation) Announcer 
 }
 
 // WithStatusActions is used in chained calls in order to produce action in ClickHouseInstallation.Status.Actions
-func (a Announcer) WithStatusActions(chi *chop.ClickHouseInstallation) Announcer {
+func (a Announcer) WithStatusActions(chi *chiV1.ClickHouseInstallation) Announcer {
 	b := a
 	if chi == nil {
 		b.chi = nil
@@ -254,7 +254,7 @@ func (a Announcer) WithStatusActions(chi *chop.ClickHouseInstallation) Announcer
 }
 
 // WithStatusError is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
-func (a Announcer) WithStatusError(chi *chop.ClickHouseInstallation) Announcer {
+func (a Announcer) WithStatusError(chi *chiV1.ClickHouseInstallation) Announcer {
 	b := a
 	if chi == nil {
 		b.chi = nil
@@ -308,7 +308,7 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
 		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, UpdateCHIStatusOptions{
 			TolerateAbsence: true,
-			CopyCHIStatusOptions: chop.CopyCHIStatusOptions{
+			CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 				Actions: true,
 				Errors:  true,
 			},

@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"strings"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	appsV1 "k8s.io/api/apps/v1"
+	coreV1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -69,11 +69,11 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 	}
 
 	// What pod does operator run in?
-	name, ok1 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAME)
-	namespace, ok2 := chop.Get().ConfigManager.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
+	name, ok1 := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_NAME)
+	namespace, ok2 := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_NAMESPACE)
 
 	if !ok1 || !ok2 {
-		str := fmt.Sprintf("ERROR read env vars: %s/%s ", chiv1.OPERATOR_POD_NAME, chiv1.OPERATOR_POD_NAMESPACE)
+		str := fmt.Sprintf("ERROR read env vars: %s/%s ", chiV1.OPERATOR_POD_NAME, chiV1.OPERATOR_POD_NAMESPACE)
 		log.V(1).M(namespace, name).F().Error(str)
 		return errors.New(str)
 	}
@@ -110,7 +110,7 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 	return nil
 }
 
-func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*corev1.Pod, error) {
+func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*coreV1.Pod, error) {
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, newGetOptions())
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR get Pod %s/%s %v", namespace, name, err)
@@ -138,7 +138,7 @@ func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*cor
 	return pod, nil
 }
 
-func (c *Controller) labelReplicaSet(ctx context.Context, pod *corev1.Pod) (*appsv1.ReplicaSet, error) {
+func (c *Controller) labelReplicaSet(ctx context.Context, pod *coreV1.Pod) (*appsV1.ReplicaSet, error) {
 	// Find parent ReplicaSet
 	replicaSetName := ""
 	for i := range pod.OwnerReferences {
@@ -185,7 +185,7 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *corev1.Pod) (*app
 	return replicaSet, nil
 }
 
-func (c *Controller) labelDeployment(ctx context.Context, rs *appsv1.ReplicaSet) error {
+func (c *Controller) labelDeployment(ctx context.Context, rs *appsV1.ReplicaSet) error {
 	// Find parent Deployment
 	deploymentName := ""
 	for i := range rs.OwnerReferences {
@@ -247,7 +247,7 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 }
 
 // appendLabelReadyPod appends Label "Ready" to the pod of the specified host
-func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiv1.ChiHost) error {
+func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -272,7 +272,7 @@ func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiv1.ChiHos
 }
 
 // deleteLabelReadyPod deletes Label "Ready" from the pod of the specified host
-func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiv1.ChiHost) error {
+func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -288,7 +288,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiv1.ChiHos
 	}
 
 	pod, err := c.getPod(host)
-	if apierrors.IsNotFound(err) {
+	if apiErrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
@@ -306,7 +306,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiv1.ChiHos
 }
 
 // appendAnnotationReadyService appends Annotation "Ready" to the service of the specified host
-func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chiv1.ChiHost) error {
+func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -331,7 +331,7 @@ func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chi
 }
 
 // deleteAnnotationReadyService deletes Annotation "Ready" from the service of the specified host
-func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chiv1.ChiHost) error {
+func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -347,7 +347,7 @@ func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chi
 	}
 
 	svc, err := c.getService(host)
-	if apierrors.IsNotFound(err) {
+	if apiErrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {

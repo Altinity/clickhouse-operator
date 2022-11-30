@@ -17,22 +17,22 @@ package chi
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsV1 "k8s.io/api/apps/v1"
+	coreV1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*core.ConfigMap, error) {
+func (c *Controller) getConfigMap(objMeta *metaV1.ObjectMeta, byNameOnly bool) (*coreV1.ConfigMap, error) {
 	get := c.configMapLister.ConfigMaps(objMeta.Namespace).Get
 	list := c.configMapLister.ConfigMaps(objMeta.Namespace).List
-	var objects []*core.ConfigMap
+	var objects []*coreV1.ConfigMap
 
 	// Check whether object with such name already exists
 	obj, err := get(objMeta.Name)
@@ -42,7 +42,7 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 		return obj, nil
 	}
 
-	if !apierrors.IsNotFound(err) {
+	if !apiErrors.IsNotFound(err) {
 		// Error, which is not related to "Object not found"
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 	}
 
 	if len(objects) == 0 {
-		return nil, apierrors.NewNotFound(apps.Resource("ConfigMap"), objMeta.Name)
+		return nil, apiErrors.NewNotFound(appsV1.Resource("ConfigMap"), objMeta.Name)
 	}
 
 	if len(objects) == 1 {
@@ -80,13 +80,13 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 // getService gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.ChiHost
-func (c *Controller) getService(obj interface{}) (*core.Service, error) {
+func (c *Controller) getService(obj interface{}) (*coreV1.Service, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *core.Service:
+	case *coreV1.Service:
 		name = typedObj.Name
 		namespace = typedObj.Namespace
-	case *chiv1.ChiHost:
+	case *chiV1.ChiHost:
 		name = chopmodel.CreateStatefulSetServiceName(typedObj)
 		namespace = typedObj.Address.Namespace
 	}
@@ -97,15 +97,15 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 // getStatefulSet gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.ChiHost
-func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*appsV1.StatefulSet, error) {
 	switch typedObj := obj.(type) {
-	case *meta.ObjectMeta:
+	case *metaV1.ObjectMeta:
 		var b bool
 		if len(byName) > 0 {
 			b = byName[0]
 		}
 		return c.getStatefulSetByMeta(typedObj, b)
-	case *chiv1.ChiHost:
+	case *chiV1.ChiHost:
 		return c.getStatefulSetByHost(typedObj)
 	}
 	return nil, fmt.Errorf("unknown type")
@@ -113,10 +113,10 @@ func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.Stat
 
 // getStatefulSet gets StatefulSet either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSetByMeta(meta *metaV1.ObjectMeta, byNameOnly bool) (*appsV1.StatefulSet, error) {
 	get := c.statefulSetLister.StatefulSets(meta.Namespace).Get
 	list := c.statefulSetLister.StatefulSets(meta.Namespace).List
-	var objects []*apps.StatefulSet
+	var objects []*appsV1.StatefulSet
 
 	// Check whether object with such name already exists
 	obj, err := get(meta.Name)
@@ -126,7 +126,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 		return obj, nil
 	}
 
-	if !apierrors.IsNotFound(err) {
+	if !apiErrors.IsNotFound(err) {
 		// Error, which is not related to "Object not found"
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 	}
 
 	if len(objects) == 0 {
-		return nil, apierrors.NewNotFound(apps.Resource("StatefulSet"), meta.Name)
+		return nil, apiErrors.NewNotFound(appsV1.Resource("StatefulSet"), meta.Name)
 	}
 
 	if len(objects) == 1 {
@@ -160,7 +160,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 }
 
 // getStatefulSetByHost finds StatefulSet of a specified host
-func (c *Controller) getStatefulSetByHost(host *chiv1.ChiHost) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSetByHost(host *chiV1.ChiHost) (*appsV1.StatefulSet, error) {
 	// Namespaced name
 	name := chopmodel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
@@ -169,20 +169,20 @@ func (c *Controller) getStatefulSetByHost(host *chiv1.ChiHost) (*apps.StatefulSe
 }
 
 // getSecret gets secret
-func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
+func (c *Controller) getSecret(secret *coreV1.Secret) (*coreV1.Secret, error) {
 	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(newContext(), secret.Name, newGetOptions())
 }
 
 // getPod gets pod. Accepted types:
 //  1. *apps.StatefulSet
 //  2. *chop.ChiHost
-func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
+func (c *Controller) getPod(obj interface{}) (*coreV1.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *apps.StatefulSet:
+	case *appsV1.StatefulSet:
 		name = chopmodel.CreatePodName(obj)
 		namespace = typedObj.Namespace
-	case *chiv1.ChiHost:
+	case *chiV1.ChiHost:
 		name = chopmodel.CreatePodName(obj)
 		namespace = typedObj.Address.Namespace
 	}
@@ -190,19 +190,19 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 }
 
 // getPods gets all pods for provided entity
-func (c *Controller) getPods(obj interface{}) []*core.Pod {
+func (c *Controller) getPods(obj interface{}) []*coreV1.Pod {
 	switch typed := obj.(type) {
-	case *chiv1.ClickHouseInstallation:
+	case *chiV1.ClickHouseInstallation:
 		return c.getPodsOfCHI(typed)
-	case *chiv1.ChiCluster:
+	case *chiV1.ChiCluster:
 		return c.getPodsOfCluster(typed)
-	case *chiv1.ChiShard:
+	case *chiV1.ChiShard:
 		return c.getPodsOfShard(typed)
 	case
-		*chiv1.ChiHost,
-		*apps.StatefulSet:
+		*chiV1.ChiHost,
+		*appsV1.StatefulSet:
 		if pod, err := c.getPod(typed); err == nil {
-			return []*core.Pod{
+			return []*coreV1.Pod{
 				pod,
 			}
 		}
@@ -211,8 +211,8 @@ func (c *Controller) getPods(obj interface{}) []*core.Pod {
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *Controller) getPodsOfCluster(cluster *chiv1.ChiCluster) (pods []*core.Pod) {
-	cluster.WalkHosts(func(host *chiv1.ChiHost) error {
+func (c *Controller) getPodsOfCluster(cluster *chiV1.ChiCluster) (pods []*coreV1.Pod) {
+	cluster.WalkHosts(func(host *chiV1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -222,8 +222,8 @@ func (c *Controller) getPodsOfCluster(cluster *chiv1.ChiCluster) (pods []*core.P
 }
 
 // getPodsOfShard gets all pods in a shard
-func (c *Controller) getPodsOfShard(shard *chiv1.ChiShard) (pods []*core.Pod) {
-	shard.WalkHosts(func(host *chiv1.ChiHost) error {
+func (c *Controller) getPodsOfShard(shard *chiV1.ChiShard) (pods []*coreV1.Pod) {
+	shard.WalkHosts(func(host *chiV1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -233,8 +233,8 @@ func (c *Controller) getPodsOfShard(shard *chiv1.ChiShard) (pods []*core.Pod) {
 }
 
 // getPodsOfCHI gets all pods in a CHI
-func (c *Controller) getPodsOfCHI(chi *chiv1.ClickHouseInstallation) (pods []*core.Pod) {
-	chi.WalkHosts(func(host *chiv1.ChiHost) error {
+func (c *Controller) getPodsOfCHI(chi *chiV1.ClickHouseInstallation) (pods []*coreV1.Pod) {
+	chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -254,7 +254,7 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool) (*chiv1.ClickHouseInstallation, error) {
+func (c *Controller) GetCHIByObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI bool) (*chiV1.ClickHouseInstallation, error) {
 	var chiName string
 	var err error
 	if isCHI {

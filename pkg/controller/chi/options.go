@@ -15,43 +15,43 @@
 package chi
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 // newListOptions returns filled metav1.ListOptions
-func newListOptions(labelsMap map[string]string) metav1.ListOptions {
+func newListOptions(labelsMap map[string]string) metaV1.ListOptions {
 	labelSelector := labels.SelectorFromSet(labelsMap)
-	return metav1.ListOptions{
+	return metaV1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
 }
 
 // newGetOptions returns filled metav1.GetOptions
-func newGetOptions() metav1.GetOptions {
-	return metav1.GetOptions{}
+func newGetOptions() metaV1.GetOptions {
+	return metaV1.GetOptions{}
 }
 
 // newCreateOptions returns filled metav1.CreateOptions
-func newCreateOptions() metav1.CreateOptions {
-	return metav1.CreateOptions{}
+func newCreateOptions() metaV1.CreateOptions {
+	return metaV1.CreateOptions{}
 }
 
 // newUpdateOptions returns filled metav1.UpdateOptions
-func newUpdateOptions() metav1.UpdateOptions {
-	return metav1.UpdateOptions{}
+func newUpdateOptions() metaV1.UpdateOptions {
+	return metaV1.UpdateOptions{}
 }
 
 // newPatchOptions returns filled metav1.PatchOptions
-func newPatchOptions() metav1.PatchOptions {
-	return metav1.PatchOptions{}
+func newPatchOptions() metaV1.PatchOptions {
+	return metaV1.PatchOptions{}
 }
 
 // newDeleteOptions returns filled *metav1.DeleteOptions
-func newDeleteOptions() metav1.DeleteOptions {
+func newDeleteOptions() metaV1.DeleteOptions {
 	gracePeriodSeconds := int64(0)
-	propagationPolicy := metav1.DeletePropagationForeground
-	return metav1.DeleteOptions{
+	propagationPolicy := metaV1.DeletePropagationForeground
+	return metaV1.DeleteOptions{
 		GracePeriodSeconds: &gracePeriodSeconds,
 		PropagationPolicy:  &propagationPolicy,
 	}
