@@ -182,19 +182,23 @@ spec:
                   description: "Errors"
                   items:
                     type: string
-                updated:
+                hostsUpdated:
                   type: integer
                   minimum: 0
                   description: "Updated Hosts count"
-                added:
+                hostsAdded:
                   type: integer
                   minimum: 0
                   description: "Added Hosts count"
-                deleted:
+                hostsCompleted:
+                  type: integer
+                  minimum: 0
+                  description: "Completed Hosts count"
+                hostsDeleted:
                   type: integer
                   minimum: 0
                   description: "Deleted Hosts count"
-                delete:
+                hostsDelete:
                   type: integer
                   minimum: 0
                   description: "About to delete Hosts count"
@@ -1295,19 +1299,23 @@ spec:
                   description: "Errors"
                   items:
                     type: string
-                updated:
+                hostsUpdated:
                   type: integer
                   minimum: 0
                   description: "Updated Hosts count"
-                added:
+                hostsAdded:
                   type: integer
                   minimum: 0
                   description: "Added Hosts count"
-                deleted:
+                hostsCompleted:
+                  type: integer
+                  minimum: 0
+                  description: "Completed Hosts count"
+                hostsDeleted:
                   type: integer
                   minimum: 0
                   description: "Deleted Hosts count"
-                delete:
+                hostsDelete:
                   type: integer
                   minimum: 0
                   description: "About to delete Hosts count"
