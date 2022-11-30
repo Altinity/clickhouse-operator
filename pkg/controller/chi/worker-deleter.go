@@ -387,7 +387,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
-	chi.EnsureStatus().DeletedHostsCount++
+	chi.EnsureStatus().HostsDeletedCount++
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence: true,
 		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
