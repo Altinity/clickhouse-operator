@@ -332,7 +332,7 @@ func (s *ChiStatus) UpdateHost() {
 	s.HostsCompletedCount++
 }
 
-// UpdateHost updates added hosts counter
+// AddHost updates added hosts counter
 func (s *ChiStatus) AddHost() {
 	if s == nil {
 		return
