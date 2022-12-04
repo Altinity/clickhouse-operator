@@ -19,9 +19,9 @@ spec:
         shardsCount: 1
         replicasCount: 1
     files:
-      graphite_rollup.xml:
-          <yandex>
-              <graphite_rollup_example>
+      graphite_rollup.xml: |
+          <clickhouse>
+              <graphite_rollup>
                   <pattern>
                       <regexp>click_cost</regexp>
                       <function>any</function>
@@ -49,8 +49,8 @@ spec:
                           <precision>3600</precision>
                       </retention>
                   </default>
-              </graphite_rollup_example>
-          <yandex>
+              </graphite_rollup>
+          </clickhouse>
   defaults:
     storageManagement:
       provisioner: Operator

@@ -3046,7 +3046,8 @@ def test_037(self):
 
 
 @TestScenario
-@Requirements()#todo
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards("1.0"),
+              RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"))
 @Name("test_038. Automatic schema propagation")
 def test_038(self):
     """Check clickhouse operator supports automatic schema propagation."""
@@ -3058,7 +3059,7 @@ def test_038(self):
     with Given("I get terminal shell"):
         self.context.shell = get_shell()
 
-    with And("chi exists"):
+    with And("chi with 1 shard exists"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -3082,7 +3083,7 @@ def test_038(self):
         "sign Int8 DEFAULT 1) ENGINE = VersionedCollapsingMergeTree(sign, version) PARTITION BY y ORDER BY d",
         "CREATE TABLE graphite_mergetree_table (d Date, a String, b UInt8, x String, y Int8, Path String, "
         "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))"
-        "ENGINE = GraphiteMergeTree('graphite_rollup_example')PARTITION BY y ORDER BY d "
+        "ENGINE = GraphiteMergeTree('graphite_rollup')PARTITION BY y ORDER BY d "
         "SETTINGS index_granularity = 8192",
         "CREATE TABLE replicated_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
         "ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_table', "
@@ -3103,7 +3104,7 @@ def test_038(self):
         "BY y ORDER BY d",
         "CREATE TABLE replicated_graphite_table on cluster 'simple'(d Date, a String, b UInt8, x String, y Int8, Path String, "
         "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))ENGINE = "
-        "ReplicatedGraphiteMergeTree('graphite_rollup_example')PARTITION BY y ORDER BY d "
+        "ReplicatedGraphiteMergeTree('graphite_rollup')PARTITION BY y ORDER BY d "
         "SETTINGS index_granularity = 8192",
         "CREATE TABLE table_for_dict ( key_column UInt64, third_column String ) "
         "ENGINE = MergeTree() ORDER BY key_column",
@@ -3137,7 +3138,7 @@ def test_038(self):
         "'{replica}') PARTITION BY y ORDER BY d",
         "CREATE LIVE VIEW test_live_view AS SELECT * FROM table_for_live_vew",
         "CREATE TABLE table_for_window_view on cluster 'simple' (id UInt64, timestamp DateTime) ENGINE = ReplicatedMergeTree() order by id",
-        "CREATE WINDOW VIEW wv as select count(id), tumbleStart(w_id) as window_start from table_for_window_view "
+        "CREATE WINDOW VIEW wv ENGINE = Log() as select count(id), tumbleStart(w_id) as window_start from table_for_window_view "
         "group by tumble(timestamp, INTERVAL '10' SECOND) as w_id",
         "CREATE TABLE tinylog_table (id UInt64, value1 UInt8, value2 UInt16, value3 UInt32, value4 UInt64) ENGINE=TinyLog",
         "CREATE TABLE log_table (id UInt64, value1 Nullable(UInt64), value2 Nullable(UInt64), value3 Nullable(UInt64)) ENGINE=Log",
@@ -3188,15 +3189,25 @@ def test_038(self):
                              pod="chi-test-038-schema-propagation-simple-0-0-0",
                              advanced_params="--allow_experimental_live_view=1 --allow_experimental_window_view=1 ")
 
+    with When("I add 1 more shard"):
+        with When("chi with 1 shard exists"):
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-038-2-schema-propagation.yaml",
+                check={
+                    "pod_count": 2,
+                    "do_not_delete": 1,
+                },
+            )
     table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-038-schema-propagation-simple-0-0-0").split()[1:]
 
     with Then("I check tables are propageted correctly"):
         for attempt in retries(timeout=500, delay=1):
             with attempt:
                 for table_name in table_names:
-                    expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-0-0-0")
-                    # actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-1-0-0")
-                    # assert expected_describe == actual_describe, error()
+                    if table_name[0] != '.':
+                        expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-0-0-0")
+                        actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-1-0-0")
+                        assert expected_describe == actual_describe, error()
 
 
 @TestModule
