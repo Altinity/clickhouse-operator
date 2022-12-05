@@ -2944,7 +2944,7 @@ def test_036(self):
 
     with And("Wait for PVC to detect PV is lost"):
         kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
-                            ".status.phase", "Lost")
+                           ".status.phase", "Lost")
 
     with Then("I check PV is recreated"):
         kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
