@@ -27,7 +27,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) clear(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
+func (w *worker) clean(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return

@@ -99,7 +99,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		WithStatusAction(new).
 		M(new).F().
 		Info("remove items scheduled for deletion")
-	w.clear(ctx, new)
+	w.clean(ctx, new)
 	w.dropReplicas(ctx, new, actionPlan)
 	w.includeStopped(new)
 	w.waitForIPAddresses(ctx, new)
