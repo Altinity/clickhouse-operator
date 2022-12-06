@@ -80,6 +80,7 @@ spec:
                 echo 'initLimit=300'
                 echo 'syncLimit=10'
                 echo 'maxClientCnxns=2000'
+                echo 'maxTimeToWaitForEpoch=2000'
                 echo 'maxSessionTimeout=60000000'
                 echo "dataDir=${ZOO_DATA_DIR}"
                 echo "dataLogDir=${ZOO_DATA_LOG_DIR}"
@@ -88,10 +89,11 @@ spec:
                 echo 'preAllocSize=131072'
                 echo 'snapCount=3000000'
                 echo 'leaderServes=yes'
-                echo 'standaloneEnabled=true'
-                echo '4lw.commands.whitelist=stat, ruok, conf, isro, mntr'
+                echo 'standaloneEnabled=false'
+                echo '4lw.commands.whitelist=*'
                 echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
                 echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
+                echo "zookeeper.skipACL=true"
               } > /conf/zoo.cfg &&
               {
                 echo "zookeeper.root.logger=CONSOLE"
@@ -102,7 +104,7 @@ spec:
                 echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
                 echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
               } > /conf/log4j.properties &&
-              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:+UseG1GC -XX:+CMSParallelRemarkEnabled"' > /conf/java.env &&
+              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -Djute.maxbuffer=8388600"' > /conf/java.env &&
               if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
                   NAME=${BASH_REMATCH[1]}
                   ORD=${BASH_REMATCH[2]}
@@ -114,10 +116,13 @@ spec:
               mkdir -p ${ZOO_DATA_LOG_DIR} &&
               export MY_ID=$((ORD+1)) &&
               echo $MY_ID > $ZOO_DATA_DIR/myid &&
-              if [[ $SERVERS -gt 1 ]]; then
-                for (( i=1; i<=$SERVERS; i++ )); do
-                    echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
-                done
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
+              done &&
+              if [[ $SERVERS -eq 1 ]]; then
+                  echo "group.1=1" >> /conf/zoo.cfg;
+              else
+                  echo "group.1=1:2:3" >> /conf/zoo.cfg;
               fi &&
               chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" "$ZOO_CONF_DIR" &&
               zkServer.sh start-foreground

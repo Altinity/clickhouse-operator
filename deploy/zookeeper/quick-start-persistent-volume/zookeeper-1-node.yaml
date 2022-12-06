@@ -135,6 +135,7 @@ spec:
                 echo 'initLimit=300'
                 echo 'syncLimit=10'
                 echo 'maxClientCnxns=2000'
+                echo 'maxTimeToWaitForEpoch=2000'
                 echo 'maxSessionTimeout=60000000'
                 echo "dataDir=${ZOO_DATA_DIR}"
                 echo "dataLogDir=${ZOO_DATA_LOG_DIR}"
@@ -147,6 +148,7 @@ spec:
                 echo '4lw.commands.whitelist=*'
                 echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
                 echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
+                echo "zookeeper.skipACL=true"
               } > /conf/zoo.cfg &&
               {
                 echo "zookeeper.root.logger=CONSOLE"
@@ -157,7 +159,7 @@ spec:
                 echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
                 echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
               } > /conf/log4j.properties &&
-              echo 'JVMFLAGS="-Xms128M -Xmx4G -XX:+UseG1GC -XX:+CMSParallelRemarkEnabled -XX:ActiveProcessorCount=8"' > /conf/java.env &&
+              echo 'JVMFLAGS="-Xms128M -Xmx4G -XX:ActiveProcessorCount=8 -Djute.maxbuffer=8388600"' > /conf/java.env &&
               if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
                   NAME=${BASH_REMATCH[1]}
                   ORD=${BASH_REMATCH[2]}

@@ -10,7 +10,7 @@ from testflows.core import *
 
 def wait_keeper_ready(keeper_type='zookeeper', pod_count=3, retries=10):
     svc_name = 'zookeeper-client' if keeper_type == "zookeeper-operator" else 'zookeeper'
-    expected_containers = "2/2" if keeper_type == "clickhouse-keeper" else "1/1"
+    expected_containers = "1/1"
     expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
     for i in range(retries):
         ready_pods = kubectl.launch(f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l")

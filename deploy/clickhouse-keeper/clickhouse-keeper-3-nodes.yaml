@@ -52,7 +52,7 @@ metadata:
   name: clickhouse-keeper-settings
 data:
   keeper_config.xml: |
-    <yandex>
+    <clickhouse>
         <include_from>/tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml</include_from>
         <logger>
             <level>trace</level>
@@ -65,10 +65,17 @@ data:
             <four_letter_word_white_list>*</four_letter_word_white_list>
             <coordination_settings>
                 <!-- <raft_logs_level>trace</raft_logs_level> -->
-                <raft_logs_level>debug</raft_logs_level>
+                <raft_logs_level>information</raft_logs_level>
             </coordination_settings>
         </keeper_server>
-    </yandex>
+        <prometheus>
+            <endpoint>/metrics</endpoint>
+            <port>7000</port>
+            <metrics>true</metrics>
+            <events>true</events>
+            <asynchronous_metrics>true</asynchronous_metrics>
+        </prometheus>
+    </clickhouse>
 
 ---
 # Setup ClickHouse Keeper StatefulSet
@@ -117,7 +124,7 @@ spec:
       containers:
         - name: clickhouse-keeper
           imagePullPolicy: IfNotPresent
-          image: "clickhouse/clickhouse-keeper:latest"
+          image: "clickhouse/clickhouse-keeper:head-alpine"
           resources:
             requests:
               memory: "256M"
@@ -168,39 +175,21 @@ spec:
                 clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
               fi
           readinessProbe:
-            tcpSocket:
-              port: 9444
+            httpGet:
+              port: 7000
+              path: /metrics
             timeoutSeconds: 5
             periodSeconds: 60
             failureThreshold: 3
+            initialDelaySeconds: 15
           livenessProbe:
-            tcpSocket:
-              port: 2181
+            httpGet:
+              port: 7000
+              path: /metrics
             timeoutSeconds: 5
-            periodSeconds: 30
-        - name: zookeeper-exporter
-          imagePullPolicy: IfNotPresent
-          image: dabealu/zookeeper-exporter:latest
-          resources:
-            requests:
-              memory: "64M"
-              cpu: "0.3"
-            limits:
-              memory: "128M"
-              cpu: "1"
-          command:
-            - zookeeper-exporter
-            - "-listen"
-            - 0.0.0.0:7000
-            - "-zk-hosts"
-            - 127.0.0.1:2181
-          livenessProbe:
-            exec:
-              command:
-                - sh
-                - -c
-                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
-            periodSeconds: 5
+            periodSeconds: 60
+            failureThreshold: 3
+            initialDelaySeconds: 15
           ports:
             - containerPort: 7000
               name: prometheus
