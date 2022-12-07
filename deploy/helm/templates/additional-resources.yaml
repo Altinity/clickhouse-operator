@@ -1,0 +1,5 @@
+{{- $template := fromYaml (include "altinity-clickhouse-operator.rawResource" .) -}}
+{{- range $i, $t := .Values.additionalResources }}
+---
+{{ toYaml (merge (tpl $t $ | fromYaml) $template) -}}
+{{- end }}
