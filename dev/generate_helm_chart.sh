@@ -13,23 +13,27 @@ cat << EOT
 EOT
 }
 
-if [[ ! (command -v yq &> /dev/null) || ! (command -v jq &> /dev/null) || ! (command -v helm-docs &> /dev/null) || ! (command -v perl &> /dev/null) ]]; then
-  usage()
-  exit 1
-fi
+for cmd in "yq jq helm-docs perl"; do
+  if ! command -v ${cmd} &> /dev/null; then
+    usage
+    exit 1
+  fi
+done
 
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
-readonly manifest_file_path="../deploy/operator/clickhouse-operator-install-bundle.yaml"
-readonly release_file_path="../release"
-readonly dashboards_path="../grafana-dashboard"
-readonly chart_path="../deploy/helm"
+readonly script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+readonly manifest_file_path="${script_dir}/../deploy/operator/clickhouse-operator-install-bundle.yaml"
+readonly release_file_path="${script_dir}/../release"
+readonly dashboards_path="${script_dir}/../grafana-dashboard"
+readonly chart_path="${script_dir}/../deploy/helm"
 readonly values_yaml="${chart_path}/values.yaml"
 
 function main() {
+  echo "Generate HELM chart"
   # process manifests from install bundle
   local tmpdir
   tmpdir=$(mktemp -d)
@@ -53,6 +57,7 @@ function main() {
   for dashboard in "${dashboards_path}"/*.json; do
     local dashboard_name
     dashboard_name=$(basename "${dashboard}")
+    echo "${dashboard_name}"
     jq '(.templating.list) |= ['"${prom_ds}"'] + .' "${dashboard}" >"${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\${DS_PROMETHEUS}"/"datasource": {"type":"prometheus","uid":"\${ds_prometheus}"}/g' "${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\$db"/"datasource": {"type":"vertamedia-clickhouse-datasource","uid":"\${db}"}/g' "${files_dir}/${dashboard_name}"
@@ -76,6 +81,7 @@ function process() {
     local templates_dir="${chart_path}/templates/generated"
     processed_file="${templates_dir}/${processed_file}"
   fi
+  echo $(basename "${processed_file}")
   mkdir -p "$(dirname "${processed_file}")"
   mv "${file}" "${processed_file}"
 

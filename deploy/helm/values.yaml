@@ -543,14 +543,25 @@ additionalResources: []
 #       namespace: {{ .Release.Namespace }}
 #     stringData:
 #       mykey: my-value
+#  - |
+#     apiVersion: clickhouse.altinity.com/v1
+#     kind: ClickHouseInstallation
+#     metadata:
+#       name: {{ include "altinity-clickhouse-operator.fullname" . }}-chi
+#       namespace: {{ .Release.Namespace }}
+#     spec:
+#       configuration:
+#         clusters:
+#         - name: default
+#           layout:
+#             shardsCount: 1
 
 dashboards:
   # dashboards.enabled -- provision grafana dashboards as secrets (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-6.33.1/charts/grafana/values.yaml#L679 )
   enabled: false
   # dashboards.additionalLabels -- labels to add to a secret with dashboards
-  additionalLabels: {}
-  #  grafana_dashboard: "1"
-
+  additionalLabels:
+    grafana_dashboard: ""
   # dashboards.annotations -- annotations to add to a secret with dashboards
   annotations: {}
-  #  grafana_folder: clickhouse
+  grafana_folder: clickhouse

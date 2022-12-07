@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.20.0](https://img.shields.io/badge/Version-0.20.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.20.0](https://img.shields.io/badge/AppVersion-0.20.0-informational?style=flat-square)
+![Version: 0.20.1](https://img.shields.io/badge/Version-0.20.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.20.1](https://img.shields.io/badge/AppVersion-0.20.1-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -12,7 +12,7 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 
 | Name | Email | Url |
 | ---- | ------ | --- |
-| altinity | <info@altinity.com> |  |
+| altinity | <support@altinity.com> |  |
 
 ## Values
 
@@ -21,9 +21,10 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 | additionalResources | list | `[]` | list of additional resources to create (are processed via `tpl` function) |
 | affinity | object | `{}` | affinity for scheduler pod assignment |
 | configs | object | check the values.yaml file for the config content | clickhouse configs |
-| dashboards.additionalLabels | object | `{}` | labels to add to a secret with dashboards |
+| dashboards.additionalLabels | object | `{"grafana_dashboard":""}` | labels to add to a secret with dashboards |
 | dashboards.annotations | object | `{}` | annotations to add to a secret with dashboards |
 | dashboards.enabled | bool | `false` | provision grafana dashboards as secrets (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-6.33.1/charts/grafana/values.yaml#L679 ) |
+| dashboards.grafana_folder | string | `"clickhouse"` |  |
 | fullnameOverride | string | `""` | full name of the chart. |
 | imagePullSecrets | list | `[]` | image pull secret for private images |
 | metrics.env | list | `[]` | additional environment variables for the deployment |

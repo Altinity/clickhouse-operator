@@ -7,7 +7,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.0
+    clickhouse.altinity.com/chop: 0.20.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
