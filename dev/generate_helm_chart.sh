@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
 
-#
-# Script splits clickhouse-operator-install-bundle.yaml to separate files and adjusts them to conform the helm standards
-# NOTE script requires some pre-installed tools:
-# - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x
-# - jq ( https://github.com/stedolan/jq )
-# - helm-docs ( https://github.com/norwoodj/helm-docs )
-# - perl ( https://learn.perl.org/installing/ )
-#
-# Usage: ./generate_helm_chart.sh
-#
+function usage() {
+cat << EOT
+ Script splits clickhouse-operator-install-bundle.yaml to separate files and adjusts them to conform the helm standards
+ NOTE script requires some pre-installed tools:
+ - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x
+ - jq ( https://github.com/stedolan/jq )
+ - helm-docs ( https://github.com/norwoodj/helm-docs )
+ - perl ( https://learn.perl.org/installing/ )
+
+ Usage: ./generate_helm_chart.sh
+EOT
+}
+
+if [[ ! (command -v yq &> /dev/null) || ! (command -v jq &> /dev/null) || ! (command -v helm-docs &> /dev/null) || ! (command -v perl &> /dev/null) ]]; then
+  usage()
+  exit 1
+fi
+
 
 set -o errexit
 set -o nounset
