@@ -2317,11 +2317,11 @@ def test_028(self):
                 note("Restart needs to be cleaned")
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
 
-        with Then("Clear RollingUpdate restart policy"):
-            cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
-            kubectl.launch(cmd)
-            time.sleep(10)
-            kubectl.wait_chi_status(chi, "Completed")
+        # with Then("Clear RollingUpdate restart policy"):
+        #    cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
+        #    kubectl.launch(cmd)
+        #    time.sleep(10)
+        #    kubectl.wait_chi_status(chi, "Completed")
 
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3},
