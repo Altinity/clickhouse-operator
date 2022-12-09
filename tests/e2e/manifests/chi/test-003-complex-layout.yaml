@@ -7,7 +7,7 @@ spec:
     - name: clickhouse-version
   configuration:
     clusters:
-      - name: clickhouse
+      - name: cluster1
         layout:
           shards:
             - name: shard0
@@ -22,3 +22,4 @@ spec:
               replicas:
                 - name: replica1-0
                 - name: replica1-1
+      - name: cluster2

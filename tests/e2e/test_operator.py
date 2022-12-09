@@ -32,6 +32,7 @@ def test_001(self):
                 "service": 2,
             },
             "configmaps": 1,
+            "pdb": ["single"]
         }
     )
 
@@ -56,7 +57,7 @@ def test_002(self):
             "pod_volumes": {
                 "/var/log/clickhouse-server",
             },
-            "pod_podAntiAffinity": 1
+            "pod_podAntiAffinity": 1,
         }
     )
 
@@ -74,10 +75,11 @@ def test_003(self):
         manifest="manifests/chi/test-003-complex-layout.yaml",
         check={
             "object_counts": {
-                "statefulset": 4,
-                "pod": 4,
-                "service": 5,
+                "statefulset": 5,
+                "pod": 5,
+                "service": 6,
             },
+            "pdb": ["cluster1", "cluster2"],
         },
     )
 
