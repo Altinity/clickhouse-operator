@@ -242,7 +242,7 @@ configs:
             # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
             namespace: ""
             # Empty `name` means no k8s Secret would be looked for
-            name: "clickhouse-operator"
+            name: "{{ include "altinity-clickhouse-operator.fullname" . }}"
           # Port where to connect to ClickHouse instances to
           port: 8123
 
