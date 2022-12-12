@@ -358,6 +358,27 @@ def get_shards_from_remote_servers(chi, cluster):
 
     return chi_shards
 
+def get_replicas_from_remote_servers(chi, cluster):
+    if cluster == '':
+        cluster = chi
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+
+    chi_start = remote_servers.find(f"<{cluster}>")
+    chi_end = remote_servers.find(f"</{cluster}>")
+    if chi_start < 0:
+        print(f"unable to find '<{cluster}>' in:")
+        print(remote_servers)
+        with Then(f"Remote servers should contain {cluster} cluster"):
+            assert chi_start >= 0
+
+    chi_cluster = remote_servers[chi_start:chi_end]
+    # print(chi_cluster)
+    chi_shards = chi_cluster.count("<shard>")
+    chi_replicas = chi_cluster.count("<replica>")
+
+    return chi_replicas/chi_shards
+
+
 @TestCheck
 def check_remote_servers(self, chi, shards, trigger_event, cluster=''):
     """Check cluster definition in configmap until signal is received"""
@@ -1123,6 +1144,8 @@ def test_014(self):
                 "do_not_delete": 1,
             })
         kubectl.wait_chi_status(chi, "Completed", retries=20)
+        with Then("Replica is removed from remote_servers.xml as well"):
+            assert get_replicas_from_remote_servers(chi, cluster) == 1
 
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
