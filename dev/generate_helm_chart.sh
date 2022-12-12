@@ -192,6 +192,13 @@ function update_configmap_resource() {
   readonly name=$(yq e '.metadata.name' "${file}")
   local data
   data=$(yq e '.data' "${file}")
+
+  if [ "${name}" = "etc-clickhouse-operator-files" ]; then
+    readonly search='name: "clickhouse-operator"'
+    readonly replace='name: "{{ include "altinity-clickhouse-operator.fullname" . }}"'
+    data=${data/"${search}"/"${replace}"}
+  fi
+
   local name_suffix="${name/etc-clickhouse-operator-/}"
   local cameled_name
   cameled_name=$(to_camel_case "${name_suffix}")
@@ -199,7 +206,7 @@ function update_configmap_resource() {
   yq e -i '.metadata.name |= "{{ printf \"%s-'"${name_suffix}"'\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
   yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ toYaml .Values.configs.'"${cameled_name}"' | nindent 2 }}"' "${file}"
+  yq e -i '.data |= "{{ tpl (toYaml .Values.configs.'"${cameled_name}"') . | nindent 2 }}"' "${file}"
 
   if [ -z "${data}" ]; then
     yq e -i '.configs.'"${cameled_name}"' |= null' "${values_yaml}"
