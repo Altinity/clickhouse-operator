@@ -1,4 +1,4 @@
-{{/* vim: set filetype=mustache: */}}
+{{/* vim: set filetype=go-template: */}}
 {{/*
 Expand the name of the chart.
 */}}
