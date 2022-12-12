@@ -148,6 +148,9 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
     if "configmaps" in check:
         check_configmaps(chi_name, ns=ns)
 
+    if "pdb" in check:
+        check_pdb(chi_name, check["pdb"], ns=ns)
+
     if "do_not_delete" not in check:
         delete_chi(chi_name, ns=ns)
 
@@ -483,3 +486,14 @@ def check_configmap(cfg_name, values, ns=namespace):
     for v in values:
         with Then(f"{cfg_name} should contain {v}"):
             assert v in cfm["data"]
+
+def check_pdb(chi, clusters, ns=namespace):
+    for c in clusters:
+        with Then(f"PDB is configured for cluster {c}"):
+            pdb = get("pdb", chi + "-" + c)
+            l = pdb["spec"]["selector"]["matchLabels"]
+            assert l["clickhouse.altinity.com/app"] == "chop"
+            assert l["clickhouse.altinity.com/chi"] == chi
+            assert l["clickhouse.altinity.com/cluster"] == c
+            assert l["clickhouse.altinity.com/namespace"] == ns
+            assert pdb["spec"]["maxUnavailable"] == 1
