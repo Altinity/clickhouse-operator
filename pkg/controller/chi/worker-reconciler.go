@@ -437,13 +437,23 @@ func (w *worker) reconcilePDB(ctx context.Context, cluster *chiV1.ChiCluster, pd
 		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, newUpdateOptions())
 		if err == nil {
 			log.V(1).Info("PDB updated %s/%s", pdb.Namespace, pdb.Name)
+		} else {
+			log.Error("FAILED update PDB %s/%s err: %v", pdb.Namespace, pdb.Name, err)
+			return err
 		}
-	case (err != nil) && apiErrors.IsNotFound(err):
+	case apiErrors.IsNotFound(err):
 		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, newCreateOptions())
 		if err == nil {
 			log.V(1).Info("PDB created %s/%s", pdb.Namespace, pdb.Name)
+		} else {
+			log.Error("FAILED create PDB %s/%s err: %v", pdb.Namespace, pdb.Name, err)
+			return err
 		}
+	default:
+		log.Error("FAILED get PDB %s/%s err: %v", pdb.Namespace, pdb.Name, err)
+		return err
 	}
+
 	return nil
 }
 
