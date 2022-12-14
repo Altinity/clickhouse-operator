@@ -3050,14 +3050,11 @@ def test_037(self):
               RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"))
 @Name("test_013_1. Automatic schema propagation for shards")
 def test_013_1(self):
-    """Check clickhouse operator supports automatic schema propagation."""
+    """Check clickhouse operator supports automatic schema propagation for shards."""
     cluster = "simple"
     manifest = f"manifests/chi/test-013-1-1-schema-propagation.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
-
-    with Given("I get terminal shell"):
-        self.context.shell = get_shell()
 
     with And("chi with 1 shard exists"):
         kubectl.create_and_check(
