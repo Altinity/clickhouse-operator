@@ -3209,7 +3209,7 @@ def test_038(self):
     with And("I delete the chi"):
         kubectl.delete_chi(chi)
 
-        
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
