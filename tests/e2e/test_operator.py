@@ -3048,11 +3048,11 @@ def test_037(self):
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards("1.0"),
               RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"))
-@Name("test_038. Automatic schema propagation")
-def test_038(self):
+@Name("test_013_1. Automatic schema propagation for shards")
+def test_013_1(self):
     """Check clickhouse operator supports automatic schema propagation."""
     cluster = "simple"
-    manifest = f"manifests/chi/test-038-1-schema-propagation.yaml"
+    manifest = f"manifests/chi/test-013-1-1-schema-propagation.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -3183,31 +3183,95 @@ def test_038(self):
             clickhouse.query(chi, query)
 
     with When("I add 1 more shard"):
-        with When("chi with 1 shard exists"):
-            kubectl.create_and_check(
-                manifest="manifests/chi/test-038-2-schema-propagation.yaml",
-                check={
-                    "apply_templates": {
-                        settings.clickhouse_template,
-                    },
-                    "pod_count": 2,
-                    "do_not_delete": 1,
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-1-2-schema-propagation.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
                 },
-            )
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
 
-    table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-038-schema-propagation-simple-0-0-0").split()[1:]
+    table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-013-1-schema-propagation-simple-0-0-0").split()
 
     with Then("I check tables are propagated correctly"):
         for attempt in retries(timeout=500, delay=1):
             with attempt:
                 for table_name in table_names:
                     if table_name[0] != '.':
-                        expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-0-0-0")
-                        actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-1-0-0")
+                        expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-013-1-schema-propagation-simple-0-0-0")
+                        actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-013-1-schema-propagation-simple-1-0-0")
                         assert expected_describe == actual_describe, error()
 
-    with And("I delete the chi"):
-        kubectl.delete_chi(chi)
+    with When("I delete second shard"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I add 1 more shard with DistributedTablesOnly schema policy"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-1-3-schema-propagation.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    tables_on_second_shard = clickhouse.query(chi, f"show tables", pod="chi-test-013-1-schema-propagation-simple-1-0-0").split()
+
+    with Then("I check tables are propagated correctly"):
+        for attempt in retries(timeout=500, delay=1):
+            with attempt:
+                assert len(tables_on_second_shard) == 2, error()
+                assert ("distr_test" in tables_on_second_shard) and (
+                            "table_for_distributed" in tables_on_second_shard), error()
+                for table_name in tables_on_second_shard:
+                    expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}",
+                                                         pod="chi-test-013-1-schema-propagation-simple-0-0-0")
+                    actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}",
+                                                       pod="chi-test-013-1-schema-propagation-simple-1-0-0")
+                    assert expected_describe == actual_describe, error()
+
+    with When("I delete second shard"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I add 1 more shard with None schema policy"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-1-4-schema-propagation.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("I check tables are not propagated"):
+        tables_on_second_shard = clickhouse.query(chi, f"show tables",
+                                                  pod="chi-test-013-1-schema-propagation-simple-1-0-0").split()
+        assert len(tables_on_second_shard) == 0, error()
 
 
 @TestModule
