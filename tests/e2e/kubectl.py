@@ -183,6 +183,7 @@ def count_objects(label="", ns=namespace):
         "service": get_count("service", ns=ns, label=label),
     }
 
+
 def apply(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is applied"):
         if " | " not in manifest:
@@ -190,6 +191,7 @@ def apply(manifest, ns=namespace, validate=True, timeout=600):
             launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
         else:
             run_shell(f"{manifest} | {kubectl_cmd} apply --namespace={ns} --validate={validate} -f -", timeout=timeout)
+
 
 def apply_chi(manifest, ns=namespace, validate=True, timeout=600):
     chi_name = yaml_manifest.get_chi_name(manifest)
@@ -202,17 +204,20 @@ def apply_chi(manifest, ns=namespace, validate=True, timeout=600):
         else:
             apply(manifest, ns=ns, validate=validate, timeout=timeout)
 
+
 def create(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is created"):
         if "<(" not in manifest:
             manifest = f"\"{manifest}\""
         launch(f"create --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
+
 def replace(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is replaced"):
         if "<(" not in manifest:
             manifest = f"\"{manifest}\""
         launch(f"replace --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
+
 
 def delete(manifest, ns=namespace, timeout=600):
     with When(f"{manifest} is deleted"):
@@ -421,12 +426,13 @@ def check_pod_volumes(chi_name, volumes, ns=namespace):
 def get_pvc_size(pvc_name, ns=namespace):
     return get_field("pvc", pvc_name, ".spec.resources.requests.storage", ns)
 
+
 def get_pv_name(pvc_name, ns=namespace):
     return get_field("pvc", pvc_name, ".spec.volumeName", ns)
 
+
 def get_pv_size(pvc_name, ns=namespace):
     return get_field("pv", get_pv_name(pvc_name, ns), ".spec.capacity.storage", ns)
-
 
 
 def check_pod_antiaffinity(chi_name, pod_name="", match_labels={}, topologyKey="kubernetes.io/hostname", ns=namespace):
@@ -487,13 +493,14 @@ def check_configmap(cfg_name, values, ns=namespace):
         with Then(f"{cfg_name} should contain {v}"):
             assert v in cfm["data"]
 
+
 def check_pdb(chi, clusters, ns=namespace):
     for c in clusters:
         with Then(f"PDB is configured for cluster {c}"):
             pdb = get("pdb", chi + "-" + c)
-            l = pdb["spec"]["selector"]["matchLabels"]
-            assert l["clickhouse.altinity.com/app"] == "chop"
-            assert l["clickhouse.altinity.com/chi"] == chi
-            assert l["clickhouse.altinity.com/cluster"] == c
-            assert l["clickhouse.altinity.com/namespace"] == ns
+            labels = pdb["spec"]["selector"]["matchLabels"]
+            assert labels["clickhouse.altinity.com/app"] == "chop"
+            assert labels["clickhouse.altinity.com/chi"] == chi
+            assert labels["clickhouse.altinity.com/cluster"] == c
+            assert labels["clickhouse.altinity.com/namespace"] == ns
             assert pdb["spec"]["maxUnavailable"] == 1
