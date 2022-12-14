@@ -3063,6 +3063,9 @@ def test_038(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
                 "pod_count": 1,
                 "do_not_delete": 1,
             },
@@ -3081,10 +3084,6 @@ def test_038(self):
         "ENGINE = CollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
         "CREATE TABLE versionedcollapsing_mergetree_table (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
         "sign Int8 DEFAULT 1) ENGINE = VersionedCollapsingMergeTree(sign, version) PARTITION BY y ORDER BY d",
-        "CREATE TABLE graphite_mergetree_table (d Date, a String, b UInt8, x String, y Int8, Path String, "
-        "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))"
-        "ENGINE = GraphiteMergeTree('graphite_rollup')PARTITION BY y ORDER BY d "
-        "SETTINGS index_granularity = 8192",
         "CREATE TABLE replicated_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
         "ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_table', "
         "'{replica}') PARTITION BY y ORDER BY d",
@@ -3102,10 +3101,6 @@ def test_038(self):
         "CREATE TABLE replicated_versionedcollapsing_table ON CLUSTER 'simple' (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
         " sign Int8 DEFAULT 1) ENGINE = ReplicatedVersionedCollapsingMergeTree(sign, version) PARTITION "
         "BY y ORDER BY d",
-        "CREATE TABLE replicated_graphite_table on cluster 'simple'(d Date, a String, b UInt8, x String, y Int8, Path String, "
-        "Time DateTime, Value Float64, col UInt64, Timestamp DateTime('Europe/Moscow'))ENGINE = "
-        "ReplicatedGraphiteMergeTree('graphite_rollup')PARTITION BY y ORDER BY d "
-        "SETTINGS index_granularity = 8192",
         "CREATE TABLE table_for_dict ( key_column UInt64, third_column String ) "
         "ENGINE = MergeTree() ORDER BY key_column",
         "CREATE DICTIONARY ndict ON CLUSTER 'simple' ( key_column UInt64 DEFAULT 0, "
@@ -3185,22 +3180,24 @@ def test_038(self):
 
     with And("I create tables with every engine"):
         for query in create_table_queries:
-            clickhouse.query(chi, query,
-                             pod="chi-test-038-schema-propagation-simple-0-0-0",
-                             advanced_params="--allow_experimental_live_view=1 --allow_experimental_window_view=1 ")
+            clickhouse.query(chi, query)
 
     with When("I add 1 more shard"):
         with When("chi with 1 shard exists"):
             kubectl.create_and_check(
                 manifest="manifests/chi/test-038-2-schema-propagation.yaml",
                 check={
+                    "apply_templates": {
+                        settings.clickhouse_template,
+                    },
                     "pod_count": 2,
                     "do_not_delete": 1,
                 },
             )
+
     table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-038-schema-propagation-simple-0-0-0").split()[1:]
 
-    with Then("I check tables are propageted correctly"):
+    with Then("I check tables are propagated correctly"):
         for attempt in retries(timeout=500, delay=1):
             with attempt:
                 for table_name in table_names:
@@ -3209,7 +3206,10 @@ def test_038(self):
                         actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-038-schema-propagation-simple-1-0-0")
                         assert expected_describe == actual_describe, error()
 
+    with And("I delete the chi"):
+        kubectl.delete_chi(chi)
 
+        
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
