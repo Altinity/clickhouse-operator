@@ -34,9 +34,10 @@ func (w *worker) clean(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 	}
 
 	// Remove deleted items
+	w.a.V(1).M(chi).F().Info("Failed to reconcile objects:\n%s", w.task.registryFailed)
+	w.a.V(1).M(chi).F().Info("Reconciled objects:\n%s", w.task.registryReconciled)
 	objs := w.c.discovery(ctx, chi)
 	need := w.task.registryReconciled
-	w.a.V(1).M(chi).F().Info("Reconciled objects:\n%s", w.task.registryReconciled)
 	w.a.V(1).M(chi).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(chi).F().Info("Non-reconciled objects:\n%s", objs)
