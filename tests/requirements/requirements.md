@@ -248,30 +248,32 @@
       * 4.41.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupreconcilefailedobjects)
   * 4.42 [Defaults](#defaults)
       * 4.42.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults](#rqsrs-026clickhouseoperatorcustomresourcespecdefaults)
-    * 4.42.9 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
-      * 4.42.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
-    * 4.42.10 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
-      * 4.42.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
-    * 4.42.11 [Templates](#templates)
-      * 4.42.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
-      * 4.42.11.2 [Host Template](#host-template)
-        * 4.42.11.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
-      * 4.42.11.3 [Pod Template](#pod-template)
-        * 4.42.11.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
-      * 4.42.11.4 [Data Volume Claim Template](#data-volume-claim-template)
-        * 4.42.11.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
-      * 4.42.11.5 [Log Volume Claim Template](#log-volume-claim-template)
-        * 4.42.11.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
-      * 4.42.11.6 [Service Template](#service-template)
-        * 4.42.11.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
-      * 4.42.11.7 [Cluster Service Template](#cluster-service-template)
-        * 4.42.11.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
-      * 4.42.11.8 [Shard Service Template](#shard-service-template)
-        * 4.42.11.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
-      * 4.42.11.9 [Replica Service Template](#replica-service-template)
-        * 4.42.11.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
-      * 4.42.11.10 [Volume Claim Template](#volume-claim-template)
-        * 4.42.11.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
+    * 4.42.9 [Specifying Storage Management Provisioner](#specifying-storage-management-provisioner)
+      * 4.42.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsstoragemanagementprovisioner)
+    * 4.42.10 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
+      * 4.42.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
+    * 4.42.11 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
+      * 4.42.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
+    * 4.42.12 [Templates](#templates)
+      * 4.42.12.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
+      * 4.42.12.2 [Host Template](#host-template)
+        * 4.42.12.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
+      * 4.42.12.3 [Pod Template](#pod-template)
+        * 4.42.12.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
+      * 4.42.12.4 [Data Volume Claim Template](#data-volume-claim-template)
+        * 4.42.12.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
+      * 4.42.12.5 [Log Volume Claim Template](#log-volume-claim-template)
+        * 4.42.12.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
+      * 4.42.12.6 [Service Template](#service-template)
+        * 4.42.12.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
+      * 4.42.12.7 [Cluster Service Template](#cluster-service-template)
+        * 4.42.12.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
+      * 4.42.12.8 [Shard Service Template](#shard-service-template)
+        * 4.42.12.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
+      * 4.42.12.9 [Replica Service Template](#replica-service-template)
+        * 4.42.12.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
+      * 4.42.12.10 [Volume Claim Template](#volume-claim-template)
+        * 4.42.12.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
   * 4.43 [ClickHouse Server Configuration](#clickhouse-server-configuration)
     * 4.43.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration](#rqsrs-026clickhouseoperatorcustomresourcespecconfiguration)
     * 4.43.2 [ZooKeeper](#zookeeper)
@@ -1887,6 +1889,27 @@ For example,
 ```yaml
 spec:
   defaults:
+```
+
+#### Specifying Storage Management Provisioner
+
+##### RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner
+version: 1.0
+
+[ClickHouse Operator] SHALL support `.spec.defaults.storageManagement` property
+with string enum type that SHALL define storage management provisioner.
+
+This value can be either `"StatefulSet"` or `"Operator""`.
+
+The default value SHALL be `"StatefulSet"`.
+
+For example,
+
+```yaml
+spec:
+  defaults:
+    storageManagement:
+      provisioner: Operator
 ```
 
 #### Specifying Replicas By FQDN
