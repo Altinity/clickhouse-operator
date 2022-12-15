@@ -197,8 +197,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
         with Then("Create tables"):
             for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
                 clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host=h)
-                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host=h)
-            clickhouse.query(chi, "INSERT INTO test_dist SELECT * from numbers(2)")
+                clickhouse.query(chi, "INSERT INTO test_local SELECT 1", host=h)
 
     trigger_event = threading.Event()
 
@@ -218,33 +217,34 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
         trigger_event=trigger_event,
     )
 
-    with When(f"upgrade operator to {version_to}"):
-        util.install_operator_version(version_to)
-        time.sleep(15)
+    try:
+        with When(f"upgrade operator to {version_to}"):
+            util.install_operator_version(version_to)
+            time.sleep(15)
 
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
-        kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
-        with Then("Check that table is here"):
-            tables = clickhouse.query(chi, "SHOW TABLES")
-            assert "test_local" in tables
-            out = clickhouse.query(chi, "SELECT count() FROM test_local")
-            assert out == "1"
+    finally:
+        trigger_event.set()
+        join()
 
-        with Then("ClickHouse pods should not be restarted during upgrade"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-            if start_time != new_start_time:
-                kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
-                kubectl.launch(
-                    # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator)
-                    #f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-                    f"logs -n {settings.operator_namespace} $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-                )
-            assert start_time == new_start_time, error(
-                f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
+    with Then("Check that table is here"):
+        tables = clickhouse.query(chi, "SHOW TABLES")
+        assert "test_local" in tables
+        out = clickhouse.query(chi, "SELECT count() FROM test_local")
+        assert out == "1"
 
-    trigger_event.set()
-    join()
+    with Then("ClickHouse pods should not be restarted during upgrade"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        if start_time != new_start_time:
+            kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
+            kubectl.launch(
+            # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator)
+            #f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+            f"logs -n {settings.operator_namespace} $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+            )
+            assert start_time == new_start_time, error(f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
 
     kubectl.delete_chi(chi)
 
