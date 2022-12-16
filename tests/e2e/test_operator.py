@@ -888,9 +888,7 @@ def test_013_1(self):
             check={
                 "apply_templates": {
                     settings.clickhouse_template,
-                    "manifests/chit/tpl-persistent-volume-100Mi.yaml",
-                    "manifests/chit/tpl-clickhouse-storage-management.yaml"
-                },
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"                },
                 "pod_count": 1,
                 "do_not_delete": 1,
             },
