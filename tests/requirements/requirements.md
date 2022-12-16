@@ -171,22 +171,26 @@
       * 4.24.8.2 [RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades.IndividualOrAll](#rqsrs-026clickhouseoperatormanagingversionupgradesindividualorall)
     * 4.24.9 [Re-provisioning Pods Using Different Template](#re-provisioning-pods-using-different-template)
       * 4.24.9.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate](#rqsrs-026clickhouseoperatormanagingreprovisioningpodsusingdifferenttemplate)
-    * 4.24.10 [Stopping And Starting](#stopping-and-starting)
-      * 4.24.10.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting](#rqsrs-026clickhouseoperatormanagingstoppingandstarting)
-    * 4.24.11 [Stopping Specific ClickHouse Pods](#stopping-specific-clickhouse-pods)
-      * 4.24.11.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousepods)
-    * 4.24.12 [Stopping Specific ClickHouse Hosts](#stopping-specific-clickhouse-hosts)
-      * 4.24.12.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousehosts)
-    * 4.24.13 [Exporting Metrics](#exporting-metrics)
-      * 4.24.13.1 [RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics](#rqsrs-026clickhouseoperatormanagingexportingmetrics)
-    * 4.24.14 [Monitoring](#monitoring)
-      * 4.24.14.1 [RQ.SRS-026.ClickHouseOperator.Managing.Monitoring](#rqsrs-026clickhouseoperatormanagingmonitoring)
-    * 4.24.15 [Rolling Update](#rolling-update)
-      * 4.24.15.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate](#rqsrs-026clickhouseoperatormanagingrollingupdate)
+    * 4.24.10 [Re-provisioning Volume](#re-provisioning-volume)
+      * 4.24.10.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume](#rqsrs-026clickhouseoperatormanagingreprovisioningvolume)
+    * 4.24.11 [StorageManagement switch](#storagemanagement-switch)
+      * 4.24.11.1 [RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch](#rqsrs-026clickhouseoperatormanagingstoragemanagementswitch)
+    * 4.24.12 [Stopping And Starting](#stopping-and-starting)
+      * 4.24.12.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting](#rqsrs-026clickhouseoperatormanagingstoppingandstarting)
+    * 4.24.13 [Stopping Specific ClickHouse Pods](#stopping-specific-clickhouse-pods)
+      * 4.24.13.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousepods)
+    * 4.24.14 [Stopping Specific ClickHouse Hosts](#stopping-specific-clickhouse-hosts)
+      * 4.24.14.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousehosts)
+    * 4.24.15 [Exporting Metrics](#exporting-metrics)
+      * 4.24.15.1 [RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics](#rqsrs-026clickhouseoperatormanagingexportingmetrics)
+    * 4.24.16 [Monitoring](#monitoring)
+      * 4.24.16.1 [RQ.SRS-026.ClickHouseOperator.Managing.Monitoring](#rqsrs-026clickhouseoperatormanagingmonitoring)
+    * 4.24.17 [Rolling Update](#rolling-update)
+      * 4.24.17.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate](#rqsrs-026clickhouseoperatormanagingrollingupdate)
   * 4.25 [Logging](#logging)
-      * 4.25.15.1 [RQ.SRS-026.ClickHouseOperator.Logging](#rqsrs-026clickhouseoperatorlogging)
-      * 4.25.15.2 [High Level Status](#high-level-status)
-        * 4.25.15.2.1 [RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus](#rqsrs-026clickhouseoperatorlogginghighlevelstatus)
+      * 4.25.17.1 [RQ.SRS-026.ClickHouseOperator.Logging](#rqsrs-026clickhouseoperatorlogging)
+      * 4.25.17.2 [High Level Status](#high-level-status)
+        * 4.25.17.2.1 [RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus](#rqsrs-026clickhouseoperatorlogginghighlevelstatus)
   * 4.26 [Valid Installation](#valid-installation)
     * 4.26.1 [RQ.SRS-026.ClickHouseOperator.ValidInstallation](#rqsrs-026clickhouseoperatorvalidinstallation)
   * 4.27 [Operator Settings](#operator-settings)
@@ -244,30 +248,32 @@
       * 4.41.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupreconcilefailedobjects)
   * 4.42 [Defaults](#defaults)
       * 4.42.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults](#rqsrs-026clickhouseoperatorcustomresourcespecdefaults)
-    * 4.42.9 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
-      * 4.42.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
-    * 4.42.10 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
-      * 4.42.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
-    * 4.42.11 [Templates](#templates)
-      * 4.42.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
-      * 4.42.11.2 [Host Template](#host-template)
-        * 4.42.11.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
-      * 4.42.11.3 [Pod Template](#pod-template)
-        * 4.42.11.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
-      * 4.42.11.4 [Data Volume Claim Template](#data-volume-claim-template)
-        * 4.42.11.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
-      * 4.42.11.5 [Log Volume Claim Template](#log-volume-claim-template)
-        * 4.42.11.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
-      * 4.42.11.6 [Service Template](#service-template)
-        * 4.42.11.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
-      * 4.42.11.7 [Cluster Service Template](#cluster-service-template)
-        * 4.42.11.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
-      * 4.42.11.8 [Shard Service Template](#shard-service-template)
-        * 4.42.11.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
-      * 4.42.11.9 [Replica Service Template](#replica-service-template)
-        * 4.42.11.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
-      * 4.42.11.10 [Volume Claim Template](#volume-claim-template)
-        * 4.42.11.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
+    * 4.42.9 [Specifying Storage Management Provisioner](#specifying-storage-management-provisioner)
+      * 4.42.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsstoragemanagementprovisioner)
+    * 4.42.10 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
+      * 4.42.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
+    * 4.42.11 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
+      * 4.42.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
+    * 4.42.12 [Templates](#templates)
+      * 4.42.12.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
+      * 4.42.12.2 [Host Template](#host-template)
+        * 4.42.12.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
+      * 4.42.12.3 [Pod Template](#pod-template)
+        * 4.42.12.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
+      * 4.42.12.4 [Data Volume Claim Template](#data-volume-claim-template)
+        * 4.42.12.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
+      * 4.42.12.5 [Log Volume Claim Template](#log-volume-claim-template)
+        * 4.42.12.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
+      * 4.42.12.6 [Service Template](#service-template)
+        * 4.42.12.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
+      * 4.42.12.7 [Cluster Service Template](#cluster-service-template)
+        * 4.42.12.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
+      * 4.42.12.8 [Shard Service Template](#shard-service-template)
+        * 4.42.12.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
+      * 4.42.12.9 [Replica Service Template](#replica-service-template)
+        * 4.42.12.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
+      * 4.42.12.10 [Volume Claim Template](#volume-claim-template)
+        * 4.42.12.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
   * 4.43 [ClickHouse Server Configuration](#clickhouse-server-configuration)
     * 4.43.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration](#rqsrs-026clickhouseoperatorcustomresourcespecconfiguration)
     * 4.43.2 [ZooKeeper](#zookeeper)
@@ -1323,6 +1329,27 @@ version: 1.0
 
 [ClickHouse Operator] SHALL support re-provisioning [Pod]s using a different template.
 
+#### Re-provisioning Volume
+
+##### RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume
+version: 1.0
+
+[ClickHouse Operator] SHALL support re-provisioning Volume by deleting [PVC], recreating [PVC] and recreating [StatefullSet].
+
+#### StorageManagement switch
+
+##### RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch
+version: 1.0
+
+[ClickHouse Operator] SHALL support switching storageManagement from default to Operator.
+
+```
+defaults:
+  storageManagement:
+  # provisioner: StatefulSet # this is default
+    provisioner: Operator
+```
+
 #### Stopping And Starting
 
 ##### RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting
@@ -1862,6 +1889,27 @@ For example,
 ```yaml
 spec:
   defaults:
+```
+
+#### Specifying Storage Management Provisioner
+
+##### RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner
+version: 1.0
+
+[ClickHouse Operator] SHALL support `.spec.defaults.storageManagement` property
+with string enum type that SHALL define storage management provisioner.
+
+This value can be either `"StatefulSet"` or `"Operator""`.
+
+The default value SHALL be `"StatefulSet"`.
+
+For example,
+
+```yaml
+spec:
+  defaults:
+    storageManagement:
+      provisioner: Operator
 ```
 
 #### Specifying Replicas By FQDN
@@ -4695,3 +4743,4 @@ updated on the same run before failed [StatefulSet] met.
 [Revision history]: https://gitlab.com/altinity-qa/documents/qa-srs026-clickhouse-operator/commits/main/QA_SRS026_ClickHouse_Operator.md
 [Git]: https://git-scm.com/
 [GitLab]: https://gitlab.com
+

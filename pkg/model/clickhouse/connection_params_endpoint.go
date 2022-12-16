@@ -28,7 +28,7 @@ func NewEndpointConnectionParams(scheme, hostname, username, password, rootCA st
 	}
 }
 
-// SetTimeouts
+// SetTimeouts sets timeout
 func (p *EndpointConnectionParams) SetTimeouts(timeouts *Timeouts) *EndpointConnectionParams {
 	if p == nil {
 		return nil

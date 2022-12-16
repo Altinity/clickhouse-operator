@@ -128,8 +128,9 @@ def install_clickhouse_and_keeper(chi_file, chi_template_file, chi_name,
 
     with Given("install zookeeper/clickhouse-keeper + clickhouse"):
         if clean_ns:
-            kubectl.delete_ns(settings.test_namespace, ok_to_fail=True, timeout=600)
-            kubectl.create_ns(settings.test_namespace)
+            kubectl.delete_all_chi(settings.test_namespace)
+            kubectl.delete_all_keeper(settings.test_namespace)
+
         # when create clickhouse, need install ZK before CH
         if keeper_install_first:
             require_keeper(keeper_type=keeper_type, keeper_manifest=keeper_manifest, force_install=force_keeper_install)

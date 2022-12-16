@@ -1,0 +1,50 @@
+name: release_chart
+
+on:
+  release:
+    types: [ published ]
+
+jobs:
+  release_chart:
+    name: Release Chart
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Install chart-releaser
+        run: |
+          wget https://github.com/helm/chart-releaser/releases/download/v1.4.1/chart-releaser_1.4.1_linux_amd64.tar.gz
+          tar -zxf chart-releaser_1.4.1_linux_amd64.tar.gz cr
+          sudo install cr /usr/local/bin/
+          rm -f cr chart-releaser_1.4.1_linux_amd64.tar.gz
+      - name: Package Chart
+        run: cr package deploy/helm
+      - name: Upload Release Artifacts
+        run: |
+          CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/gzip" \
+            -T "${CHART_PATH}" \
+            "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${{ github.event.release.id }}/assets?name=$(basename ${CHART_PATH})"
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+      - name: Release Chart
+        run: |
+          git remote add httpsorigin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch httpsorigin
+          cr index \
+            --git-repo=${GITHUB_REPOSITORY#*/} \
+            --owner=${GITHUB_REPOSITORY_OWNER} \
+            --release-name-template=${{ github.event.release.name }} \
+            --token=${{ secrets.GITHUB_TOKEN }}  \
+            --index-path=index.yaml \
+            --remote=httpsorigin \
+            --push

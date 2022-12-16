@@ -52,14 +52,22 @@ func mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
 		return dst
 	}
 
+	created := false
 	if dst == nil {
-		// No receiver, allocate new one
+		// No receiver specified, allocate a new one
 		dst = &v1.Affinity{}
+		created = true
 	}
 
 	dst.NodeAffinity = mergeNodeAffinity(dst.NodeAffinity, src.NodeAffinity)
 	dst.PodAffinity = mergePodAffinity(dst.PodAffinity, src.PodAffinity)
 	dst.PodAntiAffinity = mergePodAntiAffinity(dst.PodAntiAffinity, src.PodAntiAffinity)
+
+	empty := (dst.NodeAffinity == nil) && (dst.PodAffinity == nil) && (dst.PodAntiAffinity == nil)
+	if created && empty {
+		// Do not return empty and internally created dst
+		return nil
+	}
 
 	return dst
 }
@@ -90,8 +98,88 @@ func newNodeAffinity(template *chiV1.ChiPodTemplate) *v1.NodeAffinity {
 			},
 		},
 
-		PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
+		// PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
 	}
+}
+
+func getNodeSelectorTerms(affinity *v1.NodeAffinity) []v1.NodeSelectorTerm {
+	if affinity == nil {
+		return nil
+	}
+
+	if affinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		return nil
+	}
+	return affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+}
+
+func getNodeSelectorTerm(affinity *v1.NodeAffinity, i int) *v1.NodeSelectorTerm {
+	terms := getNodeSelectorTerms(affinity)
+	if terms == nil {
+		return nil
+	}
+	if i >= len(terms) {
+		return nil
+	}
+	return &terms[i]
+}
+
+func appendNodeSelectorTerm(affinity *v1.NodeAffinity, term *v1.NodeSelectorTerm) *v1.NodeAffinity {
+	if term == nil {
+		return affinity
+	}
+
+	// Ensure path to terms exists
+	if affinity == nil {
+		affinity = &v1.NodeAffinity{}
+	}
+	if affinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		affinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
+	}
+
+	affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
+		affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
+		*term,
+	)
+
+	return affinity
+}
+
+func getPreferredSchedulingTerms(affinity *v1.NodeAffinity) []v1.PreferredSchedulingTerm {
+	if affinity == nil {
+		return nil
+	}
+
+	return affinity.PreferredDuringSchedulingIgnoredDuringExecution
+}
+
+func getPreferredSchedulingTerm(affinity *v1.NodeAffinity, i int) *v1.PreferredSchedulingTerm {
+	terms := getPreferredSchedulingTerms(affinity)
+	if terms == nil {
+		return nil
+	}
+	if i >= len(terms) {
+		return nil
+	}
+	return &terms[i]
+}
+
+func appendPreferredSchedulingTerm(affinity *v1.NodeAffinity, term *v1.PreferredSchedulingTerm) *v1.NodeAffinity {
+	if term == nil {
+		return affinity
+	}
+
+	// Ensure path to terms exists
+	if affinity == nil {
+		affinity = &v1.NodeAffinity{}
+	}
+
+	affinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+		affinity.PreferredDuringSchedulingIgnoredDuringExecution,
+		*term,
+	)
+
+	return affinity
 }
 
 // mergeNodeAffinity
@@ -102,48 +190,36 @@ func mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffin
 	}
 
 	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.NodeAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-				NodeSelectorTerms: []v1.NodeSelectorTerm{},
-			},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
-		}
+		// In case no receiver, it will be allocated by appendNodeSelectorTerm() or appendPreferredSchedulingTerm() if need be
 	}
 
 	// Merge NodeSelectors
-	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-		s := &src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i]
+	for i := range getNodeSelectorTerms(src) {
+		s := getNodeSelectorTerm(src, i)
 		equal := false
-		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[j]
+		for j := range getNodeSelectorTerms(dst) {
+			d := getNodeSelectorTerm(dst, j)
 			if _, equal = messagediff.DeepDiff(*s, *d); equal {
 				break
 			}
 		}
 		if !equal {
-			dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
-				dst.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-				src.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[i],
-			)
+			dst = appendNodeSelectorTerm(dst, s)
 		}
 	}
 
 	// Merge PreferredSchedulingTerm
-	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
+	for i := range getPreferredSchedulingTerms(src) {
+		s := getPreferredSchedulingTerm(src, i)
 		equal := false
-		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
+		for j := range getPreferredSchedulingTerms(dst) {
+			d := getPreferredSchedulingTerm(dst, j)
 			if _, equal = messagediff.DeepDiff(*s, *d); equal {
 				break
 			}
 		}
 		if !equal {
-			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-				dst.PreferredDuringSchedulingIgnoredDuringExecution,
-				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-			)
+			dst = appendPreferredSchedulingTerm(dst, s)
 		}
 	}
 
@@ -152,12 +228,15 @@ func mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffin
 
 // newPodAffinity
 func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
+	// Return podAffinity only in case something was added into it
+	added := false
 	podAffinity := &v1.PodAffinity{}
 
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case chiV1.PodDistributionNamespaceAffinity:
+			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				newWeightedPodAffinityTermWithMatchLabels(
@@ -169,6 +248,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				),
 			)
 		case chiV1.PodDistributionClickHouseInstallationAffinity:
+			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				newWeightedPodAffinityTermWithMatchLabels(
@@ -180,6 +260,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				),
 			)
 		case chiV1.PodDistributionClusterAffinity:
+			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				newWeightedPodAffinityTermWithMatchLabels(
@@ -191,6 +272,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				),
 			)
 		case chiV1.PodDistributionShardAffinity:
+			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				newWeightedPodAffinityTermWithMatchLabels(
@@ -202,6 +284,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 				),
 			)
 		case chiV1.PodDistributionReplicaAffinity:
+			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
 				newWeightedPodAffinityTermWithMatchLabels(
@@ -214,6 +297,7 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 			)
 		case chiV1.PodDistributionPreviousTailAffinity:
 			// Newer k8s insists on Required for this Affinity
+			added = true
 			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchLabels(
@@ -236,12 +320,86 @@ func newPodAffinity(template *chiV1.ChiPodTemplate) *v1.PodAffinity {
 		}
 	}
 
-	if len(podAffinity.PreferredDuringSchedulingIgnoredDuringExecution) > 0 {
+	if added {
 		// Has something to return
 		return podAffinity
 	}
 
 	return nil
+}
+
+func getPodAffinityTerms(affinity *v1.PodAffinity) []v1.PodAffinityTerm {
+	if affinity == nil {
+		return nil
+	}
+
+	return affinity.RequiredDuringSchedulingIgnoredDuringExecution
+}
+
+func getPodAffinityTerm(affinity *v1.PodAffinity, i int) *v1.PodAffinityTerm {
+	terms := getPodAffinityTerms(affinity)
+	if terms == nil {
+		return nil
+	}
+	if i >= len(terms) {
+		return nil
+	}
+	return &terms[i]
+}
+
+func appendPodAffinityTerm(affinity *v1.PodAffinity, term *v1.PodAffinityTerm) *v1.PodAffinity {
+	if term == nil {
+		return affinity
+	}
+
+	// Ensure path to terms exists
+	if affinity == nil {
+		affinity = &v1.PodAffinity{}
+	}
+
+	affinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+		affinity.RequiredDuringSchedulingIgnoredDuringExecution,
+		*term,
+	)
+
+	return affinity
+}
+
+func getWeightedPodAffinityTerms(affinity *v1.PodAffinity) []v1.WeightedPodAffinityTerm {
+	if affinity == nil {
+		return nil
+	}
+
+	return affinity.PreferredDuringSchedulingIgnoredDuringExecution
+}
+
+func getWeightedPodAffinityTerm(affinity *v1.PodAffinity, i int) *v1.WeightedPodAffinityTerm {
+	terms := getWeightedPodAffinityTerms(affinity)
+	if terms == nil {
+		return nil
+	}
+	if i >= len(terms) {
+		return nil
+	}
+	return &terms[i]
+}
+
+func appendWeightedPodAffinityTerm(affinity *v1.PodAffinity, term *v1.WeightedPodAffinityTerm) *v1.PodAffinity {
+	if term == nil {
+		return affinity
+	}
+
+	// Ensure path to terms exists
+	if affinity == nil {
+		affinity = &v1.PodAffinity{}
+	}
+
+	affinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+		affinity.PreferredDuringSchedulingIgnoredDuringExecution,
+		*term,
+	)
+
+	return affinity
 }
 
 // mergePodAffinity
@@ -252,46 +410,36 @@ func mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) *v1.PodAffinity 
 	}
 
 	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.PodAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
-		}
+		// In case no receiver, it will be allocated by appendPodAffinityTerm() or appendWeightedPodAffinityTerm() if need be
 	}
 
 	// Merge PodAffinityTerm
-	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
-		s := &src.RequiredDuringSchedulingIgnoredDuringExecution[i]
+	for i := range getPodAffinityTerms(src) {
+		s := getPodAffinityTerm(src, i)
 		equal := false
-		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution[j]
+		for j := range getPodAffinityTerms(dst) {
+			d := getPodAffinityTerm(dst, j)
 			if _, equal = messagediff.DeepDiff(*s, *d); equal {
 				break
 			}
 		}
 		if !equal {
-			dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
-				dst.RequiredDuringSchedulingIgnoredDuringExecution,
-				src.RequiredDuringSchedulingIgnoredDuringExecution[i],
-			)
+			dst = appendPodAffinityTerm(dst, s)
 		}
 	}
 
 	// Merge WeightedPodAffinityTerm
-	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
+	for i := range getWeightedPodAffinityTerms(src) {
+		s := getWeightedPodAffinityTerm(src, i)
 		equal := false
-		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
+		for j := range getWeightedPodAffinityTerms(dst) {
+			d := getWeightedPodAffinityTerm(dst, j)
 			if _, equal = messagediff.DeepDiff(*s, *d); equal {
 				break
 			}
 		}
 		if !equal {
-			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-				dst.PreferredDuringSchedulingIgnoredDuringExecution,
-				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-			)
+			dst = appendWeightedPodAffinityTerm(dst, s)
 		}
 	}
 
@@ -344,6 +492,8 @@ func newMatchLabels(
 
 // newPodAntiAffinity
 func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
+	// Return podAntiAffinity only in case something was added into it
+	added := false
 	podAntiAffinity := &v1.PodAntiAffinity{}
 
 	// PodDistribution
@@ -351,6 +501,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
 		case chiV1.PodDistributionClickHouseAntiAffinity:
+			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchLabels(
@@ -364,6 +515,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionMaxNumberPerNode:
+			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchLabels(
@@ -377,6 +529,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionShardAntiAffinity:
+			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchLabels(
@@ -390,6 +543,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionReplicaAntiAffinity:
+			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchLabels(
@@ -403,6 +557,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionAnotherNamespaceAntiAffinity:
+			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchExpressions(
@@ -419,6 +574,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionAnotherClickHouseInstallationAntiAffinity:
+			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchExpressions(
@@ -435,6 +591,7 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 				),
 			)
 		case chiV1.PodDistributionAnotherClusterAntiAffinity:
+			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
 				newPodAffinityTermWithMatchExpressions(
@@ -453,12 +610,86 @@ func newPodAntiAffinity(template *chiV1.ChiPodTemplate) *v1.PodAntiAffinity {
 		}
 	}
 
-	if len(podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) > 0 {
+	if added {
 		// Has something to return
 		return podAntiAffinity
 	}
 
 	return nil
+}
+
+func getPodAntiAffinityTerms(affinity *v1.PodAntiAffinity) []v1.PodAffinityTerm {
+	if affinity == nil {
+		return nil
+	}
+
+	return affinity.RequiredDuringSchedulingIgnoredDuringExecution
+}
+
+func getPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, i int) *v1.PodAffinityTerm {
+	terms := getPodAntiAffinityTerms(affinity)
+	if terms == nil {
+		return nil
+	}
+	if i >= len(terms) {
+		return nil
+	}
+	return &terms[i]
+}
+
+func appendPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, term *v1.PodAffinityTerm) *v1.PodAntiAffinity {
+	if term == nil {
+		return affinity
+	}
+
+	// Ensure path to terms exists
+	if affinity == nil {
+		affinity = &v1.PodAntiAffinity{}
+	}
+
+	affinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+		affinity.RequiredDuringSchedulingIgnoredDuringExecution,
+		*term,
+	)
+
+	return affinity
+}
+
+func getWeightedPodAntiAffinityTerms(affinity *v1.PodAntiAffinity) []v1.WeightedPodAffinityTerm {
+	if affinity == nil {
+		return nil
+	}
+
+	return affinity.PreferredDuringSchedulingIgnoredDuringExecution
+}
+
+func getWeightedPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, i int) *v1.WeightedPodAffinityTerm {
+	terms := getWeightedPodAntiAffinityTerms(affinity)
+	if terms == nil {
+		return nil
+	}
+	if i >= len(terms) {
+		return nil
+	}
+	return &terms[i]
+}
+
+func appendWeightedPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, term *v1.WeightedPodAffinityTerm) *v1.PodAntiAffinity {
+	if term == nil {
+		return affinity
+	}
+
+	// Ensure path to terms exists
+	if affinity == nil {
+		affinity = &v1.PodAntiAffinity{}
+	}
+
+	affinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+		affinity.PreferredDuringSchedulingIgnoredDuringExecution,
+		*term,
+	)
+
+	return affinity
 }
 
 // mergePodAntiAffinity
@@ -469,46 +700,36 @@ func mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.
 	}
 
 	if dst == nil {
-		// No receiver, allocate new one
-		dst = &v1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution:  []v1.PodAffinityTerm{},
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{},
-		}
+		// In case no receiver, it will be allocated by appendPodAntiAffinityTerm() or appendWeightedPodAntiAffinityTerm() if need be
 	}
 
 	// Merge PodAffinityTerm
-	for i := range src.RequiredDuringSchedulingIgnoredDuringExecution {
-		s := &src.RequiredDuringSchedulingIgnoredDuringExecution[i]
+	for i := range getPodAntiAffinityTerms(src) {
+		s := getPodAntiAffinityTerm(src, i)
 		equal := false
-		for j := range dst.RequiredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.RequiredDuringSchedulingIgnoredDuringExecution[j]
+		for j := range getPodAntiAffinityTerms(dst) {
+			d := getPodAntiAffinityTerm(dst, j)
 			if _, equal = messagediff.DeepDiff(*s, *d); equal {
 				break
 			}
 		}
 		if !equal {
-			dst.RequiredDuringSchedulingIgnoredDuringExecution = append(
-				dst.RequiredDuringSchedulingIgnoredDuringExecution,
-				src.RequiredDuringSchedulingIgnoredDuringExecution[i],
-			)
+			dst = appendPodAntiAffinityTerm(dst, s)
 		}
 	}
 
 	// Merge WeightedPodAffinityTerm
-	for i := range src.PreferredDuringSchedulingIgnoredDuringExecution {
-		s := &src.PreferredDuringSchedulingIgnoredDuringExecution[i]
+	for i := range getWeightedPodAntiAffinityTerms(src) {
+		s := getWeightedPodAntiAffinityTerm(src, i)
 		equal := false
-		for j := range dst.PreferredDuringSchedulingIgnoredDuringExecution {
-			d := &dst.PreferredDuringSchedulingIgnoredDuringExecution[j]
+		for j := range getWeightedPodAntiAffinityTerms(dst) {
+			d := getWeightedPodAntiAffinityTerm(dst, j)
 			if _, equal = messagediff.DeepDiff(*s, *d); equal {
 				break
 			}
 		}
 		if !equal {
-			dst.PreferredDuringSchedulingIgnoredDuringExecution = append(
-				dst.PreferredDuringSchedulingIgnoredDuringExecution,
-				src.PreferredDuringSchedulingIgnoredDuringExecution[i],
-			)
+			dst = appendWeightedPodAntiAffinityTerm(dst, s)
 		}
 	}
 
@@ -601,7 +822,10 @@ func newWeightedPodAffinityTermWithMatchLabels(
 
 // prepareAffinity
 func prepareAffinity(podTemplate *chiV1.ChiPodTemplate, host *chiV1.ChiHost) {
-	if podTemplate.Spec.Affinity == nil {
+	switch {
+	case podTemplate == nil:
+		return
+	case podTemplate.Spec.Affinity == nil:
 		return
 	}
 
@@ -657,6 +881,9 @@ func processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *chiV1.
 
 // processNodeSelectorRequirement
 func processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *chiV1.ChiHost) {
+	if nodeSelectorRequirement == nil {
+		return
+	}
 	nodeSelectorRequirement.Key = macro(host).Line(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range nodeSelectorRequirement.Values {
@@ -682,6 +909,9 @@ func processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAf
 
 // processPodAffinityTerm
 func processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *chiV1.ChiHost) {
+	if podAffinityTerm == nil {
+		return
+	}
 	processLabelSelector(podAffinityTerm.LabelSelector, host)
 	podAffinityTerm.TopologyKey = macro(host).Line(podAffinityTerm.TopologyKey)
 }
@@ -703,6 +933,9 @@ func processLabelSelector(labelSelector *metaV1.LabelSelector, host *chiV1.ChiHo
 
 // processLabelSelectorRequirement
 func processLabelSelectorRequirement(labelSelectorRequirement *metaV1.LabelSelectorRequirement, host *chiV1.ChiHost) {
+	if labelSelectorRequirement == nil {
+		return
+	}
 	labelSelectorRequirement.Key = macro(host).Line(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range labelSelectorRequirement.Values {

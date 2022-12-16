@@ -23,6 +23,7 @@ type ClusterCredentials struct {
 	Port     int
 }
 
+// NewClusterCredentials creates new ClusterCredentials
 func NewClusterCredentials(scheme, username, password, rootCA string, port int) *ClusterCredentials {
 	return &ClusterCredentials{
 		Scheme:   scheme,

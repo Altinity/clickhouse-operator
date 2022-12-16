@@ -27,12 +27,20 @@ type EntityType string
 
 // Possible entity types
 const (
+	// StatefulSet describes StatefulSet entity type
 	StatefulSet EntityType = "StatefulSet"
-	ConfigMap   EntityType = "ConfigMap"
-	Service     EntityType = "Service"
-	Secret      EntityType = "Secret"
-	PVC         EntityType = "PVC"
-	PV          EntityType = "PV"
+	// ConfigMap describes ConfigMap entity type
+	ConfigMap EntityType = "ConfigMap"
+	// Service describes Service entity type
+	Service EntityType = "Service"
+	// Secret describes Secret entity type
+	Secret EntityType = "Secret"
+	// PVC describes PersistentVolumeClaim entity type
+	PVC EntityType = "PVC"
+	// PV describes PersistentVolume entity type
+	PV EntityType = "PV"
+	// PDB describes PodDisruptionBudget entity type
+	PDB EntityType = "PDB"
 )
 
 // Registry specifies registry struct
@@ -234,6 +242,26 @@ func (r *Registry) NumPV() int {
 // WalkPV walk over specified entity types
 func (r *Registry) WalkPV(f func(meta v1.ObjectMeta)) {
 	r.WalkEntityType(PV, f)
+}
+
+// RegisterPDB register PDB
+func (r *Registry) RegisterPDB(meta v1.ObjectMeta) {
+	r.registerEntity(PDB, meta)
+}
+
+// HasPDB checks whether registry has specified PDB
+func (r *Registry) HasPDB(meta v1.ObjectMeta) bool {
+	return r.hasEntity(PDB, meta)
+}
+
+// NumPDB gets number of PDB
+func (r *Registry) NumPDB() int {
+	return r.Len(PDB)
+}
+
+// WalkPDB walk over specified entity types
+func (r *Registry) WalkPDB(f func(meta v1.ObjectMeta)) {
+	r.WalkEntityType(PDB, f)
 }
 
 // hasEntity

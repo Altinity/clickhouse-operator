@@ -1,0 +1,25 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-013-1-schema-propagation"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+    - name: persistent-volume
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+    - name: simple
+      layout:
+        shardsCount: 2
+        replicasCount: 1
+      schemaPolicy:
+        replica: All
+        shard: DistributedTablesOnly
+    profiles:
+      default/allow_experimental_window_view: 1
+      default/allow_experimental_live_view: 1
+      default/database_atomic_wait_for_drop_and_detach_synchronously: 1

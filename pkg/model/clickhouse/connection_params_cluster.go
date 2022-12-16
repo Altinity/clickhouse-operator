@@ -28,7 +28,7 @@ func NewClusterConnectionParams(scheme, username, password, rootCA string, port 
 	}
 }
 
-// SetTimeouts
+// SetTimeouts sets timeout
 func (p *ClusterConnectionParams) SetTimeouts(timeouts *Timeouts) *ClusterConnectionParams {
 	if p == nil {
 		return nil

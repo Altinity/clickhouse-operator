@@ -17,11 +17,11 @@ package chi
 import (
 	"time"
 
-	core "k8s.io/api/core/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	coreV1 "k8s.io/api/core/v1"
+	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 const (
@@ -61,7 +61,7 @@ const (
 
 // EventInfo emits event Info
 func (c *Controller) EventInfo(
-	chi *chop.ClickHouseInstallation,
+	chi *chiV1.ClickHouseInstallation,
 	action string,
 	reason string,
 	message string,
@@ -71,7 +71,7 @@ func (c *Controller) EventInfo(
 
 // EventWarning emits event Warning
 func (c *Controller) EventWarning(
-	chi *chop.ClickHouseInstallation,
+	chi *chiV1.ClickHouseInstallation,
 	action string,
 	reason string,
 	message string,
@@ -81,7 +81,7 @@ func (c *Controller) EventWarning(
 
 // EventError emits event Error
 func (c *Controller) EventError(
-	chi *chop.ClickHouseInstallation,
+	chi *chiV1.ClickHouseInstallation,
 	action string,
 	reason string,
 	message string,
@@ -95,7 +95,7 @@ func (c *Controller) EventError(
 // reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
 func (c *Controller) emitEvent(
-	chi *chop.ClickHouseInstallation,
+	chi *chiV1.ClickHouseInstallation,
 	_type string,
 	action string,
 	reason string,
@@ -108,11 +108,11 @@ func (c *Controller) emitEvent(
 	uid := chi.UID
 	resourceVersion := chi.ResourceVersion
 
-	event := &core.Event{
-		ObjectMeta: meta.ObjectMeta{
+	event := &coreV1.Event{
+		ObjectMeta: metaV1.ObjectMeta{
 			GenerateName: "chop-chi-",
 		},
-		InvolvedObject: core.ObjectReference{
+		InvolvedObject: coreV1.ObjectReference{
 			Kind:            kind,
 			Namespace:       namespace,
 			Name:            name,
@@ -122,13 +122,13 @@ func (c *Controller) emitEvent(
 		},
 		Reason:  reason,
 		Message: message,
-		Source: core.EventSource{
+		Source: coreV1.EventSource{
 			Component: componentName,
 		},
-		FirstTimestamp: meta.Time{
+		FirstTimestamp: metaV1.Time{
 			Time: now,
 		},
-		LastTimestamp: meta.Time{
+		LastTimestamp: metaV1.Time{
 			Time: now,
 		},
 		Count:               1,

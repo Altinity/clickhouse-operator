@@ -3,18 +3,18 @@ import yaml
 import threading
 import re
 
-import e2e.clickhouse as clickhouse
-import e2e.kubectl as kubectl
 import e2e.yaml_manifest as yaml_manifest
-import e2e.settings as settings
-import e2e.util as util
 import xml.etree.ElementTree as etree
+import e2e.clickhouse as clickhouse
+import e2e.settings as settings
+import e2e.kubectl as kubectl
+import e2e.util as util
 
-
-from testflows.core import *
-from testflows.asserts import error
 from requirements.requirements import *
 from testflows.connect import Shell
+from testflows.asserts import error
+from testflows.core import *
+from e2e.steps import *
 
 
 @TestScenario
@@ -32,6 +32,7 @@ def test_001(self):
                 "service": 2,
             },
             "configmaps": 1,
+            "pdb": ["single"]
         }
     )
 
@@ -56,7 +57,7 @@ def test_002(self):
             "pod_volumes": {
                 "/var/log/clickhouse-server",
             },
-            "pod_podAntiAffinity": 1
+            "pod_podAntiAffinity": 1,
         }
     )
 
@@ -74,10 +75,11 @@ def test_003(self):
         manifest="manifests/chi/test-003-complex-layout.yaml",
         check={
             "object_counts": {
-                "statefulset": 4,
-                "pod": 4,
-                "service": 5,
+                "statefulset": 5,
+                "pod": 5,
+                "service": 6,
             },
+            "pdb": ["cluster1", "cluster2"],
         },
     )
 
@@ -195,8 +197,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
         with Then("Create tables"):
             for h in [f'chi-{chi}-{cluster}-0-0-0', f'chi-{chi}-{cluster}-1-0-0']:
                 clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_local (a UInt32) Engine = Log", host=h)
-                clickhouse.query(chi, "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a%2)", host=h)
-            clickhouse.query(chi, "INSERT INTO test_dist SELECT * from numbers(2)")
+                clickhouse.query(chi, "INSERT INTO test_local SELECT 1", host=h)
 
     trigger_event = threading.Event()
 
@@ -216,33 +217,34 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=sett
         trigger_event=trigger_event,
     )
 
-    with When(f"upgrade operator to {version_to}"):
-        util.install_operator_version(version_to)
-        time.sleep(15)
+    try:
+        with When(f"upgrade operator to {version_to}"):
+            util.install_operator_version(version_to)
+            time.sleep(15)
 
-        kubectl.wait_chi_status(chi, "Completed", retries=20)
-        kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
-        with Then("Check that table is here"):
-            tables = clickhouse.query(chi, "SHOW TABLES")
-            assert "test_local" in tables
-            out = clickhouse.query(chi, "SELECT count() FROM test_local")
-            assert out == "1"
+    finally:
+        trigger_event.set()
+        join()
 
-        with Then("ClickHouse pods should not be restarted during upgrade"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-            if start_time != new_start_time:
-                kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
-                kubectl.launch(
-                    # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator)
-                    #f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-                    f"logs -n {settings.operator_namespace} $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
-                )
-            assert start_time == new_start_time, error(
-                f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
+    with Then("Check that table is here"):
+        tables = clickhouse.query(chi, "SHOW TABLES")
+        assert "test_local" in tables
+        out = clickhouse.query(chi, "SELECT count() FROM test_local")
+        assert out == "1"
 
-    trigger_event.set()
-    join()
+    with Then("ClickHouse pods should not be restarted during upgrade"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        if start_time != new_start_time:
+            kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
+            kubectl.launch(
+            # In my env "pod/: prefix is already returned by $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator)
+            #f"logs -n {settings.operator_namespace} pod/$(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+            f"logs -n {settings.operator_namespace} $(kubectl get pods -o name -n {settings.operator_namespace} | grep clickhouse-operator) -c clickhouse-operator"
+            )
+            assert start_time == new_start_time, error(f"{start_time} != {new_start_time}, pod restarted after operator upgrade")
 
     kubectl.delete_chi(chi)
 
@@ -355,6 +357,27 @@ def get_shards_from_remote_servers(chi, cluster):
     chi_shards = chi_cluster.count("<shard>")
 
     return chi_shards
+
+def get_replicas_from_remote_servers(chi, cluster):
+    if cluster == '':
+        cluster = chi
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+
+    chi_start = remote_servers.find(f"<{cluster}>")
+    chi_end = remote_servers.find(f"</{cluster}>")
+    if chi_start < 0:
+        print(f"unable to find '<{cluster}>' in:")
+        print(remote_servers)
+        with Then(f"Remote servers should contain {cluster} cluster"):
+            assert chi_start >= 0
+
+    chi_cluster = remote_servers[chi_start:chi_end]
+    # print(chi_cluster)
+    chi_shards = chi_cluster.count("<shard>")
+    chi_replicas = chi_cluster.count("<replica>")
+
+    return chi_replicas/chi_shards
+
 
 @TestCheck
 def check_remote_servers(self, chi, shards, trigger_event, cluster=''):
@@ -846,99 +869,236 @@ def test_012(self):
 
     kubectl.delete_chi("test-012")
 
-
 @TestScenario
-@Name("test_013. Test adding shards and creating local and distributed tables automatically")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards("1.0"),
-    RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0")
-)
-def test_013(self):
-    manifest = "manifests/chi/test-013-add-shards-1.yaml"
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards("1.0"),
+              RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"))
+@Name("test_013_1. Automatic schema propagation for shards")
+def test_013_1(self):
+    """Check clickhouse operator supports automatic schema propagation for shards."""
+    cluster = "simple"
+    manifest = f"manifests/chi/test-013-1-1-schema-propagation.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-    cluster = "default"
+    n_shards=2
 
-    kubectl.create_and_check(
-        manifest=manifest,
-        check={
-            "apply_templates": {
-                settings.clickhouse_template,
-            },
-            "object_counts": {
-                "statefulset": 1,
-                "pod": 1,
-                "service": 2,
-            },
-            "do_not_delete": 1,
-        }
-    )
-    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+    util.require_keeper(keeper_type=self.context.keeper_type)
 
-    schema_objects = [
-        'test_local_013',
-        'test_distr_013',
-        'events-distr_013',
-    ]
-    with Then("Create local and distributed tables"):
-        clickhouse.query(chi, "CREATE DATABASE \\\"test-db-013\\\"")
-        clickhouse.query(
-            chi,
-            "CREATE TABLE \\\"test-db-013\\\".test_local_013 Engine = Log AS SELECT * FROM system.one"
-        )
-        clickhouse.query(
-            chi,
-            "CREATE TABLE \\\"test-db-013\\\".test_distr_013 Engine = Distributed('all-sharded', \\\"test-db-013\\\", test_local_013)"
-        )
-        clickhouse.query(
-            chi,
-            "CREATE TABLE \\\"test-db-013\\\".\\\"events-distr_013\\\" as system.events "
-            "ENGINE = Distributed('all-sharded', system, events)"
-        )
-
-    n_shards = 2
-    with Then(f"Add {n_shards - 1} shards"):
+    with When("chi with 1 shard exists"):
         kubectl.create_and_check(
-            manifest="manifests/chi/test-013-add-shards-2.yaml",
+            manifest=manifest,
             check={
-                "object_counts": {
-                    "statefulset": n_shards,
-                    "pod": n_shards,
-                    "service": n_shards + 1,
-                },
+                "apply_templates": {
+                    settings.clickhouse_template,
+                    "manifests/chit/tpl-persistent-volume-100Mi.yaml"                },
+                "pod_count": 1,
                 "do_not_delete": 1,
             },
-            timeout=1500,
+        )
+
+    create_table_queries = [
+        "CREATE TABLE mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "MergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE replacing_mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "ReplacingMergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE summing_mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "SummingMergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE aggregating_mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "AggregatingMergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE collapsing_mergetree_table (d DATE, a String, b UInt8, x String, y Int8, Sign Int8) "
+        "ENGINE = CollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
+        "CREATE TABLE versionedcollapsing_mergetree_table (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
+        "sign Int8 DEFAULT 1) ENGINE = VersionedCollapsingMergeTree(sign, version) PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_table', "
+        "'{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_replacing_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "ReplicatedReplacingMergeTree ('/clickhouse/{cluster}/tables/{database}/replicated_replacing_table', "
+        "'{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_summing_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_summing_table', "
+        "'{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_aggregating_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE ="
+        "ReplicatedAggregatingMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_aggregating_table',"
+        "'{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_collapsing_table ON CLUSTER 'simple' (d DATE, a String, b UInt8, x String, y Int8, Sign Int8) "
+        "ENGINE = ReplicatedCollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_versionedcollapsing_table ON CLUSTER 'simple' (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
+        " sign Int8 DEFAULT 1) ENGINE = ReplicatedVersionedCollapsingMergeTree(sign, version) PARTITION "
+        "BY y ORDER BY d",
+        "CREATE TABLE table_for_dict ( key_column UInt64, third_column String ) "
+        "ENGINE = MergeTree() ORDER BY key_column",
+        "CREATE DICTIONARY ndict ON CLUSTER 'simple' ( key_column UInt64 DEFAULT 0, "
+        "third_column String DEFAULT 'qqq' ) PRIMARY KEY key_column "
+        "SOURCE(CLICKHOUSE(HOST 'localhost' PORT 9000 USER 'default' TABLE 'table_for_dict' "
+        "PASSWORD '' DB 'default')) LIFETIME(MIN 1 MAX 10) LAYOUT(HASHED())",
+        "CREATE TABLE table_for_distributed (d Date, a String, b UInt8 DEFAULT 1, x String, "
+        "y Int8 ) ENGINE = SummingMergeTree PARTITION BY y ORDER BY d SETTINGS index_granularity = 8192",
+        "CREATE TABLE IF NOT EXISTS distr_test ON CLUSTER 'simple' (d Date, a String, b UInt8) "
+        "ENGINE = Distributed('simple', default, table_for_distributed, rand())",
+        "CREATE TABLE table_for_kafka (readings_id Int32 Codec(DoubleDelta, LZ4), "
+        "time DateTime Codec(DoubleDelta, LZ4), date ALIAS toDate(time), temperature Decimal(5,2) "
+        "Codec(T64, LZ4) ) Engine = MergeTree PARTITION BY toYYYYMM(time) ORDER BY (readings_id, time)",
+        "CREATE TABLE kafka_readings_queue (readings_id Int32, time DateTime, "
+        "temperature Decimal(5,2) ) ENGINE = Kafka SETTINGS "
+        "kafka_broker_list = 'kafka-headless.kafka:9092', kafka_topic_list = 'table_for_kafka', "
+        "kafka_group_name = 'readings_consumer_group1', kafka_format = 'CSV', "
+        "kafka_max_block_size = 1048576",
+        "CREATE TABLE table_for_view (date Date, id Int8, name String, value Int64) "
+        "ENGINE = MergeTree() Order by date",
+        "CREATE VIEW test_view AS SELECT * FROM table_for_view",
+        "CREATE TABLE table_for_materialized_view (when DateTime, userid UInt32, bytes Float32) "
+        "ENGINE = MergeTree PARTITION BY toYYYYMM(when) ORDER BY (userid, when)",
+        "CREATE MATERIALIZED VIEW materialized_view ENGINE = SummingMergeTree "
+        "PARTITION BY toYYYYMM(day) ORDER BY (userid, day) "
+        "POPULATE AS SELECT toStartOfDay(when) AS day, userid, count() as downloads, "
+        "sum(bytes) AS bytes FROM table_for_materialized_view GROUP BY userid, day",
+        "CREATE TABLE table_for_live_vew (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
+        "ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/default/table_for_live_vew', "
+        "'{replica}') PARTITION BY y ORDER BY d",
+        "CREATE LIVE VIEW test_live_view AS SELECT * FROM table_for_live_vew",
+        "CREATE TABLE table_for_window_view on cluster 'simple' (id UInt64, timestamp DateTime) ENGINE = ReplicatedMergeTree() order by id",
+        "CREATE WINDOW VIEW wv ENGINE = Log() as select count(id), tumbleStart(w_id) as window_start from table_for_window_view "
+        "group by tumble(timestamp, INTERVAL '10' SECOND) as w_id",
+        "CREATE TABLE tinylog_table (id UInt64, value1 UInt8, value2 UInt16, value3 UInt32, value4 UInt64) ENGINE=TinyLog",
+        "CREATE TABLE log_table (id UInt64, value1 Nullable(UInt64), value2 Nullable(UInt64), value3 Nullable(UInt64)) ENGINE=Log",
+        "CREATE TABLE stripelog_table (timestamp DateTime, message_type String, message String ) ENGINE = StripeLog",
+        "CREATE TABLE null_table (a String, b Int8, x UInt8) ENGINE = Null",
+        "CREATE TABLE merge_table (id Int32) Engine = Merge(default, '_*')",
+        "CREATE TABLE set_table (userid UInt64) ENGINE = Set",
+        "CREATE TABLE left_join_table (x UInt32, s String) engine = Join(ALL, LEFT, x)",
+        "CREATE TABLE url_table (word String, value UInt64) ENGINE=URL('http://127.0.0.1:12345/', CSV)",
+        "CREATE TABLE memory_table (a Int64, b Nullable(Int64), c String) engine = Memory",
+        "CREATE TABLE table_for_buffer (EventDate Date, UTCEventTime DateTime, MoscowEventDate Date "
+        "DEFAULT toDate(UTCEventTime)) ENGINE = MergeTree() Order by EventDate",
+        "CREATE TABLE buffer_table AS table_for_buffer ENGINE = Buffer('default', "
+        "'table_for_buffer', 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
+        "CREATE TABLE generate_random_table (name String, value UInt32) ENGINE = GenerateRandom(1, 5, 3)",
+        "CREATE TABLE file_engine_table (name String, value UInt32) ENGINE = File(TabSeparated)",
+        "CREATE TABLE odbc (BannerID UInt64, CompaignID UInt64) ENGINE = "
+        "ODBC('DSN=pgconn;Database=postgres', somedb, bannerdict)",
+        "CREATE TABLE jdbc_table (Str String) ENGINE = JDBC('{}', 'default', 'ExternalTable')",
+        "CREATE TABLE mysql_table (float_nullable Nullable(Float32), int_id Int32 ) "
+        "ENGINE = MySQL('localhost:3306', 'vs_db', 'vs_table', 'vs_user', 'vs_pass')",
+        "CREATE TABLE mongodb_table ( key UInt64, data String ) ENGINE = "
+        "MongoDB('mongo1:27017', 'vs_db', 'vs_collection', 'testuser', 'clickhouse_password')",
+        "CREATE TABLE hdfs_table (name String, value UInt32) ENGINE = "
+        "HDFS('hdfs://hdfs1:9000/some_file', 'TSV')",
+        "CREATE TABLE s3_engine_table (name String, value UInt32)ENGINE = S3("
+        "'https://storage.test.net/my-test1/test-data.csv.gz', 'CSV', 'gzip')",
+        "CREATE TABLE embeddedrocksdb_table (key UInt64, value String) Engine = EmbeddedRocksDB "
+        "PRIMARY KEY(key)",
+        "CREATE TABLE postgresql_table (float_nullable Nullable(Float32), str String,"
+        " int_id Int32 ) ENGINE = PostgreSQL('localhost:5432', 'public_db', 'test_table', "
+        "'postges_user', 'postgres_password')",
+        "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = "
+        "ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', "
+        "'test_replicas', 'postgres', 'mysecretpassword')",
+        # "CREATE TABLE materialized_postgresql_table (key UInt64, value UInt64) ENGINE = "
+        # "MaterializedPostgreSQL('localhost:5433', 'postgres_database', 'postgresql_replica', "
+        # "'postgres_user', 'postgres_password')PRIMARY KEY key",
+        # "CREATE TABLE rabbitmq_table (key UInt64, value UInt64 ) ENGINE = RabbitMQ SETTINGS "
+        # "rabbitmq_host_port = 'localhost:5672', rabbitmq_exchange_name = 'exchange1', "
+        # "rabbitmq_exchange_type = 'headers', rabbitmq_routing_key_list = 'format=logs,type=report,"
+        # "year=2020', rabbitmq_format = 'JSONEachRow', rabbitmq_num_consumers = 5",
+    ]
+
+    with And("I create tables with every engine"):
+        for query in create_table_queries:
+            clickhouse.query(chi, query)
+
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+    with When("I add 1 more shard"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-1-2-schema-propagation.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
         )
 
     with Then("Unaffected pod should not be restarted"):
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
-    with And("Schema objects should be migrated to new shards"):
-        for obj in schema_objects:
-            out = clickhouse.query(
-                chi,
-                f"SELECT count() FROM system.tables WHERE name = '{obj}'",
-                host=f"chi-{chi}-{cluster}-1-0"
-            )
-            assert out == "1"
+    with Then("remote_servers.xml should contain 2 shards"):
+        assert get_shards_from_remote_servers(chi, cluster) == 2
 
-    with When("Remove shards"):
+    table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-013-1-schema-propagation-simple-0-0-0").split()
+
+    with Then("I check tables are propagated correctly"):
+        for attempt in retries(timeout=500, delay=1):
+            with attempt:
+                for table_name in table_names:
+                    if table_name[0] != '.':
+                        expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-013-1-schema-propagation-simple-0-0-0")
+                        actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}", pod="chi-test-013-1-schema-propagation-simple-1-0-0")
+                        assert expected_describe == actual_describe, error()
+
+    with When("I delete second shard"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
-                "object_counts": {
-                    "statefulset": 1,
-                    "pod": 1,
-                    "service": 2,
-                },
+                "pod_count": 1,
                 "do_not_delete": 1,
-            }
+            },
         )
 
-        with Then("Unaffected pod should not be restarted"):
-            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
-            assert start_time == new_start_time
+    with Then("Unaffected pod should not be restarted"):
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time == new_start_time
+
+    with Then("remote_servers.xml should contain 1 shard"):
+        assert get_shards_from_remote_servers(chi, cluster) == 1
+
+    with When("I add 1 more shard with DistributedTablesOnly schema policy"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-1-3-schema-propagation.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    tables_on_second_shard = clickhouse.query(chi, f"show tables", pod="chi-test-013-1-schema-propagation-simple-1-0-0").split()
+
+    with Then("I check tables are propagated correctly"):
+        for attempt in retries(timeout=500, delay=1):
+            with attempt:
+                assert len(tables_on_second_shard) == 2, error()
+                assert ("distr_test" in tables_on_second_shard) and (
+                            "table_for_distributed" in tables_on_second_shard), error()
+                for table_name in tables_on_second_shard:
+                    expected_describe = clickhouse.query(chi, f"DESCRIBE {table_name}",
+                                                         pod="chi-test-013-1-schema-propagation-simple-0-0-0")
+                    actual_describe = clickhouse.query(chi, f"DESCRIBE {table_name}",
+                                                       pod="chi-test-013-1-schema-propagation-simple-1-0-0")
+                    assert expected_describe == actual_describe, error()
+
+    with When("I delete second shard"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I add 1 more shard with None schema policy"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-013-1-4-schema-propagation.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("I check tables are not propagated"):
+        tables_on_second_shard = clickhouse.query(chi, f"show tables",
+                                                  pod="chi-test-013-1-schema-propagation-simple-1-0-0").split()
+        assert len(tables_on_second_shard) == 0, error()
+
 
     kubectl.delete_chi(chi)
 
@@ -1121,6 +1281,8 @@ def test_014(self):
                 "do_not_delete": 1,
             })
         kubectl.wait_chi_status(chi, "Completed", retries=20)
+        with Then("Replica is removed from remote_servers.xml as well"):
+            assert get_replicas_from_remote_servers(chi, cluster) == 1
 
         new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
@@ -2317,11 +2479,11 @@ def test_028(self):
                 note("Restart needs to be cleaned")
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
 
-        with Then("Clear RollingUpdate restart policy"):
-            cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
-            kubectl.launch(cmd)
-            time.sleep(10)
-            kubectl.wait_chi_status(chi, "Completed")
+        # with Then("Clear RollingUpdate restart policy"):
+        #    cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
+        #    kubectl.launch(cmd)
+        #    time.sleep(10)
+        #    kubectl.wait_chi_status(chi, "Completed")
 
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(chi=chi, wait_objects={"statefulset": 2, "pod": 2, "service": 3},
@@ -2907,6 +3069,144 @@ def test_035(self):
             self.context.shell.close()
 
 
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
+@Name("test_036. Check operator volume re-provisioning")
+def test_036(self):
+    """Check clickhouse operator recreates volumes and schema if volume is broken."""
+    manifest = f"manifests/chi/test-036-volume-re-provisioning.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {settings.clickhouse_template},
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I create replicated table with some data"):
+        create_table = """
+            CREATE TABLE test_local_036 ON CLUSTER '{cluster}' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace('\r', '').replace('\n', '')
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
+
+    with When("I delete PV", description="delete PV on replica 0"):
+        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+
+        kubectl.launch(f"delete pv {pv_name} --force &")
+        kubectl.launch(f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""")
+
+    with And("Wait for PVC to detect PV is lost"):
+        kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                           ".status.phase", "Lost")
+
+    with Then("I check PV is recreated"):
+        kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                           ".status.phase", "Bound")
+        kubectl.wait_object("pv", kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0"))
+        size = kubectl.get_pv_size("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+        assert size == "1Gi", error()
+
+    with And("I check data on each replica"):
+        with By("checking data on the replica 0"):
+            r = clickhouse.query(chi, pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                                 sql="SELECT count(*) FROM test_local_036")
+            assert r == "10000", error()
+        with And("checking data on the replica 1"):
+            r = clickhouse.query(chi, pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
+                                 sql="SELECT count(*) FROM test_local_036")
+            assert r == "10000", error()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
+@Name("test_037. storageManagement switch")
+def test_037(self):
+    """Check clickhouse-operator supports switching storageManagement
+    config option from default (StatefulSet) to Operator"""
+    cluster = "default"
+    manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I time up pod start time"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+
+    with And("I create a table with some data"):
+        create_table = """
+            CREATE TABLE test_local_037 (a UInt32)
+            Engine = MergeTree()
+            ORDER BY a
+            """.replace('\r', '').replace('\n', '')
+        clickhouse.query(chi, create_table)
+        clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
+
+    with When("I switch storageManagement to Operator"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-2-storagemanagement-switch.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("I check cluster is restarted and time up new pod start time"):
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        assert start_time != start_time_new, error()
+        start_time = start_time_new
+
+    with And("I rescale volume configuration to 2Gi to check that storage management is switched"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("storage size should be 2Gi"):
+        kubectl.wait_field("pvc", f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0",
+                           ".spec.resources.requests.storage", "2Gi")
+        size = kubectl.get_pvc_size(f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
+        assert size == "2Gi", error()
+
+    with And("check the pod's start time to see if it has been restarted"):
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
+        with Then("storage provisioner is operator, pod should not be restarted"):
+            assert start_time == start_time_new, error()
+
+    with And("check data in the table"):
+        r = clickhouse.query(chi, "SELECT count(*) from test_local_037",
+                             pod=f"chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
+        assert r == "10000"
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(
@@ -2930,7 +3230,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.19.3"
+    self.context.test_009_version_from = "0.20.0"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):

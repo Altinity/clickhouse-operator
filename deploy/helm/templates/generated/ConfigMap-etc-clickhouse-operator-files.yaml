@@ -1,0 +1,13 @@
+# Template Parameters:
+#
+# NAME=etc-clickhouse-operator-files
+# NAMESPACE=kube-system
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-files" (include "altinity-clickhouse-operator.fullname" .) }}
+  namespace: {{ .Release.Namespace }}
+  labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+data: {{ tpl (toYaml .Values.configs.files) . | nindent 2 }}

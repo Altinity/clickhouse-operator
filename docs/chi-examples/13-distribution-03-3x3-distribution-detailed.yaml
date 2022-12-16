@@ -8,7 +8,7 @@ spec:
       podTemplate: dist-template
   configuration:
     clusters:
-      - name: "dist_exp"
+      - name: "dist-exp"
         layout:
           shardsCount: 3
           replicasCount: 3

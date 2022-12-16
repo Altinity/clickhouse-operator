@@ -18,18 +18,18 @@ import (
 	"context"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	appsV1 "k8s.io/api/apps/v1"
+	coreV1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
-func (c *Controller) deleteHost(ctx context.Context, host *chop.ChiHost) error {
+func (c *Controller) deleteHost(ctx context.Context, host *chiV1.ChiHost) error {
 	log.V(1).M(host).S().Info(host.Address.ClusterNameString())
 
 	// Each host consists of:
@@ -44,9 +44,9 @@ func (c *Controller) deleteHost(ctx context.Context, host *chop.ChiHost) error {
 }
 
 // deleteConfigMapsCHI
-func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -58,15 +58,15 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 
 	var err error
 
-	configMapCommon := chopmodel.CreateConfigMapCommonName(chi)
-	configMapCommonUsersName := chopmodel.CreateConfigMapCommonUsersName(chi)
+	configMapCommon := chopModel.CreateConfigMapCommonName(chi)
+	configMapCommonUsersName := chopModel.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommon, newDeleteOptions())
 	switch {
 	case err == nil:
 		log.V(1).M(chi).Info("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommon)
-	case apierrors.IsNotFound(err):
+	case apiErrors.IsNotFound(err):
 		log.V(1).M(chi).Info("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommon)
 	default:
 		log.V(1).M(chi).F().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommon, err)
@@ -76,7 +76,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 	switch {
 	case err == nil:
 		log.V(1).M(chi).Info("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
-	case apierrors.IsNotFound(err):
+	case apiErrors.IsNotFound(err):
 		log.V(1).M(chi).Info("NEUTRAL not found ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
 		err = nil
 	default:
@@ -87,18 +87,18 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chop.ClickHou
 }
 
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
-func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps.StatefulSet, host *chop.ChiHost) error {
+func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *appsV1.StatefulSet, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
-	name := chopmodel.CreatePodName(statefulSet)
+	name := chopModel.CreatePodName(statefulSet)
 	log.V(1).M(host).Info("Delete Pod %s/%s", statefulSet.Namespace, name)
 	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(ctx, name, newDeleteOptions())
 	if err == nil {
 		log.V(1).M(host).Info("OK delete Pod %s/%s", statefulSet.Namespace, name)
-	} else if apierrors.IsNotFound(err) {
+	} else if apiErrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found Pod %s/%s", statefulSet.Namespace, name)
 		err = nil
 	} else {
@@ -109,9 +109,9 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
-func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) error {
+func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -121,7 +121,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 	// it is possible to scale the StatefulSet down to 0 prior to deletion.
 
 	// Namespaced name
-	name := chopmodel.CreateStatefulSetName(host)
+	name := chopModel.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -129,7 +129,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 		// We need to set cur StatefulSet to a deletable one temporary
 		host.StatefulSet = sts
 	} else {
-		if apierrors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 		} else {
 			log.V(1).M(host).F().Error("FAIL get StatefulSet %s/%s err:%v", namespace, name, err)
@@ -153,7 +153,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
 		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
 		c.waitHostDeleted(host)
-	} else if apierrors.IsNotFound(err) {
+	} else if apiErrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 	} else {
 		log.V(1).M(host).F().Error("FAIL delete StatefulSet %s/%s err: %v", namespace, name, err)
@@ -163,10 +163,10 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chop.ChiHost) 
 }
 
 // syncStatefulSet
-func (c *Controller) syncStatefulSet(ctx context.Context, host *chop.ChiHost) {
+func (c *Controller) syncStatefulSet(ctx context.Context, host *chiV1.ChiHost) {
 	for {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return
 		}
 		// TODO
@@ -182,9 +182,9 @@ func (c *Controller) syncStatefulSet(ctx context.Context, host *chop.ChiHost) {
 }
 
 // deletePVC deletes PersistentVolumeClaim
-func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
+func (c *Controller) deletePVC(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -192,13 +192,13 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 	defer log.V(2).M(host).E().P()
 
 	namespace := host.Address.Namespace
-	c.walkDiscoveredPVCs(host, func(pvc *v1.PersistentVolumeClaim) {
+	c.walkDiscoveredPVCs(host, func(pvc *coreV1.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return
 		}
 
-		if !chopmodel.HostCanDeletePVC(host, pvc.Name) {
+		if !chopModel.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).M(host).Info("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
 			// Move to the next PVC
 			return
@@ -207,7 +207,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 		// Actually delete PVC
 		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, newDeleteOptions()); err == nil {
 			log.V(1).M(host).Info("OK delete PVC %s/%s", namespace, pvc.Name)
-		} else if apierrors.IsNotFound(err) {
+		} else if apiErrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found PVC %s/%s", namespace, pvc.Name)
 		} else {
 			log.M(host).F().Error("FAIL to delete PVC %s/%s err:%v", namespace, pvc.Name, err)
@@ -218,19 +218,19 @@ func (c *Controller) deletePVC(ctx context.Context, host *chop.ChiHost) error {
 }
 
 // deleteConfigMap deletes ConfigMap
-func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) error {
+func (c *Controller) deleteConfigMap(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
-	name := chopmodel.CreateConfigMapHostName(host)
+	name := chopModel.CreateConfigMapHostName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
 	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
 		log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
-	} else if apierrors.IsNotFound(err) {
+	} else if apiErrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
 	} else {
 		log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
@@ -240,7 +240,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 	//namespace = host.Address.Namespace
 	//log.V(1).M(host).F().Info("%s/%s", namespace, name)
 	//
-	//if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
+	//if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(task, name, newDeleteOptions()); err == nil {
 	//	log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
 	//} else if apierrors.IsNotFound(err) {
 	//	log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
@@ -252,52 +252,52 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chop.ChiHost) er
 }
 
 // deleteServiceHost deletes Service
-func (c *Controller) deleteServiceHost(ctx context.Context, host *chop.ChiHost) error {
+func (c *Controller) deleteServiceHost(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
-	serviceName := chopmodel.CreateStatefulSetServiceName(host)
+	serviceName := chopModel.CreateStatefulSetServiceName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
 
 // deleteServiceShard
-func (c *Controller) deleteServiceShard(ctx context.Context, shard *chop.ChiShard) error {
+func (c *Controller) deleteServiceShard(ctx context.Context, shard *chiV1.ChiShard) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
-	serviceName := chopmodel.CreateShardServiceName(shard)
+	serviceName := chopModel.CreateShardServiceName(shard)
 	namespace := shard.Address.Namespace
 	log.V(1).M(shard).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
 
 // deleteServiceCluster
-func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chop.ChiCluster) error {
+func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chiV1.ChiCluster) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
-	serviceName := chopmodel.CreateClusterServiceName(cluster)
+	serviceName := chopModel.CreateClusterServiceName(cluster)
 	namespace := cluster.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
 
 // deleteServiceCHI
-func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
-	serviceName := chopmodel.CreateCHIServiceName(chi)
+	serviceName := chopModel.CreateCHIServiceName(chi)
 	namespace := chi.Namespace
 	log.V(1).M(chi).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -306,7 +306,7 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chop.ClickHouseI
 // deleteServiceIfExists deletes Service in case it does not exist
 func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name string) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -330,13 +330,13 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 }
 
 // deleteSecretCluster
-func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chop.ChiCluster) error {
+func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chiV1.ChiCluster) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
-	secretName := chopmodel.CreateClusterAutoSecretName(cluster)
+	secretName := chopModel.CreateClusterAutoSecretName(cluster)
 	namespace := cluster.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, secretName)
 	return c.deleteSecretIfExists(ctx, namespace, secretName)
@@ -345,7 +345,7 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chop.ChiC
 // deleteSecretIfExists deletes Secret in case it does not exist
 func (c *Controller) deleteSecretIfExists(ctx context.Context, namespace, name string) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 

@@ -38,9 +38,11 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.EnsureStatus().ShardsCount = chi.ShardsCount()
 	chi.EnsureStatus().HostsCount = chi.HostsCount()
 	chi.EnsureStatus().TaskID = *chi.Spec.TaskID
-	chi.EnsureStatus().UpdatedHostsCount = 0
-	chi.EnsureStatus().DeleteHostsCount = 0
-	chi.EnsureStatus().DeletedHostsCount = 0
+	chi.EnsureStatus().HostsUpdatedCount = 0
+	chi.EnsureStatus().HostsAddedCount = 0
+	chi.EnsureStatus().HostsCompletedCount = 0
+	chi.EnsureStatus().HostsDeleteCount = 0
+	chi.EnsureStatus().HostsDeletedCount = 0
 	chi.EnsureStatus().Pods = pods
 	chi.EnsureStatus().FQDNs = fqdns
 	chi.EnsureStatus().Endpoint = endpoint
@@ -701,6 +703,7 @@ func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 	return chi.Spec.Reconciling
 }
 
+// CopyFiltered make copy filtering some fields
 func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *ClickHouseInstallation {
 	if chi == nil {
 		return nil
@@ -726,6 +729,7 @@ func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *Cli
 	return &chi2
 }
 
+// JSON returns JSON string
 func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
 	if chi == nil {
 		return ""
@@ -740,6 +744,7 @@ func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
 
 }
 
+// YAML return YAML string
 func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
 	if chi == nil {
 		return ""
@@ -753,6 +758,7 @@ func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
 	return string(yamlBytes)
 }
 
+// EnsureStatus ensures status
 func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	if chi == nil {
 		return nil

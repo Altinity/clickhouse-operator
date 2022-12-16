@@ -38,10 +38,11 @@ type ChiStatus struct {
 	Actions                []string                `json:"actions,omitempty"             yaml:"actions,omitempty"`
 	Error                  string                  `json:"error,omitempty"               yaml:"error,omitempty"`
 	Errors                 []string                `json:"errors,omitempty"              yaml:"errors,omitempty"`
-	UpdatedHostsCount      int                     `json:"updated,omitempty"             yaml:"updated,omitempty"`
-	AddedHostsCount        int                     `json:"added,omitempty"               yaml:"added,omitempty"`
-	DeletedHostsCount      int                     `json:"deleted,omitempty"             yaml:"deleted,omitempty"`
-	DeleteHostsCount       int                     `json:"delete,omitempty"              yaml:"delete,omitempty"`
+	HostsUpdatedCount      int                     `json:"hostsUpdated,omitempty"        yaml:"hostsUpdated,omitempty"`
+	HostsAddedCount        int                     `json:"hostsAdded,omitempty"          yaml:"hostsAdded,omitempty"`
+	HostsCompletedCount    int                     `json:"hostsCompleted,omitempty"      yaml:"hostsCompleted,omitempty"`
+	HostsDeletedCount      int                     `json:"hostsDeleted,omitempty"        yaml:"hostsDeleted,omitempty"`
+	HostsDeleteCount       int                     `json:"hostsDelete,omitempty"         yaml:"hostsDelete,omitempty"`
 	Pods                   []string                `json:"pods,omitempty"                yaml:"pods,omitempty"`
 	PodIPs                 []string                `json:"pod-ips,omitempty"             yaml:"pod-ips,omitempty"`
 	FQDNs                  []string                `json:"fqdns,omitempty"               yaml:"fqdns,omitempty"`
@@ -65,7 +66,7 @@ func (s *ChiStatus) PushAction(action string) {
 	s.TrimActions()
 }
 
-// TripActions trims actions
+// TrimActions trims actions
 func (s *ChiStatus) TrimActions() {
 	if s == nil {
 		return
@@ -126,10 +127,11 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 		return
 	}
 	s.Status = StatusInProgress
-	s.UpdatedHostsCount = 0
-	s.AddedHostsCount = 0
-	s.DeletedHostsCount = 0
-	s.DeleteHostsCount = DeleteHostsCount
+	s.HostsUpdatedCount = 0
+	s.HostsAddedCount = 0
+	s.HostsCompletedCount = 0
+	s.HostsDeletedCount = 0
+	s.HostsDeleteCount = DeleteHostsCount
 	s.PushTaskIDStarted()
 }
 
@@ -149,13 +151,15 @@ func (s *ChiStatus) DeleteStart() {
 		return
 	}
 	s.Status = StatusTerminating
-	s.UpdatedHostsCount = 0
-	s.AddedHostsCount = 0
-	s.DeletedHostsCount = 0
-	s.DeleteHostsCount = 0
+	s.HostsUpdatedCount = 0
+	s.HostsAddedCount = 0
+	s.HostsCompletedCount = 0
+	s.HostsDeletedCount = 0
+	s.HostsDeleteCount = 0
 	s.PushTaskIDStarted()
 }
 
+// CopyCHIStatusOptions specifies what to copy in CHI status options
 type CopyCHIStatusOptions struct {
 	Actions     bool
 	Errors      bool
@@ -164,6 +168,7 @@ type CopyCHIStatusOptions struct {
 	WholeStatus bool
 }
 
+// MergeActions merges actions
 func (s *ChiStatus) MergeActions(from *ChiStatus) {
 	if s == nil {
 		return
@@ -176,6 +181,7 @@ func (s *ChiStatus) MergeActions(from *ChiStatus) {
 	s.TrimActions()
 }
 
+// CopyFrom copies
 func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 	if s == nil {
 		return
@@ -213,10 +219,11 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.MergeActions(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
-		s.UpdatedHostsCount = from.UpdatedHostsCount
-		s.AddedHostsCount = from.AddedHostsCount
-		s.DeletedHostsCount = from.DeletedHostsCount
-		s.DeleteHostsCount = from.DeleteHostsCount
+		s.HostsUpdatedCount = from.HostsUpdatedCount
+		s.HostsAddedCount = from.HostsAddedCount
+		s.HostsCompletedCount = from.HostsCompletedCount
+		s.HostsDeletedCount = from.HostsDeletedCount
+		s.HostsDeleteCount = from.HostsDeleteCount
 		s.Pods = from.Pods
 		s.PodIPs = from.PodIPs
 		s.FQDNs = from.FQDNs
@@ -246,10 +253,11 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.MergeActions(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
-		s.UpdatedHostsCount = from.UpdatedHostsCount
-		s.AddedHostsCount = from.AddedHostsCount
-		s.DeletedHostsCount = from.DeletedHostsCount
-		s.DeleteHostsCount = from.DeleteHostsCount
+		s.HostsUpdatedCount = from.HostsUpdatedCount
+		s.HostsAddedCount = from.HostsAddedCount
+		s.HostsCompletedCount = from.HostsCompletedCount
+		s.HostsDeletedCount = from.HostsDeletedCount
+		s.HostsDeleteCount = from.HostsDeleteCount
 		s.Pods = from.Pods
 		s.PodIPs = from.PodIPs
 		s.FQDNs = from.FQDNs
@@ -259,6 +267,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 	}
 }
 
+// GetFQDNs is a getter
 func (s *ChiStatus) GetFQDNs() []string {
 	if s == nil {
 		return nil
@@ -266,6 +275,7 @@ func (s *ChiStatus) GetFQDNs() []string {
 	return s.FQDNs
 }
 
+// GetCHOpIP is a getter
 func (s *ChiStatus) GetCHOpIP() string {
 	if s == nil {
 		return ""
@@ -273,6 +283,7 @@ func (s *ChiStatus) GetCHOpIP() string {
 	return s.CHOpIP
 }
 
+// GetNormalizedCHICompleted is a getter
 func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	if s == nil {
 		return nil
@@ -280,6 +291,7 @@ func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	return s.NormalizedCHICompleted
 }
 
+// GetNormalizedCHI is a getter
 func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	if s == nil {
 		return nil
@@ -287,6 +299,7 @@ func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	return s.NormalizedCHI
 }
 
+// GetStatus is a getter
 func (s *ChiStatus) GetStatus() string {
 	if s == nil {
 		return ""
@@ -294,6 +307,7 @@ func (s *ChiStatus) GetStatus() string {
 	return s.Status
 }
 
+// GetPods is a getter
 func (s *ChiStatus) GetPods() []string {
 	if s == nil {
 		return nil
@@ -301,9 +315,28 @@ func (s *ChiStatus) GetPods() []string {
 	return s.Pods
 }
 
+// GetPodIPS is a getter
 func (s *ChiStatus) GetPodIPS() []string {
 	if s == nil {
 		return nil
 	}
 	return s.PodIPs
+}
+
+// UpdateHost updates updated hosts counter
+func (s *ChiStatus) UpdateHost() {
+	if s == nil {
+		return
+	}
+	s.HostsUpdatedCount++
+	s.HostsCompletedCount++
+}
+
+// AddHost updates added hosts counter
+func (s *ChiStatus) AddHost() {
+	if s == nil {
+		return
+	}
+	s.HostsAddedCount++
+	s.HostsCompletedCount++
 }

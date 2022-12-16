@@ -1,0 +1,154 @@
+# Template Parameters:
+#
+# NAMESPACE=kube-system
+# COMMENT=#
+# ROLE_KIND=ClusterRole
+# ROLE_NAME=clickhouse-operator-kube-system
+# ROLE_BINDING_KIND=ClusterRoleBinding
+# ROLE_BINDING_NAME=clickhouse-operator-kube-system
+#
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "altinity-clickhouse-operator.fullname" . }}
+  #namespace: kube-system
+  labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - services
+      - persistentvolumeclaims
+      - secrets
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - create
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+      - pods
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - create
+      - delete
+  - apiGroups:
+      - apps
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - patch
+      - update
+      - delete
+  - apiGroups:
+      - apps
+    resourceNames:
+      - {{ include "altinity-clickhouse-operator.fullname" . }}
+    resources:
+      - deployments
+    verbs:
+      - get
+      - patch
+      - update
+      - delete
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+      - create
+      - delete
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations
+    verbs:
+      - get
+      - patch
+      - update
+      - delete
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations
+      - clickhouseinstallationtemplates
+      - clickhouseoperatorconfigurations
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations/finalizers
+      - clickhouseinstallationtemplates/finalizers
+      - clickhouseoperatorconfigurations/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - clickhouse.altinity.com
+    resources:
+      - clickhouseinstallations/status
+      - clickhouseinstallationtemplates/status
+      - clickhouseoperatorconfigurations/status
+    verbs:
+      - get
+      - update
+      - patch
+      - create
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - get
+      - list

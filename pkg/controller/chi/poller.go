@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	appsV1 "k8s.io/api/apps/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -36,9 +36,9 @@ const (
 )
 
 // waitHostNotReady polls host's StatefulSet for not exists or not ready
-func (c *Controller) waitHostNotReady(ctx context.Context, host *chiv1.ChiHost) error {
+func (c *Controller) waitHostNotReady(ctx context.Context, host *chiV1.ChiHost) error {
 	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptions().FromConfig(chop.Config()).SetCreateTimeout(0), model.IsStatefulSetNotReady, nil)
-	if apierrors.IsNotFound(err) {
+	if apiErrors.IsNotFound(err) {
 		err = nil
 	}
 
@@ -46,13 +46,13 @@ func (c *Controller) waitHostNotReady(ctx context.Context, host *chiv1.ChiHost) 
 }
 
 // waitHostReady polls host's StatefulSet until it is ready
-func (c *Controller) waitHostReady(ctx context.Context, host *chiv1.ChiHost) error {
+func (c *Controller) waitHostReady(ctx context.Context, host *chiV1.ChiHost) error {
 	// Wait for StatefulSet to reach generation
 	err := c.pollStatefulSet(
 		ctx,
 		host.StatefulSet,
 		nil,
-		func(sts *apps.StatefulSet) bool {
+		func(sts *appsV1.StatefulSet) bool {
 			if sts == nil {
 				return false
 			}
@@ -74,7 +74,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chiv1.ChiHost) err
 		ctx,
 		host.StatefulSet,
 		nil,
-		func(sts *apps.StatefulSet) bool {
+		func(sts *appsV1.StatefulSet) bool {
 			_ = c.deleteLabelReadyPod(ctx, host)
 			_ = c.deleteAnnotationReadyService(ctx, host)
 			return model.IsStatefulSetReady(sts)
@@ -87,7 +87,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chiv1.ChiHost) err
 }
 
 // waitHostDeleted polls host's StatefulSet until it is not available
-func (c *Controller) waitHostDeleted(host *chiv1.ChiHost) {
+func (c *Controller) waitHostDeleted(host *chiV1.ChiHost) {
 	for {
 		// TODO
 		// Probably there would be better way to wait until k8s reported StatefulSet deleted
@@ -102,7 +102,7 @@ func (c *Controller) waitHostDeleted(host *chiv1.ChiHost) {
 }
 
 // waitHostRunning polls host for `Running` state
-func (c *Controller) waitHostRunning(host *chiv1.ChiHost) error {
+func (c *Controller) waitHostRunning(host *chiV1.ChiHost) error {
 	namespace := host.Address.Namespace
 	name := host.Address.HostName
 	// Wait for some limited time for StatefulSet to reach target generation
@@ -160,7 +160,7 @@ func (o *StatefulSetPollOptions) Ensure() *StatefulSetPollOptions {
 }
 
 // FromConfig makes poll options from config
-func (o *StatefulSetPollOptions) FromConfig(config *chiv1.OperatorConfig) *StatefulSetPollOptions {
+func (o *StatefulSetPollOptions) FromConfig(config *chiV1.OperatorConfig) *StatefulSetPollOptions {
 	if o == nil {
 		return nil
 	}
@@ -186,11 +186,11 @@ func (c *Controller) pollStatefulSet(
 	ctx context.Context,
 	entity interface{},
 	opts *StatefulSetPollOptions,
-	mainFn func(set *apps.StatefulSet) bool,
+	mainFn func(set *appsV1.StatefulSet) bool,
 	backFn func(),
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 	opts = opts.Ensure().FromConfig(chop.Config())
@@ -198,12 +198,12 @@ func (c *Controller) pollStatefulSet(
 	name := ""
 
 	switch entity.(type) {
-	case *apps.StatefulSet:
-		sts := entity.(*apps.StatefulSet)
+	case *appsV1.StatefulSet:
+		sts := entity.(*appsV1.StatefulSet)
 		namespace = sts.Namespace
 		name = sts.Name
-	case *chiv1.ChiHost:
-		h := entity.(*chiv1.ChiHost)
+	case *chiV1.ChiHost:
+		h := entity.(*chiV1.ChiHost)
 		namespace = h.Address.Namespace
 		name = h.Address.StatefulSet
 	}
@@ -213,7 +213,7 @@ func (c *Controller) pollStatefulSet(
 	start := time.Now()
 	for {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return nil
 		}
 
@@ -230,7 +230,7 @@ func (c *Controller) pollStatefulSet(
 				// Start bothering with log messages after some time only
 				log.V(1).M(namespace, name).F().Info("WAIT:%s", model.StrStatefulSetStatus(&statefulSet.Status))
 			}
-		} else if apierrors.IsNotFound(err) {
+		} else if apiErrors.IsNotFound(err) {
 			// Object is not found - it either failed to be created or just still not created
 			if time.Since(start) >= opts.CreateTimeout {
 				// No more wait for object to be created. Consider create as failed.
@@ -292,12 +292,12 @@ func pollback(ctx context.Context, opts *StatefulSetPollOptions, fn func()) {
 // pollHost polls host with poll callback function.
 func (c *Controller) pollHostContext(
 	ctx context.Context,
-	host *chiv1.ChiHost,
+	host *chiV1.ChiHost,
 	opts *StatefulSetPollOptions,
-	f func(ctx context.Context, host *chiv1.ChiHost) bool,
+	f func(ctx context.Context, host *chiV1.ChiHost) bool,
 ) error {
 	if util.IsContextDone(ctx) {
-		log.V(2).Info("ctx is done")
+		log.V(2).Info("task is done")
 		return nil
 	}
 
@@ -309,7 +309,7 @@ func (c *Controller) pollHostContext(
 	start := time.Now()
 	for {
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return nil
 		}
 
@@ -320,7 +320,7 @@ func (c *Controller) pollHostContext(
 		}
 
 		if util.IsContextDone(ctx) {
-			log.V(2).Info("ctx is done")
+			log.V(2).Info("task is done")
 			return nil
 		}
 

@@ -10,7 +10,7 @@ from testflows.core import *
 
 def wait_keeper_ready(keeper_type='zookeeper', pod_count=3, retries=10):
     svc_name = 'zookeeper-client' if keeper_type == "zookeeper-operator" else 'zookeeper'
-    expected_containers = "2/2" if keeper_type == "clickhouse-keeper" else "1/1"
+    expected_containers = "1/1"
     expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
     for i in range(retries):
         ready_pods = kubectl.launch(f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l")
@@ -62,6 +62,7 @@ def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_table
                 pod=pod_for_insert_data
             )
 
+
 def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
     for pod_num in range(pod_count):
         found = False
@@ -106,12 +107,12 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
     }
     assert expected_out[keeper_type] == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 
+
 def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, keeper_manifest_1_node, keeper_manifest_3_node, first_install=False, clean_ns=None):
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f'manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml',
-        # chi_template_file='manifests/chit/tpl-clickhouse-latest.yaml',
-        chi_template_file='manifests/chit/tpl-clickhouse-stable.yaml',
+        chi_template_file='manifests/chit/tpl-clickhouse-latest.yaml',
         chi_name='test-cluster-for-zk',
         keeper_manifest=keeper_manifest,
         keeper_type=keeper_type,
@@ -121,6 +122,7 @@ def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, kee
         make_object_count=False,
     )
     return chi
+
 
 @TestOutline
 def test_keeper_outline(self,
@@ -218,6 +220,7 @@ def test_zookeeper_operator_rescale(self):
         keeper_manifest_3_node='zookeeper-operator-3-nodes.yaml',
     )
 
+
 @TestScenario
 @Name("test_zookeeper_pvc_scaleout_rescale. Check ZK+PVC scale-up / scale-down cases")
 def test_zookeeper_pvc_scaleout_rescale(self):
@@ -227,6 +230,7 @@ def test_zookeeper_pvc_scaleout_rescale(self):
         keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml',
         keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml',
     )
+
 
 @TestOutline
 def test_keeper_probes_outline(
@@ -247,9 +251,9 @@ def test_keeper_probes_outline(
         wait_clickhouse_no_readonly_replicas(chi)
 
     with Then("Create keeper_bench table"):
-        clickhouse.query(chi['metadata']['name'],"DROP DATABASE IF EXISTS keeper_bench SYNC")
-        clickhouse.query(chi['metadata']['name'],"CREATE DATABASE keeper_bench")
-        clickhouse.query(chi['metadata']['name'],"""
+        clickhouse.query(chi['metadata']['name'], "DROP DATABASE IF EXISTS keeper_bench SYNC")
+        clickhouse.query(chi['metadata']['name'], "CREATE DATABASE keeper_bench")
+        clickhouse.query(chi['metadata']['name'], """
             CREATE TABLE keeper_bench.keeper_bench (p UInt64, x UInt64)
             ENGINE=ReplicatedSummingMergeTree('/clickhouse/tables/{database}/{table}', '{replica}' )
             ORDER BY tuple()
@@ -262,10 +266,10 @@ def test_keeper_probes_outline(
                 max_parts_in_total=1000000;        
         """)
     with Then("Insert data to keeper_bench for make zookeeper workload"):
-        pod_prefix="chi-test-cluster-for-zk-default"
+        pod_prefix = "chi-test-cluster-for-zk-default"
         rows = 1000
         for pod in ("0-0-0", "0-1-0"):
-            clickhouse.query(chi['metadata']['name'],"""
+            clickhouse.query(chi['metadata']['name'], """
                 INSERT INTO keeper_bench.keeper_bench SELECT rand(1)%100, rand(2) FROM numbers({rows})
                 SETTINGS max_block_size=1,
                   min_insert_block_size_bytes=1,
@@ -273,7 +277,7 @@ def test_keeper_probes_outline(
                   insert_deduplicate=0,
                   max_threads=128,
                   max_insert_threads=128
-            """, pod=f"{pod_prefix}-{pod}", timeout=rows )
+            """, pod=f"{pod_prefix}-{pod}", timeout=rows)
 
     with Then("Check liveness and readiness probes fail"):
         zk_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
@@ -282,7 +286,7 @@ def test_keeper_probes_outline(
             assert "probe failed" not in out, "all probes shall be successful"
 
     with Then("Check ReadOnlyReplica"):
-        out = clickhouse.query(chi['metadata']['name'],"SELECT count() FROM cluster('all-sharded',system.metric_log) WHERE CurrentMetric_ReadonlyReplica > 0")
+        out = clickhouse.query(chi['metadata']['name'], "SELECT count() FROM cluster('all-sharded',system.metric_log) WHERE CurrentMetric_ReadonlyReplica > 0")
         assert out == "0", "ReadOnlyReplica shall be zero"
 
 
@@ -294,6 +298,7 @@ def test_zookeeper_probes_workload(self):
         keeper_manifest_1_node='zookeeper-1-node-for-test-probes.yaml',
         keeper_manifest_3_node='zookeeper-3-nodes-for-test-probes.yaml',
     )
+
 
 @TestScenario
 @Name('test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
@@ -317,6 +322,7 @@ def test_zookeeper_operator_probes_workload(self):
         # keeper_manifest_3_node='zookeeper-operator-3-nodes-with-custom-probes.yaml',
     )
 
+
 @TestScenario
 @Name('test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
 def test_clickhouse_keeper_probes_workload(self):
@@ -325,6 +331,7 @@ def test_clickhouse_keeper_probes_workload(self):
         keeper_manifest_1_node='clickhouse-keeper-1-node-256M-for-test-only.yaml',
         keeper_manifest_3_node='clickhouse-keeper-3-nodes-256M-for-test-only.yaml',
     )
+
 
 @TestModule
 @Name("e2e.test_keeper")

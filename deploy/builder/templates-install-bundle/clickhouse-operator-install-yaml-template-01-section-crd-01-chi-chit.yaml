@@ -55,26 +55,31 @@ spec:
           description: CHI status
           priority: 0 # show in standard view
           jsonPath: .status.status
-        - name: updated
+        - name: hosts-updated
           type: integer
           description: Updated hosts count
           priority: 1 # show in wide view
-          jsonPath: .status.updated
-        - name: added
+          jsonPath: .status.hostsUpdated
+        - name: hosts-added
           type: integer
           description: Added hosts count
           priority: 1 # show in wide view
-          jsonPath: .status.added
-        - name: deleted
+          jsonPath: .status.hostsAdded
+        - name: hosts-completed
+          type: integer
+          description: Completed hosts count
+          priority: 0 # show in standard view
+          jsonPath: .status.hostsCompleted
+        - name: hosts-deleted
           type: integer
           description: Hosts deleted count
           priority: 1 # show in wide view
-          jsonPath: .status.deleted
-        - name: delete
+          jsonPath: .status.hostsDeleted
+        - name: hosts-delete
           type: integer
           description: Hosts to be deleted count
           priority: 1 # show in wide view
-          jsonPath: .status.delete
+          jsonPath: .status.hostsDelete
         - name: endpoint
           type: string
           description: Client access endpoint
@@ -170,19 +175,23 @@ spec:
                   description: "Errors"
                   items:
                     type: string
-                updated:
+                hostsUpdated:
                   type: integer
                   minimum: 0
                   description: "Updated Hosts count"
-                added:
+                hostsAdded:
                   type: integer
                   minimum: 0
                   description: "Added Hosts count"
-                deleted:
+                hostsCompleted:
+                  type: integer
+                  minimum: 0
+                  description: "Completed Hosts count"
+                hostsDeleted:
                   type: integer
                   minimum: 0
                   description: "Deleted Hosts count"
-                delete:
+                hostsDelete:
                   type: integer
                   minimum: 0
                   description: "About to delete Hosts count"
