@@ -882,7 +882,7 @@ def test_013_1(self):
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
-    with And("chi with 1 shard exists"):
+    with When("chi with 1 shard exists"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
