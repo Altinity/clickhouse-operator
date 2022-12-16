@@ -22,8 +22,4 @@ spec:
     profiles:
       default/allow_experimental_window_view: 1
       default/allow_experimental_live_view: 1
-  defaults:
-    storageManagement:
-      provisioner: Operator
-    templates:
-      volumeClaimTemplate: default
+      default/database_atomic_wait_for_drop_and_detach_synchronously: 1
