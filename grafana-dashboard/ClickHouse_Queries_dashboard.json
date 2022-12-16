@@ -44,7 +44,7 @@
       "type": "datasource",
       "id": "vertamedia-clickhouse-datasource",
       "name": "ClickHouse",
-      "version": "2.5.0"
+      "version": "2.5.3"
     }
   ],
   "annotations": {
@@ -129,7 +129,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
@@ -137,14 +137,14 @@
           "datetimeLoading": false,
           "expr": "",
           "format": "time_series",
-          "formattedQuery": "SELECT * FROM ($rateColumns(\n    substring(query,  1,  45) AS query,\n    count() c)\nFROM $table\nWHERE\n    cityHash64(query) global in (\n    SELECT cityHash64(substring(query,  1,  45)) AS h\n    FROM $table\n    WHERE\n        $timeFilter\n        AND type in ($type)\n        AND initial_user in ($user)\n        AND('$query_type' = 'all' or(positionCaseInsensitive(query,  '$query_type') = 1))\n    GROUP BY h\n    ORDER BY count() desc\n    LIMIT $top)\n    AND type in ($type)\n    AND initial_user in ($user)\n    AND('$query_type' = 'all' or(positionCaseInsensitive(query,  '$query_type') = 1))) SETTINGS skip_unavailable_shards=1",
+          "formattedQuery": "SELECT * FROM ($rateColumns(\n    substring(query,  1,  45) AS query,\n    count() c)\nFROM cluster('all-sharded',system.query_log)\nWHERE\n    cityHash64(query) global in (\n    SELECT cityHash64(substring(query,  1,  45)) AS h\n    FROM cluster('all-sharded',system.query_log)\n    WHERE\n        $timeFilter\n        AND type in ($type)\n        AND initial_user in ($user)\n        AND('$query_type' = 'all' or(positionCaseInsensitive(query,  '$query_type') = 1))\n    GROUP BY h\n    ORDER BY count() desc\n    LIMIT $top)\n    AND type in ($type)\n    AND initial_user in ($user)\n    AND('$query_type' = 'all' or(positionCaseInsensitive(query,  '$query_type') = 1))) SETTINGS skip_unavailable_shards=1",
           "intervalFactor": 2,
-          "query": "SELECT\r\n    t,\r\n    arrayMap(a -> (a.1, a.2 / runningDifference(t / 1000)), groupArr)\r\nFROM (\r\n    SELECT t, groupArray((query, c)) AS groupArr\r\n    FROM (\r\n        SELECT\r\n            (intDiv(toUInt32(event_time), 2) * 2) * 1000 AS t,\r\n            substring(query, 1, 45) AS query,\r\n            count() c\r\n        FROM $table\r\n        WHERE $timeFilter\r\n        AND cityHash64(query) GLOBAL IN (\r\n            SELECT cityHash64(substring(query, 1, 45)) AS h\r\n            FROM $table\r\n            WHERE $timeFilter\r\n                AND type IN ($type)\r\n                AND initial_user IN ($user)\r\n                AND ('$query_type' = 'all' OR (positionCaseInsensitive(query, '$query_type') = 1))\r\n            GROUP BY h\r\n            ORDER BY count() DESC\r\n            LIMIT $top\r\n            SETTINGS skip_unavailable_shards=1\r\n        )\r\n            AND type IN ($type)\r\n            AND initial_user IN ($user)\r\n            AND ('$query_type' = 'all' OR (positionCaseInsensitive(query, '$query_type') = 1))\r\n        GROUP BY t, query\r\n        ORDER BY t\r\n    )\r\n    GROUP BY t\r\n    ORDER BY t\r\n) SETTINGS skip_unavailable_shards=1",
+          "query": "SELECT\r\n    t,\r\n    arrayMap(a -> (a.1, a.2 / runningDifference(t / 1000)), groupArr)\r\nFROM (\r\n    SELECT t, groupArray((query, c)) AS groupArr\r\n    FROM (\r\n        SELECT\r\n            (intDiv(toUInt32(event_time), 2) * 2) * 1000 AS t,\r\n            substring(query, 1, 45) AS query,\r\n            count() c\r\n        FROM cluster('all-sharded',system.query_log)\r\n        WHERE $timeFilter\r\n        AND cityHash64(query) GLOBAL IN (\r\n            SELECT cityHash64(substring(query, 1, 45)) AS h\r\n            FROM cluster('all-sharded',system.query_log)\r\n            WHERE $timeFilter\r\n                AND type IN ($type)\r\n                AND initial_user IN ($user)\r\n                AND ('$query_type' = 'all' OR (positionCaseInsensitive(query, '$query_type') = 1))\r\n            GROUP BY h\r\n            ORDER BY count() DESC\r\n            LIMIT $top\r\n            SETTINGS skip_unavailable_shards=1\r\n        )\r\n            AND type IN ($type)\r\n            AND initial_user IN ($user)\r\n            AND ('$query_type' = 'all' OR (positionCaseInsensitive(query, '$query_type') = 1))\r\n        GROUP BY t, query\r\n        ORDER BY t\r\n    )\r\n    GROUP BY t\r\n    ORDER BY t\r\n) SETTINGS skip_unavailable_shards=1",
           "rawQuery": "SELECT     t,     arrayMap(a -> (a.1, a.2 / runningDifference(t / 1000)), groupArr) FROM (     SELECT t, groupArray((query, c)) AS groupArr     FROM (         SELECT             (intDiv(toUInt32(event_time), 2) * 2) * 1000 AS t,             substring(query, 1, 45) AS query,             count() c         FROM cluster('all-sharded',system.query_log)         WHERE event_date >= toDate(1586192379) AND event_time >= toDateTime(1586192379)         AND cityHash64(query) GLOBAL IN (             SELECT cityHash64(substring(query, 1, 45)) AS h             FROM cluster('all-sharded',system.query_log)             WHERE event_date >= toDate(1586192379) AND event_time >= toDateTime(1586192379)                 AND type IN (1,2,3,4)                 AND initial_user IN ('default')                 AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))             GROUP BY h             ORDER BY count() DESC             LIMIT 5             SETTINGS skip_unavailable_shards=1         )             AND type IN (1,2,3,4)             AND initial_user IN ('default')             AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))         GROUP BY t, query         ORDER BY t     )     GROUP BY t     ORDER BY t ) SETTINGS skip_unavailable_shards=1",
           "refId": "A",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         }
       ],
@@ -281,7 +281,7 @@
       ],
       "targets": [
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
@@ -289,14 +289,14 @@
           "datetimeLoading": false,
           "expr": "",
           "format": "table",
-          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"navajowhite\">rand</font>() <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">substring</font>(query,  <font color=\"cornflowerblue\">1</font>,  <font color=\"cornflowerblue\">70</font>) <font color=\"darkorange\">AS</font> query,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms) duration,<br />    <font color=\"navajowhite\">count</font>() <font color=\"navajowhite\">count</font><br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">GROUP BY</font> query<br /><font color=\"darkorange\">ORDER BY</font> duration <font color=\"darkorange\">desc</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"darkcyan\">$top</font>",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"navajowhite\">rand</font>() <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">substring</font>(query,  <font color=\"cornflowerblue\">1</font>,  <font color=\"cornflowerblue\">70</font>) <font color=\"darkorange\">AS</font> query,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms) duration,<br />    <font color=\"navajowhite\">count</font>() <font color=\"navajowhite\">count</font><br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">cluster('all-sharded',system.query_log)</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">GROUP BY</font> query<br /><font color=\"darkorange\">ORDER BY</font> duration <font color=\"darkorange\">desc</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"darkcyan\">$top</font>",
           "intervalFactor": 2,
-          "query": "SELECT\n    rand() as t,\n    substring(query,  1,  70) AS query,\n    avg(query_duration_ms) duration,\n    count() count\nFROM $table\nWHERE\n    $timeFilter\n    AND type in ($type)\n    and initial_user in ($user)\n    and('$query_type' = 'all' or(positionCaseInsensitive(query,  '$query_type') = 1))\nGROUP BY query\nORDER BY duration desc\nLIMIT $top",
+          "query": "SELECT\n    rand() as t,\n    substring(query,  1,  70) AS query,\n    avg(query_duration_ms) duration,\n    count() count\nFROM cluster('all-sharded',system.query_log)\nWHERE\n    $timeFilter\n    AND type in ($type)\n    and initial_user in ($user)\n    and('$query_type' = 'all' or(positionCaseInsensitive(query,  '$query_type') = 1))\nGROUP BY query\nORDER BY duration desc\nLIMIT $top",
           "rawQuery": "SELECT     t,     arrayMap(a -> (a.1, a.2 / runningDifference(t / 1000)), groupArr) FROM (     SELECT t, groupArray((query, c)) AS groupArr     FROM (         SELECT             (intDiv(toUInt32(event_time), 2) * 2) * 1000 AS t,             substring(query, 1, 45) AS query,             count() c         FROM cluster('all-sharded',system.query_log)         WHERE event_date >= toDate(1586234275) AND event_time >= toDateTime(1586234275)         AND cityHash64(query) GLOBAL IN (             SELECT cityHash64(substring(query, 1, 45)) AS h             FROM cluster('all-sharded',system.query_log)             WHERE event_date >= toDate(1586234275) AND event_time >= toDateTime(1586234275)                 AND type IN (1,2,3,4)                 AND initial_user IN ('default')                 AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))             GROUP BY h             ORDER BY count() DESC             LIMIT 5             SETTINGS skip_unavailable_shards=1         )             AND type IN (1,2,3,4)             AND initial_user IN ('default')             AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))         GROUP BY t, query         ORDER BY t     )     GROUP BY t     ORDER BY t ) SETTINGS skip_unavailable_shards=1",
           "refId": "A",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         }
       ],
@@ -379,7 +379,7 @@
       ],
       "targets": [
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
@@ -387,14 +387,14 @@
           "datetimeLoading": false,
           "expr": "",
           "format": "table",
-          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"navajowhite\">rand</font>() <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">substring</font>(query,  <font color=\"cornflowerblue\">1</font>,  <font color=\"cornflowerblue\">70</font>) <font color=\"darkorange\">AS</font> query,<br />    <font color=\"navajowhite\">avg</font>(memory_usage) usage,<br />    <font color=\"navajowhite\">count</font>() <font color=\"navajowhite\">count</font><br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">GROUP BY</font> query<br /><font color=\"darkorange\">ORDER BY</font> usage <font color=\"darkorange\">desc</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"darkcyan\">$top</font>",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"navajowhite\">rand</font>() <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">substring</font>(query,  <font color=\"cornflowerblue\">1</font>,  <font color=\"cornflowerblue\">70</font>) <font color=\"darkorange\">AS</font> query,<br />    <font color=\"navajowhite\">avg</font>(memory_usage) usage,<br />    <font color=\"navajowhite\">count</font>() <font color=\"navajowhite\">count</font><br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">cluster('all-sharded',system.query_log)</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">GROUP BY</font> query<br /><font color=\"darkorange\">ORDER BY</font> usage <font color=\"darkorange\">desc</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"darkcyan\">$top</font>",
           "intervalFactor": 2,
-          "query": "SELECT\n    rand() as t,\n    substring(query,  1,  70) AS query,\n    avg(memory_usage) usage,\n    count() count\nFROM $table\nWHERE\n    $timeFilter\n    AND type IN ($type)\n    AND initial_user IN ($user)\n    AND ('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nGROUP BY query\nORDER BY usage DESC\nLIMIT $top",
+          "query": "SELECT\n    rand() as t,\n    substring(query,  1,  70) AS query,\n    avg(memory_usage) usage,\n    count() count\nFROM cluster('all-sharded',system.query_log)\nWHERE\n    $timeFilter\n    AND type IN ($type)\n    AND initial_user IN ($user)\n    AND ('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nGROUP BY query\nORDER BY usage DESC\nLIMIT $top",
           "rawQuery": "SELECT     t,     arrayMap(a -> (a.1, a.2 / runningDifference(t / 1000)), groupArr) FROM (     SELECT t, groupArray((query, c)) AS groupArr     FROM (         SELECT             (intDiv(toUInt32(event_time), 2) * 2) * 1000 AS t,             substring(query, 1, 45) AS query,             count() c         FROM cluster('all-sharded',system.query_log)         WHERE event_date >= toDate(1586234300) AND event_time >= toDateTime(1586234300)         AND cityHash64(query) GLOBAL IN (             SELECT cityHash64(substring(query, 1, 45)) AS h             FROM cluster('all-sharded',system.query_log)             WHERE event_date >= toDate(1586234300) AND event_time >= toDateTime(1586234300)                 AND type IN (1,2,3,4)                 AND initial_user IN ('default')                 AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))             GROUP BY h             ORDER BY count() DESC             LIMIT 5             SETTINGS skip_unavailable_shards=1         )             AND type IN (1,2,3,4)             AND initial_user IN ('default')             AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))         GROUP BY t, query         ORDER BY t     )     GROUP BY t     ORDER BY t ) SETTINGS skip_unavailable_shards=1",
           "refId": "A",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         }
       ],
@@ -477,7 +477,7 @@
       ],
       "targets": [
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
@@ -485,14 +485,14 @@
           "datetimeLoading": false,
           "expr": "",
           "format": "table",
-          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"navajowhite\">rand</font>() <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">substring</font>(query,  <font color=\"cornflowerblue\">1</font>,  <font color=\"cornflowerblue\">70</font>) <font color=\"darkorange\">AS</font> query,<br />    <font color=\"darkorange\">type</font>,<br />    <font color=\"navajowhite\">count</font>() <font color=\"navajowhite\">count</font><br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"cornflowerblue\">3</font>,<font color=\"cornflowerblue\">4</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">GROUP BY</font><br />    query,<br />    <font color=\"darkorange\">type</font><br /><font color=\"darkorange\">ORDER BY</font> <font color=\"navajowhite\">count</font> <font color=\"darkorange\">desc</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"darkcyan\">$top</font>",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"navajowhite\">rand</font>() <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">substring</font>(query,  <font color=\"cornflowerblue\">1</font>,  <font color=\"cornflowerblue\">70</font>) <font color=\"darkorange\">AS</font> query,<br />    <font color=\"darkorange\">type</font>,<br />    <font color=\"navajowhite\">count</font>() <font color=\"navajowhite\">count</font><br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">cluster('all-sharded',system.query_log)</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"cornflowerblue\">3</font>,<font color=\"cornflowerblue\">4</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">GROUP BY</font><br />    query,<br />    <font color=\"darkorange\">type</font><br /><font color=\"darkorange\">ORDER BY</font> <font color=\"navajowhite\">count</font> <font color=\"darkorange\">desc</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"darkcyan\">$top</font>",
           "intervalFactor": 2,
-          "query": "SELECT\n    rand() as t,\n    substring(query,  1,  70) AS query,\n    type,\n    count() count\nFROM $table\nWHERE\n    $timeFilter\n    AND type IN (3,4)\n    AND initial_user IN ($user)\n    AND ('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nGROUP BY\n    query,\n    type\nORDER BY count desc\nLIMIT $top",
+          "query": "SELECT\n    rand() as t,\n    substring(query,  1,  70) AS query,\n    type,\n    count() count\nFROM cluster('all-sharded',system.query_log)\nWHERE\n    $timeFilter\n    AND type IN (3,4)\n    AND initial_user IN ($user)\n    AND ('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nGROUP BY\n    query,\n    type\nORDER BY count desc\nLIMIT $top",
           "rawQuery": "SELECT     t,     arrayMap(a -> (a.1, a.2 / runningDifference(t / 1000)), groupArr) FROM (     SELECT t, groupArray((query, c)) AS groupArr     FROM (         SELECT             (intDiv(toUInt32(event_time), 2) * 2) * 1000 AS t,             substring(query, 1, 45) AS query,             count() c         FROM cluster('all-sharded',system.query_log)         WHERE event_date >= toDate(1586234335) AND event_time >= toDateTime(1586234335)         AND cityHash64(query) GLOBAL IN (             SELECT cityHash64(substring(query, 1, 45)) AS h             FROM cluster('all-sharded',system.query_log)             WHERE event_date >= toDate(1586234335) AND event_time >= toDateTime(1586234335)                 AND type IN (1,2,3,4)                 AND initial_user IN ('default')                 AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))             GROUP BY h             ORDER BY count() DESC             LIMIT 5             SETTINGS skip_unavailable_shards=1         )             AND type IN (1,2,3,4)             AND initial_user IN ('default')             AND ('all' = 'all' OR (positionCaseInsensitive(query, 'all') = 1))         GROUP BY t, query         ORDER BY t     )     GROUP BY t     ORDER BY t ) SETTINGS skip_unavailable_shards=1",
           "refId": "A",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         }
       ],
@@ -557,7 +557,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
@@ -565,15 +565,15 @@
           "datetimeLoading": false,
           "expr": "",
           "format": "time_series",
-          "formattedQuery": "<font color=\"darkcyan\">$rate</font>(<font color=\"navajowhite\">count</font>() c)<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">where</font>  <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))",
+          "formattedQuery": "<font color=\"darkcyan\">$rate</font>(<font color=\"navajowhite\">count</font>() c)<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">cluster('all-sharded',system.query_log)</font><br /><font color=\"darkorange\">where</font>  <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))",
           "interval": "",
           "intervalFactor": 2,
-          "query": "$rate(count() c)\nFROM $table\nWHERE  type IN($type)\n    AND initial_user IN ($user)\n    AND ('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))",
+          "query": "$rate(count() c)\nFROM cluster('all-sharded',system.query_log)\nWHERE  type IN($type)\n    AND initial_user IN ($user)\n    AND ('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))",
           "rawQuery": "SELECT t, c/runningDifference(t/1000) cRate FROM ( SELECT (intDiv(toUInt32(event_time), 120) * 120) * 1000 AS t, count() c FROM cluster('all-sharded',system.query_log) WHERE event_date >= toDate(1586192459) AND event_time >= toDateTime(1586192459) AND  type IN (1,2,3,4)     AND initial_user IN ('default')     AND ('all' = 'all' OR (positionCaseInsensitive(query,  'all') = 1)) GROUP BY t ORDER BY t)",
           "refId": "A",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         }
       ],
@@ -681,7 +681,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
@@ -689,18 +689,18 @@
           "datetimeLoading": false,
           "expr": "",
           "format": "time_series",
-          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms)  select_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br />    <font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'select'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms)  select_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">cluster('all-sharded',system.query_log)</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br />    <font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'select'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
           "intervalFactor": 2,
-          "query": "SELECT\n    $timeSeries as t,\n    quantile(0.5)(query_duration_ms)  select_quantile_50,\n    quantile(0.9)(query_duration_ms)  select_quantile_90\nFROM $table\nWHERE\n    $timeFilter\n    AND type = 2\n    AND positionCaseInsensitive(query,  'select') = 1\n    AND initial_user IN ($user)\nGROUP BY t\nORDER BY t",
+          "query": "SELECT\n    $timeSeries as t,\n    quantile(0.5)(query_duration_ms)  select_quantile_50,\n    quantile(0.9)(query_duration_ms)  select_quantile_90\nFROM cluster('all-sharded',system.query_log)\nWHERE\n    $timeFilter\n    AND type = 2\n    AND positionCaseInsensitive(query,  'select') = 1\n    AND initial_user IN ($user)\nGROUP BY t\nORDER BY t",
           "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     quantile(0.5)(query_duration_ms)  select_quantile_50,     quantile(0.9)(query_duration_ms)  select_quantile_90 FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1595573984) AND event_time >= toDateTime(1595573984)     AND type = 2     AND positionCaseInsensitive(query,  'select') = 1     AND initial_user IN ('default') GROUP BY t ORDER BY t",
           "refId": "A",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         },
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
@@ -708,14 +708,14 @@
           "datetimeLoading": false,
           "expr": "",
           "format": "time_series",
-          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms) insert_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br /><font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'insert into'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    <font color=\"darkcyan\">$timeSeries</font> <font color=\"darkorange\">as</font> t,<br />    <font color=\"navajowhite\">avg</font>(query_duration_ms) insert_duration<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">cluster('all-sharded',system.query_log)</font><br /><font color=\"darkorange\">WHERE</font><br />    <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">2</font><br /><font color=\"yellow\">and</font> positionCaseInsensitive(query,  <font color=\"lightgreen\">'insert into'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font><br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br /><font color=\"darkorange\">GROUP BY</font> t<br /><font color=\"darkorange\">ORDER BY</font> t",
           "intervalFactor": 2,
-          "query": "SELECT\n    $timeSeries as t,\n    quantile(0.5)(query_duration_ms) insert_quantile_50,\n    quantile(0.9)(query_duration_ms) insert_quantile_90\nFROM $table\nWHERE\n    $timeFilter\n    AND type = 2\nand positionCaseInsensitive(query,  'insert into') = 1\n    and initial_user in ($user)\nGROUP BY t\nORDER BY t",
+          "query": "SELECT\n    $timeSeries as t,\n    quantile(0.5)(query_duration_ms) insert_quantile_50,\n    quantile(0.9)(query_duration_ms) insert_quantile_90\nFROM cluster('all-sharded',system.query_log)\nWHERE\n    $timeFilter\n    AND type = 2\nand positionCaseInsensitive(query,  'insert into') = 1\n    and initial_user in ($user)\nGROUP BY t\nORDER BY t",
           "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     quantile(0.5)(query_duration_ms) insert_quantile_50,     quantile(0.9)(query_duration_ms) insert_quantile_90 FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1595573984) AND event_time >= toDateTime(1595573984)     AND type = 2 and positionCaseInsensitive(query,  'insert into') = 1     and initial_user in ('default') GROUP BY t ORDER BY t",
           "refId": "B",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         }
       ],
@@ -849,21 +849,21 @@
       ],
       "targets": [
         {
-          "database": "",
+          "database": "system",
           "dateColDataType": "event_date",
           "dateLoading": false,
           "dateTimeColDataType": "event_time",
           "dateTimeType": "DATETIME",
           "datetimeLoading": false,
           "format": "time_series",
-          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    event_time,<br />    user,<br />    query_duration_ms duration,<br />    memory_usage memory,<br />    if(exception<font color=\"yellow\">!=</font><font color=\"lightgreen\">''</font>, <font color=\"lightgreen\">'fail'</font>, <font color=\"lightgreen\">'success'</font>) result,<br />    <font color=\"navajowhite\">concat</font>(<font color=\"navajowhite\">substring</font>(query,<font color=\"cornflowerblue\">1</font>,<font color=\"cornflowerblue\">120</font>), <font color=\"lightgreen\">'...'</font>) query<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">$table</font><br /><font color=\"darkorange\">WHERE</font> <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">ORDER BY</font> event_time <font color=\"darkorange\">DESC</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"cornflowerblue\">1000</font>",
+          "formattedQuery": "<font color=\"darkorange\">SELECT</font><br />    event_time,<br />    user,<br />    query_duration_ms duration,<br />    memory_usage memory,<br />    if(exception<font color=\"yellow\">!=</font><font color=\"lightgreen\">''</font>, <font color=\"lightgreen\">'fail'</font>, <font color=\"lightgreen\">'success'</font>) result,<br />    <font color=\"navajowhite\">concat</font>(<font color=\"navajowhite\">substring</font>(query,<font color=\"cornflowerblue\">1</font>,<font color=\"cornflowerblue\">120</font>), <font color=\"lightgreen\">'...'</font>) query<br /><font color=\"darkorange\">FROM</font> <font color=\"darkcyan\">cluster('all-sharded',system.query_log)</font><br /><font color=\"darkorange\">WHERE</font> <font color=\"darkcyan\">$timeFilter</font><br />    <font color=\"yellow\">AND</font> <font color=\"darkorange\">type</font> <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$type</font>)<br />    <font color=\"yellow\">and</font> initial_user <font color=\"darkorange\">in</font> (<font color=\"darkcyan\">$user</font>)<br />    <font color=\"yellow\">and</font>(<font color=\"lightgreen\">'$query_type'</font> <font color=\"yellow\">=</font> <font color=\"lightgreen\">'all'</font> <font color=\"yellow\">or</font>(positionCaseInsensitive(query,  <font color=\"lightgreen\">'$query_type'</font>) <font color=\"yellow\">=</font> <font color=\"cornflowerblue\">1</font>))<br /><font color=\"darkorange\">ORDER BY</font> event_time <font color=\"darkorange\">DESC</font><br /><font color=\"darkorange\">LIMIT</font> <font color=\"cornflowerblue\">1000</font>",
           "intervalFactor": 1,
-          "query": "SELECT\n    event_time,\n    hostName() host,\n    user,\n    query_duration_ms duration,\n    memory_usage memory,\n    if(exception!='', 'fail', 'success') result,\n    concat(substring(query,1,120), '...') query\nFROM $table\nWHERE $timeFilter\n    AND type in ($type)\n    and initial_user in ($user)\n    and('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nORDER BY event_time DESC\nLIMIT 1000",
+          "query": "SELECT\n    event_time,\n    hostName() host,\n    user,\n    query_duration_ms duration,\n    memory_usage memory,\n    if(exception!='', 'fail', 'success') result,\n    concat(substring(query,1,120), '...') query\nFROM cluster('all-sharded',system.query_log)\nWHERE $timeFilter\n    AND type in ($type)\n    and initial_user in ($user)\n    and('$query_type' = 'all' OR (positionCaseInsensitive(query,  '$query_type') = 1))\nORDER BY event_time DESC\nLIMIT 1000",
           "rawQuery": "SELECT     (intDiv(toUInt32(event_time), 10) * 10) * 1000 as t,     avg(query_duration_ms)  select_duration FROM cluster('all-sharded',system.query_log) WHERE     event_date >= toDate(1586232299) AND event_time >= toDateTime(1586232299)     AND type = 2     and positionCaseInsensitive(query,  'select') = 1     and initial_user in ('default') GROUP BY t ORDER BY t",
           "refId": "A",
           "resultFormat": "time_series",
           "round": "0s",
-          "table": "cluster('all-sharded',system.query_log)",
+          "table": "query_log",
           "tableLoading": false
         }
       ],
