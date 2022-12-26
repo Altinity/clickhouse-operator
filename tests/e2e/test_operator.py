@@ -3207,6 +3207,55 @@ def test_037(self):
         assert r == "10000"
 
 
+@TestCheck
+def test_038(self, step=1):
+    """Check clickhouse-operator support secure inter-cluster communications."""
+    cluster = "secret-ref"
+    manifest = f"manifests/chi/test-038-{step}-secure-inter-cluster-communications.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    "manifests/secret/test-038-secret.yaml"
+                },
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I create distributed table using secure port"):
+        clickhouse.query(chi, f"CREATE TABLE IF NOT EXISTS secure_dist on cluster '{cluster}' (x String)"
+                              f" ENGINE = Distributed('{cluster}', default, secure)")
+
+
+@TestScenario
+@Requirements()
+@Name("test_038_1. secure inter-cluster communications")
+def test_038_1(self):
+    """Check clickhouse-operator support secure inter-cluster communications."""
+    test_038(step=1)
+
+
+@TestScenario
+@Requirements()
+@Name("test_038_2. secure inter-cluster communications")
+def test_038_2(self):
+    """Check clickhouse-operator support secure inter-cluster communications."""
+    test_038(step=2)
+
+
+@TestScenario
+@Requirements()
+@Name("test_038_3. secure inter-cluster communications")
+def test_038_3(self):
+    """Check clickhouse-operator support secure inter-cluster communications."""
+    test_038(step=3)
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(

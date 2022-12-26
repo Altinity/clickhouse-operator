@@ -1,0 +1,50 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-038-secure-communications"
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  defaults:
+    templates:
+      podTemplate: pod-distribution
+
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+      - name: "secret-ref"
+        secret:
+          auto: "true"
+        layout:
+          shardsCount: 1
+          replicas:
+            - templates:
+                hostTemplate: replica-0
+            - templates:
+                hostTemplate: replica-1
+
+  templates:
+    hostTemplates:
+      - name: replica-0
+        spec:
+          tcpPort: 9000
+          httpPort: 10001
+          secure: true
+          interserverHTTPPort: 10002
+      - name: replica-1
+        spec:
+          tcpPort: 9001
+          httpPort: 11001
+          secure: true
+          interserverHTTPPort: 11002
+
+    podTemplates:
+      - name: pod-distribution
+        spec:
+          hostNetwork: true
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.8
