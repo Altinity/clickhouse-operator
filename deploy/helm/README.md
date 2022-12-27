@@ -10,9 +10,16 @@ The ClickHouse Operator creates, configures and manages ClickHouse clusters runn
 
 ## Maintainers
 
-| Name | Email | Url |
-| ---- | ------ | --- |
-| altinity | <support@altinity.com> |  |
+| Name | Email | Url                                                    |
+| ---- | ------ |--------------------------------------------------------|
+| altinity | <support@altinity.com> | https://github.com/Altinity/clickhouse-operator/issues |
+
+
+## Installation 
+```bash
+helm repo add clickhouse-operator https://docs.altinity.com/clickhouse-operator/
+helm install clickhouse-operator clickhouse-operator/altinity-clickhouse-operator
+```
 
 ## Values
 
