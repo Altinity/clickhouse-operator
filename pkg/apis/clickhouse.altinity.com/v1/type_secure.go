@@ -14,8 +14,13 @@
 
 package v1
 
-// Secure specifies secure type
+// Secure specifies secure data type.
 type Secure bool
+
+// HasValue checks whether secure has value specified
+func (s *Secure) HasValue() bool {
+	return s != nil
+}
 
 // Value gets bool value of secure
 func (s *Secure) Value() bool {
