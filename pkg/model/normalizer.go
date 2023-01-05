@@ -233,7 +233,7 @@ func (n *Normalizer) fillCHIAddressInfo() {
 		clusterScopeCycleOffset int,
 
 		clusterIndex int,
-		cluster *chiV1.ChiCluster,
+		cluster *chiV1.Cluster,
 
 		shardIndex int,
 		shard *chiV1.ChiShard,
@@ -810,7 +810,7 @@ func (n *Normalizer) normalizeUseTemplate(useTemplate *chiV1.ChiUseTemplate) {
 }
 
 // normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
+func (n *Normalizer) normalizeClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
 
@@ -823,23 +823,25 @@ func (n *Normalizer) normalizeClusters(clusters []*chiV1.ChiCluster) []*chiV1.Ch
 }
 
 // newDefaultCluster
-func (n *Normalizer) newDefaultCluster() *chiV1.ChiCluster {
-	return &chiV1.ChiCluster{
+func (n *Normalizer) newDefaultCluster() *chiV1.Cluster {
+	return &chiV1.Cluster{
 		Name: "cluster",
 	}
 }
 
 // ensureClusters
-func (n *Normalizer) ensureClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
+func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster {
 	if len(clusters) > 0 {
 		return clusters
 	}
 
 	if n.ctx.options.WithDefaultCluster {
-		return []*chiV1.ChiCluster{n.newDefaultCluster()}
+		return []*chiV1.Cluster{
+			n.newDefaultCluster(),
+		}
 	}
 
-	return []*chiV1.ChiCluster{}
+	return []*chiV1.Cluster{}
 }
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
@@ -956,7 +958,7 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 
 const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
 
-func (n *Normalizer) appendClusterSecretEnvVar(cluster *chiV1.ChiCluster) {
+func (n *Normalizer) appendClusterSecretEnvVar(cluster *chiV1.Cluster) {
 	switch cluster.Secret.Source() {
 	case chiV1.ClusterSecretSourcePlaintext:
 		// Secret has explicit value, it is not passed via ENV vars
@@ -1289,7 +1291,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiV1.Settings) *chiV1.S
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiCluster {
+func (n *Normalizer) normalizeCluster(cluster *chiV1.Cluster) *chiV1.Cluster {
 	if cluster == nil {
 		cluster = n.newDefaultCluster()
 	}
@@ -1340,7 +1342,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 }
 
 // createHostsField
-func (n *Normalizer) createHostsField(cluster *chiV1.ChiCluster) {
+func (n *Normalizer) createHostsField(cluster *chiV1.Cluster) {
 	cluster.Layout.HostsField = chiV1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
 	// Need to migrate hosts from Shards and Replicas into HostsField
@@ -1490,7 +1492,7 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *chiV1.ChiClusterLayout)
 }
 
 // normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *chiV1.ChiShard, cluster *chiV1.ChiCluster, shardIndex int) {
+func (n *Normalizer) normalizeShard(shard *chiV1.ChiShard, cluster *chiV1.Cluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
@@ -1507,7 +1509,7 @@ func (n *Normalizer) normalizeShard(shard *chiV1.ChiShard, cluster *chiV1.ChiClu
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *chiV1.ChiReplica, cluster *chiV1.ChiCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplica(replica *chiV1.ChiReplica, cluster *chiV1.Cluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
@@ -1591,7 +1593,7 @@ func (n *Normalizer) normalizeShardWeight(shard *chiV1.ChiShard) {
 }
 
 // normalizeShardHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardHosts(shard *chiV1.ChiShard, cluster *chiV1.ChiCluster, shardIndex int) {
+func (n *Normalizer) normalizeShardHosts(shard *chiV1.ChiShard, cluster *chiV1.Cluster, shardIndex int) {
 	// Use hosts from HostsField
 	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
@@ -1604,7 +1606,7 @@ func (n *Normalizer) normalizeShardHosts(shard *chiV1.ChiShard, cluster *chiV1.C
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaHosts(replica *chiV1.ChiReplica, cluster *chiV1.ChiCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplicaHosts(replica *chiV1.ChiReplica, cluster *chiV1.Cluster, replicaIndex int) {
 	// Use hosts from HostsField
 	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {
@@ -1621,7 +1623,7 @@ func (n *Normalizer) normalizeHost(
 	host *chiV1.ChiHost,
 	shard *chiV1.ChiShard,
 	replica *chiV1.ChiReplica,
-	cluster *chiV1.ChiCluster,
+	cluster *chiV1.Cluster,
 	shardIndex int,
 	replicaIndex int,
 ) {

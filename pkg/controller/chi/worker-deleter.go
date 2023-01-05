@@ -62,7 +62,7 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstalla
 	w.a.V(1).M(chi).F().S().Info("drop replicas based on AP")
 	cnt := 0
 	ap.WalkRemoved(
-		func(cluster *chiV1.ChiCluster) {
+		func(cluster *chiV1.Cluster) {
 		},
 		func(shard *chiV1.ChiShard) {
 		},
@@ -252,7 +252,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 	})
 
 	// Delete all clusters
-	chi.WalkClusters(func(cluster *chiV1.ChiCluster) error {
+	chi.WalkClusters(func(cluster *chiV1.Cluster) error {
 		return w.deleteCluster(ctx, chi, cluster)
 	})
 
@@ -448,7 +448,7 @@ func (w *worker) deleteShard(ctx context.Context, chi *chiV1.ClickHouseInstallat
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 // chi is the new CHI in which there will be no more this cluster
-func (w *worker) deleteCluster(ctx context.Context, chi *chiV1.ClickHouseInstallation, cluster *chiV1.ChiCluster) error {
+func (w *worker) deleteCluster(ctx context.Context, chi *chiV1.ClickHouseInstallation, cluster *chiV1.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

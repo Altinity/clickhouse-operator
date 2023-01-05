@@ -124,7 +124,7 @@ func (l *Labeler) getServiceCHI(chi *chiv1.ClickHouseInstallation) map[string]st
 }
 
 // getServiceCluster
-func (l *Labeler) getServiceCluster(cluster *chiv1.ChiCluster) map[string]string {
+func (l *Labeler) getServiceCluster(cluster *chiv1.Cluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getClusterScope(cluster),
 		map[string]string{
@@ -174,13 +174,13 @@ func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
 }
 
 // getClusterScope gets labels for Cluster-scoped object
-func (l *Labeler) getClusterScope(cluster *chiv1.ChiCluster) map[string]string {
+func (l *Labeler) getClusterScope(cluster *chiv1.Cluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorClusterScope(cluster)))
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
-func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
+func getSelectorClusterScope(cluster *chiv1.Cluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   labelsNamer.getNamePartNamespace(cluster),
@@ -191,7 +191,7 @@ func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 }
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
-func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
+func getSelectorClusterScopeReady(cluster *chiv1.Cluster) map[string]string {
 	return appendKeyReady(getSelectorClusterScope(cluster))
 }
 

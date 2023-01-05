@@ -209,7 +209,7 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 }
 
 // GetCluster gets cluster
-func (host *ChiHost) GetCluster() *ChiCluster {
+func (host *ChiHost) GetCluster() *Cluster {
 	// Host has to have filled Address
 	return host.GetCHI().FindCluster(host.Address.ClusterName)
 }

@@ -114,7 +114,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 		clusterScopeCycleOffset int,
 
 		clusterIndex int,
-		cluster *ChiCluster,
+		cluster *Cluster,
 
 		shardIndex int,
 		shard *ChiShard,
@@ -185,7 +185,7 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 		clusterScopeCycleOffset int,
 
 		clusterIndex int,
-		cluster *ChiCluster,
+		cluster *Cluster,
 
 		shardIndex int,
 		shard *ChiShard,
@@ -205,7 +205,7 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 
 // WalkClustersFullPath walks clusters with full path
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
-	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error,
+	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error,
 ) []error {
 	res := make([]error, 0)
 
@@ -217,7 +217,7 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 }
 
 // WalkClusters walks clusters
-func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *ChiCluster) error) []error {
+func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *Cluster) error) []error {
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -232,7 +232,7 @@ func (chi *ClickHouseInstallation) WalkShardsFullPath(
 	f func(
 		chi *ClickHouseInstallation,
 		clusterIndex int,
-		cluster *ChiCluster,
+		cluster *Cluster,
 		shardIndex int,
 		shard *ChiShard,
 	) error,
@@ -289,7 +289,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 		clusterScopeCycleOffset int,
 
 		clusterIndex int,
-		cluster *ChiCluster,
+		cluster *Cluster,
 
 		shardIndex int,
 		shard *ChiShard,
@@ -410,7 +410,7 @@ func (chi *ClickHouseInstallation) WalkHostsTillError(f func(host *ChiHost) erro
 func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
 	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
-	fCluster func(ctx context.Context, cluster *ChiCluster) error,
+	fCluster func(ctx context.Context, cluster *Cluster) error,
 	fShard func(ctx context.Context, shard *ChiShard) error,
 	fHost func(ctx context.Context, host *ChiHost) error,
 	fCHI func(ctx context.Context, chi *ClickHouseInstallation) error,
@@ -523,9 +523,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 }
 
 // FindCluster finds cluster by name or index
-func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *ChiCluster {
-	var resultCluster *ChiCluster
-	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error {
+func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *Cluster {
+	var resultCluster *Cluster
+	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error {
 		switch v := needle.(type) {
 		case string:
 			if cluster.Name == v {
@@ -552,7 +552,7 @@ func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleSh
 // ClustersCount counts clusters
 func (chi *ClickHouseInstallation) ClustersCount() int {
 	count := 0
-	chi.WalkClusters(func(cluster *ChiCluster) error {
+	chi.WalkClusters(func(cluster *Cluster) error {
 		count++
 		return nil
 	})
