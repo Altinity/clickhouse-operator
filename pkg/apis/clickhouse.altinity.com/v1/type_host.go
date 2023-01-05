@@ -47,37 +47,6 @@ type ChiHost struct {
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
-// Secure specifies secure type
-type Secure bool
-
-// Value gets bool value of secure
-func (s *Secure) Value() bool {
-	if s == nil {
-		return false
-	}
-
-	return *s == true
-}
-
-// MergeFrom merges value from specified Secure
-func (s *Secure) MergeFrom(from *Secure) *Secure {
-	if from == nil {
-		// Nothing to merge from, keep original value
-		return s
-	}
-
-	// From now on we have `from` specified
-
-	if s == nil {
-		// Recipient is not specified, just use `from` value
-		return from
-	}
-
-	// Both recipient and `from` are specified, need to pick one value.
-	// Prefer local value
-	return s
-}
-
 // InheritSettingsFrom inherits settings from specified shard and replica
 func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
