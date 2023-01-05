@@ -220,7 +220,10 @@ spec:
                     replicaServiceTemplate: replica-service-template
 
       - name: with-secret
-        # shared secret value to secure cluster communications
+        # Secure communication.
+        # Translates into <secure>1</secure> ClickHouse setting
+        secure: true
+        # Shared secret value to secure cluster communications
         secret:
           # Auto-generate shared secret value to secure cluster communications
           auto: "True"
