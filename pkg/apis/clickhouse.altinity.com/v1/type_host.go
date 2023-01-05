@@ -233,6 +233,6 @@ func (host *ChiHost) IsSecure() bool {
 		return host.Secure.Value()
 	}
 
-	// No personal value for host secure is set - need to fallback
-	return false
+	// No personal value for host secure is set - need to fallback to cluster value
+	return host.GetCluster().GetSecure().Value()
 }
