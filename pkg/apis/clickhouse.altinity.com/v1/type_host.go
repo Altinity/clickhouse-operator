@@ -228,5 +228,11 @@ func (host *ChiHost) IsSecure() bool {
 	if host == nil {
 		return false
 	}
-	return host.Secure.Value()
+
+	if host.Secure.HasValue() {
+		return host.Secure.Value()
+	}
+
+	// No personal value for host secure is set - need to fallback
+	return false
 }
