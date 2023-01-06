@@ -24,7 +24,7 @@ type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
 	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
-	Secure              *Secure           `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`

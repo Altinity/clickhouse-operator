@@ -59,6 +59,11 @@ func (s StringBool) String() string {
 	return string(s)
 }
 
+// HasValue checks whether value is specified
+func (s *StringBool) HasValue() bool {
+	return s != nil
+}
+
 // Value gets bool value
 func (s StringBool) Value() bool {
 	if s.IsTrue() {
@@ -196,4 +201,23 @@ func (s StringBool) Normalize(defaultValue bool) StringBool {
 	}
 
 	return StringBool(_false)
+}
+
+// MergeFrom merges value from another variable
+func (s *StringBool) MergeFrom(from *StringBool) *StringBool {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return s
+	}
+
+	// From now on we have `from` specified
+
+	if s == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to pick one value.
+	// Prefer local value
+	return s
 }
