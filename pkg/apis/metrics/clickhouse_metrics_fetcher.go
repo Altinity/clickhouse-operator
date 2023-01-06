@@ -15,7 +15,7 @@
 package metrics
 
 import (
-	sqlmodule "database/sql"
+	"database/sql"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -158,7 +158,7 @@ func (f *ClickHouseMetricsFetcher) getConnection() *clickhouse.Connection {
 func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics() (table, error) {
 	return f.clickHouseQueryScanRows(
 		queryMetricsSQL,
-		func(rows *sqlmodule.Rows, data *table) error {
+		func(rows *sql.Rows, data *table) error {
 			var metric, value, description, _type string
 			if err := rows.Scan(&metric, &value, &description, &_type); err == nil {
 				*data = append(*data, []string{metric, value, description, _type})
@@ -172,7 +172,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics() (table, error) {
 func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts() (table, error) {
 	return f.clickHouseQueryScanRows(
 		querySystemPartsSQL,
-		func(rows *sqlmodule.Rows, data *table) error {
+		func(rows *sql.Rows, data *table) error {
 			var database, table, active, partitions, parts, bytes, uncompressed, _rows,
 				metricDiskDataBytes, metricMemoryPrimaryKeyBytesAllocated string
 			if err := rows.Scan(
@@ -193,7 +193,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts() (table, error) {
 func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas() (table, error) {
 	return f.clickHouseQueryScanRows(
 		querySystemReplicasSQL,
-		func(rows *sqlmodule.Rows, data *table) error {
+		func(rows *sql.Rows, data *table) error {
 			var database, table, isSessionExpired string
 			if err := rows.Scan(&database, &table, &isSessionExpired); err == nil {
 				*data = append(*data, []string{database, table, isSessionExpired})
@@ -207,7 +207,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas() (table, er
 func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations() (table, error) {
 	return f.clickHouseQueryScanRows(
 		queryMutationsSQL,
-		func(rows *sqlmodule.Rows, data *table) error {
+		func(rows *sql.Rows, data *table) error {
 			var database, table, mutations, partsToDo string
 			if err := rows.Scan(&database, &table, &mutations, &partsToDo); err == nil {
 				*data = append(*data, []string{database, table, mutations, partsToDo})
@@ -221,7 +221,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations() (table, error) 
 func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks() (table, error) {
 	return f.clickHouseQueryScanRows(
 		querySystemDisksSQL,
-		func(rows *sqlmodule.Rows, data *table) error {
+		func(rows *sql.Rows, data *table) error {
 			var disk, freeBytes, totalBytes string
 			if err := rows.Scan(&disk, &freeBytes, &totalBytes); err == nil {
 				*data = append(*data, []string{disk, freeBytes, totalBytes})
@@ -235,7 +235,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks() (table, error
 func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts() (table, error) {
 	return f.clickHouseQueryScanRows(
 		queryDetachedPartsSQL,
-		func(rows *sqlmodule.Rows, data *table) error {
+		func(rows *sql.Rows, data *table) error {
 			var detachedParts, database, table, disk, reason string
 			if err := rows.Scan(&detachedParts, &database, &table, &disk, &reason); err == nil {
 				*data = append(*data, []string{detachedParts, database, table, disk, reason})
@@ -245,11 +245,7 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts() (table, err
 	)
 }
 
-type scanFunction func(
-	rows *sqlmodule.Rows,
-	data *table,
-) error
-
+type scanFunction func(rows *sql.Rows, data *table) error
 type table [][]string
 
 func newTable() table {
