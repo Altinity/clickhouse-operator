@@ -156,7 +156,7 @@ func (in *ChiHost) DeepCopyInto(out *ChiHost) {
 	*out = *in
 	if in.Secure != nil {
 		in, out := &in.Secure, &out.Secure
-		*out = new(Secure)
+		*out = new(StringBool)
 		**out = **in
 	}
 	if in.Settings != nil {
@@ -1038,6 +1038,11 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 	if in.SchemaPolicy != nil {
 		in, out := &in.SchemaPolicy, &out.SchemaPolicy
 		*out = new(SchemaPolicy)
+		**out = **in
+	}
+	if in.Secure != nil {
+		in, out := &in.Secure, &out.Secure
+		*out = new(StringBool)
 		**out = **in
 	}
 	if in.Secret != nil {
