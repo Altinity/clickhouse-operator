@@ -59,7 +59,7 @@ Operator creates, configures and manages ClickHouse clusters running on Kubernet
  
 ## License
 
-Copyright (c) 2019-2219, Altinity Ltd and/or its affiliates. All rights reserved.
+Copyright (c) 2019-2023, Altinity Inc and/or its affiliates. All rights reserved.
 
 Altinity Operator for ClickHouse is licensed under the Apache License 2.0.
 
