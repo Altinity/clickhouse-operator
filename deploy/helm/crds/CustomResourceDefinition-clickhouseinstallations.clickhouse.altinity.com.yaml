@@ -693,7 +693,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            !!merge <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -784,7 +784,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            !!merge <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -871,7 +871,7 @@ spec:
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               secure:
-                                type: boolean
+                                !!merge <<: *TypeStringBool
                                 description: |
                                   optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified
