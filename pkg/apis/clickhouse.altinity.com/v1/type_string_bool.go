@@ -45,6 +45,7 @@ const (
 	StringBoolEnabledLowercase     = "enabled"
 )
 
+// NewStringBool creates new StringBool variable with optional value
 func NewStringBool(value ...bool) *StringBool {
 	r := new(StringBool)
 	if len(value) > 0 {
@@ -57,12 +58,12 @@ func NewStringBool(value ...bool) *StringBool {
 	return r
 }
 
-// From casts bool to StringBool
+// From casts bool to a StringBool
 func (s *StringBool) From(value bool) *StringBool {
 	return NewStringBool(value)
 }
 
-// String casts StringBool to string
+// String casts StringBool to a string
 func (s *StringBool) String() string {
 	if s == nil {
 		return ""
@@ -75,7 +76,7 @@ func (s *StringBool) HasValue() bool {
 	return s != nil
 }
 
-// Value gets bool value
+// Value returns bool value
 func (s *StringBool) Value() bool {
 	if s == nil {
 		return false
@@ -155,7 +156,7 @@ func (s *StringBool) IsTrue() bool {
 	}
 }
 
-// CastTo01 casts string-bool into string "0/1"
+// CastTo01 casts string-bool into string "0"/"1"
 func (s *StringBool) CastTo01(defaultValue bool) string {
 	// True and False string values
 	_true := StringBool1
@@ -177,7 +178,7 @@ func (s *StringBool) CastTo01(defaultValue bool) string {
 	return _false
 }
 
-// CastToStringTrueFalse casts string-bool into string "true/false"
+// CastToStringTrueFalse casts string-bool into string "true"/"false"
 func (s *StringBool) CastToStringTrueFalse(defaultValue bool) string {
 	// True and False values
 	_true := StringBoolTrueLowercase
@@ -199,7 +200,7 @@ func (s *StringBool) CastToStringTrueFalse(defaultValue bool) string {
 	return _false
 }
 
-// Normalize normalizes
+// Normalize normalizes StringBool value with fallback to defaultValue in case initial value is incorrect
 func (s *StringBool) Normalize(defaultValue bool) *StringBool {
 	if s.IsValid() {
 		return s
