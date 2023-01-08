@@ -222,7 +222,7 @@ spec:
       - name: with-secret
         # Secure communication.
         # Translates into <secure>1</secure> ClickHouse setting
-        secure: true
+        secure: "True"
         # Shared secret value to secure cluster communications
         secret:
           # Auto-generate shared secret value to secure cluster communications
