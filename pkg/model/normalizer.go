@@ -402,14 +402,14 @@ func (n *Normalizer) normalizeTaskID(taskID *string) *string {
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop chiV1.StringBool) chiV1.StringBool {
+func (n *Normalizer) normalizeStop(stop *chiV1.StringBool) *chiV1.StringBool {
 	if stop.IsValid() {
 		// It is bool, use as it is
 		return stop
 	}
 
 	// In case it is unknown value - just use set it to false
-	return chiV1.StringBoolFalseLowercase
+	return chiV1.NewStringBool(false)
 }
 
 // normalizeRestart normalizes .spec.restart
@@ -426,14 +426,14 @@ func (n *Normalizer) normalizeRestart(restart string) string {
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
-func (n *Normalizer) normalizeTroubleshoot(troubleshoot chiV1.StringBool) chiV1.StringBool {
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot *chiV1.StringBool) *chiV1.StringBool {
 	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
-	return chiV1.StringBoolFalseLowercase
+	return chiV1.NewStringBool(false)
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern

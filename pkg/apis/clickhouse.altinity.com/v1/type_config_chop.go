@@ -233,8 +233,8 @@ type OperatorConfigReconcile struct {
 
 	Host struct {
 		Wait struct {
-			Exclude StringBool `json:"exclude" yaml:"exclude"`
-			Include StringBool `json:"include" yaml:"include"`
+			Exclude *StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+			Include *StringBool `json:"include,omitempty" yaml:"include,omitempty"`
 		} `json:"wait" yaml:"wait"`
 	} `json:"host" yaml:"host"`
 }

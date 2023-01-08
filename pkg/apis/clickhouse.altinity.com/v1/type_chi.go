@@ -483,20 +483,20 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 
 	switch _type {
 	case MergeTypeFillEmptyValues:
-		if spec.Stop == "" {
-			spec.Stop = from.Stop
+		if !spec.Stop.HasValue() {
+			spec.Stop = spec.Stop.MergeFrom(from.Stop)
 		}
 		if spec.Restart == "" {
 			spec.Restart = from.Restart
 		}
-		if spec.Troubleshoot == "" {
-			spec.Troubleshoot = from.Troubleshoot
+		if !spec.Troubleshoot.HasValue() {
+			spec.Troubleshoot = spec.Troubleshoot.MergeFrom(from.Troubleshoot)
 		}
 		if spec.NamespaceDomainPattern == "" {
 			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
 	case MergeTypeOverrideByNonEmptyValues:
-		if from.Stop != "" {
+		if from.Stop.HasValue() {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
 		}
@@ -504,7 +504,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 			// Override by non-empty values only
 			spec.Restart = from.Restart
 		}
-		if from.Troubleshoot != "" {
+		if from.Troubleshoot.HasValue() {
 			// Override by non-empty values only
 			spec.Troubleshoot = from.Troubleshoot
 		}
