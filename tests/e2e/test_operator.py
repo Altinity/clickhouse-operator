@@ -1413,6 +1413,9 @@ def test_014_1(self):
         with Then("FQDN should be used as interserver_http_host"):
             for replica in replicas:
                 cfm = kubectl.get("configmap", f"chi-{chi}-deploy-confd-{cluster}-0-{replica}")
+                print("looking for:")
+                print(f"<interserver_http_host>chi-{chi}-{cluster}-0-{replica}.")
+                print("in")
                 print(cfm["data"]["chop-generated-hostname-ports.xml"])
                 assert f"<interserver_http_host>chi-{chi}-{cluster}-0-{replica}." in cfm["data"]["chop-generated-hostname-ports.xml"]
 
