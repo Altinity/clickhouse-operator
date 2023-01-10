@@ -9,7 +9,7 @@ spec:
     files:
       settings.xml: |
         <yandex>
-          <tcp_port_secure>9440</tcp_port_secure>
+          <tcp_port_secure>9000</tcp_port_secure>
         </yandex>
     users:
       default/password: qkrq
@@ -21,7 +21,7 @@ spec:
       - name: "secret-ref"
         secure: "yes"
         secret:
-          value: "abcd"
+          value: abcd
         layout:
           shardsCount: 2
           replicasCount: 2

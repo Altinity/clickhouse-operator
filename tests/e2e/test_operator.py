@@ -3217,7 +3217,6 @@ def test_038(self, step=1, insert_numbers=100):
     manifest = f"manifests/chi/test-038-{step}-secure-inter-cluster-communications.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
-    print(chi)
     create_table = f"""
     DROP TABLE IF EXISTS secure on cluster '{cluster}' SYNC;"""+"""
     CREATE TABLE secure on cluster 'secret-ref' (a UInt32)
@@ -3239,11 +3238,11 @@ def test_038(self, step=1, insert_numbers=100):
         )
 
     with When("I create distributed table that use secure port and insert data into it"):
-        clickhouse.query(chi, create_table, pwd="qkrq", port="9440")
+        clickhouse.query(chi, create_table, pwd="qkrq")
         clickhouse.query(chi, f"DROP TABLE IF EXISTS secure_dist on cluster 'secret-ref' SYNC;"
                               f"CREATE TABLE IF NOT EXISTS secure_dist on cluster '{cluster}' as secure"
-                              f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq", port="9440")
-        clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers({insert_numbers})", pwd="qkrq", port="9440")
+                              f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq")
+        clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers({insert_numbers})", pwd="qkrq")
 
     with Then("I check chop-generated-remote_servers.xml generated correctly"):
         r = kubectl.launch(f"exec --namespace={settings.test_namespace} chi-test-038-secure-communications-secret-ref-0-0-0 -- "
@@ -3251,10 +3250,11 @@ def test_038(self, step=1, insert_numbers=100):
         assert "<secure>1</secure>" in r
 
     with And("I check that default user can select from this table"):
-        r = clickhouse.query(chi, "SELECT * FROM secure_dist", pwd="qkrq", port="9440")
+        r = clickhouse.query(chi, "SELECT * FROM secure_dist", pwd="qkrq")
         assert r == "\n".join([f"{i}" for i in range(insert_numbers)])
 
     kubectl.delete_chi(chi)
+
 
 @TestScenario
 @Requirements()
