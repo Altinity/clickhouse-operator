@@ -106,7 +106,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 }
 
 // CreateServiceCluster creates new corev1.Service for specified Cluster
-func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
+func (c *Creator) CreateServiceCluster(cluster *chiv1.Cluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 	ownerReferences := getOwnerReferences(c.chi)
 
@@ -803,7 +803,7 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 }
 
 // NewPodDisruptionBudget creates new PodDisruptionBudget
-func (c *Creator) NewPodDisruptionBudget(cluster *chiv1.ChiCluster) *policyv1.PodDisruptionBudget {
+func (c *Creator) NewPodDisruptionBudget(cluster *chiv1.Cluster) *policyv1.PodDisruptionBudget {
 	ownerReferences := getOwnerReferences(c.chi)
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{

@@ -1,0 +1,30 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "adv-layout-shard"
+spec:
+  configuration:
+    clusters:
+      - name: adv
+        layout:
+          shards:
+            - replicas:
+                - templates:
+                    podTemplate: clickhouse:22.1
+                - templates:
+                    podTemplate: clickhouse:nonexist
+
+  templates:
+    podTemplates:
+
+      - name: clickhouse:22.1
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.1
+
+      - name: clickhouse:nonexist
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.122

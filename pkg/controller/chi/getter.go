@@ -194,7 +194,7 @@ func (c *Controller) getPods(obj interface{}) []*coreV1.Pod {
 	switch typed := obj.(type) {
 	case *chiV1.ClickHouseInstallation:
 		return c.getPodsOfCHI(typed)
-	case *chiV1.ChiCluster:
+	case *chiV1.Cluster:
 		return c.getPodsOfCluster(typed)
 	case *chiV1.ChiShard:
 		return c.getPodsOfShard(typed)
@@ -211,7 +211,7 @@ func (c *Controller) getPods(obj interface{}) []*coreV1.Pod {
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *Controller) getPodsOfCluster(cluster *chiV1.ChiCluster) (pods []*coreV1.Pod) {
+func (c *Controller) getPodsOfCluster(cluster *chiV1.Cluster) (pods []*coreV1.Pod) {
 	cluster.WalkHosts(func(host *chiV1.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)

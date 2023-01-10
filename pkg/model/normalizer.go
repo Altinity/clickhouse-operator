@@ -233,7 +233,7 @@ func (n *Normalizer) fillCHIAddressInfo() {
 		clusterScopeCycleOffset int,
 
 		clusterIndex int,
-		cluster *chiV1.ChiCluster,
+		cluster *chiV1.Cluster,
 
 		shardIndex int,
 		shard *chiV1.ChiShard,
@@ -402,14 +402,14 @@ func (n *Normalizer) normalizeTaskID(taskID *string) *string {
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop chiV1.StringBool) chiV1.StringBool {
+func (n *Normalizer) normalizeStop(stop *chiV1.StringBool) *chiV1.StringBool {
 	if stop.IsValid() {
 		// It is bool, use as it is
 		return stop
 	}
 
 	// In case it is unknown value - just use set it to false
-	return chiV1.StringBoolFalseLowercase
+	return chiV1.NewStringBool(false)
 }
 
 // normalizeRestart normalizes .spec.restart
@@ -426,14 +426,14 @@ func (n *Normalizer) normalizeRestart(restart string) string {
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
-func (n *Normalizer) normalizeTroubleshoot(troubleshoot chiV1.StringBool) chiV1.StringBool {
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot *chiV1.StringBool) *chiV1.StringBool {
 	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
-	return chiV1.StringBoolFalseLowercase
+	return chiV1.NewStringBool(false)
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
@@ -810,7 +810,7 @@ func (n *Normalizer) normalizeUseTemplate(useTemplate *chiV1.ChiUseTemplate) {
 }
 
 // normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
+func (n *Normalizer) normalizeClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
 
@@ -823,23 +823,25 @@ func (n *Normalizer) normalizeClusters(clusters []*chiV1.ChiCluster) []*chiV1.Ch
 }
 
 // newDefaultCluster
-func (n *Normalizer) newDefaultCluster() *chiV1.ChiCluster {
-	return &chiV1.ChiCluster{
+func (n *Normalizer) newDefaultCluster() *chiV1.Cluster {
+	return &chiV1.Cluster{
 		Name: "cluster",
 	}
 }
 
 // ensureClusters
-func (n *Normalizer) ensureClusters(clusters []*chiV1.ChiCluster) []*chiV1.ChiCluster {
+func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster {
 	if len(clusters) > 0 {
 		return clusters
 	}
 
 	if n.ctx.options.WithDefaultCluster {
-		return []*chiV1.ChiCluster{n.newDefaultCluster()}
+		return []*chiV1.Cluster{
+			n.newDefaultCluster(),
+		}
 	}
 
-	return []*chiV1.ChiCluster{}
+	return []*chiV1.Cluster{}
 }
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
@@ -956,7 +958,7 @@ func (n *Normalizer) substWithSecretEnvField(users *chiV1.Settings, username str
 
 const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
 
-func (n *Normalizer) appendClusterSecretEnvVar(cluster *chiV1.ChiCluster) {
+func (n *Normalizer) appendClusterSecretEnvVar(cluster *chiV1.Cluster) {
 	switch cluster.Secret.Source() {
 	case chiV1.ClusterSecretSourcePlaintext:
 		// Secret has explicit value, it is not passed via ENV vars
@@ -1128,124 +1130,140 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
-		//
-		// Ensure each user has mandatory sections:
-		//
-		// 1. user/profile
-		// 2. user/quota
-		// 3. user/networks/ip
-		// 4. user/networks/host_regexp
-		profile := chop.Config().ClickHouse.Config.User.Default.Profile
-		quota := chop.Config().ClickHouse.Config.User.Default.Quota
-		ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-		regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
-		// Some users may have special options
-		switch username {
-		case defaultUsername:
-			ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
-			if !n.ctx.options.DefaultUserInsertHostRegex {
-				regexp = ""
-			}
-		case chopUsername:
-			ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
-
-			profile = ""
-			quota = ""
-			ips = []string{ip}
-			regexp = ""
-		}
-		// Ensure required values aer in place and apply non-empty values in case no own value(s) provided
-		if profile != "" {
-			users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(profile))
-		}
-		if quota != "" {
-			users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(quota))
-		}
-		if len(ips) > 0 {
-			users.Set(username+"/networks/ip", chiV1.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
-		}
-		if regexp != "" {
-			users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(regexp))
-		}
-
-		//
-		// Deal with passwords
-		//
-
-		// Values from the secret have higher priority
-		n.substWithSecretField(users, username, "password", "k8s_secret_password")
-		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-		n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
-
-		// Values from the secret passed via ENV have even higher priority
-		n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
-		n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
-		n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
-
-		// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-		if users.Has(username + "/password_double_sha1_hex") {
-			users.Delete(username + "/password_sha256_hex")
-			users.Delete(username + "/password")
-			continue // move to the next user
-		}
-
-		// Than goes password_sha256_hex, thus keep it only
-		if users.Has(username + "/password_sha256_hex") {
-			users.Delete(username + "/password_double_sha1_hex")
-			users.Delete(username + "/password")
-			continue // move to the next user
-		}
-
-		// From now on we either have a plaintext password specified, or no password at all
-
-		if users.Get(username + "/password").HasAttributes() {
-			// Have plaintext password explicitly specified via ENV vars
-			// This is still OK
-			continue // move to the next user
-		}
-
-		// From now on we either have plaintext password specified as an explicit string, or no password at all
-
-		passwordPlaintext := users.Get(username + "/password").String()
-
-		// Apply default password for password-less non-default users
-		if passwordPlaintext == "" {
-			switch username {
-			case defaultUsername:
-				// NB "default" user may keep empty password in here.
-			case chopUsername:
-				passwordPlaintext = chop.Config().ClickHouse.Access.Password
-			default:
-				passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
-			}
-		}
-
-		// NB "default" user may keep empty password in here.
-
-		if passwordPlaintext != "" {
-			// Replace plaintext password with encrypted
-			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-			// And keep it only
-			users.Delete(username + "/password_double_sha1_hex")
-			users.Delete(username + "/password")
-		}
+		n.normalizeConfigurationUser(users, username)
 	}
 
-	if users.Has(defaultUsername+"/password_double_sha1_hex") || users.Has(defaultUsername+"/password_sha256_hex") {
-		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
-		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
-		// thus we need to overwrite it.
-		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
-	}
-	if users.Has(chopUsername+"/password_double_sha1_hex") || users.Has(chopUsername+"/password_sha256_hex") {
-		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
-		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
-		// thus we need to overwrite it.
-		users.Set(chopUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
-	}
+	// Remove plain password for default user and chop user
+	n.removePlainPassword(users, defaultUsername)
+	n.removePlainPassword(users, chopUsername)
 
 	return users
+}
+
+func (n *Normalizer) removePlainPassword(users *chiV1.Settings, username string) {
+	if users.Has(username+"/password_double_sha1_hex") || users.Has(username+"/password_sha256_hex") {
+		// If user has encrypted password specified, we need to delete existing plaintext password.
+		// Set "remove" flag for user's "password", which is specified as empty in stock ClickHouse users.xml,
+		// thus we need to overwrite it.
+		users.Set(username+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
+	}
+}
+
+func (n *Normalizer) normalizeConfigurationUser(users *chiV1.Settings, username string) {
+	n.normalizeConfigurationUserEnsureMandatorySections(users, username)
+	n.normalizeConfigurationUserPassword(users, username)
+}
+
+func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *chiV1.Settings, username string) {
+	chopUsername := chop.Config().ClickHouse.Access.Username
+	//
+	// Ensure each user has mandatory sections:
+	//
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/networks/host_regexp
+	profile := chop.Config().ClickHouse.Config.User.Default.Profile
+	quota := chop.Config().ClickHouse.Config.User.Default.Quota
+	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
+	regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+
+	// Some users may have special options
+	switch username {
+	case defaultUsername:
+		ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
+		if !n.ctx.options.DefaultUserInsertHostRegex {
+			regexp = ""
+		}
+	case chopUsername:
+		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
+
+		profile = ""
+		quota = ""
+		ips = []string{ip}
+		regexp = ""
+	}
+
+	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
+	if profile != "" {
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(profile))
+	}
+	if quota != "" {
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(quota))
+	}
+	if len(ips) > 0 {
+		users.Set(username+"/networks/ip", chiV1.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
+	}
+	if regexp != "" {
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(regexp))
+	}
+}
+
+func (n *Normalizer) normalizeConfigurationUserPassword(users *chiV1.Settings, username string) {
+	//
+	// Deal with passwords
+	//
+
+	chopUsername := chop.Config().ClickHouse.Access.Username
+
+	// Values from the secret have higher priority
+	n.substWithSecretField(users, username, "password", "k8s_secret_password")
+	n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+	n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+
+	// Values from the secret passed via ENV have even higher priority
+	n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
+	n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
+	n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
+
+	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
+	if users.Has(username + "/password_double_sha1_hex") {
+		users.Delete(username + "/password_sha256_hex")
+		users.Delete(username + "/password")
+		return // move to the next user
+	}
+
+	// Than goes password_sha256_hex, thus keep it only
+	if users.Has(username + "/password_sha256_hex") {
+		users.Delete(username + "/password_double_sha1_hex")
+		users.Delete(username + "/password")
+		return // move to the next user
+	}
+
+	// From now on we either have a plaintext password specified, or no password at all
+
+	if users.Get(username + "/password").HasAttributes() {
+		// Have plaintext password explicitly specified via ENV vars
+		// This is still OK
+		return // move to the next user
+	}
+
+	// From now on we either have plaintext password specified as an explicit string, or no password at all
+
+	passwordPlaintext := users.Get(username + "/password").String()
+
+	// Apply default password for password-less non-default users
+	if passwordPlaintext == "" {
+		switch username {
+		case defaultUsername:
+			// NB "default" user may keep empty password in here.
+		case chopUsername:
+			passwordPlaintext = chop.Config().ClickHouse.Access.Password
+		default:
+			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
+		}
+	}
+
+	// NB "default" user may keep empty password in here.
+
+	if passwordPlaintext != "" {
+		// Replace plaintext password with encrypted
+		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
+		users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+		// And keep it only
+		users.Delete(username + "/password_double_sha1_hex")
+		users.Delete(username + "/password")
+	}
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
@@ -1289,7 +1307,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chiV1.Settings) *chiV1.S
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiCluster {
+func (n *Normalizer) normalizeCluster(cluster *chiV1.Cluster) *chiV1.Cluster {
 	if cluster == nil {
 		cluster = n.newDefaultCluster()
 	}
@@ -1340,7 +1358,7 @@ func (n *Normalizer) normalizeCluster(cluster *chiV1.ChiCluster) *chiV1.ChiClust
 }
 
 // createHostsField
-func (n *Normalizer) createHostsField(cluster *chiV1.ChiCluster) {
+func (n *Normalizer) createHostsField(cluster *chiV1.Cluster) {
 	cluster.Layout.HostsField = chiV1.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
 	// Need to migrate hosts from Shards and Replicas into HostsField
@@ -1490,7 +1508,7 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *chiV1.ChiClusterLayout)
 }
 
 // normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *chiV1.ChiShard, cluster *chiV1.ChiCluster, shardIndex int) {
+func (n *Normalizer) normalizeShard(shard *chiV1.ChiShard, cluster *chiV1.Cluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
@@ -1507,7 +1525,7 @@ func (n *Normalizer) normalizeShard(shard *chiV1.ChiShard, cluster *chiV1.ChiClu
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *chiV1.ChiReplica, cluster *chiV1.ChiCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplica(replica *chiV1.ChiReplica, cluster *chiV1.Cluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
@@ -1591,7 +1609,7 @@ func (n *Normalizer) normalizeShardWeight(shard *chiV1.ChiShard) {
 }
 
 // normalizeShardHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardHosts(shard *chiV1.ChiShard, cluster *chiV1.ChiCluster, shardIndex int) {
+func (n *Normalizer) normalizeShardHosts(shard *chiV1.ChiShard, cluster *chiV1.Cluster, shardIndex int) {
 	// Use hosts from HostsField
 	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
@@ -1604,7 +1622,7 @@ func (n *Normalizer) normalizeShardHosts(shard *chiV1.ChiShard, cluster *chiV1.C
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaHosts(replica *chiV1.ChiReplica, cluster *chiV1.ChiCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplicaHosts(replica *chiV1.ChiReplica, cluster *chiV1.Cluster, replicaIndex int) {
 	// Use hosts from HostsField
 	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {
@@ -1621,7 +1639,7 @@ func (n *Normalizer) normalizeHost(
 	host *chiV1.ChiHost,
 	shard *chiV1.ChiShard,
 	replica *chiV1.ChiReplica,
-	cluster *chiV1.ChiCluster,
+	cluster *chiV1.Cluster,
 	shardIndex int,
 	replicaIndex int,
 ) {

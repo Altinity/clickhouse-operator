@@ -46,7 +46,7 @@ func NewSchemer(scheme, username, password, rootCA string, port int) *Schemer {
 
 // shouldCreateDistributedObjects determines whether distributed objects should be created
 func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
-	hosts := CreateFQDNs(host, chop.ChiCluster{}, false)
+	hosts := CreateFQDNs(host, chop.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
@@ -94,7 +94,7 @@ func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiH
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
 func shouldCreateReplicatedObjects(host *chop.ChiHost) bool {
 	shard := CreateFQDNs(host, chop.ChiShard{}, false)
-	cluster := CreateFQDNs(host, chop.ChiCluster{}, false)
+	cluster := CreateFQDNs(host, chop.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard

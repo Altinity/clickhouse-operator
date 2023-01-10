@@ -80,7 +80,7 @@ const (
 type macrosEngine struct {
 	names   *namer
 	chi     *chop.ClickHouseInstallation
-	cluster *chop.ChiCluster
+	cluster *chop.Cluster
 	shard   *chop.ChiShard
 	host    *chop.ChiHost
 }
@@ -92,7 +92,7 @@ func macro(scope interface{}) *macrosEngine {
 	switch t := scope.(type) {
 	case *chop.ClickHouseInstallation:
 		m.chi = t
-	case *chop.ChiCluster:
+	case *chop.Cluster:
 		m.cluster = t
 	case *chop.ChiShard:
 		m.shard = t

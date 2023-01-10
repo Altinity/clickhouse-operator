@@ -278,7 +278,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *chiV1.ChiSha
 }
 
 // deleteServiceCluster
-func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chiV1.ChiCluster) error {
+func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chiV1.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -330,7 +330,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 }
 
 // deleteSecretCluster
-func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chiV1.ChiCluster) error {
+func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chiV1.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

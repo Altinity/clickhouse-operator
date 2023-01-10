@@ -15,17 +15,17 @@
 package v1
 
 // InheritSettingsFrom inherits settings from specified cluster
-func (replica *ChiReplica) InheritSettingsFrom(cluster *ChiCluster) {
+func (replica *ChiReplica) InheritSettingsFrom(cluster *Cluster) {
 	replica.Settings = replica.Settings.MergeFrom(cluster.Settings)
 }
 
 // InheritFilesFrom inherits files from specified cluster
-func (replica *ChiReplica) InheritFilesFrom(cluster *ChiCluster) {
+func (replica *ChiReplica) InheritFilesFrom(cluster *Cluster) {
 	replica.Files = replica.Files.MergeFrom(cluster.Files)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
-func (replica *ChiReplica) InheritTemplatesFrom(cluster *ChiCluster) {
+func (replica *ChiReplica) InheritTemplatesFrom(cluster *Cluster) {
 	replica.Templates = replica.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
 	replica.Templates.HandleDeprecatedFields()
 }

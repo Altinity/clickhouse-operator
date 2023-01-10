@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.20.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -577,6 +577,9 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          secure:
+                            <<: *TypeStringBool
+                            description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -697,7 +700,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -788,7 +791,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -875,7 +878,7 @@ spec:
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               secure:
-                                type: boolean
+                                <<: *TypeStringBool
                                 description: |
                                   optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified
@@ -1127,7 +1130,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.20.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1694,6 +1697,9 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          secure:
+                            <<: *TypeStringBool
+                            description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -1814,7 +1820,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -1905,7 +1911,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -1992,7 +1998,7 @@ spec:
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               secure:
-                                type: boolean
+                                <<: *TypeStringBool
                                 description: |
                                   optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified
@@ -2241,7 +2247,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.20.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced

@@ -20,21 +20,14 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	log "github.com/golang/glog"
-	// log "k8s.io/klog"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	chopAPI "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
-)
-
-const (
-	defaultTimeout = 30 * time.Second
 )
 
 // Exporter implements prometheus.Collector interface
@@ -48,7 +41,10 @@ type Exporter struct {
 	toRemoveFromWatched sync.Map
 }
 
-var exporter *Exporter
+// Type compatibility
+var (
+	_ prometheus.Collector = &Exporter{}
+)
 
 type chInstallationsIndex map[string]*WatchedCHI
 
@@ -77,23 +73,26 @@ func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
 // Collect implements prometheus.Collector Collect method
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	if ch == nil {
-		log.V(2).Info("Prometheus channel is closed. Skipping")
+		log.Warning("Prometheus channel is closed. Unable to write metrics")
 		return
 	}
 
+	// Clean up all pending for cleaning CHIs
+	log.V(2).Info("Starting cleanup")
+	e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
+		switch key.(type) {
+		case *WatchedCHI:
+			e.toRemoveFromWatched.Delete(key)
+			e.removeFromWatched(key.(*WatchedCHI))
+			log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedCHI).Name, key.(*WatchedCHI).Namespace)
+		}
+		return true
+	})
+	log.V(2).Info("Completed cleanup")
+
+	// This method may be called concurrently and must therefore be implemented in a concurrency safe way
 	e.mutex.Lock()
-	defer func() {
-		e.mutex.Unlock()
-		e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
-			switch key.(type) {
-			case *WatchedCHI:
-				e.toRemoveFromWatched.Delete(key)
-				e.removeFromWatched(key.(*WatchedCHI))
-				log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedCHI).Name, key.(*WatchedCHI).Namespace)
-			}
-			return true
-		})
-	}()
+	defer e.mutex.Unlock()
 
 	log.V(2).Info("Starting Collect")
 	var wg = sync.WaitGroup{}
@@ -105,7 +104,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		}(chi, hostname, ch)
 	})
 	wg.Wait()
-	log.V(2).Info("Finished Collect")
+	log.V(2).Info("Completed Collect")
 }
 
 // enqueueToRemoveFromWatched
@@ -155,7 +154,11 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 	}
 
 	// CHI is not watched
-	log.V(1).Infof("Added ClickHouseInstallation (%s/%s): including hostnames into Exporter", chi.Namespace, chi.Name)
+	log.V(1).Infof(
+		"Added ClickHouseInstallation (%s/%s): including hostnames into Exporter",
+		chi.Namespace,
+		chi.Name,
+	)
 
 	e.chInstallations[chi.indexKey()] = chi
 }
@@ -187,7 +190,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("system.metrics")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.V(2).Infof("Error querying metrics for %s: %s\n", hostname, err)
+		log.Warningf("Error querying system.metrics for host %s err: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.metrics")
 	}
 
@@ -200,7 +203,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("system parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.V(2).Infof("Error querying system.parts for %s: %s\n", hostname, err)
+		log.Warningf("Error querying system.parts for host %s err: %s\n", hostname, err)
 		writer.WriteErrorFetch("table sizes")
 		writer.WriteErrorFetch("system parts")
 	}
@@ -212,7 +215,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("system.replicas")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.V(2).Infof("Error querying system replicas for %s: %s\n", hostname, err)
+		log.Warningf("Error querying system.replicas for host %s err: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.replicas")
 	}
 
@@ -223,7 +226,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("system.mutations")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.V(2).Infof("Error querying mutations for %s: %s\n", hostname, err)
+		log.Warningf("Error querying system.mutations for host %s err: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.mutations")
 	}
 
@@ -234,7 +237,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("system.disks")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.V(2).Infof("Error querying disks for %s: %s\n", hostname, err)
+		log.Warningf("Error querying system.disks for host %s err: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.disks")
 	}
 
@@ -245,7 +248,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 		writer.WriteOKFetch("system.detached_parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.V(2).Infof("Error querying detached parts for %s: %s\n", hostname, err)
+		log.Warningf("Error querying system.detached_parts for host %s err: %s\n", hostname, err)
 		writer.WriteErrorFetch("system.detached_parts")
 	}
 }
@@ -289,7 +292,7 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 }
 
 // DiscoveryWatchedCHIs discovers all ClickHouseInstallation objects available for monitoring and adds them to watched list
-func (e *Exporter) DiscoveryWatchedCHIs(chopClient *chopclientset.Clientset) {
+func (e *Exporter) DiscoveryWatchedCHIs(chopClient *chopAPI.Clientset) {
 	// Get all CHI objects from watched namespace(s)
 	watchedNamespace := chop.Config().GetInformerNamespace()
 	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(context.TODO(), v1.ListOptions{})

@@ -39,7 +39,7 @@ func StartMetricsREST(
 ) *Exporter {
 	log.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
 
-	exporter = NewExporter(connectionParams)
+	exporter := NewExporter(connectionParams)
 	prometheus.MustRegister(exporter)
 
 	http.Handle(metricsPath, promhttp.Handler())

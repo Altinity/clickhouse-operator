@@ -24,7 +24,7 @@ type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
 	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
-	Secure              *Secure           `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
@@ -45,37 +45,6 @@ type ChiHost struct {
 	// DesiredStatefulSet is a desired stateful set - reconcile target
 	DesiredStatefulSet *appsv1.StatefulSet     `json:"-" yaml:"-" testdiff:"ignore"`
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
-}
-
-// Secure specifies secure type
-type Secure bool
-
-// Value gets bool value of secure
-func (s *Secure) Value() bool {
-	if s == nil {
-		return false
-	}
-
-	return *s == true
-}
-
-// MergeFrom merges value from specified Secure
-func (s *Secure) MergeFrom(from *Secure) *Secure {
-	if from == nil {
-		// Nothing to merge from, keep original value
-		return s
-	}
-
-	// From now on we have `from` specified
-
-	if s == nil {
-		// Recipient is not specified, just use `from` value
-		return from
-	}
-
-	// Both recipient and `from` are specified, need to pick one value.
-	// Prefer local value
-	return s
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
@@ -209,7 +178,7 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 }
 
 // GetCluster gets cluster
-func (host *ChiHost) GetCluster() *ChiCluster {
+func (host *ChiHost) GetCluster() *Cluster {
 	// Host has to have filled Address
 	return host.GetCHI().FindCluster(host.Address.ClusterName)
 }
@@ -259,5 +228,11 @@ func (host *ChiHost) IsSecure() bool {
 	if host == nil {
 		return false
 	}
-	return host.Secure.Value()
+
+	if host.Secure.HasValue() {
+		return host.Secure.Value()
+	}
+
+	// No personal value for host secure is set - need to fallback to cluster value
+	return host.GetCluster().GetSecure().Value()
 }

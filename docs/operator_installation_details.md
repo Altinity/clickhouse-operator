@@ -20,7 +20,7 @@ Verify the Docker manifest is available based on the version table, replacing `{
 [clickhouse-operator-install-bundle.yaml][clickhouse-operator-install-bundle.yaml] file availability.
 In is located in `deploy/operator` folder inside `clickhouse-operator` sources.
 
-## Install
+## Install via kubectl
 
 Operator installation process is quite straightforward and consists of one main step - deploy **ClickHouse operator**.
 We'll apply operator manifest directly from github repo
@@ -52,6 +52,17 @@ clickhouse-operator-5c46dfc7bd-7cz5l   1/1     Running   0          43m
 ...
 ```
 
+
+## Install via helm
+
+from 0.20.1 version official clickhouse-operator helm chart, also available
+
+```bash
+helm repo add clickhouse-operator https://docs.altinity.com/clickhouse-operator/
+helm install clickhouse-operator clickhouse-operator/altinity-clickhouse-operator
+```
+
+Look https://github.com/Altinity/clickhouse-operator/tree/master/deploy/helm/ for details 
 
 ## Resources Description
 
