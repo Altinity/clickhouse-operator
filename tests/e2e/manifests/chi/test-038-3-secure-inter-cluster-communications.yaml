@@ -5,49 +5,26 @@ metadata:
 spec:
   useTemplates:
     - name: clickhouse-version
-  defaults:
-    templates:
-      podTemplate: pod-distribution
-
   configuration:
+    files:
+      settings.xml: |
+        <yandex>
+          <tcp_port_secure>9440</tcp_port_secure>
+        </yandex>
+    users:
+      default/password: qkrq
     zookeeper:
       nodes:
         - host: zookeeper
           port: 2181
     clusters:
       - name: "secret-ref"
+        secure: "yes"
         secret:
           valueFrom:
             secretKeyRef:
               name: "secure-inter-cluster-communications"
               key: "secret"
         layout:
-          shardsCount: 1
-          replicas:
-            - templates:
-                hostTemplate: replica-0
-            - templates:
-                hostTemplate: replica-1
-
-  templates:
-    hostTemplates:
-      - name: replica-0
-        spec:
-          tcpPort: 9000
-          httpPort: 10001
-          secure: true
-          interserverHTTPPort: 10002
-      - name: replica-1
-        spec:
-          tcpPort: 9001
-          httpPort: 11001
-          secure: true
-          interserverHTTPPort: 11002
-
-    podTemplates:
-      - name: pod-distribution
-        spec:
-          hostNetwork: true
-          containers:
-            - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+          shardsCount: 2
+          replicasCount: 2

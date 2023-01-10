@@ -3128,7 +3128,7 @@ def test_036(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
-@Name("test_037. storageManagement switch")
+@Name("test_037. StorageManagement switch")
 def test_037(self):
     """Check clickhouse-operator supports switching storageManagement
     config option from default (StatefulSet) to Operator"""
@@ -3208,12 +3208,20 @@ def test_037(self):
 
 
 @TestCheck
-def test_038(self, step=1):
+def test_038(self, step=1, insert_numbers=100):
     """Check clickhouse-operator support secure inter-cluster communications."""
     cluster = "secret-ref"
     manifest = f"manifests/chi/test-038-{step}-secure-inter-cluster-communications.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
+    print(chi)
+    create_table = f"""
+    DROP TABLE IF EXISTS secure on cluster '{cluster}' SYNC;"""+"""
+    CREATE TABLE secure on cluster 'secret-ref' (a UInt32)
+    Engine = ReplicatedMergeTree()
+    PARTITION BY tuple()
+    ORDER BY a
+    """.replace('\r', '').replace('\n', '')
 
     with Given("chi exists"):
         kubectl.create_and_check(
@@ -3227,14 +3235,27 @@ def test_038(self, step=1):
             },
         )
 
-    with When("I create distributed table using secure port"):
-        clickhouse.query(chi, f"CREATE TABLE IF NOT EXISTS secure_dist on cluster '{cluster}' (x String)"
-                              f" ENGINE = Distributed('{cluster}', default, secure)")
+    with When("I create distributed table that use secure port and insert data into it"):
+        clickhouse.query(chi, create_table, pwd="qkrq", port="9440")
+        clickhouse.query(chi, f"DROP TABLE IF EXISTS secure_dist on cluster 'secret-ref' SYNC;"
+                              f"CREATE TABLE IF NOT EXISTS secure_dist on cluster '{cluster}' as secure"
+                              f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq", port="9440")
+        clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers({insert_numbers})", pwd="qkrq", port="9440")
 
+    with Then("I check chop-generated-remote_servers.xml generated correctly"):
+        r = kubectl.launch(f"exec --namespace={settings.test_namespace} chi-test-038-secure-communications-secret-ref-0-0-0 -- "
+                           "sed '11!d' etc/clickhouse-server/config.d/chop-generated-remote_servers.xml")
+        assert "<secure>1</secure>" in r
+
+    with And("I check that default user can select from this table"):
+        r = clickhouse.query(chi, "SELECT * FROM secure_dist", pwd="qkrq", port="9440")
+        assert r == "\n".join([f"{i}" for i in range(insert_numbers)])
+
+    kubectl.delete_chi(chi)
 
 @TestScenario
 @Requirements()
-@Name("test_038_1. secure inter-cluster communications")
+@Name("test_038_1. Secure inter-cluster communications")
 def test_038_1(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
     test_038(step=1)
@@ -3242,7 +3263,7 @@ def test_038_1(self):
 
 @TestScenario
 @Requirements()
-@Name("test_038_2. secure inter-cluster communications")
+@Name("test_038_2. Secure inter-cluster communications")
 def test_038_2(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
     test_038(step=2)
@@ -3250,7 +3271,7 @@ def test_038_2(self):
 
 @TestScenario
 @Requirements()
-@Name("test_038_3. secure inter-cluster communications")
+@Name("test_038_3. Secure inter-cluster communications")
 def test_038_3(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
     test_038(step=3)
