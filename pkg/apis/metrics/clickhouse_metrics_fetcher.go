@@ -15,7 +15,9 @@
 package metrics
 
 import (
+	"context"
 	"database/sql"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -155,8 +157,9 @@ func (f *ClickHouseMetricsFetcher) connection() *clickhouse.Connection {
 }
 
 // getClickHouseQueryMetrics requests metrics data from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics() (Table, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
+		ctx,
 		queryMetricsSQL,
 		func(rows *sql.Rows, data *Table) error {
 			var metric, value, description, _type string
@@ -169,8 +172,9 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryMetrics() (Table, error) {
 }
 
 // getClickHouseSystemParts requests data sizes from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts() (Table, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
+		ctx,
 		querySystemPartsSQL,
 		func(rows *sql.Rows, data *Table) error {
 			var database, table, active, partitions, parts, bytes, uncompressed, _rows,
@@ -190,8 +194,9 @@ func (f *ClickHouseMetricsFetcher) getClickHouseSystemParts() (Table, error) {
 }
 
 // getClickHouseQuerySystemReplicas requests replica information from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas() (Table, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
+		ctx,
 		querySystemReplicasSQL,
 		func(rows *sql.Rows, data *Table) error {
 			var database, table, isSessionExpired string
@@ -204,8 +209,9 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemReplicas() (Table, er
 }
 
 // getClickHouseQueryMutations requests mutations information from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations() (Table, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
+		ctx,
 		queryMutationsSQL,
 		func(rows *sql.Rows, data *Table) error {
 			var database, table, mutations, partsToDo string
@@ -218,8 +224,9 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryMutations() (Table, error) 
 }
 
 // getClickHouseQuerySystemDisks requests used disks information from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks() (Table, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
+		ctx,
 		querySystemDisksSQL,
 		func(rows *sql.Rows, data *Table) error {
 			var disk, freeBytes, totalBytes string
@@ -232,8 +239,9 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQuerySystemDisks() (Table, error
 }
 
 // getClickHouseQueryDetachedParts requests detached parts reasons from ClickHouse
-func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts() (Table, error) {
+func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts(ctx context.Context) (Table, error) {
 	return f.clickHouseQueryScanRows(
+		ctx,
 		queryDetachedPartsSQL,
 		func(rows *sql.Rows, data *Table) error {
 			var detachedParts, database, table, disk, reason string
@@ -256,8 +264,15 @@ func newTable() Table {
 }
 
 // clickHouseQueryScanRows scan all rows by external scan function
-func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(sql string, scan ScanFunction) (Table, error) {
-	query, err := f.connection().Query(heredoc.Doc(sql))
+func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(
+	ctx context.Context,
+	sql string,
+	scan ScanFunction,
+) (Table, error) {
+	if util.IsContextDone(ctx) {
+		return nil, ctx.Err()
+	}
+	query, err := f.connection().QueryContext(ctx, heredoc.Doc(sql))
 	if err != nil {
 		return nil, err
 	}
