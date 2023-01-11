@@ -92,7 +92,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	log.V(2).Info("Starting Collect")
 	var wg = sync.WaitGroup{}
-	e.WalkWatchedChi(func(chi *WatchedCHI, hostname string) {
+	e.walkWatchedChi(func(chi *WatchedCHI, hostname string) {
 		wg.Add(1)
 		go func(chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
 			defer wg.Done()
@@ -103,8 +103,8 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.V(2).Info("Completed Collect")
 }
 
-// WalkWatchedChi walks over watched CHI objects
-func (e *Exporter) WalkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
+// walkWatchedChi walks over watched CHI objects
+func (e *Exporter) walkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
 	// Loop over ClickHouseInstallations
 	for _, chi := range e.chInstallations {
 		// Loop over all hostnames of this installation
@@ -180,8 +180,8 @@ func (e *Exporter) newFetcher(hostname string) *ClickHouseMetricsFetcher {
 	return NewClickHouseFetcher(e.clusterConnectionParams.NewEndpointConnectionParams(hostname))
 }
 
-// UpdateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
-func (e *Exporter) UpdateWatch(namespace, chiName string, hostnames []string) {
+// updateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
+func (e *Exporter) updateWatch(namespace, chiName string, hostnames []string) {
 	chi := &WatchedCHI{
 		Namespace: namespace,
 		Name:      chiName,
