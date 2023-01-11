@@ -3213,10 +3213,33 @@ def test_037(self):
 @TestCheck
 def test_038(self, step=1, insert_numbers=100):
     """Check clickhouse-operator support secure inter-cluster communications."""
+
+    shell = Shell()
     cluster = "secret-ref"
     manifest = f"manifests/chi/test-038-{step}-secure-inter-cluster-communications.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = "test-038-secure-communications"
+
     util.require_keeper(keeper_type=self.context.keeper_type)
+    with Given("certs for installing clickhouse with TLS"):
+        shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+        shell(f""" \
+            openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
+                -keyout clickhouse-key.pem -out clickhouse-cert.pem \
+                -subj "/CN=clickhouse-test-038-secure-communications" \
+                -addext "subjectAltName=DNS:clickhouse-{chi},DNS:clickhouse-{chi}.clickhouse-test,DNS:clickhouse-{chi}.test.svc.cluster.local"
+        """)
+    with And("secrets for the certs"):
+        shell(f"kubectl -n {settings.test_namespace} create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
+
+    with And("configmap with the CA to validate the cert"):
+        shell(f"kubectl -n {settings.test_namespace} create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
+
+    with And("chi exists"):
+        kubectl.apply(util.get_full_path("manifests/secret/test-038-secret.yaml"))
+        kubectl.apply(util.get_full_path(manifest, lookup_in_host=False))
+        kubectl.wait_chi_status(chi, "Completed", ns=settings.test_namespace)
+        kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=4, ns=settings.test_namespace)
+
     create_table = f"""
     DROP TABLE IF EXISTS secure on cluster '{cluster}' SYNC;"""+"""
     CREATE TABLE secure on cluster 'secret-ref' (a UInt32)
@@ -3225,24 +3248,12 @@ def test_038(self, step=1, insert_numbers=100):
     ORDER BY a
     """.replace('\r', '').replace('\n', '')
 
-    with Given("chi exists"):
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "apply_templates": {
-                    "manifests/secret/test-038-secret.yaml"
-                },
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
-
     with When("I create distributed table that use secure port and insert data into it"):
-        clickhouse.query(chi, create_table, pwd="qkrq")
+        clickhouse.query(chi, create_table, pwd="qkrq", port="9440")
         clickhouse.query(chi, f"DROP TABLE IF EXISTS secure_dist on cluster 'secret-ref' SYNC;"
                               f"CREATE TABLE IF NOT EXISTS secure_dist on cluster '{cluster}' as secure"
-                              f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq")
-        clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers({insert_numbers})", pwd="qkrq")
+                              f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq", port="9440")
+        clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers({insert_numbers})", pwd="qkrq", port="9440")
 
     with Then("I check chop-generated-remote_servers.xml generated correctly"):
         r = kubectl.launch(f"exec --namespace={settings.test_namespace} chi-test-038-secure-communications-secret-ref-0-0-0 -- "
@@ -3250,14 +3261,18 @@ def test_038(self, step=1, insert_numbers=100):
         assert "<secure>1</secure>" in r
 
     with And("I check that default user can select from this table"):
-        r = clickhouse.query(chi, "SELECT * FROM secure_dist", pwd="qkrq")
-        assert r == "\n".join([f"{i}" for i in range(insert_numbers)])
+        for attempt in retries(timeout=300, delay=1):
+            with attempt:
+                r = clickhouse.query(chi, "SELECT * FROM secure_dist order by a", pwd="qkrq", port="9440")
+                assert r == "\n".join([f"{i}" for i in range(insert_numbers)])
 
-    kubectl.delete_chi(chi)
+    with Finally("I clean up"):
+        shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
+        shell.close()
+        kubectl.delete_chi(chi)
 
 
 @TestScenario
-@Requirements()
 @Name("test_038_1. Secure inter-cluster communications")
 def test_038_1(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
@@ -3265,7 +3280,6 @@ def test_038_1(self):
 
 
 @TestScenario
-@Requirements()
 @Name("test_038_2. Secure inter-cluster communications")
 def test_038_2(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
@@ -3273,7 +3287,6 @@ def test_038_2(self):
 
 
 @TestScenario
-@Requirements()
 @Name("test_038_3. Secure inter-cluster communications")
 def test_038_3(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
