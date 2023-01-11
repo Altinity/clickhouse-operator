@@ -245,7 +245,10 @@ func (f *ClickHouseMetricsFetcher) getClickHouseQueryDetachedParts() (Table, err
 	)
 }
 
+// ScanFunction defines function to scan rows
 type ScanFunction func(rows *sql.Rows, data *Table) error
+
+// Table defines tables of strings
 type Table [][]string
 
 func newTable() Table {
