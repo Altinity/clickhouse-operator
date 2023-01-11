@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	log "github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -33,6 +34,7 @@ import (
 // Exporter implements prometheus.Collector interface
 type Exporter struct {
 	clusterConnectionParams *clickhouse.ClusterConnectionParams
+	collectorTimeout time.Duration
 
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
@@ -58,10 +60,14 @@ func (i chInstallationsIndex) Slice() []*WatchedCHI {
 }
 
 // NewExporter returns a new instance of Exporter type
-func NewExporter(connectionParams *clickhouse.ClusterConnectionParams) *Exporter {
+func NewExporter(
+	connectionParams *clickhouse.ClusterConnectionParams,
+	collectorTimeout time.Duration,
+) *Exporter {
 	return &Exporter{
 		chInstallations:         make(map[string]*WatchedCHI),
 		clusterConnectionParams: connectionParams,
+		collectorTimeout: collectorTimeout,
 	}
 }
 
