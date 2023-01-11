@@ -1444,6 +1444,7 @@ func (in *OperatorConfigClickHouse) DeepCopyInto(out *OperatorConfigClickHouse) 
 	*out = *in
 	in.Config.DeepCopyInto(&out.Config)
 	out.Access = in.Access
+	out.Metrics = in.Metrics
 	return
 }
 

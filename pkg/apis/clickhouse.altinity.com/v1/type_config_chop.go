@@ -191,14 +191,14 @@ type OperatorConfigClickHouse struct {
 			Connect time.Duration `json:"connect" yaml:"connect"`
 			Query   time.Duration `json:"query"   yaml:"query"`
 		} `json:"timeouts" yaml:"timeouts"`
-
-		// Metrics used to specify how the operator fetches metrics from ClickHouse instances
-		Metrics struct {
-			Timeouts struct {
-				Collect time.Duration `json:"collect" yaml:"collect"`
-			} `json:"timeouts" yaml:"timeouts"`
-		} `json:"metrics" yaml:"metrics"`
 	} `json:"access" yaml:"access"`
+
+	// Metrics used to specify how the operator fetches metrics from ClickHouse instances
+	Metrics struct {
+		Timeouts struct {
+			Collect time.Duration `json:"collect" yaml:"collect"`
+		} `json:"timeouts" yaml:"timeouts"`
+	} `json:"metrics" yaml:"metrics"`
 }
 
 // OperatorConfigTemplate specifies template section
@@ -724,11 +724,11 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
 
-	if c.ClickHouse.Access.Metrics.Timeouts.Collect == 0 {
-		c.ClickHouse.Access.Metrics.Timeouts.Collect = defaultTimeoutCollect
+	if c.ClickHouse.Metrics.Timeouts.Collect == 0 {
+		c.ClickHouse.Metrics.Timeouts.Collect = defaultTimeoutCollect
 	}
 	// Adjust seconds to time.Duration
-	c.ClickHouse.Access.Metrics.Timeouts.Collect = c.ClickHouse.Access.Metrics.Timeouts.Collect * time.Second
+	c.ClickHouse.Metrics.Timeouts.Collect = c.ClickHouse.Metrics.Timeouts.Collect * time.Second
 
 }
 

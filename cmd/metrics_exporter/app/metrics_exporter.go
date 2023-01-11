@@ -116,7 +116,7 @@ func Run() {
 
 		metricsEP,
 		metricsPath,
-		chop.Config().ClickHouse.Access.Metrics.Timeouts.Collect,
+		chop.Config().ClickHouse.Metrics.Timeouts.Collect,
 
 		chiListEP,
 		chiListPath,
