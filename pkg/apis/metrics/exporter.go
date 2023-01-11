@@ -72,23 +72,13 @@ func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
 
 // Collect implements prometheus.Collector Collect method
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	// Run cleanup on each collect
+	e.cleanup()
+
 	if ch == nil {
 		log.Warning("Prometheus channel is closed. Unable to write metrics")
 		return
 	}
-
-	// Clean up all pending for cleaning CHIs
-	log.V(2).Info("Starting cleanup")
-	e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
-		switch key.(type) {
-		case *WatchedCHI:
-			e.toRemoveFromWatched.Delete(key)
-			e.removeFromWatched(key.(*WatchedCHI))
-			log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedCHI).Name, key.(*WatchedCHI).Namespace)
-		}
-		return true
-	})
-	log.V(2).Info("Completed cleanup")
 
 	// This method may be called concurrently and must therefore be implemented in a concurrency safe way
 	e.mutex.Lock()
@@ -107,11 +97,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.V(2).Info("Completed Collect")
 }
 
-// enqueueToRemoveFromWatched
-func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedCHI) {
-	e.toRemoveFromWatched.Store(chi, struct{}{})
-}
-
 // WalkWatchedChi walks over watched CHI objects
 func (e *Exporter) WalkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
 	// Loop over ClickHouseInstallations
@@ -126,6 +111,27 @@ func (e *Exporter) WalkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
 // Describe implements prometheus.Collector Describe method
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	prometheus.DescribeByCollect(e, ch)
+}
+
+// enqueueToRemoveFromWatched
+func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedCHI) {
+	e.toRemoveFromWatched.Store(chi, struct{}{})
+}
+
+// cleanup cleans all pending for cleaning
+func (e *Exporter) cleanup() {
+	// Clean up all pending for cleaning CHIs
+	log.V(2).Info("Starting cleanup")
+	e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
+		switch key.(type) {
+		case *WatchedCHI:
+			e.toRemoveFromWatched.Delete(key)
+			e.removeFromWatched(key.(*WatchedCHI))
+			log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedCHI).Name, key.(*WatchedCHI).Namespace)
+		}
+		return true
+	})
+	log.V(2).Info("Completed cleanup")
 }
 
 // removeFromWatched deletes record from Exporter.chInstallation map identified by chiName key
