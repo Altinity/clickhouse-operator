@@ -40,7 +40,7 @@ spec:
           auto: "true"
         layout:
           shardsCount: 2
-          replicasCount: 2
+          replicasCount: 1
     settings:
       # disable non-secure ports, & configure secure ports.
       tcp_port: _removed_
