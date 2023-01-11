@@ -245,10 +245,12 @@ type OperatorConfigReconcile struct {
 	Host OperatorConfigReconcileHost `json:"host" yaml:"host"`
 }
 
+// OperatorConfigReconcileHost defines reconcile host config
 type OperatorConfigReconcileHost struct {
 	Wait OperatorConfigReconcileHostWait `json:"wait" yaml:"wait"`
 }
 
+// OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
 	Exclude *StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
 	Include *StringBool `json:"include,omitempty" yaml:"include,omitempty"`
