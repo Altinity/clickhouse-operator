@@ -34,7 +34,7 @@ import (
 // Exporter implements prometheus.Collector interface
 type Exporter struct {
 	clusterConnectionParams *clickhouse.ClusterConnectionParams
-	collectorTimeout time.Duration
+	collectorTimeout        time.Duration
 
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
@@ -67,7 +67,7 @@ func NewExporter(
 	return &Exporter{
 		chInstallations:         make(map[string]*WatchedCHI),
 		clusterConnectionParams: connectionParams,
-		collectorTimeout: collectorTimeout,
+		collectorTimeout:        collectorTimeout,
 	}
 }
 
