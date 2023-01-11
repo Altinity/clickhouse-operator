@@ -20,8 +20,6 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
-	"time"
-
 	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
 	goch "github.com/mailru/go-clickhouse"
 
@@ -91,8 +89,8 @@ func (c *Connection) connect(_ctx context.Context) {
 		return
 	}
 
-	// Ping should be deadlined
-	ctx, cancel := context.WithDeadline(c.ensureCtx(_ctx), time.Now().Add(c.params.GetConnectTimeout()))
+	// Ping should have timeout
+	ctx, cancel := context.WithTimeout(c.ensureCtx(_ctx), c.params.GetConnectTimeout())
 	defer cancel()
 
 	if err := dbConnection.PingContext(ctx); err != nil {
@@ -122,15 +120,18 @@ func (c *Connection) QueryContext(_ctx context.Context, sql string) (*QueryResul
 		return nil, nil
 	}
 
-	// Query should be deadlined
-	ctx, cancel := context.WithDeadline(c.ensureCtx(_ctx), time.Now().Add(c.params.GetQueryTimeout()))
-
-	if !c.ensureConnected(ctx) {
-		cancel()
+	if !c.ensureConnected(_ctx) {
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		c.l.V(1).F().Error(s)
 		return nil, fmt.Errorf(s)
 	}
+
+	if util.IsContextDone(_ctx) {
+		return nil, _ctx.Err()
+	}
+
+	// Query should have timeout
+	ctx, cancel := context.WithTimeout(c.ensureCtx(_ctx), c.params.GetQueryTimeout())
 
 	rows, err := c.db.QueryContext(ctx, sql)
 	if err != nil {
@@ -159,11 +160,9 @@ func (c *Connection) ensureCtx(ctx context.Context) context.Context {
 
 // ctx creates context with deadline
 func (c *Connection) ctx(ctx context.Context, opts *QueryOptions) (context.Context, context.CancelFunc) {
-	return context.WithDeadline(
+	return context.WithTimeout(
 		c.ensureCtx(ctx),
-		time.Now().Add(
-			util.ReasonableDuration(opts.GetQueryTimeout(), c.params.GetQueryTimeout()),
-		),
+		util.ReasonableDuration(opts.GetQueryTimeout(), c.params.GetQueryTimeout()),
 	)
 }
 
