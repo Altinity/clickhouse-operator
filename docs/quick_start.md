@@ -15,8 +15,8 @@
 # Prerequisites
 
 1. Kubernetes cluster that observes the following version considerations:
-    1. `clickhouse-operator` versions **before** `0.16.0` is compatible with [Kubenetes after `1.16` and prior `1.22`](https://kubernetes.io/releases/).
-    1. `clickhouse-operator` versions `0.16.0` **and after** is compatible [Kubernetes version `1.16` and after](https://kubernetes.io/releases/).
+    1. `clickhouse-operator` versions **before** `0.16.0` are compatible with [Kubenetes after `1.16` and prior `1.22`](https://kubernetes.io/releases/).
+    1. `clickhouse-operator` versions `0.16.0` **and after** are compatible [Kubernetes version `1.16` and after](https://kubernetes.io/releases/).
 1. Properly configured `kubectl`
 1. `curl`
 
@@ -64,11 +64,12 @@ installer will install **clickhouse-operator** into `kube-system` namespace and 
 you can download manually [this template file][clickhouse-operator-install-template.yaml]
 and edit it according to your choice. After that apply it with `kubectl`. Or you can use this snippet instead:
 ```bash
+#!/bin/bash
+
 # Namespace to install operator into
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-test-clickhouse-operator}"
 # Namespace to install metrics-exporter into
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
-
 # Operator's docker image
 OPERATOR_IMAGE="${OPERATOR_IMAGE:-altinity/clickhouse-operator:latest}"
 # Metrics exporter's docker image
