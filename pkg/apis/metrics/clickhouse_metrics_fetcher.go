@@ -17,12 +17,12 @@ package metrics
 import (
 	"context"
 	"database/sql"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (

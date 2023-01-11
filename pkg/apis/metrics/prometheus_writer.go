@@ -22,7 +22,6 @@ import (
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
