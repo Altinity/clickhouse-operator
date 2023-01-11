@@ -91,12 +91,17 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	defer e.mutex.Unlock()
 
 	log.V(2).Info("Starting Collect")
+
+	// Collect should have timeout
+	ctx, cancel := context.WithTimeout(context.Background(), e.collectorTimeout)
+	defer cancel()
+
 	var wg = sync.WaitGroup{}
 	e.walkWatchedChi(func(chi *WatchedCHI, hostname string) {
 		wg.Add(1)
 		go func(chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
 			defer wg.Done()
-			e.collectFromHost(chi, hostname, c)
+			e.collectFromHost(ctx, chi, hostname, c)
 		}(chi, hostname, ch)
 	})
 	wg.Wait()
@@ -191,12 +196,12 @@ func (e *Exporter) updateWatch(namespace, chiName string, hostnames []string) {
 }
 
 // collectFromHost collects metrics from one host and writes them into chan
-func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
+func (e *Exporter) collectFromHost(ctx context.Context, chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
 	fetcher := e.newFetcher(hostname)
 	writer := NewPrometheusWriter(c, chi, hostname)
 
 	log.V(2).Infof("Querying metrics for %s\n", hostname)
-	if metrics, err := fetcher.getClickHouseQueryMetrics(); err == nil {
+	if metrics, err := fetcher.getClickHouseQueryMetrics(ctx); err == nil {
 		log.V(2).Infof("Extracted %d metrics for %s\n", len(metrics), hostname)
 		writer.WriteMetrics(metrics)
 		writer.WriteOKFetch("system.metrics")
@@ -207,7 +212,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	log.V(2).Infof("Querying table sizes for %s\n", hostname)
-	if systemPartsData, err := fetcher.getClickHouseSystemParts(); err == nil {
+	if systemPartsData, err := fetcher.getClickHouseSystemParts(ctx); err == nil {
 		log.V(2).Infof("Extracted %d table sizes for %s\n", len(systemPartsData), hostname)
 		writer.WriteTableSizes(systemPartsData)
 		writer.WriteOKFetch("table sizes")
@@ -221,7 +226,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	log.V(2).Infof("Querying system replicas for %s\n", hostname)
-	if systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(); err == nil {
+	if systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(ctx); err == nil {
 		log.V(2).Infof("Extracted %d system replicas for %s\n", len(systemReplicas), hostname)
 		writer.WriteSystemReplicas(systemReplicas)
 		writer.WriteOKFetch("system.replicas")
@@ -232,7 +237,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	log.V(2).Infof("Querying mutations for %s\n", hostname)
-	if mutations, err := fetcher.getClickHouseQueryMutations(); err == nil {
+	if mutations, err := fetcher.getClickHouseQueryMutations(ctx); err == nil {
 		log.V(2).Infof("Extracted %d mutations for %s\n", len(mutations), hostname)
 		writer.WriteMutations(mutations)
 		writer.WriteOKFetch("system.mutations")
@@ -243,7 +248,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	log.V(2).Infof("Querying disks for %s\n", hostname)
-	if disks, err := fetcher.getClickHouseQuerySystemDisks(); err == nil {
+	if disks, err := fetcher.getClickHouseQuerySystemDisks(ctx); err == nil {
 		log.V(2).Infof("Extracted %d disks for %s\n", len(disks), hostname)
 		writer.WriteSystemDisks(disks)
 		writer.WriteOKFetch("system.disks")
@@ -254,7 +259,7 @@ func (e *Exporter) collectFromHost(chi *WatchedCHI, hostname string, c chan<- pr
 	}
 
 	log.V(2).Infof("Querying detached parts for %s\n", hostname)
-	if detachedParts, err := fetcher.getClickHouseQueryDetachedParts(); err == nil {
+	if detachedParts, err := fetcher.getClickHouseQueryDetachedParts(ctx); err == nil {
 		log.V(2).Infof("Extracted %d detached parts info for %s\n", len(detachedParts), hostname)
 		writer.WriteDetachedParts(detachedParts)
 		writer.WriteOKFetch("system.detached_parts")
