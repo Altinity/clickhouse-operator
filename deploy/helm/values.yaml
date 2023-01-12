@@ -252,6 +252,10 @@ configs:
             connect: 2
             query: 5
 
+        metrics:
+          timeouts:
+            collect: 9
+
       ################################################
       ##
       ## Templates Section
