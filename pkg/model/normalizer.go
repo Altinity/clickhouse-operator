@@ -221,30 +221,13 @@ func (n *Normalizer) finalizeCHI() {
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.ctx.chi.WalkHostsFullPath(0, 0, func(
 		chi *chiV1.ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
 		cluster *chiV1.Cluster,
-
-		shardIndex int,
 		shard *chiV1.ChiShard,
-
-		replicaIndex int,
 		replica *chiV1.ChiReplica,
-
 		host *chiV1.ChiHost,
+		address *chiV1.HostAddress,
 	) error {
 		host.Address.StatefulSet = CreateStatefulSetName(host)
-
 		return nil
 	})
 }
