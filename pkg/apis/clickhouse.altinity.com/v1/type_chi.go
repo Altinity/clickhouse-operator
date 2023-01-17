@@ -102,68 +102,52 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 
 	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, func(
 		chi *ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
 		cluster *Cluster,
-
-		shardIndex int,
 		shard *ChiShard,
-
-		replicaIndex int,
 		replica *ChiReplica,
-
 		host *ChiHost,
+		address *HostAddress,
 	) error {
 		cluster.Address.Namespace = chi.Namespace
 		cluster.Address.CHIName = chi.Name
 		cluster.Address.ClusterName = cluster.Name
-		cluster.Address.ClusterIndex = clusterIndex
+		cluster.Address.ClusterIndex = address.ClusterIndex
 
 		shard.Address.Namespace = chi.Namespace
 		shard.Address.CHIName = chi.Name
 		shard.Address.ClusterName = cluster.Name
-		shard.Address.ClusterIndex = clusterIndex
+		shard.Address.ClusterIndex = address.ClusterIndex
 		shard.Address.ShardName = shard.Name
-		shard.Address.ShardIndex = shardIndex
+		shard.Address.ShardIndex = address.ShardIndex
 
 		replica.Address.Namespace = chi.Namespace
 		replica.Address.CHIName = chi.Name
 		replica.Address.ClusterName = cluster.Name
-		replica.Address.ClusterIndex = clusterIndex
+		replica.Address.ClusterIndex = address.ClusterIndex
 		replica.Address.ReplicaName = replica.Name
-		replica.Address.ReplicaIndex = replicaIndex
+		replica.Address.ReplicaIndex = address.ReplicaIndex
 
 		host.Address.Namespace = chi.Namespace
 		// Skip StatefulSet as impossible to self-calculate
 		// host.Address.StatefulSet = CreateStatefulSetName(host)
 		host.Address.CHIName = chi.Name
 		host.Address.ClusterName = cluster.Name
-		host.Address.ClusterIndex = clusterIndex
+		host.Address.ClusterIndex = address.ClusterIndex
 		host.Address.ShardName = shard.Name
-		host.Address.ShardIndex = shardIndex
+		host.Address.ShardIndex = address.ShardIndex
 		host.Address.ReplicaName = replica.Name
-		host.Address.ReplicaIndex = replicaIndex
+		host.Address.ReplicaIndex = address.ReplicaIndex
 		host.Address.HostName = host.Name
-		host.Address.CHIScopeIndex = chiScopeIndex
-		host.Address.CHIScopeCycleSize = chiScopeCycleSize
-		host.Address.CHIScopeCycleIndex = chiScopeCycleIndex
-		host.Address.CHIScopeCycleOffset = chiScopeCycleOffset
-		host.Address.ClusterScopeIndex = clusterScopeIndex
-		host.Address.ClusterScopeCycleSize = clusterScopeCycleSize
-		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
-		host.Address.ClusterScopeCycleOffset = clusterScopeCycleOffset
-		host.Address.ShardScopeIndex = replicaIndex
-		host.Address.ReplicaScopeIndex = shardIndex
+		host.Address.CHIScopeIndex = address.CHIScope.Index
+		host.Address.CHIScopeCycleSize = address.CHIScope.Cycle.Size
+		host.Address.CHIScopeCycleIndex = address.CHIScope.Cycle.Index
+		host.Address.CHIScopeCycleOffset = address.CHIScope.Cycle.Offset
+		host.Address.ClusterScopeIndex = address.ClusterScope.Index
+		host.Address.ClusterScopeCycleSize = address.ClusterScope.Cycle.Size
+		host.Address.ClusterScopeCycleIndex = address.ClusterScope.Cycle.Index
+		host.Address.ClusterScopeCycleOffset = address.ClusterScope.Cycle.Offset
+		host.Address.ShardScopeIndex = address.ReplicaIndex
+		host.Address.ReplicaScopeIndex = address.ShardIndex
 
 		return nil
 	})
@@ -173,27 +157,11 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 func (chi *ClickHouseInstallation) FillCHIPointer() {
 	chi.WalkHostsFullPath(0, 0, func(
 		chi *ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
 		cluster *Cluster,
-
-		shardIndex int,
 		shard *ChiShard,
-
-		replicaIndex int,
 		replica *ChiReplica,
-
 		host *ChiHost,
+		address *HostAddress,
 	) error {
 		cluster.CHI = chi
 		shard.CHI = chi
@@ -271,102 +239,93 @@ func (chi *ClickHouseInstallation) WalkShards(
 	return res
 }
 
+type HostScopeCycle struct {
+	Size int
+
+	Index  int
+	Offset int
+}
+
+func NewHostScopeCycle() *HostScopeCycle {
+	return &HostScopeCycle{}
+}
+
+type HostScope struct {
+	Cycle *HostScopeCycle
+	Index int
+}
+
+func NewHostScope() *HostScope {
+	return &HostScope{
+		Cycle: NewHostScopeCycle(),
+	}
+}
+
+func (s *HostScope) Init() {
+	s.Index = 0
+	s.Cycle.Index = 0
+	s.Cycle.Offset = 0
+}
+
+func (s *HostScope) Inc() {
+	s.Index++
+	s.Cycle.Offset++
+	if (s.Cycle.Size > 0) && (s.Cycle.Offset >= s.Cycle.Size) {
+		s.Cycle.Offset = 0
+		s.Cycle.Index++
+	}
+}
+
+type HostAddress struct {
+	CHIScope     *HostScope
+	ClusterScope *HostScope
+	ClusterIndex int
+	ShardIndex   int
+	ReplicaIndex int
+}
+
+func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddress) {
+	a = &HostAddress{
+		CHIScope:     NewHostScope(),
+		ClusterScope: NewHostScope(),
+	}
+	a.CHIScope.Cycle.Size = chiScopeCycleSize
+	a.ClusterScope.Cycle.Size = clusterScopeCycleSize
+	return a
+}
+
+type WalkHostsAddressFn func(
+	chi *ClickHouseInstallation,
+	cluster *Cluster,
+	shard *ChiShard,
+	replica *ChiReplica,
+	host *ChiHost,
+	address *HostAddress,
+) error
+
 // WalkHostsFullPath walks hosts with full path
 func (chi *ClickHouseInstallation) WalkHostsFullPath(
 	chiScopeCycleSize int,
 	clusterScopeCycleSize int,
-	f func(
-		chi *ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
-		cluster *Cluster,
-
-		shardIndex int,
-		shard *ChiShard,
-
-		replicaIndex int,
-		replica *ChiReplica,
-
-		host *ChiHost,
-	) error,
-) []error {
-
-	res := make([]error, 0)
-
-	chiScopeIndex := 0
-	chiScopeCycleIndex := 0
-	chiScopeCycleOffset := 0
-
-	clusterScopeIndex := 0
-	clusterScopeCycleIndex := 0
-	clusterScopeCycleOffset := 0
-
+	f WalkHostsAddressFn,
+) (res []error) {
+	address := NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize)
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
-
-		clusterScopeIndex = 0
-		clusterScopeCycleIndex = 0
-		clusterScopeCycleOffset = 0
-
+		address.ClusterScope.Init()
 		for shardIndex := range cluster.Layout.Shards {
 			shard := cluster.GetShard(shardIndex)
 			for replicaIndex, host := range shard.Hosts {
 				replica := cluster.GetReplica(replicaIndex)
-
-				res = append(res, f(
-					chi,
-
-					chiScopeIndex,
-					chiScopeCycleSize,
-					chiScopeCycleIndex,
-					chiScopeCycleOffset,
-
-					clusterScopeIndex,
-					clusterScopeCycleSize,
-					clusterScopeCycleIndex,
-					clusterScopeCycleOffset,
-
-					clusterIndex,
-					cluster,
-
-					shardIndex,
-					shard,
-
-					replicaIndex,
-					replica,
-
-					host,
-				))
-
-				// CHI-scope counters
-				chiScopeIndex++
-				chiScopeCycleOffset++
-				if (chiScopeCycleSize > 0) && (chiScopeCycleOffset >= chiScopeCycleSize) {
-					chiScopeCycleOffset = 0
-					chiScopeCycleIndex++
-				}
-
-				// Cluster-scope counters
-				clusterScopeIndex++
-				clusterScopeCycleOffset++
-				if (clusterScopeCycleSize > 0) && (clusterScopeCycleOffset >= clusterScopeCycleSize) {
-					clusterScopeCycleOffset = 0
-					clusterScopeCycleIndex++
-				}
+				address.ClusterIndex = clusterIndex
+				address.ShardIndex = shardIndex
+				address.ReplicaIndex = replicaIndex
+				res = append(res, f(chi, cluster, shard, replica, host, address))
+				address.CHIScope.Inc()
+				address.ClusterScope.Inc()
 			}
 		}
 	}
-
 	return res
 }
 
