@@ -355,24 +355,6 @@ func (chi *ClickHouseInstallation) WalkHosts(f func(host *ChiHost) error) []erro
 	return res
 }
 
-// WalkHostsTillError walks hosts until an error met
-func (chi *ClickHouseInstallation) WalkHostsTillError(f func(host *ChiHost) error) error {
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
-		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Hosts {
-				host := shard.Hosts[replicaIndex]
-				if err := f(host); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 // WalkTillError walks until an error met
 func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
