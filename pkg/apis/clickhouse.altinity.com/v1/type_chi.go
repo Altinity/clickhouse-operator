@@ -100,75 +100,83 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 		clusterScopeCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
 	}
 
-	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, func(
-		chi *ClickHouseInstallation,
-		cluster *Cluster,
-		shard *ChiShard,
-		replica *ChiReplica,
-		host *ChiHost,
-		address *HostAddress,
-	) error {
-		cluster.Address.Namespace = chi.Namespace
-		cluster.Address.CHIName = chi.Name
-		cluster.Address.ClusterName = cluster.Name
-		cluster.Address.ClusterIndex = address.ClusterIndex
+	chi.WalkHostsFullPath(
+		chiScopeCycleSize,
+		clusterScopeCycleSize,
+		func(
+			chi *ClickHouseInstallation,
+			cluster *Cluster,
+			shard *ChiShard,
+			replica *ChiReplica,
+			host *ChiHost,
+			address *HostAddress,
+		) error {
+			cluster.Address.Namespace = chi.Namespace
+			cluster.Address.CHIName = chi.Name
+			cluster.Address.ClusterName = cluster.Name
+			cluster.Address.ClusterIndex = address.ClusterIndex
 
-		shard.Address.Namespace = chi.Namespace
-		shard.Address.CHIName = chi.Name
-		shard.Address.ClusterName = cluster.Name
-		shard.Address.ClusterIndex = address.ClusterIndex
-		shard.Address.ShardName = shard.Name
-		shard.Address.ShardIndex = address.ShardIndex
+			shard.Address.Namespace = chi.Namespace
+			shard.Address.CHIName = chi.Name
+			shard.Address.ClusterName = cluster.Name
+			shard.Address.ClusterIndex = address.ClusterIndex
+			shard.Address.ShardName = shard.Name
+			shard.Address.ShardIndex = address.ShardIndex
 
-		replica.Address.Namespace = chi.Namespace
-		replica.Address.CHIName = chi.Name
-		replica.Address.ClusterName = cluster.Name
-		replica.Address.ClusterIndex = address.ClusterIndex
-		replica.Address.ReplicaName = replica.Name
-		replica.Address.ReplicaIndex = address.ReplicaIndex
+			replica.Address.Namespace = chi.Namespace
+			replica.Address.CHIName = chi.Name
+			replica.Address.ClusterName = cluster.Name
+			replica.Address.ClusterIndex = address.ClusterIndex
+			replica.Address.ReplicaName = replica.Name
+			replica.Address.ReplicaIndex = address.ReplicaIndex
 
-		host.Address.Namespace = chi.Namespace
-		// Skip StatefulSet as impossible to self-calculate
-		// host.Address.StatefulSet = CreateStatefulSetName(host)
-		host.Address.CHIName = chi.Name
-		host.Address.ClusterName = cluster.Name
-		host.Address.ClusterIndex = address.ClusterIndex
-		host.Address.ShardName = shard.Name
-		host.Address.ShardIndex = address.ShardIndex
-		host.Address.ReplicaName = replica.Name
-		host.Address.ReplicaIndex = address.ReplicaIndex
-		host.Address.HostName = host.Name
-		host.Address.CHIScopeIndex = address.CHIScope.Index
-		host.Address.CHIScopeCycleSize = address.CHIScope.Cycle.Size
-		host.Address.CHIScopeCycleIndex = address.CHIScope.Cycle.Index
-		host.Address.CHIScopeCycleOffset = address.CHIScope.Cycle.Offset
-		host.Address.ClusterScopeIndex = address.ClusterScope.Index
-		host.Address.ClusterScopeCycleSize = address.ClusterScope.Cycle.Size
-		host.Address.ClusterScopeCycleIndex = address.ClusterScope.Cycle.Index
-		host.Address.ClusterScopeCycleOffset = address.ClusterScope.Cycle.Offset
-		host.Address.ShardScopeIndex = address.ReplicaIndex
-		host.Address.ReplicaScopeIndex = address.ShardIndex
+			host.Address.Namespace = chi.Namespace
+			// Skip StatefulSet as impossible to self-calculate
+			// host.Address.StatefulSet = CreateStatefulSetName(host)
+			host.Address.CHIName = chi.Name
+			host.Address.ClusterName = cluster.Name
+			host.Address.ClusterIndex = address.ClusterIndex
+			host.Address.ShardName = shard.Name
+			host.Address.ShardIndex = address.ShardIndex
+			host.Address.ReplicaName = replica.Name
+			host.Address.ReplicaIndex = address.ReplicaIndex
+			host.Address.HostName = host.Name
+			host.Address.CHIScopeIndex = address.CHIScope.Index
+			host.Address.CHIScopeCycleSize = address.CHIScope.Cycle.Size
+			host.Address.CHIScopeCycleIndex = address.CHIScope.Cycle.Index
+			host.Address.CHIScopeCycleOffset = address.CHIScope.Cycle.Offset
+			host.Address.ClusterScopeIndex = address.ClusterScope.Index
+			host.Address.ClusterScopeCycleSize = address.ClusterScope.Cycle.Size
+			host.Address.ClusterScopeCycleIndex = address.ClusterScope.Cycle.Index
+			host.Address.ClusterScopeCycleOffset = address.ClusterScope.Cycle.Offset
+			host.Address.ShardScopeIndex = address.ReplicaIndex
+			host.Address.ReplicaScopeIndex = address.ShardIndex
 
-		return nil
-	})
+			return nil
+		},
+	)
 }
 
 // FillCHIPointer fills CHI pointer
 func (chi *ClickHouseInstallation) FillCHIPointer() {
-	chi.WalkHostsFullPath(0, 0, func(
-		chi *ClickHouseInstallation,
-		cluster *Cluster,
-		shard *ChiShard,
-		replica *ChiReplica,
-		host *ChiHost,
-		address *HostAddress,
-	) error {
-		cluster.CHI = chi
-		shard.CHI = chi
-		replica.CHI = chi
-		host.CHI = chi
-		return nil
-	})
+	chi.WalkHostsFullPath(
+		0,
+		0,
+		func(
+			chi *ClickHouseInstallation,
+			cluster *Cluster,
+			shard *ChiShard,
+			replica *ChiReplica,
+			host *ChiHost,
+			address *HostAddress,
+		) error {
+			cluster.CHI = chi
+			shard.CHI = chi
+			replica.CHI = chi
+			host.CHI = chi
+			return nil
+		},
+	)
 }
 
 // WalkClustersFullPath walks clusters with full path
