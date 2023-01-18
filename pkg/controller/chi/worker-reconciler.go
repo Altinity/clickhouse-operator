@@ -143,6 +143,24 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 	defer w.a.V(2).M(chi).E().P()
 
 	// 1. CHI Service
+	if err := w.reconcileCHIService(ctx, chi); err != nil {
+		return err
+	}
+
+	// 2. CHI common ConfigMap without added hosts
+	options := w.options()
+	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
+		w.a.F().Error("failed to reconcile config map common. err: %v", err)
+	}
+	// 3. CHI users ConfigMap
+	if err := w.reconcileCHIConfigMapUsers(ctx, chi); err != nil {
+		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+	}
+
+	return nil
+}
+
+func (w *worker) reconcileCHIService(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if chi.IsStopped() {
 		// Stopped cluster must have no entry point
 		_ = w.c.deleteServiceCHI(ctx, chi)
@@ -156,17 +174,6 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 			w.task.registryReconciled.RegisterService(service.ObjectMeta)
 		}
 	}
-
-	// 2. CHI common ConfigMap without added hosts
-	options := w.options()
-	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
-		w.a.F().Error("failed to reconcile config map common. err: %v", err)
-	}
-	// 3. CHI users ConfigMap
-	if err := w.reconcileCHIConfigMapUsers(ctx, chi); err != nil {
-		w.a.F().Error("failed to reconcile config map users. err: %v", err)
-	}
-
 	return nil
 }
 
@@ -493,6 +500,12 @@ func (w *worker) reconcileConfigMap(
 	}
 
 	return err
+}
+
+func (w *worker) hasService(ctx context.Context, chi *chiV1.ClickHouseInstallation, service *coreV1.Service) bool {
+	// Check whether this object already exists
+	curService, _ := w.c.getService(service)
+	return curService != nil
 }
 
 // reconcileService reconciles core.Service
