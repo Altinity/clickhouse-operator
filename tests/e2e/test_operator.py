@@ -3241,8 +3241,8 @@ def test_038(self, step=1, insert_numbers=100):
         kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=4, ns=settings.test_namespace)
 
     create_table = f"""
-    DROP TABLE IF EXISTS secure on cluster '{cluster}' SYNC;"""+"""
-    CREATE TABLE secure on cluster 'secret-ref' (a UInt32)
+    DROP TABLE IF EXISTS secure on cluster '{cluster}' SYNC;"""+f"""
+    CREATE TABLE secure on cluster '{cluster}' (a UInt32)
     Engine = ReplicatedMergeTree()
     PARTITION BY tuple()
     ORDER BY a
@@ -3250,7 +3250,7 @@ def test_038(self, step=1, insert_numbers=100):
 
     with When("I create distributed table that use secure port and insert data into it"):
         clickhouse.query(chi, create_table, pwd="qkrq", port="9440")
-        clickhouse.query(chi, f"DROP TABLE IF EXISTS secure_dist on cluster 'secret-ref' SYNC;"
+        clickhouse.query(chi, f"DROP TABLE IF EXISTS secure_dist on cluster '{cluster}' SYNC;"
                               f"CREATE TABLE IF NOT EXISTS secure_dist on cluster '{cluster}' as secure"
                               f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq", port="9440")
         clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers({insert_numbers})", pwd="qkrq", port="9440")
@@ -3274,12 +3274,14 @@ def test_038(self, step=1, insert_numbers=100):
 
 @TestScenario
 @Name("test_038_1. Secure inter-cluster communications")
+@Requirements(RQ_SRS_026_ClickHouseOperator_SecureInterClusterCommunication("1.0"))
 def test_038_1(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
     test_038(step=1)
 
 
 @TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_SecureInterClusterCommunication("1.0"))
 @Name("test_038_2. Secure inter-cluster communications")
 def test_038_2(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
@@ -3287,10 +3289,78 @@ def test_038_2(self):
 
 
 @TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_SecureInterClusterCommunication("1.0"))
 @Name("test_038_3. Secure inter-cluster communications")
 def test_038_3(self):
     """Check clickhouse-operator support secure inter-cluster communications."""
     test_038(step=3)
+
+
+@TestCheck
+@Name("test_039. Inter-cluster communications with secret")
+def test_039(self, step=1):
+    """Check clickhouse-operator."""#todo
+    cluster = "default"
+    manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "apply_templates": {
+                    settings.clickhouse_template,
+                },
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    create_table = f"""
+    DROP TABLE IF EXISTS secure on cluster '{cluster}' SYNC;"""+f"""
+    CREATE TABLE secure on cluster '{cluster}' (a UInt32)
+    Engine = ReplicatedMergeTree()
+    PARTITION BY tuple()
+    ORDER BY a
+    """.replace('\r', '').replace('\n', '')
+
+    with When("I create distributed table that use secure port and insert data into it"):
+        clickhouse.query(chi, create_table, pwd="qkrq")
+        clickhouse.query(chi, f"DROP TABLE IF EXISTS secure_dist on cluster '{cluster}' SYNC;"
+                              f"CREATE TABLE secure_dist on cluster '{cluster}' as secure"
+                              f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq")
+        clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers(10)", pwd="qkrq")
+
+    with Then("I check that default user can select from this table"):
+        for attempt in retries(timeout=300, delay=1):
+            with attempt:
+                r = clickhouse.query(chi, "SELECT * FROM secure_dist order by a", pwd="qkrq")
+                assert r == "\n".join([f"{i}" for i in range(10)])
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
+@Name("test_039_1. Secure inter-cluster communications")
+def test_039_1(self):
+    """Check clickhouse-operator support inter-cluster communications with secret."""
+    test_039(step=1)
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
+@Name("test_039_2. Secure inter-cluster communications")
+def test_039_2(self):
+    """Check clickhouse-operator support inter-cluster communications with secret."""
+    test_039(step=2)
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
+@Name("test_039_3. Secure inter-cluster communications")
+def test_039_3(self):
+    """Check clickhouse-operator support inter-cluster communications with secret."""
+    test_039(step=3)
 
 
 @TestModule
