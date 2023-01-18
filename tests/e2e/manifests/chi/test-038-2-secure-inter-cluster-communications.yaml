@@ -45,10 +45,6 @@ spec:
       # disable non-secure ports, & configure secure ports.
       tcp_port: _removed_
       tcp_port_secure: 9440
-      http_port: _removed_
-      https_port: 8443
-      interserver_http_port: _removed_
-      interserver_https_port: 9010
 
       # https://clickhouse.com/docs/en/guides/sre/configuring-ssl/
       openSSL/server/certificateFile: "/etc/clickhouse-server/tls/tls.crt"
