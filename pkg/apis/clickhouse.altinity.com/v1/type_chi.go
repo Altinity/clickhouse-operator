@@ -100,7 +100,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 		clusterScopeCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
 	}
 
-	chi.WalkHostsFullPath(
+	chi.WalkHostsFullPathAndScope(
 		chiScopeCycleSize,
 		clusterScopeCycleSize,
 		func(
@@ -160,8 +160,6 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 // FillCHIPointer fills CHI pointer
 func (chi *ClickHouseInstallation) FillCHIPointer() {
 	chi.WalkHostsFullPath(
-		0,
-		0,
 		func(
 			chi *ClickHouseInstallation,
 			cluster *Cluster,
@@ -288,7 +286,7 @@ type WalkHostsAddressFn func(
 ) error
 
 // WalkHostsFullPath walks hosts with full path
-func (chi *ClickHouseInstallation) WalkHostsFullPath(
+func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 	chiScopeCycleSize int,
 	clusterScopeCycleSize int,
 	f WalkHostsAddressFn,
@@ -311,6 +309,10 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(
 		}
 	}
 	return res
+}
+
+func (chi *ClickHouseInstallation) WalkHostsFullPath(f WalkHostsAddressFn) (res []error) {
+	return chi.WalkHostsFullPathAndScope(0, 0, f)
 }
 
 // WalkHosts walks hosts
