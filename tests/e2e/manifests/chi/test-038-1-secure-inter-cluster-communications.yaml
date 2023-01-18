@@ -45,10 +45,6 @@ spec:
       # disable non-secure ports, & configure secure ports.
       tcp_port: _removed_
       tcp_port_secure: 9440
-      http_port: _removed_
-      https_port: 8443
-      interserver_http_port: _removed_
-      interserver_https_port: 9010
 
       # https://clickhouse.com/docs/en/guides/sre/configuring-ssl/
       openSSL/server/certificateFile: "/etc/clickhouse-server/tls/tls.crt"
@@ -87,13 +83,6 @@ spec:
           containers:
             - image: clickhouse/clickhouse-server:22.8
               imagePullPolicy: IfNotPresent
-              livenessProbe:
-                httpGet:
-                  path: /ping
-                  port: https
-                  scheme: HTTPS
-                initialDelaySeconds: 60
-                periodSeconds: 3
               name: clickhouse-pod
               ports:
                 - containerPort: 9440
@@ -105,10 +94,6 @@ spec:
                 - containerPort: 9010
                   name: interserver
                   protocol: TCP
-              readinessProbe:
-                httpGet:
-                  path: /ping
-                  port: https
                   scheme: HTTPS
               volumeMounts:
                 - mountPath: /etc/clickhouse-server/tls
