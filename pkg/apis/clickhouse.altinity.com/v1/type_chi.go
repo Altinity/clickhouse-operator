@@ -203,30 +203,6 @@ func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *Cluster) error) 
 	return res
 }
 
-// WalkShardsFullPath walks shards with full path
-func (chi *ClickHouseInstallation) WalkShardsFullPath(
-	f func(
-		chi *ClickHouseInstallation,
-		clusterIndex int,
-		cluster *Cluster,
-		shardIndex int,
-		shard *ChiShard,
-	) error,
-) []error {
-
-	res := make([]error, 0)
-
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
-		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
-			res = append(res, f(chi, clusterIndex, cluster, shardIndex, shard))
-		}
-	}
-
-	return res
-}
-
 // WalkShards walks shards
 func (chi *ClickHouseInstallation) WalkShards(
 	f func(

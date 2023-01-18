@@ -219,21 +219,10 @@ func (n *Normalizer) finalizeCHI() {
 
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
-	n.ctx.chi.WalkHostsFullPath(
-		0,
-		0,
-		func(
-			chi *chiV1.ClickHouseInstallation,
-			cluster *chiV1.Cluster,
-			shard *chiV1.ChiShard,
-			replica *chiV1.ChiReplica,
-			host *chiV1.ChiHost,
-			address *chiV1.HostAddress,
-		) error {
-			host.Address.StatefulSet = CreateStatefulSetName(host)
-			return nil
-		},
-	)
+	n.ctx.chi.WalkHosts(func(host *chiV1.ChiHost) error {
+		host.Address.StatefulSet = CreateStatefulSetName(host)
+		return nil
+	})
 }
 
 // getHostTemplate gets Host Template to be used to normalize Host
