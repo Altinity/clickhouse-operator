@@ -142,12 +142,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
 
-	// 1. CHI Service
-	if err := w.reconcileCHIService(ctx, chi); err != nil {
-		return err
-	}
-
-	// 2. CHI common ConfigMap without added hosts
+	// CHI common ConfigMap without added hosts
 	options := w.options()
 	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
@@ -392,6 +387,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
+	if host.Address.CHIScopeIndex == 0 {
+		defer w.reconcileCHIService(ctx, host.CHI)
+	}
 
 	w.a.V(1).
 		WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
