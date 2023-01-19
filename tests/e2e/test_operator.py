@@ -2811,46 +2811,6 @@ def test_032(self):
 
 
 @TestScenario
-@Name("test_033. Test installing with TLS")
-def test_033(self):
-    """Test installing with TLS."""
-    util.require_keeper(keeper_type=self.context.keeper_type)
-
-    shell = Shell()
-
-    manifest = "manifests/chi/test-033-tls.yaml"
-    chi = "test-033-tls"
-
-    # generate certs for installing clickhouse with TLS
-    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
-    shell(f"""
-        openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
-            -keyout clickhouse-key.pem -out clickhouse-cert.pem \
-            -subj "/CN=clickhouse-test-033-tls" \
-            -addext "subjectAltName=DNS:clickhouse-{chi},DNS:clickhouse-{chi}.clickhouse-test,DNS:clickhouse-{chi}.test.svc.cluster.local"
-    """)
-    # create secrets for the certs
-    shell(f"kubectl -n {settings.test_namespace} create secret tls clickhouse-cert --cert=clickhouse-cert.pem --key=clickhouse-key.pem")
-    # create a configmap with the CA to validate the cert
-    shell(f"kubectl -n {settings.test_namespace} create cm clickhouse-ca --from-file=ca.crt=clickhouse-cert.pem")
-
-    # deploy clickhouse
-    kubectl.apply(util.get_full_path(manifest, lookup_in_host=False))
-
-    kubectl.wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi}", count=1)
-    time.sleep(300)
-
-    with And("ClickHouse should be queryable and running on port 9440"):
-        # connect on the TLS port and verify the node registered itself in the cluster with port 9440
-        out = clickhouse.query(chi, "select count() from system.clusters WHERE cluster='default' AND port=9440;", port=9440)
-        print(f"out: {out}")
-        assert out == "2"
-
-    shell("rm -f clickhouse-cert.pem clickhouse-key.pem")
-    kubectl.delete_chi(chi)
-
-
-@TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_EnableHttps("1.0"))
 @Name("test_034. Check HTTPS support for health check")
 def test_034(self):
@@ -2859,6 +2819,7 @@ def test_034(self):
     monitoring the metrics endpoint on port 8888.
     """
     chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
+    operator_namespace = settings.operator_namespace
 
     def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=10):
         with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
@@ -2880,22 +2841,16 @@ def test_034(self):
                     time.sleep(i * 5)
             assert expected_pattern_found, error()
 
-    with Given("clickhouse-operator pod exists"):
-        kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
-                           ns=settings.operator_namespace)
-        assert kubectl.get_count("pod", ns=settings.operator_namespace, label=util.operator_label) > 0, error()
-        operator_namespace = settings.operator_namespace
-
     with When("create the chi without secure connection"):
-        manifest = "manifests/chi/test-operator-http-connection.yaml"
+        manifest = "manifests/chi/test-034-http.yaml"
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+        cluster = "default"
 
         kubectl.create_and_check(
             manifest=manifest,
             check={
                 "apply_templates": {
                     settings.clickhouse_template,
-                    "manifests/chit/tpl-persistent-volume-100Mi.yaml",
                 },
                 "object_counts": {
                     "statefulset": 1,
@@ -2907,11 +2862,9 @@ def test_034(self):
             timeout=600,
         )
 
-        kubectl.wait_jsonpath("pod", "chi-test-operator-http-connection-default-0-0-0", "{.status.containerStatuses[0].ready}", "true",
-                            ns=kubectl.namespace)
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end 1"):
-        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
 
@@ -2934,12 +2887,13 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end and delete the chi"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
-        kubectl.delete_chi(chi)
+
+    kubectl.delete_chi(chi)
 
     with When("create the chi with secure connection"):
-        manifest = "manifests/chi/test-operator-https-connection.yaml"
+        manifest = "manifests/chi/test-034-https.yaml"
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
         kubectl.create_and_check(
@@ -2947,7 +2901,6 @@ def test_034(self):
             check={
                 "apply_templates": {
                     settings.clickhouse_template,
-                    "manifests/chit/tpl-persistent-volume-100Mi.yaml",
                 },
                 "object_counts": {
                     "statefulset": 1,
@@ -2958,24 +2911,20 @@ def test_034(self):
             },
             timeout=600,
         )
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "pod_count": 1,
-                "pod_volumes": {
-                    "/var/lib/clickhouse",
-                },
-                "do_not_delete": 1,
-            },
-            timeout=1200,
-        )
 
-        kubectl.wait_jsonpath(
-            "pod",
-            "chi-test-operator-https-connection-t1-0-0-0",
-            "{.status.containerStatuses[0].ready}",
-            "true",
-            ns=kubectl.namespace)
+    client_pod = "test-034-client"
+    with And(f"Start {client_pod} pod"):
+        kubectl.apply(util.get_full_path("manifests/chi/test-034-client.yaml"))
+        kubectl.wait_pod_status(client_pod, "Running")
+
+    with And("Confirm it can securely connect to clickhouse"):
+        cmd = f"""exec {client_pod} -- clickhouse-client -h chi-test-034-https-default-0-0 --secure --port 9440 \
+               --user=test_034_client --password=test_034 \
+               -q 'select 1000'"""
+        out = kubectl.launch(cmd, ok_to_fail = True)
+        assert out == "1000", error()
+
+        kubectl.launch(f"delete pod {client_pod}")
 
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
@@ -3000,76 +2949,6 @@ def test_034(self):
         check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$")
 
     kubectl.delete_chi(chi)
-
-
-@TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps("1.0"))
-@Name("test_035. Check CHI HTTPS connection from local client")
-def test_035(self):
-    """Check ClickHouse server can be deployed by ClickHouse Operator with the support for `HTTPS` connection
-    by creating a ClickHouse installation with HTTPS enabled and executing a simple query from a local ClickHouse client
-    with the`--secure` option when port forwarding is enabled.
-    """
-    self.context.shell = Shell()
-
-    try:
-        with Given("clickhouse-operator pod exists"):
-            kubectl.wait_field(
-                "pods",
-                util.operator_label,
-                ".status.containerStatuses[*].ready",
-                "true,true",
-                ns=settings.operator_namespace)
-            assert kubectl.get_count("pod", ns=settings.operator_namespace, label=util.operator_label) > 0, error()
-
-        with When("create the chi with secure connection"):
-            manifest = "manifests/chi/test-operator-https-connection.yaml"
-            chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-
-            kubectl.create_and_check(
-                manifest=manifest,
-                check={
-                    "apply_templates": {
-                        settings.clickhouse_template,
-                        "manifests/chit/tpl-persistent-volume-100Mi.yaml",
-                    },
-                    "pod_volumes": {
-                        "/var/lib/clickhouse",
-                    },
-                    "object_counts": {
-                        "statefulset": 1,
-                        "pod": 1,
-                        "service": 2,
-                    },
-                    "do_not_delete": 1,
-                },
-                timeout=600,
-            )
-            kubectl.wait_jsonpath(
-                "pod",
-                "chi-test-operator-https-connection-t1-0-0-0",
-                "{.status.containerStatuses[0].ready}",
-                "true",
-                ns=kubectl.namespace
-            )
-
-        with When("I enable port forwarding to the service port 9440"):
-            self.context.shell(f"kubectl port-forward -n {settings.test_namespace} service/clickhouse-test-operator-https-connection 9440:9440 --address 0.0.0.0 &")
-
-        with And("I send secure connection request to clickhouse pod"):
-            for attempt in retries(timeout=30, delay=3, count=10):
-                with attempt:
-                    cmd = current().context.shell("clickhouse-client --secure --host=127.0.0.1 --port 9440 --query 'select 1000'", timeout=5)
-                    with Then("I expect query to return 1000"):
-                        assert "1000" in cmd.output, error()
-
-        with And("I delete the chi"):
-            kubectl.delete_chi(chi)
-
-    finally:
-        with Finally("I remove the port forwarding and close the shell"):
-            self.context.shell(f"pkill -e -f 'port\-forward \-n {settings.test_namespace} kubeservice/clickhouse\-test\-operator\-https\-connection'", timeout=5)
-            self.context.shell.close()
 
 
 @TestScenario
