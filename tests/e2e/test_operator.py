@@ -3128,6 +3128,8 @@ def test_036(self):
                                  sql="SELECT count(*) FROM test_local_036")
             assert r == "10000", error()
 
+    kubectl.delete_chi(chi)
+
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch("1.0"))
@@ -3209,10 +3211,12 @@ def test_037(self):
                              pod=f"chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
         assert r == "10000"
 
+    kubectl.delete_chi(chi)
+
 
 @TestCheck
 @Name("test_039. Inter-cluster communications with secret")
-def test_039(self, step=1):
+def test_039(self, step=0):
     """Check clickhouse-operator support inter-cluster communications with secrets."""
     cluster = "default"
     manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
@@ -3232,27 +3236,30 @@ def test_039(self, step=1):
             },
         )
 
-    create_table = f"""
-    DROP TABLE IF EXISTS secure on cluster '{cluster}' SYNC;"""+f"""
-    CREATE TABLE secure on cluster '{cluster}' (a UInt32)
-    Engine = ReplicatedMergeTree()
-    PARTITION BY tuple()
-    ORDER BY a
-    """.replace('\r', '').replace('\n', '')
-
     with When("I create distributed table that use secure port and insert data into it"):
-        clickhouse.query(chi, create_table, pwd="qkrq")
-        clickhouse.query(chi, f"DROP TABLE IF EXISTS secure_dist on cluster '{cluster}' SYNC;"
-                              f"CREATE TABLE secure_dist on cluster '{cluster}' as secure"
-                              f" ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq")
-        clickhouse.query(chi, f"INSERT INTO secure_dist select number as a from numbers(10)", pwd="qkrq")
+        clickhouse.query(chi, "CREATE OR REPLACE TABLE secure on cluster '{cluster}' (a UInt32) ENGINE = MergeTree() PARTITION BY tuple() ORDER BY a", pwd="qkrq")
+        clickhouse.query(chi, "CREATE OR REPLACE TABLE secure_dist on cluster '{cluster}' as secure ENGINE = Distributed('{cluster}', default, secure, a%2)", pwd="qkrq")
+        clickhouse.query(chi, "INSERT INTO secure_dist select number as a from numbers(10)", pwd="qkrq")
 
-    with Then("I check that default user can select from this table"):
-        for attempt in retries(timeout=300, delay=1):
-            with attempt:
-                r = clickhouse.query(chi, "SELECT * FROM secure_dist order by a", pwd="qkrq")
-                assert r == "\n".join([f"{i}" for i in range(10)])
+    if step == 0:
+        with Then("Select in cluster with no secret should fail"):
+            r = clickhouse.query_with_error(chi, "SELECT count(a) FROM secure_dist", pwd="qkrq")
+            assert "AUTHENTICATION_FAILED" in r
+    if step > 0:
+        with Then("Select in cluster with secret should pass"):
+            r = clickhouse.query(chi, "SELECT count() FROM secure_dist", pwd="qkrq")
+            assert r == "10"
 
+    if step == 3:
+        kubectl.delete_chi(chi)
+
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
+@Name("test_039_0. Inter-cluster communications with no secret defined")
+def test_039_0(self):
+    test_039(step=0)
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
@@ -3301,7 +3308,7 @@ def test(self):
     #         Scenario(test=t[0], args=t[1])()
 
     # define values for Operator upgrade test (test_009)
-    self.context.test_009_version_from = "0.20.0"
+    self.context.test_009_version_from = "0.20.1"
     self.context.test_009_version_to = settings.operator_version
 
     for scenario in loads(current_module(), Scenario, Suite):
