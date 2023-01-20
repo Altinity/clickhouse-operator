@@ -2991,6 +2991,7 @@ def test_036(self):
                            ".status.phase", "Lost")
 
     with Then("I check PV is recreated"):
+        assert not "NOT IMPPLEMENTED"
         kubectl.wait_field("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
                            ".status.phase", "Bound")
         kubectl.wait_object("pv", kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0"))

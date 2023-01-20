@@ -7,8 +7,7 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    #"/regression/e2e.test_operator/test_035*": [(Fail, "Does not work yet")],
-    #"/regression/e2e.test_operator/test_036*": [(Fail, "not implemented yet")],
+    "/regression/e2e.test_operator/test_036*": [(Fail, "not implemented yet")],
 
 
     # test_clickhouse.py
