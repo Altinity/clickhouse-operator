@@ -3143,25 +3143,25 @@ def test_039_0(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_1. Inter-cluster communications with secret")
+@Name("test_039_1. Inter-cluster communications with 'auto' secret")
 def test_039_1(self):
-    """Check clickhouse-operator support inter-cluster communications with secret."""
+    """Check clickhouse-operator support inter-cluster communications with 'auto' secret."""
     test_039(step=1)
 
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_1. Inter-cluster communications with secret")
+@Name("test_039_1. Inter-cluster communications with plan text secret")
 def test_039_2(self):
-    """Check clickhouse-operator support inter-cluster communications with secret."""
+    """Check clickhouse-operator support inter-cluster communications with plan text secret."""
     test_039(step=2)
 
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_1. Inter-cluster communications with secret")
+@Name("test_039_1. Inter-cluster communications with k8s secret")
 def test_039_3(self):
-    """Check clickhouse-operator support inter-cluster communications with secret."""
+    """Check clickhouse-operator support inter-cluster communications with k8s secret."""
     test_039(step=3)
 
 
