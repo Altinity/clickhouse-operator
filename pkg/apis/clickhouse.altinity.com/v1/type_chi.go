@@ -256,6 +256,7 @@ func NewCycleAddress() *CycleAddress {
 	return &CycleAddress{}
 }
 
+// Init initializes the CycleAddress
 func (s *CycleAddress) Init() {
 	if s == nil {
 		return
@@ -264,11 +265,14 @@ func (s *CycleAddress) Init() {
 	s.Index = 0
 }
 
+// Inc increases the CycleAddress
 func (s *CycleAddress) Inc(spec *CycleSpec) {
 	if s == nil {
 		return
 	}
+	// Shift index within the cycle
 	s.Index++
+	// In case of overflow - shift to next cycle
 	if spec.IsValid() && (s.Index >= spec.Size) {
 		s.Index = 0
 		s.CycleIndex++
@@ -285,6 +289,7 @@ type ScopeAddress struct {
 	Index int
 }
 
+// NewScopeAddress creates new ScopeAddress
 func NewScopeAddress(cycleSize int) *ScopeAddress {
 	return &ScopeAddress{
 		CycleSpec:    NewCycleSpec(cycleSize),
@@ -292,16 +297,19 @@ func NewScopeAddress(cycleSize int) *ScopeAddress {
 	}
 }
 
+// Init initializes the ScopeAddress
 func (s *ScopeAddress) Init() {
 	s.CycleAddress.Init()
 	s.Index = 0
 }
 
+// Inc increases the ScopeAddress
 func (s *ScopeAddress) Inc() {
 	s.CycleAddress.Inc(s.CycleSpec)
 	s.Index++
 }
 
+// HostAddress specifies address of a host
 type HostAddress struct {
 	CHIScope     *ScopeAddress
 	ClusterScope *ScopeAddress
@@ -310,6 +318,7 @@ type HostAddress struct {
 	ReplicaIndex int
 }
 
+// NewHostAddress creates new HostAddress
 func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddress) {
 	a = &HostAddress{
 		CHIScope:     NewScopeAddress(chiScopeCycleSize),
@@ -318,6 +327,7 @@ func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddres
 	return a
 }
 
+// WalkHostsAddressFn specifies function to walk over hosts
 type WalkHostsAddressFn func(
 	chi *ClickHouseInstallation,
 	cluster *Cluster,
@@ -353,6 +363,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 	return res
 }
 
+// WalkHostsFullPath walks hosts with a function
 func (chi *ClickHouseInstallation) WalkHostsFullPath(f WalkHostsAddressFn) (res []error) {
 	return chi.WalkHostsFullPathAndScope(0, 0, f)
 }
@@ -641,8 +652,9 @@ func (chi *ClickHouseInstallation) IsStopped() bool {
 	return chi.Spec.Stop.Value()
 }
 
-// Restart const presents possible values for .spec.restart
+// Restart constants present possible values for .spec.restart
 const (
+	// RestartAll specifies default value
 	RestartAll = "Restart"
 	// RestartRollingUpdate requires to roll over all hosts in the cluster and shutdown and reconcile each of it.
 	// This restart policy means that all hosts in the cluster would pass through shutdown/reconcile cycle.
