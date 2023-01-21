@@ -142,13 +142,13 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			host.Address.ReplicaIndex = address.ReplicaIndex
 			host.Address.HostName = host.Name
 			host.Address.CHIScopeIndex = address.CHIScope.Index
-			host.Address.CHIScopeCycleSize = address.CHIScope.Cycle.Size
-			host.Address.CHIScopeCycleIndex = address.CHIScope.Cycle.Index
-			host.Address.CHIScopeCycleOffset = address.CHIScope.Cycle.Offset
+			host.Address.CHIScopeCycleSize = address.CHIScope.CycleAddress.Size
+			host.Address.CHIScopeCycleIndex = address.CHIScope.CycleAddress.Index
+			host.Address.CHIScopeCycleOffset = address.CHIScope.CycleAddress.Offset
 			host.Address.ClusterScopeIndex = address.ClusterScope.Index
-			host.Address.ClusterScopeCycleSize = address.ClusterScope.Cycle.Size
-			host.Address.ClusterScopeCycleIndex = address.ClusterScope.Cycle.Index
-			host.Address.ClusterScopeCycleOffset = address.ClusterScope.Cycle.Offset
+			host.Address.ClusterScopeCycleSize = address.ClusterScope.CycleAddress.Size
+			host.Address.ClusterScopeCycleIndex = address.ClusterScope.CycleAddress.Index
+			host.Address.ClusterScopeCycleOffset = address.ClusterScope.CycleAddress.Offset
 			host.Address.ShardScopeIndex = address.ReplicaIndex
 			host.Address.ReplicaScopeIndex = address.ShardIndex
 
@@ -221,40 +221,42 @@ func (chi *ClickHouseInstallation) WalkShards(
 	return res
 }
 
-type HostScopeCycle struct {
+// CycleAddress defines cycle address
+type CycleAddress struct {
+	// Size specifies size of a cycle
 	Size int
 
 	Index  int
 	Offset int
 }
 
-func NewHostScopeCycle() *HostScopeCycle {
-	return &HostScopeCycle{}
+func NewCycleAddress() *CycleAddress {
+	return &CycleAddress{}
 }
 
 type HostScope struct {
-	Cycle *HostScopeCycle
-	Index int
+	CycleAddress *CycleAddress
+	Index        int
 }
 
 func NewHostScope() *HostScope {
 	return &HostScope{
-		Cycle: NewHostScopeCycle(),
+		CycleAddress: NewCycleAddress(),
 	}
 }
 
 func (s *HostScope) Init() {
 	s.Index = 0
-	s.Cycle.Index = 0
-	s.Cycle.Offset = 0
+	s.CycleAddress.Index = 0
+	s.CycleAddress.Offset = 0
 }
 
 func (s *HostScope) Inc() {
 	s.Index++
-	s.Cycle.Offset++
-	if (s.Cycle.Size > 0) && (s.Cycle.Offset >= s.Cycle.Size) {
-		s.Cycle.Offset = 0
-		s.Cycle.Index++
+	s.CycleAddress.Offset++
+	if (s.CycleAddress.Size > 0) && (s.CycleAddress.Offset >= s.CycleAddress.Size) {
+		s.CycleAddress.Offset = 0
+		s.CycleAddress.Index++
 	}
 }
 
@@ -271,8 +273,8 @@ func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddres
 		CHIScope:     NewHostScope(),
 		ClusterScope: NewHostScope(),
 	}
-	a.CHIScope.Cycle.Size = chiScopeCycleSize
-	a.ClusterScope.Cycle.Size = clusterScopeCycleSize
+	a.CHIScope.CycleAddress.Size = chiScopeCycleSize
+	a.ClusterScope.CycleAddress.Size = clusterScopeCycleSize
 	return a
 }
 
