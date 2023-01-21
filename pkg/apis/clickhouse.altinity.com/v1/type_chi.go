@@ -221,11 +221,20 @@ func (chi *ClickHouseInstallation) WalkShards(
 	return res
 }
 
-// CycleAddress defines cycle address
-type CycleAddress struct {
+// CycleSpec defines spec of a cycle
+type CycleSpec struct {
 	// Size specifies size of a cycle
 	Size int
+}
 
+func NewCycleSpec(size int) *CycleSpec {
+	return &CycleSpec{
+		Size: size,
+	}
+}
+
+// CycleAddress defines cycle address
+type CycleAddress struct {
 	Index  int
 	Offset int
 }
