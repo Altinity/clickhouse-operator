@@ -142,11 +142,11 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			host.Address.ReplicaIndex = address.ReplicaIndex
 			host.Address.HostName = host.Name
 			host.Address.CHIScopeIndex = address.CHIScope.Index
-			host.Address.CHIScopeCycleSize = address.CHIScope.CycleAddress.Size
+			host.Address.CHIScopeCycleSize = address.CHIScope.CycleSpec.Size
 			host.Address.CHIScopeCycleIndex = address.CHIScope.CycleAddress.Index
 			host.Address.CHIScopeCycleOffset = address.CHIScope.CycleAddress.Offset
 			host.Address.ClusterScopeIndex = address.ClusterScope.Index
-			host.Address.ClusterScopeCycleSize = address.ClusterScope.CycleAddress.Size
+			host.Address.ClusterScopeCycleSize = address.ClusterScope.CycleSpec.Size
 			host.Address.ClusterScopeCycleIndex = address.ClusterScope.CycleAddress.Index
 			host.Address.ClusterScopeCycleOffset = address.ClusterScope.CycleAddress.Offset
 			host.Address.ShardScopeIndex = address.ReplicaIndex
@@ -227,51 +227,61 @@ type CycleSpec struct {
 	Size int
 }
 
+// NewCycleSpec creates new CycleSpec
 func NewCycleSpec(size int) *CycleSpec {
 	return &CycleSpec{
 		Size: size,
 	}
 }
 
-// CycleAddress defines cycle address
+// CycleAddress defines cycle address of an entity
 type CycleAddress struct {
-	Index  int
+	// Index specifies index of this cycle
+	Index int
+	// Offset specifies offset within the cycle
 	Offset int
 }
 
+// NewCycleAddress creates new CycleAddress
 func NewCycleAddress() *CycleAddress {
 	return &CycleAddress{}
 }
 
-type HostScope struct {
+// ScopeAddress defines scope address of an entity
+type ScopeAddress struct {
+	// CycleSpec specifies cycle which to be used to specify CycleAddress
+	CycleSpec *CycleSpec
+	// CycleAddress specifies CycleAddress within the scope
 	CycleAddress *CycleAddress
-	Index        int
+	// Index specifies index within the scope
+	Index int
 }
 
-func NewHostScope() *HostScope {
-	return &HostScope{
+func NewScopeAddress(cycleSize int) *ScopeAddress {
+	return &ScopeAddress{
+		CycleSpec:    NewCycleSpec(cycleSize),
 		CycleAddress: NewCycleAddress(),
 	}
 }
 
-func (s *HostScope) Init() {
+func (s *ScopeAddress) Init() {
 	s.Index = 0
 	s.CycleAddress.Index = 0
 	s.CycleAddress.Offset = 0
 }
 
-func (s *HostScope) Inc() {
+func (s *ScopeAddress) Inc() {
 	s.Index++
 	s.CycleAddress.Offset++
-	if (s.CycleAddress.Size > 0) && (s.CycleAddress.Offset >= s.CycleAddress.Size) {
+	if (s.CycleSpec.Size > 0) && (s.CycleAddress.Offset >= s.CycleSpec.Size) {
 		s.CycleAddress.Offset = 0
 		s.CycleAddress.Index++
 	}
 }
 
 type HostAddress struct {
-	CHIScope     *HostScope
-	ClusterScope *HostScope
+	CHIScope     *ScopeAddress
+	ClusterScope *ScopeAddress
 	ClusterIndex int
 	ShardIndex   int
 	ReplicaIndex int
@@ -279,11 +289,9 @@ type HostAddress struct {
 
 func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddress) {
 	a = &HostAddress{
-		CHIScope:     NewHostScope(),
-		ClusterScope: NewHostScope(),
+		CHIScope:     NewScopeAddress(chiScopeCycleSize),
+		ClusterScope: NewScopeAddress(clusterScopeCycleSize),
 	}
-	a.CHIScope.CycleAddress.Size = chiScopeCycleSize
-	a.ClusterScope.CycleAddress.Size = clusterScopeCycleSize
 	return a
 }
 
