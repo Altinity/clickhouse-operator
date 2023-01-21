@@ -234,6 +234,15 @@ func NewCycleSpec(size int) *CycleSpec {
 	}
 }
 
+// IsValid specifies whether spec is a valid one
+func (s *CycleSpec) IsValid() bool {
+	if s == nil {
+		return false
+	}
+
+	return s.Size > 0
+}
+
 // CycleAddress defines cycle address of an entity
 type CycleAddress struct {
 	// Index specifies index of this cycle
@@ -273,7 +282,7 @@ func (s *ScopeAddress) Init() {
 func (s *ScopeAddress) Inc() {
 	s.Index++
 	s.CycleAddress.Offset++
-	if (s.CycleSpec.Size > 0) && (s.CycleAddress.Offset >= s.CycleSpec.Size) {
+	if s.CycleSpec.IsValid() && (s.CycleAddress.Offset >= s.CycleSpec.Size) {
 		s.CycleAddress.Offset = 0
 		s.CycleAddress.Index++
 	}
