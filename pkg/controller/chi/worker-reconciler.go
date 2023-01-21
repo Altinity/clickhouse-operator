@@ -397,7 +397,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
-	if host.Address.CHIScopeIndex == 0 {
+	if host.IsFirst() {
 		w.reconcileCHIServicePreliminary(ctx, host.CHI)
 		defer w.reconcileCHIServiceFinal(ctx, host.CHI)
 	}
