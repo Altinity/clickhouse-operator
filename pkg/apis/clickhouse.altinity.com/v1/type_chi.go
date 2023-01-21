@@ -141,14 +141,14 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			host.Address.ReplicaName = replica.Name
 			host.Address.ReplicaIndex = address.ReplicaIndex
 			host.Address.HostName = host.Name
-			host.Address.CHIScopeIndex = address.CHIScope.Index
-			host.Address.CHIScopeCycleSize = address.CHIScope.CycleSpec.Size
-			host.Address.CHIScopeCycleIndex = address.CHIScope.CycleAddress.CycleIndex
-			host.Address.CHIScopeCycleOffset = address.CHIScope.CycleAddress.Index
-			host.Address.ClusterScopeIndex = address.ClusterScope.Index
-			host.Address.ClusterScopeCycleSize = address.ClusterScope.CycleSpec.Size
-			host.Address.ClusterScopeCycleIndex = address.ClusterScope.CycleAddress.CycleIndex
-			host.Address.ClusterScopeCycleOffset = address.ClusterScope.CycleAddress.Index
+			host.Address.CHIScopeIndex = address.CHIScopeAddress.Index
+			host.Address.CHIScopeCycleSize = address.CHIScopeAddress.CycleSpec.Size
+			host.Address.CHIScopeCycleIndex = address.CHIScopeAddress.CycleAddress.CycleIndex
+			host.Address.CHIScopeCycleOffset = address.CHIScopeAddress.CycleAddress.Index
+			host.Address.ClusterScopeIndex = address.ClusterScopeAddress.Index
+			host.Address.ClusterScopeCycleSize = address.ClusterScopeAddress.CycleSpec.Size
+			host.Address.ClusterScopeCycleIndex = address.ClusterScopeAddress.CycleAddress.CycleIndex
+			host.Address.ClusterScopeCycleOffset = address.ClusterScopeAddress.CycleAddress.Index
 			host.Address.ShardScopeIndex = address.ReplicaIndex
 			host.Address.ReplicaScopeIndex = address.ShardIndex
 
@@ -311,18 +311,23 @@ func (s *ScopeAddress) Inc() {
 
 // HostAddress specifies address of a host
 type HostAddress struct {
-	CHIScope     *ScopeAddress
-	ClusterScope *ScopeAddress
+	// CHIScopeAddress specifies address within CHI scope
+	CHIScopeAddress *ScopeAddress
+	// ClusterScopeAddress specifies address within cluster scope
+	ClusterScopeAddress *ScopeAddress
+	// ClusterIndex specifies index of the cluster within CHI
 	ClusterIndex int
-	ShardIndex   int
+	// ShardIndex specifies index of a shard within cluster
+	ShardIndex int
+	// ReplicaIndex specifies index of a replica within cluster
 	ReplicaIndex int
 }
 
 // NewHostAddress creates new HostAddress
 func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddress) {
 	a = &HostAddress{
-		CHIScope:     NewScopeAddress(chiScopeCycleSize),
-		ClusterScope: NewScopeAddress(clusterScopeCycleSize),
+		CHIScopeAddress:     NewScopeAddress(chiScopeCycleSize),
+		ClusterScopeAddress: NewScopeAddress(clusterScopeCycleSize),
 	}
 	return a
 }
@@ -337,7 +342,7 @@ type WalkHostsAddressFn func(
 	address *HostAddress,
 ) error
 
-// WalkHostsFullPath walks hosts with full path
+// WalkHostsFullPathAndScope walks hosts with full path
 func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 	chiScopeCycleSize int,
 	clusterScopeCycleSize int,
@@ -346,7 +351,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 	address := NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize)
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
-		address.ClusterScope.Init()
+		address.ClusterScopeAddress.Init()
 		for shardIndex := range cluster.Layout.Shards {
 			shard := cluster.GetShard(shardIndex)
 			for replicaIndex, host := range shard.Hosts {
@@ -355,8 +360,8 @@ func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 				address.ShardIndex = shardIndex
 				address.ReplicaIndex = replicaIndex
 				res = append(res, f(chi, cluster, shard, replica, host, address))
-				address.CHIScope.Inc()
-				address.ClusterScope.Inc()
+				address.CHIScopeAddress.Inc()
+				address.ClusterScopeAddress.Inc()
 			}
 		}
 	}

@@ -237,7 +237,7 @@ func (host *ChiHost) IsSecure() bool {
 	return host.GetCluster().GetSecure().Value()
 }
 
-// IsFirst() boo checks whether host is the first host of the CHI
+// IsFirst checks whether host is the first host of the CHI
 func (host *ChiHost) IsFirst() bool {
 	if host == nil {
 		return false
