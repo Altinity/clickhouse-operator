@@ -155,20 +155,30 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 	return nil
 }
 
-func (w *worker) reconcileCHIService(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
+func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if chi.IsStopped() {
-		// Stopped cluster must have no entry point
+		// Stopped CHI must have no entry point
 		_ = w.c.deleteServiceCHI(ctx, chi)
-	} else {
-		if service := w.task.creator.CreateServiceCHI(); service != nil {
-			if err := w.reconcileService(ctx, chi, service); err != nil {
-				// Service not reconciled
-				w.task.registryFailed.RegisterService(service.ObjectMeta)
-				return err
-			}
-			w.task.registryReconciled.RegisterService(service.ObjectMeta)
-		}
 	}
+	return nil
+}
+
+func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
+	if chi.IsStopped() {
+		// Stopped CHI must have no entry point
+		return nil
+	}
+
+	// Create entry point for the whole CHI
+	if service := w.task.creator.CreateServiceCHI(); service != nil {
+		if err := w.reconcileService(ctx, chi, service); err != nil {
+			// Service not reconciled
+			w.task.registryFailed.RegisterService(service.ObjectMeta)
+			return err
+		}
+		w.task.registryReconciled.RegisterService(service.ObjectMeta)
+	}
+
 	return nil
 }
 
@@ -388,7 +398,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 	if host.Address.CHIScopeIndex == 0 {
-		defer w.reconcileCHIService(ctx, host.CHI)
+		w.reconcileCHIServicePreliminary(ctx, host.CHI)
+		defer w.reconcileCHIServiceFinal(ctx, host.CHI)
 	}
 
 	w.a.V(1).
