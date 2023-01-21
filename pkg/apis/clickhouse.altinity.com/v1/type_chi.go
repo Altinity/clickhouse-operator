@@ -143,12 +143,12 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			host.Address.HostName = host.Name
 			host.Address.CHIScopeIndex = address.CHIScope.Index
 			host.Address.CHIScopeCycleSize = address.CHIScope.CycleSpec.Size
-			host.Address.CHIScopeCycleIndex = address.CHIScope.CycleAddress.Index
-			host.Address.CHIScopeCycleOffset = address.CHIScope.CycleAddress.Offset
+			host.Address.CHIScopeCycleIndex = address.CHIScope.CycleAddress.CycleIndex
+			host.Address.CHIScopeCycleOffset = address.CHIScope.CycleAddress.Index
 			host.Address.ClusterScopeIndex = address.ClusterScope.Index
 			host.Address.ClusterScopeCycleSize = address.ClusterScope.CycleSpec.Size
-			host.Address.ClusterScopeCycleIndex = address.ClusterScope.CycleAddress.Index
-			host.Address.ClusterScopeCycleOffset = address.ClusterScope.CycleAddress.Offset
+			host.Address.ClusterScopeCycleIndex = address.ClusterScope.CycleAddress.CycleIndex
+			host.Address.ClusterScopeCycleOffset = address.ClusterScope.CycleAddress.Index
 			host.Address.ShardScopeIndex = address.ReplicaIndex
 			host.Address.ReplicaScopeIndex = address.ShardIndex
 
@@ -245,15 +245,34 @@ func (s *CycleSpec) IsValid() bool {
 
 // CycleAddress defines cycle address of an entity
 type CycleAddress struct {
-	// Index specifies index of this cycle
+	// CycleIndex specifies index of this cycle
+	CycleIndex int
+	// Index specifies index within the cycle
 	Index int
-	// Offset specifies offset within the cycle
-	Offset int
 }
 
 // NewCycleAddress creates new CycleAddress
 func NewCycleAddress() *CycleAddress {
 	return &CycleAddress{}
+}
+
+func (s *CycleAddress) Init() {
+	if s == nil {
+		return
+	}
+	s.CycleIndex = 0
+	s.Index = 0
+}
+
+func (s *CycleAddress) Inc(spec *CycleSpec) {
+	if s == nil {
+		return
+	}
+	s.Index++
+	if spec.IsValid() && (s.Index >= spec.Size) {
+		s.Index = 0
+		s.CycleIndex++
+	}
 }
 
 // ScopeAddress defines scope address of an entity
@@ -274,18 +293,13 @@ func NewScopeAddress(cycleSize int) *ScopeAddress {
 }
 
 func (s *ScopeAddress) Init() {
+	s.CycleAddress.Init()
 	s.Index = 0
-	s.CycleAddress.Index = 0
-	s.CycleAddress.Offset = 0
 }
 
 func (s *ScopeAddress) Inc() {
+	s.CycleAddress.Inc(s.CycleSpec)
 	s.Index++
-	s.CycleAddress.Offset++
-	if s.CycleSpec.IsValid() && (s.CycleAddress.Offset >= s.CycleSpec.Size) {
-		s.CycleAddress.Offset = 0
-		s.CycleAddress.Index++
-	}
 }
 
 type HostAddress struct {
