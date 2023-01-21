@@ -299,12 +299,18 @@ func NewScopeAddress(cycleSize int) *ScopeAddress {
 
 // Init initializes the ScopeAddress
 func (s *ScopeAddress) Init() {
+	if s == nil {
+		return
+	}
 	s.CycleAddress.Init()
 	s.Index = 0
 }
 
 // Inc increases the ScopeAddress
 func (s *ScopeAddress) Inc() {
+	if s == nil {
+		return
+	}
 	s.CycleAddress.Inc(s.CycleSpec)
 	s.Index++
 }
