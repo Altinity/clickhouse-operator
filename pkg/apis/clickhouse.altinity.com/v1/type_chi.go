@@ -311,11 +311,11 @@ func (s *ScopeAddress) Inc() {
 
 // HostAddress specifies address of a host
 type HostAddress struct {
-	// CHIScopeAddress specifies address within CHI scope
+	// CHIScopeAddress specifies address of a host within CHI scope
 	CHIScopeAddress *ScopeAddress
-	// ClusterScopeAddress specifies address within cluster scope
+	// ClusterScopeAddress specifies address of a host within cluster scope
 	ClusterScopeAddress *ScopeAddress
-	// ClusterIndex specifies index of the cluster within CHI
+	// ClusterIndex specifies index of a cluster within CHI
 	ClusterIndex int
 	// ShardIndex specifies index of a shard within cluster
 	ShardIndex int
