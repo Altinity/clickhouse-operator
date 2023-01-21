@@ -236,3 +236,12 @@ func (host *ChiHost) IsSecure() bool {
 	// No personal value for host secure is set - need to fallback to cluster value
 	return host.GetCluster().GetSecure().Value()
 }
+
+// IsFirst() boo checks whether host is the first host of the CHI
+func (host *ChiHost) IsFirst() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.Address.CHIScopeIndex == 0
+}
