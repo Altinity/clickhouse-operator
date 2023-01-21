@@ -155,6 +155,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 	return nil
 }
 
+// reconcileCHIServicePreliminary runs first stage of CHI reconcile process
 func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if chi.IsStopped() {
 		// Stopped CHI must have no entry point
@@ -163,6 +164,7 @@ func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi *chiV1.
 	return nil
 }
 
+// reconcileCHIServiceFinal runs second stage of CHI reconcile process
 func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if chi.IsStopped() {
 		// Stopped CHI must have no entry point
