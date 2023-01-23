@@ -1679,10 +1679,9 @@ def test_019(self, step=1):
         },
     )
 
-    create_non_replicated_table = "drop table if exists t1; create table t1 Engine = Log as select 1 as a"
+    create_non_replicated_table = "create or replace table t1 Engine = Log as select 1 as a"
     create_replicated_table = """
-    drop table if exists t2;
-    create table t2
+    create or replace table t2
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
     partition by tuple() order by a
     as select 1 as a""".replace('\r', '').replace('\n', '')
@@ -1692,15 +1691,13 @@ def test_019(self, step=1):
         clickhouse.query(chi, sql=create_replicated_table)
 
     with When("CHI with retained volume is deleted"):
-        pvc_count = kubectl.get_count("pvc")
-        # pv is not namespace based and get_count can't be use for parallel execution
-        pv_count = kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l")
-
+        pvc_count = kubectl.get_count("pvc", chi = chi)
+        pv_count = kubectl.get_count("pv")
         kubectl.delete_chi(chi)
 
         with Then("PVC should be retained"):
-            assert kubectl.get_count("pvc") == pvc_count
-            assert kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l") == pv_count
+            assert kubectl.get_count("pvc", chi = chi) == pvc_count
+            assert kubectl.get_count("pv") == pv_count
 
     with When("Re-create CHI"):
         kubectl.create_and_check(
@@ -1764,9 +1761,8 @@ def test_019(self, step=1):
             assert out == "2"
 
         with When("Remove a replica"):
-            pvc_count = kubectl.get_count("pvc")
-            # pv is not namespace based and get_count can't be use for parallel execution
-            pv_count = kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l")
+            pvc_count = kubectl.get_count("pvc", chi=chi)
+            pv_count = kubectl.get_count("pv")
 
             kubectl.create_and_check(
                 manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
@@ -1776,8 +1772,8 @@ def test_019(self, step=1):
                 },
             )
             with Then("Replica PVC should be retained"):
-                assert kubectl.get_count("pvc") == pvc_count
-                assert kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l") == pv_count
+                assert kubectl.get_count("pvc", chi=chi) == pvc_count
+                assert kubectl.get_count("pv") == pv_count
 
             with And("Replica should NOT be removed from ZooKeeper"):
                 out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
@@ -1802,14 +1798,13 @@ def test_019(self, step=1):
                 check={
                     "pod_count": 2,
                     "do_not_delete": 1,
-                    # "chi_status": "InProgress",
+                    # "chi_status": "InProgress", # !!!!!
                 },
             )
 
             with And("Remove a replica"):
-                pvc_count = kubectl.get_count("pvc")
-                # pv is not namespace based and get_count can't be use for parallel execution
-                pv_count = kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l")
+                pvc_count = kubectl.get_count("pvc", chi=chi)
+                pv_count = kubectl.get_count("pv")
 
                 kubectl.create_and_check(
                     manifest=f"manifests/chi/test-019-{step}-retain-volume-1.yaml",
@@ -1820,14 +1815,20 @@ def test_019(self, step=1):
                 )
                 # Not implemented yet
                 with Then("Replica PVC should be deleted"):
-                    assert kubectl.get_count("pvc") < pvc_count
-                    assert kubectl.launch(f"get pv -o json | jq -r '.items[] | select(.spec.claimRef.namespace == \"{settings.test_namespace}\") | [.spec.claimRef.namespace, .spec.claimRef.name] | @tsv' | wc -l") < pv_count
+                    assert kubectl.get_count("pvc", chi=chi) < pvc_count
+                    assert kubectl.get_count("pv") < pv_count
 
                 with And("Replica should be removed from ZooKeeper"):
                     out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
                     assert out == "1"
 
-    kubectl.delete_chi(chi)
+    with When("Delete chi"):
+        kubectl.delete_chi(chi)
+        with Then("One PVC should be left because relcaim policy is not set anymore"):
+            assert kubectl.get_count("pvc", chi=chi) == 1
+        with Then("Cleanup PVCs"):
+            for pvc in kubectl.get_obj_names(chi, 'pvc'):
+                kubectl.launch(f"delete pvc {pvc}")
 
 
 @TestScenario
