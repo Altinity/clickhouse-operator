@@ -1255,6 +1255,11 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 			MainFields: true,
 		},
 	})
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
+		WithStatusAction(host.CHI).
+		M(host).F().
+		Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 
 	if err == nil {
 		w.a.V(1).
@@ -1356,6 +1361,11 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 					MainFields: true,
 				},
 			})
+			w.a.V(1).
+				WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
+				WithStatusAction(host.CHI).
+				M(host).F().
+				Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 				WithStatusAction(host.CHI).

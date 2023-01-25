@@ -169,12 +169,20 @@ def delete_ns(ns, ok_to_fail=False, timeout=600):
     launch(f"delete ns {ns} -v 5 --now --timeout={timeout}s", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
 
 
-def get_count(kind, name="", label="", ns=namespace):
-    out = launch(f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=ns, ok_to_fail=True)
+def get_count(kind, name="", label="", chi = "", ns=namespace):
+    if (chi != "" and label == ""):
+        label = f"-l clickhouse.altinity.com/chi={chi}"
+
+    if kind == "pv":
+        # pv is not namespaced so need to search namespace in claimRef
+        out = launch(f'get pv {label} -o yaml | grep "namespace: {ns}"', ok_to_fail=True)
+    else:
+        out = launch(f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=ns, ok_to_fail=True)
+
     if (out is None) or (len(out) == 0):
         return 0
-    return len(out.splitlines()) - 1
-
+    else:
+        return len(out.splitlines()) - 1
 
 def count_objects(label="", ns=namespace):
     return {

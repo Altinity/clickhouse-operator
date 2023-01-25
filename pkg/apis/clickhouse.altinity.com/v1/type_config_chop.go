@@ -58,8 +58,12 @@ const (
 	defaultChRootCA   = ""
 
 	// Timeouts used to limit connection and queries from the operator to ClickHouse instances. In seconds
+	// defaultTimeoutConnect specifies default timeout to connect to the ClickHouse instance. In seconds
 	defaultTimeoutConnect = 2
-	defaultTimeoutQuery   = 5
+	// defaultTimeoutQuery specifies default timeout to query the CLickHouse instance. In seconds
+	defaultTimeoutQuery = 5
+	// defaultTimeoutCollect specifies default timeout to collect metrics from the ClickHouse instance. In seconds
+	defaultTimeoutCollect = 8
 
 	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
@@ -188,6 +192,13 @@ type OperatorConfigClickHouse struct {
 			Query   time.Duration `json:"query"   yaml:"query"`
 		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"access" yaml:"access"`
+
+	// Metrics used to specify how the operator fetches metrics from ClickHouse instances
+	Metrics struct {
+		Timeouts struct {
+			Collect time.Duration `json:"collect" yaml:"collect"`
+		} `json:"timeouts" yaml:"timeouts"`
+	} `json:"metrics" yaml:"metrics"`
 }
 
 // OperatorConfigTemplate specifies template section
@@ -231,12 +242,18 @@ type OperatorConfigReconcile struct {
 		} `json:"update" yaml:"update"`
 	} `json:"statefulSet" yaml:"statefulSet"`
 
-	Host struct {
-		Wait struct {
-			Exclude StringBool `json:"exclude" yaml:"exclude"`
-			Include StringBool `json:"include" yaml:"include"`
-		} `json:"wait" yaml:"wait"`
-	} `json:"host" yaml:"host"`
+	Host OperatorConfigReconcileHost `json:"host" yaml:"host"`
+}
+
+// OperatorConfigReconcileHost defines reconcile host config
+type OperatorConfigReconcileHost struct {
+	Wait OperatorConfigReconcileHostWait `json:"wait" yaml:"wait"`
+}
+
+// OperatorConfigReconcileHostWait defines reconcile host wait config
+type OperatorConfigReconcileHostWait struct {
+	Exclude *StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+	Include *StringBool `json:"include,omitempty" yaml:"include,omitempty"`
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -269,12 +286,12 @@ type OperatorConfig struct {
 		// Namespace specifies namespace where operator runs
 		Namespace string
 	}
-	Watch       OperatorConfigWatch      `json:"watch" yaml:"watch"`
+	Watch       OperatorConfigWatch      `json:"watch"      yaml:"watch"`
 	ClickHouse  OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
-	Template    OperatorConfigTemplate   `json:"template" yaml:"template"`
-	Reconcile   OperatorConfigReconcile  `json:"reconcile" yaml:"reconcile"`
+	Template    OperatorConfigTemplate   `json:"template"   yaml:"template"`
+	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
 	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
-	Label       OperatorConfigLabel      `json:"label" yaml:"label"`
+	Label       OperatorConfigLabel      `json:"label"      yaml:"label"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
@@ -706,6 +723,13 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	}
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
+
+	if c.ClickHouse.Metrics.Timeouts.Collect == 0 {
+		c.ClickHouse.Metrics.Timeouts.Collect = defaultTimeoutCollect
+	}
+	// Adjust seconds to time.Duration
+	c.ClickHouse.Metrics.Timeouts.Collect = c.ClickHouse.Metrics.Timeouts.Collect * time.Second
+
 }
 
 func (c *OperatorConfig) normalizeLogSection() {

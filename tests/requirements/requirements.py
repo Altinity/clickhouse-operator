@@ -1,6 +1,6 @@
 # These requirements were auto generated
 # from software requirements specification (SRS)
-# document by TestFlows v1.9.221009.1165957.
+# document by TestFlows v1.9.221228.1171522.
 # Do not edit by hand but re-generate instead
 # using 'tfs requirements generate' command.
 from testflows.core import Specification
@@ -360,6 +360,68 @@ RQ_SRS_026_ClickHouseOperator_EnableHttps = Requirement(
     num='4.8.4.1'
 )
 
+RQ_SRS_026_ClickHouseOperator_SecureInterClusterCommunication = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support secure inter-cluster communications with secrets.\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'apiVersion: "clickhouse.altinity.com/v1"\n'
+        'kind: "ClickHouseInstallation"\n'
+        'metadata:\n'
+        '  name: "name"\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: "secret-ref"\n'
+        '        secure: "yes"\n'
+        '        secret:\n'
+        '          auto: "true"\n'
+        '```\n'
+        '\n'
+    ),
+    link=None,
+    level=4,
+    num='4.8.4.2'
+)
+
+RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support inter-cluster communications with secret.\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'apiVersion: "clickhouse.altinity.com/v1"\n'
+        'kind: "ClickHouseInstallation"\n'
+        'metadata:\n'
+        '  name: "name"\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: "secret-ref"\n'
+        '        secret:\n'
+        '          auto: "true"\n'
+        '```\n'
+        '\n'
+        '\n'
+    ),
+    link=None,
+    level=4,
+    num='4.8.4.3'
+)
+
 RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps = Requirement(
     name='RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps',
     version='1.0',
@@ -373,7 +435,7 @@ RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps = Requirement(
     ),
     link=None,
     level=4,
-    num='4.8.4.2'
+    num='4.8.4.4'
 )
 
 RQ_SRS_026_ClickHouseOperator_DefaultTemplates = Requirement(
@@ -6356,7 +6418,9 @@ QA_SRS026_ClickHouse_Operator = Specification(
         Heading(name='RQ.SRS-026.ClickHouseOperator.Secrets', level=4, num='4.8.3.1'),
         Heading(name='Secure Connection', level=3, num='4.8.4'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.EnableHttps', level=4, num='4.8.4.1'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps', level=4, num='4.8.4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication', level=4, num='4.8.4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret', level=4, num='4.8.4.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps', level=4, num='4.8.4.4'),
         Heading(name='Default Templates', level=2, num='4.9'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates', level=3, num='4.9.1'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates', level=3, num='4.9.2'),
@@ -6836,6 +6900,8 @@ QA_SRS026_ClickHouse_Operator = Specification(
         RQ_SRS_026_ClickHouseOperator_DefaultUsers,
         RQ_SRS_026_ClickHouseOperator_Secrets,
         RQ_SRS_026_ClickHouseOperator_EnableHttps,
+        RQ_SRS_026_ClickHouseOperator_SecureInterClusterCommunication,
+        RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret,
         RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps,
         RQ_SRS_026_ClickHouseOperator_DefaultTemplates,
         RQ_SRS_026_ClickHouseOperator_DefaultTemplates_MergingWithUserDefinedTemplates,
@@ -7152,7 +7218,9 @@ QA_SRS026_ClickHouse_Operator = Specification(
       * 4.8.3.1 [RQ.SRS-026.ClickHouseOperator.Secrets](#rqsrs-026clickhouseoperatorsecrets)
     * 4.8.4 [Secure Connection](#secure-connection)
       * 4.8.4.1 [RQ.SRS-026.ClickHouseOperator.EnableHttps](#rqsrs-026clickhouseoperatorenablehttps)
-      * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
+      * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication](#rqsrs-026clickhouseoperatorsecureinterclustercommunication)
+      * 4.8.4.3 [RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret](#rqsrs-026clickhouseoperatorinterclustercommunicationwithsecret)
+      * 4.8.4.4 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
   * 4.9 [Default Templates](#default-templates)
     * 4.9.1 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates](#rqsrs-026clickhouseoperatordefaulttemplates)
     * 4.9.2 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates](#rqsrs-026clickhouseoperatordefaulttemplatesmergingwithuserdefinedtemplates)
@@ -7612,7 +7680,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
       * 4.54.7.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackcreate)
       * 4.54.7.2 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackupdate)
     * 4.54.8 [Successful Update Before Failed](#successful-update-before-failed)
-      * 4.54.8.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing](#rqsrs-026clickhouseoperatorerrorhandlingsuccessfulupdatebeforefaileddonothing)
+        * 4.54.8.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing](#rqsrs-026clickhouseoperatorerrorhandlingsuccessfulupdatebeforefaileddonothing)
 
 ## Revision History
 
@@ -7970,6 +8038,46 @@ spec:
       scheme: https
       port: 8443
 ```
+
+##### RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication
+version: 1.0
+
+[ClickHouse Operator] SHALL support secure inter-cluster communications with secrets.
+For example,
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "name"
+spec:
+  configuration:
+    clusters:
+      - name: "secret-ref"
+        secure: "yes"
+        secret:
+          auto: "true"
+```
+
+##### RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret
+version: 1.0
+
+[ClickHouse Operator] SHALL support inter-cluster communications with secret.
+For example,
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "name"
+spec:
+  configuration:
+    clusters:
+      - name: "secret-ref"
+        secret:
+          auto: "true"
+```
+
 
 ##### RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps
 version: 1.0

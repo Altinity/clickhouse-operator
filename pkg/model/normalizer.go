@@ -219,32 +219,8 @@ func (n *Normalizer) finalizeCHI() {
 
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
-	n.ctx.chi.WalkHostsFullPath(0, 0, func(
-		chi *chiV1.ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
-		cluster *chiV1.Cluster,
-
-		shardIndex int,
-		shard *chiV1.ChiShard,
-
-		replicaIndex int,
-		replica *chiV1.ChiReplica,
-
-		host *chiV1.ChiHost,
-	) error {
+	n.ctx.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		host.Address.StatefulSet = CreateStatefulSetName(host)
-
 		return nil
 	})
 }
@@ -402,14 +378,14 @@ func (n *Normalizer) normalizeTaskID(taskID *string) *string {
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop chiV1.StringBool) chiV1.StringBool {
+func (n *Normalizer) normalizeStop(stop *chiV1.StringBool) *chiV1.StringBool {
 	if stop.IsValid() {
 		// It is bool, use as it is
 		return stop
 	}
 
 	// In case it is unknown value - just use set it to false
-	return chiV1.StringBoolFalseLowercase
+	return chiV1.NewStringBool(false)
 }
 
 // normalizeRestart normalizes .spec.restart
@@ -426,14 +402,14 @@ func (n *Normalizer) normalizeRestart(restart string) string {
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
-func (n *Normalizer) normalizeTroubleshoot(troubleshoot chiV1.StringBool) chiV1.StringBool {
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot *chiV1.StringBool) *chiV1.StringBool {
 	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
-	return chiV1.StringBoolFalseLowercase
+	return chiV1.NewStringBool(false)
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
@@ -1130,124 +1106,140 @@ func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.S
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
-		//
-		// Ensure each user has mandatory sections:
-		//
-		// 1. user/profile
-		// 2. user/quota
-		// 3. user/networks/ip
-		// 4. user/networks/host_regexp
-		profile := chop.Config().ClickHouse.Config.User.Default.Profile
-		quota := chop.Config().ClickHouse.Config.User.Default.Quota
-		ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-		regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
-		// Some users may have special options
-		switch username {
-		case defaultUsername:
-			ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
-			if !n.ctx.options.DefaultUserInsertHostRegex {
-				regexp = ""
-			}
-		case chopUsername:
-			ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
-
-			profile = ""
-			quota = ""
-			ips = []string{ip}
-			regexp = ""
-		}
-		// Ensure required values aer in place and apply non-empty values in case no own value(s) provided
-		if profile != "" {
-			users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(profile))
-		}
-		if quota != "" {
-			users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(quota))
-		}
-		if len(ips) > 0 {
-			users.Set(username+"/networks/ip", chiV1.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
-		}
-		if regexp != "" {
-			users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(regexp))
-		}
-
-		//
-		// Deal with passwords
-		//
-
-		// Values from the secret have higher priority
-		n.substWithSecretField(users, username, "password", "k8s_secret_password")
-		n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-		n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
-
-		// Values from the secret passed via ENV have even higher priority
-		n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
-		n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
-		n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
-
-		// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-		if users.Has(username + "/password_double_sha1_hex") {
-			users.Delete(username + "/password_sha256_hex")
-			users.Delete(username + "/password")
-			continue // move to the next user
-		}
-
-		// Than goes password_sha256_hex, thus keep it only
-		if users.Has(username + "/password_sha256_hex") {
-			users.Delete(username + "/password_double_sha1_hex")
-			users.Delete(username + "/password")
-			continue // move to the next user
-		}
-
-		// From now on we either have a plaintext password specified, or no password at all
-
-		if users.Get(username + "/password").HasAttributes() {
-			// Have plaintext password explicitly specified via ENV vars
-			// This is still OK
-			continue // move to the next user
-		}
-
-		// From now on we either have plaintext password specified as an explicit string, or no password at all
-
-		passwordPlaintext := users.Get(username + "/password").String()
-
-		// Apply default password for password-less non-default users
-		if passwordPlaintext == "" {
-			switch username {
-			case defaultUsername:
-				// NB "default" user may keep empty password in here.
-			case chopUsername:
-				passwordPlaintext = chop.Config().ClickHouse.Access.Password
-			default:
-				passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
-			}
-		}
-
-		// NB "default" user may keep empty password in here.
-
-		if passwordPlaintext != "" {
-			// Replace plaintext password with encrypted
-			passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-			users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-			// And keep it only
-			users.Delete(username + "/password_double_sha1_hex")
-			users.Delete(username + "/password")
-		}
+		n.normalizeConfigurationUser(users, username)
 	}
 
-	if users.Has(defaultUsername+"/password_double_sha1_hex") || users.Has(defaultUsername+"/password_sha256_hex") {
-		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
-		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
-		// thus we need to overwrite it.
-		users.Set(defaultUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
-	}
-	if users.Has(chopUsername+"/password_double_sha1_hex") || users.Has(chopUsername+"/password_sha256_hex") {
-		// As "default" user has encrypted password provided, we need to delete existing pre-configured password.
-		// Set "remove" flag for "default" user's "password", which is specified as empty in stock ClickHouse users.xml,
-		// thus we need to overwrite it.
-		users.Set(chopUsername+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
-	}
+	// Remove plain password for default user and chop user
+	n.removePlainPassword(users, defaultUsername)
+	n.removePlainPassword(users, chopUsername)
 
 	return users
+}
+
+func (n *Normalizer) removePlainPassword(users *chiV1.Settings, username string) {
+	if users.Has(username+"/password_double_sha1_hex") || users.Has(username+"/password_sha256_hex") {
+		// If user has encrypted password specified, we need to delete existing plaintext password.
+		// Set "remove" flag for user's "password", which is specified as empty in stock ClickHouse users.xml,
+		// thus we need to overwrite it.
+		users.Set(username+"/password", chiV1.NewSettingScalar("").SetAttribute("remove", "1"))
+	}
+}
+
+func (n *Normalizer) normalizeConfigurationUser(users *chiV1.Settings, username string) {
+	n.normalizeConfigurationUserEnsureMandatorySections(users, username)
+	n.normalizeConfigurationUserPassword(users, username)
+}
+
+func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *chiV1.Settings, username string) {
+	chopUsername := chop.Config().ClickHouse.Access.Username
+	//
+	// Ensure each user has mandatory sections:
+	//
+	// 1. user/profile
+	// 2. user/quota
+	// 3. user/networks/ip
+	// 4. user/networks/host_regexp
+	profile := chop.Config().ClickHouse.Config.User.Default.Profile
+	quota := chop.Config().ClickHouse.Config.User.Default.Quota
+	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
+	regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+
+	// Some users may have special options
+	switch username {
+	case defaultUsername:
+		ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
+		if !n.ctx.options.DefaultUserInsertHostRegex {
+			regexp = ""
+		}
+	case chopUsername:
+		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
+
+		profile = ""
+		quota = ""
+		ips = []string{ip}
+		regexp = ""
+	}
+
+	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
+	if profile != "" {
+		users.SetIfNotExists(username+"/profile", chiV1.NewSettingScalar(profile))
+	}
+	if quota != "" {
+		users.SetIfNotExists(username+"/quota", chiV1.NewSettingScalar(quota))
+	}
+	if len(ips) > 0 {
+		users.Set(username+"/networks/ip", chiV1.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
+	}
+	if regexp != "" {
+		users.SetIfNotExists(username+"/networks/host_regexp", chiV1.NewSettingScalar(regexp))
+	}
+}
+
+func (n *Normalizer) normalizeConfigurationUserPassword(users *chiV1.Settings, username string) {
+	//
+	// Deal with passwords
+	//
+
+	chopUsername := chop.Config().ClickHouse.Access.Username
+
+	// Values from the secret have higher priority
+	n.substWithSecretField(users, username, "password", "k8s_secret_password")
+	n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+	n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+
+	// Values from the secret passed via ENV have even higher priority
+	n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
+	n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
+	n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
+
+	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
+	if users.Has(username + "/password_double_sha1_hex") {
+		users.Delete(username + "/password_sha256_hex")
+		users.Delete(username + "/password")
+		return // move to the next user
+	}
+
+	// Than goes password_sha256_hex, thus keep it only
+	if users.Has(username + "/password_sha256_hex") {
+		users.Delete(username + "/password_double_sha1_hex")
+		users.Delete(username + "/password")
+		return // move to the next user
+	}
+
+	// From now on we either have a plaintext password specified, or no password at all
+
+	if users.Get(username + "/password").HasAttributes() {
+		// Have plaintext password explicitly specified via ENV vars
+		// This is still OK
+		return // move to the next user
+	}
+
+	// From now on we either have plaintext password specified as an explicit string, or no password at all
+
+	passwordPlaintext := users.Get(username + "/password").String()
+
+	// Apply default password for password-less non-default users
+	if passwordPlaintext == "" {
+		switch username {
+		case defaultUsername:
+			// NB "default" user may keep empty password in here.
+		case chopUsername:
+			passwordPlaintext = chop.Config().ClickHouse.Access.Password
+		default:
+			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
+		}
+	}
+
+	// NB "default" user may keep empty password in here.
+
+	if passwordPlaintext != "" {
+		// Replace plaintext password with encrypted
+		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
+		users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+		// And keep it only
+		users.Delete(username + "/password_double_sha1_hex")
+		users.Delete(username + "/password")
+	}
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles

@@ -45,22 +45,43 @@ const (
 	StringBoolEnabledLowercase     = "enabled"
 )
 
-// From casts bool to StringBool
-func (s StringBool) From(value bool) StringBool {
-	if value {
-		return StringBoolTrueFirstCapital
+// NewStringBool creates new StringBool variable with optional value
+func NewStringBool(value ...bool) *StringBool {
+	r := new(StringBool)
+	if len(value) > 0 {
+		if value[0] {
+			*r = StringBoolTrueFirstCapital
+			return r
+		}
+	}
+	*r = StringBoolFalseFirstCapital
+	return r
+}
+
+// From casts bool to a StringBool
+func (s *StringBool) From(value bool) *StringBool {
+	return NewStringBool(value)
+}
+
+// String casts StringBool to a string
+func (s *StringBool) String() string {
+	if s == nil {
+		return ""
+	}
+	return string(*s)
+}
+
+// HasValue checks whether value is specified
+func (s *StringBool) HasValue() bool {
+	return s != nil
+}
+
+// Value returns bool value
+func (s *StringBool) Value() bool {
+	if s == nil {
+		return false
 	}
 
-	return StringBoolFalseFirstCapital
-}
-
-// String casts StringBool to string
-func (s StringBool) String() string {
-	return string(s)
-}
-
-// Value gets bool value
-func (s StringBool) Value() bool {
 	if s.IsTrue() {
 		return true
 	}
@@ -74,7 +95,7 @@ func (s StringBool) Value() bool {
 }
 
 // IsValid checks whether StringBool has a proper value
-func (s StringBool) IsValid() bool {
+func (s *StringBool) IsValid() bool {
 	switch strings.ToLower(s.String()) {
 	case
 		StringBool0,
@@ -102,7 +123,7 @@ func (s StringBool) IsValid() bool {
 }
 
 // IsFalse checks whether str is a string as bool "false" value
-func (s StringBool) IsFalse() bool {
+func (s *StringBool) IsFalse() bool {
 	switch strings.ToLower(s.String()) {
 	case
 		StringBool0,
@@ -119,7 +140,7 @@ func (s StringBool) IsFalse() bool {
 }
 
 // IsTrue checks whether str is a string as bool "true" value
-func (s StringBool) IsTrue() bool {
+func (s *StringBool) IsTrue() bool {
 	switch strings.ToLower(s.String()) {
 	case
 		StringBool1,
@@ -135,8 +156,8 @@ func (s StringBool) IsTrue() bool {
 	}
 }
 
-// CastTo01 casts string-bool into string "0/1"
-func (s StringBool) CastTo01(defaultValue bool) string {
+// CastTo01 casts string-bool into string "0"/"1"
+func (s *StringBool) CastTo01(defaultValue bool) string {
 	// True and False string values
 	_true := StringBool1
 	_false := StringBool0
@@ -157,8 +178,8 @@ func (s StringBool) CastTo01(defaultValue bool) string {
 	return _false
 }
 
-// CastToStringTrueFalse casts string-bool into string "true/false"
-func (s StringBool) CastToStringTrueFalse(defaultValue bool) string {
+// CastToStringTrueFalse casts string-bool into string "true"/"false"
+func (s *StringBool) CastToStringTrueFalse(defaultValue bool) string {
 	// True and False values
 	_true := StringBoolTrueLowercase
 	_false := StringBoolFalseLowercase
@@ -179,21 +200,31 @@ func (s StringBool) CastToStringTrueFalse(defaultValue bool) string {
 	return _false
 }
 
-// Normalize normalizes
-func (s StringBool) Normalize(defaultValue bool) StringBool {
-	// True and False values
-	_true := StringBoolTrueLowercase
-	_false := StringBoolFalseLowercase
-
+// Normalize normalizes StringBool value with fallback to defaultValue in case initial value is incorrect
+func (s *StringBool) Normalize(defaultValue bool) *StringBool {
 	if s.IsValid() {
 		return s
 	}
 
 	// String value unrecognized, return default value
+	return NewStringBool(defaultValue)
+}
 
-	if defaultValue {
-		return StringBool(_true)
+// MergeFrom merges value from another variable
+func (s *StringBool) MergeFrom(from *StringBool) *StringBool {
+	if from == nil {
+		// Nothing to merge from, keep original value
+		return s
 	}
 
-	return StringBool(_false)
+	// From now on we have `from` specified
+
+	if s == nil {
+		// Recipient is not specified, just use `from` value
+		return from
+	}
+
+	// Both recipient and `from` are specified, need to pick one value.
+	// Prefer local value
+	return s
 }

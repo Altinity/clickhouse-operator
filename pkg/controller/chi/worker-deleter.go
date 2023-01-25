@@ -118,6 +118,94 @@ func shouldPurgePDB(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chop
 	return true
 }
 
+func (w *worker) purgeStatefulSet(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) int {
+	if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+		return 1
+	}
+	return 0
+}
+
+func (w *worker) purgePVC(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgePVC(chi, reconcileFailedObjs, m) {
+		if chopModel.GetReclaimPolicy(m) == chiV1.PVCReclaimPolicyDelete {
+			w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
+			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+				w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
+			}
+		}
+	}
+}
+
+func (w *worker) purgeConfigMap(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
+func (w *worker) purgeService(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgeService(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
+func (w *worker) purgeSecret(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
+func (w *worker) purgePDB(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgePDB(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
 // purge
 func (w *worker) purge(
 	ctx context.Context,
@@ -133,50 +221,17 @@ func (w *worker) purge(
 	reg.Walk(func(entityType chopModel.EntityType, m metaV1.ObjectMeta) {
 		switch entityType {
 		case chopModel.StatefulSet:
-			if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-				cnt++
-			}
+			cnt += w.purgeStatefulSet(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.PVC:
-			if shouldPurgePVC(chi, reconcileFailedObjs, m) {
-				if chopModel.GetReclaimPolicy(m) == chiV1.PVCReclaimPolicyDelete {
-					w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
-					if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-						w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
-					}
-				}
-			}
+			w.purgePVC(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.ConfigMap:
-			if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgeConfigMap(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.Service:
-			if shouldPurgeService(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgeService(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.Secret:
-			if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgeSecret(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.PDB:
-			if shouldPurgePDB(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgePDB(ctx, chi, reconcileFailedObjs, m)
 		}
 	})
 	return cnt

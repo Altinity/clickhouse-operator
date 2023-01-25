@@ -20,7 +20,7 @@ import (
 
 // ClusterSecret defines the shared secret for nodes to authenticate each other with
 type ClusterSecret struct {
-	Auto      StringBool           `json:"auto,omitempty"      yaml:"auto,omitempty"`
+	Auto      *StringBool          `json:"auto,omitempty"      yaml:"auto,omitempty"`
 	Value     string               `json:"value,omitempty"     yaml:"value,omitempty"`
 	ValueFrom *ClusterSecretSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }

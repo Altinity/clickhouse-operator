@@ -17,10 +17,10 @@ package metrics
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
-
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -33,13 +33,14 @@ func StartMetricsREST(
 
 	metricsAddress string,
 	metricsPath string,
+	collectorTimeout time.Duration,
 
 	chiListAddress string,
 	chiListPath string,
 ) *Exporter {
 	log.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
 
-	exporter = NewExporter(connectionParams)
+	exporter := NewExporter(connectionParams, collectorTimeout)
 	prometheus.MustRegister(exporter)
 
 	http.Handle(metricsPath, promhttp.Handler())
