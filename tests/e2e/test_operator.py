@@ -441,25 +441,21 @@ def check_remote_servers(self, chi, shards, trigger_event, cluster=""):
     if cluster == "":
         cluster = chi
 
-    try:
-        self.context.shell = Shell()
-        ok = 0
+    with Given("I get shell"):
+        self.context.shell = get_shell()
+    ok = 0
 
-        while not trigger_event.is_set():
-            chi_shards = get_shards_from_remote_servers(chi, cluster)
+    while not trigger_event.is_set():
+        chi_shards = get_shards_from_remote_servers(chi, cluster)
 
-            if chi_shards != shards:
-                with Then(f"Number of shards in {cluster} cluster should be {shards}"):
-                    assert chi_shards == shards
-            ok += 1
-            time.sleep(1)
+        if chi_shards != shards:
+            with Then(f"Number of shards in {cluster} cluster should be {shards}"):
+                assert chi_shards == shards
+        ok += 1
+        time.sleep(1)
 
-        with By(f"remote_servers were always correct {ok} times"):
-            assert ok > 0
-
-    finally:
-        if hasattr(self.context, "shell"):
-            self.context.shell.close()
+    with By(f"remote_servers were always correct {ok} times"):
+        assert ok > 0
 
 
 @TestScenario
@@ -3118,7 +3114,8 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
     """Run a select query in parallel until the stop signal is received."""
 
     client_pod = "clickhouse-client"
-    self.context.shell = Shell()
+    with Given("I get shell"):
+        self.context.shell = get_shell()
     try:
 
         kubectl.launch(
@@ -3152,8 +3149,6 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
                 )
     finally:
         kubectl.launch(f"delete pod {client_pod}")
-        if hasattr(self.context, "shell"):
-            self.context.shell.close()
 
 
 @TestCheck
@@ -3161,7 +3156,8 @@ def run_insert_query(self, host, user, password, query, trigger_event):
     """Run an insert query in parallel until the stop signal is received."""
 
     client_pod = "clickhouse-insert"
-    self.context.shell = Shell()
+    with Given("I get shell"):
+        self.context.shell = get_shell()
     try:
 
         kubectl.launch(
@@ -3185,8 +3181,6 @@ def run_insert_query(self, host, user, password, query, trigger_event):
             assert errors == 0
     finally:
         kubectl.launch(f"delete pod {client_pod}")
-        if hasattr(self.context, "shell"):
-            self.context.shell.close()
 
 
 @TestScenario
