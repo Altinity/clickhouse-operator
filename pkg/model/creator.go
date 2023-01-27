@@ -379,22 +379,12 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
-	c.setupStatefulSetVersion(statefulSet)
+	MakeObjectVersionLabel(&statefulSet.ObjectMeta, statefulSet)
 
 	host.StatefulSet = statefulSet
 	host.DesiredStatefulSet = statefulSet
 
 	return statefulSet
-}
-
-// setupStatefulSetVersion
-// TODO property of the labeler?
-func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
-	// Version can drift from instance to instance of the CHI StatefulSet even for the same CHI because
-	// StatefulSet has owner already specified, which has UID of owner, which is different for different CHIs
-	MakeObjectVersionLabel(&statefulSet.ObjectMeta, statefulSet)
-	// TODO fix this with verbosity update
-	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
 // PreparePersistentVolume prepares PV labels
