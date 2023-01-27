@@ -951,7 +951,7 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
-                        description: "define ClickHouse Pod distibution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                        description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                         # nullable: true
                         items:
                           type: object
@@ -2059,7 +2059,7 @@ spec:
                           - "OnePerHost"
                       podDistribution:
                         type: array
-                        description: "define ClickHouse Pod distibution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                        description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                         # nullable: true
                         items:
                           type: object
