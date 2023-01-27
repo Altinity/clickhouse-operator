@@ -3971,7 +3971,7 @@ spec:
 ##### RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution
 version: 1.0
 
-[ClickHouse Operator] SHALL support defining [ClickHouse] [Pod] distibution policy
+[ClickHouse Operator] SHALL support defining [ClickHouse] [Pod] distribution policy
 between [Kubernetes] nodes inside shard, replica, [Namespace], [CHI],
 or another [ClickHouse] cluster using  `.spec.templates.podTemplates[].podDistribution`
 [array] type object.
