@@ -3131,9 +3131,8 @@ def test_039(self, step=0):
             r = clickhouse.query(chi, "SELECT count() FROM secure_dist", pwd="qkrq")
             assert r == "10"
 
-    if step == 3:
+    if step == 4:
         kubectl.delete_chi(chi)
-
 
 
 @TestScenario
@@ -3152,7 +3151,7 @@ def test_039_1(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_1. Inter-cluster communications with plan text secret")
+@Name("test_039_2. Inter-cluster communications with plan text secret")
 def test_039_2(self):
     """Check clickhouse-operator support inter-cluster communications with plan text secret."""
     test_039(step=2)
@@ -3160,11 +3159,17 @@ def test_039_2(self):
 
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
-@Name("test_039_1. Inter-cluster communications with k8s secret")
+@Name("test_039_3. Inter-cluster communications with k8s secret")
 def test_039_3(self):
     """Check clickhouse-operator support inter-cluster communications with k8s secret."""
     test_039(step=3)
 
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
+@Name("test_039_4. Inter-cluster communications over HTTPS")
+def test_039_4(self):
+    """Check clickhouse-operator support inter-cluster communications over HTTPS."""
+    test_039(step=4)
 
 @TestModule
 @Name("e2e.test_operator")
