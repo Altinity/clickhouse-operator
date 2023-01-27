@@ -383,8 +383,8 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelClusterName], nil
 }
 
-// MakeObjectVersionLabel makes object version label
-func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
+// MakeObjectVersion makes object version label
+func MakeObjectVersion(meta *meta.ObjectMeta, obj interface{}) {
 	meta.Labels = util.MergeStringMapsOverwrite(
 		meta.Labels,
 		map[string]string{
