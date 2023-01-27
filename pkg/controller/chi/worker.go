@@ -1193,8 +1193,8 @@ func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetS
 
 	if curStatefulSet != nil {
 		// Try to perform label-based comparison
-		curLabel, curHasLabel := w.task.creator.GetObjectVersion(curStatefulSet.ObjectMeta)
-		newLabel, newHasLabel := w.task.creator.GetObjectVersion(meta)
+		curLabel, curHasLabel := chopModel.GetObjectVersion(curStatefulSet.ObjectMeta)
+		newLabel, newHasLabel := chopModel.GetObjectVersion(meta)
 		if curHasLabel && newHasLabel {
 			if curLabel == newLabel {
 				w.a.M(meta).F().Info(

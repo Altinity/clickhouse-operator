@@ -397,13 +397,6 @@ func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
 	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
 }
 
-// GetObjectVersion gets version of the StatefulSet
-// TODO property of the labeler?
-func (c *Creator) GetObjectVersion(meta metav1.ObjectMeta) (string, bool) {
-	label, ok := meta.Labels[LabelObjectVersion]
-	return label, ok
-}
-
 // PreparePersistentVolume prepares PV labels
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
 	pv.Labels = macro(host).Map(c.labels.getPV(pv, host))

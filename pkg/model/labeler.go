@@ -393,6 +393,12 @@ func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
 	)
 }
 
+// GetObjectVersion gets version of the object
+func GetObjectVersion(meta meta.ObjectMeta) (string, bool) {
+	label, ok := meta.Labels[LabelObjectVersion]
+	return label, ok
+}
+
 // isObjectVersionLabelTheSame checks whether object version in meta.Labels is the same as provided value
 func isObjectVersionLabelTheSame(meta *meta.ObjectMeta, value string) bool {
 	if meta == nil {
