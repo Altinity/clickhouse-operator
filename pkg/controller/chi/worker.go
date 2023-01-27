@@ -876,7 +876,6 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
 func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
-	status := host.ReconcileAttributes.GetStatus()
 	switch {
 	case host.GetCHI().IsStopped():
 		w.a.V(1).
@@ -888,12 +887,12 @@ func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 			M(host).F().
 			Info("While rolling update host would be restarted host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
-	case status == chiV1.StatefulSetStatusNew:
+	case host.ReconcileAttributes.GetStatus() == chiV1.StatefulSetStatusNew:
 		w.a.V(1).
 			M(host).F().
 			Info("Nothing to exclude, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
-	case status == chiV1.StatefulSetStatusSame:
+	case host.ReconcileAttributes.GetStatus() == chiV1.StatefulSetStatusSame:
 		w.a.V(1).
 			M(host).F().
 			Info("The same host would not be updated host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
