@@ -852,6 +852,8 @@ func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
 		),
 	)
 
+	// Unify settings fingerprint
+	host.Config.SettingsFingerprint = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
 	return nil
 }
 
