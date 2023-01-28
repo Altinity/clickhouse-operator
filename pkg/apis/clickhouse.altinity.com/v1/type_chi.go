@@ -571,10 +571,10 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 }
 
 // HostsCountAttributes counts hosts by attributes
-func (chi *ClickHouseInstallation) HostsCountAttributes(a ChiHostReconcileAttributes) int {
+func (chi *ClickHouseInstallation) HostsCountAttributes(a *ChiHostReconcileAttributes) int {
 	count := 0
 	chi.WalkHosts(func(host *ChiHost) error {
-		if host.ReconcileAttributes.Any(a) {
+		if host.GetReconcileAttributes().Any(a) {
 			count++
 		}
 		return nil

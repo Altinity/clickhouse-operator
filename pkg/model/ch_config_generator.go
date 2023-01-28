@@ -205,7 +205,7 @@ func (o *RemoteServersGeneratorOptions) Exclude(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return true
 	}
@@ -226,7 +226,7 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return false
 	}

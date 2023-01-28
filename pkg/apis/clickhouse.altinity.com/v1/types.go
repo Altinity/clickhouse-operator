@@ -636,8 +636,11 @@ func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 }
 
 // Any checks whether any of the attributes is set
-func (s *ChiHostReconcileAttributes) Any(of ChiHostReconcileAttributes) bool {
+func (s *ChiHostReconcileAttributes) Any(of *ChiHostReconcileAttributes) bool {
 	if s == nil {
+		return false
+	}
+	if of == nil {
 		return false
 	}
 	return false ||

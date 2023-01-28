@@ -181,7 +181,11 @@ func (in *ChiHost) DeepCopyInto(out *ChiHost) {
 	}
 	out.Address = in.Address
 	out.Config = in.Config
-	out.ReconcileAttributes = in.ReconcileAttributes
+	if in.reconcileAttributes != nil {
+		in, out := &in.reconcileAttributes, &out.reconcileAttributes
+		*out = new(ChiHostReconcileAttributes)
+		**out = **in
+	}
 	if in.StatefulSet != nil {
 		in, out := &in.StatefulSet, &out.StatefulSet
 		*out = new(appsv1.StatefulSet)

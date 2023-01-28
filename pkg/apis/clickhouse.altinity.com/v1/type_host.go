@@ -33,9 +33,9 @@ type ChiHost struct {
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
 	// Internal data
-	Address             ChiHostAddress             `json:"-" yaml:"-"`
-	Config              ChiHostConfig              `json:"-" yaml:"-"`
-	ReconcileAttributes ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	Address             ChiHostAddress              `json:"-" yaml:"-"`
+	Config              ChiHostConfig               `json:"-" yaml:"-"`
+	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	// StatefulSet is a stateful set which is being worked with by the host.
 	// It can be desired stateful set when host is being created or current stateful set.
 	// Ex.: polling sts after creation.
@@ -45,6 +45,17 @@ type ChiHost struct {
 	// DesiredStatefulSet is a desired stateful set - reconcile target
 	DesiredStatefulSet *appsv1.StatefulSet     `json:"-" yaml:"-" testdiff:"ignore"`
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+// GetReconcileAttributes is an ensurer getter
+func (host *ChiHost) GetReconcileAttributes() *ChiHostReconcileAttributes {
+	if host == nil {
+		return nil
+	}
+	if host.reconcileAttributes == nil {
+		host.reconcileAttributes = NewChiHostReconcileAttributes()
+	}
+	return host.reconcileAttributes
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica

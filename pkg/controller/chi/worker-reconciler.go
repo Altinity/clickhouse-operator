@@ -429,7 +429,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.reconcileHostService(ctx, host)
 
-	host.ReconcileAttributes.UnsetAdd()
+	host.GetReconcileAttributes().UnsetAdd()
 
 	_ = w.migrateTables(ctx, host)
 
@@ -596,7 +596,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
-	if host.ReconcileAttributes.GetStatus() == chiV1.StatefulSetStatusSame {
+	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame {
 		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
 		return nil
 	}
