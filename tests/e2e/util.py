@@ -16,13 +16,9 @@ operator_label = "-l app=clickhouse-operator"
 def get_full_path(test_file, lookup_in_host=True):
     # this must be substituted if ran in docker
     if current().context.native or lookup_in_host:
-        return os.path.normpath(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), test_file)
-        )
+        return os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), test_file))
     else:
-        return os.path.abspath(
-            f"/home/master/clickhouse-operator/tests/e2e/{test_file}"
-        )
+        return os.path.abspath(f"/home/master/clickhouse-operator/tests/e2e/{test_file}")
 
 
 def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
@@ -39,9 +35,7 @@ def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
         f"set image deployment.v1.apps/clickhouse-operator metrics-exporter={metrics_exporter_image}",
         ns=ns,
     )
-    kubectl.launch(
-        "rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout
-    )
+    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
     if kubectl.get_count("pod", ns=ns, label=operator_label) == 0:
         fail("invalid clickhouse-operator pod count")
 
@@ -75,30 +69,18 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
     if force_install or kubectl.get_count("service", name=keeper_type) == 0:
 
         if keeper_type == "zookeeper":
-            keeper_manifest = (
-                "zookeeper-1-node-1GB-for-tests-only.yaml"
-                if keeper_manifest == ""
-                else keeper_manifest
-            )
+            keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = (
-                "clickhouse-keeper-1-node-256M-for-test-only.yaml"
-                if keeper_manifest == ""
-                else keeper_manifest
+                "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
             keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
-            keeper_manifest = (
-                "zookeeper-operator-1-node.yaml"
-                if keeper_manifest == ""
-                else keeper_manifest
-            )
+            keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
 
-        multi_doc = yaml_manifest.get_multidoc_manifest_data(
-            get_full_path(keeper_manifest, lookup_in_host=True)
-        )
+        multi_doc = yaml_manifest.get_multidoc_manifest_data(get_full_path(keeper_manifest, lookup_in_host=True))
         keeper_nodes = 1
         docs_count = 0
         for doc in multi_doc:
@@ -121,13 +103,9 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
         with Given(f"Install {keeper_type} {keeper_nodes} nodes"):
             kubectl.apply(get_full_path(keeper_manifest, lookup_in_host=False))
             for pod_num in range(keeper_nodes):
-                kubectl.wait_object(
-                    "pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}"
-                )
+                kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}")
             for pod_num in range(keeper_nodes):
-                kubectl.wait_pod_status(
-                    f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running"
-                )
+                kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running")
 
 
 def wait_clickhouse_cluster_ready(chi):
@@ -143,9 +121,7 @@ def wait_clickhouse_cluster_ready(chi):
                     pod=pod,
                 )
                 for host in chi["status"]["fqdns"]:
-                    svc_short_name = host.replace(
-                        f".{settings.test_namespace}.svc.cluster.local", ""
-                    )
+                    svc_short_name = host.replace(f".{settings.test_namespace}.svc.cluster.local", "")
                     if svc_short_name not in cluster_response:
                         with Then("Not ready, sleep 5 seconds"):
                             all_pods_ready = False

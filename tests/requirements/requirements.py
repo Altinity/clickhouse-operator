@@ -31,10 +31,7 @@ RQ_SRS_026_ClickHouseOperator_Installation = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support being installed as a [Deployment] or via CoreOS OLM.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support being installed as a [Deployment] or via CoreOS OLM.\n" "\n"),
     link=None,
     level=3,
     num="4.2.1",
@@ -81,10 +78,7 @@ RQ_SRS_026_ClickHouseOperator_Namespaces_UserDefined = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support being installed user defined [Namespace].\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support being installed user defined [Namespace].\n" "\n"),
     link=None,
     level=4,
     num="4.3.2.1",
@@ -149,8 +143,7 @@ RQ_SRS_026_ClickHouseOperator_DeleteBroken = Requirement(
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support be able to delete a [ClickHouse] cluster with broken image.\n"
-        "\n"
+        "[ClickHouse Operator] SHALL support be able to delete a [ClickHouse] cluster with broken image.\n" "\n"
     ),
     link=None,
     level=4,
@@ -184,10 +177,7 @@ RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support being updated without restarting any [Pod]s.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support being updated without restarting any [Pod]s.\n" "\n"),
     link=None,
     level=4,
     num="4.7.1.1",
@@ -200,11 +190,7 @@ RQ_SRS_026_ClickHouseOperator_Managing_DowngradingOperator = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support being downgraded to previous version.\n"
-        "\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support being downgraded to previous version.\n" "\n" "\n"),
     link=None,
     level=4,
     num="4.7.2.1",
@@ -465,10 +451,7 @@ RQ_SRS_026_ClickHouseOperator_DefaultTemplates_MergingWithUserDefinedTemplates =
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support merging default templates with user defined ones.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support merging default templates with user defined ones.\n" "\n"),
     link=None,
     level=3,
     num="4.9.2",
@@ -557,10 +540,7 @@ RQ_SRS_026_ClickHouseOperator_ServiceTemplates_LoadBalancer = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL provide a load balancer for each [Service] entry point.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL provide a load balancer for each [Service] entry point.\n" "\n"),
     link=None,
     level=4,
     num="4.12.2.1",
@@ -591,8 +571,7 @@ RQ_SRS_026_ClickHouseOperator_ServiceTemplates_Annotations = Requirement(
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support annotations that SHALL allow use of external load balancers.\n"
-        "\n"
+        "[ClickHouse Operator] SHALL support annotations that SHALL allow use of external load balancers.\n" "\n"
     ),
     link=None,
     level=4,
@@ -698,9 +677,7 @@ RQ_SRS_026_ClickHouseOperator_Deployments_SingleNodeInstances = Requirement(
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating and managing single node instance\n"
-        "deployments.\n"
-        "\n"
+        "[ClickHouse Operator] SHALL support creating and managing single node instance\n" "deployments.\n" "\n"
     ),
     link=None,
     level=4,
@@ -837,10 +814,7 @@ RQ_SRS_026_ClickHouseOperator_Deployments_PluggingExternalVolumes = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support plugging of externally created volumes to [CHI].\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support plugging of externally created volumes to [CHI].\n" "\n"),
     link=None,
     level=3,
     num="4.17.1",
@@ -887,10 +861,7 @@ RQ_SRS_026_ClickHouseOperator_ConfigurationFileControl_EmbeddedXML = Requirement
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support embedding XML files in YAML configuration.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support embedding XML files in YAML configuration.\n" "\n"),
     link=None,
     level=4,
     num="4.18.3.1",
@@ -937,10 +908,7 @@ RQ_SRS_026_ClickHouseOperator_ReconnectingExistingPersistentVolumes = Requiremen
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support reconnecting existing persistent volumes ([PV]s).\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support reconnecting existing persistent volumes ([PV]s).\n" "\n"),
     link=None,
     level=3,
     num="4.20.1",
@@ -975,9 +943,7 @@ RQ_SRS_026_ClickHouseOperator_AddingNewPersistentVolumesToPods = Requirement(
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support adding new persistent volumes ([PV]s)\n"
-        "to managed [Pod]s.\n"
-        "\n"
+        "[ClickHouse Operator] SHALL support adding new persistent volumes ([PV]s)\n" "to managed [Pod]s.\n" "\n"
     ),
     link=None,
     level=3,
@@ -1048,8 +1014,7 @@ RQ_SRS_026_ClickHouseOperator_Managing_Changes = Requirement(
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL apply all changes in a sequential order host-by-host in scope of [CHI].\n"
-        "\n"
+        "[ClickHouse Operator] SHALL apply all changes in a sequential order host-by-host in scope of [CHI].\n" "\n"
     ),
     link=None,
     level=4,
@@ -1118,10 +1083,7 @@ RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards = Requirement
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support adding shards to [CHI] with schema propagation.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support adding shards to [CHI] with schema propagation.\n" "\n"),
     link=None,
     level=5,
     num="4.24.7.1.1",
@@ -1246,10 +1208,7 @@ RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningPodsUsingDifferentTemplate 
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support re-provisioning [Pod]s using a different template.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support re-provisioning [Pod]s using a different template.\n" "\n"),
     link=None,
     level=4,
     num="4.24.9.1",
@@ -1301,10 +1260,7 @@ RQ_SRS_026_ClickHouseOperator_Managing_StoppingAndStarting = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support stopping and starting [CHI] entirely.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support stopping and starting [CHI] entirely.\n" "\n"),
     link=None,
     level=4,
     num="4.24.12.1",
@@ -1317,10 +1273,7 @@ RQ_SRS_026_ClickHouseOperator_Managing_StoppingSpecificClickHousePods = Requirem
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support stopping specific [ClickHouse] [Pod]s completely.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support stopping specific [ClickHouse] [Pod]s completely.\n" "\n"),
     link=None,
     level=4,
     num="4.24.13.1",
@@ -1474,9 +1427,7 @@ RQ_SRS_026_ClickHouseOperator_Settings_ConfigYaml = Requirement(
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support configuration using\n"
-        "`/etc/clickhouse-operator/config.yaml`.\n"
-        "\n"
+        "[ClickHouse Operator] SHALL support configuration using\n" "`/etc/clickhouse-operator/config.yaml`.\n" "\n"
     ),
     link=None,
     level=4,
@@ -1949,8 +1900,7 @@ RQ_SRS_026_ClickHouseOperator_ReconcilingCycle_ApplyingConfigMapsBeforeStatefulS
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL create or update [ConfigMap]s before any changes to [StatefulSet]s.\n"
-        "\n"
+        "[ClickHouse Operator] SHALL create or update [ConfigMap]s before any changes to [StatefulSet]s.\n" "\n"
     ),
     link=None,
     level=4,
@@ -5953,10 +5903,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_VModule = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support `.spec.vmodule` [string] type property.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support `.spec.vmodule` [string] type property.\n" "\n"),
     link=None,
     level=4,
     num="4.52.23.1",
@@ -5969,10 +5916,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogBacktrace = Requirement(
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support `.spec.log_backtrace_at` [string] type property.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support `.spec.log_backtrace_at` [string] type property.\n" "\n"),
     link=None,
     level=4,
     num="4.52.24.1",
@@ -6005,10 +5949,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitExclude = Requirem
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support `.spec.reconcileWaitExclude` [string] type property.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support `.spec.reconcileWaitExclude` [string] type property.\n" "\n"),
     link=None,
     level=4,
     num="4.52.26.1",
@@ -6021,10 +5962,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitInclude = Requirem
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support `.spec.reconcileWaitInclude` [string] type property.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support `.spec.reconcileWaitInclude` [string] type property.\n" "\n"),
     link=None,
     level=4,
     num="4.52.27.1",
@@ -6268,10 +6206,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Create = Requiremen
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support reverting back after [StatefulSet] create failure.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support reverting back after [StatefulSet] create failure.\n" "\n"),
     link=None,
     level=4,
     num="4.54.7.1",
@@ -6284,10 +6219,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Update = Requiremen
     group=None,
     type=None,
     uid=None,
-    description=(
-        "[ClickHouse Operator] SHALL support reverting back after [StatefulSet] update failure.\n"
-        "\n"
-    ),
+    description=("[ClickHouse Operator] SHALL support reverting back after [StatefulSet] update failure.\n" "\n"),
     link=None,
     level=4,
     num="4.54.7.2",
@@ -6385,9 +6317,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
         Heading(name="General", level=2, num="4.1"),
         Heading(name="RQ.SRS-026.ClickHouseOperator", level=4, num="4.1.0.1"),
         Heading(name="Installation", level=2, num="4.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Installation", level=3, num="4.2.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.Installation", level=3, num="4.2.1"),
         Heading(name="Monitoring Support", level=3, num="4.2.2"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.Installation.MonitoringSupport",
@@ -6417,12 +6347,8 @@ QA_SRS026_ClickHouse_Operator = Specification(
         Heading(name="RQ.SRS-026.ClickHouseOperator.ACM", level=4, num="4.4.3.1"),
         Heading(name="Creating Clusters", level=2, num="4.5"),
         Heading(name="RQ.SRS-026.ClickHouseOperator.Create", level=4, num="4.5.3.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.DeleteBroken", level=4, num="4.5.3.2"
-        ),
-        Heading(
-            name="Auto-generated ClickHouse Clusters Definitions", level=2, num="4.6"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.DeleteBroken", level=4, num="4.5.3.2"),
+        Heading(name="Auto-generated ClickHouse Clusters Definitions", level=2, num="4.6"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.AutoGeneratedClickHouseClusters",
             level=3,
@@ -6455,15 +6381,11 @@ QA_SRS026_ClickHouse_Operator = Specification(
             num="4.8.1.1",
         ),
         Heading(name="Default Users", level=3, num="4.8.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.DefaultUsers", level=4, num="4.8.2.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.DefaultUsers", level=4, num="4.8.2.1"),
         Heading(name="Secrets", level=3, num="4.8.3"),
         Heading(name="RQ.SRS-026.ClickHouseOperator.Secrets", level=4, num="4.8.3.1"),
         Heading(name="Secure Connection", level=3, num="4.8.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.EnableHttps", level=4, num="4.8.4.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.EnableHttps", level=4, num="4.8.4.1"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication",
             level=4,
@@ -6480,9 +6402,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             num="4.8.4.4",
         ),
         Heading(name="Default Templates", level=2, num="4.9"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.DefaultTemplates", level=3, num="4.9.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.DefaultTemplates", level=3, num="4.9.1"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates",
             level=3,
@@ -6495,22 +6415,16 @@ QA_SRS026_ClickHouse_Operator = Specification(
             num="4.10.1",
         ),
         Heading(name="Custom Pod Templates", level=2, num="4.11"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.PodTemplates", level=4, num="4.11.1.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.PodTemplates", level=4, num="4.11.1.1"),
         Heading(name="Custom Service Templates", level=2, num="4.12"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates", level=3, num="4.12.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates", level=3, num="4.12.1"),
         Heading(name="Load Balancer", level=3, num="4.12.2"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.LoadBalancer",
             level=4,
             num="4.12.2.1",
         ),
-        Heading(
-            name="Standard Kubernetes Service Specification", level=3, num="4.12.3"
-        ),
+        Heading(name="Standard Kubernetes Service Specification", level=3, num="4.12.3"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.ServiceSpecificationStandard",
             level=4,
@@ -6529,9 +6443,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             num="4.12.5.1",
         ),
         Heading(name="Custom Host Template", level=2, num="4.13"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.HostTemplates", level=4, num="4.13.5.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.HostTemplates", level=4, num="4.13.5.1"),
         Heading(name="Custom Volume Claim Templates", level=2, num="4.14"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates",
@@ -6664,9 +6576,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
         ),
         Heading(name="Managing ClickHouse", level=2, num="4.24"),
         Heading(name="Configuring TLS", level=3, num="4.24.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.TLS", level=4, num="4.24.1.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.Managing.TLS", level=4, num="4.24.1.1"),
         Heading(name="Restarting ZooKeeper Cluster", level=3, num="4.24.2"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.Managing.RestartingZooKeeper",
@@ -6743,9 +6653,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             level=4,
             num="4.24.8.2",
         ),
-        Heading(
-            name="Re-provisioning Pods Using Different Template", level=3, num="4.24.9"
-        ),
+        Heading(name="Re-provisioning Pods Using Different Template", level=3, num="4.24.9"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate",
             level=4,
@@ -6831,9 +6739,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             level=4,
             num="4.27.2.2",
         ),
-        Heading(
-            name="`ClickHouseOperatorConfiguration` Resource", level=3, num="4.27.3"
-        ),
+        Heading(name="`ClickHouseOperatorConfiguration` Resource", level=3, num="4.27.3"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration",
             level=4,
@@ -6933,9 +6839,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             num="4.40.1",
         ),
         Heading(name="Reconciling Cycle", level=2, num="4.41"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ReconcilingCycle", level=3, num="4.41.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.ReconcilingCycle", level=3, num="4.41.1"),
         Heading(name="Applying ConfigMaps Before StatefulSets", level=3, num="4.41.2"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets",
@@ -6984,9 +6888,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             level=4,
             num="4.42.8.1",
         ),
-        Heading(
-            name="Specifying Storage Management Provisioner", level=3, num="4.42.9"
-        ),
+        Heading(name="Specifying Storage Management Provisioner", level=3, num="4.42.9"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner",
             level=4,
@@ -7694,9 +7596,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             level=4,
             num="4.52.12.1",
         ),
-        Heading(
-            name="ClickHouse Config User Default Networks IP", level=3, num="4.52.13"
-        ),
+        Heading(name="ClickHouse Config User Default Networks IP", level=3, num="4.52.13"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP",
             level=4,
@@ -7772,9 +7672,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             level=4,
             num="4.52.24.1",
         ),
-        Heading(
-            name="Number Of Threads For Reconciliation Cycle", level=3, num="4.52.25"
-        ),
+        Heading(name="Number Of Threads For Reconciliation Cycle", level=3, num="4.52.25"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber",
             level=4,
@@ -7805,9 +7703,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             num="4.52.29.1",
         ),
         Heading(name="Stateful Sets", level=2, num="4.53"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.StatefulSets", level=3, num="4.53.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.StatefulSets", level=3, num="4.53.1"),
         Heading(name="Sticky Identity", level=3, num="4.53.2"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity",
@@ -7821,9 +7717,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
             num="4.53.3.1",
         ),
         Heading(name="Error Handling", level=2, num="4.54"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling", level=3, num="4.54.1"
-        ),
+        Heading(name="RQ.SRS-026.ClickHouseOperator.ErrorHandling", level=3, num="4.54.1"),
         Heading(name="Health Monitoring", level=3, num="4.54.2"),
         Heading(
             name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring",

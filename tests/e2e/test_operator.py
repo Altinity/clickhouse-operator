@@ -64,15 +64,9 @@ def test_002(self):
 @Name("test_003. 4 nodes with custom layout definition")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Name(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Name(
-        "1.0"
-    ),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Name("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Name("1.0"),
 )
 def test_003(self):
     kubectl.create_and_check(
@@ -89,19 +83,11 @@ def test_003(self):
 
 
 @TestScenario
-@Name(
-    "test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported"
-)
+@Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Name(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Spec(
-        "1.0"
-    ),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Name("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Spec("1.0"),
 )
 def test_004(self):
     kubectl.create_and_check(
@@ -132,9 +118,7 @@ def test_005(self):
 
 
 @TestScenario
-@Name(
-    "test_006. Test clickhouse version upgrade from one version to another using podTemplate change"
-)
+@Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
 def test_006(self):
     old_version = "clickhouse/clickhouse-server:22.3"
@@ -157,9 +141,7 @@ def test_006(self):
                 "do_not_delete": 1,
             },
         )
-    with Then(
-        "Change image in podTemplate itself and confirm that pod image is updated"
-    ):
+    with Then("Change image in podTemplate itself and confirm that pod image is updated"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-3.yaml",
             check={
@@ -172,15 +154,9 @@ def test_006(self):
 @TestScenario
 @Name("test_007. Test template with custom clickhouse ports")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_InterServerHttpPort(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_TcpPort(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_HttpPort(
-        "1.0"
-    ),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_InterServerHttpPort("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_TcpPort("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_HttpPort("1.0"),
 )
 def test_007(self):
     kubectl.create_and_check(
@@ -193,9 +169,7 @@ def test_007(self):
 
 
 @TestCheck
-def test_operator_upgrade(
-    self, manifest, service, version_from, version_to=settings.operator_version
-):
+def test_operator_upgrade(self, manifest, service, version_from, version_to=settings.operator_version):
     with Given(f"clickhouse-operator from {version_from}"):
         util.install_operator_version(version_from)
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
@@ -212,9 +186,7 @@ def test_operator_upgrade(
                 "do_not_delete": 1,
             },
         )
-        start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
         with Then("Create tables"):
             for h in [f"chi-{chi}-{cluster}-0-0-0", f"chi-{chi}-{cluster}-1-0-0"]:
@@ -237,11 +209,7 @@ def test_operator_upgrade(
         trigger_event=trigger_event,
     )
 
-    Check(
-        "Check that cluster definition does not change during restart",
-        test=check_remote_servers,
-        parallel=True,
-    )(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -266,9 +234,7 @@ def test_operator_upgrade(
         assert out == "1"
 
     with Then("ClickHouse pods should not be restarted during upgrade"):
-        new_start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         if start_time != new_start_time:
             kubectl.launch(f"describe chi -n {settings.test_namespace} {chi}")
             kubectl.launch(
@@ -350,11 +316,7 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
         trigger_event=trigger_event,
     )
 
-    Check(
-        "insert into distributed table until receive stop event",
-        test=run_insert_query,
-        parallel=True,
-    )(
+    Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True,)(
         host=service,
         user="test_008",
         password="test_008",
@@ -362,11 +324,7 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
         trigger_event=trigger_event,
     )
 
-    Check(
-        "Check that cluster definition does not change during restart",
-        test=check_remote_servers,
-        parallel=True,
-    )(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -393,9 +351,7 @@ def test_operator_restart(self, manifest, service, version=settings.operator_ver
 def get_shards_from_remote_servers(chi, cluster):
     if cluster == "":
         cluster = chi
-    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"][
-        "chop-generated-remote_servers.xml"
-    ]
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
 
     chi_start = remote_servers.find(f"<{cluster}>")
     chi_end = remote_servers.find(f"</{cluster}>")
@@ -415,9 +371,7 @@ def get_shards_from_remote_servers(chi, cluster):
 def get_replicas_from_remote_servers(chi, cluster):
     if cluster == "":
         cluster = chi
-    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"][
-        "chop-generated-remote_servers.xml"
-    ]
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
 
     chi_start = remote_servers.find(f"<{cluster}>")
     chi_end = remote_servers.find(f"</{cluster}>")
@@ -519,17 +473,11 @@ def test_008_3(self):
                 kubectl.wait_chi_status(chi, "Completed")
 
     with Then("Upgrade ClickHouse version to run a reconcile"):
-        kubectl.create_and_check(
-            manifest_2, check={"do_not_delete": 1, "chi_status": "InProgress"}
-        )
+        kubectl.create_and_check(manifest_2, check={"do_not_delete": 1, "chi_status": "InProgress"})
 
     trigger_event = threading.Event()
 
-    Check(
-        "Check that cluster definition does not change during restart",
-        test=check_remote_servers,
-        parallel=True,
-    )(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -572,9 +520,7 @@ def test_009_2(self):
 
 @TestScenario
 @Name("test_010. Test zookeeper initialization")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper("1.0")
-)
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper("1.0"))
 def test_010(self):
     util.set_operator_version(settings.operator_version)
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -591,18 +537,14 @@ def test_010(self):
     )
     time.sleep(10)
     with And("ClickHouse should complain regarding zookeeper path"):
-        out = clickhouse.query_with_error(
-            "test-010-zkroot", "select * from system.zookeeper where path = '/'"
-        )
+        out = clickhouse.query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
         assert "DB::Exception" in out, error()
 
     kubectl.delete_chi("test-010-zkroot")
 
 
 def get_user_xml_from_configmap(chi, user):
-    users_xml = kubectl.get("configmap", f"chi-{chi}-common-usersd")["data"][
-        "chop-generated-users.xml"
-    ]
+    users_xml = kubectl.get("configmap", f"chi-{chi}-common-usersd")["data"]["chop-generated-users.xml"]
     root_node = etree.fromstring(users_xml)
     return root_node.find(f"users/{user}")
 
@@ -639,22 +581,16 @@ def test_011(self):
         # Tests default user security
         def test_default_user():
             with Then("Default user should have 5 allowed ips"):
-                ips = get_user_xml_from_configmap(
-                    "test-011-secured-cluster", "default"
-                ).findall("networks/ip")
+                ips = get_user_xml_from_configmap("test-011-secured-cluster", "default").findall("networks/ip")
                 ips_l = []
                 for ip in ips:
                     ips_l.append(ip.text)
-                print(
-                    f"users.xml: {ips_l}"
-                )  # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
+                print(f"users.xml: {ips_l}")  # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
                 assert len(ips) == 5
 
             clickhouse.query("test-011-secured-cluster", "SYSTEM RELOAD CONFIG")
             with And("Connection to localhost should succeed with default user"):
-                out = clickhouse.query_with_error(
-                    "test-011-secured-cluster", "select 'OK'"
-                )
+                out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'")
                 assert out == "OK"
 
             with And("Connection from secured to secured host should succeed"):
@@ -665,9 +601,7 @@ def test_011(self):
                 )
                 assert out == "OK"
 
-            with And(
-                "Connection from insecured to secured host should fail for default user"
-            ):
+            with And("Connection from insecured to secured host should fail for default user"):
                 out = clickhouse.query_with_error(
                     "test-011-insecured-cluster",
                     "select 'OK'",
@@ -687,9 +621,7 @@ def test_011(self):
 
             with Then("Make sure host_regexp is disabled"):
                 regexp = (
-                    get_user_xml_from_configmap("test-011-secured-cluster", "default")
-                    .find("networks/host_regexp")
-                    .text
+                    get_user_xml_from_configmap("test-011-secured-cluster", "default").find("networks/host_regexp").text
                 )
                 print(f"users.xml: {regexp}")
                 assert regexp == "disabled"
@@ -699,9 +631,7 @@ def test_011(self):
 
             test_default_user()
 
-        with And(
-            "Connection from insecured to secured host should fail for user 'user1' with no password"
-        ):
+        with And("Connection from insecured to secured host should fail for user 'user1' with no password"):
             out = clickhouse.query_with_error(
                 "test-011-insecured-cluster",
                 "select 'OK'",
@@ -710,9 +640,7 @@ def test_011(self):
             )
             assert "Password" in out or "password" in out
 
-        with And(
-            "Connection from insecured to secured host should work for user 'user1' with password"
-        ):
+        with And("Connection from insecured to secured host should work for user 'user1' with password"):
             out = clickhouse.query_with_error(
                 "test-011-insecured-cluster",
                 "select 'OK'",
@@ -729,14 +657,10 @@ def test_011(self):
             assert "<password_sha256_hex>" in users_xml
 
         with And("User 'user2' with no password should get default automatically"):
-            out = clickhouse.query_with_error(
-                "test-011-secured-cluster", "select 'OK'", user="user2", pwd="default"
-            )
+            out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'", user="user2", pwd="default")
             assert out == "OK"
 
-        with And(
-            "User 'user3' with both plain and sha256 password should get the latter one"
-        ):
+        with And("User 'user3' with both plain and sha256 password should get the latter one"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "select 'OK'",
@@ -754,9 +678,7 @@ def test_011(self):
             )
             assert out == "1000"
 
-        with And(
-            "User 'default' with NO access management enabled CAN NOT run SHOW USERS"
-        ):
+        with And("User 'default' with NO access management enabled CAN NOT run SHOW USERS"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
                 "SHOW USERS",
@@ -764,15 +686,11 @@ def test_011(self):
             assert "ACCESS_DENIED" in out
 
         with And("User 'user4' with access management enabled CAN run SHOW USERS"):
-            out = clickhouse.query(
-                "test-011-secured-cluster", "SHOW USERS", user="user4", pwd="secret"
-            )
+            out = clickhouse.query("test-011-secured-cluster", "SHOW USERS", user="user4", pwd="secret")
             assert "ACCESS_DENIED" not in out
 
         with And("User 'user5' with google.com as a host filter can not login"):
-            out = clickhouse.query_with_error(
-                "test-011-insecured-cluster", "select 'OK'", user="user5", pwd="secret"
-            )
+            out = clickhouse.query_with_error("test-011-insecured-cluster", "select 'OK'", user="user5", pwd="secret")
             assert out != "OK"
 
         with And("User 'clickhouse_operator' with can login with custom password"):
@@ -792,9 +710,7 @@ def test_011(self):
 @Name("test_011_1. Test default user security")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
 def test_011_1(self):
-    with Given(
-        "test-011-secured-default-1.yaml with password_sha256_hex for default user"
-    ):
+    with Given("test-011-secured-default-1.yaml with password_sha256_hex for default user"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-011-secured-default-1.yaml",
             check={
@@ -805,24 +721,11 @@ def test_011_1(self):
 
         with Then("Default user plain password should be removed"):
             chi = kubectl.get("chi", "test-011-secured-default")
-            assert (
-                "default/password"
-                in chi["status"]["normalizedCompleted"]["spec"]["configuration"][
-                    "users"
-                ]
-            )
-            assert (
-                chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"][
-                    "default/password"
-                ]
-                == ""
-            )
+            assert "default/password" in chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]
+            assert chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/password"] == ""
 
             cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
-            assert (
-                '<password remove="1"></password>'
-                in cfm["data"]["chop-generated-users.xml"]
-            )
+            assert '<password remove="1"></password>' in cfm["data"]["chop-generated-users.xml"]
 
         with And("Connection to localhost should succeed with default user"):
             out = clickhouse.query_with_error(
@@ -841,26 +744,11 @@ def test_011_1(self):
             )
             with Then("Default user plain password should be removed"):
                 chi = kubectl.get("chi", "test-011-secured-default")
-                assert (
-                    "default/password"
-                    in chi["status"]["normalizedCompleted"]["spec"]["configuration"][
-                        "users"
-                    ]
-                )
-                assert (
-                    chi["status"]["normalizedCompleted"]["spec"]["configuration"][
-                        "users"
-                    ]["default/password"]
-                    == ""
-                )
+                assert "default/password" in chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]
+                assert chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/password"] == ""
 
-                cfm = kubectl.get(
-                    "configmap", "chi-test-011-secured-default-common-usersd"
-                )
-                assert (
-                    '<password remove="1"></password>'
-                    in cfm["data"]["chop-generated-users.xml"]
-                )
+                cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
+                assert '<password remove="1"></password>' in cfm["data"]["chop-generated-users.xml"]
 
         with When("Default user password is removed"):
             kubectl.create_and_check(
@@ -869,12 +757,8 @@ def test_011_1(self):
                     "do_not_delete": 1,
                 },
             )
-            with Then(
-                "Connection to localhost should succeed with default user and no password"
-            ):
-                out = clickhouse.query_with_error(
-                    "test-011-secured-default", "select 'OK'"
-                )
+            with Then("Connection to localhost should succeed with default user and no password"):
+                out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
                 assert out == "OK"
 
         kubectl.delete_chi("test-011-secured-default")
@@ -900,21 +784,15 @@ def test_011_2(self):
         )
 
         with Then("Connection to localhost should succeed with user1"):
-            out = clickhouse.query_with_error(
-                "test-011-secrets", "select 'OK'", user="user1", pwd="pwduser1"
-            )
+            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user1", pwd="pwduser1")
             assert out == "OK"
 
         with And("Connection to localhost should succeed with user2"):
-            out = clickhouse.query_with_error(
-                "test-011-secrets", "select 'OK'", user="user2", pwd="pwduser2"
-            )
+            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user2", pwd="pwduser2")
             assert out == "OK"
 
         with And("Connection to localhost should succeed with user3"):
-            out = clickhouse.query_with_error(
-                "test-011-secrets", "select 'OK'", user="user3", pwd="pwduser3"
-            )
+            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user3", pwd="pwduser3")
             assert out == "OK"
 
         kubectl.delete_chi("test-011-secrets")
@@ -955,9 +833,7 @@ def test_012(self):
     with And("There should be a service for default cluster"):
         kubectl.check_service("service-default", "ClusterIP")
 
-    node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0][
-        "nodePort"
-    ]
+    node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
 
     with Then("Update chi"):
         kubectl.create_and_check(
@@ -973,9 +849,7 @@ def test_012(self):
         )
 
         with And("NodePort should not change"):
-            new_node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][
-                0
-            ]["nodePort"]
+            new_node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
             assert (
                 new_node_port == node_port
             ), f"LoadBalancer.spec.ports[0].nodePort changed from {node_port} to {new_node_port}"
@@ -1097,12 +971,10 @@ def test_013_1(self):
         "ENGINE = MySQL('localhost:3306', 'vs_db', 'vs_table', 'vs_user', 'vs_pass')",
         "CREATE TABLE mongodb_table ( key UInt64, data String ) ENGINE = "
         "MongoDB('mongo1:27017', 'vs_db', 'vs_collection', 'testuser', 'clickhouse_password')",
-        "CREATE TABLE hdfs_table (name String, value UInt32) ENGINE = "
-        "HDFS('hdfs://hdfs1:9000/some_file', 'TSV')",
+        "CREATE TABLE hdfs_table (name String, value UInt32) ENGINE = " "HDFS('hdfs://hdfs1:9000/some_file', 'TSV')",
         "CREATE TABLE s3_engine_table (name String, value UInt32)ENGINE = S3("
         "'https://storage.test.net/my-test1/test-data.csv.gz', 'CSV', 'gzip')",
-        "CREATE TABLE embeddedrocksdb_table (key UInt64, value String) Engine = EmbeddedRocksDB "
-        "PRIMARY KEY(key)",
+        "CREATE TABLE embeddedrocksdb_table (key UInt64, value String) Engine = EmbeddedRocksDB " "PRIMARY KEY(key)",
         "CREATE TABLE postgresql_table (float_nullable Nullable(Float32), str String,"
         " int_id Int32 ) ENGINE = PostgreSQL('localhost:5432', 'public_db', 'test_table', "
         "'postges_user', 'postgres_password')",
@@ -1122,9 +994,7 @@ def test_013_1(self):
         for query in create_table_queries:
             clickhouse.query(chi, query)
 
-    start_time = kubectl.get_field(
-        "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-    )
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
     with When("I add 1 more shard"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-013-1-2-schema-propagation.yaml",
@@ -1138,17 +1008,13 @@ def test_013_1(self):
         )
 
     with Then("Unaffected pod should not be restarted"):
-        new_start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
     with Then("remote_servers.xml should contain 2 shards"):
         assert get_shards_from_remote_servers(chi, cluster) == 2
 
-    table_names = clickhouse.query(
-        chi, "SHOW TABLES", pod="chi-test-013-1-schema-propagation-simple-0-0-0"
-    ).split()
+    table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-013-1-schema-propagation-simple-0-0-0").split()
 
     with Then("I check tables are propagated correctly"):
         for attempt in retries(timeout=500, delay=1):
@@ -1177,9 +1043,7 @@ def test_013_1(self):
         )
 
     with Then("Unaffected pod should not be restarted"):
-        new_start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
     with Then("remote_servers.xml should contain 1 shard"):
@@ -1248,9 +1112,7 @@ def test_013_1(self):
 def get_shards_from_remote_servers(chi, cluster):
     if cluster == "":
         cluster = chi
-    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"][
-        "chop-generated-remote_servers.xml"
-    ]
+    remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
 
     chi_start = remote_servers.find(f"<{cluster}>")
     chi_end = remote_servers.find(f"</{cluster}>")
@@ -1270,9 +1132,7 @@ def get_shards_from_remote_servers(chi, cluster):
 @TestScenario
 @Name("test_014. Test that schema is correctly propagated on replicas")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper(
-        "1.0"
-    ),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
 )
 def test_014(self):
@@ -1302,9 +1162,7 @@ def test_014(self):
     )
     kubectl.wait_chi_status(chi, "Completed", retries=20)
 
-    start_time = kubectl.get_field(
-        "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-    )
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
     schema_objects = [
         "test_local_014",
@@ -1437,9 +1295,7 @@ def test_014(self):
         # Give some time for replication to catch up
         time.sleep(10)
 
-        new_start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
         check_schema_propagation(replicas)
@@ -1458,9 +1314,7 @@ def test_014(self):
         with Then("Replica is removed from remote_servers.xml as well"):
             assert get_replicas_from_remote_servers(chi, cluster) == 1
 
-        new_start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time == new_start_time
 
         with Then("Replica needs to be removed from the Keeper as well"):
@@ -1480,18 +1334,14 @@ def test_014(self):
         with Then(
             f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"
         ):
-            out = clickhouse.query_with_error(
-                chi, "INSERT INTO test_local_014 VALUES(2)"
-            )
+            out = clickhouse.query_with_error(chi, "INSERT INTO test_local_014 VALUES(2)")
             assert "Table is in readonly mode" in out
 
         with Then(f"Wait for {self.context.keeper_type} pod to come back"):
             kubectl.wait_object("pod", f"{self.context.keeper_type}-0")
             kubectl.wait_pod_status(f"{self.context.keeper_type}-0", "Running")
 
-        with Then(
-            f"Wait for ClickHouse to reconnect to {self.context.keeper_type} and switch to read-write mode"
-        ):
+        with Then(f"Wait for ClickHouse to reconnect to {self.context.keeper_type} and switch to read-write mode"):
             time.sleep(30)
 
         with Then("Table should be back to normal"):
@@ -1593,9 +1443,7 @@ def test_014_1(self):
     with When("replicasUseFQDN is disabled"):
         with Then("Replica service should be used as interserver_http_host"):
             for replica in replicas:
-                cfm = kubectl.get(
-                    "configmap", f"chi-{chi}-deploy-confd-{cluster}-0-{replica}"
-                )
+                cfm = kubectl.get("configmap", f"chi-{chi}-deploy-confd-{cluster}-0-{replica}")
                 assert (
                     f"<interserver_http_host>chi-{chi}-{cluster}-0-{replica}</interserver_http_host>"
                     in cfm["data"]["chop-generated-hostname-ports.xml"]
@@ -1613,9 +1461,7 @@ def test_014_1(self):
 
         with Then("FQDN should be used as interserver_http_host"):
             for replica in replicas:
-                cfm = kubectl.get(
-                    "configmap", f"chi-{chi}-deploy-confd-{cluster}-0-{replica}"
-                )
+                cfm = kubectl.get("configmap", f"chi-{chi}-deploy-confd-{cluster}-0-{replica}")
                 print("looking for:")
                 print(f"<interserver_http_host>chi-{chi}-{cluster}-0-{replica}.")
                 print("in")
@@ -1694,15 +1540,11 @@ def test_016(self):
     )
 
     with Then("Custom macro 'layer' should be available"):
-        out = clickhouse.query(
-            chi, sql="select substitution from system.macros where macro='layer'"
-        )
+        out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
         assert out == "01"
 
     with And("Custom macro 'test' should be available"):
-        out = clickhouse.query(
-            chi, sql="select substitution from system.macros where macro='test'"
-        )
+        out = clickhouse.query(chi, sql="select substitution from system.macros where macro='test'")
         assert out == "test"
 
     with And("dictGet() should work"):
@@ -1711,15 +1553,11 @@ def test_016(self):
 
     with And("query_log should be disabled"):
         clickhouse.query(chi, sql="system flush logs")
-        out = clickhouse.query_with_error(
-            chi, sql="select count() from system.query_log"
-        )
+        out = clickhouse.query_with_error(chi, sql="select count() from system.query_log")
         assert "doesn't exist" in out
 
     with And("max_memory_usage should be 7000000000"):
-        out = clickhouse.query(
-            chi, sql="select value from system.settings where name='max_memory_usage'"
-        )
+        out = clickhouse.query(chi, sql="select value from system.settings where name='max_memory_usage'")
         assert out == "7000000000"
 
     with And("test_usersd user should be available"):
@@ -1729,16 +1567,12 @@ def test_016(self):
         clickhouse.query(chi, sql="select version()", user="user1", pwd="qwerty")
 
     with And("system.clusters should have a custom cluster"):
-        out = clickhouse.query(
-            chi, sql="select count() from system.clusters where cluster='custom'"
-        )
+        out = clickhouse.query(chi, sql="select count() from system.clusters where cluster='custom'")
         assert out == "1"
 
     # test-016-settings-02.yaml
     with When("Update usersd settings"):
-        start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-        )
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-02.yaml",
             check={
@@ -1754,30 +1588,20 @@ def test_016(self):
         with Then("Force reload config"):
             clickhouse.query(chi, sql="SYSTEM RELOAD CONFIG")
         with Then("test_norestart user should be available"):
-            version = clickhouse.query(
-                chi, sql="select version()", user="test_norestart"
-            )
+            version = clickhouse.query(chi, sql="select version()", user="test_norestart")
         with And("user1 user should not be available"):
-            version_user1 = clickhouse.query_with_error(
-                chi, sql="select version()", user="user1", pwd="qwerty"
-            )
+            version_user1 = clickhouse.query_with_error(chi, sql="select version()", user="user1", pwd="qwerty")
             assert version != version_user1
         with And("user2 user should be available"):
-            version_user2 = clickhouse.query(
-                chi, sql="select version()", user="user2", pwd="qwerty"
-            )
+            version_user2 = clickhouse.query(chi, sql="select version()", user="user2", pwd="qwerty")
             assert version == version_user2
         with And("ClickHouse SHOULD NOT be restarted"):
-            new_start_time = kubectl.get_field(
-                "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-            )
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
 
     # test-016-settings-03.yaml
     with When("Update custom.xml settings"):
-        start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-        )
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-03.yaml",
             check={
@@ -1791,22 +1615,16 @@ def test_016(self):
             )
 
         with And("Custom macro 'test' should change the value"):
-            out = clickhouse.query(
-                chi, sql="select substitution from system.macros where macro='test'"
-            )
+            out = clickhouse.query(chi, sql="select substitution from system.macros where macro='test'")
             assert out == "test-03"
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field(
-                "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-            )
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time < new_start_time
 
     # test-016-settings-04.yaml
     with When("Add new custom2.xml config file"):
-        start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-        )
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-04.yaml",
             check={
@@ -1827,9 +1645,7 @@ def test_016(self):
             assert out == "test-custom2"
 
         with And("ClickHouse SHOULD BE restarted"):
-            new_start_time = kubectl.get_field(
-                "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-            )
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time < new_start_time
 
     kubectl.delete_chi("test-016-settings")
@@ -1837,11 +1653,7 @@ def test_016(self):
 
 @TestScenario
 @Name("test_017. Test deployment of multiple versions in a cluster")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_Deployments_DifferentClickHouseVersionsOnReplicasAndShards(
-        "1.0"
-    )
-)
+@Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_DifferentClickHouseVersionsOnReplicasAndShards("1.0"))
 def test_017(self):
     pod_count = 2
     kubectl.create_and_check(
@@ -1906,9 +1718,7 @@ def test_018(self):
             note(display_name)
             assert "new_display_name" in display_name
             with Then("And ClickHouse should pick them up"):
-                macros = clickhouse.query(
-                    chi, "SELECT substitution from system.macros where macro = 'test'"
-                )
+                macros = clickhouse.query(chi, "SELECT substitution from system.macros where macro = 'test'")
                 note(macros)
                 assert "new_test" == macros
 
@@ -1928,9 +1738,7 @@ def test_019(self, step=1):
         },
     )
 
-    create_non_replicated_table = (
-        "create or replace table t1 Engine = Log as select 1 as a"
-    )
+    create_non_replicated_table = "create or replace table t1 Engine = Log as select 1 as a"
     create_replicated_table = """
     create or replace table t2
     Engine = ReplicatedMergeTree('/clickhouse/{installation}/{cluster}/tables/{shard}/{database}/{table}', '{replica}')
@@ -2012,9 +1820,7 @@ def test_019(self, step=1):
             },
         )
         with Then("Replicated table should have two replicas now"):
-            out = clickhouse.query(
-                chi, sql="select total_replicas from system.replicas where table='t2'"
-            )
+            out = clickhouse.query(chi, sql="select total_replicas from system.replicas where table='t2'")
             assert out == "2"
 
         with When("Remove a replica"):
@@ -2049,9 +1855,7 @@ def test_019(self, step=1):
         )
 
         with Then("Table should have data"):
-            out = clickhouse.query(
-                chi, sql="select a from t2", host=f"chi-{chi}-simple-0-1"
-            )
+            out = clickhouse.query(chi, sql="select a from t2", host=f"chi-{chi}-simple-0-1")
             assert out == "1"
 
         with When("Set reclaim policy to Delete but do not wait for completion"):
@@ -2097,18 +1901,14 @@ def test_019(self, step=1):
 
 
 @TestScenario
-@Name(
-    "test_019_1. Test that volume is correctly retained and can be re-attached. Provisioner: StatefulSet"
-)
+@Name("test_019_1. Test that volume is correctly retained and can be re-attached. Provisioner: StatefulSet")
 @Requirements(RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0"))
 def test_019_1(self):
     test_019(step=1)
 
 
 @TestScenario
-@Name(
-    "test_019_2. Test that volume is correctly retained and can be re-attached. Provisioner: Operator"
-)
+@Name("test_019_2. Test that volume is correctly retained and can be re-attached. Provisioner: Operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0"))
 def test_019_2(self):
     test_019(step=2)
@@ -2131,26 +1931,18 @@ def test_020(self, step=1):
     )
     kubectl.wait_chi_status(chi, "Completed", retries=20)
     with When("Create a table and insert 1 row"):
-        clickhouse.query(
-            chi, "create table test_disks(a Int8) Engine = MergeTree() order by a"
-        )
+        clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
         clickhouse.query(chi, "insert into test_disks values (1)")
 
         with Then("Data should be placed on default disk"):
-            out = clickhouse.query(
-                chi, "select disk_name from system.parts where table='test_disks'"
-            )
+            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
             assert out == "default"
 
     with When("alter table test_disks move partition tuple() to disk 'disk2'"):
-        clickhouse.query(
-            chi, "alter table test_disks move partition tuple() to disk 'disk2'"
-        )
+        clickhouse.query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
 
         with Then("Data should be placed on disk2"):
-            out = clickhouse.query(
-                chi, "select disk_name from system.parts where table='test_disks'"
-            )
+            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
             assert out == "disk2"
 
     kubectl.delete_chi(chi)
@@ -2180,13 +1972,9 @@ def test_021(self, step=1):
         default_storage_class = kubectl.get_default_storage_class()
         assert default_storage_class is not None
         assert len(default_storage_class) > 0
-        allow_volume_expansion = kubectl.get_field(
-            "storageclass", default_storage_class, ".allowVolumeExpansion"
-        )
+        allow_volume_expansion = kubectl.get_field("storageclass", default_storage_class, ".allowVolumeExpansion")
         if allow_volume_expansion != "true":
-            kubectl.launch(
-                f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'"
-            )
+            kubectl.launch(f"patch storageclass {default_storage_class} -p '{{\"allowVolumeExpansion\":true}}'")
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -2198,22 +1986,16 @@ def test_021(self, step=1):
     )
 
     with Then("Storage size should be 1Gi"):
-        size = kubectl.get_pvc_size(
-            f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0"
-        )
+        size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
         print(f"size: {size}")
         assert size == "1Gi"
 
     with Then("Create a table with a single row"):
         clickhouse.query(chi, "drop table if exists test_local_021;")
-        clickhouse.query(
-            chi, "create table test_local_021(a Int8) Engine = MergeTree() order by a"
-        )
+        clickhouse.query(chi, "create table test_local_021(a Int8) Engine = MergeTree() order by a")
         clickhouse.query(chi, "insert into test_local_021 values (1)")
 
-    start_time = kubectl.get_field(
-        "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-    )
+    start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
     with When("Re-scale volume configuration to 2Gi"):
         kubectl.create_and_check(
@@ -2231,9 +2013,7 @@ def test_021(self, step=1):
                 ".spec.resources.requests.storage",
                 "2Gi",
             )
-            size = kubectl.get_pvc_size(
-                f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0"
-            )
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             print(f"size: {size}")
             assert size == "2Gi"
 
@@ -2242,18 +2022,12 @@ def test_021(self, step=1):
             assert out == "1"
 
         with And("Check if pod has been restarted"):
-            new_start_time = kubectl.get_field(
-                "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-            )
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
             if step == 1:
-                with Then(
-                    "Storage provisioner is StatefulSet. Pod should be restarted"
-                ):
+                with Then("Storage provisioner is StatefulSet. Pod should be restarted"):
                     assert start_time != new_start_time
             if step == 2:
-                with Then(
-                    "Storage provisioner is Operator. Pod should not be restarted"
-                ):
+                with Then("Storage provisioner is Operator. Pod should not be restarted"):
                     assert start_time == new_start_time
 
     with When("Add a second disk"):
@@ -2271,29 +2045,21 @@ def test_021(self, step=1):
         # Adding new volume takes time, so pod_volumes check does not work
 
         with Then("There should be two PVC"):
-            size = kubectl.get_pvc_size(
-                f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0"
-            )
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             assert size == "2Gi"
-            kubectl.wait_object(
-                "pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0"
-            )
+            kubectl.wait_object("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             kubectl.wait_field(
                 "pvc",
                 f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0",
                 ".status.phase",
                 "Bound",
             )
-            size = kubectl.get_pvc_size(
-                f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0"
-            )
+            size = kubectl.get_pvc_size(f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             print(f"size: {size}")
             assert size == "1Gi"
 
         with And("There should be two disks recognized by ClickHouse"):
-            kubectl.wait_pod_status(
-                f"chi-test-021-{step}-rescale-volume-simple-0-0-0", "Running"
-            )
+            kubectl.wait_pod_status(f"chi-test-021-{step}-rescale-volume-simple-0-0-0", "Running")
             # ClickHouse requires some time to mount volume. Race conditions.
             # TODO: wait for proper pod state and check the liveness probe probably. This is better than waiting
             out = ""
@@ -2311,17 +2077,13 @@ def test_021(self, step=1):
 
     with When("There are two disks test the move"):
         with Then("Data should be initially on a default disk"):
-            out = clickhouse.query(
-                chi, "select disk_name from system.parts where table='test_local_021'"
-            )
+            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_local_021'")
             print(f"out : {out}")
             print(f"want: default")
             assert out == "default"
 
         with When("alter table test_local_021 move partition tuple() to disk 'disk2'"):
-            clickhouse.query(
-                chi, "alter table test_local_021 move partition tuple() to disk 'disk2'"
-            )
+            clickhouse.query(chi, "alter table test_local_021 move partition tuple() to disk 'disk2'")
 
             with Then("Data should be moved to disk2"):
                 out = clickhouse.query(
@@ -2332,9 +2094,7 @@ def test_021(self, step=1):
                 print(f"want: disk2")
                 assert out == "disk2"
 
-    with When(
-        "Try reducing the disk size and also change a version to recreate the stateful set"
-    ):
+    with When("Try reducing the disk size and also change a version to recreate the stateful set"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-021-{step}-rescale-volume-04-decrease-disk.yaml",
             check={
@@ -2344,9 +2104,7 @@ def test_021(self, step=1):
         )
 
         with Then("Storage size should be unchanged 2Gi"):
-            size = kubectl.get_pvc_size(
-                f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0"
-            )
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             print(f"size: {size}")
             assert size == "2Gi"
 
@@ -2378,9 +2136,7 @@ def test_021(self, step=1):
                 ".spec.resources.requests.storage",
                 "2Gi",
             )
-            size = kubectl.get_pvc_size(
-                f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0"
-            )
+            size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             print(f"size: {size}")
             assert size == "2Gi"
 
@@ -2438,12 +2194,8 @@ def test_023(self):
     manifest = "manifests/chi/test-001.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
-    chit_data = yaml_manifest.get_manifest_data(
-        util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml")
-    )
-    expected_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"][
-        "containers"
-    ][0]["image"]
+    chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
+    expected_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-001.yaml",
@@ -2460,19 +2212,9 @@ def test_023(self):
         },
     )
     with Then("Annotation from a template should be populated"):
-        assert (
-            kubectl.get_field(
-                "chi", chi, ".status.normalizedCompleted.metadata.annotations.test"
-            )
-            == "test"
-        )
+        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
     with Then("Pod annotation should populated from template"):
-        assert (
-            kubectl.get_field(
-                "pod", "chi-test-001-single-0-0-0", ".metadata.annotations.test"
-            )
-            == "test"
-        )
+        assert kubectl.get_field("pod", "chi-test-001-single-0-0-0", ".metadata.annotations.test") == "test"
 
     kubectl.delete_chi(chi)
     kubectl.delete(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
@@ -2522,19 +2264,9 @@ def test_024(self):
         )
 
     with And("Pod annotation should populated from a CHI"):
-        assert (
-            kubectl.get_field(
-                "pod", "chi-test-024-default-0-0-0", ".metadata.annotations.chi/test"
-            )
-            == "test"
-        )
+        assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.chi/test") == "test"
     with And("Service annotation should be populated from a CHI"):
-        assert (
-            kubectl.get_field(
-                "service", "clickhouse-test-024", ".metadata.annotations.chi/test"
-            )
-            == "test"
-        )
+        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.chi/test") == "test"
     with And("PVC annotation should be populated from a CHI"):
         assert (
             kubectl.get_field(
@@ -2568,9 +2300,7 @@ def test_024(self):
 
 @TestScenario
 @Name("test_025. Test that service is available during re-scaling, upgrades etc.")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicas("1.0")
-)
+@Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicas("1.0"))
 def test_025(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -2656,19 +2386,13 @@ def test_025(self):
                 "SELECT count() FROM test_local_025",
                 "chi-test-025-rescaling-default-0-1.test.svc.cluster.local",
             )
-            cnt_lb = clickhouse.query_with_error(
-                chi, "SELECT count() FROM test_local_025"
-            )
-            cnt_distr_lb = clickhouse.query_with_error(
-                chi, "SELECT count() FROM test_distr_025"
-            )
+            cnt_lb = clickhouse.query_with_error(chi, "SELECT count() FROM test_local_025")
+            cnt_distr_lb = clickhouse.query_with_error(chi, "SELECT count() FROM test_distr_025")
             if "Exception" in cnt_lb or cnt_lb == 0:
                 lb_error_time = time.time()
             if "Exception" in cnt_distr_lb or cnt_distr_lb == 0:
                 distr_lb_error_time = time.time()
-            note(
-                f"local via loadbalancer: {cnt_lb}, distributed via loadbalancer: {cnt_distr_lb}"
-            )
+            note(f"local via loadbalancer: {cnt_lb}, distributed via loadbalancer: {cnt_distr_lb}")
             if "Exception" not in cnt_local:
                 note(f"local: {cnt_local}, distr: {cnt_distr_lb}")
                 if cnt_local == numbers:
@@ -2691,11 +2415,7 @@ def test_025(self):
 
 @TestScenario
 @Name("test_026. Test mixed single and multi-volume configuration in one cluster")
-@Requirements(
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout(
-        "1.0"
-    )
-)
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0"))
 def test_026(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -2797,9 +2517,7 @@ def test_027(self):
                 },
             )
             with And("We can exec to the pod"):
-                out = kubectl.launch(
-                    f'exec chi-{chi}-default-0-0-0 -- bash -c "echo Success"'
-                )
+                out = kubectl.launch(f'exec chi-{chi}-default-0-0-0 -- bash -c "echo Success"')
                 assert out == "Success"
 
         with Then("We can start in normal mode after correcting the problem"):
@@ -2847,9 +2565,7 @@ def test_028(self):
         cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
         kubectl.launch(cmd)
         with Then("Operator should let the query to finish"):
-            out = clickhouse.query_with_error(
-                chi, "select count(sleepEachRow(1)) from numbers(30)"
-            )
+            out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
             assert out == "30"
 
         with Then("Operator should start processing a change"):
@@ -2880,9 +2596,7 @@ def test_028(self):
                         ch1_downtime = ch1_downtime + 5
                     if "error" in ch2 or "Exception" in ch2 or ch1.endswith("1"):
                         ch2_downtime = ch2_downtime + 5
-                    if ("error" in ch1 or "Exception" in ch1) and (
-                        "error" in ch2 or "Exception" in ch2
-                    ):
+                    if ("error" in ch1 or "Exception" in ch1) and ("error" in ch2 or "Exception" in ch2):
                         chi_downtime = chi_downtime + 5
 
                     print(ch1 + "\t" + ch2)
@@ -2902,9 +2616,7 @@ def test_028(self):
                 note("Restart is cleaned automatically")
             else:
                 note("Restart needs to be cleaned")
-                start_time = kubectl.get_field(
-                    "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-                )
+                start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
 
         # with Then("Clear RollingUpdate restart policy"):
         #    cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
@@ -2921,9 +2633,7 @@ def test_028(self):
 
         with Then("Re-apply the original config. CHI should not be restarted"):
             kubectl.create_and_check(manifest=manifest, check={"do_not_delete": 1})
-            new_start_time = kubectl.get_field(
-                "pod", f"chi-{chi}-default-0-0-0", ".status.startTime"
-            )
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             print(f"old_start_time: {start_time}")
             print(f"new_start_time: {new_start_time}")
             assert start_time == new_start_time
@@ -2941,18 +2651,10 @@ def test_028(self):
 @TestScenario
 @Name("test_029. Test different distribution settings")
 @Requirements(
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Type(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Scope(
-        "1.0"
-    ),
-    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_TopologyKey(
-        "1.0"
-    ),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Type("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Scope("1.0"),
+    RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_TopologyKey("1.0"),
 )
 def test_029(self):
     # TODO: this test needs to be extended in order to handle more distribution types
@@ -3003,11 +2705,7 @@ def test_030(self):
     )
 
     trigger_event = threading.Event()
-    Check(
-        "Check that cluster definition does not change during restart",
-        test=check_remote_servers,
-        parallel=True,
-    )(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
         chi=chi,
         cluster="default",
         shards=2,
@@ -3019,10 +2717,7 @@ def test_030(self):
         with Then("CHI should be deleted"):
             kubectl.wait_object("chi", chi, count=0)
             with And("CHI objects SHOULD NOT be deleted"):
-                assert (
-                    kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}")
-                    == object_counts
-                )
+                assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}") == object_counts
 
     pod = kubectl.get_pod_names(chi)[0]
     start_time = kubectl.get_field("pod", pod, ".status.startTime")
@@ -3054,9 +2749,7 @@ def test_031(self):
     chi = "test-031-wo-tpl"
 
     with Given("I generate CHO deploy manifest"):
-        with open(
-            util.get_full_path(settings.clickhouse_operator_install_manifest)
-        ) as base_template, open(
+        with open(util.get_full_path(settings.clickhouse_operator_install_manifest)) as base_template, open(
             util.get_full_path("../../config/config.yaml")
         ) as config_file:
             manifest_yaml = list(yaml.safe_load_all(base_template.read()))
@@ -3091,9 +2784,7 @@ def test_031(self):
             with By(f"Check that {obj_type}s annotations are correct"):
                 objs = kubectl.get_obj_names(chi_name=chi, obj_type=obj_type + "s")
                 for o in objs:
-                    annotations = kubectl.launch(
-                        command=f"get {obj_type} {o} -o jsonpath='{{.metadata.annotations}}'"
-                    )
+                    annotations = kubectl.launch(command=f"get {obj_type} {o} -o jsonpath='{{.metadata.annotations}}'")
                     assert "incl" in annotations, error()
                     assert "excl" not in annotations, error()
 
@@ -3102,9 +2793,7 @@ def test_031(self):
     with Finally("I restore original operator state"):
         util.install_operator_if_not_exist(
             reinstall=True,
-            manifest=util.get_full_path(
-                settings.clickhouse_operator_install_manifest, False
-            ),
+            manifest=util.get_full_path(settings.clickhouse_operator_install_manifest, False),
         )
         util.restart_operator(ns=settings.operator_namespace)
 
@@ -3118,9 +2807,7 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
         self.context.shell = get_shell()
     try:
 
-        kubectl.launch(
-            f'run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c "sleep 3600"'
-        )
+        kubectl.launch(f'run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c "sleep 3600"')
         kubectl.wait_pod_status(client_pod, "Running")
 
         ok = 0
@@ -3160,9 +2847,7 @@ def run_insert_query(self, host, user, password, query, trigger_event):
         self.context.shell = get_shell()
     try:
 
-        kubectl.launch(
-            f'run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c "sleep 3600"'
-        )
+        kubectl.launch(f'run {client_pod} --image={settings.clickhouse_version} -- /bin/sh -c "sleep 3600"')
         kubectl.wait_pod_status(client_pod, "Running")
 
         ok = 0
@@ -3175,9 +2860,7 @@ def run_insert_query(self, host, user, password, query, trigger_event):
                 ok += 1
             else:
                 errors += 1
-        with By(
-            f"{ok} inserts have been executed with no errors, {errors} inserts have failed"
-        ):
+        with By(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
             assert errors == 0
     finally:
         kubectl.launch(f"delete pod {client_pod}")
@@ -3229,15 +2912,11 @@ def test_032(self):
             chi,
             "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)",
         )
-        clickhouse.query(
-            chi, f"INSERT INTO test_distr_032 select * from numbers({numbers})"
-        )
+        clickhouse.query(chi, f"INSERT INTO test_distr_032 select * from numbers({numbers})")
 
     with When("check the initial select query count before rolling update"):
         with By("executing query in the clickhouse installation"):
-            cnt_test_local = clickhouse.query(
-                chi_name=chi, sql="select count() from test_distr_032", with_error=True
-            )
+            cnt_test_local = clickhouse.query(chi_name=chi, sql="select count() from test_distr_032", with_error=True)
         with Then("checking expected result"):
             assert cnt_test_local == str(numbers), error()
 
@@ -3253,20 +2932,14 @@ def test_032(self):
         trigger_event=trigger_event,
     )
 
-    Check(
-        "Check that cluster definition does not change during restart",
-        test=check_remote_servers,
-        parallel=True,
-    )(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
         chi=chi,
         cluster="default",
         shards=2,
         trigger_event=trigger_event,
     )
 
-    with When(
-        "Change the image in the podTemplate by updating the chi version to test the rolling update logic"
-    ):
+    with When("Change the image in the podTemplate by updating the chi version to test the rolling update logic"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-032-rescaling-2.yaml",
             check={
@@ -3301,12 +2974,8 @@ def test_034(self):
     chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
     operator_namespace = settings.operator_namespace
 
-    def check_metrics_monitoring(
-        operator_namespace, operator_pod, expect_pattern, max_retries=10
-    ):
-        with Then(
-            f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"
-        ):
+    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=10):
+        with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
             for i in range(1, max_retries):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
                 out = kubectl.launch(
@@ -3346,12 +3015,8 @@ def test_034(self):
             timeout=600,
         )
 
-    with Then(
-        "check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end 1"
-    ):
-        out = kubectl.launch(
-            "get pods -l app=clickhouse-operator", ns=operator_namespace
-        ).splitlines()[1]
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end 1"):
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
         check_metrics_monitoring(
             operator_namespace,
@@ -3359,23 +3024,15 @@ def test_034(self):
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
-    with And(
-        f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"
-    ):
-        kubectl.apply(
-            util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace
-        )
+    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
+        kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration 1"):
         util.restart_operator()
-        out = kubectl.launch(
-            "get pods -l app=clickhouse-operator", ns=settings.operator_namespace
-        ).splitlines()[1]
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then(
-        "check for `chi_clickhouse_metric_fetch_errors` string with non zero value `1` at the end"
-    ):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with non zero value `1` at the end"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3383,20 +3040,14 @@ def test_034(self):
         )
 
     with When("remove the ClickHouseOperatorConfiguration"):
-        kubectl.delete(
-            util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace
-        )
+        kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration 2"):
         util.restart_operator()
-        out = kubectl.launch(
-            "get pods -l app=clickhouse-operator", ns=settings.operator_namespace
-        ).splitlines()[1]
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then(
-        "check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"
-    ):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3439,23 +3090,15 @@ def test_034(self):
 
         kubectl.launch(f"delete pod {client_pod}")
 
-    with And(
-        f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"
-    ):
-        kubectl.apply(
-            util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace
-        )
+    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
+        kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration 3"):
         util.restart_operator()
-        out = kubectl.launch(
-            "get pods -l app=clickhouse-operator", ns=settings.operator_namespace
-        ).splitlines()[1]
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then(
-        "check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"
-    ):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3463,20 +3106,14 @@ def test_034(self):
         )
 
     with When("remove the ClickHouseOperatorConfiguration"):
-        kubectl.delete(
-            util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace
-        )
+        kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration 4"):
         util.restart_operator()
-        out = kubectl.launch(
-            "get pods -l app=clickhouse-operator", ns=settings.operator_namespace
-        ).splitlines()[1]
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then(
-        "check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"
-    ):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3517,14 +3154,10 @@ def test_036(self):
             "\n", ""
         )
         clickhouse.query(chi, create_table)
-        clickhouse.query(
-            chi, f"INSERT INTO test_local_036 select * from numbers(10000)"
-        )
+        clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
     with When("I delete PV", description="delete PV on replica 0"):
-        pv_name = kubectl.get_pv_name(
-            "default-chi-test-036-volume-re-provisioning-simple-0-0-0"
-        )
+        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
 
         kubectl.launch(f"delete pv {pv_name} --force &")
         kubectl.launch(
@@ -3549,13 +3182,9 @@ def test_036(self):
         )
         kubectl.wait_object(
             "pv",
-            kubectl.get_pv_name(
-                "default-chi-test-036-volume-re-provisioning-simple-0-0-0"
-            ),
+            kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0"),
         )
-        size = kubectl.get_pv_size(
-            "default-chi-test-036-volume-re-provisioning-simple-0-0-0"
-        )
+        size = kubectl.get_pv_size("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
         assert size == "1Gi", error()
 
     with And("I check data on each replica"):
@@ -3601,9 +3230,7 @@ def test_037(self):
         )
 
     with And("I time up pod start time"):
-        start_time = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
     with And("I create a table with some data"):
         create_table = """
@@ -3616,9 +3243,7 @@ def test_037(self):
             "\n", ""
         )
         clickhouse.query(chi, create_table)
-        clickhouse.query(
-            chi, f"INSERT INTO test_local_037 select * from numbers(10000)"
-        )
+        clickhouse.query(chi, f"INSERT INTO test_local_037 select * from numbers(10000)")
 
     with When("I switch storageManagement to Operator"):
         kubectl.create_and_check(
@@ -3633,15 +3258,11 @@ def test_037(self):
         )
 
     with And("I check cluster is restarted and time up new pod start time"):
-        start_time_new = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         assert start_time != start_time_new, error()
         start_time = start_time_new
 
-    with And(
-        "I rescale volume configuration to 2Gi to check that storage management is switched"
-    ):
+    with And("I rescale volume configuration to 2Gi to check that storage management is switched"):
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-037-3-storagemanagement-switch.yaml",
             check={
@@ -3660,15 +3281,11 @@ def test_037(self):
             ".spec.resources.requests.storage",
             "2Gi",
         )
-        size = kubectl.get_pvc_size(
-            f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0"
-        )
+        size = kubectl.get_pvc_size(f"default-chi-test-037-storagemanagement-switch-{cluster}-0-0-0")
         assert size == "2Gi", error()
 
     with And("check the pod's start time to see if it has been restarted"):
-        start_time_new = kubectl.get_field(
-            "pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime"
-        )
+        start_time_new = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
         with Then("storage provisioner is operator, pod should not be restarted"):
             assert start_time == start_time_new, error()
 
@@ -3705,9 +3322,7 @@ def test_039(self, step=0):
             },
         )
 
-    with When(
-        "I create distributed table that use secure port and insert data into it"
-    ):
+    with When("I create distributed table that use secure port and insert data into it"):
         clickhouse.query(
             chi,
             "CREATE OR REPLACE TABLE secure on cluster '{cluster}' (a UInt32) ENGINE = MergeTree() PARTITION BY tuple() ORDER BY a",
@@ -3726,9 +3341,7 @@ def test_039(self, step=0):
 
     if step == 0:
         with Then("Select in cluster with no secret should fail"):
-            r = clickhouse.query_with_error(
-                chi, "SELECT count(a) FROM secure_dist", pwd="qkrq"
-            )
+            r = clickhouse.query_with_error(chi, "SELECT count(a) FROM secure_dist", pwd="qkrq")
             assert "AUTHENTICATION_FAILED" in r
     if step > 0:
         with Then("Select in cluster with secret should pass"):

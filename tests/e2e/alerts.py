@@ -10,12 +10,8 @@ import e2e.clickhouse as clickhouse
 import e2e.util as util
 
 
-def check_alert_state(
-    alert_name, prometheus_pod, alert_state="firing", labels=None, time_range="10s"
-):
-    with Then(
-        f"check {alert_name} for state {alert_state} and {labels} labels in {time_range}"
-    ):
+def check_alert_state(alert_name, prometheus_pod, alert_state="firing", labels=None, time_range="10s"):
+    with Then(f"check {alert_name} for state {alert_state} and {labels} labels in {time_range}"):
         cmd = f"exec -n {settings.prometheus_namespace} {prometheus_pod} -c prometheus -- "
         cmd += "wget -qO- 'http://127.0.0.1:9090/api/v1/query?query=ALERTS{"
         if labels is None:
@@ -34,11 +30,7 @@ def check_alert_state(
                 return False
         result_labels = out["data"]["result"][0]["metric"].items()
         exists = all(item in result_labels for item in labels.items())
-        with Then(
-            "got result and contains labels"
-            if exists
-            else "got result, but doesn't contain labels"
-        ):
+        with Then("got result and contains labels" if exists else "got result, but doesn't contain labels"):
             return exists
 
 
@@ -57,9 +49,7 @@ def wait_alert_state(
     for _ in range(max_try):
         if callback is not None:
             callback()
-        if expected_state == check_alert_state(
-            alert_name, prometheus_pod, alert_state, labels, time_range
-        ):
+        if expected_state == check_alert_state(alert_name, prometheus_pod, alert_state, labels, time_range):
             catched = True
             break
         with Then(f"not ready, wait {sleep_time}s"):
@@ -100,9 +90,7 @@ def get_prometheus_and_alertmanager_spec():
             label="-l app.kubernetes.io/managed-by=prometheus-operator,prometheus=prometheus",
         )
         if not (
-            "items" in prometheus_spec
-            and len(prometheus_spec["items"])
-            and "metadata" in prometheus_spec["items"][0]
+            "items" in prometheus_spec and len(prometheus_spec["items"]) and "metadata" in prometheus_spec["items"][0]
         ):
             fail("invalid prometheus_spec, please run create-prometheus.sh")
         return prometheus_operator_spec, prometheus_spec, alertmanager_spec

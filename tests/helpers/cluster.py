@@ -55,11 +55,11 @@ class Cluster(object):
 
         docker_compose_project_dir = os.path.join(caller_dir, "docker-compose")
 
-        docker_compose_file_path = os.path.join(
-            docker_compose_project_dir or "", "docker-compose.yml"
-        )
+        docker_compose_file_path = os.path.join(docker_compose_project_dir or "", "docker-compose.yml")
 
-        self.docker_compose += f' --project-directory "{docker_compose_project_dir}" --file "{docker_compose_file_path}"'
+        self.docker_compose += (
+            f' --project-directory "{docker_compose_project_dir}" --file "{docker_compose_file_path}"'
+        )
 
     def __enter__(self):
         with Given("docker-compose cluster"):
@@ -72,9 +72,7 @@ class Cluster(object):
 
     def down(self, timeout=3600):
         """Bring cluster down by executing docker-compose down."""
-        return self.shell(
-            f"{self.docker_compose} down --timeout {timeout}  -v --remove-orphans"
-        )
+        return self.shell(f"{self.docker_compose} down --timeout {timeout}  -v --remove-orphans")
 
     def up(self, timeout=3600):
         with Given("docker-compose"):
@@ -106,25 +104,13 @@ class Cluster(object):
                                     break
 
                     with Then("check there are no unhealthy containers"):
-                        ps_cmd = self.shell(
-                            f'set -o pipefail && {self.docker_compose} ps | tee | grep -v "Exit 0"'
-                        )
+                        ps_cmd = self.shell(f'set -o pipefail && {self.docker_compose} ps | tee | grep -v "Exit 0"')
                         if "is unhealthy" in cmd.output or "Exit" in ps_cmd.output:
-                            self.shell(
-                                f"set -o pipefail && {self.docker_compose} logs | tee"
-                            )
+                            self.shell(f"set -o pipefail && {self.docker_compose} logs | tee")
                             continue
 
-                    if (
-                        cmd.exitcode == 0
-                        and "is unhealthy" not in cmd.output
-                        and "Exit" not in ps_cmd.output
-                    ):
+                    if cmd.exitcode == 0 and "is unhealthy" not in cmd.output and "Exit" not in ps_cmd.output:
                         break
 
-            if (
-                cmd.exitcode != 0
-                or "is unhealthy" in cmd.output
-                or "Exit" in ps_cmd.output
-            ):
+            if cmd.exitcode != 0 or "is unhealthy" in cmd.output or "Exit" in ps_cmd.output:
                 fail("could not bring up docker-compose cluster")

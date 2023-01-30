@@ -94,9 +94,7 @@ def delete_all_chi(ns=namespace):
 def delete_all_keeper(ns=namespace):
     for keeper_type in ("zookeeper-operator", "zookeeper", "clickhouse-keeper"):
         expected_resource_types = (
-            ("zookeepercluster",)
-            if keeper_type == "zookeeper-operator"
-            else ("sts", "pvc", "cm", "svc")
+            ("zookeepercluster",) if keeper_type == "zookeeper-operator" else ("sts", "pvc", "cm", "svc")
         )
         for resource_type in expected_resource_types:
             try:
@@ -201,9 +199,7 @@ def get_count(kind, name="", label="", chi="", ns=namespace):
 
     if kind == "pv":
         # pv is not namespaced so need to search namespace in claimRef
-        out = launch(
-            f'get pv {label} -o yaml | grep "namespace: {ns}"', ok_to_fail=True
-        )
+        out = launch(f'get pv {label} -o yaml | grep "namespace: {ns}"', ok_to_fail=True)
     else:
         out = launch(
             f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}",
@@ -281,9 +277,7 @@ def wait_objects(chi, object_counts, ns=namespace):
         f"to be available"
     ):
         for i in range(1, max_retries):
-            cur_object_counts = count_objects(
-                label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns
-            )
+            cur_object_counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
             if cur_object_counts == object_counts:
                 break
             with Then(
@@ -297,17 +291,13 @@ def wait_objects(chi, object_counts, ns=namespace):
         assert cur_object_counts == object_counts, error()
 
 
-def wait_object(
-    kind, name, label="", count=1, ns=namespace, retries=max_retries, backoff=5
-):
+def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries, backoff=5):
     with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
             cur_count = get_count(kind, ns=ns, name=name, label=label)
             if cur_count >= count:
                 break
-            with Then(
-                f"Not ready yet. {cur_count}/{count}. Wait for {i * backoff} seconds"
-            ):
+            with Then(f"Not ready yet. {cur_count}/{count}. Wait for {i * backoff} seconds"):
                 time.sleep(i * backoff)
         assert cur_count >= count, error()
 
@@ -324,9 +314,7 @@ def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
 
 
 def wait_chi_status(chi, status, ns=namespace, retries=max_retries, throw_error=True):
-    wait_field(
-        "chi", chi, ".status.status", status, ns, retries, throw_error=throw_error
-    )
+    wait_field("chi", chi, ".status.status", status, ns, retries, throw_error=throw_error)
 
 
 def get_chi_status(chi, ns=namespace):
@@ -374,9 +362,7 @@ def wait_field_changed(
                 break
             with Then("Not ready. Wait for " + str(i * backoff) + " seconds"):
                 time.sleep(i * backoff)
-        assert (
-            cur_value != "" and cur_value != prev_value or throw_error == False
-        ), error()
+        assert cur_value != "" and cur_value != prev_value or throw_error == False, error()
 
 
 def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
@@ -393,9 +379,7 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
 def get_field(kind, name, field, ns=namespace):
     out = ""
     if get_count(kind, name=name, ns=ns) > 0:
-        out = launch(
-            f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns
-        ).splitlines()
+        out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
     if len(out) > 1:
         return out[1]
     else:
@@ -461,9 +445,7 @@ def get_obj_names(chi_name, obj_type="pods", ns=namespace):
 
 
 def get_pod_volumes(chi_name, pod_name="", ns=namespace):
-    volume_mounts = get_pod_spec(chi_name, pod_name, ns)["containers"][0][
-        "volumeMounts"
-    ]
+    volume_mounts = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["volumeMounts"]
     return volume_mounts
 
 

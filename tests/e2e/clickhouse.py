@@ -116,8 +116,6 @@ def create_distributed_table_on_cluster(
     local_engine="ENGINE MergeTree() ORDER BY tuple()",
     distr_engine="ENGINE Distributed('all-sharded',default, test, test)",
 ):
-    create_table_on_cluster(
-        chi, cluster_name, local_table, fields_definition + " " + local_engine
-    )
+    create_table_on_cluster(chi, cluster_name, local_table, fields_definition + " " + local_engine)
     create_distr_sql = f"CREATE TABLE {distr_table} ON CLUSTER '{cluster_name}' {fields_definition} {distr_engine}"
     query(chi["metadata"]["name"], create_distr_sql, timeout=240)

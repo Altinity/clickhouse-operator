@@ -14,10 +14,7 @@ import e2e.util as util
 @Name("Check metrics server setup and version")
 def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
-        assert (
-            kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label)
-            > 0
-        ), error()
+        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
         with Then(f"Set metrics-exporter version {settings.operator_version}"):
             util.set_metrics_exporter_version(settings.operator_version)
 
@@ -25,12 +22,8 @@ def test_metrics_exporter_setup(self):
 @TestScenario
 @Name("Check metrics server state after reboot")
 def test_metrics_exporter_reboot(self):
-    def check_monitoring_chi(
-        operator_namespace, operator_pod, expect_result, max_retries=10
-    ):
-        with Then(
-            f"metrics-exporter /chi endpoint result should return {expect_result}"
-        ):
+    def check_monitoring_chi(operator_namespace, operator_pod, expect_result, max_retries=10):
+        with Then(f"metrics-exporter /chi endpoint result should return {expect_result}"):
             for i in range(1, max_retries):
                 # check /metrics for try to refresh monitored instances
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
@@ -59,14 +52,9 @@ def test_metrics_exporter_reboot(self):
             "true,true",
             ns=settings.operator_namespace,
         )
-        assert (
-            kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label)
-            > 0
-        ), error()
+        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
 
-        out = kubectl.launch(
-            "get pods -l app=clickhouse-operator", ns=settings.operator_namespace
-        ).splitlines()[1]
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
         operator_namespace = settings.operator_namespace
         kubectl.delete_ns(kubectl.namespace, ok_to_fail=True)
@@ -94,9 +82,7 @@ def test_metrics_exporter_reboot(self):
             ]
             check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
             with When("reboot metrics exporter"):
-                kubectl.launch(
-                    f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter -- bash -c 'kill 1'"
-                )
+                kubectl.launch(f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter -- bash -c 'kill 1'")
                 time.sleep(15)
                 kubectl.wait_field(
                     "pods",
@@ -107,21 +93,15 @@ def test_metrics_exporter_reboot(self):
                 )
                 with Then("check metrics exporter still contains chi objects"):
                     check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
-                    kubectl.delete(
-                        util.get_full_path(manifest, lookup_in_host=False), timeout=600
-                    )
+                    kubectl.delete(util.get_full_path(manifest, lookup_in_host=False), timeout=600)
                     check_monitoring_chi(operator_namespace, operator_pod, [])
 
 
 @TestScenario
 @Name("Check metrics server help with different clickhouse version")
 def test_metrics_exporter_with_multiple_clickhouse_version(self):
-    def check_monitoring_metrics(
-        operator_namespace, operator_pod, expect_result, max_retries=10
-    ):
-        with Then(
-            f"metrics-exporter /metrics endpoint result should match with {expect_result}"
-        ):
+    def check_monitoring_metrics(operator_namespace, operator_pod, expect_result, max_retries=10):
+        with Then(f"metrics-exporter /metrics endpoint result should match with {expect_result}"):
             for i in range(1, max_retries):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
                 out = kubectl.launch(
@@ -141,9 +121,7 @@ def test_metrics_exporter_with_multiple_clickhouse_version(self):
             assert all_strings_expected_done, error()
 
     with Given("clickhouse-operator pod exists"):
-        out = kubectl.launch(
-            "get pods -l app=clickhouse-operator", ns="kube-system"
-        ).splitlines()[1]
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns="kube-system").splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
         operator_namespace = "kube-system"
 

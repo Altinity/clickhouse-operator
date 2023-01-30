@@ -9,9 +9,7 @@ xfails = {
     # test_operator.py
     "/regression/e2e.test_operator/test_036*": [(Fail, "not implemented yet")],
     # test_clickhouse.py
-    "/regression/e2e.test_clickhouse/test_ch_001*": [
-        (Fail, "Insert Quorum test need to refactoring")
-    ],
+    "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py
     # "/regression/e2e.test_metrics_alerts/test_clickhouse_dns_errors*": [
     #     (Fail, "DNSError behavior changed on 21.9, look https://github.com/ClickHouse/ClickHouse/issues/29624")

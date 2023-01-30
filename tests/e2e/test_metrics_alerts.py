@@ -14,9 +14,7 @@ import e2e.alerts as alerts
 
 @TestScenario
 @Name("test_prometheus_setup. Check clickhouse-operator/prometheus/alertmanager setup")
-def test_prometheus_setup(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_prometheus_setup(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     with Given("clickhouse-operator is installed"):
         assert (
             kubectl.get_count(
@@ -25,9 +23,7 @@ def test_prometheus_setup(
                 label="-l app=clickhouse-operator",
             )
             > 0
-        ), error(
-            "please run deploy/operator/clickhouse-operator-install.sh before run test"
-        )
+        ), error("please run deploy/operator/clickhouse-operator-install.sh before run test")
         util.set_operator_version(settings.operator_version)
         util.set_metrics_exporter_version(settings.operator_version)
 
@@ -56,10 +52,10 @@ def test_prometheus_setup(
             )
             > 0
         ), error("please run deploy/promehteus/create_prometheus.sh before test run")
-        prometheus_operator_exptected_version = f"quay.io/prometheus-operator/prometheus-operator:v{settings.prometheus_operator_version}"
-        actual_image = prometheus_operator_spec["items"][0]["spec"]["containers"][0][
-            "image"
-        ]
+        prometheus_operator_exptected_version = (
+            f"quay.io/prometheus-operator/prometheus-operator:v{settings.prometheus_operator_version}"
+        )
+        actual_image = prometheus_operator_spec["items"][0]["spec"]["containers"][0]["image"]
         assert prometheus_operator_exptected_version in actual_image, error(
             f"require {prometheus_operator_exptected_version} image"
         )
@@ -67,13 +63,9 @@ def test_prometheus_setup(
 
 @TestScenario
 @Name("test_metrics_exporter_down. Check ClickHouseMetricsExporterDown")
-def test_metrics_exporter_down(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_metrics_exporter_down(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     def reboot_metrics_exporter():
-        clickhouse_operator_pod = clickhouse_operator_spec["items"][0]["metadata"][
-            "name"
-        ]
+        clickhouse_operator_pod = clickhouse_operator_spec["items"][0]["metadata"]["name"]
         kubectl.launch(
             f"exec -n {settings.operator_namespace} {clickhouse_operator_pod} -c metrics-exporter -- sh -c 'kill 1'",
             ok_to_fail=True,
@@ -87,26 +79,16 @@ def test_metrics_exporter_down(
             callback=reboot_metrics_exporter,
             time_range="30s",
         )
-        assert fired, error(
-            "can't get ClickHouseMetricsExporterDown alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseMetricsExporterDown alert in firing state")
 
     with Then("check ClickHouseMetricsExporterDown gone away"):
-        resolved = alerts.wait_alert_state(
-            "ClickHouseMetricsExporterDown", "firing", expected_state=False
-        )
-        assert resolved, error(
-            "can't get ClickHouseMetricsExporterDown alert is gone away"
-        )
+        resolved = alerts.wait_alert_state("ClickHouseMetricsExporterDown", "firing", expected_state=False)
+        assert resolved, error("can't get ClickHouseMetricsExporterDown alert is gone away")
 
 
 @TestScenario
-@Name(
-    "test_clickhouse_server_reboot. Check ClickHouseServerDown, ClickHouseServerRestartRecently"
-)
-def test_clickhouse_server_reboot(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+@Name("test_clickhouse_server_reboot. Check ClickHouseServerDown, ClickHouseServerRestartRecently")
+def test_clickhouse_server_reboot(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
@@ -150,9 +132,7 @@ def test_clickhouse_server_reboot(
             labels={"hostname": clickhouse_svc, "chi": chi["metadata"]["name"]},
             time_range="30s",
         )
-        assert fired, error(
-            "after ClickHouseServerDown gone away, ClickHouseServerRestartRecently shall firing"
-        )
+        assert fired, error("after ClickHouseServerDown gone away, ClickHouseServerRestartRecently shall firing")
 
         resolved = alerts.wait_alert_state(
             "ClickHouseServerRestartRecently",
@@ -163,16 +143,12 @@ def test_clickhouse_server_reboot(
             time_range="5s",
             labels={"hostname": clickhouse_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseServerRestartRecently alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseServerRestartRecently alert is gone away")
 
 
 @TestScenario
 @Name("test_clickhouse_dns_errors. Check ClickHouseDNSErrors")
-def test_clickhouse_dns_errors(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_clickhouse_dns_errors(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     random_idx = random.randint(0, 1)
     clickhouse_pod = chi["status"]["pods"][random_idx]
     clickhouse_svc = chi["status"]["fqdns"][random_idx]
@@ -181,9 +157,7 @@ def test_clickhouse_dns_errors(
         f"exec -n {kubectl.namespace} {clickhouse_pod} -c clickhouse-pod -- cat /etc/resolv.conf",
         ok_to_fail=False,
     )
-    new_dns = re.sub(
-        r"^nameserver (.+)", "nameserver 1.1.1.1", old_dns, flags=re.MULTILINE
-    )
+    new_dns = re.sub(r"^nameserver (.+)", "nameserver 1.1.1.1", old_dns, flags=re.MULTILINE)
 
     def rewrite_dns_on_clickhouse_server(write_new=True):
         dns = new_dns if write_new else old_dns
@@ -215,17 +189,13 @@ def test_clickhouse_dns_errors(
 
     with Then("check ClickHouseDNSErrors gone away"):
         rewrite_dns_on_clickhouse_server(write_new=False)
-        resolved = alerts.wait_alert_state(
-            "ClickHouseDNSErrors", "firing", False, labels={"hostname": clickhouse_svc}
-        )
+        resolved = alerts.wait_alert_state("ClickHouseDNSErrors", "firing", False, labels={"hostname": clickhouse_svc})
         assert resolved, error("can't check ClickHouseDNSErrors alert is gone away")
 
 
 @TestScenario
 @Name("test_distributed_files_to_insert. Check ClickHouseDistributedFilesToInsertHigh")
-def test_distributed_files_to_insert(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_distributed_files_to_insert(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         delayed_pod,
         delayed_svc,
@@ -246,11 +216,7 @@ def test_distributed_files_to_insert(
     files_to_insert_from_disk = 0
     tries = 0
     # we need more than 50 delayed files for catch
-    while (
-        files_to_insert_from_disk <= 55
-        and files_to_insert_from_metrics <= 55
-        and tries < 500
-    ):
+    while files_to_insert_from_disk <= 55 and files_to_insert_from_metrics <= 55 and tries < 500:
         kubectl.launch(
             f"exec -n {kubectl.namespace} {restarted_pod} -c clickhouse-pod -- kill 1",
             ok_to_fail=True,
@@ -284,9 +250,7 @@ def test_distributed_files_to_insert(
             True,
             labels={"hostname": delayed_svc, "chi": chi["metadata"]["name"]},
         )
-        assert fired, error(
-            "can't get ClickHouseDistributedFilesToInsertHigh alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseDistributedFilesToInsertHigh alert in firing state")
 
     kubectl.wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
 
@@ -304,20 +268,14 @@ def test_distributed_files_to_insert(
             False,
             labels={"hostname": delayed_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseDistributedFilesToInsertHigh alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseDistributedFilesToInsertHigh alert is gone away")
 
     clickhouse.drop_distributed_table_on_cluster(chi)
 
 
 @TestScenario
-@Name(
-    "test_distributed_connection_exceptions. Check ClickHouseDistributedConnectionExceptions"
-)
-def test_distributed_connection_exceptions(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+@Name("test_distributed_connection_exceptions. Check ClickHouseDistributedConnectionExceptions")
+def test_distributed_connection_exceptions(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         delayed_pod,
         delayed_svc,
@@ -328,7 +286,9 @@ def test_distributed_connection_exceptions(
 
     def reboot_clickhouse_and_distributed_exection():
         # we need 70 delayed files for catch
-        insert_sql = "INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 10000"
+        insert_sql = (
+            "INSERT INTO default.test_distr(event_time, test) SELECT now(), number FROM system.numbers LIMIT 10000"
+        )
         select_sql = "SELECT count() FROM default.test_distr"
         with Then("reboot clickhouse-server pod"):
             kubectl.launch(
@@ -360,9 +320,7 @@ def test_distributed_connection_exceptions(
             time_range="30s",
             callback=reboot_clickhouse_and_distributed_exection,
         )
-        assert fired, error(
-            "can't get ClickHouseDistributedConnectionExceptions alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseDistributedConnectionExceptions alert in firing state")
 
     with Then("check DistributedConnectionExpections gone away"):
         resolved = alerts.wait_alert_state(
@@ -371,9 +329,7 @@ def test_distributed_connection_exceptions(
             False,
             labels={"hostname": delayed_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseDistributedConnectionExceptions alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseDistributedConnectionExceptions alert is gone away")
     kubectl.wait_pod_status(restarted_pod, "Running", ns=kubectl.namespace)
     kubectl.wait_jsonpath(
         "pod",
@@ -389,9 +345,7 @@ def test_distributed_connection_exceptions(
 @Name(
     "test_insert_related_alerts. Check ClickHouseRejectedInsert, ClickHouseDelayedInsertThrottling, ClickHouseMaxPartCountForPartition, ClickHouseLowInsertedRowsPerQuery"
 )
-def test_insert_related_alerts(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_insert_related_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     clickhouse.create_table_on_cluster(chi)
     (
         delayed_pod,
@@ -425,12 +379,8 @@ def test_insert_related_alerts(
                 min_block
                 + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
             )
-            clickhouse.query_with_error(
-                chi_name, sql, host=selected_svc, ns=kubectl.namespace
-            )
-            with Then(
-                f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"
-            ):
+            clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
+            with Then(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
                 time.sleep(prometheus_scrape_interval * 2)
 
             with Then("after 21.8 InsertedRows include system.* rows"):
@@ -439,9 +389,7 @@ def test_insert_related_alerts(
                         min_block
                         + "INSERT INTO default.test(event_time, test) SELECT now(), number FROM system.numbers LIMIT 1;"
                     )
-                    clickhouse.query_with_error(
-                        chi_name, sql, host=selected_svc, ns=kubectl.namespace
-                    )
+                    clickhouse.query_with_error(chi_name, sql, host=selected_svc, ns=kubectl.namespace)
 
     insert_many_parts_to_clickhouse()
     with Then("check ClickHouseDelayedInsertThrottling firing"):
@@ -452,9 +400,7 @@ def test_insert_related_alerts(
             labels={"hostname": delayed_svc},
             time_range="60s",
         )
-        assert fired, error(
-            "can't get ClickHouseDelayedInsertThrottling alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseDelayedInsertThrottling alert in firing state")
     with Then("check ClickHouseMaxPartCountForPartition firing"):
         fired = alerts.wait_alert_state(
             "ClickHouseMaxPartCountForPartition",
@@ -463,9 +409,7 @@ def test_insert_related_alerts(
             labels={"hostname": delayed_svc},
             time_range="90s",
         )
-        assert fired, error(
-            "can't get ClickHouseMaxPartCountForPartition alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseMaxPartCountForPartition alert in firing state")
     with Then("check ClickHouseLowInsertedRowsPerQuery firing"):
         fired = alerts.wait_alert_state(
             "ClickHouseLowInsertedRowsPerQuery",
@@ -474,9 +418,7 @@ def test_insert_related_alerts(
             labels={"hostname": delayed_svc},
             time_range="120s",
         )
-        assert fired, error(
-            "can't get ClickHouseLowInsertedRowsPerQuery alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseLowInsertedRowsPerQuery alert in firing state")
 
     clickhouse.query(
         chi_name,
@@ -492,9 +434,7 @@ def test_insert_related_alerts(
             False,
             labels={"hostname": delayed_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseDelayedInsertThrottling alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseDelayedInsertThrottling alert is gone away")
     with Then("check ClickHouseMaxPartCountForPartition gone away"):
         resolved = alerts.wait_alert_state(
             "ClickHouseMaxPartCountForPartition",
@@ -502,9 +442,7 @@ def test_insert_related_alerts(
             False,
             labels={"hostname": delayed_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseMaxPartCountForPartition alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseMaxPartCountForPartition alert is gone away")
     with Then("check ClickHouseLowInsertedRowsPerQuery gone away"):
         resolved = alerts.wait_alert_state(
             "ClickHouseLowInsertedRowsPerQuery",
@@ -512,9 +450,7 @@ def test_insert_related_alerts(
             False,
             labels={"hostname": delayed_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseLowInsertedRowsPerQuery alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseLowInsertedRowsPerQuery alert is gone away")
 
     parts_limits = parts_to_throw_insert
     selected_svc = rejected_svc
@@ -537,9 +473,7 @@ def test_insert_related_alerts(
             False,
             labels={"hostname": rejected_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseRejectedInsert alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseRejectedInsert alert is gone away")
 
     clickhouse.query(
         chi_name,
@@ -552,12 +486,8 @@ def test_insert_related_alerts(
 
 @TestScenario
 @Name("test_longest_running_query. Check ClickHouseLongestRunningQuery")
-def test_longest_running_query(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
-    long_running_pod, long_running_svc, _, _ = alerts.random_pod_choice_for_callbacks(
-        chi
-    )
+def test_longest_running_query(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
+    long_running_pod, long_running_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
     # 600s trigger + 2*30s - double prometheus scraping interval
     clickhouse.query(
         chi["metadata"]["name"],
@@ -573,9 +503,7 @@ def test_longest_running_query(
             labels={"hostname": long_running_svc},
             time_range="30s",
         )
-        assert fired, error(
-            "can't get ClickHouseLongestRunningQuery alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseLongestRunningQuery alert in firing state")
     with Then("check ClickHouseLongestRunningQuery gone away"):
         resolved = alerts.wait_alert_state(
             "ClickHouseLongestRunningQuery",
@@ -583,9 +511,7 @@ def test_longest_running_query(
             False,
             labels={"hostname": long_running_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseLongestRunningQuery alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseLongestRunningQuery alert is gone away")
 
 
 @TestScenario
@@ -623,16 +549,12 @@ def test_query_preempted(self, prometheus_operator_spec, clickhouse_operator_spe
             False,
             labels={"hostname": priority_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseQueryPreempted alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseQueryPreempted alert is gone away")
 
 
 @TestScenario
 @Name("test_read_only_replica. Check ClickHouseReadonlyReplica")
-def test_read_only_replica(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_read_only_replica(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         read_only_pod,
         read_only_svc,
@@ -677,9 +599,7 @@ def test_read_only_replica(
             False,
             labels={"hostname": read_only_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseReadonlyReplica alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseReadonlyReplica alert is gone away")
 
     kubectl.wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
     kubectl.wait_jsonpath(
@@ -720,9 +640,7 @@ def test_read_only_replica(
 
 @TestScenario
 @Name("test_replicas_max_absolute_delay. Check ClickHouseReplicasMaxAbsoluteDelay")
-def test_replicas_max_absolute_delay(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_replicas_max_absolute_delay(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         stop_replica_pod,
         stop_replica_svc,
@@ -776,18 +694,14 @@ def test_replicas_max_absolute_delay(
             False,
             labels={"hostname": stop_replica_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseReplicasMaxAbsoluteDelay alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseReplicasMaxAbsoluteDelay alert is gone away")
 
     clickhouse.drop_table_on_cluster(chi, "all-replicated", "default.test_repl")
 
 
 @TestScenario
 @Name("test_too_many_connections. Check ClickHouseTooManyConnections")
-def test_too_many_connections(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_too_many_connections(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         too_many_connection_pod,
         too_many_connection_svc,
@@ -807,7 +721,9 @@ def test_too_many_connections(
             if port == "8123":
                 # HTTPConnection metric increase after full parsing of HTTP Request, we can't provide pause between CONNECT and QUERY running
                 # long_cmd += f"nc -vv 127.0.0.1 {port} <( printf \"POST / HTTP/1.1\\r\\nHost: 127.0.0.1:8123\\r\\nContent-Length: 34\\r\\n\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\\r\\nTEST\");"
-                long_cmd += 'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
+                long_cmd += (
+                    'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
+                )
             elif port == "9000":
                 long_cmd += 'clickhouse-client --send_logs_level trace --idle_connection_timeout 70 --receive_timeout 70 -q "SELECT sleepEachRow(1),number,now() FROM numbers(30)";'
             # elif port == "3306":
@@ -819,9 +735,7 @@ def test_too_many_connections(
         with open("/tmp/nc_cmd.sh", "w") as f:
             f.write(nc_cmd)
 
-        kubectl.launch(
-            f"cp /tmp/nc_cmd.sh {too_many_connection_pod}:/tmp/nc_cmd.sh -c clickhouse-pod"
-        )
+        kubectl.launch(f"cp /tmp/nc_cmd.sh {too_many_connection_pod}:/tmp/nc_cmd.sh -c clickhouse-pod")
 
         kubectl.launch(
             f"exec -n {kubectl.namespace} {too_many_connection_pod} -c clickhouse-pod -- bash /tmp/nc_cmd.sh",
@@ -837,9 +751,7 @@ def test_too_many_connections(
             time_range="90s",
             callback=make_too_many_connection,
         )
-        assert fired, error(
-            "can't get ClickHouseTooManyConnections alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseTooManyConnections alert in firing state")
 
     with Then("check ClickHouseTooManyConnections gone away"):
         resolved = alerts.wait_alert_state(
@@ -848,16 +760,12 @@ def test_too_many_connections(
             False,
             labels={"hostname": too_many_connection_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseTooManyConnections alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseTooManyConnections alert is gone away")
 
 
 @TestScenario
 @Name("test_too_much_running_queries. Check ClickHouseTooManyRunningQueries")
-def test_too_much_running_queries(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         _,
         _,
@@ -875,19 +783,21 @@ def test_too_much_running_queries(
         for _ in range(90):
             port = random.choice(["8123", "3306", "9000"])
             if port == "9000":
-                long_cmd += 'clickhouse-client --send_logs_level trace -q "SELECT sleepEachRow(1),now() FROM numbers(60)";'
+                long_cmd += (
+                    'clickhouse-client --send_logs_level trace -q "SELECT sleepEachRow(1),now() FROM numbers(60)";'
+                )
             if port == "3306":
                 long_cmd += 'mysql -h 127.0.0.1 -P 3306 -u default -e "SELECT sleepEachRow(1),now() FROM numbers(60)";'
             if port == "8123":
                 long_cmd += 'wget -qO- "http://127.0.0.1:8123?query=SELECT sleepEachRow(1),now() FROM numbers(60)";'
 
-        long_cmd = f"echo '{long_cmd}' | xargs --verbose -i'{{}}' --no-run-if-empty -d ';' -P 100 bash -c '{{}}' 1>/dev/null"
+        long_cmd = (
+            f"echo '{long_cmd}' | xargs --verbose -i'{{}}' --no-run-if-empty -d ';' -P 100 bash -c '{{}}' 1>/dev/null"
+        )
         with open("/tmp/long_cmd.sh", "w") as f:
             f.write(long_cmd)
 
-        kubectl.launch(
-            f"cp /tmp/long_cmd.sh {too_many_queries_pod}:/tmp/long_cmd.sh -c clickhouse-pod"
-        )
+        kubectl.launch(f"cp /tmp/long_cmd.sh {too_many_queries_pod}:/tmp/long_cmd.sh -c clickhouse-pod")
         kubectl.launch(
             f"exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse-pod -- bash /tmp/long_cmd.sh",
             timeout=90,
@@ -902,9 +812,7 @@ def test_too_much_running_queries(
             callback=make_too_many_queries,
             time_range="30s",
         )
-        assert fired, error(
-            "can't get ClickHouseTooManyRunningQueries alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseTooManyRunningQueries alert in firing state")
 
     with Then("check ClickHouseTooManyConnections gone away"):
         resolved = alerts.wait_alert_state(
@@ -914,16 +822,12 @@ def test_too_much_running_queries(
             labels={"hostname": too_many_queries_svc},
             sleep_time=settings.prometheus_scrape_interval,
         )
-        assert resolved, error(
-            "can't check ClickHouseTooManyConnections alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseTooManyConnections alert is gone away")
 
 
 @TestScenario
 @Name("test_system_settings_changed. Check ClickHouseSystemSettingsChanged")
-def test_system_settings_changed(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_system_settings_changed(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     changed_pod, changed_svc, _, _ = alerts.random_pod_choice_for_callbacks(chi)
 
     with When("apply changed settings"):
@@ -951,9 +855,7 @@ def test_system_settings_changed(
             labels={"hostname": changed_svc},
             time_range="30s",
         )
-        assert fired, error(
-            "can't get ClickHouseSystemSettingsChanged alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseSystemSettingsChanged alert in firing state")
 
     with When("rollback changed settings"):
         kubectl.create_and_check(
@@ -981,9 +883,7 @@ def test_system_settings_changed(
             labels={"hostname": changed_svc},
             sleep_time=30,
         )
-        assert resolved, error(
-            "can't check ClickHouseSystemSettingsChanged alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseSystemSettingsChanged alert is gone away")
 
 
 @TestScenario
@@ -1008,9 +908,7 @@ def test_version_changed(self, prometheus_operator_spec, clickhouse_operator_spe
             },
         )
         prometheus_scrape_interval = 15
-        with Then(
-            f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"
-        ):
+        with Then(f"wait prometheus_scrape_interval={prometheus_scrape_interval}*2 sec"):
             time.sleep(prometheus_scrape_interval * 2)
 
     with Then("check ClickHouseVersionChanged firing"):
@@ -1050,16 +948,12 @@ def test_version_changed(self, prometheus_operator_spec, clickhouse_operator_spe
             labels={"hostname": changed_svc},
             sleep_time=30,
         )
-        assert resolved, error(
-            "can't check ClickHouseVersionChanged alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseVersionChanged alert is gone away")
 
 
 @TestScenario
 @Name("test_zookeeper_hardware_exceptions. Check ClickHouseZooKeeperHardwareExceptions")
-def test_zookeeper_hardware_exceptions(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_zookeeper_hardware_exceptions(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     pod1, svc1, pod2, svc2 = alerts.random_pod_choice_for_callbacks(chi)
     chi_name = chi["metadata"]["name"]
 
@@ -1090,9 +984,7 @@ def test_zookeeper_hardware_exceptions(
                 sleep_time=settings.prometheus_scrape_interval,
                 callback=restart_keeper,
             )
-            assert fired, error(
-                "can't get ClickHouseZooKeeperHardwareExceptions alert in firing state"
-            )
+            assert fired, error("can't get ClickHouseZooKeeperHardwareExceptions alert in firing state")
 
     kubectl.wait_pod_status("zookeeper-0", "Running", ns=kubectl.namespace)
     kubectl.wait_jsonpath(
@@ -1111,18 +1003,12 @@ def test_zookeeper_hardware_exceptions(
                 False,
                 labels={"hostname": svc},
             )
-            assert resolved, error(
-                "can't check ClickHouseZooKeeperHardwareExceptions alert is gone away"
-            )
+            assert resolved, error("can't check ClickHouseZooKeeperHardwareExceptions alert is gone away")
 
 
 @TestScenario
-@Name(
-    "test_distributed_sync_insertion_timeout. Check ClickHouseDistributedSyncInsertionTimeoutExceeded"
-)
-def test_distributed_sync_insertion_timeout(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+@Name("test_distributed_sync_insertion_timeout. Check ClickHouseDistributedSyncInsertionTimeoutExceeded")
+def test_distributed_sync_insertion_timeout(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     (
         sync_pod,
         sync_svc,
@@ -1156,9 +1042,7 @@ def test_distributed_sync_insertion_timeout(
             time_range="30s",
             callback=insert_distributed_sync,
         )
-        assert fired, error(
-            "can't get ClickHouseDistributedSyncInsertionTimeoutExceeded alert in firing state"
-        )
+        assert fired, error("can't get ClickHouseDistributedSyncInsertionTimeoutExceeded alert in firing state")
 
     with Then("check ClickHouseDistributedSyncInsertionTimeoutExceeded gone away"):
         resolved = alerts.wait_alert_state(
@@ -1167,9 +1051,7 @@ def test_distributed_sync_insertion_timeout(
             False,
             labels={"hostname": sync_svc},
         )
-        assert resolved, error(
-            "can't check ClickHouseDistributedSyncInsertionTimeoutExceeded alert is gone away"
-        )
+        assert resolved, error("can't check ClickHouseDistributedSyncInsertionTimeoutExceeded alert is gone away")
 
     clickhouse.drop_distributed_table_on_cluster(chi)
 
@@ -1235,26 +1117,20 @@ def test_detached_parts(self, prometheus_operator_spec, clickhouse_operator_spec
 
 @TestScenario
 @Name("test_clickhouse_keeper_alerts. Check ClickHouseKeeperDown")
-def test_clickhouse_keeper_alerts(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_clickhouse_keeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     test_keeper_alerts_outline(keeper_type="clickhouse-keeper")
 
 
 @TestScenario
 @Name("test_zookeeper_alerts. Check ZookeeperDown, ZookeeperRestartRecently")
-def test_zookeeper_alerts(
-    self, prometheus_operator_spec, clickhouse_operator_spec, chi
-):
+def test_zookeeper_alerts(self, prometheus_operator_spec, clickhouse_operator_spec, chi):
     test_keeper_alerts_outline(keeper_type="zookeeper")
 
 
 @TestOutline
 def test_keeper_alerts_outline(self, keeper_type):
     keeper_spec = kubectl.get("endpoints", keeper_type)
-    keeper_spec = random.choice(keeper_spec["subsets"][0]["addresses"])["targetRef"][
-        "name"
-    ]
+    keeper_spec = random.choice(keeper_spec["subsets"][0]["addresses"])["targetRef"]["name"]
 
     expected_alerts = {
         "zookeeper": {
@@ -1293,9 +1169,7 @@ def test_keeper_alerts_outline(self, keeper_type):
                 sleep_time=settings.prometheus_scrape_interval,
                 callback=restart_keeper,
             )
-            assert fired, error(
-                f"can't get {expected_alerts[keeper_type]['down']} alert in firing state"
-            )
+            assert fired, error(f"can't get {expected_alerts[keeper_type]['down']} alert in firing state")
 
     wait_when_keeper_up()
 
@@ -1307,9 +1181,7 @@ def test_keeper_alerts_outline(self, keeper_type):
                 False,
                 labels={"pod_name": keeper_spec},
             )
-            assert resolved, error(
-                f"can't check {expected_alerts[keeper_type]['down']} alert is gone away"
-            )
+            assert resolved, error(f"can't check {expected_alerts[keeper_type]['down']} alert is gone away")
 
     restart_keeper()
 
@@ -1322,9 +1194,7 @@ def test_keeper_alerts_outline(self, keeper_type):
                 labels={"pod_name": keeper_spec},
                 time_range="30s",
             )
-            assert fired, error(
-                f"can't get {expected_alerts[keeper_type]['restart']} alert in firing state"
-            )
+            assert fired, error(f"can't get {expected_alerts[keeper_type]['restart']} alert in firing state")
 
     wait_when_keeper_up()
 
@@ -1337,21 +1207,13 @@ def test_keeper_alerts_outline(self, keeper_type):
                 labels={"pod_name": keeper_spec},
                 max_try=30,
             )
-            assert resolved, error(
-                f"can't check {expected_alerts[keeper_type]['restart']} alert is gone away"
-            )
+            assert resolved, error(f"can't check {expected_alerts[keeper_type]['restart']} alert is gone away")
 
 
 @TestFeature
 @Name("e2e.test_metrics_alerts")
 def test(self):
-    (
-        prometheus_operator_spec,
-        prometheus_spec,
-        alertmanager_spec,
-        clickhouse_operator_spec,
-        chi,
-    ) = alerts.initialize(
+    (prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi,) = alerts.initialize(
         chi_file="manifests/chi/test-cluster-for-alerts.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",
         chi_name="test-cluster-for-alerts",
@@ -1363,13 +1225,7 @@ def test(self):
         chi=chi,
     )
 
-    (
-        prometheus_operator_spec,
-        prometheus_spec,
-        alertmanager_spec,
-        clickhouse_operator_spec,
-        chi,
-    ) = alerts.initialize(
+    (prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi,) = alerts.initialize(
         chi_file="manifests/chi/test-cluster-for-alerts.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",
         chi_name="test-cluster-for-alerts",
@@ -1381,13 +1237,7 @@ def test(self):
         chi=chi,
     )
 
-    (
-        prometheus_operator_spec,
-        prometheus_spec,
-        alertmanager_spec,
-        clickhouse_operator_spec,
-        chi,
-    ) = alerts.initialize(
+    (prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi,) = alerts.initialize(
         chi_file="manifests/chi/test-cluster-for-alerts.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",
         chi_name="test-cluster-for-alerts",

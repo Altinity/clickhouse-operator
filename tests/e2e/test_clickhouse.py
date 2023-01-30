@@ -31,9 +31,7 @@ def test_ch_001(self):
         },
     )
 
-    chi = yaml_manifest.get_chi_name(
-        util.get_full_path("manifests/chi/test-ch-001-insert-quorum.yaml")
-    )
+    chi = yaml_manifest.get_chi_name(util.get_full_path("manifests/chi/test-ch-001-insert-quorum.yaml"))
     chi_data = kubectl.get("chi", ns=settings.test_namespace, name=chi)
     util.wait_clickhouse_cluster_ready(chi_data)
 
@@ -69,12 +67,8 @@ def test_ch_001(self):
         "\n", ""
     )
 
-    create_mv2 = (
-        "create materialized view t_mv2 on cluster default to t2 as select a from t1"
-    )
-    create_mv3 = (
-        "create materialized view t_mv3 on cluster default to t3 as select a from t1"
-    )
+    create_mv2 = "create materialized view t_mv2 on cluster default to t2 as select a from t1"
+    create_mv3 = "create materialized view t_mv3 on cluster default to t3 as select a from t1"
 
     with Given("Tables t1, t2, t3 and MVs t1->t2, t1-t3 are created"):
         clickhouse.query(chi, create_table)
@@ -85,18 +79,14 @@ def test_ch_001(self):
         clickhouse.query(chi, create_mv3)
 
         with When("Add a row to an old partition"):
-            clickhouse.query(
-                chi, "insert into t1(a,d) values(6, today()-1)", host=host0
-            )
+            clickhouse.query(chi, "insert into t1(a,d) values(6, today()-1)", host=host0)
 
         with When("Stop fetches for t1 at replica1"):
             clickhouse.query(chi, "system stop fetches default.t1", host=host1)
 
             with Then("Wait 10 seconds and the data should be dropped by TTL"):
                 time.sleep(10)
-                out = clickhouse.query(
-                    chi, "select count() from t1 where a=6", host=host0
-                )
+                out = clickhouse.query(chi, "select count() from t1 where a=6", host=host0)
                 assert out == "0", error()
 
         with When("Resume fetches for t1 at replica1"):
@@ -112,9 +102,7 @@ def test_ch_001(self):
             clickhouse.query(chi, "system stop fetches default.t2", host=host1)
 
             with Then("Insert should fail since it can not reach the quorum"):
-                out = clickhouse.query_with_error(
-                    chi, "insert into t1(a) values(2)", host=host0
-                )
+                out = clickhouse.query_with_error(chi, "insert into t1(a) values(2)", host=host0)
                 assert "Timeout while waiting for quorum" in out, error()
 
         # kubectl(f"exec {host0}-0 -n test -- cp /var/lib//clickhouse/data/default/t2/all_1_1_0/a.mrk2 /var/lib//clickhouse/data/default/t2/all_1_1_0/a.bin")
@@ -137,26 +125,16 @@ def test_ch_001(self):
                     time.sleep(5)
                     i += 1
 
-            with Then(
-                "Inserts should fail with an error regarding not satisfied quorum"
-            ):
-                out = clickhouse.query_with_error(
-                    chi, "insert into t1(a) values(3)", host=host0
-                )
-                assert (
-                    "Quorum for previous write has not been satisfied yet" in out
-                ), error()
+            with Then("Inserts should fail with an error regarding not satisfied quorum"):
+                out = clickhouse.query_with_error(chi, "insert into t1(a) values(3)", host=host0)
+                assert "Quorum for previous write has not been satisfied yet" in out, error()
 
             with And("Second insert of the same block should pass"):
                 clickhouse.query(chi, "insert into t1(a) values(3)", host=host0)
 
             with And("Insert of the new block should fail"):
-                out = clickhouse.query_with_error(
-                    chi, "insert into t1(a) values(4)", host=host0
-                )
-                assert (
-                    "Quorum for previous write has not been satisfied yet" in out
-                ), error()
+                out = clickhouse.query_with_error(chi, "insert into t1(a) values(4)", host=host0)
+                assert "Quorum for previous write has not been satisfied yet" in out, error()
 
             with And(
                 "Second insert of the same block with 'deduplicate_blocks_in_dependent_materialized_views' setting should fail"
@@ -166,9 +144,7 @@ def test_ch_001(self):
                     "set deduplicate_blocks_in_dependent_materialized_views=1; insert into t1(a) values(5)",
                     host=host0,
                 )
-                assert (
-                    "Quorum for previous write has not been satisfied yet" in out
-                ), error()
+                assert "Quorum for previous write has not been satisfied yet" in out, error()
 
         out = clickhouse.query_with_error(
             chi,

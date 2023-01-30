@@ -9,13 +9,9 @@ from testflows.core import *
 
 
 def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
-    svc_name = (
-        "zookeeper-client" if keeper_type == "zookeeper-operator" else "zookeeper"
-    )
+    svc_name = "zookeeper-client" if keeper_type == "zookeeper-operator" else "zookeeper"
     expected_containers = "1/1"
-    expected_pod_prefix = (
-        "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
-    )
+    expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
     for i in range(retries):
         ready_pods = kubectl.launch(
             f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l"
@@ -40,9 +36,7 @@ def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
 
 
 def wait_clickhouse_no_readonly_replicas(chi, retries=20):
-    expected_replicas = chi["spec"]["configuration"]["clusters"][0]["layout"][
-        "replicasCount"
-    ]
+    expected_replicas = chi["spec"]["configuration"]["clusters"][0]["layout"]["replicasCount"]
     expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
     for i in range(retries):
         readonly_replicas = clickhouse.query(
@@ -50,9 +44,7 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
             "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
         )
         if readonly_replicas == expected_replicas:
-            message(
-                f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}"
-            )
+            message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
             break
         else:
             with But(
@@ -60,9 +52,7 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
             ):
                 time.sleep(i * 3)
         if i >= (retries - 1):
-            raise RuntimeError(
-                f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}"
-            )
+            raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
 
 
 def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_tables):
@@ -128,9 +118,7 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
 
         assert found, f"Unexpected {keeper_type} `ls /` output"
 
-    out = clickhouse.query(
-        chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'"
-    )
+    out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
     expected_out = {
         "zookeeper": "2",
         "zookeeper-operator": "3",
@@ -150,9 +138,7 @@ def rescale_zk_and_clickhouse(
     first_install=False,
     clean_ns=None,
 ):
-    keeper_manifest = (
-        keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
-    )
+    keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f"manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-latest.yaml",
@@ -277,9 +263,7 @@ def test_keeper_outline(
 
     with Then("drop all created tables"):
         for i in range(3):
-            clickhouse.drop_table_on_cluster(
-                chi, "all-sharded", f"default.test_repl{i + 1}"
-            )
+            clickhouse.drop_table_on_cluster(chi, "all-sharded", f"default.test_repl{i + 1}")
 
 
 @TestScenario
@@ -305,9 +289,7 @@ def test_clickhouse_keeper_rescale(self):
 
 
 @TestScenario
-@Name(
-    "test_zookeeper_operator_rescale. Check Zookeeper OPERATOR scale-up / scale-down cases"
-)
+@Name("test_zookeeper_operator_rescale. Check Zookeeper OPERATOR scale-up / scale-down cases")
 def test_zookeeper_operator_rescale(self):
     test_keeper_outline(
         keeper_type="zookeeper-operator",
@@ -355,9 +337,7 @@ def test_keeper_probes_outline(
         wait_clickhouse_no_readonly_replicas(chi)
 
     with Then("Create keeper_bench table"):
-        clickhouse.query(
-            chi["metadata"]["name"], "DROP DATABASE IF EXISTS keeper_bench SYNC"
-        )
+        clickhouse.query(chi["metadata"]["name"], "DROP DATABASE IF EXISTS keeper_bench SYNC")
         clickhouse.query(chi["metadata"]["name"], "CREATE DATABASE keeper_bench")
         clickhouse.query(
             chi["metadata"]["name"],
@@ -394,9 +374,7 @@ def test_keeper_probes_outline(
             )
 
     with Then("Check liveness and readiness probes fail"):
-        zk_pod_prefix = (
-            "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
-        )
+        zk_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
         for zk_pod in range(3):
             out = kubectl.launch(f"describe pod {zk_pod_prefix}-{zk_pod}")
             assert "probe failed" not in out, "all probes shall be successful"
