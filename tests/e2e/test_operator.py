@@ -441,7 +441,7 @@ def check_remote_servers(self, chi, shards, trigger_event, cluster=""):
     if cluster == "":
         cluster = chi
 
-    with Given("I get shell"):
+    with Given("I have a shell"):
         self.context.shell = get_shell()
     ok = 0
 
@@ -3114,7 +3114,7 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
     """Run a select query in parallel until the stop signal is received."""
 
     client_pod = "clickhouse-client"
-    with Given("I get shell"):
+    with Given("I have a shell"):
         self.context.shell = get_shell()
     try:
 
@@ -3156,7 +3156,7 @@ def run_insert_query(self, host, user, password, query, trigger_event):
     """Run an insert query in parallel until the stop signal is received."""
 
     client_pod = "clickhouse-insert"
-    with Given("I get shell"):
+    with Given("I have a shell"):
         self.context.shell = get_shell()
     try:
 
