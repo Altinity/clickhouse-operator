@@ -240,11 +240,12 @@ func (host *ChiHost) IsSecure() bool {
 		return false
 	}
 
+	// Personal host settings take priority
 	if host.Secure.HasValue() {
 		return host.Secure.Value()
 	}
 
-	// No personal value for host secure is set - need to fallback to cluster value
+	// No personal value for host secure is set - fallback to cluster value
 	return host.GetCluster().GetSecure().Value()
 }
 
