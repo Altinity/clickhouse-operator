@@ -249,6 +249,7 @@ func NewSettings() *Settings {
 	}
 }
 
+// makeM makes a map of string to setting
 func makeM() map[string]*Setting {
 	return make(map[string]*Setting)
 }
@@ -515,6 +516,11 @@ func (settings *Settings) fetchPort(name string) int32 {
 // GetTCPPort gets TCP port from settings
 func (settings *Settings) GetTCPPort() int32 {
 	return settings.fetchPort("tcp_port")
+}
+
+// GetTCPPortSecure gets TCP port secure from settings
+func (settings *Settings) GetTCPPortSecure() int32 {
+	return settings.fetchPort("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
