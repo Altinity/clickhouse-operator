@@ -312,27 +312,49 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 // hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
 	// Use host personal settings at first
-	ensurePortValuesFromSettings(host, host.GetSettings(), false)
+	ensurePortValuesFromSettings(host, host.GetSettings(), true)
 	// Fallback to common settings
-	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
+	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, false)
 }
 
 // ensurePortValuesFromSettings fetches port spec from settings, if any provided
-func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, finalize bool) {
-	fallbackTCPPortNumber := chPortNumberMustBeAssignedLater
-	fallbackHTTPPortNumber := chPortNumberMustBeAssignedLater
-	fallbackInterserverHTTPPortNumber := chPortNumberMustBeAssignedLater
-	if finalize {
-		fallbackTCPPortNumber = chDefaultTCPPortNumber
-		fallbackHTTPPortNumber = chDefaultHTTPPortNumber
-		fallbackInterserverHTTPPortNumber = chDefaultInterserverHTTPPortNumber
+func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, intermittent bool) {
+	var (
+		fallbackTCPPort             int32
+		fallbackHTTPPort            int32
+		fallbackInterserverHTTPPort int32
+	)
+	if intermittent {
+		// For intermittent setup fallback values should be from "MustBeAssignedLater" family, because
+		// this is not final setup (just intermittent) and all these ports may be overwritten later
+		fallbackTCPPort = chPortNumberMustBeAssignedLater
+		fallbackHTTPPort = chPortNumberMustBeAssignedLater
+		fallbackInterserverHTTPPort = chPortNumberMustBeAssignedLater
+	} else {
+		// This is final setup and we need to assign real numbers to ports
+		if host.IsSecure() {
+			fallbackTCPPort = chDefaultTCPPortSecureNumber
+		} else {
+			fallbackTCPPort = chDefaultTCPPortNumber
+		}
+		fallbackHTTPPort = chDefaultHTTPPortNumber
+		fallbackInterserverHTTPPort = chDefaultInterserverHTTPPortNumber
 	}
-	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPortNumber)
-	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPortNumber)
-	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPortNumber)
+	var tcpPort int32
+	if host.IsSecure() {
+		tcpPort = settings.GetTCPPortSecure()
+	} else {
+		tcpPort = settings.GetTCPPort()
+	}
+	ensurePortValue(&host.TCPPort, tcpPort, fallbackTCPPort)
+	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
+	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
 
-// ensurePortValue
+// ensurePortValue ensures port either:
+// - already has own value assigned
+// - or has provided value
+// - or value is fell back to default
 func ensurePortValue(port *int32, value, _default int32) {
 	// Port may already be explicitly specified in podTemplate or by portDistribution
 	if *port != chPortNumberMustBeAssignedLater {
@@ -340,14 +362,16 @@ func ensurePortValue(port *int32, value, _default int32) {
 		return
 	}
 
-	// Port has no value, let's use value from settings
+	// Port has no explicitly assigned value
+
+	// Let's use provided value real value
 	if value != chPortNumberMustBeAssignedLater {
-		// Settings has a value, use it
+		// Provided value is a real value, use it
 		*port = value
 		return
 	}
 
-	// Port has no explicit value, settings has no value, fallback to default value
+	// Fallback to default value
 	*port = _default
 }
 
