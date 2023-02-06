@@ -577,6 +577,9 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          secure:
+                            <<: *TypeStringBool
+                            description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -697,7 +700,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -788,7 +791,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -875,7 +878,7 @@ spec:
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               secure:
-                                type: boolean
+                                <<: *TypeStringBool
                                 description: |
                                   optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified
@@ -957,7 +960,7 @@ spec:
                               - "OnePerHost"
                           podDistribution:
                             type: array
-                            description: "define ClickHouse Pod distibution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                            description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                             # nullable: true
                             items:
                               type: object

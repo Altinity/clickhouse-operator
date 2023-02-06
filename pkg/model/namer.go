@@ -241,8 +241,8 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 	case *chop.ClickHouseInstallation:
 		chi := obj.(*chop.ClickHouseInstallation)
 		return n.namePartChiName(chi.Namespace)
-	case *chop.ChiCluster:
-		cluster := obj.(*chop.ChiCluster)
+	case *chop.Cluster:
+		cluster := obj.(*chop.Cluster)
 		return n.namePartChiName(cluster.Address.Namespace)
 	case *chop.ChiShard:
 		shard := obj.(*chop.ChiShard)
@@ -261,8 +261,8 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 	case *chop.ClickHouseInstallation:
 		chi := obj.(*chop.ClickHouseInstallation)
 		return n.namePartChiName(chi.Name)
-	case *chop.ChiCluster:
-		cluster := obj.(*chop.ChiCluster)
+	case *chop.Cluster:
+		cluster := obj.(*chop.Cluster)
 		return n.namePartChiName(cluster.Address.CHIName)
 	case *chop.ChiShard:
 		shard := obj.(*chop.ChiShard)
@@ -278,8 +278,8 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 // getNamePartClusterName
 func (n *namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
-	case *chop.ChiCluster:
-		cluster := obj.(*chop.ChiCluster)
+	case *chop.Cluster:
+		cluster := obj.(*chop.Cluster)
 		return n.namePartClusterName(cluster.Address.ClusterName)
 	case *chop.ChiShard:
 		shard := obj.(*chop.ChiShard)
@@ -429,7 +429,7 @@ func CreateCHIServiceFQDN(chi *chop.ClickHouseInstallation) string {
 }
 
 // CreateClusterServiceName returns a name of a cluster's Service
-func CreateClusterServiceName(cluster *chop.ChiCluster) string {
+func CreateClusterServiceName(cluster *chop.Cluster) string {
 	// Name can be generated either from default name pattern,
 	// or from personal name pattern provided in ServiceTemplate
 
@@ -620,7 +620,7 @@ func createPodFQDN(host *chop.ChiHost) string {
 }
 
 // createPodFQDNsOfCluster creates fully qualified domain names of all pods in a cluster
-func createPodFQDNsOfCluster(cluster *chop.ChiCluster) (fqdns []string) {
+func createPodFQDNsOfCluster(cluster *chop.Cluster) (fqdns []string) {
 	cluster.WalkHosts(func(host *chop.ChiHost) error {
 		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
@@ -659,7 +659,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 	switch typed := obj.(type) {
 	case *chop.ClickHouseInstallation:
 		return createPodFQDNsOfCHI(typed)
-	case *chop.ChiCluster:
+	case *chop.Cluster:
 		return createPodFQDNsOfCluster(typed)
 	case *chop.ChiShard:
 		return createPodFQDNsOfShard(typed)
@@ -673,7 +673,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 			return util.RemoveFromArray(self, []string{createPodFQDN(typed)})
 		case chop.ChiShard:
 			return util.RemoveFromArray(self, createPodFQDNsOfShard(typed.GetShard()))
-		case chop.ChiCluster:
+		case chop.Cluster:
 			return util.RemoveFromArray(self, createPodFQDNsOfCluster(typed.GetCluster()))
 		case chop.ClickHouseInstallation:
 			return util.RemoveFromArray(self, createPodFQDNsOfCHI(typed.GetCHI()))
@@ -708,7 +708,7 @@ func CreatePodNames(obj interface{}) []string {
 	switch typed := obj.(type) {
 	case *chop.ClickHouseInstallation:
 		return createPodNamesOfCHI(typed)
-	case *chop.ChiCluster:
+	case *chop.Cluster:
 		return createPodNamesOfCluster(typed)
 	case *chop.ChiShard:
 		return createPodNamesOfShard(typed)
@@ -723,7 +723,7 @@ func CreatePodNames(obj interface{}) []string {
 }
 
 // createPodNamesOfCluster creates pod names of all pods in a cluster
-func createPodNamesOfCluster(cluster *chop.ChiCluster) (names []string) {
+func createPodNamesOfCluster(cluster *chop.Cluster) (names []string) {
 	cluster.WalkHosts(func(host *chop.ChiHost) error {
 		names = append(names, CreatePodName(host))
 		return nil
@@ -755,7 +755,7 @@ func CreatePVCName(host *chop.ChiHost, _ *v1.VolumeMount, template *chop.ChiVolu
 }
 
 // CreateClusterAutoSecretName creates Secret name where auto-generated secret is kept
-func CreateClusterAutoSecretName(cluster *chop.ChiCluster) string {
+func CreateClusterAutoSecretName(cluster *chop.Cluster) string {
 	if cluster.Name == "" {
 		return fmt.Sprintf(
 			"%s-auto-secret",

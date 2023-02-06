@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "clickhouse-client-config"
+data:
+  config.xml: |
+    <config>
+        <openSSL>
+            <client>
+                <invalidCertificateHandler>
+                    <name>AcceptCertificateHandler</name>
+                </invalidCertificateHandler>
+            </client>
+        </openSSL>
+        <port>9440</port>
+        <secure>1</secure>
+    </config>
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "test-034-client"
+spec:
+  containers:
+    - name: clickhouse-client
+      image: clickhouse/clickhouse-server:22.8
+      command: [ "/bin/sh", "-c", "sleep 3600" ]
+      volumeMounts:
+      - name: client-config
+        mountPath: "/etc/clickhouse-client/"
+  volumes:
+    - name: client-config
+      configMap:
+         name: clickhouse-client-config
+         items:
+         - key: config.xml
+           path: config.xml
