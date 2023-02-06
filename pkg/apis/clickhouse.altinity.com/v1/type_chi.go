@@ -100,112 +100,86 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 		clusterScopeCycleSize = int(math.Ceil(float64(chi.HostsCount()) / float64(requestedClusterScopeCyclesNum)))
 	}
 
-	chi.WalkHostsFullPath(chiScopeCycleSize, clusterScopeCycleSize, func(
-		chi *ClickHouseInstallation,
+	chi.WalkHostsFullPathAndScope(
+		chiScopeCycleSize,
+		clusterScopeCycleSize,
+		func(
+			chi *ClickHouseInstallation,
+			cluster *Cluster,
+			shard *ChiShard,
+			replica *ChiReplica,
+			host *ChiHost,
+			address *HostAddress,
+		) error {
+			cluster.Address.Namespace = chi.Namespace
+			cluster.Address.CHIName = chi.Name
+			cluster.Address.ClusterName = cluster.Name
+			cluster.Address.ClusterIndex = address.ClusterIndex
 
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
+			shard.Address.Namespace = chi.Namespace
+			shard.Address.CHIName = chi.Name
+			shard.Address.ClusterName = cluster.Name
+			shard.Address.ClusterIndex = address.ClusterIndex
+			shard.Address.ShardName = shard.Name
+			shard.Address.ShardIndex = address.ShardIndex
 
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
+			replica.Address.Namespace = chi.Namespace
+			replica.Address.CHIName = chi.Name
+			replica.Address.ClusterName = cluster.Name
+			replica.Address.ClusterIndex = address.ClusterIndex
+			replica.Address.ReplicaName = replica.Name
+			replica.Address.ReplicaIndex = address.ReplicaIndex
 
-		clusterIndex int,
-		cluster *ChiCluster,
+			host.Address.Namespace = chi.Namespace
+			// Skip StatefulSet as impossible to self-calculate
+			// host.Address.StatefulSet = CreateStatefulSetName(host)
+			host.Address.CHIName = chi.Name
+			host.Address.ClusterName = cluster.Name
+			host.Address.ClusterIndex = address.ClusterIndex
+			host.Address.ShardName = shard.Name
+			host.Address.ShardIndex = address.ShardIndex
+			host.Address.ReplicaName = replica.Name
+			host.Address.ReplicaIndex = address.ReplicaIndex
+			host.Address.HostName = host.Name
+			host.Address.CHIScopeIndex = address.CHIScopeAddress.Index
+			host.Address.CHIScopeCycleSize = address.CHIScopeAddress.CycleSpec.Size
+			host.Address.CHIScopeCycleIndex = address.CHIScopeAddress.CycleAddress.CycleIndex
+			host.Address.CHIScopeCycleOffset = address.CHIScopeAddress.CycleAddress.Index
+			host.Address.ClusterScopeIndex = address.ClusterScopeAddress.Index
+			host.Address.ClusterScopeCycleSize = address.ClusterScopeAddress.CycleSpec.Size
+			host.Address.ClusterScopeCycleIndex = address.ClusterScopeAddress.CycleAddress.CycleIndex
+			host.Address.ClusterScopeCycleOffset = address.ClusterScopeAddress.CycleAddress.Index
+			host.Address.ShardScopeIndex = address.ReplicaIndex
+			host.Address.ReplicaScopeIndex = address.ShardIndex
 
-		shardIndex int,
-		shard *ChiShard,
-
-		replicaIndex int,
-		replica *ChiReplica,
-
-		host *ChiHost,
-	) error {
-		cluster.Address.Namespace = chi.Namespace
-		cluster.Address.CHIName = chi.Name
-		cluster.Address.ClusterName = cluster.Name
-		cluster.Address.ClusterIndex = clusterIndex
-
-		shard.Address.Namespace = chi.Namespace
-		shard.Address.CHIName = chi.Name
-		shard.Address.ClusterName = cluster.Name
-		shard.Address.ClusterIndex = clusterIndex
-		shard.Address.ShardName = shard.Name
-		shard.Address.ShardIndex = shardIndex
-
-		replica.Address.Namespace = chi.Namespace
-		replica.Address.CHIName = chi.Name
-		replica.Address.ClusterName = cluster.Name
-		replica.Address.ClusterIndex = clusterIndex
-		replica.Address.ReplicaName = replica.Name
-		replica.Address.ReplicaIndex = replicaIndex
-
-		host.Address.Namespace = chi.Namespace
-		// Skip StatefulSet as impossible to self-calculate
-		// host.Address.StatefulSet = CreateStatefulSetName(host)
-		host.Address.CHIName = chi.Name
-		host.Address.ClusterName = cluster.Name
-		host.Address.ClusterIndex = clusterIndex
-		host.Address.ShardName = shard.Name
-		host.Address.ShardIndex = shardIndex
-		host.Address.ReplicaName = replica.Name
-		host.Address.ReplicaIndex = replicaIndex
-		host.Address.HostName = host.Name
-		host.Address.CHIScopeIndex = chiScopeIndex
-		host.Address.CHIScopeCycleSize = chiScopeCycleSize
-		host.Address.CHIScopeCycleIndex = chiScopeCycleIndex
-		host.Address.CHIScopeCycleOffset = chiScopeCycleOffset
-		host.Address.ClusterScopeIndex = clusterScopeIndex
-		host.Address.ClusterScopeCycleSize = clusterScopeCycleSize
-		host.Address.ClusterScopeCycleIndex = clusterScopeCycleIndex
-		host.Address.ClusterScopeCycleOffset = clusterScopeCycleOffset
-		host.Address.ShardScopeIndex = replicaIndex
-		host.Address.ReplicaScopeIndex = shardIndex
-
-		return nil
-	})
+			return nil
+		},
+	)
 }
 
 // FillCHIPointer fills CHI pointer
 func (chi *ClickHouseInstallation) FillCHIPointer() {
-	chi.WalkHostsFullPath(0, 0, func(
-		chi *ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
-		cluster *ChiCluster,
-
-		shardIndex int,
-		shard *ChiShard,
-
-		replicaIndex int,
-		replica *ChiReplica,
-
-		host *ChiHost,
-	) error {
-		cluster.CHI = chi
-		shard.CHI = chi
-		replica.CHI = chi
-		host.CHI = chi
-		return nil
-	})
+	chi.WalkHostsFullPath(
+		func(
+			chi *ClickHouseInstallation,
+			cluster *Cluster,
+			shard *ChiShard,
+			replica *ChiReplica,
+			host *ChiHost,
+			address *HostAddress,
+		) error {
+			cluster.CHI = chi
+			shard.CHI = chi
+			replica.CHI = chi
+			host.CHI = chi
+			return nil
+		},
+	)
 }
 
 // WalkClustersFullPath walks clusters with full path
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
-	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error,
+	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error,
 ) []error {
 	res := make([]error, 0)
 
@@ -217,35 +191,11 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 }
 
 // WalkClusters walks clusters
-func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *ChiCluster) error) []error {
+func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *Cluster) error) []error {
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		res = append(res, f(chi.Spec.Configuration.Clusters[clusterIndex]))
-	}
-
-	return res
-}
-
-// WalkShardsFullPath walks shards with full path
-func (chi *ClickHouseInstallation) WalkShardsFullPath(
-	f func(
-		chi *ClickHouseInstallation,
-		clusterIndex int,
-		cluster *ChiCluster,
-		shardIndex int,
-		shard *ChiShard,
-	) error,
-) []error {
-
-	res := make([]error, 0)
-
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
-		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
-			res = append(res, f(chi, clusterIndex, cluster, shardIndex, shard))
-		}
 	}
 
 	return res
@@ -271,103 +221,162 @@ func (chi *ClickHouseInstallation) WalkShards(
 	return res
 }
 
-// WalkHostsFullPath walks hosts with full path
-func (chi *ClickHouseInstallation) WalkHostsFullPath(
+// CycleSpec defines spec of a cycle
+type CycleSpec struct {
+	// Size specifies size of a cycle
+	Size int
+}
+
+// NewCycleSpec creates new CycleSpec
+func NewCycleSpec(size int) *CycleSpec {
+	return &CycleSpec{
+		Size: size,
+	}
+}
+
+// IsValid specifies whether spec is a valid one
+func (s *CycleSpec) IsValid() bool {
+	if s == nil {
+		return false
+	}
+
+	return s.Size > 0
+}
+
+// CycleAddress defines cycle address of an entity
+type CycleAddress struct {
+	// CycleIndex specifies index of this cycle
+	CycleIndex int
+	// Index specifies index within the cycle
+	Index int
+}
+
+// NewCycleAddress creates new CycleAddress
+func NewCycleAddress() *CycleAddress {
+	return &CycleAddress{}
+}
+
+// Init initializes the CycleAddress
+func (s *CycleAddress) Init() {
+	if s == nil {
+		return
+	}
+	s.CycleIndex = 0
+	s.Index = 0
+}
+
+// Inc increases the CycleAddress
+func (s *CycleAddress) Inc(spec *CycleSpec) {
+	if s == nil {
+		return
+	}
+	// Shift index within the cycle
+	s.Index++
+	// In case of overflow - shift to next cycle
+	if spec.IsValid() && (s.Index >= spec.Size) {
+		s.Index = 0
+		s.CycleIndex++
+	}
+}
+
+// ScopeAddress defines scope address of an entity
+type ScopeAddress struct {
+	// CycleSpec specifies cycle which to be used to specify CycleAddress
+	CycleSpec *CycleSpec
+	// CycleAddress specifies CycleAddress within the scope
+	CycleAddress *CycleAddress
+	// Index specifies index within the scope
+	Index int
+}
+
+// NewScopeAddress creates new ScopeAddress
+func NewScopeAddress(cycleSize int) *ScopeAddress {
+	return &ScopeAddress{
+		CycleSpec:    NewCycleSpec(cycleSize),
+		CycleAddress: NewCycleAddress(),
+	}
+}
+
+// Init initializes the ScopeAddress
+func (s *ScopeAddress) Init() {
+	if s == nil {
+		return
+	}
+	s.CycleAddress.Init()
+	s.Index = 0
+}
+
+// Inc increases the ScopeAddress
+func (s *ScopeAddress) Inc() {
+	if s == nil {
+		return
+	}
+	s.CycleAddress.Inc(s.CycleSpec)
+	s.Index++
+}
+
+// HostAddress specifies address of a host
+type HostAddress struct {
+	// CHIScopeAddress specifies address of a host within CHI scope
+	CHIScopeAddress *ScopeAddress
+	// ClusterScopeAddress specifies address of a host within cluster scope
+	ClusterScopeAddress *ScopeAddress
+	// ClusterIndex specifies index of a cluster within CHI
+	ClusterIndex int
+	// ShardIndex specifies index of a shard within cluster
+	ShardIndex int
+	// ReplicaIndex specifies index of a replica within cluster
+	ReplicaIndex int
+}
+
+// NewHostAddress creates new HostAddress
+func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddress) {
+	a = &HostAddress{
+		CHIScopeAddress:     NewScopeAddress(chiScopeCycleSize),
+		ClusterScopeAddress: NewScopeAddress(clusterScopeCycleSize),
+	}
+	return a
+}
+
+// WalkHostsAddressFn specifies function to walk over hosts
+type WalkHostsAddressFn func(
+	chi *ClickHouseInstallation,
+	cluster *Cluster,
+	shard *ChiShard,
+	replica *ChiReplica,
+	host *ChiHost,
+	address *HostAddress,
+) error
+
+// WalkHostsFullPathAndScope walks hosts with full path
+func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 	chiScopeCycleSize int,
 	clusterScopeCycleSize int,
-	f func(
-		chi *ClickHouseInstallation,
-
-		chiScopeIndex int,
-		chiScopeCycleSize int,
-		chiScopeCycleIndex int,
-		chiScopeCycleOffset int,
-
-		clusterScopeIndex int,
-		clusterScopeCycleSize int,
-		clusterScopeCycleIndex int,
-		clusterScopeCycleOffset int,
-
-		clusterIndex int,
-		cluster *ChiCluster,
-
-		shardIndex int,
-		shard *ChiShard,
-
-		replicaIndex int,
-		replica *ChiReplica,
-
-		host *ChiHost,
-	) error,
-) []error {
-
-	res := make([]error, 0)
-
-	chiScopeIndex := 0
-	chiScopeCycleIndex := 0
-	chiScopeCycleOffset := 0
-
-	clusterScopeIndex := 0
-	clusterScopeCycleIndex := 0
-	clusterScopeCycleOffset := 0
-
+	f WalkHostsAddressFn,
+) (res []error) {
+	address := NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize)
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
-
-		clusterScopeIndex = 0
-		clusterScopeCycleIndex = 0
-		clusterScopeCycleOffset = 0
-
+		address.ClusterScopeAddress.Init()
 		for shardIndex := range cluster.Layout.Shards {
 			shard := cluster.GetShard(shardIndex)
 			for replicaIndex, host := range shard.Hosts {
 				replica := cluster.GetReplica(replicaIndex)
-
-				res = append(res, f(
-					chi,
-
-					chiScopeIndex,
-					chiScopeCycleSize,
-					chiScopeCycleIndex,
-					chiScopeCycleOffset,
-
-					clusterScopeIndex,
-					clusterScopeCycleSize,
-					clusterScopeCycleIndex,
-					clusterScopeCycleOffset,
-
-					clusterIndex,
-					cluster,
-
-					shardIndex,
-					shard,
-
-					replicaIndex,
-					replica,
-
-					host,
-				))
-
-				// CHI-scope counters
-				chiScopeIndex++
-				chiScopeCycleOffset++
-				if (chiScopeCycleSize > 0) && (chiScopeCycleOffset >= chiScopeCycleSize) {
-					chiScopeCycleOffset = 0
-					chiScopeCycleIndex++
-				}
-
-				// Cluster-scope counters
-				clusterScopeIndex++
-				clusterScopeCycleOffset++
-				if (clusterScopeCycleSize > 0) && (clusterScopeCycleOffset >= clusterScopeCycleSize) {
-					clusterScopeCycleOffset = 0
-					clusterScopeCycleIndex++
-				}
+				address.ClusterIndex = clusterIndex
+				address.ShardIndex = shardIndex
+				address.ReplicaIndex = replicaIndex
+				res = append(res, f(chi, cluster, shard, replica, host, address))
+				address.CHIScopeAddress.Inc()
+				address.ClusterScopeAddress.Inc()
 			}
 		}
 	}
-
 	return res
+}
+
+// WalkHostsFullPath walks hosts with a function
+func (chi *ClickHouseInstallation) WalkHostsFullPath(f WalkHostsAddressFn) (res []error) {
+	return chi.WalkHostsFullPathAndScope(0, 0, f)
 }
 
 // WalkHosts walks hosts
@@ -388,29 +397,11 @@ func (chi *ClickHouseInstallation) WalkHosts(f func(host *ChiHost) error) []erro
 	return res
 }
 
-// WalkHostsTillError walks hosts until an error met
-func (chi *ClickHouseInstallation) WalkHostsTillError(f func(host *ChiHost) error) error {
-	for clusterIndex := range chi.Spec.Configuration.Clusters {
-		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
-		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
-			for replicaIndex := range shard.Hosts {
-				host := shard.Hosts[replicaIndex]
-				if err := f(host); err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
 // WalkTillError walks until an error met
 func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
 	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
-	fCluster func(ctx context.Context, cluster *ChiCluster) error,
+	fCluster func(ctx context.Context, cluster *Cluster) error,
 	fShard func(ctx context.Context, shard *ChiShard) error,
 	fHost func(ctx context.Context, host *ChiHost) error,
 	fCHI func(ctx context.Context, chi *ClickHouseInstallation) error,
@@ -483,20 +474,20 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 
 	switch _type {
 	case MergeTypeFillEmptyValues:
-		if spec.Stop == "" {
-			spec.Stop = from.Stop
+		if !spec.Stop.HasValue() {
+			spec.Stop = spec.Stop.MergeFrom(from.Stop)
 		}
 		if spec.Restart == "" {
 			spec.Restart = from.Restart
 		}
-		if spec.Troubleshoot == "" {
-			spec.Troubleshoot = from.Troubleshoot
+		if !spec.Troubleshoot.HasValue() {
+			spec.Troubleshoot = spec.Troubleshoot.MergeFrom(from.Troubleshoot)
 		}
 		if spec.NamespaceDomainPattern == "" {
 			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
 	case MergeTypeOverrideByNonEmptyValues:
-		if from.Stop != "" {
+		if from.Stop.HasValue() {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
 		}
@@ -504,7 +495,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 			// Override by non-empty values only
 			spec.Restart = from.Restart
 		}
-		if from.Troubleshoot != "" {
+		if from.Troubleshoot.HasValue() {
 			// Override by non-empty values only
 			spec.Troubleshoot = from.Troubleshoot
 		}
@@ -523,9 +514,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 }
 
 // FindCluster finds cluster by name or index
-func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *ChiCluster {
-	var resultCluster *ChiCluster
-	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error {
+func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *Cluster {
+	var resultCluster *Cluster
+	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error {
 		switch v := needle.(type) {
 		case string:
 			if cluster.Name == v {
@@ -552,7 +543,7 @@ func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleSh
 // ClustersCount counts clusters
 func (chi *ClickHouseInstallation) ClustersCount() int {
 	count := 0
-	chi.WalkClusters(func(cluster *ChiCluster) error {
+	chi.WalkClusters(func(cluster *Cluster) error {
 		count++
 		return nil
 	})
@@ -580,10 +571,10 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 }
 
 // HostsCountAttributes counts hosts by attributes
-func (chi *ClickHouseInstallation) HostsCountAttributes(a ChiHostReconcileAttributes) int {
+func (chi *ClickHouseInstallation) HostsCountAttributes(a *ChiHostReconcileAttributes) int {
 	count := 0
 	chi.WalkHosts(func(host *ChiHost) error {
-		if host.ReconcileAttributes.Any(a) {
+		if host.GetReconcileAttributes().Any(a) {
 			count++
 		}
 		return nil
@@ -672,8 +663,9 @@ func (chi *ClickHouseInstallation) IsStopped() bool {
 	return chi.Spec.Stop.Value()
 }
 
-// Restart const presents possible values for .spec.restart
+// Restart constants present possible values for .spec.restart
 const (
+	// RestartAll specifies default value
 	RestartAll = "Restart"
 	// RestartRollingUpdate requires to roll over all hosts in the cluster and shutdown and reconcile each of it.
 	// This restart policy means that all hosts in the cluster would pass through shutdown/reconcile cycle.

@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.20.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -577,6 +577,9 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          secure:
+                            <<: *TypeStringBool
+                            description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -697,7 +700,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -788,7 +791,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -875,7 +878,7 @@ spec:
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               secure:
-                                type: boolean
+                                <<: *TypeStringBool
                                 description: |
                                   optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified
@@ -957,7 +960,7 @@ spec:
                               - "OnePerHost"
                           podDistribution:
                             type: array
-                            description: "define ClickHouse Pod distibution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                            description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                             # nullable: true
                             items:
                               type: object
@@ -1127,7 +1130,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.20.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1694,6 +1697,9 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          secure:
+                            <<: *TypeStringBool
+                            description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -1814,7 +1820,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -1905,7 +1911,7 @@ spec:
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                                           secure:
-                                            type: boolean
+                                            <<: *TypeStringBool
                                             description: |
                                               optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                               if specified
@@ -1992,7 +1998,7 @@ spec:
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
                               secure:
-                                type: boolean
+                                <<: *TypeStringBool
                                 description: |
                                   optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified
@@ -2074,7 +2080,7 @@ spec:
                               - "OnePerHost"
                           podDistribution:
                             type: array
-                            description: "define ClickHouse Pod distibution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                            description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                             # nullable: true
                             items:
                               type: object
@@ -2241,7 +2247,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.20.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2386,6 +2392,19 @@ spec:
                               minimum: 1
                               maximum: 600
                               description: "Query timeout. In seconds."
+                    metrics:
+                      type: object
+                      description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"
+                      properties:
+                        timeouts:
+                          type: object
+                          description: "Timeouts used to limit connection and queries from the operator to ClickHouse instances, In seconds"
+                          properties:
+                            collect:
+                              type: integer
+                              minimum: 1
+                              maximum: 600
+                              description: "Collect timeout. In seconds."
                 template:
                   type: object
                   description: "Parameters which are used if you want to generate ClickHouseInstallationTemplate custom resources from files which are stored inside clickhouse-operator deployment"

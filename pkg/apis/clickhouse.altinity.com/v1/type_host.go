@@ -24,7 +24,7 @@ type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
 	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
-	Secure              *Secure           `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
@@ -33,9 +33,9 @@ type ChiHost struct {
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
 	// Internal data
-	Address             ChiHostAddress             `json:"-" yaml:"-"`
-	Config              ChiHostConfig              `json:"-" yaml:"-"`
-	ReconcileAttributes ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	Address             ChiHostAddress              `json:"-" yaml:"-"`
+	Config              ChiHostConfig               `json:"-" yaml:"-"`
+	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	// StatefulSet is a stateful set which is being worked with by the host.
 	// It can be desired stateful set when host is being created or current stateful set.
 	// Ex.: polling sts after creation.
@@ -47,35 +47,15 @@ type ChiHost struct {
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
-// Secure specifies secure type
-type Secure bool
-
-// Value gets bool value of secure
-func (s *Secure) Value() bool {
-	if s == nil {
-		return false
+// GetReconcileAttributes is an ensurer getter
+func (host *ChiHost) GetReconcileAttributes() *ChiHostReconcileAttributes {
+	if host == nil {
+		return nil
 	}
-
-	return *s == true
-}
-
-// MergeFrom merges value from specified Secure
-func (s *Secure) MergeFrom(from *Secure) *Secure {
-	if from == nil {
-		// Nothing to merge from, keep original value
-		return s
+	if host.reconcileAttributes == nil {
+		host.reconcileAttributes = NewChiHostReconcileAttributes()
 	}
-
-	// From now on we have `from` specified
-
-	if s == nil {
-		// Recipient is not specified, just use `from` value
-		return from
-	}
-
-	// Both recipient and `from` are specified, need to pick one value.
-	// Prefer local value
-	return s
+	return host.reconcileAttributes
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
@@ -209,7 +189,7 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 }
 
 // GetCluster gets cluster
-func (host *ChiHost) GetCluster() *ChiCluster {
+func (host *ChiHost) GetCluster() *Cluster {
 	// Host has to have filled Address
 	return host.GetCHI().FindCluster(host.Address.ClusterName)
 }
@@ -259,5 +239,21 @@ func (host *ChiHost) IsSecure() bool {
 	if host == nil {
 		return false
 	}
-	return host.Secure.Value()
+
+	// Personal host settings take priority
+	if host.Secure.HasValue() {
+		return host.Secure.Value()
+	}
+
+	// No personal value for host secure is set - fallback to cluster value
+	return host.GetCluster().GetSecure().Value()
+}
+
+// IsFirst checks whether host is the first host of the CHI
+func (host *ChiHost) IsFirst() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.Address.CHIScopeIndex == 0
 }

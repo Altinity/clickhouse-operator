@@ -80,7 +80,9 @@
       * 4.8.3.1 [RQ.SRS-026.ClickHouseOperator.Secrets](#rqsrs-026clickhouseoperatorsecrets)
     * 4.8.4 [Secure Connection](#secure-connection)
       * 4.8.4.1 [RQ.SRS-026.ClickHouseOperator.EnableHttps](#rqsrs-026clickhouseoperatorenablehttps)
-      * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
+      * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication](#rqsrs-026clickhouseoperatorsecureinterclustercommunication)
+      * 4.8.4.3 [RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret](#rqsrs-026clickhouseoperatorinterclustercommunicationwithsecret)
+      * 4.8.4.4 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
   * 4.9 [Default Templates](#default-templates)
     * 4.9.1 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates](#rqsrs-026clickhouseoperatordefaulttemplates)
     * 4.9.2 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates](#rqsrs-026clickhouseoperatordefaulttemplatesmergingwithuserdefinedtemplates)
@@ -898,6 +900,46 @@ spec:
       scheme: https
       port: 8443
 ```
+
+##### RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication
+version: 1.0
+
+[ClickHouse Operator] SHALL support secure inter-cluster communications with secrets.
+For example,
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "name"
+spec:
+  configuration:
+    clusters:
+      - name: "secret-ref"
+        secure: "yes"
+        secret:
+          auto: "true"
+```
+
+##### RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret
+version: 1.0
+
+[ClickHouse Operator] SHALL support inter-cluster communications with secret.
+For example,
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "name"
+spec:
+  configuration:
+    clusters:
+      - name: "secret-ref"
+        secret:
+          auto: "true"
+```
+
 
 ##### RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps
 version: 1.0
@@ -3929,7 +3971,7 @@ spec:
 ##### RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution
 version: 1.0
 
-[ClickHouse Operator] SHALL support defining [ClickHouse] [Pod] distibution policy
+[ClickHouse Operator] SHALL support defining [ClickHouse] [Pod] distribution policy
 between [Kubernetes] nodes inside shard, replica, [Namespace], [CHI],
 or another [ClickHouse] cluster using  `.spec.templates.podTemplates[].podDistribution`
 [array] type object.

@@ -124,7 +124,7 @@ func (l *Labeler) getServiceCHI(chi *chiv1.ClickHouseInstallation) map[string]st
 }
 
 // getServiceCluster
-func (l *Labeler) getServiceCluster(cluster *chiv1.ChiCluster) map[string]string {
+func (l *Labeler) getServiceCluster(cluster *chiv1.Cluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getClusterScope(cluster),
 		map[string]string{
@@ -174,13 +174,13 @@ func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
 }
 
 // getClusterScope gets labels for Cluster-scoped object
-func (l *Labeler) getClusterScope(cluster *chiv1.ChiCluster) map[string]string {
+func (l *Labeler) getClusterScope(cluster *chiv1.Cluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorClusterScope(cluster)))
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
-func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
+func getSelectorClusterScope(cluster *chiv1.Cluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   labelsNamer.getNamePartNamespace(cluster),
@@ -191,7 +191,7 @@ func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 }
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
-func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
+func getSelectorClusterScopeReady(cluster *chiv1.Cluster) map[string]string {
 	return appendKeyReady(getSelectorClusterScope(cluster))
 }
 
@@ -240,7 +240,7 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 		// TODO
 		// When we'll have Cluster Discovery functionality we can refactor this properly
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
-		labels[LabelSettingsConfigVersion] = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
+		labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
 	}
 	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))
 }
@@ -383,14 +383,20 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelClusterName], nil
 }
 
-// MakeObjectVersionLabel makes object version label
-func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
+// MakeObjectVersion makes object version label
+func MakeObjectVersion(meta *meta.ObjectMeta, obj interface{}) {
 	meta.Labels = util.MergeStringMapsOverwrite(
 		meta.Labels,
 		map[string]string{
 			LabelObjectVersion: util.Fingerprint(obj),
 		},
 	)
+}
+
+// GetObjectVersion gets version of the object
+func GetObjectVersion(meta meta.ObjectMeta) (string, bool) {
+	label, ok := meta.Labels[LabelObjectVersion]
+	return label, ok
 }
 
 // isObjectVersionLabelTheSame checks whether object version in meta.Labels is the same as provided value

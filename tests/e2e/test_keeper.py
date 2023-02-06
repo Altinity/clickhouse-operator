@@ -8,25 +8,31 @@ import e2e.util as util
 from testflows.core import *
 
 
-def wait_keeper_ready(keeper_type='zookeeper', pod_count=3, retries=10):
-    svc_name = 'zookeeper-client' if keeper_type == "zookeeper-operator" else 'zookeeper'
+def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
+    svc_name = "zookeeper-client" if keeper_type == "zookeeper-operator" else "zookeeper"
     expected_containers = "1/1"
     expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
     for i in range(retries):
-        ready_pods = kubectl.launch(f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l")
+        ready_pods = kubectl.launch(
+            f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l"
+        )
         ready_endpoints = "0"
         if ready_pods == str(pod_count):
-            ready_endpoints = kubectl.launch(f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l")
+            ready_endpoints = kubectl.launch(
+                f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l"
+            )
             if ready_endpoints == str(pod_count):
                 break
         else:
             with Then(
-                    f"Zookeeper Not ready yet ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}. "
-                    f"Wait for {i * 3} seconds"
+                f"Zookeeper Not ready yet ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}. "
+                f"Wait for {i * 3} seconds"
             ):
                 time.sleep(i * 3)
         if i == retries - 1:
-            Fail(f"Zookeeper failed, ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}")
+            Fail(
+                f"Zookeeper failed, ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}"
+            )
 
 
 def wait_clickhouse_no_readonly_replicas(chi, retries=20):
@@ -34,32 +40,37 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
     for i in range(retries):
         readonly_replicas = clickhouse.query(
-            chi['metadata']['name'],
-            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'"
+            chi["metadata"]["name"],
+            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
         )
         if readonly_replicas == expected_replicas:
             message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
             break
         else:
-            with But(f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"):
+            with But(
+                f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"
+            ):
                 time.sleep(i * 3)
         if i >= (retries - 1):
             raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
 
 
 def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_tables):
-    with When(f'create if not exists replicated tables {create_tables}'):
+    with When(f"create if not exists replicated tables {create_tables}"):
         for table in create_tables:
             clickhouse.create_table_on_cluster(
-                chi, 'all-sharded', f'default.{table}',
-                f'(id UInt64) ENGINE=ReplicatedMergeTree(\'/clickhouse/tables/default.{table}/{{shard}}\',\'{{replica}}\') ORDER BY (id)',
+                chi,
+                "all-sharded",
+                f"default.{table}",
+                f"(id UInt64) ENGINE=ReplicatedMergeTree('/clickhouse/tables/default.{table}/{{shard}}','{{replica}}') ORDER BY (id)",
                 if_not_exists=True,
             )
-    with When(f'insert tables data {insert_tables}'):
+    with When(f"insert tables data {insert_tables}"):
         for table in insert_tables:
             clickhouse.query(
-                chi['metadata']['name'], f'INSERT INTO default.{table} SELECT rand()+number FROM numbers(1000)',
-                pod=pod_for_insert_data
+                chi["metadata"]["name"],
+                f"INSERT INTO default.{table} SELECT rand()+number FROM numbers(1000)",
+                pod=pod_for_insert_data,
             )
 
 
@@ -68,15 +79,19 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
         found = False
         for i in range(retry_count):
             if keeper_type == "zookeeper-operator":
-                expected_outs = ("[clickhouse, zookeeper, zookeeper-operator]", )
-                keeper_cmd = './bin/zkCli.sh ls /'
+                expected_outs = ("[clickhouse, zookeeper, zookeeper-operator]",)
+                keeper_cmd = "./bin/zkCli.sh ls /"
                 pod_prefix = "zookeeper"
             elif keeper_type == "zookeeper":
-                expected_outs = ("[clickhouse, zookeeper]", )
-                keeper_cmd = './bin/zkCli.sh ls /'
+                expected_outs = ("[clickhouse, zookeeper]",)
+                keeper_cmd = "./bin/zkCli.sh ls /"
                 pod_prefix = "zookeeper"
             else:
-                expected_outs = ("[keeper, clickhouse]", "[clickhouse, keeper]", "[keeper]")
+                expected_outs = (
+                    "[keeper, clickhouse]",
+                    "[clickhouse, keeper]",
+                    "[keeper]",
+                )
                 keeper_cmd = "if [[ ! $(command -v zkcli) ]]; then "
                 keeper_cmd += "wget -q -O /tmp/zkcli.tar.gz https://github.com/let-us-go/zkcli/releases/download/v0.4.0/zkcli-0.4.0-linux-amd64.tar.gz; "
                 keeper_cmd += "cd /tmp; tar -xf zkcli.tar.gz; "
@@ -85,7 +100,11 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
                 keeper_cmd += "zkcli -s 127.0.0.1:2181 ls /"
                 pod_prefix = "clickhouse-keeper"
 
-            out = kubectl.launch(f"exec {pod_prefix}-{pod_num} -- bash -ce '{keeper_cmd}'", ns=settings.test_namespace, ok_to_fail=True)
+            out = kubectl.launch(
+                f"exec {pod_prefix}-{pod_num} -- bash -ce '{keeper_cmd}'",
+                ns=settings.test_namespace,
+                ok_to_fail=True,
+            )
             found = False
             for expected_out in expected_outs:
                 if expected_out in out:
@@ -105,15 +124,25 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
         "zookeeper-operator": "3",
         "clickhouse-keeper": "2",
     }
-    assert expected_out[keeper_type] == out.strip(" \t\r\n"), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
+    assert expected_out[keeper_type] == out.strip(
+        " \t\r\n"
+    ), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 
 
-def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, keeper_manifest_1_node, keeper_manifest_3_node, first_install=False, clean_ns=None):
+def rescale_zk_and_clickhouse(
+    ch_node_count,
+    keeper_node_count,
+    keeper_type,
+    keeper_manifest_1_node,
+    keeper_manifest_3_node,
+    first_install=False,
+    clean_ns=None,
+):
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
-        chi_file=f'manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml',
-        chi_template_file='manifests/chit/tpl-clickhouse-latest.yaml',
-        chi_name='test-cluster-for-zk',
+        chi_file=f"manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml",
+        chi_template_file="manifests/chit/tpl-clickhouse-latest.yaml",
+        chi_name="test-cluster-for-zk",
         keeper_manifest=keeper_manifest,
         keeper_type=keeper_type,
         clean_ns=first_install if clean_ns is None else clean_ns,
@@ -125,11 +154,12 @@ def rescale_zk_and_clickhouse(ch_node_count, keeper_node_count, keeper_type, kee
 
 
 @TestOutline
-def test_keeper_outline(self,
+def test_keeper_outline(
+    self,
     keeper_type="zookeeper",
     pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-    keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only.yaml',
-    keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only.yaml',
+    keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
+    keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
 ):
     """
     test scenario for Zoo/Clickhouse Keeper
@@ -144,48 +174,96 @@ def test_keeper_outline(self,
         kubectl.delete_all_keeper(settings.test_namespace)
 
     with When("Install CH 1 node ZK 1 node"):
-        chi = rescale_zk_and_clickhouse(ch_node_count=1, keeper_node_count=1, keeper_type=keeper_type, keeper_manifest_1_node=keeper_manifest_1_node, keeper_manifest_3_node=keeper_manifest_3_node, first_install=True)
+        chi = rescale_zk_and_clickhouse(
+            ch_node_count=1,
+            keeper_node_count=1,
+            keeper_type=keeper_type,
+            keeper_manifest_1_node=keeper_manifest_1_node,
+            keeper_manifest_3_node=keeper_manifest_3_node,
+            first_install=True,
+        )
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
         check_zk_root_znode(chi, keeper_type, pod_count=1)
         wait_clickhouse_no_readonly_replicas(chi)
-        insert_replicated_data(chi, pod_for_insert_data, create_tables=['test_repl1'], insert_tables=['test_repl1'])
+        insert_replicated_data(
+            chi,
+            pod_for_insert_data,
+            create_tables=["test_repl1"],
+            insert_tables=["test_repl1"],
+        )
 
     total_iterations = 3
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
-                chi = rescale_zk_and_clickhouse(ch_node_count=2, keeper_node_count=3, keeper_type=keeper_type, keeper_manifest_1_node=keeper_manifest_1_node, keeper_manifest_3_node=keeper_manifest_3_node)
+                chi = rescale_zk_and_clickhouse(
+                    ch_node_count=2,
+                    keeper_node_count=3,
+                    keeper_type=keeper_type,
+                    keeper_manifest_1_node=keeper_manifest_1_node,
+                    keeper_manifest_3_node=keeper_manifest_3_node,
+                )
                 wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
                 check_zk_root_znode(chi, keeper_type, pod_count=3)
 
                 util.wait_clickhouse_cluster_ready(chi)
                 wait_clickhouse_no_readonly_replicas(chi)
-                insert_replicated_data(chi, pod_for_insert_data, create_tables=['test_repl2'], insert_tables=['test_repl1', 'test_repl2'])
+                insert_replicated_data(
+                    chi,
+                    pod_for_insert_data,
+                    create_tables=["test_repl2"],
+                    insert_tables=["test_repl1", "test_repl2"],
+                )
 
             with Then("CH 2 -> 1 wait complete + ZK 3 -> 1 nowait"):
-                chi = rescale_zk_and_clickhouse(ch_node_count=1, keeper_node_count=1, keeper_type=keeper_type, keeper_manifest_1_node=keeper_manifest_1_node, keeper_manifest_3_node=keeper_manifest_3_node,)
+                chi = rescale_zk_and_clickhouse(
+                    ch_node_count=1,
+                    keeper_node_count=1,
+                    keeper_type=keeper_type,
+                    keeper_manifest_1_node=keeper_manifest_1_node,
+                    keeper_manifest_3_node=keeper_manifest_3_node,
+                )
                 wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
                 check_zk_root_znode(chi, keeper_type, pod_count=1)
 
                 util.wait_clickhouse_cluster_ready(chi)
                 wait_clickhouse_no_readonly_replicas(chi)
-                insert_replicated_data(chi, pod_for_insert_data, create_tables=['test_repl3'], insert_tables=['test_repl1', 'test_repl2', 'test_repl3'])
+                insert_replicated_data(
+                    chi,
+                    pod_for_insert_data,
+                    create_tables=["test_repl3"],
+                    insert_tables=["test_repl1", "test_repl2", "test_repl3"],
+                )
 
     with When("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
-        chi = rescale_zk_and_clickhouse(ch_node_count=2, keeper_node_count=3, keeper_type=keeper_type, keeper_manifest_1_node=keeper_manifest_1_node, keeper_manifest_3_node=keeper_manifest_3_node)
+        chi = rescale_zk_and_clickhouse(
+            ch_node_count=2,
+            keeper_node_count=3,
+            keeper_type=keeper_type,
+            keeper_manifest_1_node=keeper_manifest_1_node,
+            keeper_manifest_3_node=keeper_manifest_3_node,
+        )
         check_zk_root_znode(chi, keeper_type, pod_count=3)
 
-    with Then('check data in tables'):
-        for table_name, exptected_rows in {"test_repl1": str(1000 + 2000 * total_iterations), "test_repl2": str(2000 * total_iterations), "test_repl3": str(1000 * total_iterations)}.items():
+    with Then("check data in tables"):
+        for table_name, exptected_rows in {
+            "test_repl1": str(1000 + 2000 * total_iterations),
+            "test_repl2": str(2000 * total_iterations),
+            "test_repl3": str(1000 * total_iterations),
+        }.items():
             actual_rows = clickhouse.query(
-                chi['metadata']['name'], f'SELECT count() FROM default.{table_name}', pod="chi-test-cluster-for-zk-default-0-1-0"
+                chi["metadata"]["name"],
+                f"SELECT count() FROM default.{table_name}",
+                pod="chi-test-cluster-for-zk-default-0-1-0",
             )
-            assert actual_rows == exptected_rows, f"Invalid rows counter after inserts {table_name} expected={exptected_rows} actual={actual_rows}"
+            assert (
+                actual_rows == exptected_rows
+            ), f"Invalid rows counter after inserts {table_name} expected={exptected_rows} actual={actual_rows}"
 
-    with Then('drop all created tables'):
+    with Then("drop all created tables"):
         for i in range(3):
-            clickhouse.drop_table_on_cluster(chi, 'all-sharded', f'default.test_repl{i + 1}')
+            clickhouse.drop_table_on_cluster(chi, "all-sharded", f"default.test_repl{i + 1}")
 
 
 @TestScenario
@@ -194,8 +272,8 @@ def test_zookeeper_rescale(self):
     test_keeper_outline(
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only.yaml',
-        keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only.yaml',
+        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
     )
 
 
@@ -205,8 +283,8 @@ def test_clickhouse_keeper_rescale(self):
     test_keeper_outline(
         keeper_type="clickhouse-keeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node='clickhouse-keeper-1-node-256M-for-test-only.yaml',
-        keeper_manifest_3_node='clickhouse-keeper-3-nodes-256M-for-test-only.yaml',
+        keeper_manifest_1_node="clickhouse-keeper-1-node-256M-for-test-only.yaml",
+        keeper_manifest_3_node="clickhouse-keeper-3-nodes-256M-for-test-only.yaml",
     )
 
 
@@ -216,8 +294,8 @@ def test_zookeeper_operator_rescale(self):
     test_keeper_outline(
         keeper_type="zookeeper-operator",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node='zookeeper-operator-1-node.yaml',
-        keeper_manifest_3_node='zookeeper-operator-3-nodes.yaml',
+        keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
+        keeper_manifest_3_node="zookeeper-operator-3-nodes.yaml",
     )
 
 
@@ -227,8 +305,8 @@ def test_zookeeper_pvc_scaleout_rescale(self):
     test_keeper_outline(
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-        keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml',
-        keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml',
+        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml",
     )
 
 
@@ -236,24 +314,34 @@ def test_zookeeper_pvc_scaleout_rescale(self):
 def test_keeper_probes_outline(
     self,
     keeper_type="zookeeper",
-    keeper_manifest_1_node='zookeeper-1-node-for-test-probes.yaml',
-    keeper_manifest_3_node='zookeeper-3-nodes-for-test-probes.yaml'
+    keeper_manifest_1_node="zookeeper-1-node-for-test-probes.yaml",
+    keeper_manifest_3_node="zookeeper-3-nodes-for-test-probes.yaml",
 ):
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
         kubectl.delete_all_chi(settings.test_namespace)
         kubectl.delete_all_keeper(settings.test_namespace)
 
     with Then("Install CH 2 node ZK 3 node"):
-        chi = rescale_zk_and_clickhouse(ch_node_count=2, keeper_node_count=3, keeper_type=keeper_type, keeper_manifest_1_node=keeper_manifest_1_node, keeper_manifest_3_node=keeper_manifest_3_node, first_install=True, clean_ns=False)
+        chi = rescale_zk_and_clickhouse(
+            ch_node_count=2,
+            keeper_node_count=3,
+            keeper_type=keeper_type,
+            keeper_manifest_1_node=keeper_manifest_1_node,
+            keeper_manifest_3_node=keeper_manifest_3_node,
+            first_install=True,
+            clean_ns=False,
+        )
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
         check_zk_root_znode(chi, keeper_type, pod_count=3)
         wait_clickhouse_no_readonly_replicas(chi)
 
     with Then("Create keeper_bench table"):
-        clickhouse.query(chi['metadata']['name'], "DROP DATABASE IF EXISTS keeper_bench SYNC")
-        clickhouse.query(chi['metadata']['name'], "CREATE DATABASE keeper_bench")
-        clickhouse.query(chi['metadata']['name'], """
+        clickhouse.query(chi["metadata"]["name"], "DROP DATABASE IF EXISTS keeper_bench SYNC")
+        clickhouse.query(chi["metadata"]["name"], "CREATE DATABASE keeper_bench")
+        clickhouse.query(
+            chi["metadata"]["name"],
+            """
             CREATE TABLE keeper_bench.keeper_bench (p UInt64, x UInt64)
             ENGINE=ReplicatedSummingMergeTree('/clickhouse/tables/{database}/{table}', '{replica}' )
             ORDER BY tuple()
@@ -264,12 +352,15 @@ def test_keeper_probes_outline(
                 parts_to_delay_insert=1000000,
                 parts_to_throw_insert=1000000,
                 max_parts_in_total=1000000;        
-        """)
+        """,
+        )
     with Then("Insert data to keeper_bench for make zookeeper workload"):
         pod_prefix = "chi-test-cluster-for-zk-default"
         rows = 1000
         for pod in ("0-0-0", "0-1-0"):
-            clickhouse.query(chi['metadata']['name'], """
+            clickhouse.query(
+                chi["metadata"]["name"],
+                """
                 INSERT INTO keeper_bench.keeper_bench SELECT rand(1)%100, rand(2) FROM numbers({rows})
                 SETTINGS max_block_size=1,
                   min_insert_block_size_bytes=1,
@@ -277,7 +368,10 @@ def test_keeper_probes_outline(
                   insert_deduplicate=0,
                   max_threads=128,
                   max_insert_threads=128
-            """, pod=f"{pod_prefix}-{pod}", timeout=rows)
+            """,
+                pod=f"{pod_prefix}-{pod}",
+                timeout=rows,
+            )
 
     with Then("Check liveness and readiness probes fail"):
         zk_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
@@ -286,37 +380,46 @@ def test_keeper_probes_outline(
             assert "probe failed" not in out, "all probes shall be successful"
 
     with Then("Check ReadOnlyReplica"):
-        out = clickhouse.query(chi['metadata']['name'], "SELECT count() FROM cluster('all-sharded',system.metric_log) WHERE CurrentMetric_ReadonlyReplica > 0")
+        out = clickhouse.query(
+            chi["metadata"]["name"],
+            "SELECT count() FROM cluster('all-sharded',system.metric_log) WHERE CurrentMetric_ReadonlyReplica > 0",
+        )
         assert out == "0", "ReadOnlyReplica shall be zero"
 
 
 @TestScenario
-@Name('test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
+@Name(
+    "test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+)
 def test_zookeeper_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="zookeeper",
-        keeper_manifest_1_node='zookeeper-1-node-for-test-probes.yaml',
-        keeper_manifest_3_node='zookeeper-3-nodes-for-test-probes.yaml',
+        keeper_manifest_1_node="zookeeper-1-node-for-test-probes.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-for-test-probes.yaml",
     )
 
 
 @TestScenario
-@Name('test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
+@Name(
+    "test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+)
 def test_zookeeper_pvc_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="zookeeper",
-        keeper_manifest_1_node='zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml',
-        keeper_manifest_3_node='zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml',
+        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only-scaleout-pvc.yaml",
     )
 
 
 @TestScenario
-@Name('test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
+@Name(
+    "test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+)
 def test_zookeeper_operator_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="zookeeper-operator",
-        keeper_manifest_1_node='zookeeper-operator-1-node.yaml',
-        keeper_manifest_3_node='zookeeper-operator-3-nodes.yaml',
+        keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
+        keeper_manifest_3_node="zookeeper-operator-3-nodes.yaml",
         # uncomment
         # keeper_manifest_1_node='zookeeper-operator-1-node-with-custom-probes.yaml',
         # keeper_manifest_3_node='zookeeper-operator-3-nodes-with-custom-probes.yaml',
@@ -324,12 +427,14 @@ def test_zookeeper_operator_probes_workload(self):
 
 
 @TestScenario
-@Name('test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation')
+@Name(
+    "test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+)
 def test_clickhouse_keeper_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="clickhouse-keeper",
-        keeper_manifest_1_node='clickhouse-keeper-1-node-256M-for-test-only.yaml',
-        keeper_manifest_3_node='clickhouse-keeper-3-nodes-256M-for-test-only.yaml',
+        keeper_manifest_1_node="clickhouse-keeper-1-node-256M-for-test-only.yaml",
+        keeper_manifest_3_node="clickhouse-keeper-3-nodes-256M-for-test-only.yaml",
     )
 
 
@@ -341,7 +446,6 @@ def test(self):
         test_clickhouse_keeper_rescale,
         test_zookeeper_pvc_scaleout_rescale,
         test_zookeeper_rescale,
-
         test_zookeeper_probes_workload,
         test_zookeeper_pvc_probes_workload,
         test_zookeeper_operator_probes_workload,

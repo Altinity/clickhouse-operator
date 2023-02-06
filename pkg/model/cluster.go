@@ -108,7 +108,7 @@ func (c *Cluster) ExecCHI(ctx context.Context, chi *chop.ClickHouseInstallation,
 }
 
 // ExecCluster runs set of SQL queries over the cluster
-func (c *Cluster) ExecCluster(ctx context.Context, cluster *chop.ChiCluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
+func (c *Cluster) ExecCluster(ctx context.Context, cluster *chop.Cluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
 	hosts := CreateFQDNs(cluster, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)

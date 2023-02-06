@@ -142,22 +142,7 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
 
-	// 1. CHI Service
-	if chi.IsStopped() {
-		// Stopped cluster must have no entry point
-		_ = w.c.deleteServiceCHI(ctx, chi)
-	} else {
-		if service := w.task.creator.CreateServiceCHI(); service != nil {
-			if err := w.reconcileService(ctx, chi, service); err != nil {
-				// Service not reconciled
-				w.task.registryFailed.RegisterService(service.ObjectMeta)
-				return err
-			}
-			w.task.registryReconciled.RegisterService(service.ObjectMeta)
-		}
-	}
-
-	// 2. CHI common ConfigMap without added hosts
+	// CHI common ConfigMap without added hosts
 	options := w.options()
 	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
@@ -165,6 +150,35 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *chi
 	// 3. CHI users ConfigMap
 	if err := w.reconcileCHIConfigMapUsers(ctx, chi); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+	}
+
+	return nil
+}
+
+// reconcileCHIServicePreliminary runs first stage of CHI reconcile process
+func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
+	if chi.IsStopped() {
+		// Stopped CHI must have no entry point
+		_ = w.c.deleteServiceCHI(ctx, chi)
+	}
+	return nil
+}
+
+// reconcileCHIServiceFinal runs second stage of CHI reconcile process
+func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
+	if chi.IsStopped() {
+		// Stopped CHI must have no entry point
+		return nil
+	}
+
+	// Create entry point for the whole CHI
+	if service := w.task.creator.CreateServiceCHI(); service != nil {
+		if err := w.reconcileService(ctx, chi, service); err != nil {
+			// Service not reconciled
+			w.task.registryFailed.RegisterService(service.ObjectMeta)
+			return err
+		}
+		w.task.registryReconciled.RegisterService(service.ObjectMeta)
 	}
 
 	return nil
@@ -312,7 +326,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *chiV1.ChiHost) 
 }
 
 // reconcileCluster reconciles Cluster, excluding nested shards
-func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.ChiCluster) error {
+func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -385,6 +399,10 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
+	if host.IsFirst() {
+		w.reconcileCHIServicePreliminary(ctx, host.CHI)
+		defer w.reconcileCHIServiceFinal(ctx, host.CHI)
+	}
 
 	w.a.V(1).
 		WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
@@ -411,7 +429,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.reconcileHostService(ctx, host)
 
-	host.ReconcileAttributes.UnsetAdd()
+	host.GetReconcileAttributes().UnsetAdd()
 
 	_ = w.migrateTables(ctx, host)
 
@@ -430,7 +448,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 }
 
 // reconcilePDB reconciles PodDisruptionBudget
-func (w *worker) reconcilePDB(ctx context.Context, cluster *chiV1.ChiCluster, pdb *policyV1.PodDisruptionBudget) error {
+func (w *worker) reconcilePDB(ctx context.Context, cluster *chiV1.Cluster, pdb *policyV1.PodDisruptionBudget) error {
 	_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, newGetOptions())
 	switch {
 	case err == nil:
@@ -493,6 +511,12 @@ func (w *worker) reconcileConfigMap(
 	}
 
 	return err
+}
+
+func (w *worker) hasService(ctx context.Context, chi *chiV1.ClickHouseInstallation, service *coreV1.Service) bool {
+	// Check whether this object already exists
+	curService, _ := w.c.getService(service)
+	return curService != nil
 }
 
 // reconcileService reconciles core.Service
@@ -572,7 +596,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
-	if host.ReconcileAttributes.GetStatus() == chiV1.StatefulSetStatusSame {
+	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame {
 		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
 		return nil
 	}

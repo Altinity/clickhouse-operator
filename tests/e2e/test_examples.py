@@ -2,6 +2,7 @@ from testflows.core import *
 import e2e.kubectl as kubectl
 import e2e.util as util
 
+
 @TestScenario
 @Name("test_examples01_1. Empty installation, creates 1 node")
 def test_examples01_1(self):
@@ -13,7 +14,8 @@ def test_examples01_1(self):
                 "pod": 1,
                 "service": 2,
             }
-        })
+        },
+    )
 
 
 @TestScenario
@@ -27,7 +29,8 @@ def test_examples01_2(self):
                 "pod": 2,
                 "service": 3,
             }
-        })
+        },
+    )
 
 
 @TestScenario
@@ -41,7 +44,8 @@ def test_examples02_1(self):
                 "/var/lib/clickhouse",
                 "/var/log/clickhouse-server",
             },
-        })
+        },
+    )
 
 
 @TestScenario
@@ -56,13 +60,19 @@ def test_examples02_2(self):
                 "/var/lib/clickhouse",
                 "/var/log/clickhouse-server",
             },
-        })
+        },
+    )
 
 
 @TestFeature
 @Name("e2e.test_examples")
 def test(self):
     util.clean_namespace(delete_chi=False)
-    examples = [test_examples01_1, test_examples01_2, test_examples02_1, test_examples02_2]
+    examples = [
+        test_examples01_1,
+        test_examples01_2,
+        test_examples02_1,
+        test_examples02_2,
+    ]
     for t in examples:
         Scenario(test=t)()

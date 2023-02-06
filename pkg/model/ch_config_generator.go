@@ -205,7 +205,7 @@ func (o *RemoteServersGeneratorOptions) Exclude(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return true
 	}
@@ -226,7 +226,7 @@ func (o *RemoteServersGeneratorOptions) Include(host *chiv1.ChiHost) bool {
 		return false
 	}
 
-	if o.exclude.attributes.Any(host.ReconcileAttributes) {
+	if o.exclude.attributes.Any(host.GetReconcileAttributes()) {
 		// Reconcile attributes specify to exclude this host
 		return false
 	}
@@ -267,7 +267,7 @@ func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorO
 }
 
 // ClusterHostsNum count hosts according to the options
-func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *chiv1.ChiCluster, options *RemoteServersGeneratorOptions) int {
+func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *chiv1.Cluster, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	// Build each shard XML
 	cluster.WalkShards(func(index int, shard *chiv1.ChiShard) error {
@@ -305,7 +305,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 	util.Iline(b, 8, "<!-- User-specified clusters -->")
 
 	// Build each cluster XML
-	c.chi.WalkClusters(func(cluster *chiv1.ChiCluster) error {
+	c.chi.WalkClusters(func(cluster *chiv1.Cluster) error {
 		if c.ClusterHostsNum(cluster, options) < 1 {
 			// Skip empty cluster
 			return nil
