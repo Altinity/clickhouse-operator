@@ -3398,12 +3398,12 @@ data:
             </default>
         </profiles>
     </yandex>
+---
 #
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
 #   OPERATOR_VERSION=0.20.3
----
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #

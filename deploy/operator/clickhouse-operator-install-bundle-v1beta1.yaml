@@ -3398,12 +3398,12 @@ data:
             </default>
         </profiles>
     </yandex>
+---
 #
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
 #   OPERATOR_VERSION=0.20.3
----
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -3419,9 +3419,14 @@ type: Opaque
 stringData:
   username: clickhouse_operator
   password: clickhouse_operator_password
+---
+# Template Parameters:
+#
+# NAMESPACE=kube-system
+# COMMENT=
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.20.3
 # OPERATOR_IMAGE_PULL_POLICY=Always
 # METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.20.3
----
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
