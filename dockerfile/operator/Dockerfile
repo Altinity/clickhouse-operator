@@ -33,8 +33,10 @@ RUN CGO_ENABLED=0 GO111MODULE=on GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go in
 # ===== Image Base =====
 # ======================
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS image-base
-RUN microdnf update && microdnf clean all
+# FROM registry.access.redhat.com/ubi9/ubi-minimal:latest AS image-base
+# RUN microdnf update && microdnf clean all
+FROM docker.io/alpine:latest AS image-base
+RUN apk add --no-cache curl bash
 
 MAINTAINER "Altinity <support@altinity.com>"
 
