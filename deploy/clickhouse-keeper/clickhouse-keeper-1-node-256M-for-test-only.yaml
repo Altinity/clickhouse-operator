@@ -97,7 +97,7 @@ data:
         </prometheus>
     </clickhouse>
       
-      ---
+---
 # Setup ClickHouse Keeper StatefulSet
 apiVersion: apps/v1
 kind: StatefulSet
