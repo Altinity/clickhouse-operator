@@ -85,8 +85,6 @@ spec:
     - name: age
       type: date
       description: Age of the resource
-      # Displayed in all priorities
-
       JSONPath: .metadata.creationTimestamp
   subresources:
     status: {}
@@ -222,7 +220,6 @@ spec:
         spec:
           type: object
           # x-kubernetes-preserve-unknown-fields: true
-
           description: |
             Specification of the desired behavior of one or more ClickHouse clusters
             More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md
@@ -279,7 +276,6 @@ spec:
             templating:
               type: object
               # nullable: true
-
               description: "optional, define policy for auto applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
               properties:
                 policy:
@@ -292,7 +288,6 @@ spec:
               type: object
               description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
               # nullable: true
-
               properties:
                 policy:
                   type: string
@@ -308,13 +303,11 @@ spec:
                   type: object
                   description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
                   # nullable: true
-
                   properties:
                     unknownObjects:
                       type: object
                       description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
                       # nullable: true
-
                       properties:
                         statefulSet: &TypeObjectsCleanup
                           type: string
@@ -337,7 +330,6 @@ spec:
                       type: object
                       description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
                       # nullable: true
-
                       properties:
                         statefulSet:
                           !!merge <<: *TypeObjectsCleanup
@@ -357,7 +349,6 @@ spec:
                 define default behavior for whole ClickHouseInstallation, some behavior can be re-define on cluster, shard and replica level
                 More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specdefaults
               # nullable: true
-
               properties:
                 replicasUseFQDN:
                   !!merge <<: *TypeStringBool
@@ -371,7 +362,6 @@ spec:
                     allows change `<yandex><distributed_ddl></distributed_ddl></yandex>` settings
                     More info: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-distributed_ddl
                   # nullable: true
-
                   properties:
                     profile:
                       type: string
@@ -400,7 +390,6 @@ spec:
                   type: object
                   description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
                   # nullable: true
-
                   properties:
                     hostTemplate:
                       type: string
@@ -433,7 +422,6 @@ spec:
               type: object
               description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
               # nullable: true
-
               properties:
                 zookeeper: &TypeZookeeperConfig
                   type: object
@@ -443,17 +431,14 @@ spec:
                     currently, zookeeper (or clickhouse-keeper replacement) used for *ReplicatedMergeTree table engines and for `distributed_ddl`
                     More details: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings_zookeeper
                   # nullable: true
-
                   properties:
                     nodes:
                       type: array
                       description: "describe every available zookeeper cluster node for interaction"
                       # nullable: true
-
                       items:
                         type: object
                         #required:
-
                         #  - host
                         properties:
                           host:
@@ -484,7 +469,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/settings/settings-users/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
                   type: object
@@ -494,7 +478,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/settings/settings-profiles/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationprofiles
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 quotas:
                   type: object
@@ -504,7 +487,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/quotas/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationquotas
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 settings: &TypeSettings
                   type: object
@@ -513,7 +495,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 files: &TypeFiles
                   type: object
@@ -525,7 +506,6 @@ spec:
                     each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                     More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 clusters:
                   type: array
@@ -536,11 +516,9 @@ spec:
                     Clusters will use for Distributed table engine, more details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
                     If `cluster` contains zookeeper settings (could be inherited from top `chi` level), when you can create *ReplicatedMergeTree tables
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
                     properties:
                       name:
@@ -548,7 +526,6 @@ spec:
                         description: "cluster name, used to identify set of ClickHouse servers and wide used during generate names of related Kubernetes resources"
                         minLength: 1
                         # See namePartClusterMaxLen const
-
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                       zookeeper:
@@ -635,7 +612,6 @@ spec:
                           describe current cluster layout, how much shards in cluster, how much replica in shard
                           allows override settings on each shard and replica separatelly
                         # nullable: true
-
                         properties:
                           type:
                             type: string
@@ -650,7 +626,6 @@ spec:
                             type: array
                             description: "optional, allows override top-level `chi.spec.configuration`, cluster-level `chi.spec.configuration.clusters` settings for each shard separately, use it only if you fully understand what you do"
                             # nullable: true
-
                             items:
                               type: object
                               properties:
@@ -659,7 +634,6 @@ spec:
                                   description: "optional, by default shard name is generated, but you can override it and setup custom name"
                                   minLength: 1
                                   # See namePartShardMaxLen const
-
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 definitionType:
@@ -706,7 +680,6 @@ spec:
                                   description: |
                                     optional, allows override behavior for selected replicas from cluster-level `chi.spec.configuration.clusters` and shard-level `chi.spec.configuration.clusters.layout.shards`
                                   # nullable: true
-
                                   items:
                                     # Host
                                     type: object
@@ -716,7 +689,6 @@ spec:
                                         description: "optional, by default replica name is generated, but you can override it and setup custom name"
                                         minLength: 1
                                         # See namePartReplicaMaxLen const
-
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                                       secure:
@@ -765,7 +737,6 @@ spec:
                             type: array
                             description: "optional, allows override top-level `chi.spec.configuration` and cluster-level `chi.spec.configuration.clusters` configuration for each replica and each shard relates to selected replica, use it only if you fully understand what you do"
                             # nullable: true
-
                             items:
                               type: object
                               properties:
@@ -774,7 +745,6 @@ spec:
                                   description: "optional, by default replica name is generated, but you can override it and setup custom name"
                                   minLength: 1
                                   # See namePartShardMaxLen const
-
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 settings:
@@ -801,7 +771,6 @@ spec:
                                   type: array
                                   description: "optional, list of shards related to current replica, will ignore if `chi.spec.configuration.clusters.layout.shards` presents"
                                   # nullable: true
-
                                   items:
                                     # Host
                                     type: object
@@ -811,7 +780,6 @@ spec:
                                         description: "optional, by default shard name is generated, but you can override it and setup custom name"
                                         minLength: 1
                                         # See namePartReplicaMaxLen const
-
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                                       secure:
@@ -860,17 +828,14 @@ spec:
               type: object
               description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
               # nullable: true
-
               properties:
                 hostTemplates:
                   type: array
                   description: "hostTemplate will use during apply to generate `clickhose-server` config files"
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
                     properties:
                       name:
@@ -880,11 +845,9 @@ spec:
                         type: array
                         description: "define how will distribute numeric values of named ports in `Pod.spec.containers.ports` and clickhouse-server configs"
                         # nullable: true
-
                         items:
                           type: object
                           #required:
-
                           #  - type
                           properties:
                             type:
@@ -904,7 +867,6 @@ spec:
                             description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
                             minLength: 1
                             # See namePartReplicaMaxLen const
-
                             maxLength: 15
                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                           secure:
@@ -954,11 +916,9 @@ spec:
                     podTemplate will use during render `Pod` inside `StatefulSet.spec` and allows define rendered `Pod.spec`, pod scheduling distribution and pod zone
                     More information: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatespodtemplates
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
                     properties:
                       name:
@@ -971,7 +931,6 @@ spec:
                         type: object
                         description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
                         #required:
-
                         #  - values
                         properties:
                           key:
@@ -981,7 +940,6 @@ spec:
                             type: array
                             description: "optional, if defined, allows select kubernetes nodes by label with `value` in `values`"
                             # nullable: true
-
                             items:
                               type: string
                       distribution:
@@ -995,11 +953,9 @@ spec:
                         type: array
                         description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                         # nullable: true
-
                         items:
                           type: object
                           #required:
-
                           #  - type
                           properties:
                             type:
@@ -1048,7 +1004,6 @@ spec:
                         type: object
                         description: "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                       metadata:
                         type: object
@@ -1056,19 +1011,15 @@ spec:
                           allows pass standard object's metadata from template to Pod
                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                 volumeClaimTemplates:
                   type: array
                   description: "allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else"
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
-
                     #  - spec
                     properties:
                       name:
@@ -1087,7 +1038,6 @@ spec:
                           allows to pass standard object's metadata from template to PVC
                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                       spec:
                         type: object
@@ -1095,20 +1045,16 @@ spec:
                           allows define all aspects of `PVC` resource
                           More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                 serviceTemplates:
                   type: array
                   description: |
                     allows define template for rendering `Service` which would get endpoint from Pods which scoped chi-wide, cluster-wide, shard-wide, replica-wide level
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
-
                     #  - spec
                     properties:
                       name:
@@ -1130,7 +1076,6 @@ spec:
                           Could be use for define specificly for Cloud Provider metadata which impact to behavior of service
                           More info: https://kubernetes.io/docs/concepts/services-networking/service/
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                       spec:
                         # TODO specify ServiceSpec
@@ -1139,17 +1084,14 @@ spec:
                           describe behavior of generated Service
                           More info: https://kubernetes.io/docs/concepts/services-networking/service/
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
             useTemplates:
               type: array
               description: "list of `ClickHouseInstallationTemplate` (chit) resource names which will merge with current `Chi` manifest during render Kubernetes resources to create related ClickHouse clusters"
               # nullable: true
-
               items:
                 type: object
                 #required:
-
                 #  - name
                 properties:
                   name:
@@ -1165,8 +1107,13 @@ spec:
                       # List useTypeXXX constants from model
                       - ""
                       - "merge"
-# SHORT=chit
 ---
+# Template Parameters:
+#
+# KIND=ClickHouseInstallationTemplate
+# SINGULAR=clickhouseinstallationtemplate
+# PLURAL=clickhouseinstallationtemplates
+# SHORT=chit
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -1248,8 +1195,6 @@ spec:
     - name: age
       type: date
       description: Age of the resource
-      # Displayed in all priorities
-
       JSONPath: .metadata.creationTimestamp
   validation:
     openAPIV3Schema:
@@ -1383,7 +1328,6 @@ spec:
         spec:
           type: object
           # x-kubernetes-preserve-unknown-fields: true
-
           description: |
             Specification of the desired behavior of one or more ClickHouse clusters
             More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md
@@ -1440,7 +1384,6 @@ spec:
             templating:
               type: object
               # nullable: true
-
               description: "optional, define policy for auto applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
               properties:
                 policy:
@@ -1453,7 +1396,6 @@ spec:
               type: object
               description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
               # nullable: true
-
               properties:
                 policy:
                   type: string
@@ -1469,13 +1411,11 @@ spec:
                   type: object
                   description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
                   # nullable: true
-
                   properties:
                     unknownObjects:
                       type: object
                       description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
                       # nullable: true
-
                       properties:
                         statefulSet: &TypeObjectsCleanup
                           type: string
@@ -1498,7 +1438,6 @@ spec:
                       type: object
                       description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
                       # nullable: true
-
                       properties:
                         statefulSet:
                           !!merge <<: *TypeObjectsCleanup
@@ -1518,7 +1457,6 @@ spec:
                 define default behavior for whole ClickHouseInstallation, some behavior can be re-define on cluster, shard and replica level
                 More info: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specdefaults
               # nullable: true
-
               properties:
                 replicasUseFQDN:
                   !!merge <<: *TypeStringBool
@@ -1532,7 +1470,6 @@ spec:
                     allows change `<yandex><distributed_ddl></distributed_ddl></yandex>` settings
                     More info: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-distributed_ddl
                   # nullable: true
-
                   properties:
                     profile:
                       type: string
@@ -1561,7 +1498,6 @@ spec:
                   type: object
                   description: "optional, configuration of the templates names which will use for generate Kubernetes resources according to one or more ClickHouse clusters described in current ClickHouseInstallation (chi) resource"
                   # nullable: true
-
                   properties:
                     hostTemplate:
                       type: string
@@ -1594,7 +1530,6 @@ spec:
               type: object
               description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
               # nullable: true
-
               properties:
                 zookeeper: &TypeZookeeperConfig
                   type: object
@@ -1604,17 +1539,14 @@ spec:
                     currently, zookeeper (or clickhouse-keeper replacement) used for *ReplicatedMergeTree table engines and for `distributed_ddl`
                     More details: https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings_zookeeper
                   # nullable: true
-
                   properties:
                     nodes:
                       type: array
                       description: "describe every available zookeeper cluster node for interaction"
                       # nullable: true
-
                       items:
                         type: object
                         #required:
-
                         #  - host
                         properties:
                           host:
@@ -1645,7 +1577,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/settings/settings-users/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
                   type: object
@@ -1655,7 +1586,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/settings/settings-profiles/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationprofiles
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 quotas:
                   type: object
@@ -1665,7 +1595,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/quotas/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationquotas
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 settings: &TypeSettings
                   type: object
@@ -1674,7 +1603,6 @@ spec:
                     More details: https://clickhouse.tech/docs/en/operations/settings/settings/
                     Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 files: &TypeFiles
                   type: object
@@ -1686,7 +1614,6 @@ spec:
                     each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                     More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
                   # nullable: true
-
                   x-kubernetes-preserve-unknown-fields: true
                 clusters:
                   type: array
@@ -1697,11 +1624,9 @@ spec:
                     Clusters will use for Distributed table engine, more details: https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/
                     If `cluster` contains zookeeper settings (could be inherited from top `chi` level), when you can create *ReplicatedMergeTree tables
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
                     properties:
                       name:
@@ -1709,7 +1634,6 @@ spec:
                         description: "cluster name, used to identify set of ClickHouse servers and wide used during generate names of related Kubernetes resources"
                         minLength: 1
                         # See namePartClusterMaxLen const
-
                         maxLength: 15
                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                       zookeeper:
@@ -1796,7 +1720,6 @@ spec:
                           describe current cluster layout, how much shards in cluster, how much replica in shard
                           allows override settings on each shard and replica separatelly
                         # nullable: true
-
                         properties:
                           type:
                             type: string
@@ -1811,7 +1734,6 @@ spec:
                             type: array
                             description: "optional, allows override top-level `chi.spec.configuration`, cluster-level `chi.spec.configuration.clusters` settings for each shard separately, use it only if you fully understand what you do"
                             # nullable: true
-
                             items:
                               type: object
                               properties:
@@ -1820,7 +1742,6 @@ spec:
                                   description: "optional, by default shard name is generated, but you can override it and setup custom name"
                                   minLength: 1
                                   # See namePartShardMaxLen const
-
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 definitionType:
@@ -1867,7 +1788,6 @@ spec:
                                   description: |
                                     optional, allows override behavior for selected replicas from cluster-level `chi.spec.configuration.clusters` and shard-level `chi.spec.configuration.clusters.layout.shards`
                                   # nullable: true
-
                                   items:
                                     # Host
                                     type: object
@@ -1877,7 +1797,6 @@ spec:
                                         description: "optional, by default replica name is generated, but you can override it and setup custom name"
                                         minLength: 1
                                         # See namePartReplicaMaxLen const
-
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                                       secure:
@@ -1926,7 +1845,6 @@ spec:
                             type: array
                             description: "optional, allows override top-level `chi.spec.configuration` and cluster-level `chi.spec.configuration.clusters` configuration for each replica and each shard relates to selected replica, use it only if you fully understand what you do"
                             # nullable: true
-
                             items:
                               type: object
                               properties:
@@ -1935,7 +1853,6 @@ spec:
                                   description: "optional, by default replica name is generated, but you can override it and setup custom name"
                                   minLength: 1
                                   # See namePartShardMaxLen const
-
                                   maxLength: 15
                                   pattern: "^[a-zA-Z0-9-]{0,15}$"
                                 settings:
@@ -1962,7 +1879,6 @@ spec:
                                   type: array
                                   description: "optional, list of shards related to current replica, will ignore if `chi.spec.configuration.clusters.layout.shards` presents"
                                   # nullable: true
-
                                   items:
                                     # Host
                                     type: object
@@ -1972,7 +1888,6 @@ spec:
                                         description: "optional, by default shard name is generated, but you can override it and setup custom name"
                                         minLength: 1
                                         # See namePartReplicaMaxLen const
-
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
                                       secure:
@@ -2021,17 +1936,14 @@ spec:
               type: object
               description: "allows define templates which will use for render Kubernetes resources like StatefulSet, ConfigMap, Service, PVC, by default, clickhouse-operator have own templates, but you can override it"
               # nullable: true
-
               properties:
                 hostTemplates:
                   type: array
                   description: "hostTemplate will use during apply to generate `clickhose-server` config files"
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
                     properties:
                       name:
@@ -2041,11 +1953,9 @@ spec:
                         type: array
                         description: "define how will distribute numeric values of named ports in `Pod.spec.containers.ports` and clickhouse-server configs"
                         # nullable: true
-
                         items:
                           type: object
                           #required:
-
                           #  - type
                           properties:
                             type:
@@ -2065,7 +1975,6 @@ spec:
                             description: "by default, hostname will generate, but this allows define custom name for each `clickhuse-server`"
                             minLength: 1
                             # See namePartReplicaMaxLen const
-
                             maxLength: 15
                             pattern: "^[a-zA-Z0-9-]{0,15}$"
                           secure:
@@ -2115,11 +2024,9 @@ spec:
                     podTemplate will use during render `Pod` inside `StatefulSet.spec` and allows define rendered `Pod.spec`, pod scheduling distribution and pod zone
                     More information: https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#spectemplatespodtemplates
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
                     properties:
                       name:
@@ -2132,7 +2039,6 @@ spec:
                         type: object
                         description: "allows define custom zone name and will separate ClickHouse `Pods` between nodes, shortcut for `chi.spec.templates.podTemplates.spec.affinity.podAntiAffinity`"
                         #required:
-
                         #  - values
                         properties:
                           key:
@@ -2142,7 +2048,6 @@ spec:
                             type: array
                             description: "optional, if defined, allows select kubernetes nodes by label with `value` in `values`"
                             # nullable: true
-
                             items:
                               type: string
                       distribution:
@@ -2156,11 +2061,9 @@ spec:
                         type: array
                         description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                         # nullable: true
-
                         items:
                           type: object
                           #required:
-
                           #  - type
                           properties:
                             type:
@@ -2209,7 +2112,6 @@ spec:
                         type: object
                         description: "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                       metadata:
                         type: object
@@ -2217,19 +2119,15 @@ spec:
                           allows pass standard object's metadata from template to Pod
                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                 volumeClaimTemplates:
                   type: array
                   description: "allows define template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mount clickhouse `data`, clickhouse `logs` or something else"
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
-
                     #  - spec
                     properties:
                       name:
@@ -2248,7 +2146,6 @@ spec:
                           allows to pass standard object's metadata from template to PVC
                           More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                       spec:
                         type: object
@@ -2256,20 +2153,16 @@ spec:
                           allows define all aspects of `PVC` resource
                           More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                 serviceTemplates:
                   type: array
                   description: |
                     allows define template for rendering `Service` which would get endpoint from Pods which scoped chi-wide, cluster-wide, shard-wide, replica-wide level
                   # nullable: true
-
                   items:
                     type: object
                     #required:
-
                     #  - name
-
                     #  - spec
                     properties:
                       name:
@@ -2291,7 +2184,6 @@ spec:
                           Could be use for define specificly for Cloud Provider metadata which impact to behavior of service
                           More info: https://kubernetes.io/docs/concepts/services-networking/service/
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
                       spec:
                         # TODO specify ServiceSpec
@@ -2300,17 +2192,14 @@ spec:
                           describe behavior of generated Service
                           More info: https://kubernetes.io/docs/concepts/services-networking/service/
                         # nullable: true
-
                         x-kubernetes-preserve-unknown-fields: true
             useTemplates:
               type: array
               description: "list of `ClickHouseInstallationTemplate` (chit) resource names which will merge with current `Chi` manifest during render Kubernetes resources to create related ClickHouse clusters"
               # nullable: true
-
               items:
                 type: object
                 #required:
-
                 #  - name
                 properties:
                   name:
@@ -2326,8 +2215,10 @@ spec:
                       # List useTypeXXX constants from model
                       - ""
                       - "merge"
-# NONE
 ---
+# Template Parameters:
+#
+# NONE
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -2354,8 +2245,6 @@ spec:
     - name: age
       type: date
       description: Age of the resource
-      # Displayed in all priorities
-
       JSONPath: .metadata.creationTimestamp
   validation:
     openAPIV3Schema:
