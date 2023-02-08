@@ -628,75 +628,119 @@ func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.found == to.found)
+	return true &&
+		(s.add == to.add) &&
+		(s.remove == to.remove) &&
+		(s.modify == to.modify) &&
+		(s.found == to.found)
 }
 
 // Any checks whether any of the attributes is set
-func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
+func (s *ChiHostReconcileAttributes) Any(of *ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.found && to.found)
+	if of == nil {
+		return false
+	}
+	return false ||
+		(s.add && of.add) ||
+		(s.remove && of.remove) ||
+		(s.modify && of.modify) ||
+		(s.found && of.found)
 }
 
 // SetStatus sets status
 func (s *ChiHostReconcileAttributes) SetStatus(status StatefulSetStatus) *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.status = status
 	return s
 }
 
 // GetStatus gets status
 func (s *ChiHostReconcileAttributes) GetStatus() StatefulSetStatus {
+	if s == nil {
+		return StatefulSetStatus("")
+	}
 	return s.status
 }
 
 // SetAdd sets 'add' attribute
 func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.add = true
 	return s
 }
 
 // UnsetAdd unsets 'add' attribute
 func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.add = false
 	return s
 }
 
 // SetRemove sets 'remove' attribute
 func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.remove = true
 	return s
 }
 
 // SetModify sets 'modify' attribute
 func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.modify = true
 	return s
 }
 
 // SetFound sets 'found' attribute
 func (s *ChiHostReconcileAttributes) SetFound() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.found = true
 	return s
 }
 
 // IsAdd checks whether 'add' attribute is set
 func (s *ChiHostReconcileAttributes) IsAdd() bool {
+	if s == nil {
+		return false
+	}
 	return s.add
 }
 
 // IsRemove checks whether 'remove' attribute is set
 func (s *ChiHostReconcileAttributes) IsRemove() bool {
+	if s == nil {
+		return false
+	}
 	return s.remove
 }
 
 // IsModify checks whether 'modify' attribute is set
 func (s *ChiHostReconcileAttributes) IsModify() bool {
+	if s == nil {
+		return false
+	}
 	return s.modify
 }
 
 // IsFound checks whether 'found' attribute is set
 func (s *ChiHostReconcileAttributes) IsFound() bool {
+	if s == nil {
+		return false
+	}
 	return s.found
 }
 

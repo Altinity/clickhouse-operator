@@ -240,7 +240,7 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 		// TODO
 		// When we'll have Cluster Discovery functionality we can refactor this properly
 		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
-		labels[LabelSettingsConfigVersion] = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
+		labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
 	}
 	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))
 }
@@ -383,14 +383,20 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelClusterName], nil
 }
 
-// MakeObjectVersionLabel makes object version label
-func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
+// MakeObjectVersion makes object version label
+func MakeObjectVersion(meta *meta.ObjectMeta, obj interface{}) {
 	meta.Labels = util.MergeStringMapsOverwrite(
 		meta.Labels,
 		map[string]string{
 			LabelObjectVersion: util.Fingerprint(obj),
 		},
 	)
+}
+
+// GetObjectVersion gets version of the object
+func GetObjectVersion(meta meta.ObjectMeta) (string, bool) {
+	label, ok := meta.Labels[LabelObjectVersion]
+	return label, ok
 }
 
 // isObjectVersionLabelTheSame checks whether object version in meta.Labels is the same as provided value

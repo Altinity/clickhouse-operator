@@ -624,11 +624,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 				if found {
 					// StatefulSet of this host already exist, we can't ADD it for sure
 					// It looks like FOUND is the most correct approach
-					(&host.ReconcileAttributes).SetFound()
+					host.GetReconcileAttributes().SetFound()
 					w.a.V(1).M(chi).Info("Add host as FOUND. Host was found as sts %s", host.Name)
 				} else {
 					// StatefulSet of this host does not exist, looks like we need to ADD it
-					(&host.ReconcileAttributes).SetAdd()
+					host.GetReconcileAttributes().SetAdd()
 					w.a.V(1).M(chi).Info("Add host as ADD. Host was not found as sts %s", host.Name)
 				}
 
@@ -637,12 +637,12 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 		},
 		func(shard *chiV1.ChiShard) {
 			shard.WalkHosts(func(host *chiV1.ChiHost) error {
-				(&host.ReconcileAttributes).SetAdd()
+				host.GetReconcileAttributes().SetAdd()
 				return nil
 			})
 		},
 		func(host *chiV1.ChiHost) {
-			(&host.ReconcileAttributes).SetAdd()
+			host.GetReconcileAttributes().SetAdd()
 		},
 	)
 
@@ -652,34 +652,34 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 		func(shard *chiV1.ChiShard) {
 		},
 		func(host *chiV1.ChiHost) {
-			(&host.ReconcileAttributes).SetModify()
+			host.GetReconcileAttributes().SetModify()
 		},
 	)
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		if host.ReconcileAttributes.IsAdd() {
+		if host.GetReconcileAttributes().IsAdd() {
 			// Already added
 			return nil
 		}
-		if host.ReconcileAttributes.IsModify() {
+		if host.GetReconcileAttributes().IsModify() {
 			// Already modified
 			return nil
 		}
 		// Not clear yet
-		(&host.ReconcileAttributes).SetFound()
+		host.GetReconcileAttributes().SetFound()
 		return nil
 	})
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		if host.ReconcileAttributes.IsAdd() {
+		if host.GetReconcileAttributes().IsAdd() {
 			w.a.M(host).Info("ADD host: %s", host.Address.CompactString())
 			return nil
 		}
-		if host.ReconcileAttributes.IsModify() {
+		if host.GetReconcileAttributes().IsModify() {
 			w.a.M(host).Info("MODIFY host: %s", host.Address.CompactString())
 			return nil
 		}
-		if host.ReconcileAttributes.IsFound() {
+		if host.GetReconcileAttributes().IsFound() {
 			w.a.M(host).Info("FOUND host: %s", host.Address.CompactString())
 			return nil
 		}
@@ -721,7 +721,7 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chi
 
 	// StatefulSet for a host
 	_ = w.task.creator.CreateStatefulSet(host, shutdown)
-	(&host.ReconcileAttributes).SetStatus(w.getStatefulSetStatus(host.StatefulSet.ObjectMeta))
+	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host.StatefulSet.ObjectMeta))
 }
 
 // migrateTables
@@ -758,7 +758,7 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost) bool {
 	case host.GetCHI().IsStopped():
 		// Stopped host is not able to receive data
 		return false
-	case host.ReconcileAttributes.GetStatus() == chiV1.StatefulSetStatusSame:
+	case host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame:
 		// No need to migrate on the same host
 		return false
 	}
@@ -876,7 +876,6 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
 func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
-	status := host.ReconcileAttributes.GetStatus()
 	switch {
 	case host.GetCHI().IsStopped():
 		w.a.V(1).
@@ -888,12 +887,12 @@ func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 			M(host).F().
 			Info("While rolling update host would be restarted host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
-	case status == chiV1.StatefulSetStatusNew:
+	case host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew:
 		w.a.V(1).
 			M(host).F().
 			Info("Nothing to exclude, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
-	case status == chiV1.StatefulSetStatusSame:
+	case host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame:
 		w.a.V(1).
 			M(host).F().
 			Info("The same host would not be updated host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
@@ -936,7 +935,7 @@ func (w *worker) shouldWaitExcludeHost(host *chiV1.ChiHost) bool {
 
 // shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
 func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
-	status := host.ReconcileAttributes.GetStatus()
+	status := host.GetReconcileAttributes().GetStatus()
 	switch {
 	case status == chiV1.StatefulSetStatusNew:
 		return false
@@ -1193,8 +1192,8 @@ func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetS
 
 	if curStatefulSet != nil {
 		// Try to perform label-based comparison
-		curLabel, curHasLabel := w.task.creator.GetObjectVersion(curStatefulSet.ObjectMeta)
-		newLabel, newHasLabel := w.task.creator.GetObjectVersion(meta)
+		curLabel, curHasLabel := chopModel.GetObjectVersion(curStatefulSet.ObjectMeta)
+		newLabel, newHasLabel := chopModel.GetObjectVersion(meta)
 		if curHasLabel && newHasLabel {
 			if curLabel == newLabel {
 				w.a.M(meta).F().Info(

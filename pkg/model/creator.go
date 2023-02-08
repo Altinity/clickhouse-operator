@@ -101,7 +101,7 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	}
-	MakeObjectVersionLabel(&svc.ObjectMeta, svc)
+	MakeObjectVersion(&svc.ObjectMeta, svc)
 	return svc
 }
 
@@ -209,7 +209,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			PublishNotReadyAddresses: true,
 		},
 	}
-	MakeObjectVersionLabel(&svc.ObjectMeta, svc)
+	MakeObjectVersion(&svc.ObjectMeta, svc)
 	return svc
 }
 
@@ -262,7 +262,7 @@ func (c *Creator) createServiceFromTemplate(
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&service.ObjectMeta, service)
+	MakeObjectVersion(&service.ObjectMeta, service)
 
 	return service
 }
@@ -281,7 +281,7 @@ func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGenerat
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
 	}
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	MakeObjectVersion(&cm.ObjectMeta, cm)
 	return cm
 }
 
@@ -299,7 +299,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	MakeObjectVersion(&cm.ObjectMeta, cm)
 	return cm
 }
 
@@ -316,7 +316,7 @@ func (c *Creator) createConfigMapHost(host *chiv1.ChiHost, name string, data map
 		Data: data,
 	}
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	MakeObjectVersion(&cm.ObjectMeta, cm)
 	return cm
 }
 
@@ -379,7 +379,7 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
-	c.setupStatefulSetVersion(statefulSet)
+	MakeObjectVersion(&statefulSet.ObjectMeta, statefulSet)
 
 	host.StatefulSet = statefulSet
 	host.DesiredStatefulSet = statefulSet
@@ -387,34 +387,12 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 	return statefulSet
 }
 
-// setupStatefulSetVersion
-// TODO property of the labeler?
-func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
-	// Version can drift from instance to instance of the CHI StatefulSet even for the same CHI because
-	// StatefulSet has owner already specified, which has UID of owner, which is different for different CHIs
-	statefulSet.Labels = util.MergeStringMapsOverwrite(
-		statefulSet.Labels,
-		map[string]string{
-			LabelObjectVersion: util.Fingerprint(statefulSet),
-		},
-	)
-	// TODO fix this with verbosity update
-	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
-}
-
-// GetObjectVersion gets version of the StatefulSet
-// TODO property of the labeler?
-func (c *Creator) GetObjectVersion(meta metav1.ObjectMeta) (string, bool) {
-	label, ok := meta.Labels[LabelObjectVersion]
-	return label, ok
-}
-
 // PreparePersistentVolume prepares PV labels
 func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chiv1.ChiHost) *corev1.PersistentVolume {
 	pv.Labels = macro(host).Map(c.labels.getPV(pv, host))
 	pv.Annotations = macro(host).Map(c.annotations.getPV(pv, host))
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&pv.ObjectMeta, pv)
+	MakeObjectVersion(&pv.ObjectMeta, pv)
 	return pv
 }
 
@@ -427,7 +405,7 @@ func (c *Creator) PreparePersistentVolumeClaim(
 	pvc.Labels = macro(host).Map(c.labels.getPVC(pvc, host, template))
 	pvc.Annotations = macro(host).Map(c.annotations.getPVC(pvc, host, template))
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&pvc.ObjectMeta, pvc)
+	MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
 }
 
