@@ -28,7 +28,7 @@ spec:
     auth.basic:
       enabled: True
     auth.anonymous:
-      enabled: $GRAFANA_ANONYMOUS_EDITOR
+      enabled: False
       org_role: Editor
 # look to https://grafana.com/docs/grafana/latest/auth/generic-oauth/
 #    server:
