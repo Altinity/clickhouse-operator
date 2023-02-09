@@ -1,0 +1,113 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "clickhouse-initdb-udf"
+data:
+  # todo think about arm64 and hash sum calculation
+  load_jq_udf.sh: |
+    #!/usr/bin/env bash
+    if [ ! -f /opt/user_scripts/jq ]; then
+      clickhouse-client --echo -q "INSERT INTO FUNCTION file('./jq', RawBLOB) SELECT value FROM url('https://github.com/stedolan/jq/releases/latest/download/jq-linux64', RawBLOB, 'value String') SETTINGS max_http_get_redirects=5"
+      mv -vf /var/lib/clickhouse/user_files/jq /opt/user_scripts/
+    
+    cat > /opt/user_scripts/jq-wrapper.sh << EOL
+      while IFS='$\n' read -r line; do
+        json=\$(echo "\$line" | awk '{print \$1}')
+        expression=\$(echo "\$line" | awk '{\$1=""; print \$0}')
+        echo "\$json" | /opt/user_scripts/jq -c -r "\$expression"
+      done
+    EOL
+    
+      chmod -v +x /opt/user_scripts/jq*
+    fi
+
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "udf-executable-example"
+spec:
+  troubleshoot: "no"
+  templates:
+    volumeClaimTemplates:
+      - name: udf-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+      - name: data-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+      - name: log-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+
+    podTemplates:
+      - name: pod-template-with-udf
+        spec:
+          volumes:
+            - name: initdb-volume
+              configMap:
+                name: clickhouse-initdb-udf
+                defaultMode: 0555
+          
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:latest
+              volumeMounts:
+                - name: initdb-volume
+                  mountPath: /docker-entrypoint-initdb.d
+                  readOnly: true
+                - name: udf-volume
+                  mountPath: /opt/user_scripts
+                - name: data-volume
+                  mountPath: /var/lib/clickhouse
+                - name: log-volume
+                  mountPath: /var/log/clickhouse-server
+  defaults:
+    templates:
+      podTemplate: pod-template-with-udf
+  configuration:
+    settings:
+      user_scripts_path: /opt/user_scripts
+      user_defined_executable_functions_config: config.d/*_function.xml
+    files:
+      config.d/jq_udf_function.xml: |
+        <!--
+        look documentation https://clickhouse.com/docs/en/sql-reference/functions/#executable-user-defined-functions
+        
+        SELECT jq('{"a":111}','.a'), jq('{"foo":222}','.foo')
+          
+        ┌─jq('{"a":111}','.a')─┬─jq('{"foo":222}','.foo')─┐
+        │ 111                  │ 222                      │
+        └──────────────────────┴──────────────────────────┘        
+        -->
+        <clickhouse>
+        	<function>
+        		<type>executable_pool</type>
+        		<execute_direct>0</execute_direct>
+        		<name>jq</name>
+        		<return_type>String</return_type>
+        		<argument>
+                    <name>json</name>
+        			<type>String</type>
+        		</argument>
+        		<argument>
+                    <name>query</name>
+        			<type>String</type>
+        		</argument>
+        		<format>TabSeparated</format>
+        		<command>/opt/user_scripts/jq-wrapper.sh</command>
+        	</function>
+        </clickhouse>
