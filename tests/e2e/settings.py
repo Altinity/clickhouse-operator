@@ -68,7 +68,7 @@ clickhouse_version = get_ch_version(clickhouse_template)
 clickhouse_version_old = get_ch_version(clickhouse_template_old)
 
 prometheus_namespace = "prometheus"
-prometheus_operator_version = "0.57"
+prometheus_operator_version = "0.62"
 prometheus_scrape_interval = 10
 
 minio_version = "latest"
