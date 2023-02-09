@@ -39,7 +39,7 @@ spec:
           volumeMounts:
             - mountPath: /var/lib/clickhouse
               name: default-gp2
-        - image: altinity/clickhouse-backup:1.3.1
+        - image: altinity/clickhouse-backup:2.1.3
           name: clickhouse-backup
           command:
             - clickhouse-backup

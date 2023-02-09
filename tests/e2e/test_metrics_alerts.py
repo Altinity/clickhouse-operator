@@ -775,7 +775,7 @@ def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_ope
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y mysql-client"
     kubectl.launch(
         f'exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse-pod -- bash -c  "{cmd}"',
-        ok_to_fail=True,
+        timeout=120,
     )
 
     def make_too_many_queries():
