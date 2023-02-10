@@ -446,7 +446,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	var (
 		hostsCompleted int
-		hostsCount int
+		hostsCount     int
 	)
 
 	if host.CHI != nil && host.CHI.Status != nil {
@@ -614,6 +614,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 
 	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame {
 		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		host.CHI.EnsureStatus().HostUnchanged()
 		return nil
 	}
 
@@ -632,6 +633,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	}
 
 	if err != nil {
+		host.CHI.EnsureStatus().HostFailed()
 		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
