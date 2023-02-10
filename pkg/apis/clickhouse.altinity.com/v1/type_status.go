@@ -325,8 +325,8 @@ func (s *ChiStatus) GetPodIPS() []string {
 	return s.PodIPs
 }
 
-// UpdateHost updates updated hosts counter
-func (s *ChiStatus) UpdateHost() {
+// HostUpdated updates updated hosts counter
+func (s *ChiStatus) HostUpdated() {
 	if s == nil {
 		return
 	}
@@ -334,8 +334,8 @@ func (s *ChiStatus) UpdateHost() {
 	s.HostsCompletedCount++
 }
 
-// AddHost updates added hosts counter
-func (s *ChiStatus) AddHost() {
+// HostAdded updates added hosts counter
+func (s *ChiStatus) HostAdded() {
 	if s == nil {
 		return
 	}
