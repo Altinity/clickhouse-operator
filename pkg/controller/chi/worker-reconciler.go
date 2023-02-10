@@ -444,6 +444,22 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		M(host).F().
 		Info("Reconcile Host %s completed", host.Name)
 
+	var (
+		hostsCompleted int
+		hostsCount int
+	)
+
+	if host.CHI != nil && host.CHI.Status != nil {
+		hostsCompleted = host.CHI.Status.HostsCompletedCount
+		hostsCount = host.CHI.Status.HostsCount
+	}
+
+	w.a.V(1).
+		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
+		WithStatusAction(host.CHI).
+		M(host).F().
+		Info("%s: %d of %d", eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+
 	return nil
 }
 
