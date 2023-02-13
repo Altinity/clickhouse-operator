@@ -15,12 +15,19 @@ max_retries = 20
 
 shell = Shell()
 shell.timeout = 300
-namespace = settings.test_namespace
+namespace = "test"
 kubectl_cmd = settings.kubectl_cmd
 
 
-def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
+def launch(command, ok_to_fail=False, ns=None, timeout=600):
     # Build command
+
+    if ns is None:
+        if hasattr(current().context, "namespace"):
+            ns = current().context.namespace
+        else:
+            ns = namespace
+
     cmd = f"{kubectl_cmd} "
     cmd_args = command.split(" ")
     if ns is not None and ns != "" and ns != "--all-namespaces":
@@ -58,7 +65,7 @@ def run_shell(cmd, timeout=600, ok_to_fail=False):
     return res_cmd.output if (code == 0) or ok_to_fail else ""
 
 
-def delete_chi(chi, ns=namespace, wait=True, ok_to_fail=False):
+def delete_chi(chi, ns=None, wait=True, ok_to_fail=False):
     with When(f"Delete chi {chi}"):
         launch(
             f"delete chi {chi} -v 5 --now --timeout=600s",
@@ -78,7 +85,7 @@ def delete_chi(chi, ns=namespace, wait=True, ok_to_fail=False):
             )
 
 
-def delete_all_chi(ns=namespace):
+def delete_all_chi(ns=None):
     crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
     if "clickhouseinstallations.clickhouse.altinity.com" in crds:
         try:
@@ -91,7 +98,7 @@ def delete_all_chi(ns=namespace):
                 delete_chi(chi["metadata"]["name"], ns)
 
 
-def delete_all_keeper(ns=namespace):
+def delete_all_keeper(ns=None):
     for keeper_type in ("zookeeper-operator", "zookeeper", "clickhouse-keeper"):
         expected_resource_types = (
             ("zookeepercluster",) if keeper_type == "zookeeper-operator" else ("sts", "pvc", "cm", "svc")
@@ -110,10 +117,10 @@ def delete_all_keeper(ns=namespace):
             if "items" in item_list:
                 for item in item_list["items"]:
                     name = item["metadata"]["name"]
-                    launch(f"delete {resource_type} -n {ns} {name}", ok_to_fail=True)
+                    launch(f"delete {resource_type} -n {current().context.namespace} {name}", ok_to_fail=True)
 
 
-def create_and_check(manifest, check, ns=namespace, timeout=900):
+def create_and_check(manifest, check, ns=None, timeout=900):
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(f"{manifest}"))
 
     # state_field = ".status.taskID"
@@ -174,32 +181,36 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
         delete_chi(chi_name, ns=ns)
 
 
-def get(kind, name, label="", ns=namespace, ok_to_fail=False):
+def get(kind, name, label="", ns=None, ok_to_fail=False):
     out = launch(f"get {kind} {name} {label} -o json", ns=ns, ok_to_fail=ok_to_fail)
     return json.loads(out.strip())
 
 
 def create_ns(ns):
-    launch(f"create ns {ns}", ns=None)
-    launch(f"get ns {ns}", ns=None)
+    if ns is None:
+        launch(f"create ns {current().context.namespace}", ns=None)
+        launch(f"get ns {current().context.namespace}", ns=None)
+    else:
+        launch(f"create ns {ns}", ns=None)
+        launch(f"get ns {ns}", ns=None)
 
 
 def delete_ns(ns, ok_to_fail=False, timeout=600):
     launch(
-        f"delete ns {ns} -v 5 --now --timeout={timeout}s",
+        f"delete ns {current().context.namespace} -v 5 --now --timeout={timeout}s",
         ns=None,
         ok_to_fail=ok_to_fail,
         timeout=timeout,
     )
 
 
-def get_count(kind, name="", label="", chi="", ns=namespace):
+def get_count(kind, name="", label="", chi="", ns=None):
     if chi != "" and label == "":
         label = f"-l clickhouse.altinity.com/chi={chi}"
 
     if kind == "pv":
         # pv is not namespaced so need to search namespace in claimRef
-        out = launch(f'get pv {label} -o yaml | grep "namespace: {ns}"', ok_to_fail=True)
+        out = launch(f'get pv {label} -o yaml | grep "namespace: {current().context.namespace}"', ok_to_fail=True)
     else:
         out = launch(
             f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}",
@@ -213,7 +224,7 @@ def get_count(kind, name="", label="", chi="", ns=namespace):
         return len(out.splitlines()) - 1
 
 
-def count_objects(label="", ns=namespace):
+def count_objects(label="", ns=None):
     return {
         "statefulset": get_count("sts", ns=ns, label=label),
         "pod": get_count("pod", ns=ns, label=label),
@@ -221,19 +232,19 @@ def count_objects(label="", ns=namespace):
     }
 
 
-def apply(manifest, ns=namespace, validate=True, timeout=600):
+def apply(manifest, ns=None, validate=True, timeout=600):
     with When(f"{manifest} is applied"):
         if " | " not in manifest:
             manifest = f'"{manifest}"'
             launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
         else:
             run_shell(
-                f"{manifest} | {kubectl_cmd} apply --namespace={ns} --validate={validate} -f -",
+                f"{manifest} | {kubectl_cmd} apply --namespace={current().context.namespace} --validate={validate} -f -",
                 timeout=timeout,
             )
 
 
-def apply_chi(manifest, ns=namespace, validate=True, timeout=600):
+def apply_chi(manifest, ns=None, validate=True, timeout=600):
     chi_name = yaml_manifest.get_chi_name(manifest)
     with When(f"CHI {chi_name} is applied"):
         if settings.kubectl_mode == "replace":
@@ -245,21 +256,21 @@ def apply_chi(manifest, ns=namespace, validate=True, timeout=600):
             apply(manifest, ns=ns, validate=validate, timeout=timeout)
 
 
-def create(manifest, ns=namespace, validate=True, timeout=600):
+def create(manifest, ns=None, validate=True, timeout=600):
     with When(f"{manifest} is created"):
         if "<(" not in manifest:
             manifest = f'"{manifest}"'
         launch(f"create --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
 
-def replace(manifest, ns=namespace, validate=True, timeout=600):
+def replace(manifest, ns=None, validate=True, timeout=600):
     with When(f"{manifest} is replaced"):
         if "<(" not in manifest:
             manifest = f'"{manifest}"'
         launch(f"replace --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
 
-def delete(manifest, ns=namespace, timeout=600):
+def delete(manifest, ns=None, timeout=600):
     with When(f"{manifest} is deleted"):
         if " | " not in manifest:
             manifest = f'"{manifest}"'
@@ -268,7 +279,7 @@ def delete(manifest, ns=namespace, timeout=600):
             run_shell(f"{manifest} | {kubectl_cmd} delete -f -", timeout=timeout)
 
 
-def wait_objects(chi, object_counts, ns=namespace):
+def wait_objects(chi, object_counts, ns=None):
     with Then(
         f"Waiting for: "
         f"{object_counts['statefulset']} statefulsets, "
@@ -291,7 +302,7 @@ def wait_objects(chi, object_counts, ns=namespace):
         assert cur_object_counts == object_counts, error()
 
 
-def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries, backoff=5):
+def wait_object(kind, name, label="", count=1, ns=None, retries=max_retries, backoff=5):
     with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
             cur_count = get_count(kind, ns=ns, name=name, label=label)
@@ -302,7 +313,7 @@ def wait_object(kind, name, label="", count=1, ns=namespace, retries=max_retries
         assert cur_count >= count, error()
 
 
-def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
+def wait_command(command, result, count=1, ns=None, retries=max_retries):
     with Then(f"{command} should return {result}"):
         for i in range(1, retries):
             res = launch(command, ok_to_fail=True, ns=ns)
@@ -313,15 +324,15 @@ def wait_command(command, result, count=1, ns=namespace, retries=max_retries):
         assert res == result, error()
 
 
-def wait_chi_status(chi, status, ns=namespace, retries=max_retries, throw_error=True):
+def wait_chi_status(chi, status, ns=None, retries=max_retries, throw_error=True):
     wait_field("chi", chi, ".status.status", status, ns, retries, throw_error=throw_error)
 
 
-def get_chi_status(chi, ns=namespace):
+def get_chi_status(chi, ns=None):
     get_field("chi", chi, ".status.status", ns)
 
 
-def wait_pod_status(pod, status, ns=namespace):
+def wait_pod_status(pod, status, ns=None):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
@@ -330,7 +341,7 @@ def wait_field(
     name,
     field,
     value,
-    ns=namespace,
+    ns=None,
     retries=max_retries,
     backoff=5,
     throw_error=True,
@@ -350,7 +361,7 @@ def wait_field_changed(
     name,
     field,
     prev_value,
-    ns=namespace,
+    ns=None,
     retries=max_retries,
     backoff=5,
     throw_error=True,
@@ -365,7 +376,7 @@ def wait_field_changed(
         assert cur_value != "" and cur_value != prev_value or throw_error == False, error()
 
 
-def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
+def wait_jsonpath(kind, name, field, value, ns=None, retries=max_retries):
     with Then(f"{kind} {name} -o jsonpath={field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_jsonpath(kind, name, field, ns)
@@ -376,7 +387,7 @@ def wait_jsonpath(kind, name, field, value, ns=namespace, retries=max_retries):
         assert cur_value == value, error()
 
 
-def get_field(kind, name, field, ns=namespace):
+def get_field(kind, name, field, ns=None):
     out = ""
     if get_count(kind, name=name, ns=ns) > 0:
         out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns).splitlines()
@@ -386,12 +397,12 @@ def get_field(kind, name, field, ns=namespace):
         return ""
 
 
-def get_jsonpath(kind, name, field, ns=namespace):
+def get_jsonpath(kind, name, field, ns=None):
     out = launch(f'get {kind} {name} -o jsonpath="{field}"', ns=ns).splitlines()
     return out[0]
 
 
-def get_default_storage_class(ns=namespace):
+def get_default_storage_class(ns=None):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
@@ -414,7 +425,7 @@ def get_default_storage_class(ns=namespace):
             return parts[1].strip()
 
 
-def get_pod_spec(chi_name, pod_name="", ns=namespace):
+def get_pod_spec(chi_name, pod_name="", ns=None):
     label = f"-l clickhouse.altinity.com/chi={chi_name}"
     if pod_name == "":
         pod = get("pod", "", ns=ns, label=label)["items"][0]
@@ -423,12 +434,12 @@ def get_pod_spec(chi_name, pod_name="", ns=namespace):
     return pod["spec"]
 
 
-def get_pod_image(chi_name, pod_name="", ns=namespace):
+def get_pod_image(chi_name, pod_name="", ns=None):
     pod_image = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["image"]
     return pod_image
 
 
-def get_pod_names(chi_name, ns=namespace):
+def get_pod_names(chi_name, ns=None):
     pod_names = launch(
         f"get pods -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns,
@@ -436,7 +447,7 @@ def get_pod_names(chi_name, ns=namespace):
     return pod_names[1:]
 
 
-def get_obj_names(chi_name, obj_type="pods", ns=namespace):
+def get_obj_names(chi_name, obj_type="pods", ns=None):
     pod_names = launch(
         f"get {obj_type} -o=custom-columns=name:.metadata.name -l clickhouse.altinity.com/chi={chi_name}",
         ns=ns,
@@ -444,12 +455,12 @@ def get_obj_names(chi_name, obj_type="pods", ns=namespace):
     return pod_names[1:]
 
 
-def get_pod_volumes(chi_name, pod_name="", ns=namespace):
+def get_pod_volumes(chi_name, pod_name="", ns=None):
     volume_mounts = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["volumeMounts"]
     return volume_mounts
 
 
-def get_pod_ports(chi_name, pod_name="", ns=namespace):
+def get_pod_ports(chi_name, pod_name="", ns=None):
     port_specs = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["ports"]
     ports = []
     for p in port_specs:
@@ -457,19 +468,19 @@ def get_pod_ports(chi_name, pod_name="", ns=namespace):
     return ports
 
 
-def check_pod_ports(chi_name, ports, ns=namespace):
+def check_pod_ports(chi_name, ports, ns=None):
     pod_ports = get_pod_ports(chi_name, ns=ns)
     with Then(f"Expect pod ports {pod_ports} to match {ports}"):
         assert sorted(pod_ports) == sorted(ports)
 
 
-def check_pod_image(chi_name, image, ns=namespace):
+def check_pod_image(chi_name, image, ns=None):
     pod_image = get_pod_image(chi_name, ns=ns)
     with Then(f"Expect pod image {pod_image} to match {image}"):
         assert pod_image == image
 
 
-def check_pod_volumes(chi_name, volumes, ns=namespace):
+def check_pod_volumes(chi_name, volumes, ns=None):
     pod_volumes = get_pod_volumes(chi_name, ns=ns)
     for v in volumes:
         with Then(f"Expect pod has volume mount {v}"):
@@ -481,15 +492,15 @@ def check_pod_volumes(chi_name, volumes, ns=namespace):
             assert found == 1
 
 
-def get_pvc_size(pvc_name, ns=namespace):
+def get_pvc_size(pvc_name, ns=None):
     return get_field("pvc", pvc_name, ".spec.resources.requests.storage", ns)
 
 
-def get_pv_name(pvc_name, ns=namespace):
+def get_pv_name(pvc_name, ns=None):
     return get_field("pvc", pvc_name, ".spec.volumeName", ns)
 
 
-def get_pv_size(pvc_name, ns=namespace):
+def get_pv_size(pvc_name, ns=None):
     return get_field("pv", get_pv_name(pvc_name, ns), ".spec.capacity.storage", ns)
 
 
@@ -498,14 +509,14 @@ def check_pod_antiaffinity(
     pod_name="",
     match_labels={},
     topologyKey="kubernetes.io/hostname",
-    ns=namespace,
+    ns=None,
 ):
     pod_spec = get_pod_spec(chi_name, pod_name, ns)
     if match_labels == {}:
         match_labels = {
             "clickhouse.altinity.com/app": "chop",
             "clickhouse.altinity.com/chi": f"{chi_name}",
-            "clickhouse.altinity.com/namespace": f"{ns}",
+            "clickhouse.altinity.com/namespace": f"{current().context.namespace}",
         }
     expected = {
         "requiredDuringSchedulingIgnoredDuringExecution": [
@@ -523,14 +534,14 @@ def check_pod_antiaffinity(
         assert pod_spec["affinity"]["podAntiAffinity"] == expected
 
 
-def check_service(service_name, service_type, ns=namespace):
+def check_service(service_name, service_type, ns=None):
     with When(f"{service_name} is available"):
         service = get("service", service_name, ns=ns)
         with Then(f"Service type is {service_type}"):
             assert service["spec"]["type"] == service_type
 
 
-def check_configmaps(chi_name, ns=namespace):
+def check_configmaps(chi_name, ns=None):
     check_configmap(
         f"chi-{chi_name}-common-configd",
         [
@@ -551,14 +562,14 @@ def check_configmaps(chi_name, ns=namespace):
     )
 
 
-def check_configmap(cfg_name, values, ns=namespace):
+def check_configmap(cfg_name, values, ns=None):
     cfm = get("configmap", cfg_name, ns=ns)
     for v in values:
         with Then(f"{cfg_name} should contain {v}"):
             assert v in cfm["data"]
 
 
-def check_pdb(chi, clusters, ns=namespace):
+def check_pdb(chi, clusters, ns=None):
     for c in clusters:
         with Then(f"PDB is configured for cluster {c}"):
             pdb = get("pdb", chi + "-" + c)

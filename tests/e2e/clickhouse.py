@@ -1,5 +1,6 @@
 import e2e.kubectl as kubectl
 import e2e.settings as settings
+from testflows.core import *
 
 
 def query(
@@ -28,7 +29,7 @@ def query(
 
     if with_error:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns} -c {container}"
+            f"exec {pod_name} -n {current().context.namespace} -c {container}"
             f" --"
             f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f' --query="{sql}"'
@@ -39,7 +40,7 @@ def query(
         )
     else:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns} -c {container}"
+            f"exec {pod_name} -n {current().context.namespace} -c {container}"
             f" -- "
             f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f'--query="{sql}"',
