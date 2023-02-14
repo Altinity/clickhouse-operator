@@ -4,6 +4,9 @@ kind: Grafana
 metadata:
   name: "$GRAFANA_NAME"
 spec:
+  deployment:
+    annotations:
+      cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
   ingress:
     enabled: False
 #  baseImage: "grafana/grafana:9.3.6"
