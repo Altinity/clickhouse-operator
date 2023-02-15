@@ -1,0 +1,59 @@
+---
+# need run ./deploy/prometheus/create-prometheus.sh first
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: clickhouse-metrics
+  namespace: prometheus
+  labels:
+    app: prometheus
+spec:
+  namespaceSelector:
+    matchNames:
+      - test
+  selector:
+    matchLabels:
+      clickhouse.altinity.com/app: chop
+  podMetricsEndpoints:
+    - port: "metrics"
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: internal-prometheus-example
+  namespace: test
+spec:
+  defaults:
+    templates:
+      podTemplate: pod-template-with-metrics
+  templates:
+    podTemplates:
+      - name: pod-template-with-metrics
+        metadata:
+          # for `additionalScrapeConfigs`, look https://github.com/Altinity/clickhouse-operator/blob/master/deploy/prometheus/prometheus-template.yaml#L11
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/path: "/metrics"
+            prometheus.io/port: "9363"
+        spec:
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:latest
+              # for `PodMonitor`
+              ports:
+                - name: "metrics"
+                  containerPort: 9363
+  configuration:
+    settings:
+      # listen clickhosue-server embedded prometheus endpoint
+      prometheus/endpoint: /metrics
+      prometheus/port: 9363
+      prometheus/metrics: true
+      prometheus/events: true
+      prometheus/asynchronous_metrics: true
+      prometheus/status_info: true
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1

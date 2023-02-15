@@ -4,9 +4,14 @@ kind: Grafana
 metadata:
   name: "$GRAFANA_NAME"
 spec:
+  deployment:
+    annotations:
+      cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+    securityContext:
+      fsGroup: 472
   ingress:
     enabled: False
-  baseImage: "grafana/grafana:9.3.6"
+#  baseImage: "grafana/grafana:9.3.6"
   dataStorage:
     size: 1Gi
     accessModes:
