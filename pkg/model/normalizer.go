@@ -1245,10 +1245,13 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *chiV1.Settings, u
 	passwordPlaintext := users.Get(username + "/password").String()
 
 	// Apply default password for password-less non-default users
+	// 1. NB "default" user keeps empty password in here.
+	// 2. ClickHouse user gets password from his section of chop configuration
+	// 3. All the rest users get default password
 	if passwordPlaintext == "" {
 		switch username {
 		case defaultUsername:
-			// NB "default" user may keep empty password in here.
+			// NB "default" user keeps empty password in here.
 		case chopUsername:
 			passwordPlaintext = chop.Config().ClickHouse.Access.Password
 		default:
@@ -1256,16 +1259,16 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *chiV1.Settings, u
 		}
 	}
 
-	// NB "default" user may keep empty password in here.
-
+	// Replace plaintext password with encrypted
 	if passwordPlaintext != "" {
-		// Replace plaintext password with encrypted
 		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
 		users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-		// And keep it only
+		// And keep only one password specification
 		users.Delete(username + "/password_double_sha1_hex")
 		users.Delete(username + "/password")
 	}
+
+	// NB "default" user may keep empty password in here.
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
