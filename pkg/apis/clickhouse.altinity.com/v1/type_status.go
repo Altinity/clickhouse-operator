@@ -40,6 +40,8 @@ type ChiStatus struct {
 	Errors                 []string                `json:"errors,omitempty"              yaml:"errors,omitempty"`
 	HostsUpdatedCount      int                     `json:"hostsUpdated,omitempty"        yaml:"hostsUpdated,omitempty"`
 	HostsAddedCount        int                     `json:"hostsAdded,omitempty"          yaml:"hostsAdded,omitempty"`
+	HostsUnchangedCount    int                     `json:"hostsUnchanged,omitempty"      yaml:"hostsUnchanged,omitempty"`
+	HostsFailedCount       int                     `json:"hostsFailed,omitempty"         yaml:"hostsFailed,omitempty"`
 	HostsCompletedCount    int                     `json:"hostsCompleted,omitempty"      yaml:"hostsCompleted,omitempty"`
 	HostsDeletedCount      int                     `json:"hostsDeleted,omitempty"        yaml:"hostsDeleted,omitempty"`
 	HostsDeleteCount       int                     `json:"hostsDelete,omitempty"         yaml:"hostsDelete,omitempty"`
@@ -323,8 +325,8 @@ func (s *ChiStatus) GetPodIPS() []string {
 	return s.PodIPs
 }
 
-// UpdateHost updates updated hosts counter
-func (s *ChiStatus) UpdateHost() {
+// HostUpdated updates updated hosts counter
+func (s *ChiStatus) HostUpdated() {
 	if s == nil {
 		return
 	}
@@ -332,11 +334,29 @@ func (s *ChiStatus) UpdateHost() {
 	s.HostsCompletedCount++
 }
 
-// AddHost updates added hosts counter
-func (s *ChiStatus) AddHost() {
+// HostAdded updates added hosts counter
+func (s *ChiStatus) HostAdded() {
 	if s == nil {
 		return
 	}
 	s.HostsAddedCount++
+	s.HostsCompletedCount++
+}
+
+// HostUnchanged updates unchanged hosts counter
+func (s *ChiStatus) HostUnchanged() {
+	if s == nil {
+		return
+	}
+	s.HostsUnchangedCount++
+	s.HostsCompletedCount++
+}
+
+// HostFailed updates failed hosts counter
+func (s *ChiStatus) HostFailed() {
+	if s == nil {
+		return
+	}
+	s.HostsFailedCount++
 	s.HostsCompletedCount++
 }

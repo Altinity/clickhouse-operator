@@ -1248,17 +1248,12 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 
 	err := w.c.createStatefulSet(ctx, host)
 
-	host.CHI.EnsureStatus().AddHost()
+	host.CHI.EnsureStatus().HostAdded()
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 			MainFields: true,
 		},
 	})
-	w.a.V(1).
-		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
-		WithStatusAction(host.CHI).
-		M(host).F().
-		Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 
 	if err == nil {
 		w.a.V(1).
@@ -1354,17 +1349,12 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 	if chopModel.IsStatefulSetReady(curStatefulSet) {
 		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 		if err == nil {
-			host.CHI.EnsureStatus().UpdateHost()
+			host.CHI.EnsureStatus().HostUpdated()
 			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 					MainFields: true,
 				},
 			})
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
-				WithStatusAction(host.CHI).
-				M(host).F().
-				Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 				WithStatusAction(host.CHI).
