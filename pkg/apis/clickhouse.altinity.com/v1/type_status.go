@@ -51,6 +51,7 @@ type ChiStatus struct {
 	Endpoint               string                  `json:"endpoint,omitempty"            yaml:"endpoint,omitempty"`
 	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"          yaml:"normalized,omitempty"`
 	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty" yaml:"normalizedCompleted,omitempty"`
+	HostsWithTablesCreated []string                `json:"tablesCreated,omitempty"       yaml:"tablesCreated,omitempty"`
 }
 
 const (
@@ -58,6 +59,17 @@ const (
 	maxErrors  = 10
 	maxTaskIDs = 10
 )
+
+func (s *ChiStatus) PushHostTablesCreated(host string) {
+	if s == nil {
+		return
+	}
+	if util.InArray(host, s.HostsWithTablesCreated) {
+		return
+	}
+
+	s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, host)
+}
 
 // PushAction pushes action into status
 func (s *ChiStatus) PushAction(action string) {
@@ -196,6 +208,10 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 	if opts.Actions {
 		s.Action = from.Action
 		s.MergeActions(from)
+		s.HostsWithTablesCreated = nil
+		if len(from.HostsWithTablesCreated) > 0 {
+			s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
+		}
 	}
 
 	if opts.Errors {
@@ -231,7 +247,6 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.FQDNs = from.FQDNs
 		s.Endpoint = from.Endpoint
 		s.NormalizedCHI = from.NormalizedCHI
-
 	}
 
 	if opts.Normalized {

@@ -752,8 +752,19 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 
 	err := w.schemer.HostCreateTables(ctx, host)
-	if err != nil {
-		w.a.M(host).F().Error("ERROR create tables on host %s. err: %v", host.Name, err)
+	host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Info("Tables added successfully on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+	} else {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName, err)
 	}
 	return err
 }

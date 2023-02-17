@@ -663,6 +663,11 @@ func (in *ChiStatus) DeepCopyInto(out *ChiStatus) {
 		*out = new(ClickHouseInstallation)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.HostsWithTablesCreated != nil {
+		in, out := &in.HostsWithTablesCreated, &out.HostsWithTablesCreated
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
