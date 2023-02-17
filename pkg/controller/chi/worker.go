@@ -745,6 +745,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 		WithStatusAction(host.GetCHI()).
 		M(host).F().
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+
 	err := w.schemer.HostCreateTables(ctx, host)
 	if err != nil {
 		w.a.M(host).F().Error("ERROR create tables on host %s. err: %v", host.Name, err)
