@@ -381,9 +381,6 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
 	MakeObjectVersion(&statefulSet.ObjectMeta, statefulSet)
 
-	host.StatefulSet = statefulSet
-	host.DesiredStatefulSet = statefulSet
-
 	return statefulSet
 }
 

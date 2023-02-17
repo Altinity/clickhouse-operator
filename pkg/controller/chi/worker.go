@@ -719,9 +719,14 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chi
 		return
 	}
 
-	// StatefulSet for a host
-	_ = w.task.creator.CreateStatefulSet(host, shutdown)
+	w.prepareDesiredStatefulSet(host, shutdown)
 	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host.StatefulSet.ObjectMeta))
+}
+
+// prepareDesiredStatefulSet prepares desired StatefulSet
+func (w *worker) prepareDesiredStatefulSet(host *chiV1.ChiHost, shutdown bool) {
+	host.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
+	host.StatefulSet = host.DesiredStatefulSet
 }
 
 // migrateTables
