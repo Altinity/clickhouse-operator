@@ -125,10 +125,10 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
-	if sts, err := c.getStatefulSet(host); err == nil {
-		// We need to set cur StatefulSet to a deletable one temporary
-		host.StatefulSet = sts
-	} else {
+	var err error
+	host.CurStatefulSet, err = c.getStatefulSet(host)
+	if err != nil {
+		// Unable to fetch cur StatefulSet, but this is not necessarily an error yet
 		if apiErrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 		} else {
@@ -136,6 +136,9 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 		}
 		return err
 	}
+
+	// Cur StatefulSet fetched
+	host.StatefulSet = host.CurStatefulSet
 
 	// Scale StatefulSet down to 0 pods count.
 	// This is the proper and graceful way to delete StatefulSet

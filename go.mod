@@ -2,10 +2,7 @@ module github.com/altinity/clickhouse-operator
 
 go 1.19
 
-replace (
-	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
-	golang.org/x/text => golang.org/x/text v0.3.8
-)
+replace github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
 
 replace (
 	k8s.io/api => k8s.io/api v0.21.7

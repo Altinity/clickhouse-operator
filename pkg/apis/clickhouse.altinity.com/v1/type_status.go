@@ -40,6 +40,8 @@ type ChiStatus struct {
 	Errors                 []string                `json:"errors,omitempty"              yaml:"errors,omitempty"`
 	HostsUpdatedCount      int                     `json:"hostsUpdated,omitempty"        yaml:"hostsUpdated,omitempty"`
 	HostsAddedCount        int                     `json:"hostsAdded,omitempty"          yaml:"hostsAdded,omitempty"`
+	HostsUnchangedCount    int                     `json:"hostsUnchanged,omitempty"      yaml:"hostsUnchanged,omitempty"`
+	HostsFailedCount       int                     `json:"hostsFailed,omitempty"         yaml:"hostsFailed,omitempty"`
 	HostsCompletedCount    int                     `json:"hostsCompleted,omitempty"      yaml:"hostsCompleted,omitempty"`
 	HostsDeletedCount      int                     `json:"hostsDeleted,omitempty"        yaml:"hostsDeleted,omitempty"`
 	HostsDeleteCount       int                     `json:"hostsDelete,omitempty"         yaml:"hostsDelete,omitempty"`
@@ -49,6 +51,7 @@ type ChiStatus struct {
 	Endpoint               string                  `json:"endpoint,omitempty"            yaml:"endpoint,omitempty"`
 	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"          yaml:"normalized,omitempty"`
 	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty" yaml:"normalizedCompleted,omitempty"`
+	HostsWithTablesCreated []string                `json:"tablesCreated,omitempty"       yaml:"tablesCreated,omitempty"`
 }
 
 const (
@@ -56,6 +59,17 @@ const (
 	maxErrors  = 10
 	maxTaskIDs = 10
 )
+
+func (s *ChiStatus) PushHostTablesCreated(host string) {
+	if s == nil {
+		return
+	}
+	if util.InArray(host, s.HostsWithTablesCreated) {
+		return
+	}
+
+	s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, host)
+}
 
 // PushAction pushes action into status
 func (s *ChiStatus) PushAction(action string) {
@@ -194,6 +208,10 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 	if opts.Actions {
 		s.Action = from.Action
 		s.MergeActions(from)
+		s.HostsWithTablesCreated = nil
+		if len(from.HostsWithTablesCreated) > 0 {
+			s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
+		}
 	}
 
 	if opts.Errors {
@@ -229,7 +247,6 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.FQDNs = from.FQDNs
 		s.Endpoint = from.Endpoint
 		s.NormalizedCHI = from.NormalizedCHI
-
 	}
 
 	if opts.Normalized {
@@ -323,8 +340,8 @@ func (s *ChiStatus) GetPodIPS() []string {
 	return s.PodIPs
 }
 
-// UpdateHost updates updated hosts counter
-func (s *ChiStatus) UpdateHost() {
+// HostUpdated updates updated hosts counter
+func (s *ChiStatus) HostUpdated() {
 	if s == nil {
 		return
 	}
@@ -332,11 +349,29 @@ func (s *ChiStatus) UpdateHost() {
 	s.HostsCompletedCount++
 }
 
-// AddHost updates added hosts counter
-func (s *ChiStatus) AddHost() {
+// HostAdded updates added hosts counter
+func (s *ChiStatus) HostAdded() {
 	if s == nil {
 		return
 	}
 	s.HostsAddedCount++
+	s.HostsCompletedCount++
+}
+
+// HostUnchanged updates unchanged hosts counter
+func (s *ChiStatus) HostUnchanged() {
+	if s == nil {
+		return
+	}
+	s.HostsUnchangedCount++
+	s.HostsCompletedCount++
+}
+
+// HostFailed updates failed hosts counter
+func (s *ChiStatus) HostFailed() {
+	if s == nil {
+		return
+	}
+	s.HostsFailedCount++
 	s.HostsCompletedCount++
 }

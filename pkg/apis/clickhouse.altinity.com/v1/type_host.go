@@ -23,7 +23,8 @@ import (
 type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
-	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
+	Port int32 `json:"port,omitempty"                yaml:"port,omitempty"`
+
 	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`

@@ -719,9 +719,14 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chi
 		return
 	}
 
-	// StatefulSet for a host
-	_ = w.task.creator.CreateStatefulSet(host, shutdown)
+	w.prepareDesiredStatefulSet(host, shutdown)
 	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host.StatefulSet.ObjectMeta))
+}
+
+// prepareDesiredStatefulSet prepares desired StatefulSet
+func (w *worker) prepareDesiredStatefulSet(host *chiV1.ChiHost, shutdown bool) {
+	host.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
+	host.StatefulSet = host.DesiredStatefulSet
 }
 
 // migrateTables
@@ -745,9 +750,21 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 		WithStatusAction(host.GetCHI()).
 		M(host).F().
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+
 	err := w.schemer.HostCreateTables(ctx, host)
-	if err != nil {
-		w.a.M(host).F().Error("ERROR create tables on host %s. err: %v", host.Name, err)
+	host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Info("Tables added successfully on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+	} else {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName, err)
 	}
 	return err
 }
@@ -1248,17 +1265,12 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 
 	err := w.c.createStatefulSet(ctx, host)
 
-	host.CHI.EnsureStatus().AddHost()
+	host.CHI.EnsureStatus().HostAdded()
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 			MainFields: true,
 		},
 	})
-	w.a.V(1).
-		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
-		WithStatusAction(host.CHI).
-		M(host).F().
-		Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 
 	if err == nil {
 		w.a.V(1).
@@ -1354,17 +1366,12 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 	if chopModel.IsStatefulSetReady(curStatefulSet) {
 		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 		if err == nil {
-			host.CHI.EnsureStatus().UpdateHost()
+			host.CHI.EnsureStatus().HostUpdated()
 			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 					MainFields: true,
 				},
 			})
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
-				WithStatusAction(host.CHI).
-				M(host).F().
-				Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 				WithStatusAction(host.CHI).
