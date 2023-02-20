@@ -1016,7 +1016,7 @@ def test_013_1(self):
 
     table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-013-1-schema-propagation-simple-0-0-0").split()
 
-    with Then("I check tables are propagated correctly"):
+    with Then("I check tables are propagated correctly 1"):
         for attempt in retries(timeout=500, delay=1):
             with attempt:
                 for table_name in table_names:
@@ -1062,7 +1062,7 @@ def test_013_1(self):
         chi, f"show tables", pod="chi-test-013-1-schema-propagation-simple-1-0-0"
     ).split()
 
-    with Then("I check tables are propagated correctly"):
+    with Then("I check tables are propagated correctly 2"):
         for attempt in retries(timeout=500, delay=1):
             with attempt:
                 assert len(tables_on_second_shard) == 2, error()
