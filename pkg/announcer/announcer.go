@@ -181,10 +181,8 @@ func (a Announcer) M(m ...interface{}) Announcer {
 				return a
 			}
 			b.meta = typed.Namespace + "/" + typed.Name
-			if typed.Spec.TaskID != nil {
-				if len(*typed.Spec.TaskID) > 0 {
-					b.meta += "/" + *typed.Spec.TaskID
-				}
+			if typed.Spec.HasTaskID() {
+				b.meta += "/" + typed.Spec.GetTaskID()
 			}
 		default:
 			if meta, ok := a.findMeta(m[0]); ok {
