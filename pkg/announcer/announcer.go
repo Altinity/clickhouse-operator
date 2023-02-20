@@ -403,10 +403,8 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 		return "", false
 	}
 	res := chi.Namespace + "/" + chi.Name
-	if chi.Spec.TaskID != nil {
-		if len(*chi.Spec.TaskID) > 0 {
-			res += "/" + *chi.Spec.TaskID
-		}
+	if chi.Spec.HasTaskID() {
+		res += "/" + chi.Spec.GetTaskID()
 	}
 	return res, true
 }

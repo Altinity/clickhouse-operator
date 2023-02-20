@@ -466,6 +466,25 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	chi.Attributes = from.Attributes
 }
 
+func (spec *ChiSpec) HasTaskID() bool {
+	switch {
+	case spec == nil:
+		return false
+	case spec.TaskID == nil:
+		return false
+	case len(*spec.TaskID) == 0:
+		return false
+	default: return true
+	}
+}
+
+func (spec *ChiSpec) GetTaskID() string {
+	if spec.HasTaskID() {
+		return *spec.TaskID
+	}
+	return ""
+}
+
 // MergeFrom merges from spec
 func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
