@@ -37,7 +37,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.EnsureStatus().ClustersCount = chi.ClustersCount()
 	chi.EnsureStatus().ShardsCount = chi.ShardsCount()
 	chi.EnsureStatus().HostsCount = chi.HostsCount()
-	chi.EnsureStatus().TaskID = *chi.Spec.TaskID
+	chi.EnsureStatus().TaskID = chi.Spec.GetTaskID()
 	chi.EnsureStatus().HostsUpdatedCount = 0
 	chi.EnsureStatus().HostsAddedCount = 0
 	chi.EnsureStatus().HostsCompletedCount = 0
@@ -464,6 +464,10 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 
 	// Copy service attributes
 	chi.Attributes = from.Attributes
+
+	chi.EnsureStatus().CopyFrom(from.Status, CopyCHIStatusOptions{
+		InheritableFields: true,
+	})
 }
 
 func (spec *ChiSpec) HasTaskID() bool {
@@ -474,7 +478,8 @@ func (spec *ChiSpec) HasTaskID() bool {
 		return false
 	case len(*spec.TaskID) == 0:
 		return false
-	default: return true
+	default:
+		return true
 	}
 }
 
@@ -493,6 +498,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 
 	switch _type {
 	case MergeTypeFillEmptyValues:
+		if !spec.HasTaskID() {
+			spec.TaskID = from.TaskID
+		}
 		if !spec.Stop.HasValue() {
 			spec.Stop = spec.Stop.MergeFrom(from.Stop)
 		}
@@ -506,6 +514,9 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
 		}
 	case MergeTypeOverrideByNonEmptyValues:
+		if from.HasTaskID() {
+			spec.TaskID = from.TaskID
+		}
 		if from.Stop.HasValue() {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
