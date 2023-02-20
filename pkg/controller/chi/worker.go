@@ -556,7 +556,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseIn
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
-		Info("reconcile started")
+		Info("reconcile started, task id: %s", chi.Spec.GetTaskID())
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
@@ -595,7 +595,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHou
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
-		Info("reconcile completed")
+		Info("reconcile completed, task id: %s", _chi.Spec.GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
@@ -773,13 +773,16 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 func (w *worker) shouldMigrateTables(host *chiV1.ChiHost) bool {
 	switch {
 	case host.GetCHI().IsStopped():
-		// Stopped host is not able to receive data
+		// Stopped host is not able to receive any data
 		return false
-	case host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame:
-		// No need to migrate on the same host
+
+	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().HostsWithTablesCreated):
+		// This host is listed as having tables created already
 		return false
+
+	default:
+		return true
 	}
-	return true
 }
 
 // excludeHost excludes host from ClickHouse clusters if required
