@@ -72,6 +72,16 @@ func (s *ChiStatus) PushHostTablesCreated(host string) {
 	s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, host)
 }
 
+func (s *ChiStatus) SyncHostTablesCreated() {
+	if s == nil {
+		return
+	}
+	if s.FQDNs == nil {
+		return
+	}
+	s.HostsWithTablesCreated = util.IntersectStringArrays(s.HostsWithTablesCreated, s.FQDNs)
+}
+
 // PushAction pushes action into status
 func (s *ChiStatus) PushAction(action string) {
 	if s == nil {
