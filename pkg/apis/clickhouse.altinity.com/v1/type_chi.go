@@ -470,6 +470,7 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	})
 }
 
+// HasTaskID checks whether task id is specified
 func (spec *ChiSpec) HasTaskID() bool {
 	switch {
 	case spec == nil:
@@ -483,6 +484,7 @@ func (spec *ChiSpec) HasTaskID() bool {
 	}
 }
 
+// GetTaskID gets task id as a string
 func (spec *ChiSpec) GetTaskID() string {
 	if spec.HasTaskID() {
 		return *spec.TaskID
