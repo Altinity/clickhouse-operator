@@ -60,6 +60,7 @@ const (
 	maxTaskIDs = 10
 )
 
+// PushHostTablesCreated pushes host to the list of hosts with created tables
 func (s *ChiStatus) PushHostTablesCreated(host string) {
 	if s == nil {
 		return
