@@ -65,20 +65,24 @@ def restart_operator(ns=settings.operator_namespace, timeout=600):
     print(f"new operator pod: {new_pod_name} ip: {new_pod_ip}")
 
 
-def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=False):
+def require_keeper(keeper_manifest="", keeper_configmap="", keeper_type="zookeeper", force_install=False):
     if force_install or kubectl.get_count("service", name=keeper_type) == 0:
 
         if keeper_type == "zookeeper":
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+            keeper_configmap = "zookeeper-1-node-1GB-for-tests-only.yaml" if keeper_configmap == "" else keeper_configmap
+            keeper_configmap = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_configmap}"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = (
                 "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
             keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+            keeper_configmap = f""
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+            keeper_configmap = f""
 
         multi_doc = yaml_manifest.get_multidoc_manifest_data(get_full_path(keeper_manifest, lookup_in_host=True))
         keeper_nodes = 1
@@ -101,6 +105,10 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
             docs_count == expected_docs[keeper_type]
         ), f"invalid {keeper_type} manifest, expected {expected_docs[keeper_type]}, actual {docs_count} documents in {keeper_manifest} file"
         with Given(f"Install {keeper_type} {keeper_nodes} nodes"):
+            if keeper_configmap != "":
+                kubectl.apply(get_full_path(keeper_configmap, lookup_in_host=False))
+                with Then("wait when ConfigMap will promote"):
+                    time.sleep(60)
             kubectl.apply(get_full_path(keeper_manifest, lookup_in_host=False))
             for pod_num in range(keeper_nodes):
                 kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}")
@@ -134,6 +142,7 @@ def install_clickhouse_and_keeper(
     chi_name,
     keeper_type="zookeeper",
     keeper_manifest="",
+    keeper_configmap="",
     force_keeper_install=False,
     clean_ns=True,
     keeper_install_first=True,
@@ -142,10 +151,13 @@ def install_clickhouse_and_keeper(
     if keeper_manifest == "":
         if keeper_type == "zookeeper":
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml"
+            keeper_configmap = "zookeeper-1-node-configmap-for-tests-only.yaml"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml"
+            keeper_configmap = ""
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml"
+            keeper_configmap = ""
 
     with Given("install zookeeper/clickhouse-keeper + clickhouse"):
         if clean_ns:
@@ -157,6 +169,7 @@ def install_clickhouse_and_keeper(
             require_keeper(
                 keeper_type=keeper_type,
                 keeper_manifest=keeper_manifest,
+                keeper_configmap=keeper_configmap,
                 force_install=force_keeper_install,
             )
 
@@ -193,6 +206,7 @@ def install_clickhouse_and_keeper(
             require_keeper(
                 keeper_type=keeper_type,
                 keeper_manifest=keeper_manifest,
+                keeper_configmap=keeper_configmap,
                 force_install=force_keeper_install,
             )
 

@@ -135,15 +135,19 @@ def rescale_zk_and_clickhouse(
     keeper_type,
     keeper_manifest_1_node,
     keeper_manifest_3_node,
+    keeper_configmap_1_node,
+    keeper_configmap_3_node,
     first_install=False,
     clean_ns=None,
 ):
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
+    keeper_configmap = keeper_configmap_1_node if keeper_node_count == 1 else keeper_configmap_3_node
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f"manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-latest.yaml",
         chi_name="test-cluster-for-zk",
         keeper_manifest=keeper_manifest,
+        keeper_configmap=keeper_configmap,
         keeper_type=keeper_type,
         clean_ns=first_install if clean_ns is None else clean_ns,
         force_keeper_install=True,
@@ -160,6 +164,8 @@ def test_keeper_outline(
     pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
     keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
     keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
+    keeper_configmap_1_node="",
+    keeper_configmap_3_node="",
 ):
     """
     test scenario for Zoo/Clickhouse Keeper
@@ -180,6 +186,8 @@ def test_keeper_outline(
             keeper_type=keeper_type,
             keeper_manifest_1_node=keeper_manifest_1_node,
             keeper_manifest_3_node=keeper_manifest_3_node,
+            keeper_configmap_1_node=keeper_configmap_1_node,
+            keeper_configmap_3_node=keeper_configmap_3_node,
             first_install=True,
         )
         util.wait_clickhouse_cluster_ready(chi)
@@ -203,6 +211,8 @@ def test_keeper_outline(
                     keeper_type=keeper_type,
                     keeper_manifest_1_node=keeper_manifest_1_node,
                     keeper_manifest_3_node=keeper_manifest_3_node,
+                    keeper_configmap_1_node=keeper_configmap_1_node,
+                    keeper_configmap_3_node=keeper_configmap_3_node,
                 )
                 wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
                 check_zk_root_znode(chi, keeper_type, pod_count=3)
@@ -223,6 +233,8 @@ def test_keeper_outline(
                     keeper_type=keeper_type,
                     keeper_manifest_1_node=keeper_manifest_1_node,
                     keeper_manifest_3_node=keeper_manifest_3_node,
+                    keeper_configmap_1_node=keeper_configmap_1_node,
+                    keeper_configmap_3_node=keeper_configmap_3_node,
                 )
                 wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
                 check_zk_root_znode(chi, keeper_type, pod_count=1)
@@ -243,6 +255,8 @@ def test_keeper_outline(
             keeper_type=keeper_type,
             keeper_manifest_1_node=keeper_manifest_1_node,
             keeper_manifest_3_node=keeper_manifest_3_node,
+            keeper_configmap_1_node=keeper_configmap_1_node,
+            keeper_configmap_3_node=keeper_configmap_3_node,
         )
         check_zk_root_znode(chi, keeper_type, pod_count=3)
 
@@ -273,7 +287,9 @@ def test_zookeeper_rescale(self):
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
+        keeper_configmap_1_node="zookeeper-1-node-configmap-for-tests-only.yaml",
         keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
+        keeper_configmap_3_node="zookeeper-3-nodes-configmap-for-tests-only.yaml",
     )
 
 

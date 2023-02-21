@@ -69,7 +69,7 @@ spec:
   replicas: 1
   updateStrategy:
     type: RollingUpdate
-  podManagementPolicy: Parallel
+  podManagementPolicy: OrderedReady
   template:
     metadata:
       labels:
@@ -82,7 +82,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.8.0"
+          image: "docker.io/zookeeper:3.8.1"
           ports:
             - containerPort: 2181
               name: client
@@ -98,10 +98,9 @@ spec:
 # https://github.com/ClickHouse/ClickHouse/issues/11781
           command:
             - bash
-            - -x
             - -c
             - |
-              SERVERS=1 &&
+              source /etc/zookeeper-settings/zookeeper-nodes.sh &&
               HOST=`hostname -s` &&
               DOMAIN=`hostname -d` &&
               CLIENT_PORT=2181 &&
@@ -138,15 +137,15 @@ spec:
                 echo "log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender"
                 echo "log4j.appender.CONSOLE.Threshold=\${zookeeper.console.threshold}"
                 echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
-                echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
+                echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} - %-5p [%t:%C{1}@%L] - %m%n"
               } > /conf/log4j.properties &&
-              echo 'JVMFLAGS="-Xms128M -Xmx4G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"' > /conf/java.env &&
+              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"' > /conf/java.env &&
               if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
-                  NAME=${BASH_REMATCH[1]}
-                  ORD=${BASH_REMATCH[2]}
+                  NAME=${BASH_REMATCH[1]} &&
+                  ORD=${BASH_REMATCH[2]};
               else
-                  echo "Failed to parse name and ordinal of Pod"
-                  exit 1
+                  echo "Failed to parse name and ordinal of Pod" &&
+                  exit 1;
               fi &&
               mkdir -p ${ZOO_DATA_DIR} &&
               mkdir -p ${ZOO_DATA_LOG_DIR} &&
@@ -160,35 +159,39 @@ spec:
               else
                   echo "group.1=1:2:3" >> /conf/zoo.cfg;
               fi &&
-              for (( i=1; i<=$SERVERS; i++ )); do
-                  WEIGHT=1
-                  if [[ $i == 1 ]]; then
-                    WEIGHT=10
-                  fi
-                  echo "weight.$i=$WEIGHT" >> /conf/zoo.cfg;
-              done &&
-              chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" "$ZOO_CONF_DIR" &&
-              zkServer.sh start-foreground
+              chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" &&
+              zkServer.sh start-foreground & 
+              MD5SUM=$(md5sum /etc/zookeeper-settings/zookeeper-nodes.sh | awk '{print $1}') &&
+              while true; do
+                MY_ID=$(cat /var/lib/zookeeper/data/myid) &&
+                CURRENT_MD5SUM=$(md5sum /etc/zookeeper-settings/zookeeper-nodes.sh | awk '{print $1}');
+                if [[ "$MY_ID" == "1" && "$CURRENT_MD5SUM" != "$MD5SUM" ]]; then
+                  echo "Zookeeper Configuration Changed" &&
+                  kill -s STOP $(pgrep java) &&
+                  exit 0;
+                fi;
+                sleep 1;
+              done
           readinessProbe:
             exec:
               command:
                 - bash
                 - -c
-                - "OK=$(echo ruok | nc 127.0.0.1 2181);
-                   if [[ \"$OK\" == \"imok\" ]];
+                - 'OK=$(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;);
+                   if [[ "$OK" == "imok" ]];
                    then
-                      STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_server_state | cut -d \" \" -f 2);
-                      if [[ \"$STATE\" == \"leader\" ]]; then
-                        SYNCED_FOLLOWERS=$(echo mntr | nc 127.0.0.1 2181 | grep zk_synced_followers | cut -d \" \" -f 2 | cut -d \".\" -f 1);
+                      STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_server_state | cut -d " " -f 2);
+                      if [[ "$STATE" == "leader" ]]; then
+                        SYNCED_FOLLOWERS=$(echo mntr | nc 127.0.0.1 2181 | grep zk_synced_followers | cut -d " " -f 2 | cut -d "." -f 1);
                         if [[ $SYNCED_FOLLOWERS == $(( $SERVERS - 1 )) ]]; then
                           ./bin/zkCli.sh ls /;
                           exit $?;
                         else
                           exit 1;
                         fi;
-                      elif [[ \"$STATE\" == \"follower\" ]]; then
+                      elif [[ "$STATE" == "follower" ]]; then
                         PEER_STATE=$(echo mntr | nc 127.0.0.1 2181 | grep zk_peer_state);
-                        if [[ \"$PEER_STATE\" == \"following - broadcast\" ]]; then
+                        if [[ "$PEER_STATE" == "following - broadcast" ]]; then
                           ./bin/zkCli.sh ls /;
                           exit $?;
                         else
@@ -197,24 +200,34 @@ spec:
                       fi;
                     else
                       exit 1;
-                    fi"
+                    fi'
             initialDelaySeconds: 10
             timeoutSeconds: 5
           livenessProbe:
             exec:
               command:
                 - bash
-                - -c
-                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
+                - -xc
+                - 'date && OK=$(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;); if [[ "$OK" == "imok" ]]; then exit 0; else exit 1; fi'
             initialDelaySeconds: 10
             timeoutSeconds: 5
           volumeMounts:
             - name: datadir-volume
               mountPath: /var/lib/zookeeper
+            - name: zookeeper-settings
+              mountPath: /etc/zookeeper-settings
       # Run as a non-privileged user
       securityContext:
         runAsUser: 1000
         fsGroup: 1000
+      volumes:
+        - name: zookeeper-settings
+          configMap:
+            name: zookeeper-settings
+            items:
+              - key: zookeeper-nodes.sh
+                path: zookeeper-nodes.sh
+
   volumeClaimTemplates:
     - metadata:
         name: datadir-volume

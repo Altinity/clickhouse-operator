@@ -1,0 +1,11 @@
+# Setup Service to provide access to Zookeeper for clients
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-settings
+  labels:
+    app: zookeeper
+data:
+  zookeeper-nodes.sh: |
+    #!/bin/bash
+    export SERVERS=3
