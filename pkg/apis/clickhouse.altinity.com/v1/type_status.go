@@ -72,6 +72,7 @@ func (s *ChiStatus) PushHostTablesCreated(host string) {
 	s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, host)
 }
 
+// SyncHostTablesCreated syncs list of hosts with tables created with actual list of hosts
 func (s *ChiStatus) SyncHostTablesCreated() {
 	if s == nil {
 		return
