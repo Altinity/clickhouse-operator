@@ -1016,7 +1016,7 @@ def test_013_1(self):
 
     table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-013-1-schema-propagation-simple-0-0-0").split()
 
-    with Then("I check tables are propagated correctly"):
+    with Then("I check tables are propagated correctly 1"):
         for attempt in retries(timeout=500, delay=1):
             with attempt:
                 for table_name in table_names:
@@ -1062,7 +1062,7 @@ def test_013_1(self):
         chi, f"show tables", pod="chi-test-013-1-schema-propagation-simple-1-0-0"
     ).split()
 
-    with Then("I check tables are propagated correctly"):
+    with Then("I check tables are propagated correctly 2"):
         for attempt in retries(timeout=500, delay=1):
             with attempt:
                 assert len(tables_on_second_shard) == 2, error()
@@ -2215,6 +2215,11 @@ def test_023(self):
         assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
     with Then("Pod annotation should populated from template"):
         assert kubectl.get_field("pod", "chi-test-001-single-0-0-0", ".metadata.annotations.test") == "test"
+    with Then("Environment variable from a template should be populated"):
+       pod = kubectl.get_pod_spec(chi)
+       env = pod["containers"][0]["env"][0]
+       assert env["name"] == "TEST_ENV"
+       assert env["value"] == "TEST_ENV_VALUE"
 
     kubectl.delete_chi(chi)
     kubectl.delete(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))

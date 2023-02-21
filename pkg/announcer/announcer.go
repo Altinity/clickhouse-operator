@@ -181,10 +181,8 @@ func (a Announcer) M(m ...interface{}) Announcer {
 				return a
 			}
 			b.meta = typed.Namespace + "/" + typed.Name
-			if typed.Spec.TaskID != nil {
-				if len(*typed.Spec.TaskID) > 0 {
-					b.meta += "/" + *typed.Spec.TaskID
-				}
+			if typed.Spec.HasTaskID() {
+				b.meta += "/" + typed.Spec.GetTaskID()
 			}
 		default:
 			if meta, ok := a.findMeta(m[0]); ok {
@@ -391,20 +389,20 @@ func (a Announcer) findInCHI(m interface{}) (string, bool) {
 	if !object.IsValid() || object.IsZero() || ((object.Kind() == reflect.Ptr) && object.IsNil()) {
 		return "", false
 	}
-	chi := object.Elem().FieldByName("CHI")
-	if !chi.IsValid() || chi.IsZero() || ((chi.Kind() == reflect.Ptr) && chi.IsNil()) {
+	chiValue := object.Elem().FieldByName("CHI")
+	if !chiValue.IsValid() ||
+		chiValue.IsZero() ||
+		((chiValue.Kind() == reflect.Ptr) && chiValue.IsNil()) {
 		return "", false
 	}
 
-	typed, ok := chi.Interface().(v1.ClickHouseInstallation)
+	chi, ok := chiValue.Interface().(v1.ClickHouseInstallation)
 	if !ok {
 		return "", false
 	}
-	res := typed.Namespace + "/" + typed.Name
-	if typed.Spec.TaskID != nil {
-		if len(*typed.Spec.TaskID) > 0 {
-			res += "/" + *typed.Spec.TaskID
-		}
+	res := chi.Namespace + "/" + chi.Name
+	if chi.Spec.HasTaskID() {
+		res += "/" + chi.Spec.GetTaskID()
 	}
 	return res, true
 }
