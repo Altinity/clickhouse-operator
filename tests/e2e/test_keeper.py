@@ -176,8 +176,8 @@ def test_keeper_outline(
     """
 
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
-        kubectl.delete_all_chi(settings.test_namespace)
         kubectl.delete_all_keeper(settings.test_namespace)
+        kubectl.delete_all_chi(settings.test_namespace)
 
     with When("Install CH 1 node ZK 1 node"):
         chi = rescale_zk_and_clickhouse(
