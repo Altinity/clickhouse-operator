@@ -46,6 +46,18 @@ spec:
       app: zookeeper
   maxUnavailable: 1
 ---
+# Setup zookeeper settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zookeeper-settings
+  labels:
+    app: zookeeper
+data:
+  zookeeper-nodes.sh: |
+    #!/bin/bash
+    export SERVERS=1
+---
 # Setup Zookeeper StatefulSet
 # Possible params:
 # 1. replicas

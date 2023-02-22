@@ -60,6 +60,7 @@ const (
 	maxTaskIDs = 10
 )
 
+// PushHostTablesCreated pushes host to the list of hosts with created tables
 func (s *ChiStatus) PushHostTablesCreated(host string) {
 	if s == nil {
 		return
@@ -69,6 +70,17 @@ func (s *ChiStatus) PushHostTablesCreated(host string) {
 	}
 
 	s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, host)
+}
+
+// SyncHostTablesCreated syncs list of hosts with tables created with actual list of hosts
+func (s *ChiStatus) SyncHostTablesCreated() {
+	if s == nil {
+		return
+	}
+	if s.FQDNs == nil {
+		return
+	}
+	s.HostsWithTablesCreated = util.IntersectStringArrays(s.HostsWithTablesCreated, s.FQDNs)
 }
 
 // PushAction pushes action into status
