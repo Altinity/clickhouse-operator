@@ -102,7 +102,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 		log.V(1).M(host).Info("NEUTRAL not found Pod %s/%s", statefulSet.Namespace, name)
 		err = nil
 	} else {
-		log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", statefulSet.Namespace, name, err)
+		log.V(1).M(host).F().Error("FAIL delete Pod %s/%s err:%v", statefulSet.Namespace, name, err)
 	}
 
 	return err
