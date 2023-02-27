@@ -134,7 +134,7 @@ TEMPLATE="${TEMPLATE:-"${DEFAULT_TEMPLATE}"}"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"kube-system"}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 # Operator's docker image
-if [[ -z "${OPERATOR_VERSION}" ]] && [[ -z "${MANIFEST}" ]] && [[ "${TEMPLATE}" == "${DEFAULT_TEMPLATE}" ]]; then
+if [[ -z "${OPERATOR_VERSION}" ]]; then
     # Going for default template
     RELEASE_VERSION=$(get_file https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/release)
 fi
@@ -160,7 +160,16 @@ check_deployment "${OPERATOR_NAMESPACE}" "${UPDATE}"
 if [[ ! -z "${MANIFEST}" ]]; then
     # Manifest is in place
     echo "Install operator from manifest ${MANIFEST} into ${OPERATOR_NAMESPACE} namespace"
-    kubectl apply --validate="${VALIDATE_YAML}" --namespace="${OPERATOR_NAMESPACE}" -f "${MANIFEST}"
+    kubectl apply --validate="${VALIDATE_YAML}" --namespace="${OPERATOR_NAMESPACE}" -f <( \
+      cat "${MANIFEST}" | \
+      OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
+      OPERATOR_IMAGE="${OPERATOR_IMAGE}" \
+      OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY}" \
+      METRICS_EXPORTER_NAMESPACE="${METRICS_EXPORTER_NAMESPACE}" \
+      METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE}" \
+      METRICS_EXPORTER_IMAGE_PULL_POLICY="${METRICS_EXPORTER_IMAGE_PULL_POLICY}" \
+      envsubst \
+    )
 elif [[ ! -z "${TEMPLATE}" ]]; then
     # Template is in place
     echo "Install operator from template ${TEMPLATE} into ${OPERATOR_NAMESPACE} namespace"
