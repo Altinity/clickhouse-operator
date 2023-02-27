@@ -2191,22 +2191,20 @@ def test_022(self):
 @Name("test_023. Test auto templates")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating("1.0"))
 def test_023(self):
-    manifest = "manifests/chi/test-001.yaml"
+    manifest = "manifests/chi/test-023-auto-templates.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("Auto templates are deployed"):
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
 
     chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
     expected_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
 
     kubectl.create_and_check(
-        manifest="manifests/chi/test-001.yaml",
+        manifest=manifest,
         check={
             "pod_count": 1,
-            "apply_templates": {
-                settings.clickhouse_template,
-                "manifests/chit/tpl-clickhouse-auto-1.yaml",
-                "manifests/chit/tpl-clickhouse-auto-2.yaml",
-            },
-            # test-001.yaml does not have a template reference but should get correct ClickHouse version
             "pod_image": expected_image,
             "do_not_delete": 1,
         },
@@ -2214,7 +2212,7 @@ def test_023(self):
     with Then("Annotation from a template should be populated"):
         assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
     with Then("Pod annotation should populated from template"):
-        assert kubectl.get_field("pod", "chi-test-001-single-0-0-0", ".metadata.annotations.test") == "test"
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
     with Then("Environment variable from a template should be populated"):
        pod = kubectl.get_pod_spec(chi)
        env = pod["containers"][0]["env"][0]

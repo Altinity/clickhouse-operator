@@ -1,3 +1,5 @@
+# test_023
+
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 
