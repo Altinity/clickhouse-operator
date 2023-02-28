@@ -126,9 +126,9 @@ func (n *Normalizer) CreateTemplatedCHI(
 	var useTemplates []chiV1.ChiUseTemplate
 	// 1. Get list of auto templates to be applied
 	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
-		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
+		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
-			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
+			log.V(1).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Namespace, template.Name)
 			useTemplates = append(useTemplates, chiV1.ChiUseTemplate{
 				Name:      template.Name,
 				Namespace: template.Namespace,
@@ -150,7 +150,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			log.V(1).M(chi).F().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).F().Warning("UNABLE to find template referenced in useTemplates: %s/%s", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			// Apply template
 			(&n.ctx.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
@@ -169,7 +169,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 					append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
 				),
 			)
-			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).F().Info("Merge template referenced in useTemplates: %s/%s", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
