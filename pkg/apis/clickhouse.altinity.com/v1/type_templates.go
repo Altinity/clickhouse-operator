@@ -46,6 +46,8 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *C
 		templates = NewChiTemplates()
 	}
 
+	// Merge sections
+
 	templates.mergeHostTemplates(from)
 	templates.mergePodTemplates(from)
 	templates.mergeVolumeClaimTemplates(from)
@@ -73,9 +75,7 @@ func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
 				// Receiver already have such a template
 				sameNameFound = true
 				// Merge `to` template with `from` template
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepCopy); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
 				// Receiver `to` template is processed
 				break
 			}
@@ -108,9 +108,7 @@ func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
 				// Receiver already have such a template
 				sameNameFound = true
 				// Merge `to` template with `from` template
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepCopy); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
 				// Receiver `to` template is processed
 				break
 			}
@@ -143,9 +141,7 @@ func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
 				// Receiver already have such a template
 				sameNameFound = true
 				// Merge `to` template with `from` template
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepCopy); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
 				// Receiver `to` template is processed
 				break
 			}
@@ -178,9 +174,7 @@ func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
 				// Receiver already have such a template
 				sameNameFound = true
 				// Merge `to` template with `from` template
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepCopy); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
 				// Receiver `to` template is processed
 				break
 			}
