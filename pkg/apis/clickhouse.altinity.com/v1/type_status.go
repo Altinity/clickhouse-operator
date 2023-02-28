@@ -16,6 +16,7 @@ package v1
 
 import (
 	"sort"
+	"sync"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -52,6 +53,8 @@ type ChiStatus struct {
 	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
 	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
 	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
+
+	sync.RWMutex // We use pretty coarse grained locking over the entire struct, but at least try to separate reads/writes.
 }
 
 const (
@@ -65,6 +68,9 @@ func (s *ChiStatus) PushHostTablesCreated(host string) {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	if util.InArray(host, s.HostsWithTablesCreated) {
 		return
 	}
@@ -77,6 +83,9 @@ func (s *ChiStatus) SyncHostTablesCreated() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	if s.FQDNs == nil {
 		return
 	}
@@ -88,12 +97,25 @@ func (s *ChiStatus) PushAction(action string) {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.Actions = append([]string{action}, s.Actions...)
-	s.TrimActions()
+	s.trimActionsInternal()
 }
 
 // TrimActions trims actions
 func (s *ChiStatus) TrimActions() {
+	if s == nil {
+		return
+	}
+	s.Lock()
+	defer s.Unlock()
+	s.trimActionsInternal()
+}
+
+// trimActionsInternal trims actions (internal: for usage within other synchronized functions).
+func (s *ChiStatus) trimActionsInternal() {
 	if s == nil {
 		return
 	}
@@ -107,6 +129,9 @@ func (s *ChiStatus) PushError(error string) {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
 		s.Errors = s.Errors[:maxErrors]
@@ -118,6 +143,9 @@ func (s *ChiStatus) SetAndPushError(error string) {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.Error = error
 	s.Errors = append([]string{error}, s.Errors...)
 	if len(s.Errors) > maxErrors {
@@ -127,6 +155,16 @@ func (s *ChiStatus) SetAndPushError(error string) {
 
 // PushTaskIDStarted pushes task id into status
 func (s *ChiStatus) PushTaskIDStarted() {
+	if s == nil {
+		return
+	}
+	s.Lock()
+	defer s.Unlock()
+	s.pushTaskIDStartedInternal()
+}
+
+// pushTaskIDStartedInternal pushes task id into status (internal: for usage within other synchronized functions).
+func (s *ChiStatus) pushTaskIDStartedInternal() {
 	if s == nil {
 		return
 	}
@@ -141,6 +179,16 @@ func (s *ChiStatus) PushTaskIDCompleted() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+	s.pushTaskIDCompletedInternal()
+}
+
+// pushTaskIDCompletedInternal pushes task id into status (internal: for usage within other synchronized functions).
+func (s *ChiStatus) pushTaskIDCompletedInternal() {
+	if s == nil {
+		return
+	}
 	s.TaskIDsCompleted = append([]string{s.TaskID}, s.TaskIDsCompleted...)
 	if len(s.TaskIDsCompleted) > maxTaskIDs {
 		s.TaskIDsCompleted = s.TaskIDsCompleted[:maxTaskIDs]
@@ -152,13 +200,16 @@ func (s *ChiStatus) ReconcileStart(DeleteHostsCount int) {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.Status = StatusInProgress
 	s.HostsUpdatedCount = 0
 	s.HostsAddedCount = 0
 	s.HostsCompletedCount = 0
 	s.HostsDeletedCount = 0
 	s.HostsDeleteCount = DeleteHostsCount
-	s.PushTaskIDStarted()
+	s.pushTaskIDStartedInternal()
 }
 
 // ReconcileComplete marks reconcile completion
@@ -166,9 +217,12 @@ func (s *ChiStatus) ReconcileComplete() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.Status = StatusCompleted
 	s.Action = ""
-	s.PushTaskIDCompleted()
+	s.pushTaskIDCompletedInternal()
 }
 
 // DeleteStart marks deletion start
@@ -176,13 +230,16 @@ func (s *ChiStatus) DeleteStart() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.Status = StatusTerminating
 	s.HostsUpdatedCount = 0
 	s.HostsAddedCount = 0
 	s.HostsCompletedCount = 0
 	s.HostsDeletedCount = 0
 	s.HostsDeleteCount = 0
-	s.PushTaskIDStarted()
+	s.pushTaskIDStartedInternal()
 }
 
 // CopyCHIStatusOptions specifies what to copy in CHI status options
@@ -196,27 +253,49 @@ type CopyCHIStatusOptions struct {
 }
 
 // MergeActions merges actions
+// Note: to avoid deadlocks, avoid cyclical MergeActions calls.
+// Concurrently running MergeActions(a, b) and MergeActions(b, a) is capable of deadlocking.
 func (s *ChiStatus) MergeActions(from *ChiStatus) {
-	if s == nil {
+	if s == nil || from == nil {
 		return
 	}
-	if from == nil {
+
+	// We lock the receiving ChiStatus (this one) with a writer lock.
+	s.Lock()
+	defer s.Unlock()
+
+	// NB: We also lock the received ChiStatus with a reader lock.
+	from.RLock()
+	defer from.RUnlock()
+
+	s.mergeActionsInternal(from)
+}
+
+// mergeActionsInternal merges actions  (internal: for usage within other synchronized functions).
+func (s *ChiStatus) mergeActionsInternal(from *ChiStatus) {
+	if s == nil || from == nil {
 		return
 	}
 	s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
 	sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
-	s.TrimActions()
+	s.trimActionsInternal()
 }
 
-// CopyFrom copies
+// CopyFrom copies state from another ChiStatus into this one.
+// Note: to avoid deadlocks, avoid cyclical CopyFrom calls.
+// Concurrently running CopyFrom(a, b) and CopyFrom(b, a) is capable of deadlocking.
 func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
-	if s == nil {
+	if s == nil || from == nil {
 		return
 	}
 
-	if from == nil {
-		return
-	}
+	// We lock the receiving ChiStatus (this one) with a writer lock.
+	s.Lock()
+	defer s.Unlock()
+
+	// NB: We also lock the received ChiStatus with a reader lock.
+	from.RLock()
+	defer from.RUnlock()
 
 	if opts.InheritableFields {
 		s.TaskIDsStarted = from.TaskIDsStarted
@@ -228,7 +307,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 
 	if opts.Actions {
 		s.Action = from.Action
-		s.MergeActions(from)
+		s.mergeActionsInternal(from)
 		s.HostsWithTablesCreated = nil
 		if len(from.HostsWithTablesCreated) > 0 {
 			s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
@@ -255,7 +334,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.TaskIDsStarted = from.TaskIDsStarted
 		s.TaskIDsCompleted = from.TaskIDsCompleted
 		s.Action = from.Action
-		s.MergeActions(from)
+		s.mergeActionsInternal(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
 		s.HostsUpdatedCount = from.HostsUpdatedCount
@@ -288,7 +367,7 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.TaskIDsStarted = from.TaskIDsStarted
 		s.TaskIDsCompleted = from.TaskIDsCompleted
 		s.Action = from.Action
-		s.MergeActions(from)
+		s.mergeActionsInternal(from)
 		s.Error = from.Error
 		s.Errors = from.Errors
 		s.HostsUpdatedCount = from.HostsUpdatedCount
@@ -310,6 +389,8 @@ func (s *ChiStatus) GetFQDNs() []string {
 	if s == nil {
 		return nil
 	}
+	s.RLock()
+	defer s.RUnlock()
 	return s.FQDNs
 }
 
@@ -318,6 +399,8 @@ func (s *ChiStatus) GetCHOpIP() string {
 	if s == nil {
 		return ""
 	}
+	s.RLock()
+	defer s.RUnlock()
 	return s.CHOpIP
 }
 
@@ -326,6 +409,8 @@ func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	if s == nil {
 		return nil
 	}
+	s.RLock()
+	defer s.RUnlock()
 	return s.NormalizedCHICompleted
 }
 
@@ -334,6 +419,8 @@ func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	if s == nil {
 		return nil
 	}
+	s.RLock()
+	defer s.RUnlock()
 	return s.NormalizedCHI
 }
 
@@ -342,6 +429,8 @@ func (s *ChiStatus) GetStatus() string {
 	if s == nil {
 		return ""
 	}
+	s.RLock()
+	defer s.RUnlock()
 	return s.Status
 }
 
@@ -350,6 +439,8 @@ func (s *ChiStatus) GetPods() []string {
 	if s == nil {
 		return nil
 	}
+	s.RLock()
+	defer s.RUnlock()
 	return s.Pods
 }
 
@@ -358,6 +449,8 @@ func (s *ChiStatus) GetPodIPS() []string {
 	if s == nil {
 		return nil
 	}
+	s.RLock()
+	defer s.RUnlock()
 	return s.PodIPs
 }
 
@@ -366,6 +459,9 @@ func (s *ChiStatus) HostUpdated() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.HostsUpdatedCount++
 	s.HostsCompletedCount++
 }
@@ -375,6 +471,9 @@ func (s *ChiStatus) HostAdded() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.HostsAddedCount++
 	s.HostsCompletedCount++
 }
@@ -384,6 +483,9 @@ func (s *ChiStatus) HostUnchanged() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.HostsUnchangedCount++
 	s.HostsCompletedCount++
 }
@@ -393,6 +495,9 @@ func (s *ChiStatus) HostFailed() {
 	if s == nil {
 		return
 	}
+	s.Lock()
+	defer s.Unlock()
+
 	s.HostsFailedCount++
 	s.HostsCompletedCount++
 }
