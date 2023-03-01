@@ -35,24 +35,6 @@ def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
             )
 
 
-def wait_clickhouse_no_readonly_replicas(chi, retries=20):
-    expected_replicas = chi["spec"]["configuration"]["clusters"][0]["layout"]["replicasCount"]
-    expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
-    for i in range(retries):
-        readonly_replicas = clickhouse.query(
-            chi["metadata"]["name"],
-            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
-        )
-        if readonly_replicas == expected_replicas:
-            message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
-            break
-        else:
-            with But(
-                    f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"
-            ):
-                time.sleep(i * 3)
-        if i >= (retries - 1):
-            raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
 
 
 def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_tables):
@@ -207,7 +189,7 @@ def test_keeper_outline(
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
         check_zk_root_znode(chi, keeper_type, pod_count=1)
-        wait_clickhouse_no_readonly_replicas(chi)
+        util.wait_clickhouse_no_readonly_replicas(chi)
         insert_replicated_data(
             chi,
             pod_for_insert_data,
@@ -230,7 +212,7 @@ def test_keeper_outline(
                 check_zk_root_znode(chi, keeper_type, pod_count=3)
 
                 util.wait_clickhouse_cluster_ready(chi)
-                wait_clickhouse_no_readonly_replicas(chi)
+                util.wait_clickhouse_no_readonly_replicas(chi)
                 insert_replicated_data(
                     chi,
                     pod_for_insert_data,
@@ -252,7 +234,7 @@ def test_keeper_outline(
                     delete_keeper_pvc(keeper_type=keeper_type)
 
                 util.wait_clickhouse_cluster_ready(chi)
-                wait_clickhouse_no_readonly_replicas(chi)
+                util.wait_clickhouse_no_readonly_replicas(chi)
                 insert_replicated_data(
                     chi,
                     pod_for_insert_data,
@@ -358,7 +340,7 @@ def test_keeper_probes_outline(
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
         check_zk_root_znode(chi, keeper_type, pod_count=3)
-        wait_clickhouse_no_readonly_replicas(chi)
+        util.wait_clickhouse_no_readonly_replicas(chi)
 
     with Then("Create keeper_bench table"):
         clickhouse.query(chi["metadata"]["name"], "DROP DATABASE IF EXISTS keeper_bench ON CLUSTER '{cluster}' SYNC")

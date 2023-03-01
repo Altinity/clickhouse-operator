@@ -6,7 +6,7 @@ import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.yaml_manifest as yaml_manifest
 
-from testflows.core import fail, Given, Then, current
+from testflows.core import fail, Given, Then, But, current, message
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -274,3 +274,30 @@ def install_operator_version(version):
         f"envsubst",
         validate=False,
     )
+
+
+def wait_clickhouse_no_readonly_replicas(chi, retries=20):
+    expected_replicas = 1
+    layout = chi["spec"]["configuration"]["clusters"][0]["layout"]
+
+    if "replicasCount" in layout:
+        expected_replicas = layout["replicasCount"]
+    if "shardsCount" in layout:
+        expected_replicas = expected_replicas * layout["shardsCount"]
+
+    expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
+    for i in range(retries):
+        readonly_replicas = clickhouse.query(
+            chi["metadata"]["name"],
+            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
+        )
+        if readonly_replicas == expected_replicas:
+            message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
+            break
+        else:
+            with But(
+                    f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"
+            ):
+                time.sleep(i * 3)
+        if i >= (retries - 1):
+            raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
