@@ -2214,10 +2214,10 @@ def test_023(self):
     with Then("Pod annotation should populated from template"):
         assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.test") == "test"
     with Then("Environment variable from a template should be populated"):
-       pod = kubectl.get_pod_spec(chi)
-       env = pod["containers"][0]["env"][0]
-       assert env["name"] == "TEST_ENV"
-       assert env["value"] == "TEST_ENV_VALUE"
+        pod = kubectl.get_pod_spec(chi)
+        env = pod["containers"][0]["env"][0]
+        assert env["name"] == "TEST_ENV"
+        assert env["value"] == "TEST_ENV_VALUE"
 
     kubectl.delete_chi(chi)
     kubectl.delete(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))

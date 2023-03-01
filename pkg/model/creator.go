@@ -536,7 +536,7 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		c.a.V(1).F().Info("statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+		c.a.V(1).F().Info("statefulSet %s use custom template: %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
 		podTemplate = newDefaultPodTemplate(statefulSetName)
@@ -1134,15 +1134,12 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 		},
 	}
 
-	addContainer(
-		&podTemplate.Spec,
-		newDefaultClickHouseContainer(),
-	)
+	addContainer(&podTemplate.Spec, newDefaultClickHouseContainer())
 
 	return podTemplate
 }
 
-// newDefaultLivenessProbe
+// newDefaultLivenessProbe returns default liveness probe
 func newDefaultLivenessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
@@ -1157,7 +1154,7 @@ func newDefaultLivenessProbe() *corev1.Probe {
 	}
 }
 
-// newDefaultReadinessProbe
+// newDefaultReadinessProbe returns default readiness probe
 func newDefaultReadinessProbe() *corev1.Probe {
 	return &corev1.Probe{
 		Handler: corev1.Handler{
