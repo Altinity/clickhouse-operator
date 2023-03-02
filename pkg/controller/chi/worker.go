@@ -508,7 +508,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiV1.ClickHouseIn
 	}
 	start := time.Now()
 	w.c.poll(ctx, chi, func(c *chiV1.ClickHouseInstallation, e error) bool {
-		if len(c.Status.GetPodIPS()) >= len(c.Status.GetPods()) {
+		if len(c.Status.GetPodIPs()) >= len(c.Status.GetPods()) {
 			// Stop polling
 			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
@@ -786,7 +786,7 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost) bool {
 		// Stopped host is not able to receive any data
 		return false
 
-	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().HostsWithTablesCreated):
+	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated()):
 		// This host is listed as having tables created already
 		return false
 
