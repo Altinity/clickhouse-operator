@@ -4,31 +4,29 @@ import time
 
 from testflows.core import *
 from testflows.asserts import error
-from testflows.connect import Shell
+# from testflows.connect import Shell
 
-import e2e.settings as settings
+# import e2e.settings as settings
 import e2e.yaml_manifest as yaml_manifest
 import e2e.util as util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 max_retries = 20
 
-shell = Shell()
-shell.timeout = 300
-namespace = "test"
-kubectl_cmd = settings.kubectl_cmd
+# shell = Shell()#todo delete
+# shell.timeout = 300
+# namespace = "test"
+# kubectl_cmd = settings.kubectl_cmd
 
 
 def launch(command, ok_to_fail=False, ns=None, timeout=600):
     # Build command
 
     if ns is None:
-        if hasattr(current().context, "namespace"):
-            ns = current().context.namespace
-        else:
-            ns = namespace
+        if hasattr(current().context, "test_namespace"):
+            ns = current().context.test_namespace
 
-    cmd = f"{kubectl_cmd} "
+    cmd = f"{current().context.kubectl_cmd} "
     cmd_args = command.split(" ")
     if ns is not None and ns != "" and ns != "--all-namespaces":
         cmd += f"{cmd_args[0]} --namespace={ns} "
@@ -49,10 +47,8 @@ def launch(command, ok_to_fail=False, ns=None, timeout=600):
 
 def run_shell(cmd, timeout=600, ok_to_fail=False):
     # Run command
-    if hasattr(current().context, "shell"):
-        res_cmd = current().context.shell(cmd, timeout=timeout)
-    else:
-        res_cmd = shell(cmd, timeout=timeout)
+
+    res_cmd = current().context.shell(cmd, timeout=timeout)
     # Check command failure
     code = res_cmd.exitcode
     if not ok_to_fail:
@@ -117,7 +113,7 @@ def delete_all_keeper(ns=None):
             if "items" in item_list:
                 for item in item_list["items"]:
                     name = item["metadata"]["name"]
-                    launch(f"delete {resource_type} -n {current().context.namespace} {name}", ok_to_fail=True)
+                    launch(f"delete {resource_type} -n {current().context.test_namespace} {name}", ok_to_fail=True)
 
 
 def create_and_check(manifest, check, ns=None, timeout=900):
@@ -188,8 +184,8 @@ def get(kind, name, label="", ns=None, ok_to_fail=False):
 
 def create_ns(ns):
     if ns is None:
-        launch(f"create ns {current().context.namespace}", ns=None)
-        launch(f"get ns {current().context.namespace}", ns=None)
+        launch(f"create ns {current().context.test_namespace}", ns=None)
+        launch(f"get ns {current().context.test_namespace}", ns=None)
     else:
         launch(f"create ns {ns}", ns=None)
         launch(f"get ns {ns}", ns=None)
@@ -197,7 +193,7 @@ def create_ns(ns):
 
 def delete_ns(ns, ok_to_fail=False, timeout=600):
     launch(
-        f"delete ns {current().context.namespace} -v 5 --now --timeout={timeout}s",
+        f"delete ns {current().context.test_namespace} -v 5 --now --timeout={timeout}s",
         ns=None,
         ok_to_fail=ok_to_fail,
         timeout=timeout,
@@ -210,7 +206,7 @@ def get_count(kind, name="", label="", chi="", ns=None):
 
     if kind == "pv":
         # pv is not namespaced so need to search namespace in claimRef
-        out = launch(f'get pv {label} -o yaml | grep "namespace: {current().context.namespace}"', ok_to_fail=True)
+        out = launch(f'get pv {label} -o yaml | grep "namespace: {current().context.test_namespace}"', ok_to_fail=True)
     else:
         out = launch(
             f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}",
@@ -239,16 +235,18 @@ def apply(manifest, ns=None, validate=True, timeout=600):
             launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
         else:
             run_shell(
-                f"{manifest} | {kubectl_cmd} apply --namespace={current().context.namespace} --validate={validate} -f -",
+                f"{manifest} | {current().context.kubectl_cmd} apply --namespace={current().context.test_namespace} --validate={validate} -f -",
                 timeout=timeout,
             )
 
 
 def apply_chi(manifest, ns=None, validate=True, timeout=600):
+    if ns is None:
+        ns = current().context.test_namespace
     chi_name = yaml_manifest.get_chi_name(manifest)
     with When(f"CHI {chi_name} is applied"):
-        if settings.kubectl_mode == "replace":
-            if get_count("chi", chi_name, ns=namespace) == 0:
+        if current().context.kubectl_mode == "replace":
+            if get_count("chi", chi_name, ns=ns) == 0:
                 create(manifest, ns=ns, validate=validate, timeout=timeout)
             else:
                 replace(manifest, ns=ns, validate=validate, timeout=timeout)
@@ -276,7 +274,7 @@ def delete(manifest, ns=None, timeout=600):
             manifest = f'"{manifest}"'
             return launch(f"delete -f {manifest}", ns=ns, timeout=timeout)
         else:
-            run_shell(f"{manifest} | {kubectl_cmd} delete -f -", timeout=timeout)
+            run_shell(f"{manifest} | {current().context.kubectl_cmd} delete -f -", timeout=timeout)
 
 
 def wait_objects(chi, object_counts, ns=None):
@@ -516,7 +514,7 @@ def check_pod_antiaffinity(
         match_labels = {
             "clickhouse.altinity.com/app": "chop",
             "clickhouse.altinity.com/chi": f"{chi_name}",
-            "clickhouse.altinity.com/namespace": f"{current().context.namespace}",
+            "clickhouse.altinity.com/namespace": f"{current().context.test_namespace}",
         }
     expected = {
         "requiredDuringSchedulingIgnoredDuringExecution": [
@@ -577,5 +575,5 @@ def check_pdb(chi, clusters, ns=None):
             assert labels["clickhouse.altinity.com/app"] == "chop"
             assert labels["clickhouse.altinity.com/chi"] == chi
             assert labels["clickhouse.altinity.com/cluster"] == c
-            assert labels["clickhouse.altinity.com/namespace"] == ns
+            assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
             assert pdb["spec"]["maxUnavailable"] == 1
