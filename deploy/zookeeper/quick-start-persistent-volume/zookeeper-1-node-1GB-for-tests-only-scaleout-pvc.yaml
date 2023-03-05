@@ -1,4 +1,4 @@
-# Following scripts based from https://github.com/pravega/zookeeper-operator/
+# Following manifests based on https://github.com/pravega/zookeeper-operator/
 ---
 # service for REST administration and reconfiguration
 apiVersion: v1
@@ -35,17 +35,6 @@ spec:
   selector:
     app: zookeeper
     what: node
----
-# Setup max number of unavailable pods in StatefulSet
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: zookeeper-pod-disruption-budget
-spec:
-  selector:
-    matchLabels:
-      app: zookeeper
-  maxUnavailable: 1
 ---
 # headless service for Zookeeper Quorum Election and service name
 apiVersion: v1
@@ -100,6 +89,8 @@ data:
     export ADMIN_SERVER_PORT=8080
     export CLUSTER_NAME=zookeeper
     export ZOO_LOG4J_PROP="WARN, CONSOLE"
+  java.env: |
+    JVMFLAGS="-Xms128M -Xmx4G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"
   log4j-quiet.properties: |
     log4j.rootLogger=CONSOLE
     log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
@@ -191,7 +182,6 @@ data:
     set -ex
     # TODO think how to add nslookup to docker image
     apt-get update && apt-get install --no-install-recommends -y dnsutils curl procps
-    source /cluster-size/cluster-size.sh
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
@@ -334,6 +324,7 @@ data:
     cp -f /conf/log4j-quiet.properties $ZOOCFGDIR
     cp -f /conf/logback.xml $ZOOCFGDIR
     cp -f /conf/env.sh $ZOOCFGDIR
+    cp -f /conf/java.env $ZOOCFGDIR
 
     if [ -f $DYNCONFIG ]; then
       # Node registered, start server
@@ -354,7 +345,6 @@ data:
 
     set -ex
 
-    source /cluster-size/cluster-size.sh
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
@@ -417,7 +407,6 @@ data:
     # You may obtain a copy of the License at
     #     https://www.apache.org/licenses/LICENSE-2.0
     set -ex
-    source /cluster-size/cluster-size.sh
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
@@ -496,19 +485,6 @@ data:
       echo "Zookeeper service is not available for requests"
       exit 1
     fi
-
----
-# ConfigMap for current cluster size
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: zookeeper-cluster-size
-  labels:
-    app: zookeeper
-data:
-  cluster-size.sh: |
-    #!/usr/bin/env bash
-    CLUSTER_SIZE=1
 
 ---
 # Main StatefulSet
@@ -609,8 +585,6 @@ spec:
               name: data
             - mountPath: /conf
               name: conf
-            - mountPath: /cluster-size
-              name: cluster-size
       restartPolicy: Always
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
@@ -619,10 +593,6 @@ spec:
             name: zookeeper-scripts
             defaultMode: 0755
           name: conf
-        - configMap:
-            name: zookeeper-cluster-size
-            defaultMode: 0755
-          name: cluster-size
   updateStrategy:
     type: RollingUpdate
   volumeClaimTemplates:
