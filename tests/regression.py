@@ -7,7 +7,6 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    "/regression/e2e.test_operator/test_014*": [(Fail, "commit f67f47a96c6962312d5ff09048241f3a3c237d0a breaks test_014")],
     "/regression/e2e.test_operator/test_036*": [(Fail, "not implemented yet")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
