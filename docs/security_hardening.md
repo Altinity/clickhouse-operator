@@ -1,47 +1,60 @@
 # ClickHouse operator hardening guide
 
-## Overview of clickhouse-operator security model
+## Overview
 
-Wtih default settings, ClickHouse operator deploys ClickHouse with two users protected by network restriction rules in order to block unauthorized access. There are many security controls available. 
+This section provides an overview of the **clickhouse-operator** security model.
 
-### 'default' user
+With the default settings, the ClickHouse operator deploys ClickHouse with two users protected by network restriction rules to block unauthorized access. 
 
-'default' user is used in order to connect to ClickHouse instance from a pod where it is running, and also for distributed queries. It is deployed with **empty password** that was a long time default for ClickHouse out-of-the box installation. In order to make it secure, operator applies network security rules that restrict connections to the pods running ClickHouse cluster, and nothing else. In versions before 0.19.0 it applied hostRegexp that captured pod names. It did not work correctly in some Kubernetes distributions, however, including GKE. Therefore in later versions operator additionally applies a restrictive set of pod IP addresses, and rebuilds this set if IP address of a pod changes for whatever reason. This is how it looks in generated users.xml for cluster with two nodes:
+### The 'default' user
 
+The '**default**' user is used to connect to ClickHouse instance from a pod where it is running, and also for distributed queries. It is deployed with an **empty password** that was a long-time default for ClickHouse out-of-the-box installation. 
+
+To secure it, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else. 
+
+- Before version **0.19.0**  `hostRegexp` was applied that captured pod names. 
+- This did not work correctly in some Kubernetes distributions, such as GKE. 
+- In later versions, the operator additionally applies a restrictive set of pod IP addresses and rebuilds this set if the IP address of a pod changes for whatever reason. 
+
+The following `users.xml`  is set up with a cluster that has two nodes. In this configuration, a '**default**' user can not connect from outside of the cluster.
+
+```xml
+<users>
+  <default>
+    <networks>
+      <host_regexp>(chi-my-cluster-[^.]+\d+-\d+|clickhouse\-my-cluster\.test\.svc\.cluster\.local$</host_regexp>
+      <ip>::1</ip>
+      <ip>127.0.0.1</ip>
+      <ip>172.17.0.4</ip>
+      <ip>172.17.0.12</ip>
+    </networks>
+    <profile>default</profile>
+    <quota>default</quota>
+  </default>
+</users>
 ```
-        <users>
-            <default>
-                <networks>
-                    <host_regexp>(chi-my-cluster-[^.]+\d+-\d+|clickhouse\-my-cluster\.test\.svc\.cluster\.local$</host_regexp>
-                    <ip>::1</ip>
-                    <ip>127.0.0.1</ip>
-                    <ip>172.17.0.4</ip>
-                    <ip>172.17.0.12</ip>
-                </networks>
-                <profile>default</profile>
-                <quota>default</quota>
-            </default>
-        </users>
-```
 
-With this approach 'default' user can not connect from outside of the cluster.
 
-### 'clickhouse_operator' user 
 
-'clickhouse_operator' user is used by operator itself in perform DMLs when adding or removing ClickHouse replicas and shards, and also for collecting monitoring data. User and password is stored in a secret. The name of the secret is configured in operator configuration as follows:
+### The 'clickhouse_operator' user 
 
-```
+The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing  ClickHouse replicas and shards, and also for collecting monitoring data. The **User** and **password** values are stored in a secret. 
+
+The following YAML shows the **name** of  **secret** is configured in the **clickhouse_operator** configuration:
+
+```yaml
 clickhouse:
   access:
     secret:
-      # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
+      # Empty `namespace` means that k8s secret would be looked 
+      # in the same namespace where the operator's pod is running.
       namespace: ""
       name: "clickhouse-operator"
 ```
 
-Here is an example of the secret:
+The following YAML shows an example using **secret**:
 
-```
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -52,37 +65,60 @@ stringData:
   password: chpassword
 ```
 
-It is possible to specify user and password explicitly in operator configuration without a secret, but it is not recommended.
+Altinity recommends that you do not include the **user** and **password** within the operator configuration without a **secret**.
 
-In order to change 'clickhouse_operator' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object. See [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for details.
+To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object. 
 
-Operator protects access for 'clickhouse\_operator' user using an IP mask. When deploying user into ClickHouse server access is restricted to the IP address of the pod where operator is running, and nothing else. So 'clickhouse_operator' user can not be used outside of this pod.
+**More Information**
+
+- [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md)
+
+The **Operator** protects access for the '**clickhouse\_operator**' user using an IP mask. 
+
+When deploying a user into a ClickHouse server, access is restricted to the IP address of the pod where the operator is running, and nothing else. Therefore, the '**clickhouse_operator**' user can not be used outside of this pod.
+
 
 
 ## Securing ClickHouse users
 
-More ClickHouse users can be created using SQL (`CREATE USER`) or specified in a dedicated section of `ClickHouseInstallation`. In the latter case operator provides following functionality in order to make sure passwords are not exposed.
+More ClickHouse users can be created using SQL, such as:
+
+- (`CREATE USER`) 
+
+- `ClickHouseInstallation` (specified in a dedicated section)
+
+
+
+To make sure passwords are not exposed, for the `ClickHouseInstallation` the operator provides the following:
+
+
 
 ### Using hashed passwords
 
-User passwords in `ClickHouseInstallation` can be specified in plain, as sha256 and double sha1 hashes. When password is specified in plain, operator hashes it when deploying to ClickHouse, but it is still left plain in `ClickHouseInstallation` that is not secure. Therefore is recommended to provide hashes explicitly, as follows:
+User passwords in `ClickHouseInstallation` can be specified in plain, as sha256 and double sha1 hashes. 
 
-```
+When a password is specified in plaintext, the operator hashes it when deploying to ClickHouse, but that is still left in unsecure plaintext format in the ClickHouseInstallation`. 
+
+Altinity recommends providing hashes explicitly as follows:
+
+```yaml
 spec:
   useTemplates:
     - name: clickhouse-version
   configuration:
     users:
-      user1/password: pwduser1 # will be hashed in ClickHouse config files, not recommended
+      user1/password: pwduser1          # This will be hashed in ClickHouse config files, but this NOT RECOMMENDED
       user2/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
       user3/password_double_sha1_hex: cbe205a7351dd15397bf423957559512bd4be395
 ```
 
+
+
 ### Using secrets
 
-Operator provides a special syntax in order to read passwords and password hashes from a secret.
+The Operator provides a special syntax to read passwords and password hashes from a secret as follows:
 
-```
+```yaml
 spec:
   configuration:
     users:
@@ -91,9 +127,11 @@ spec:
       user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
 ```
 
-It refers to the secret, that may look like this:
 
-```
+
+The following example refers to the secret:
+
+```yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -106,15 +144,33 @@ stringData:
 
 ```
 
-**Note**: while passwords are retrieved from secrets, and do not appear in `ClickHouseInstallation` anymore, they are still deployed to ClickHouse users.xml configuration (hashed). The alternate approach is to map secrets to environment variables and use ClickHouse 'from_env' feature that reads parts of configuration from the environment variables, so even hashes are not exposed. However, that would require to recreate ClickHouse podTemplates when adding new users.
 
-### Securing 'default' user
 
-While 'default' user is protected by network rules, the passwordless operatation is often not allowed by infosec teams. The password for 'default' user can be changed the same way as for other users. However, 'default' user is also used by ClickHouse in order to run distributed queries. If password changes, distributed queries may stop working. In order keep distributed queries running without exposing the password, ClickHouse allows to use a secret token for inter-cluster communications instead of 'default' user credentials. Operator supports it as follows:
+> **Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, they are still deployed to the ClickHouse `users.xml` configuration (hashed). 
+>
+> The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed. 
+>
+> This approach requires recreating the ClickHouse podTemplates when adding new users.
+
+
+
+### Securing the 'default' user
+
+While the '**default**' user is protected by network rules, passwordless operation is often not allowed by infosec teams. 
+
+- The password for the '**default**' user can be changed the same way as for other users. 
+- However, the '**default**' user is also used by ClickHouse to run distributed queries. 
+- If the password changes, distributed queries may stop working. 
+
+To keep distributed queries running without exposing the password, configure ClickHouse to use a  secret token for inter-cluster communications instead of 'default' user credentials. 
+
+
+
+The Operator supports the following:
 
 #### 'auto' secret
 
-ClickHouse can generate this secret token automatically. This is simplest and recommended way.
+The following YAML example shows how to let ClickHouse generate the secret token automatically. This is the simplest and recommended way.
 
 ```
 spec:
@@ -127,9 +183,11 @@ spec:
           auto: "true"
 ```
 
+
+
 #### Custom token
 
-Token is explicitly defined.
+The following YAML example shows how to define the Token.
 
 ```
 spec:
@@ -142,9 +200,11 @@ spec:
           value: "my_secret"
 ```
 
+
+
 #### Custom token from Kubernetes secret
 
-Token is defined in a secret.
+The following YAML example shows how to define a Token within a secret.
 
 ```
 spec:
@@ -160,32 +220,59 @@ spec:
               key: "secret"
 ```
 
+
+
+
+
 ## Securing the network
 
-### Network overview
+This section covers how to secure your network.
 
-With default settings, operator deploys pods and services that expose 3 ports:
+
+
+### Network Overview
+
+With default settings, the operator deploys pods and services that expose 3 ports:
 
 * 8123 -- HTTP interface
 * 9000 -- TCP interface
 * 9009 -- used for replication protocol between cluster nodes (HTTP)
 
-For every pod there is one service created, and also load balancer service is created to access the cluster. Additional load balancers and custom services may be created using service templates. See [link] for more information.
+For every pod, there is one service created, and also load balancer service is created to access the cluster. Additional load balancers and custom services may be created using service templates. 
+
+**More information**
+
+- [link]
+
+
 
 ### Enabling secure connections to clickhouse-server
 
-ClickHouse HTTPS/TLS configuration requeries several steps.
+The ClickHouse HTTPS/TLS configuration requires the following steps:
 
-* generate certificate files: server.crt, server.key and dhparam.pem. See details in [Network Hardening Guide](https://docs.altinity.com/operationsguide/security/clickhouse-hardening-guide/network-hardening/)
-* add generated files into `files` section of `ClickHouseInstallation`
-* add openSSL configuration for server (and client, if ClickHouse needs to connect to other nodes by SSL)
-* enable secure ports in ClickHouse configuration
-* define a custom podTemplate with secure ports
-* define a custom serviceTemplate if needed
+* Generate the following certificate files: 
 
-The podTemplate is automated by operator with a use of 'secure' flag in the cluster definition, so user does not need to do it. The secure configuration typically looks like this:
+  * `server.crt`
+  * `server.key`
+  * `dhparam.pem`
 
-```
+    **More Information**
+
+    - [Network Hardening Guide](https://docs.altinity.com/operationsguide/security/clickhouse-hardening-guide/network-hardening/)
+
+* Add generated files into the `files` section of `ClickHouseInstallation`
+* Add **openSSL configuration** for the server (and client, if ClickHouse needs to connect to other nodes by SSL)
+* Enabling **secure ports** in a ClickHouse configuration
+* Defining a custom **podTemplate** with secure ports
+* Defining a custom **serviceTemplate** if needed
+
+The **podTemplate** is automated by the operator using a '**secure**' flag in the cluster definition rather than the user doing it. 
+
+
+
+The following YAML example shows a typical secure configuration:
+
+```yaml
 spec:
   configuration:
     clusters:
@@ -220,10 +307,16 @@ spec:
       dhparam.pem: |
         ***
 
-```      
-Operator automatically adjusts services used to access individual pods when 'secure' is used, but it does not adjust load balancer service. In real environments, load balancer is managed by a separate serviceTemplate, so it is a user responsibility to define available ports. Here is a typical example:
-
 ```
+
+
+The Operator automatically adjusts services used to access individual pods when 'secure' is used, but it does not adjust load balancer service. In real environments, the load balancer is managed by a separate **serviceTemplate**. User must define the available ports. 
+
+
+
+The following YAML example shows how to define ports:
+
+```yaml
 spec:
   templates:
     serviceTemplates:
@@ -240,13 +333,19 @@ spec:
               port: 9440
           type: LoadBalancer
 ```
-**TODO**: We plan to add a special flag in order to disable insecure ports on a pod and pod service level automatically as well.
+
+
+**TODO**: 
+
+- We plan to add a special flag to disable insecure ports on a pod and pod service level automatically as well.
+
+
 
 ### Using secure connections for distributed queries
 
-If ClickHouse is configured using 'secure' flag as described above, secure connections for distributed are already enabled:
+If ClickHouse is configured using the '**secure**' flag as described above, secure connections for distributed installations are already enabled:
 
-```
+```yaml
 spec:
   configuration:
     clusters:
@@ -255,9 +354,11 @@ spec:
         secret:
           auto: "yes"
 ```
-Under the hood operator changes remote_servers configuration automatically, providing a secure port and flag:
 
-```
+
+Under the hood operator changes **remote_servers** configuration automatically, providing a secure port and flag:
+
+```xml
 <shard>
    <internal_replication>False</internal_replication>
       <replica>
@@ -266,12 +367,13 @@ Under the hood operator changes remote_servers configuration automatically, prov
           <secure>1</secure>
       </replica>
    </shard>
-
 ```
 
-It may also require openSSL client configuration:
 
-```
+
+It may also require an openSSL client configuration:
+
+```yaml
 spec:
   configuration:
     files:
@@ -290,10 +392,12 @@ spec:
             </client>
         </clickhouse>
       </openSSL>
-```            
-Note, if you want secure connections for external users only, but keep inter-cluster communications insecure, instead of 'secure' flag you'll have to specify podTemplate explicitly and open proper ports:
-
 ```
+
+
+**Note:** To secure connections for external users only, but keep inter-cluster communications insecure, instead of using the '**secure**' flag, specify the **podTemplate** explicitly and open the proper ports:
+
+```yaml
 spec:
   templates:
     podTemplates:
@@ -314,23 +418,27 @@ spec:
             containerPort: 9009
 ```
 
+
+
 ### Forcing HTTPS for operator connections
 
-HTTPS for 'clickhouse_operator' user can be enabled in operator configuration as follows:
+To have ClickHouse use HTTPS, use following YAML example to set the operator configuration for the '**clickhouse_operator**' user. It switches all interactions with ClickHouse to HTTPS, including health checks.
 
-```
+```yaml
 configuration:
   access:
     scheme: https
     port: 8443
 ```
-It switches all interactions with ClickHouse to HTTPS, including health checks.
+
+
+
 
 ### Forcing HTTPS for replication
 
-In order to enable ClickHouse replication other HTTPS on a securerly configured `ClickHouseInstallation`, port needs to be switched in ClickHouse configuration as follows: 
+To force ClickHouse replication to use HTTPS on a securerly configured ClickHouseInstallations, set the required ClickHouse ports as follows: 
 
-```
+```yaml
 spec:
   configuration:
     settings:
@@ -338,6 +446,10 @@ spec:
       interserver_https_port: 9009
 ```
 
+
+
 ### Forcing HTTPS for ZooKeeper
 
-coming soon
+**TODO**: 
+
+- Coming soon
