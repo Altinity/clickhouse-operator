@@ -88,7 +88,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
             if doc["kind"] in ("StatefulSet", "ZookeeperCluster"):
                 keeper_nodes = doc["spec"]["replicas"]
         expected_docs = {
-            "zookeeper": 6 if "scaleout-pvc" in keeper_manifest else 4,
+            "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
             "clickhouse-keeper": 6,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
