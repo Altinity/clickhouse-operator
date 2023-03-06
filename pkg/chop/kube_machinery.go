@@ -19,6 +19,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	kube "k8s.io/client-go/kubernetes"
@@ -73,6 +74,30 @@ func GetClientset(kubeConfigFile, masterURL string) (
 	if err != nil {
 		log.F().Fatal("Unable to build kubeconf: %s", err.Error())
 		os.Exit(1)
+	}
+
+	// Layer on k8s client rate limiting overrides if specified in CHOP config.
+	if maybeQps := os.Getenv(v1.OPERATOR_K8S_CLIENT_QPS_LIMIT); maybeQps != "" {
+		parsedQps, err := strconv.ParseFloat(maybeQps, 32)
+		if err != nil || parsedQps <= 0 {
+			log.F().Fatal(
+				"Invalid value set for %s, expecting a nonzero float32, got %s",
+				v1.OPERATOR_K8S_CLIENT_QPS_LIMIT,
+				maybeQps,
+			)
+		}
+		kubeConfig.QPS = float32(parsedQps)
+	}
+	if maybeBurst := os.Getenv(v1.OPERATOR_K8S_CLIENT_BURST_LIMIT); maybeBurst != "" {
+		parsedBurst, err := strconv.ParseInt(maybeBurst, 10, 64)
+		if err != nil || parsedBurst <= 0 {
+			log.F().Fatal(
+				"Invalid value set for %s, expecting a nonzero integer, got %s",
+				v1.OPERATOR_K8S_CLIENT_BURST_LIMIT,
+				maybeBurst,
+			)
+		}
+		kubeConfig.Burst = int(parsedBurst)
 	}
 
 	kubeClientset, err := kube.NewForConfig(kubeConfig)

@@ -69,6 +69,18 @@ const (
 	// Used in case no other specified in config
 	defaultReconcileThreadsNumber = 1
 
+	// defaultShardsThreadNumber specifies the default number of threads usable for concurrent shard reconciliation
+	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
+	defaultShardsThreadNumber = 1
+
+	// defaultShardsMaxConcurrencyPercent specifies the maximum integer percentage of shards that may be reconciled
+	// concurrently during cluster reconciliation. This counterbalances the fact that this is an operator setting,
+	// that different clusters will have different shard counts, and that the shard concurrency capacity is specified
+	// above in terms of a number of threads to use (up to). Example: overriding to 100 means all shards may be
+	// reconciled concurrently, if the number of shard reconciliation threads is greater than or equal to the number
+	// of shards in the cluster.
+	defaultShardsMaxConcurrencyPercent = 50
+
 	// DefaultReconcileThreadsWarmup specifies default reconcile threads warmup time
 	DefaultReconcileThreadsWarmup = 10 * time.Second
 
@@ -244,7 +256,9 @@ type OperatorConfigCHIRuntime struct {
 // OperatorConfigReconcile specifies reconcile section
 type OperatorConfigReconcile struct {
 	Runtime struct {
-		ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
+		ThreadsNumber               int `json:"threadsNumber" yaml:"threadsNumber"`
+		ShardsThreadNumber          int `json:"shardsThreadNumber" yaml:"shardsThreadNumber"`
+		ShardsMaxConcurrencyPercent int `json:"shardsMaxConcurrencyPercent" yaml:"shardsMaxConcurrencyPercent"`
 	} `json:"runtime" yaml:"runtime"`
 
 	StatefulSet struct {
@@ -399,9 +413,13 @@ type OperatorConfig struct {
 	VModule         string `json:"vmodule"          yaml:"vmodule"`
 	LogBacktraceAt  string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 	// Max number of concurrent reconciles in progress
-	ReconcileThreadsNumber int  `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
-	ReconcileWaitExclude   bool `json:"reconcileWaitExclude"   yaml:"reconcileWaitExclude"`
-	ReconcileWaitInclude   bool `json:"reconcileWaitInclude"   yaml:"reconcileWaitInclude"`
+	ReconcileThreadsNumber int `json:"reconcileThreadsNumber" yaml:"reconcileThreadsNumber"`
+	// Max number of threads available for use in concurrent reconciliation of shards within a cluster
+	ReconcileShardsThreadsNumber int `json:"reconcileShardsThreadsNumber" yaml:"reconcileShardsThreadsNumber"`
+	// Max percentage of shards that can be reconciled in parallel within a cluster
+	ReconcileShardsMaxConcurrencyPercent int  `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+	ReconcileWaitExclude                 bool `json:"reconcileWaitExclude"   yaml:"reconcileWaitExclude"`
+	ReconcileWaitInclude                 bool `json:"reconcileWaitInclude"   yaml:"reconcileWaitInclude"`
 
 	// When transferring annotations from the chi/chit.metadata to CHI objects, use these filters.
 	IncludeIntoPropagationAnnotations []string `json:"includeIntoPropagationAnnotations" yaml:"includeIntoPropagationAnnotations"`
@@ -762,6 +780,12 @@ func (c *OperatorConfig) normalizeRuntimeSection() {
 	if c.Reconcile.Runtime.ThreadsNumber == 0 {
 		c.Reconcile.Runtime.ThreadsNumber = defaultReconcileThreadsNumber
 	}
+	if c.Reconcile.Runtime.ShardsThreadNumber == 0 {
+		c.Reconcile.Runtime.ShardsThreadNumber = defaultShardsThreadNumber
+	}
+	if c.Reconcile.Runtime.ShardsMaxConcurrencyPercent == 0 {
+		c.Reconcile.Runtime.ShardsMaxConcurrencyPercent = defaultShardsMaxConcurrencyPercent
+	}
 
 	//reconcileWaitExclude: true
 	//reconcileWaitInclude: false
@@ -1075,6 +1099,14 @@ func (c *OperatorConfig) move() {
 	// Max number of concurrent reconciles in progress
 	if c.ReconcileThreadsNumber != 0 {
 		c.Reconcile.Runtime.ThreadsNumber = c.ReconcileThreadsNumber
+	}
+	// Max number of threads usable for concurrent shard reconciliations
+	if c.ReconcileShardsThreadsNumber != 0 {
+		c.Reconcile.Runtime.ShardsThreadNumber = c.ReconcileShardsThreadsNumber
+	}
+	// Max percentage of shards that can be reconciled concurrently
+	if c.ReconcileShardsMaxConcurrencyPercent != 0 {
+		c.Reconcile.Runtime.ShardsMaxConcurrencyPercent = c.ReconcileShardsMaxConcurrencyPercent
 	}
 	if c.ReconcileWaitExclude {
 		c.Reconcile.Host.Wait.Exclude = c.Reconcile.Host.Wait.Exclude.From(c.ReconcileWaitExclude)
