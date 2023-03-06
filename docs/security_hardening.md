@@ -333,11 +333,11 @@ In order to enable ClickHouse replication other HTTPS on a securerly configured 
 ```
 spec:
   configuration:
-    clusters:
-      - name: single
     settings:
       interserver_http_port: _removed_
       interserver_https_port: 9009
 ```
 
 ### Forcing HTTPS for ZooKeeper
+
+coming soon
