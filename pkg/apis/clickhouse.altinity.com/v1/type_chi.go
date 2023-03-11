@@ -46,7 +46,10 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.EnsureStatus().Pods = pods
 	chi.EnsureStatus().FQDNs = fqdns
 	chi.EnsureStatus().Endpoint = endpoint
-	chi.EnsureStatus().NormalizedCHI = chi.CopyFiltered(true, true)
+	chi.EnsureStatus().NormalizedCHI = chi.CopyFiltered(CopyOptions{
+		SkipStatus: true,
+		SkipManagedFields: true,
+	})
 }
 
 // FillSelfCalculatedAddressInfo calculates and fills address info
@@ -695,7 +698,8 @@ func (chi *ClickHouseInstallation) IsStopped() bool {
 	return chi.Spec.Stop.Value()
 }
 
-// Restart constants present possible values for .spec.restart
+// Restart constants present available values for .spec.restart
+// Controlling the operator's Clickhouse instances restart policy
 const (
 	// RestartAll specifies default value
 	RestartAll = "Restart"
@@ -727,8 +731,16 @@ func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 	return chi.Spec.Reconciling
 }
 
+// CopyOptions specifies options for CHI copier
+type CopyOptions struct {
+	// SkipStatus specifies whether to copy status
+	SkipStatus bool
+	// SkipManagedFields specifies whether to copy managed fields
+	SkipManagedFields bool
+}
+
 // CopyFiltered make copy filtering some fields
-func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *ClickHouseInstallation {
+func (chi *ClickHouseInstallation) CopyFiltered(opts CopyOptions) *ClickHouseInstallation {
 	if chi == nil {
 		return nil
 	}
@@ -742,11 +754,11 @@ func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *Cli
 		return nil
 	}
 
-	if status {
+	if opts.SkipStatus {
 		chi2.Status = nil
 	}
 
-	if managedFields {
+	if opts.SkipManagedFields {
 		chi2.ObjectMeta.ManagedFields = nil
 	}
 
@@ -754,12 +766,12 @@ func (chi *ClickHouseInstallation) CopyFiltered(status, managedFields bool) *Cli
 }
 
 // JSON returns JSON string
-func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
+func (chi *ClickHouseInstallation) JSON(opts CopyOptions) string {
 	if chi == nil {
 		return ""
 	}
 
-	filtered := chi.CopyFiltered(status, managedFields)
+	filtered := chi.CopyFiltered(opts)
 	jsonBytes, err := json.MarshalIndent(filtered, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("unable to parse. err: %v", err)
@@ -769,12 +781,12 @@ func (chi *ClickHouseInstallation) JSON(status, managedFields bool) string {
 }
 
 // YAML return YAML string
-func (chi *ClickHouseInstallation) YAML(status, managedFields bool) string {
+func (chi *ClickHouseInstallation) YAML(opts CopyOptions) string {
 	if chi == nil {
 		return ""
 	}
 
-	filtered := chi.CopyFiltered(status, managedFields)
+	filtered := chi.CopyFiltered(opts)
 	yamlBytes, err := yaml.Marshal(filtered)
 	if err != nil {
 		return fmt.Sprintf("unable to parse. err: %v", err)
