@@ -238,19 +238,15 @@ func (s *Setting) String() string {
 }
 
 // Settings specifies settings
-type Settings struct {
-	m map[string]*Setting
-}
+type Settings map[string]*Setting
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
-	return &Settings{
-		m: makeM(),
-	}
+	m := makeSettings()
+	return &m
 }
 
-// makeM makes a map of string to setting
-func makeM() map[string]*Setting {
+func makeSettings() Settings {
 	return make(map[string]*Setting)
 }
 
@@ -259,7 +255,7 @@ func (settings *Settings) Len() int {
 	if settings == nil {
 		return 0
 	}
-	return len(settings.m)
+	return len(*settings)
 }
 
 // IsZero checks whether settings is zero
@@ -278,7 +274,7 @@ func (settings *Settings) Walk(f func(name string, setting *Setting)) {
 	if settings.Len() == 0 {
 		return
 	}
-	for name := range settings.m {
+	for name := range *settings {
 		f(name, settings.Get(name))
 	}
 }
@@ -291,7 +287,7 @@ func (settings *Settings) Has(name string) bool {
 	if settings.Len() == 0 {
 		return false
 	}
-	_, ok := settings.m[name]
+	_, ok := (*settings)[name]
 	return ok
 }
 
@@ -303,7 +299,7 @@ func (settings *Settings) Get(name string) *Setting {
 	if settings.Len() == 0 {
 		return nil
 	}
-	return settings.m[name]
+	return (*settings)[name]
 }
 
 // Set sets named setting
@@ -312,10 +308,10 @@ func (settings *Settings) Set(name string, setting *Setting) {
 		return
 	}
 	// Lazy load
-	if settings.m == nil {
-		settings.m = makeM()
+	if *settings == nil {
+		*settings = makeSettings()
 	}
-	settings.m[name] = setting
+	(*settings)[name] = setting
 }
 
 // SetIfNotExists sets named setting
@@ -336,7 +332,7 @@ func (settings *Settings) Delete(name string) {
 	if !settings.Has(name) {
 		return
 	}
-	delete(settings.m, name)
+	delete(*settings, name)
 }
 
 // UnmarshalJSON unmarshal JSON
