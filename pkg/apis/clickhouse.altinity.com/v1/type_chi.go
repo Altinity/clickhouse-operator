@@ -46,7 +46,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.EnsureStatus().Pods = pods
 	chi.EnsureStatus().FQDNs = fqdns
 	chi.EnsureStatus().Endpoint = endpoint
-	chi.EnsureStatus().NormalizedCHI = chi.Copy(CopyOptions{
+	chi.EnsureStatus().NormalizedCHI = chi.Copy(CopyCHIOptions{
 		SkipStatus:        true,
 		SkipManagedFields: true,
 	})
@@ -548,7 +548,8 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
 }
 
-// FindCluster finds cluster by name or index
+// FindCluster finds cluster by name or index.
+// Name is expected to be string, index is expected to be int.
 func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *Cluster {
 	var resultCluster *Cluster
 	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error {
@@ -568,6 +569,7 @@ func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *Cluster {
 }
 
 // FindShard finds shard by name or index
+// Name is expected to be string, index is expected to be int.
 func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleShard interface{}) *ChiShard {
 	if cluster := chi.FindCluster(needleCluster); cluster != nil {
 		return cluster.FindShard(needleShard)
@@ -695,6 +697,9 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 
 // IsStopped checks whether CHI is stopped
 func (chi *ClickHouseInstallation) IsStopped() bool {
+	if chi == nil {
+		return false
+	}
 	return chi.Spec.Stop.Value()
 }
 
@@ -710,16 +715,25 @@ const (
 
 // IsRollingUpdate checks whether CHI should perform rolling update
 func (chi *ClickHouseInstallation) IsRollingUpdate() bool {
+	if chi == nil {
+		return false
+	}
 	return chi.Spec.Restart == RestartRollingUpdate
 }
 
 // IsNoRestartSpecified checks whether CHI has no restart request
 func (chi *ClickHouseInstallation) IsNoRestartSpecified() bool {
+	if chi == nil {
+		return false
+	}
 	return chi.Spec.Restart == ""
 }
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
 func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
+	if chi == nil {
+		return false
+	}
 	return chi.Spec.Troubleshoot.Value()
 }
 
@@ -731,16 +745,16 @@ func (chi *ClickHouseInstallation) GetReconciling() *ChiReconciling {
 	return chi.Spec.Reconciling
 }
 
-// CopyOptions specifies options for CHI copier
-type CopyOptions struct {
+// CopyCHIOptions specifies options for CHI copier
+type CopyCHIOptions struct {
 	// SkipStatus specifies whether to copy status
 	SkipStatus bool
 	// SkipManagedFields specifies whether to copy managed fields
 	SkipManagedFields bool
 }
 
-// CopyFiltered make copy filtering some fields
-func (chi *ClickHouseInstallation) Copy(opts CopyOptions) *ClickHouseInstallation {
+// Copy make copy filtering some fields according to CopyOptions
+func (chi *ClickHouseInstallation) Copy(opts CopyCHIOptions) *ClickHouseInstallation {
 	if chi == nil {
 		return nil
 	}
@@ -766,7 +780,7 @@ func (chi *ClickHouseInstallation) Copy(opts CopyOptions) *ClickHouseInstallatio
 }
 
 // JSON returns JSON string
-func (chi *ClickHouseInstallation) JSON(opts CopyOptions) string {
+func (chi *ClickHouseInstallation) JSON(opts CopyCHIOptions) string {
 	if chi == nil {
 		return ""
 	}
@@ -781,7 +795,7 @@ func (chi *ClickHouseInstallation) JSON(opts CopyOptions) string {
 }
 
 // YAML return YAML string
-func (chi *ClickHouseInstallation) YAML(opts CopyOptions) string {
+func (chi *ClickHouseInstallation) YAML(opts CopyCHIOptions) string {
 	if chi == nil {
 		return ""
 	}
@@ -804,4 +818,60 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	}
 
 	return chi.Status
+}
+
+// HasStatus checks whether CHI has Status
+func (chi *ClickHouseInstallation) HasStatus() bool {
+	if chi == nil {
+		return false
+	}
+	return chi.Status != nil
+}
+
+// HasAncestor checks whether CHI has an ancestor
+func (chi *ClickHouseInstallation) HasAncestor() bool {
+	if !chi.HasStatus() {
+		return false
+	}
+	return chi.Status.HasNormalizedCHICompleted()
+}
+
+// GetAncestor gets ancestor of a CHI
+func (chi *ClickHouseInstallation) GetAncestor() *ClickHouseInstallation {
+	if !chi.HasAncestor() {
+		return nil
+	}
+	return chi.Status.GetNormalizedCHICompleted()
+}
+
+// SetAncestor sets ancestor of a CHI
+func (chi *ClickHouseInstallation) SetAncestor(a *ClickHouseInstallation) {
+	if chi == nil {
+		return
+	}
+	chi.EnsureStatus().NormalizedCHICompleted = a
+}
+
+// HasTarget checks whether CHI has a target
+func (chi *ClickHouseInstallation) HasTarget() bool {
+	if !chi.HasStatus() {
+		return false
+	}
+	return chi.Status.HasNormalizedCHI()
+}
+
+// GetTarget gets target of a CHI
+func (chi *ClickHouseInstallation) GetTarget() *ClickHouseInstallation {
+	if !chi.HasTarget() {
+		return nil
+	}
+	return chi.Status.GetNormalizedCHI()
+}
+
+// SetTarget sets target of a CHI
+func (chi *ClickHouseInstallation) SetTarget(a *ClickHouseInstallation) {
+	if chi == nil {
+		return
+	}
+	chi.EnsureStatus().NormalizedCHI = a
 }
