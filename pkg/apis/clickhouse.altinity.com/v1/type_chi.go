@@ -46,8 +46,8 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 	chi.EnsureStatus().Pods = pods
 	chi.EnsureStatus().FQDNs = fqdns
 	chi.EnsureStatus().Endpoint = endpoint
-	chi.EnsureStatus().NormalizedCHI = chi.CopyFiltered(CopyOptions{
-		SkipStatus: true,
+	chi.EnsureStatus().NormalizedCHI = chi.Copy(CopyOptions{
+		SkipStatus:        true,
 		SkipManagedFields: true,
 	})
 }
@@ -740,7 +740,7 @@ type CopyOptions struct {
 }
 
 // CopyFiltered make copy filtering some fields
-func (chi *ClickHouseInstallation) CopyFiltered(opts CopyOptions) *ClickHouseInstallation {
+func (chi *ClickHouseInstallation) Copy(opts CopyOptions) *ClickHouseInstallation {
 	if chi == nil {
 		return nil
 	}
@@ -771,7 +771,7 @@ func (chi *ClickHouseInstallation) JSON(opts CopyOptions) string {
 		return ""
 	}
 
-	filtered := chi.CopyFiltered(opts)
+	filtered := chi.Copy(opts)
 	jsonBytes, err := json.MarshalIndent(filtered, "", "  ")
 	if err != nil {
 		return fmt.Sprintf("unable to parse. err: %v", err)
@@ -786,7 +786,7 @@ func (chi *ClickHouseInstallation) YAML(opts CopyOptions) string {
 		return ""
 	}
 
-	filtered := chi.CopyFiltered(opts)
+	filtered := chi.Copy(opts)
 	yamlBytes, err := yaml.Marshal(filtered)
 	if err != nil {
 		return fmt.Sprintf("unable to parse. err: %v", err)
