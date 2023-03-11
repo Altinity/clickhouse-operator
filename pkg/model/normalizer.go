@@ -846,35 +846,43 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster 
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
+	// Zookeeper
 	zk := host.GetZookeeper()
 	host.Config.ZookeeperFingerprint = util.Fingerprint(zk)
 
-	global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
-	local := host.Settings.AsSortedSliceOfStrings()
-	host.Config.SettingsFingerprint = util.Fingerprint(
-		fmt.Sprintf("%s%s",
-			util.Fingerprint(global),
-			util.Fingerprint(local),
-		),
-	)
-	host.Config.FilesFingerprint = util.Fingerprint(
-		fmt.Sprintf("%s%s",
-			util.Fingerprint(
-				n.ctx.chi.Spec.Configuration.Files.Filter(
-					nil,
-					[]chiV1.SettingsSection{chiV1.SectionUsers},
-					true,
-				).AsSortedSliceOfStrings(),
+	// Settings
+	{
+		global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
+		local := host.Settings.AsSortedSliceOfStrings()
+
+		host.Config.SettingsFingerprint = util.Fingerprint(
+			fmt.Sprintf("%s%s",
+				util.Fingerprint(global),
+				util.Fingerprint(local),
 			),
-			util.Fingerprint(
-				host.Files.Filter(
-					nil,
-					[]chiV1.SettingsSection{chiV1.SectionUsers},
-					true,
-				).AsSortedSliceOfStrings(),
+		)
+	}
+
+	//  Files
+	{
+		global := n.ctx.chi.Spec.Configuration.Files.Filter(
+			nil,
+			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			true,
+		).AsSortedSliceOfStrings()
+		local := host.Files.Filter(
+			nil,
+			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			true,
+		).AsSortedSliceOfStrings()
+
+		host.Config.FilesFingerprint = util.Fingerprint(
+			fmt.Sprintf("%s%s",
+				util.Fingerprint(global),
+				util.Fingerprint(local),
 			),
-		),
-	)
+		)
+	}
 
 	// Unify settings fingerprint
 	host.Config.SettingsFingerprint = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
