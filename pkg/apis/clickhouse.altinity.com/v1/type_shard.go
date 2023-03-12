@@ -41,6 +41,10 @@ func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 
 // WalkHosts runs specified function on each host
 func (shard *ChiShard) WalkHosts(f func(host *ChiHost) error) []error {
+	if shard == nil {
+		return nil
+	}
+
 	res := make([]error, 0)
 
 	for replicaIndex := range shard.Hosts {
