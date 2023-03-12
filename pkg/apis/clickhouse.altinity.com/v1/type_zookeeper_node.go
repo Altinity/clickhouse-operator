@@ -14,6 +14,12 @@
 
 package v1
 
+// ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
+type ChiZookeeperNode struct {
+	Host string `json:"host,omitempty" yaml:"host,omitempty"`
+	Port int32  `json:"port,omitempty" yaml:"port,omitempty"`
+}
+
 // Equal checks whether zookeepr node is equal to another
 func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 	if to == nil {
