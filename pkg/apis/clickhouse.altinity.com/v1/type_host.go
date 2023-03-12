@@ -201,6 +201,11 @@ func (host *ChiHost) GetShard() *ChiShard {
 	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
 }
 
+// GetAncestor gets ancestor of a host
+func (host *ChiHost) GetAncestor() *ChiHost {
+	return host.GetCHI().GetAncestor().FindHost(host.Address.ClusterName, host.Address.ShardName, host.Address.HostName)
+}
+
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
 func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
 	host.CHI.WalkVolumeClaimTemplates(f)
