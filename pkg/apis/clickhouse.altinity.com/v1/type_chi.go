@@ -184,6 +184,9 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
 	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error,
 ) []error {
+	if chi == nil {
+		return nil
+	}
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -195,6 +198,9 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 
 // WalkClusters walks clusters
 func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *Cluster) error) []error {
+	if chi == nil {
+		return nil
+	}
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -210,7 +216,9 @@ func (chi *ClickHouseInstallation) WalkShards(
 		shard *ChiShard,
 	) error,
 ) []error {
-
+	if chi == nil {
+		return nil
+	}
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -230,6 +238,9 @@ func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 	clusterScopeCycleSize int,
 	f WalkHostsAddressFn,
 ) (res []error) {
+	if chi == nil {
+		return nil
+	}
 	address := NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize)
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
 		cluster := chi.Spec.Configuration.Clusters[clusterIndex]
@@ -251,12 +262,15 @@ func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 }
 
 // WalkHostsFullPath walks hosts with a function
-func (chi *ClickHouseInstallation) WalkHostsFullPath(f WalkHostsAddressFn) (res []error) {
+func (chi *ClickHouseInstallation) WalkHostsFullPath(f WalkHostsAddressFn) []error {
 	return chi.WalkHostsFullPathAndScope(0, 0, f)
 }
 
-// WalkHosts walks hosts
+// WalkHosts walks hosts with a function
 func (chi *ClickHouseInstallation) WalkHosts(f func(host *ChiHost) error) []error {
+	if chi == nil {
+		return nil
+	}
 	res := make([]error, 0)
 
 	for clusterIndex := range chi.Spec.Configuration.Clusters {
@@ -273,7 +287,7 @@ func (chi *ClickHouseInstallation) WalkHosts(f func(host *ChiHost) error) []erro
 	return res
 }
 
-// WalkTillError walks until an error met
+// WalkTillError walks hosts with a function until an error met
 func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
 	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
@@ -422,7 +436,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 }
 
 // FindCluster finds cluster by name or index.
-// Name is expected to be string, index is expected to be int.
+// Expectations: name is expected to be a string, index is expected to be an int.
 func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *Cluster {
 	var resultCluster *Cluster
 	chi.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error {
@@ -442,12 +456,15 @@ func (chi *ClickHouseInstallation) FindCluster(needle interface{}) *Cluster {
 }
 
 // FindShard finds shard by name or index
-// Name is expected to be string, index is expected to be int.
+// Expectations: name is expected to be a string, index is expected to be an int.
 func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleShard interface{}) *ChiShard {
-	if cluster := chi.FindCluster(needleCluster); cluster != nil {
-		return cluster.FindShard(needleShard)
-	}
-	return nil
+	return chi.FindCluster(needleCluster).FindShard(needleShard)
+}
+
+// FindHost finds shard by name or index
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (chi *ClickHouseInstallation) FindHost(needleCluster interface{}, needleShard interface{}, needleHost interface{}) *ChiHost {
+	return chi.FindCluster(needleCluster).FindHost(needleShard, needleHost)
 }
 
 // ClustersCount counts clusters
@@ -626,7 +643,7 @@ type CopyCHIOptions struct {
 	SkipManagedFields bool
 }
 
-// Copy make copy filtering some fields according to CopyOptions
+// Copy makes copy of a CHI, filtering fields according to specified CopyOptions
 func (chi *ClickHouseInstallation) Copy(opts CopyCHIOptions) *ClickHouseInstallation {
 	if chi == nil {
 		return nil
