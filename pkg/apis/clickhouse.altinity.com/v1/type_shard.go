@@ -51,6 +51,25 @@ func (shard *ChiShard) WalkHosts(f func(host *ChiHost) error) []error {
 	return res
 }
 
+// FindHost finds host by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (shard *ChiShard) FindHost(needle interface{}) (res *ChiHost) {
+	shard.WalkHosts(func(host *ChiHost) error {
+		switch v := needle.(type) {
+		case string:
+			if host.Address.HostName == v {
+				res = host
+			}
+		case int:
+			if host.Address.ShardScopeIndex == v {
+				res = host
+			}
+		}
+		return nil
+	})
+	return
+}
+
 // FirstHost finds first host in the shard
 func (shard *ChiShard) FirstHost() *ChiHost {
 	var result *ChiHost
