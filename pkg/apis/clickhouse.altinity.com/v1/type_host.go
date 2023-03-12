@@ -235,7 +235,7 @@ func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMo
 	return
 }
 
-// IsSecure checks whether host requires secure communication
+// IsSecure checks whether the host requires secure communication
 func (host *ChiHost) IsSecure() bool {
 	if host == nil {
 		return false
@@ -250,7 +250,7 @@ func (host *ChiHost) IsSecure() bool {
 	return host.GetCluster().GetSecure().Value()
 }
 
-// IsFirst checks whether host is the first host of the CHI
+// IsFirst checks whether the host is the first host of the whole CHI
 func (host *ChiHost) IsFirst() bool {
 	if host == nil {
 		return false
