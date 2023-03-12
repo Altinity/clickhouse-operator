@@ -82,7 +82,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *C
 	// 2. common settings
 	// 3. common files
 	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.GetRemoteServers(options.GetRemoteServersGeneratorOptions()))
-	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettings(nil))
+	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.GetSettingsGlobal())
 	util.MergeStringMapsOverwrite(commonConfigSections, c.chConfigGenerator.GetFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(commonConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.CommonConfigFiles)
