@@ -418,20 +418,20 @@ func (w *worker) isCleanRestart(chi *chiV1.ClickHouseInstallation) bool {
 	// Do we have have previously completed CHI?
 	// In case no - this means that CHI has either not completed or we are migrating from
 	// such a version of the operator, where there is no completed CHI at all
-	noCompletedCHI := chi.Status.GetNormalizedCHICompleted() == nil
+	noCompletedCHI := !chi.HasAncestor()
 	// Having status completed and not having completed CHI suggests we are migrating operator version
 	statusIsCompleted := chi.Status.GetStatus() == chiV1.StatusCompleted
 	if noCompletedCHI && statusIsCompleted {
 		// In case of a restart - assume that normalized is already completed
-		chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
+		chi.SetAncestor(chi.GetTarget())
 	}
 
 	// Check whether anything has changed in CHI spec
 	// In case the generation is the same as already completed - it is clean restart
 	generationIsOk := false
-	// However, NormalizedCHICompleted still can be missing, for example, in newly requested CHI
-	if chi.Status.GetNormalizedCHICompleted() != nil {
-		generationIsOk = chi.Generation == chi.Status.GetNormalizedCHICompleted().Generation
+	// However, completed CHI still can be missing, for example, in newly requested CHI
+	if chi.HasAncestor() {
+		generationIsOk = chi.Generation == chi.GetAncestor().Generation
 	}
 
 	return generationIsOk
@@ -473,7 +473,7 @@ func (w *worker) logCHI(name string, chi *chiV1.ClickHouseInstallation) {
 		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
 		name,
 		name,
-		chi.YAML(true, true),
+		chi.YAML(chiV1.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}),
 	)
 }
 
@@ -575,8 +575,8 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHou
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
-			chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
-			chi.EnsureStatus().NormalizedCHI = nil
+			chi.SetAncestor(chi.GetTarget())
+			chi.SetTarget(nil)
 			chi.EnsureStatus().ReconcileComplete()
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
