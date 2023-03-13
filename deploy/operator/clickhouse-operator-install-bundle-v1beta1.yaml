@@ -2332,6 +2332,9 @@ spec:
                         hostRegexpTemplate:
                           type: string
                           description: "ClickHouse server configuration `<host_regexp>...</host_regexp>` for any <user>"
+                          #                    configurationRestartPolicy:
+                          #                      description: "Configuration restart policy describes what configuration changes require ClickHouse restart"
+                          #                      type: object
                 access:
                   type: object
                   description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
@@ -2853,7 +2856,52 @@ data:
         network:
           # Default host_regexp to limit network connectivity from outside
           hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+
       ################################################
+      ##
+      ## Configuration Restart Policy Section
+      ## Configuration restart policy describes what configuration changes require ClickHouse restart
+      ##
+      ################################################
+    #  configurationRestartPolicy:
+    #    default:
+    #      settings:
+    #        default: "yes"
+    #        matches:
+    #          max_server_memory_*: "no"
+    #          max_*_to_drop: "no"
+    #          dictionaries_config: "no"
+    #          logger: "no"
+    #      zookeeper:
+    #        default: "yes"
+    #      files:
+    #        matches:
+    #          config.d/*.xml: "yes"
+    #          users.d: "no"
+    #      profiles:
+    #        default: "no"
+    #        matches:
+    #          default/background_*_pool_size: "yes"
+    #    21.*:
+    #      settings/logger: "yes"
+    #
+    #  configurationRestartPolicy:
+    #    default:
+    #      settings: true
+    #      settings/max_server_memory_*: false
+    #      settings/max_*_to_drop: false
+    #      settings/dictionaries_config: false
+    #      settings/logger: false
+    #
+    #      zookeeper: true
+    #      files/config.d/*.xml: true
+    #      files/users.d: false
+    #
+    #      profiles: false
+    #      profiles/default/background_*_pool_size: true
+    #    21:
+    #      settings/logger: true
+    #  ################################################
       ##
       ## Access to ClickHouse instances
       ##
