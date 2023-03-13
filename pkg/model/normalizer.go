@@ -844,6 +844,84 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster 
 	return []*chiV1.Cluster{}
 }
 
+func (n *Normalizer) cmpZookeeper(a, b *chiV1.ChiZookeeperConfig) bool {
+	return false
+}
+
+func (n *Normalizer) cmpSettings(a, b *chiV1.Settings) bool {
+	return false
+}
+
+// isConfigurationChanged
+func (n *Normalizer) isConfigurationChanged(host *chiV1.ChiHost) bool {
+	// Zookeeper
+	{
+		var old, new *chiV1.ChiZookeeperConfig
+		if host.HasAncestor() {
+			old = host.GetAncestor().GetZookeeper()
+		}
+		new = host.GetZookeeper()
+		n.cmpZookeeper(old, new)
+	}
+	// Settings Global
+	{
+		var old, new *chiV1.Settings
+		if host.HasAncestorCHI() {
+			old = host.GetAncestorCHI().Spec.Configuration.Settings
+		}
+		if host.HasCHI() {
+			new = host.GetCHI().Spec.Configuration.Settings
+		}
+		n.cmpSettings(old, new)
+	}
+	// Settings Local
+	{
+		var old, new *chiV1.Settings
+		if host.HasAncestor() {
+			old = host.GetAncestor().Settings
+		}
+		new = host.Settings
+		n.cmpSettings(old, new)
+	}
+	// Files Global
+	{
+		var old, new *chiV1.Settings
+		if host.HasAncestorCHI() {
+			old = host.GetAncestorCHI().Spec.Configuration.Files.Filter(
+				nil,
+				[]chiV1.SettingsSection{chiV1.SectionUsers},
+				true,
+			)
+		}
+		if host.HasCHI() {
+			new = host.GetCHI().Spec.Configuration.Files.Filter(
+				nil,
+				[]chiV1.SettingsSection{chiV1.SectionUsers},
+				true,
+			)
+		}
+		n.cmpSettings(old, new)
+	}
+	// Files Local
+	{
+		var old, new *chiV1.Settings
+		if host.HasAncestor() {
+			old = host.GetAncestor().Files.Filter(
+				nil,
+				[]chiV1.SettingsSection{chiV1.SectionUsers},
+				true,
+			)
+		}
+		new = host.Files.Filter(
+			nil,
+			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			true,
+		)
+		n.cmpSettings(old, new)
+	}
+	return false
+}
+
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
 	// Zookeeper
