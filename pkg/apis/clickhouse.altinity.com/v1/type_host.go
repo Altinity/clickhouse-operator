@@ -208,7 +208,7 @@ func (host *ChiHost) GetAncestor() *ChiHost {
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
 func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
-	host.CHI.WalkVolumeClaimTemplates(f)
+	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 
 // WalkVolumeMounts walks VolumeMount(s)
