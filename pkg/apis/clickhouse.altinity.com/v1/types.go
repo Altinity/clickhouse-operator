@@ -825,8 +825,9 @@ type ChiZookeeperConfig struct {
 
 // ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiZookeeperNode struct {
-	Host string `json:"host,omitempty" yaml:"host,omitempty"`
-	Port int32  `json:"port,omitempty" yaml:"port,omitempty"`
+	Host   string      `json:"host,omitempty" yaml:"host,omitempty"`
+	Port   int32       `json:"port,omitempty" yaml:"port,omitempty"`
+	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -854,4 +855,9 @@ type ClickHouseOperatorConfigurationList struct {
 	metav1.TypeMeta `json:",inline"  yaml:",inline"`
 	metav1.ListMeta `json:"metadata" yaml:"metadata"`
 	Items           []ClickHouseOperatorConfiguration `json:"items" yaml:"items"`
+}
+
+// Secured interface for nodes and hosts
+type Secured interface {
+	IsSecure() bool
 }
