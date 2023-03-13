@@ -189,6 +189,11 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 	return host.CHI
 }
 
+// HasCHI checks whether host has CHI
+func (host *ChiHost) HasCHI() bool {
+	return host.GetCHI() != nil
+}
+
 // GetCluster gets cluster
 func (host *ChiHost) GetCluster() *Cluster {
 	// Host has to have filled Address
@@ -206,9 +211,19 @@ func (host *ChiHost) GetAncestor() *ChiHost {
 	return host.GetCHI().GetAncestor().FindHost(host.Address.ClusterName, host.Address.ShardName, host.Address.HostName)
 }
 
+// HasAncestor checks whether host has an ancestor
+func (host *ChiHost) HasAncestor() bool {
+	return host.GetAncestor() != nil
+}
+
 // GetAncestorCHI gets ancestor of a host
 func (host *ChiHost) GetAncestorCHI() *ClickHouseInstallation {
 	return host.GetCHI().GetAncestor()
+}
+
+// HasAncestorCHI checks whether host has an ancestor
+func (host *ChiHost) HasAncestorCHI() bool {
+	return host.GetAncestorCHI() != nil
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
