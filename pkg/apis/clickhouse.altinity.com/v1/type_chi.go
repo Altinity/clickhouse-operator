@@ -540,6 +540,9 @@ func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolu
 
 // WalkVolumeClaimTemplates walks over all VolumeClaimTemplates
 func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
+	if chi == nil {
+		return
+	}
 	chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Walk(f)
 }
 
