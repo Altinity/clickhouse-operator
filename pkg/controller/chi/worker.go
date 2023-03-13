@@ -104,8 +104,16 @@ func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < 1*time.Minute
 }
 
+func (w *worker) configurationChanged(host *chiV1.ChiHost) bool {
+	return false
+}
+
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
+	if w.configurationChanged(host) {
+		return true
+	}
+
 	// For recent tasks should not do force restart
 	if w.isEarlyContext() {
 		return false
@@ -115,7 +123,7 @@ func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
 	return host.GetCHI().IsRollingUpdate()
 }
 
-// isEarlyContext checks whether this context/task has been started after worker start
+// isEarlyContext checks whether this context/task has been started shortly after worker started
 func (w *worker) isEarlyContext() bool {
 	return w.task.start.Sub(w.start) < 1*time.Minute
 }
@@ -514,8 +522,8 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiV1.ClickHouseIn
 	})
 }
 
+// excludeStopped excludes stopped CHI from monitoring
 func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
-	// Exclude stopped CHI from monitoring
 	if chi.IsStopped() {
 		w.a.V(1).
 			WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
@@ -526,6 +534,7 @@ func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
 	}
 }
 
+// includeStopped includes previously stopped CHI into monitoring
 func (w *worker) includeStopped(chi *chiV1.ClickHouseInstallation) {
 	if !chi.IsStopped() {
 		w.a.V(1).
