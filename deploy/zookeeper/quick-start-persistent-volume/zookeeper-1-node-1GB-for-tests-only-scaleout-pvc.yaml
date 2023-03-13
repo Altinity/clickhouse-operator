@@ -90,7 +90,7 @@ data:
     export CLUSTER_NAME=zookeeper
     export ZOO_LOG4J_PROP="WARN, CONSOLE"
   java.env: |
-    JVMFLAGS="-Xms128M -Xmx4G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"
+    JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"
   log4j-quiet.properties: |
     log4j.rootLogger=CONSOLE
     log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
@@ -501,16 +501,16 @@ spec:
     spec:
       affinity:
         podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - zookeeper
-                topologyKey: kubernetes.io/hostname
-              weight: 20
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                      - zookeeper
+              # TODO think about multi-AZ EKS
+              # topologyKey: topology.kubernetes.io/zone
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: zookeeper
           command:
@@ -558,7 +558,7 @@ spec:
               protocol: TCP
           volumeMounts:
             - mountPath: /data
-              name: data
+              name: datadir-volume
             - mountPath: /conf
               name: conf
       restartPolicy: Always
@@ -572,12 +572,10 @@ spec:
   updateStrategy:
     type: RollingUpdate
   volumeClaimTemplates:
-    - apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
+    - metadata:
         labels:
           app: zookeeper
-        name: data
+        name: datadir-volume
       spec:
         accessModes:
           - ReadWriteOnce
