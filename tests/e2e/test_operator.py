@@ -3353,6 +3353,17 @@ def test_039(self, step=0):
             assert r == "10"
 
     if step == 4:
+        with Then("Create replicated table to test interserver_https_port"):
+            clickhouse.query(
+                chi,
+                "CREATE OR REPLACE TABLE secure_repl on cluster 'all-replicated' (a UInt32) ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{uuid}', '{replica}')  PARTITION BY tuple() ORDER BY a",
+                pwd="qkrq",
+            )
+            clickhouse.query(
+                chi,
+                "INSERT INTO secure_repl select number as a from numbers(10)",
+                pwd="qkrq",
+            )
         kubectl.delete_chi(chi)
 
 
