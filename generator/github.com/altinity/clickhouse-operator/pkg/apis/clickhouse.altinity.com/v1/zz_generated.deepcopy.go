@@ -167,12 +167,40 @@ func (in *ChiHost) DeepCopyInto(out *ChiHost) {
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Files != nil {
 		in, out := &in.Files, &out.Files
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
@@ -409,12 +437,40 @@ func (in *ChiReplica) DeepCopyInto(out *ChiReplica) {
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Files != nil {
 		in, out := &in.Files, &out.Files
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
@@ -496,12 +552,40 @@ func (in *ChiShard) DeepCopyInto(out *ChiShard) {
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Files != nil {
 		in, out := &in.Files, &out.Files
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
@@ -1052,12 +1136,40 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Files != nil {
 		in, out := &in.Files, &out.Files
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
@@ -1184,27 +1296,97 @@ func (in *Configuration) DeepCopyInto(out *Configuration) {
 	if in.Users != nil {
 		in, out := &in.Users, &out.Users
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Quotas != nil {
 		in, out := &in.Quotas, &out.Quotas
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Files != nil {
 		in, out := &in.Files, &out.Files
 		*out = new(Settings)
-		(*in).DeepCopyInto(*out)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]*Setting, len(*in))
+			for key, val := range *in {
+				var outVal *Setting
+				if val == nil {
+					(*out)[key] = nil
+				} else {
+					in, out := &val, &outVal
+					*out = new(Setting)
+					(*in).DeepCopyInto(*out)
+				}
+				(*out)[key] = outVal
+			}
+		}
 	}
 	if in.Clusters != nil {
 		in, out := &in.Clusters, &out.Clusters
@@ -1226,6 +1408,22 @@ func (in *Configuration) DeepCopy() *Configuration {
 		return nil
 	}
 	out := new(Configuration)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *CopyCHIOptions) DeepCopyInto(out *CopyCHIOptions) {
+	*out = *in
+	return
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new CopyCHIOptions.
+func (in *CopyCHIOptions) DeepCopy() *CopyCHIOptions {
+	if in == nil {
+		return nil
+	}
+	out := new(CopyCHIOptions)
 	in.DeepCopyInto(out)
 	return out
 }
@@ -1897,11 +2095,10 @@ func (in *Setting) DeepCopy() *Setting {
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
-func (in *Settings) DeepCopyInto(out *Settings) {
-	*out = *in
-	if in.m != nil {
-		in, out := &in.m, &out.m
-		*out = make(map[string]*Setting, len(*in))
+func (in Settings) DeepCopyInto(out *Settings) {
+	{
+		in := &in
+		*out = make(Settings, len(*in))
 		for key, val := range *in {
 			var outVal *Setting
 			if val == nil {
@@ -1913,18 +2110,18 @@ func (in *Settings) DeepCopyInto(out *Settings) {
 			}
 			(*out)[key] = outVal
 		}
+		return
 	}
-	return
 }
 
 // DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new Settings.
-func (in *Settings) DeepCopy() *Settings {
+func (in Settings) DeepCopy() Settings {
 	if in == nil {
 		return nil
 	}
 	out := new(Settings)
 	in.DeepCopyInto(out)
-	return out
+	return *out
 }
 
 // DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
