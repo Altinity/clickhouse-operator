@@ -535,11 +535,11 @@ func (settings *Settings) MergeFrom(src *Settings) *Settings {
 		return settings
 	}
 
-	if settings == nil {
-		settings = NewSettings()
-	}
-
 	src.Walk(func(key string, value *Setting) {
+		// Lazy load
+		if settings == nil {
+			settings = NewSettings()
+		}
 		settings.SetIfNotExists(key, value)
 	})
 
@@ -552,12 +552,12 @@ func (settings *Settings) MergeFromCB(src *Settings, filter func(path string, se
 		return settings
 	}
 
-	if settings == nil {
-		settings = NewSettings()
-	}
-
 	src.Walk(func(key string, value *Setting) {
 		if filter(key, value) {
+			// Lazy load
+			if settings == nil {
+				settings = NewSettings()
+			}
 			// Accept
 			settings.Set(key, value)
 		}
@@ -567,12 +567,10 @@ func (settings *Settings) MergeFromCB(src *Settings, filter func(path string, se
 }
 
 // GetSectionStringMap returns map of settings sections
-func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) map[string]string {
+func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) (m map[string]string) {
 	if settings == nil {
 		return nil
 	}
-
-	m := make(map[string]string)
 
 	settings.Walk(func(path string, _ *Setting) {
 		_section, err := getSectionFromPath(path)
@@ -598,6 +596,10 @@ func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUn
 		}
 
 		if scalar, ok := settings.getValueAsScalar(path); ok {
+			if m == nil {
+				// Lazy load
+				m = make(map[string]string)
+			}
 			m[filename] = scalar
 		} else {
 			// Skip vector for now
@@ -622,9 +624,7 @@ func (settings *Settings) Filter(
 	includeSections []SettingsSection,
 	excludeSections []SettingsSection,
 	includeUnspecified bool,
-) *Settings {
-	res := NewSettings()
-
+) (res *Settings) {
 	if settings.Len() == 0 {
 		return res
 	}
@@ -656,6 +656,9 @@ func (settings *Settings) Filter(
 		}
 
 		// We'd like to get this section
+		if res == nil {
+			res = NewSettings()
+		}
 		res.Set(path, settings.Get(path))
 	})
 
