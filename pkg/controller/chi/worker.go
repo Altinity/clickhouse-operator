@@ -104,13 +104,13 @@ func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < 1*time.Minute
 }
 
-func (w *worker) configurationChanged(host *chiV1.ChiHost) bool {
-	return false
+func (w *worker) isConfigurationChanged(host *chiV1.ChiHost) bool {
+	return w.normalizer.IsConfigurationChanged(host)
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
-	if w.configurationChanged(host) {
+	if w.isConfigurationChanged(host) {
 		return true
 	}
 
