@@ -864,13 +864,13 @@ func pathString(path *messagediff.Path) string {
 
 func makePathsFromDiff(diff *messagediff.Diff, prefix string) (res []string) {
 	for path := range diff.Added {
-		res = append(res, prefix + "/" + pathString(path))
+		res = append(res, prefix+"/"+pathString(path))
 	}
 	for path := range diff.Removed {
-		res = append(res, prefix + "/" + pathString(path))
+		res = append(res, prefix+"/"+pathString(path))
 	}
 	for path := range diff.Modified {
-		res = append(res, prefix + "/" + pathString(path))
+		res = append(res, prefix+"/"+pathString(path))
 	}
 	return res
 }
