@@ -19,6 +19,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"gopkg.in/d4l3k/messagediff.v1"
 	"sort"
 	"strings"
 
@@ -844,16 +845,48 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster 
 	return []*chiV1.Cluster{}
 }
 
-func (n *Normalizer) cmpZookeeper(a, b *chiV1.ChiZookeeperConfig) bool {
+func cmpZookeeper(a, b *chiV1.ChiZookeeperConfig) bool {
 	return false
 }
 
-func (n *Normalizer) cmpSettings(a, b *chiV1.Settings) bool {
-	return false
+func pathString(path *messagediff.Path) string {
+	for _, p := range *path {
+		switch mk := p.(type) {
+		case messagediff.MapKey:
+			switch str := mk.Key.(type) {
+			case string:
+				return str
+			}
+		}
+	}
+	return ""
+}
+
+func makePathsFromDiff(diff *messagediff.Diff, prefix string) (res []string) {
+	for path := range diff.Added {
+		res = append(res, prefix + "/" + pathString(path))
+	}
+	for path := range diff.Removed {
+		res = append(res, prefix + "/" + pathString(path))
+	}
+	for path := range diff.Modified {
+		res = append(res, prefix + "/" + pathString(path))
+	}
+	return res
+}
+
+func cmpSettings(section string, a, b *chiV1.Settings) bool {
+	if diff, equal := messagediff.DeepDiff(a, b); equal {
+		return equal
+	} else {
+		paths := makePathsFromDiff(diff, section)
+		_ = fmt.Sprintf("%v", paths)
+		return equal
+	}
 }
 
 // isConfigurationChanged
-func (n *Normalizer) isConfigurationChanged(host *chiV1.ChiHost) bool {
+func (n *Normalizer) IsConfigurationChanged(host *chiV1.ChiHost) bool {
 	// Zookeeper
 	{
 		var old, new *chiV1.ChiZookeeperConfig
@@ -861,7 +894,7 @@ func (n *Normalizer) isConfigurationChanged(host *chiV1.ChiHost) bool {
 			old = host.GetAncestor().GetZookeeper()
 		}
 		new = host.GetZookeeper()
-		n.cmpZookeeper(old, new)
+		cmpZookeeper(old, new)
 	}
 	// Settings Global
 	{
@@ -872,7 +905,7 @@ func (n *Normalizer) isConfigurationChanged(host *chiV1.ChiHost) bool {
 		if host.HasCHI() {
 			new = host.GetCHI().Spec.Configuration.Settings
 		}
-		n.cmpSettings(old, new)
+		cmpSettings("settings", old, new)
 	}
 	// Settings Local
 	{
@@ -881,7 +914,7 @@ func (n *Normalizer) isConfigurationChanged(host *chiV1.ChiHost) bool {
 			old = host.GetAncestor().Settings
 		}
 		new = host.Settings
-		n.cmpSettings(old, new)
+		cmpSettings("settings", old, new)
 	}
 	// Files Global
 	{
@@ -900,7 +933,7 @@ func (n *Normalizer) isConfigurationChanged(host *chiV1.ChiHost) bool {
 				true,
 			)
 		}
-		n.cmpSettings(old, new)
+		cmpSettings("files", old, new)
 	}
 	// Files Local
 	{
@@ -917,7 +950,7 @@ func (n *Normalizer) isConfigurationChanged(host *chiV1.ChiHost) bool {
 			[]chiV1.SettingsSection{chiV1.SectionUsers},
 			true,
 		)
-		n.cmpSettings(old, new)
+		cmpSettings("files", old, new)
 	}
 	return false
 }
