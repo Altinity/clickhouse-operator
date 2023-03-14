@@ -55,6 +55,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 
 	old = w.normalize(old)
 	new = w.normalize(new)
+	new.SetAncestor(old)
 	w.logOldAndNew("normalized", old, new)
 
 	actionPlan := chopModel.NewActionPlan(old, new)
