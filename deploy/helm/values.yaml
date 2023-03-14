@@ -29,6 +29,7 @@ operator:
 #    value: text
 
 metrics:
+  enabled: true
   image:
     # metrics.image.repository -- image repository
     repository: altinity/metrics-exporter
