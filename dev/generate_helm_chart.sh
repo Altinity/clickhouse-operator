@@ -183,7 +183,8 @@ function update_deployment_resource() {
   perl -pi -e "s/'{{ toYaml .Values.podAnnotations \| nindent 8 }}': null/{{ toYaml .Values.podAnnotations \| nindent 8 }}/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.operator.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
   perl -pi -e "s/- '{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}'/{{ with .Values.metrics.env }}{{ toYaml . \| nindent 12 }}{{ end }}/g" "${file}"
-
+  perl -pi -e 's/(\s+\- name: metrics-exporter)/{{ if .Values.metrics.enabled }}\n$1/g' "${file}"
+  perl -pi -e "s/(\s+imagePullSecrets: '\{\{ toYaml \.Values\.imagePullSecrets \| nindent 8 \}\}')/{{ end }}\n\$1/g" "${file}"
   perl -pi -e "s/'//g" "${file}"
 }
 

@@ -1231,6 +1231,7 @@ func (n *Normalizer) normalizeUsersList(users *chiV1.Settings, extra ...string) 
 }
 
 const defaultUsername = "default"
+const chopProfile = "clickhouse_operator"
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
@@ -1299,7 +1300,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *ch
 	case chopUsername:
 		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
 
-		profile = ""
+		profile = chopProfile
 		quota = ""
 		ips = []string{ip}
 		regexp = ""

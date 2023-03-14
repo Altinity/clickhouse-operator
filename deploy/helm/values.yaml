@@ -29,6 +29,7 @@ operator:
 #    value: text
 
 metrics:
+  enabled: true
   image:
     # metrics.image.repository -- image repository
     repository: altinity/metrics-exporter
@@ -222,14 +223,21 @@ configs:
           ##
           ################################################
           user:
+            # Default settings for user accounts, created by the operator.
+            # NB. These are not access credentials or settings for 'default' user account,
+            # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
+            # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
+            # Password for 'default' account as to be provided explicitly, if to be used
+            # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
+            # Password for CHOP account is used from `clickhouse.access.password` section
             default:
               # Default values for ClickHouse user configuration
               # 1. user/profile - string
               # 2. user/quota - string
               # 3. user/networks/ip - multiple strings
               # 4. user/password - string
-              profile: default
-              quota: default
+              profile: "default"
+              quota: "default"
               networksIP:
                 - "::1"
                 - "127.0.0.1"
