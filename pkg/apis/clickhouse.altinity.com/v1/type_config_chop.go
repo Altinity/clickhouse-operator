@@ -152,9 +152,12 @@ type OperatorConfigDefault struct {
 	Password   string   `json:"password"   yaml:"password"`
 }
 
+// type RestartPolicy map[Matchable]StringBool
+
 // OperatorConfigClickHouse specifies ClickHouse section
 type OperatorConfigClickHouse struct {
 	Config OperatorConfigConfig `json:"configuration" yaml:"configuration"`
+	//	ConfigRestartPolicy map[Matchable]RestartPolicy
 
 	Access struct {
 		// Username and Password to be used by operator to connect to ClickHouse instances
