@@ -544,7 +544,7 @@ def check_configmaps(chi_name, ns=namespace):
     check_configmap(
         f"chi-{chi_name}-common-usersd",
         [
-            "01-clickhouse-user.xml",
+            "01-clickhouse-operator-profile.xml",
             "02-clickhouse-default-profile.xml",
         ],
         ns=ns,
