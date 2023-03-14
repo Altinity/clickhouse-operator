@@ -546,6 +546,7 @@ def check_configmaps(chi_name, ns=namespace):
         [
             "01-clickhouse-operator-profile.xml",
             "02-clickhouse-default-profile.xml",
+            "03-database-ordinary.xml",
         ],
         ns=ns,
     )
