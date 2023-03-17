@@ -845,48 +845,123 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster 
 	return []*chiV1.Cluster{}
 }
 
-func cmpZookeeper(a, b *chiV1.ChiZookeeperConfig) bool {
+func isZookeeperChangeRequiresReboot(a, b *chiV1.ChiZookeeperConfig) bool {
 	return false
 }
 
-func pathString(path *messagediff.Path) string {
-	for _, p := range *path {
-		switch mk := p.(type) {
-		case messagediff.MapKey:
-			switch str := mk.Key.(type) {
-			case string:
-				return str
+func makePaths(a, b *chiV1.Settings, prefix string, path *messagediff.Path, value interface{}) (sections []string) {
+	if settings, ok := (value).(*chiV1.Settings); ok {
+		// Whole settings such as 'files' or 'settings' is being either added or removed
+		if settings == nil {
+			// Completely remove settings such as 'files' or 'settings', so the value changes from Settings to nil
+			// List the whole settings that are removed
+			for _, name := range a.Names() {
+				sections = append(sections, prefix+"/"+name)
+			}
+		} else {
+			// Introduce new settings such as 'files' or 'settings', so the value changes from nil to Settings
+			// List the whole settings that is added
+			for _, name := range b.Names() {
+				sections = append(sections, prefix+"/"+name)
 			}
 		}
+	} else {
+		// Modify settings such as 'files' or 'settings' but without full removal,
+		// something is still left in the remaining settings
+		suffix := ""
+		for _, p := range *path {
+			switch mk := p.(type) {
+			case messagediff.MapKey:
+				switch str := mk.Key.(type) {
+				case string:
+					suffix += "/" + str
+				}
+			}
+		}
+		sections = append(sections, prefix+suffix)
 	}
-	return ""
+	return sections
 }
 
-func makePathsFromDiff(diff *messagediff.Diff, prefix string) (res []string) {
-	for path := range diff.Added {
-		res = append(res, prefix+"/"+pathString(path))
+func makePathsFromDiff(a, b *chiV1.Settings, diff *messagediff.Diff, prefix string) (res []string) {
+	for path, value := range diff.Added {
+		res = append(res, makePaths(a, b, prefix, path, value)...)
 	}
-	for path := range diff.Removed {
-		res = append(res, prefix+"/"+pathString(path))
+	for path, value := range diff.Removed {
+		res = append(res, makePaths(a, b, prefix, path, value)...)
 	}
-	for path := range diff.Modified {
-		res = append(res, prefix+"/"+pathString(path))
+	for path, value := range diff.Modified {
+		res = append(res, makePaths(a, b, prefix, path, value)...)
 	}
 	return res
 }
 
-func cmpSettings(section string, a, b *chiV1.Settings) bool {
-	if diff, equal := messagediff.DeepDiff(a, b); equal {
-		return equal
-	} else {
-		paths := makePathsFromDiff(diff, section)
-		_ = fmt.Sprintf("%v", paths)
-		return equal
+func isSettingsChangeRequiresReboot(section string, a, b *chiV1.Settings) bool {
+	diff, equal := messagediff.DeepDiff(a, b)
+	if equal {
+		return false
 	}
+	affectedPaths := makePathsFromDiff(a, b, diff, section)
+	return isListedChangeRequiresReboot(affectedPaths)
 }
 
-// isConfigurationChanged
-func (n *Normalizer) IsConfigurationChanged(host *chiV1.ChiHost) bool {
+func versionMatches(version chiV1.Matchable) bool {
+	return true
+}
+
+func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (matches bool, value bool) {
+	for pattern, val := range set {
+		if pattern.Match(path) {
+			matches = true
+			value = val.IsTrue()
+			return matches, value
+		} else {
+			matches = false
+			value = false
+			return matches, value
+		}
+	}
+	matches = false
+	value = false
+	return matches, value
+}
+
+// latestConfigMatch
+func latestConfigMatch(path string) (matches bool, value bool) {
+	for _, r := range chop.Config().ClickHouse.ConfigRestartPolicy.Rules {
+		// Check ClickHouse version
+		_ = fmt.Sprintf("%s", r.Version)
+		if versionMatches(r.Version) {
+			// Check whether any rule matches path
+			for _, rule := range r.Rules {
+				if ruleMatches, ruleValue := ruleMatches(rule, path); ruleMatches {
+					matches = true
+					value = ruleValue
+				}
+			}
+		}
+	}
+	return matches, value
+}
+
+// isListedChangeRequiresReboot
+func isListedChangeRequiresReboot(paths []string) bool {
+	_ = fmt.Sprintf("%v", paths)
+	// Check whether any path matches ClickHouse configuration restart policy rules requires reboot
+	for _, path := range paths {
+		if matches, value := latestConfigMatch(path); matches {
+			// This path matches config
+			if value {
+				// And this path matches and requires reboot - no need to find any other who requires reboot
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// IsConfigurationChangeRequiresReboot
+func (n *Normalizer) IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	// Zookeeper
 	{
 		var old, new *chiV1.ChiZookeeperConfig
@@ -894,7 +969,35 @@ func (n *Normalizer) IsConfigurationChanged(host *chiV1.ChiHost) bool {
 			old = host.GetAncestor().GetZookeeper()
 		}
 		new = host.GetZookeeper()
-		cmpZookeeper(old, new)
+		if isZookeeperChangeRequiresReboot(old, new) {
+			return true
+		}
+	}
+	// Profiles Global
+	{
+		var old, new *chiV1.Settings
+		if host.HasAncestorCHI() {
+			old = host.GetAncestorCHI().Spec.Configuration.Profiles
+		}
+		if host.HasCHI() {
+			new = host.GetCHI().Spec.Configuration.Profiles
+		}
+		if isSettingsChangeRequiresReboot("profiles", old, new) {
+			return true
+		}
+	}
+	// Quotas Global
+	{
+		var old, new *chiV1.Settings
+		if host.HasAncestorCHI() {
+			old = host.GetAncestorCHI().Spec.Configuration.Quotas
+		}
+		if host.HasCHI() {
+			new = host.GetCHI().Spec.Configuration.Quotas
+		}
+		if isSettingsChangeRequiresReboot("quotas", old, new) {
+			return true
+		}
 	}
 	// Settings Global
 	{
@@ -905,7 +1008,9 @@ func (n *Normalizer) IsConfigurationChanged(host *chiV1.ChiHost) bool {
 		if host.HasCHI() {
 			new = host.GetCHI().Spec.Configuration.Settings
 		}
-		cmpSettings("settings", old, new)
+		if isSettingsChangeRequiresReboot("settings", old, new) {
+			return true
+		}
 	}
 	// Settings Local
 	{
@@ -914,7 +1019,9 @@ func (n *Normalizer) IsConfigurationChanged(host *chiV1.ChiHost) bool {
 			old = host.GetAncestor().Settings
 		}
 		new = host.Settings
-		cmpSettings("settings", old, new)
+		if isSettingsChangeRequiresReboot("settings", old, new) {
+			return true
+		}
 	}
 	// Files Global
 	{
@@ -933,7 +1040,9 @@ func (n *Normalizer) IsConfigurationChanged(host *chiV1.ChiHost) bool {
 				true,
 			)
 		}
-		cmpSettings("files", old, new)
+		if isSettingsChangeRequiresReboot("files", old, new) {
+			return true
+		}
 	}
 	// Files Local
 	{
@@ -950,7 +1059,9 @@ func (n *Normalizer) IsConfigurationChanged(host *chiV1.ChiHost) bool {
 			[]chiV1.SettingsSection{chiV1.SectionUsers},
 			true,
 		)
-		cmpSettings("files", old, new)
+		if isSettingsChangeRequiresReboot("files", old, new) {
+			return true
+		}
 	}
 	return false
 }
