@@ -18,6 +18,7 @@ package v1
 type ChiZookeeperNode struct {
 	Host string `json:"host,omitempty" yaml:"host,omitempty"`
 	Port int32  `json:"port,omitempty" yaml:"port,omitempty"`
+	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
 }
 
 // Equal checks whether zookeepr node is equal to another
