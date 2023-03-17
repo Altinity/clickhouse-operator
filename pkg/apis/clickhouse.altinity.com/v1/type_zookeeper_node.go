@@ -26,5 +26,13 @@ func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 		return false
 	}
 
-	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port)
+	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port) && (zkNode.Secure.Value() == zkNode.Secure.Value())
+}
+
+func (zkNode *ChiZookeeperNode) IsSecure() bool {
+	if zkNode == nil {
+		return false
+	}
+
+	return zkNode.Secure.Value()
 }

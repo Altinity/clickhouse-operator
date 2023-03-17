@@ -458,6 +458,9 @@ spec:
                                 description: "TCP port which used to connect to Zookeeper node"
                                 minimum: 0
                                 maximum: 65535
+                              secure:
+                                !!merge <<: *TypeStringBool
+                                description: "if a secure connection to Zookeeper is required"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
