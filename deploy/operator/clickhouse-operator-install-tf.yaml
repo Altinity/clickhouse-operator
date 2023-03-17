@@ -2901,45 +2901,28 @@ data:
       ## Configuration restart policy describes what configuration changes require ClickHouse restart
       ##
       ################################################
-    #  configurationRestartPolicy:
-    #    default:
-    #      settings:
-    #        default: "yes"
-    #        matches:
-    #          max_server_memory_*: "no"
-    #          max_*_to_drop: "no"
-    #          dictionaries_config: "no"
-    #          logger: "no"
-    #      zookeeper:
-    #        default: "yes"
-    #      files:
-    #        matches:
-    #          config.d/*.xml: "yes"
-    #          users.d: "no"
-    #      profiles:
-    #        default: "no"
-    #        matches:
-    #          default/background_*_pool_size: "yes"
-    #    21.*:
-    #      settings/logger: "yes"
-    #
-    #  configurationRestartPolicy:
-    #    default:
-    #      settings: true
-    #      settings/max_server_memory_*: false
-    #      settings/max_*_to_drop: false
-    #      settings/dictionaries_config: false
-    #      settings/logger: false
-    #
-    #      zookeeper: true
-    #      files/config.d/*.xml: true
-    #      files/users.d: false
-    #
-    #      profiles: false
-    #      profiles/default/background_*_pool_size: true
-    #    21:
-    #      settings/logger: true
-    #  ################################################
+      configurationRestartPolicy:
+        rules:
+          - version: "*"
+            rules:
+              - settings/*: "yes"
+              - settings/max_server_memory_*: "no"
+              - settings/max_*_to_drop: "no"
+              - settings/dictionaries_config: "no"
+              - settings/logger: "no"
+    
+              - zookeeper/*: "yes"
+    
+              - files/config.d/*.xml: "yes"
+              - files/users.d/*: "no"
+    
+              - profiles/*: "no"
+              - profiles/default/background_*_pool_size: "yes"
+          - version: "21.*"
+            rules:
+              - settings/logger: "yes"
+    
+      #################################################
       ##
       ## Access to ClickHouse instances
       ##
