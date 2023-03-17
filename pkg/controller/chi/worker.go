@@ -104,20 +104,22 @@ func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < 1*time.Minute
 }
 
-func (w *worker) isConfigurationChanged(host *chiV1.ChiHost) bool {
-	return w.normalizer.IsConfigurationChanged(host)
+func (w *worker) isConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
+	return w.normalizer.IsConfigurationChangeRequiresReboot(host)
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
-	if w.isConfigurationChanged(host) {
-		return true
-	}
-
 	// For recent tasks should not do force restart
 	if w.isEarlyContext() {
 		return false
 	}
+
+	// For some configuration changes we have to force restart host
+	if w.isConfigurationChangeRequiresReboot(host) {
+		return true
+	}
+
 	// RollingUpdate purpose is to always shut the host down.
 	// It is such an interesting policy.
 	return host.GetCHI().IsRollingUpdate()
