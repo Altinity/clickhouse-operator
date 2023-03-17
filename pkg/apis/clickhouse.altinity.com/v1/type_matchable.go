@@ -14,7 +14,10 @@
 
 package v1
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 type Matchable string
 
@@ -22,11 +25,8 @@ func (m *Matchable) Match(str string) bool {
 	if m == nil {
 		return false
 	}
-	match := string(*m)
+	regex := "^" + strings.Replace(string(*m), "*", ".*", -1) + "$"
+	matches, _ := regexp.MatchString(regex, str)
 
-	if strings.HasPrefix(str, match) {
-		return true
-	}
-
-	return false
+	return matches
 }
