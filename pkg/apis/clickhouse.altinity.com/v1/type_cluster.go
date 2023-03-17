@@ -178,7 +178,8 @@ func (cluster *Cluster) GetReplica(replica int) *ChiReplica {
 	return &cluster.Layout.Replicas[replica]
 }
 
-// FindShard finds shard by either name or index
+// FindShard finds shard by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
 func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 	var resultShard *ChiShard
 	cluster.WalkShards(func(index int, shard *ChiShard) error {
@@ -197,19 +198,10 @@ func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 	return resultShard
 }
 
-// FindHost finds host in the cluster
-func (cluster *Cluster) FindHost(needle interface{}) *ChiHost {
-	var result *ChiHost
-	cluster.WalkHosts(func(host *ChiHost) error {
-		switch typed := needle.(type) {
-		case *ChiHost:
-			if typed == host {
-				result = host
-			}
-		}
-		return nil
-	})
-	return result
+// FindHost finds host by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (cluster *Cluster) FindHost(needleShard interface{}, needleHost interface{}) *ChiHost {
+	return cluster.FindShard(needleShard).FindHost(needleHost)
 }
 
 // FirstHost finds first host in the cluster
@@ -228,6 +220,9 @@ func (cluster *Cluster) FirstHost() *ChiHost {
 func (cluster *Cluster) WalkShards(
 	f func(index int, shard *ChiShard) error,
 ) []error {
+	if cluster == nil {
+		return nil
+	}
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {

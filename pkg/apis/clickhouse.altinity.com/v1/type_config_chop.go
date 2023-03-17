@@ -114,6 +114,20 @@ type OperatorConfigConfig struct {
 	} `json:"network" yaml:"network"`
 }
 
+// OperatorConfigRestartPolicyRuleSet specifies set of rules
+type OperatorConfigRestartPolicyRuleSet map[Matchable]StringBool
+
+// OperatorConfigRestartPolicyRule specifies ClickHouse version and rules for this version
+type OperatorConfigRestartPolicyRule struct {
+	Version Matchable
+	Rules   []OperatorConfigRestartPolicyRuleSet
+}
+
+// OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
+type OperatorConfigRestartPolicy struct {
+	Rules []OperatorConfigRestartPolicyRule
+}
+
 // OperatorConfigFile specifies File section
 type OperatorConfigFile struct {
 	Path struct {
@@ -152,9 +166,12 @@ type OperatorConfigDefault struct {
 	Password   string   `json:"password"   yaml:"password"`
 }
 
+// type RestartPolicy map[Matchable]StringBool
+
 // OperatorConfigClickHouse specifies ClickHouse section
 type OperatorConfigClickHouse struct {
-	Config OperatorConfigConfig `json:"configuration" yaml:"configuration"`
+	Config              OperatorConfigConfig        `json:"configuration" yaml:"configuration"`
+	ConfigRestartPolicy OperatorConfigRestartPolicy `json:"configurationRestartPolicy" yaml:"configurationRestartPolicy"`
 
 	Access struct {
 		// Username and Password to be used by operator to connect to ClickHouse instances

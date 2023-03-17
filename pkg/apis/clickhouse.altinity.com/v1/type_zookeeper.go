@@ -14,6 +14,17 @@
 
 package v1
 
+// ChiZookeeperConfig defines zookeeper section of .spec.configuration
+// Refers to
+// https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
+type ChiZookeeperConfig struct {
+	Nodes              []ChiZookeeperNode `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
+	SessionTimeoutMs   int                `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
+	OperationTimeoutMs int                `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
+	Root               string             `json:"root,omitempty"                 yaml:"root,omitempty"`
+	Identity           string             `json:"identity,omitempty"             yaml:"identity,omitempty"`
+}
+
 // NewChiZookeeperConfig creates new ChiZookeeperConfig object
 func NewChiZookeeperConfig() *ChiZookeeperConfig {
 	return new(ChiZookeeperConfig)

@@ -45,14 +45,21 @@ clickhouse:
     ##
     ################################################
     user:
+      # Default settings for user accounts, created by the operator.
+      # NB. These are not access credentials or settings for 'default' user account,
+      # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
+      # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
+      # Password for 'default' account as to be provided explicitly, if to be used
+      # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
+      # Password for CHOP account is used from `clickhouse.access.password` section
       default:
         # Default values for ClickHouse user configuration
         # 1. user/profile - string
         # 2. user/quota - string
         # 3. user/networks/ip - multiple strings
         # 4. user/password - string
-        profile: default
-        quota: default
+        profile: "default"
+        quota: "default"
         networksIP:
           - "::1"
           - "127.0.0.1"
@@ -65,7 +72,35 @@ clickhouse:
     network:
       # Default host_regexp to limit network connectivity from outside
       hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+
   ################################################
+  ##
+  ## Configuration Restart Policy Section
+  ## Configuration restart policy describes what configuration changes require ClickHouse restart
+  ##
+  ################################################
+  configurationRestartPolicy:
+    rules:
+      - version: "*"
+        rules:
+          - settings/*: "yes"
+          - settings/max_server_memory_*: "no"
+          - settings/max_*_to_drop: "no"
+          - settings/dictionaries_config: "no"
+          - settings/logger: "no"
+
+          - zookeeper/*: "yes"
+
+          - files/config.d/*.xml: "yes"
+          - files/users.d/*: "no"
+
+          - profiles/*: "no"
+          - profiles/default/background_*_pool_size: "yes"
+      - version: "21.*"
+        rules:
+          - settings/logger: "yes"
+
+  #################################################
   ##
   ## Access to ClickHouse instances
   ##

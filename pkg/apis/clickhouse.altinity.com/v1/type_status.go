@@ -329,12 +329,22 @@ func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	return s.NormalizedCHICompleted
 }
 
+// HasNormalizedCHICompleted is a checker
+func (s *ChiStatus) HasNormalizedCHICompleted() bool {
+	return s.GetNormalizedCHICompleted() != nil
+}
+
 // GetNormalizedCHI is a getter
 func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	if s == nil {
 		return nil
 	}
 	return s.NormalizedCHI
+}
+
+// HasNormalizedCHI is a checker
+func (s *ChiStatus) HasNormalizedCHI() bool {
+	return s.GetNormalizedCHI() != nil
 }
 
 // GetStatus is a getter

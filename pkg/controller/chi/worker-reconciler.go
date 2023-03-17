@@ -48,13 +48,14 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
-	if new.Status.GetNormalizedCHICompleted() != nil {
-		w.a.M(new).F().Info("has NormalizedCHICompleted, use it as a base for reconcile")
-		old = new.Status.GetNormalizedCHICompleted()
+	if new.HasAncestor() {
+		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile")
+		old = new.GetAncestor()
 	}
 
 	old = w.normalize(old)
 	new = w.normalize(new)
+	new.SetAncestor(old)
 	w.logOldAndNew("normalized", old, new)
 
 	actionPlan := chopModel.NewActionPlan(old, new)

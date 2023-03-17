@@ -1,7 +1,7 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
-  name: "clickhouse-old-volume-mount"
+  name: test-004-tpl
 spec:
   useTemplates:
     - name: clickhouse-version

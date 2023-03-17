@@ -126,9 +126,9 @@ func (n *Normalizer) CreateTemplatedCHI(
 	var useTemplates []chiV1.ChiUseTemplate
 	// 1. Get list of auto templates to be applied
 	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
-		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
+		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
-			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
+			log.V(1).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Namespace, template.Name)
 			useTemplates = append(useTemplates, chiV1.ChiUseTemplate{
 				Name:      template.Name,
 				Namespace: template.Namespace,
@@ -150,7 +150,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			log.V(1).M(chi).F().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).F().Warning("UNABLE to find template referenced in useTemplates: %s/%s", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			// Apply template
 			(&n.ctx.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
@@ -169,7 +169,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 					append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
 				),
 			)
-			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).F().Info("Merge template referenced in useTemplates: %s/%s", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
@@ -846,35 +846,43 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster 
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
+	// Zookeeper
 	zk := host.GetZookeeper()
 	host.Config.ZookeeperFingerprint = util.Fingerprint(zk)
 
-	global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
-	local := host.Settings.AsSortedSliceOfStrings()
-	host.Config.SettingsFingerprint = util.Fingerprint(
-		fmt.Sprintf("%s%s",
-			util.Fingerprint(global),
-			util.Fingerprint(local),
-		),
-	)
-	host.Config.FilesFingerprint = util.Fingerprint(
-		fmt.Sprintf("%s%s",
-			util.Fingerprint(
-				n.ctx.chi.Spec.Configuration.Files.Filter(
-					nil,
-					[]chiV1.SettingsSection{chiV1.SectionUsers},
-					true,
-				).AsSortedSliceOfStrings(),
+	// Settings
+	{
+		global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
+		local := host.Settings.AsSortedSliceOfStrings()
+
+		host.Config.SettingsFingerprint = util.Fingerprint(
+			fmt.Sprintf("%s%s",
+				util.Fingerprint(global),
+				util.Fingerprint(local),
 			),
-			util.Fingerprint(
-				host.Files.Filter(
-					nil,
-					[]chiV1.SettingsSection{chiV1.SectionUsers},
-					true,
-				).AsSortedSliceOfStrings(),
+		)
+	}
+
+	//  Files
+	{
+		global := n.ctx.chi.Spec.Configuration.Files.Filter(
+			nil,
+			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			true,
+		).AsSortedSliceOfStrings()
+		local := host.Files.Filter(
+			nil,
+			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			true,
+		).AsSortedSliceOfStrings()
+
+		host.Config.FilesFingerprint = util.Fingerprint(
+			fmt.Sprintf("%s%s",
+				util.Fingerprint(global),
+				util.Fingerprint(local),
 			),
-		),
-	)
+		)
+	}
 
 	// Unify settings fingerprint
 	host.Config.SettingsFingerprint = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
@@ -1112,6 +1120,7 @@ func (n *Normalizer) normalizeUsersList(users *chiV1.Settings, extra ...string) 
 }
 
 const defaultUsername = "default"
+const chopProfile = "clickhouse_operator"
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
@@ -1180,7 +1189,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *ch
 	case chopUsername:
 		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
 
-		profile = ""
+		profile = chopProfile
 		quota = ""
 		ips = []string{ip}
 		regexp = ""

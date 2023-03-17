@@ -30,12 +30,13 @@ Operator creates, configures and manages ClickHouse clusters running on Kubernet
 
 [Quick Start Guide][quick_start_guide]
 
-**Advanced setups**
+**Advanced configuration**
  * [Detailed Operator Installation Instructions][detailed_installation_instructions]
    * [Operator Configuration][operator_configuration]
  * [Setup ClickHouse cluster with replication][replication_setup]
    * [Setting up Zookeeper][zookeeper_setup]
  * [Persistent Storage Configuration][storage_configuration]
+ * [Security Hardening][security_hardening]
  * [ClickHouse Installation Custom Resource specification][crd_explained]
  
 **Maintenance tasks**
@@ -84,3 +85,4 @@ See [LICENSE](./LICENSE) for more details.
 [contributing_manual]: ./CONTRIBUTING.md
 [devspace_manual]: ./docs/devspace.md
 [all_docs_list]: ./docs/README.md
+[security_hardening]: ./docs/security_hardening.md

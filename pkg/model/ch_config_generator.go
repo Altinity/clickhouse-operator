@@ -63,12 +63,14 @@ func (c *ClickHouseConfigGenerator) GetQuotas() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Quotas, configQuotas)
 }
 
+// GetSettingsGlobal creates data for "settings.xml"
+func (c *ClickHouseConfigGenerator) GetSettingsGlobal() string {
+	// No host specified means request to generate common config
+	return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
+}
+
 // GetSettings creates data for "settings.xml"
 func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
-	if host == nil {
-		// No host specified means request to generate common config
-		return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
-	}
 	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }

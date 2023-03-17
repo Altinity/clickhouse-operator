@@ -14,25 +14,19 @@
 
 package v1
 
-// ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
-type ChiZookeeperNode struct {
-	Host string `json:"host,omitempty" yaml:"host,omitempty"`
-	Port int32  `json:"port,omitempty" yaml:"port,omitempty"`
-}
+import (
+	"regexp"
+	"strings"
+)
 
-// Equal checks whether zookeepr node is equal to another
-func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
-	if to == nil {
+type Matchable string
+
+func (m *Matchable) Match(str string) bool {
+	if m == nil {
 		return false
 	}
+	regex := "^" + strings.Replace(string(*m), "*", ".*", -1) + "$"
+	matches, _ := regexp.MatchString(regex, str)
 
-	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port) && (zkNode.Secure.Value() == zkNode.Secure.Value())
-}
-
-func (zkNode *ChiZookeeperNode) IsSecure() bool {
-	if zkNode == nil {
-		return false
-	}
-
-	return zkNode.Secure.Value()
+	return matches
 }

@@ -66,7 +66,35 @@ clickhouse:
     network:
       # Default host_regexp to limit network connectivity from outside
       hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+
   ################################################
+  ##
+  ## Configuration Restart Policy Section
+  ## Configuration restart policy describes what configuration changes require ClickHouse restart
+  ##
+  ################################################
+  configurationRestartPolicy:
+    rules:
+      - version: "*"
+        rules:
+          - settings/*: "yes"
+          - settings/max_server_memory_*: "no"
+          - settings/max_*_to_drop: "no"
+          - settings/dictionaries_config: "no"
+          - settings/logger: "no"
+
+          - zookeeper/*: "yes"
+
+          - files/config.d/*.xml: "yes"
+          - files/users.d/*: "no"
+
+          - profiles/*: "no"
+          - profiles/default/background_*_pool_size: "yes"
+      - version: "21.*"
+        rules:
+          - settings/logger: "yes"
+
+  #################################################
   ##
   ## Access to ClickHouse instances
   ##
