@@ -105,7 +105,7 @@ func (w *worker) isJustStarted() bool {
 }
 
 func (w *worker) isConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
-	return w.normalizer.IsConfigurationChangeRequiresReboot(host)
+	return chopModel.IsConfigurationChangeRequiresReboot(host)
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
