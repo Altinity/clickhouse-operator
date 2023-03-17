@@ -324,6 +324,14 @@ func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
 	}
 }
 
+// Names gets names of the settings
+func (settings *Settings) Names() (names []string) {
+	settings.Walk(func(name string, setting *Setting) {
+		names = append(names, name)
+	})
+	return names
+}
+
 // Delete deletes named setting
 func (settings *Settings) Delete(name string) {
 	if settings == nil {
