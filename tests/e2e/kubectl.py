@@ -34,7 +34,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
         cmd += " ".join(cmd_args[1:])
 
     # save command for debug purposes
-    command = cmd
+    # command = cmd
     # print(f"run command: {cmd}")
 
     return run_shell(cmd, timeout, ok_to_fail)

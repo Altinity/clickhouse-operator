@@ -3131,8 +3131,6 @@ def test_034(self):
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
 @Name("test_036. Check operator volume re-provisioning")
 def test_036(self):
-    # TODO fix this when functionality will be available
-    return
 
     """Check clickhouse operator recreates volumes and schema if volume is broken."""
     manifest = f"manifests/chi/test-036-volume-re-provisioning.yaml"
@@ -3166,7 +3164,7 @@ def test_036(self):
     with When("I delete PV", description="delete PV on replica 0"):
         pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
 
-        kubectl.launch(f"delete pv {pv_name} --force &")
+        kubectl.launch(f"delete pv {pv_name} --force >/dev/null 2>&1 &")
         kubectl.launch(
             f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
         )
