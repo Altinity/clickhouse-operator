@@ -27,6 +27,7 @@ type ChiHost struct {
 
 	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	TLSPort             int32             `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
@@ -110,6 +111,9 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	host.Secure = host.Secure.MergeFrom(from.Secure)
 	if host.TCPPort == 0 {
 		host.TCPPort = from.TCPPort
+	}
+	if host.TLSPort == 0 {
+		host.TLSPort = from.TLSPort
 	}
 	if host.HTTPPort == 0 {
 		host.HTTPPort = from.HTTPPort
