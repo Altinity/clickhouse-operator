@@ -322,38 +322,34 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 // hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
 	// Use host personal settings at first
-	ensurePortValuesFromSettings(host, host.GetSettings(), true)
+	ensurePortValuesFromSettings(host, host.GetSettings(), false)
 	// Fallback to common settings
-	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, false)
+	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
 }
 
 // ensurePortValuesFromSettings fetches port spec from settings, if any provided
-func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, intermittent bool) {
-	var (
-		fallbackTCPPort             int32
-		fallbackTLSPort             int32
-		fallbackHTTPPort            int32
-		fallbackInterserverHTTPPort int32
-	)
-	if intermittent {
-		// For intermittent setup fallback values should be from "MustBeAssignedLater" family, because
-		// this is not final setup (just intermittent) and all these ports may be overwritten later
-		fallbackTCPPort = chPortMayBeAssignedLaterOrLeftUnused
-		fallbackTLSPort = chPortMayBeAssignedLaterOrLeftUnused
-		fallbackHTTPPort = chPortMayBeAssignedLaterOrLeftUnused
-		fallbackInterserverHTTPPort = chPortMayBeAssignedLaterOrLeftUnused
-	} else {
+func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, final bool) {
+	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
+	// because this is not final setup (just intermittent) and all these ports may be overwritten later
+	fallbackTCPPort := chPortMayBeAssignedLaterOrLeftUnused
+	fallbackTLSPort := chPortMayBeAssignedLaterOrLeftUnused
+	fallbackHTTPPort := chPortMayBeAssignedLaterOrLeftUnused
+	fallbackInterserverHTTPPort := chPortMayBeAssignedLaterOrLeftUnused
+
+	if final {
 		// This is final setup and we need to assign real numbers to ports
-		fallbackTCPPort = chDefaultTCPPortNumber
-		fallbackTLSPort = chDefaultTLSPortNumber
-		fallbackHTTPPort = chDefaultHTTPPortNumber
+		if !host.IsSecure() {
+			fallbackTCPPort = chDefaultTCPPortNumber
+			fallbackHTTPPort = chDefaultHTTPPortNumber
+		}
+		if host.IsSecure() {
+			fallbackTLSPort = chDefaultTLSPortNumber
+		}
 		fallbackInterserverHTTPPort = chDefaultInterserverHTTPPortNumber
 	}
 
 	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
-	if host.IsSecure() {
-		ensurePortValue(&host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
-	}
+	ensurePortValue(&host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
 	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
 	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
