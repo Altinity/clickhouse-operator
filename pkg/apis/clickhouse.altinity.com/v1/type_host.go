@@ -279,6 +279,15 @@ func (host *ChiHost) IsSecure() bool {
 	return host.GetCluster().GetSecure().Value()
 }
 
+// IsInsecure checks whether the host requires insecure communication
+func (host *ChiHost) IsInsecure() bool {
+	if host == nil {
+		return false
+	}
+
+	return true
+}
+
 // IsFirst checks whether the host is the first host of the whole CHI
 func (host *ChiHost) IsFirst() bool {
 	if host == nil {
