@@ -301,9 +301,15 @@ func (c *ClickHouseConfigGenerator) getRemoteServersReplica(host *chiv1.ChiHost,
 	//		<port>XXX</port>
 	//		<secure>XXX</secure>
 	// </replica>
+	var port int32
+	if host.IsSecure() {
+		port = host.TLSPort
+	} else {
+		port = host.TCPPort
+	}
 	util.Iline(b, 16, "<replica>")
 	util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-	util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
+	util.Iline(b, 16, "    <port>%d</port>", port)
 	util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
 	util.Iline(b, 16, "</replica>")
 }
