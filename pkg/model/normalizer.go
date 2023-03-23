@@ -338,7 +338,7 @@ func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings,
 
 	if final {
 		// This is final setup and we need to assign real numbers to ports
-		if !host.IsSecure() {
+		if host.IsInsecure() {
 			fallbackTCPPort = chDefaultTCPPortNumber
 			fallbackHTTPPort = chDefaultHTTPPortNumber
 		}
