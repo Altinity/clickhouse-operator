@@ -195,7 +195,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 }
 
 func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
-	if host.TCPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.TCPPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultTCPPortName,
@@ -205,7 +205,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if host.TLSPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.TLSPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultTLSPortName,
@@ -215,7 +215,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if host.HTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.HTTPPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultHTTPPortName,
@@ -225,7 +225,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if host.InterserverHTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.InterserverHTTPPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultInterserverHTTPPortName,
@@ -785,7 +785,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 
 // ensurePortByName
 func ensurePortByName(container *corev1.Container, name string, port int32) {
-	if port == chPortMayBeAssignedLaterOrLeftUnused {
+	if isUnassigned(port) {
 		return
 	}
 
@@ -1127,10 +1127,10 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
-			TCPPort:             chPortMayBeAssignedLaterOrLeftUnused,
-			TLSPort:             chPortMayBeAssignedLaterOrLeftUnused,
-			HTTPPort:            chPortMayBeAssignedLaterOrLeftUnused,
-			InterserverHTTPPort: chPortMayBeAssignedLaterOrLeftUnused,
+			TCPPort:             unassigned(),
+			TLSPort:             unassigned(),
+			HTTPPort:            unassigned(),
+			InterserverHTTPPort: unassigned(),
 			Templates:           nil,
 		},
 	}
@@ -1147,10 +1147,10 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
-			TCPPort:             chPortMayBeAssignedLaterOrLeftUnused,
-			TLSPort:             chPortMayBeAssignedLaterOrLeftUnused,
-			HTTPPort:            chPortMayBeAssignedLaterOrLeftUnused,
-			InterserverHTTPPort: chPortMayBeAssignedLaterOrLeftUnused,
+			TCPPort:             unassigned(),
+			TLSPort:             unassigned(),
+			HTTPPort:            unassigned(),
+			InterserverHTTPPort: unassigned(),
 			Templates:           nil,
 		},
 	}
@@ -1173,7 +1173,7 @@ func newDefaultPodTemplate(name string, host *chiv1.ChiHost) *chiv1.ChiPodTempla
 
 // newDefaultLivenessProbe returns default liveness probe
 func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
-	if host.HTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.HTTPPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -1191,7 +1191,7 @@ func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
 
 // newDefaultReadinessProbe returns default readiness probe
 func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
-	if host.HTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.HTTPPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -1207,7 +1207,7 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 }
 
 func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
-	if host.TCPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.TCPPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultTCPPortName,
@@ -1216,7 +1216,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if host.TLSPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.TLSPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultTLSPortName,
@@ -1225,7 +1225,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if host.HTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.HTTPPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultHTTPPortName,
@@ -1234,7 +1234,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if host.InterserverHTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+	if isAssigned(host.InterserverHTTPPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultInterserverHTTPPortName,
