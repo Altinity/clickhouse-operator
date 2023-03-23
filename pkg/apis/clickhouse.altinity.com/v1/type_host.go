@@ -19,6 +19,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+const (
+	// PortMayBeAssignedLaterOrLeftUnused value means that port
+	// is not assigned yet and is expected to be assigned later.
+	PortMayBeAssignedLaterOrLeftUnused = int32(0)
+)
+
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
@@ -99,26 +105,30 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, 
 	host.Templates.HandleDeprecatedFields()
 }
 
+func isUnassigned(port int32) bool {
+	return port == PortMayBeAssignedLaterOrLeftUnused
+}
+
 // MergeFrom merges from specified host
 func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if (host == nil) || (from == nil) {
 		return
 	}
-	if host.Port == 0 {
+	if isUnassigned(host.Port) {
 		host.Port = from.Port
 	}
 
 	host.Secure = host.Secure.MergeFrom(from.Secure)
-	if host.TCPPort == 0 {
+	if isUnassigned(host.TCPPort) {
 		host.TCPPort = from.TCPPort
 	}
-	if host.TLSPort == 0 {
+	if isUnassigned(host.TLSPort) {
 		host.TLSPort = from.TLSPort
 	}
-	if host.HTTPPort == 0 {
+	if isUnassigned(host.HTTPPort) {
 		host.HTTPPort = from.HTTPPort
 	}
-	if host.InterserverHTTPPort == 0 {
+	if isUnassigned(host.InterserverHTTPPort) {
 		host.InterserverHTTPPort = from.InterserverHTTPPort
 	}
 	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
