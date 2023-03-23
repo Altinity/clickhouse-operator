@@ -185,16 +185,22 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
 				{
-					Name:       chDefaultHTTPPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.HTTPPort,
-					TargetPort: intstr.FromInt(int(host.HTTPPort)),
-				},
-				{
 					Name:       chDefaultTCPPortName,
 					Protocol:   corev1.ProtocolTCP,
 					Port:       host.TCPPort,
 					TargetPort: intstr.FromInt(int(host.TCPPort)),
+				},
+				{
+					Name:       chDefaultTLSPortName,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       host.TLSPort,
+					TargetPort: intstr.FromInt(int(host.TLSPort)),
+				},
+				{
+					Name:       chDefaultHTTPPortName,
+					Protocol:   corev1.ProtocolTCP,
+					Port:       host.HTTPPort,
+					TargetPort: intstr.FromInt(int(host.HTTPPort)),
 				},
 				{
 					Name:       chDefaultInterserverHTTPPortName,
@@ -754,6 +760,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 		return
 	}
 	ensurePortByName(container, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(container, chDefaultTLSPortName, host.TLSPort)
 	ensurePortByName(container, chDefaultHTTPPortName, host.HTTPPort)
 	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
@@ -1098,6 +1105,7 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 		Spec: chiv1.ChiHost{
 			Name:                "",
 			TCPPort:             chPortNumberMustBeAssignedLater,
+			TLSPort:             chPortNumberMustBeAssignedLater,
 			HTTPPort:            chPortNumberMustBeAssignedLater,
 			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
 			Templates:           nil,
@@ -1117,6 +1125,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 		Spec: chiv1.ChiHost{
 			Name:                "",
 			TCPPort:             chPortNumberMustBeAssignedLater,
+			TLSPort:             chPortNumberMustBeAssignedLater,
 			HTTPPort:            chPortNumberMustBeAssignedLater,
 			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
 			Templates:           nil,

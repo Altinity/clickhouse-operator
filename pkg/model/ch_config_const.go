@@ -93,8 +93,8 @@ const (
 	// ClickHouse open ports names and values
 	chDefaultTCPPortName               = "tcp"
 	chDefaultTCPPortNumber             = int32(9000)
-	chDefaultTCPPortSecureName         = "secureclient"
-	chDefaultTCPPortSecureNumber       = int32(9440)
+	chDefaultTLSPortName               = "secureclient"
+	chDefaultTLSPortNumber             = int32(9440)
 	chDefaultHTTPPortName              = "http"
 	chDefaultHTTPPortNumber            = int32(8123)
 	chDefaultHTTPsPortName             = "https"

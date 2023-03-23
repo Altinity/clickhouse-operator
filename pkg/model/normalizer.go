@@ -273,6 +273,9 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 			if host.TCPPort == chPortNumberMustBeAssignedLater {
 				host.TCPPort = template.Spec.TCPPort
 			}
+			if host.TLSPort == chPortNumberMustBeAssignedLater {
+				host.TLSPort = template.Spec.TLSPort
+			}
 			if host.HTTPPort == chPortNumberMustBeAssignedLater {
 				host.HTTPPort = template.Spec.HTTPPort
 			}
@@ -286,6 +289,13 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 					base = template.Spec.TCPPort
 				}
 				host.TCPPort = base + int32(host.Address.ClusterScopeIndex)
+			}
+			if host.TLSPort == chPortNumberMustBeAssignedLater {
+				base := chDefaultTLSPortNumber
+				if template.Spec.TLSPort != chPortNumberMustBeAssignedLater {
+					base = template.Spec.TLSPort
+				}
+				host.TLSPort = base + int32(host.Address.ClusterScopeIndex)
 			}
 			if host.HTTPPort == chPortNumberMustBeAssignedLater {
 				base := chDefaultHTTPPortNumber
@@ -321,6 +331,7 @@ func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
 func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, intermittent bool) {
 	var (
 		fallbackTCPPort             int32
+		fallbackTLSPort             int32
 		fallbackHTTPPort            int32
 		fallbackInterserverHTTPPort int32
 	)
@@ -328,25 +339,21 @@ func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings,
 		// For intermittent setup fallback values should be from "MustBeAssignedLater" family, because
 		// this is not final setup (just intermittent) and all these ports may be overwritten later
 		fallbackTCPPort = chPortNumberMustBeAssignedLater
+		fallbackTLSPort = chPortNumberMustBeAssignedLater
 		fallbackHTTPPort = chPortNumberMustBeAssignedLater
 		fallbackInterserverHTTPPort = chPortNumberMustBeAssignedLater
 	} else {
 		// This is final setup and we need to assign real numbers to ports
-		if host.IsSecure() {
-			fallbackTCPPort = chDefaultTCPPortSecureNumber
-		} else {
-			fallbackTCPPort = chDefaultTCPPortNumber
-		}
+		fallbackTCPPort = chDefaultTCPPortNumber
+		fallbackTLSPort = chDefaultTLSPortNumber
 		fallbackHTTPPort = chDefaultHTTPPortNumber
 		fallbackInterserverHTTPPort = chDefaultInterserverHTTPPortNumber
 	}
-	var tcpPort int32
+
+	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
 	if host.IsSecure() {
-		tcpPort = settings.GetTCPPortSecure()
-	} else {
-		tcpPort = settings.GetTCPPort()
+		ensurePortValue(&host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
 	}
-	ensurePortValue(&host.TCPPort, tcpPort, fallbackTCPPort)
 	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
 	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
@@ -1704,6 +1711,10 @@ func (n *Normalizer) normalizeHostPorts(host *chiV1.ChiHost) {
 
 	if (host.TCPPort <= 0) || (host.TCPPort >= 65535) {
 		host.TCPPort = chPortNumberMustBeAssignedLater
+	}
+
+	if (host.TLSPort <= 0) || (host.TLSPort >= 65535) {
+		host.TLSPort = chPortNumberMustBeAssignedLater
 	}
 
 	if (host.HTTPPort <= 0) || (host.HTTPPort >= 65535) {

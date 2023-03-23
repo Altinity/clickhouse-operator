@@ -495,6 +495,9 @@ func (c *ClickHouseConfigGenerator) GetHostHostnameAndPorts(host *chiv1.ChiHost)
 	if host.TCPPort != chDefaultTCPPortNumber {
 		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort)
 	}
+	if host.TLSPort != chDefaultTLSPortNumber {
+		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort)
+	}
 	if host.HTTPPort != chDefaultHTTPPortNumber {
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
 	}
