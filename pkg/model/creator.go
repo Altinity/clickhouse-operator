@@ -183,40 +183,58 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       chDefaultTCPPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.TCPPort,
-					TargetPort: intstr.FromInt(int(host.TCPPort)),
-				},
-				{
-					Name:       chDefaultTLSPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.TLSPort,
-					TargetPort: intstr.FromInt(int(host.TLSPort)),
-				},
-				{
-					Name:       chDefaultHTTPPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.HTTPPort,
-					TargetPort: intstr.FromInt(int(host.HTTPPort)),
-				},
-				{
-					Name:       chDefaultInterserverHTTPPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.InterserverHTTPPort,
-					TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
-				},
-			},
 			Selector:                 GetSelectorHostScope(host),
 			ClusterIP:                templateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
 		},
 	}
+	appendPorts(svc, host)
 	MakeObjectVersion(&svc.ObjectMeta, svc)
 	return svc
+}
+
+func appendPorts(service *corev1.Service, host *chiv1.ChiHost) {
+	if host.TCPPort != chPortMayBeAssignedLaterOrLeftUnused {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultTCPPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.TCPPort,
+				TargetPort: intstr.FromInt(int(host.TCPPort)),
+			},
+		)
+	}
+	if host.TLSPort != chPortMayBeAssignedLaterOrLeftUnused {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultTLSPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.TLSPort,
+				TargetPort: intstr.FromInt(int(host.TLSPort)),
+			},
+		)
+	}
+	if host.HTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultHTTPPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.HTTPPort,
+				TargetPort: intstr.FromInt(int(host.HTTPPort)),
+			},
+		)
+	}
+	if host.InterserverHTTPPort != chPortMayBeAssignedLaterOrLeftUnused {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultInterserverHTTPPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.InterserverHTTPPort,
+				TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
+			},
+		)
+	}
 }
 
 // verifyServiceTemplatePorts verifies ChiServiceTemplate to have reasonable ports specified
@@ -767,10 +785,15 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 
 // ensurePortByName
 func ensurePortByName(container *corev1.Container, name string, port int32) {
+	if port == chPortMayBeAssignedLaterOrLeftUnused {
+		return
+	}
+
 	// Find port with specified name
 	for i := range container.Ports {
 		containerPort := &container.Ports[i]
 		if containerPort.Name == name {
+			// Assign value to existing port
 			containerPort.HostPort = 0
 			containerPort.ContainerPort = port
 			return
