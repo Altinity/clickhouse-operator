@@ -291,6 +291,9 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 			if isUnassigned(host.HTTPPort) {
 				host.HTTPPort = template.Spec.HTTPPort
 			}
+			if isUnassigned(host.HTTPSPort) {
+				host.HTTPSPort = template.Spec.HTTPSPort
+			}
 			if isUnassigned(host.InterserverHTTPPort) {
 				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
 			}
@@ -315,6 +318,13 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 					base = template.Spec.HTTPPort
 				}
 				host.HTTPPort = base + int32(host.Address.ClusterScopeIndex)
+			}
+			if isUnassigned(host.HTTPSPort) {
+				base := chDefaultHTTPSPortNumber
+				if isAssigned(template.Spec.HTTPSPort) {
+					base = template.Spec.HTTPSPort
+				}
+				host.HTTPSPort = base + int32(host.Address.ClusterScopeIndex)
 			}
 			if isUnassigned(host.InterserverHTTPPort) {
 				base := chDefaultInterserverHTTPPortNumber
@@ -346,6 +356,7 @@ func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings,
 	fallbackTCPPort := unassigned()
 	fallbackTLSPort := unassigned()
 	fallbackHTTPPort := unassigned()
+	fallbackHTTPSPort := unassigned()
 	fallbackInterserverHTTPPort := unassigned()
 
 	if final {
@@ -356,6 +367,7 @@ func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings,
 		}
 		if host.IsSecure() {
 			fallbackTLSPort = chDefaultTLSPortNumber
+			fallbackHTTPSPort = chDefaultHTTPSPortNumber
 		}
 		fallbackInterserverHTTPPort = chDefaultInterserverHTTPPortNumber
 	}
@@ -363,6 +375,7 @@ func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings,
 	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
 	ensurePortValue(&host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
 	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
+	ensurePortValue(&host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
 	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
 
@@ -1727,6 +1740,10 @@ func (n *Normalizer) normalizeHostPorts(host *chiV1.ChiHost) {
 
 	if (host.HTTPPort <= 0) || (host.HTTPPort >= 65535) {
 		host.HTTPPort = unassigned()
+	}
+
+	if (host.HTTPSPort <= 0) || (host.HTTPSPort >= 65535) {
+		host.HTTPSPort = unassigned()
 	}
 
 	if (host.InterserverHTTPPort <= 0) || (host.InterserverHTTPPort >= 65535) {
