@@ -93,11 +93,11 @@ func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (mat
 			matches = true
 			value = val.IsTrue()
 			return matches, value
-		} else {
-			matches = false
-			value = false
-			return matches, value
 		}
+		// Only one check has to be performed since we are expecting rule to have one entry
+		matches = false
+		value = false
+		return matches, value
 	}
 	matches = false
 	value = false
@@ -138,7 +138,7 @@ func isListedChangeRequiresReboot(paths []string) bool {
 	return false
 }
 
-// IsConfigurationChangeRequiresReboot
+// IsConfigurationChangeRequiresReboot checks whether configuration changes requires a reboot
 func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	// Zookeeper
 	{
