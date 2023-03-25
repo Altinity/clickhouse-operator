@@ -30,6 +30,7 @@ func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port) && (zkNode.Secure.Value() == zkNode.Secure.Value())
 }
 
+// IsSecure checks whether zookeeper node is secure
 func (zkNode *ChiZookeeperNode) IsSecure() bool {
 	if zkNode == nil {
 		return false
