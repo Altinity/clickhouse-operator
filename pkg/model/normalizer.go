@@ -281,6 +281,7 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 		host.Name = template.Spec.Name
 	}
 
+	host.Insecure = host.Secure.MergeFrom(template.Spec.Insecure)
 	host.Secure = host.Secure.MergeFrom(template.Spec.Secure)
 
 	for _, portDistribution := range template.PortDistribution {

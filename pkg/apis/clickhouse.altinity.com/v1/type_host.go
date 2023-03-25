@@ -120,7 +120,7 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 		host.Port = from.Port
 	}
 
-	host.Insecure = host.Secure.MergeFrom(from.Insecure)
+	host.Insecure = host.Insecure.MergeFrom(from.Insecure)
 	host.Secure = host.Secure.MergeFrom(from.Secure)
 	if isUnassigned(host.TCPPort) {
 		host.TCPPort = from.TCPPort
@@ -291,8 +291,13 @@ func (host *ChiHost) IsSecure() bool {
 		return host.Secure.Value()
 	}
 
-	// No personal value for host secure is set - fallback to cluster value
-	return host.GetCluster().GetSecure().Value()
+	// No personal value - fallback to cluster value
+	if host.GetCluster().GetSecure().HasValue() {
+		return host.GetCluster().GetSecure().Value()
+	}
+
+	// No cluster value - host should not expose secure
+	return false
 }
 
 // IsInsecure checks whether the host requires insecure communication
@@ -301,6 +306,17 @@ func (host *ChiHost) IsInsecure() bool {
 		return false
 	}
 
+	// Personal host settings take priority
+	if host.Insecure.HasValue() {
+		return host.Insecure.Value()
+	}
+
+	// No personal value - fallback to cluster value
+	if host.GetCluster().GetInsecure().HasValue() {
+		return host.GetCluster().GetInsecure().Value()
+	}
+
+	// No cluster value - host should expose insecure
 	return true
 }
 
