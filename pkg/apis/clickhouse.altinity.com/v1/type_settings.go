@@ -532,6 +532,11 @@ func (settings *Settings) GetHTTPPort() int32 {
 	return settings.fetchPort("http_port")
 }
 
+// GetHTTPSPort gets HTTPS port from settings
+func (settings *Settings) GetHTTPSPort() int32 {
+	return settings.fetchPort("https_port")
+}
+
 // GetInterserverHTTPPort gets interserver HTTP port from settings
 func (settings *Settings) GetInterserverHTTPPort() int32 {
 	return settings.fetchPort("interserver_http_port")
