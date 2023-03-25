@@ -35,6 +35,7 @@ type ChiHost struct {
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
 	TLSPort             int32             `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	HTTPSPort           int32             `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
 	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
@@ -127,6 +128,9 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	}
 	if isUnassigned(host.HTTPPort) {
 		host.HTTPPort = from.HTTPPort
+	}
+	if isUnassigned(host.HTTPSPort) {
+		host.HTTPSPort = from.HTTPSPort
 	}
 	if isUnassigned(host.InterserverHTTPPort) {
 		host.InterserverHTTPPort = from.InterserverHTTPPort
