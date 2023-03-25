@@ -719,6 +719,10 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
@@ -810,6 +814,10 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
@@ -896,6 +904,10 @@ spec:
                                   optional, setup `tcp_port` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified, should have equal value with `chi.spec.templates.podTemplates.spec.containers.ports[name=tcp]`
                                   More info: https://clickhouse.tech/docs/en/interfaces/tcp/
+                                minimum: 1
+                                maximum: 65535
+                              tlsPort:
+                                type: integer
                                 minimum: 1
                                 maximum: 65535
                               httpPort:
