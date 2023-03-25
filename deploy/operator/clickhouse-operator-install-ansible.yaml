@@ -737,6 +737,10 @@ spec:
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          httpsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           interserverHTTPPort:
                                             type: integer
                                             description: |
@@ -832,6 +836,10 @@ spec:
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          httpsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           interserverHTTPPort:
                                             type: integer
                                             description: |
@@ -923,6 +931,10 @@ spec:
                                   optional, setup `http_port` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified, should have equal value with `chi.spec.templates.podTemplates.spec.containers.ports[name=http]`
                                   More info: https://clickhouse.tech/docs/en/interfaces/http/
+                                minimum: 1
+                                maximum: 65535
+                              httpsPort:
+                                type: integer
                                 minimum: 1
                                 maximum: 65535
                               interserverHTTPPort:
@@ -1877,6 +1889,10 @@ spec:
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          httpsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           interserverHTTPPort:
                                             type: integer
                                             description: |
@@ -1972,6 +1988,10 @@ spec:
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          httpsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           interserverHTTPPort:
                                             type: integer
                                             description: |
@@ -2063,6 +2083,10 @@ spec:
                                   optional, setup `http_port` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified, should have equal value with `chi.spec.templates.podTemplates.spec.containers.ports[name=http]`
                                   More info: https://clickhouse.tech/docs/en/interfaces/http/
+                                minimum: 1
+                                maximum: 65535
+                              httpsPort:
+                                type: integer
                                 minimum: 1
                                 maximum: 65535
                               interserverHTTPPort:
