@@ -497,7 +497,7 @@ func (c *ClickHouseConfigGenerator) GetHostHostnameAndPorts(host *chiv1.ChiHost)
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
 	}
 	if host.HTTPSPort != chDefaultHTTPSPortNumber {
-		util.Iline(b, 4, "<https_port>%d</http_port>", host.HTTPSPort)
+		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort)
 	}
 
 	// Interserver host and port
