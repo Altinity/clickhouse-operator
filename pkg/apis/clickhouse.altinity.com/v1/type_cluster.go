@@ -22,6 +22,7 @@ type Cluster struct {
 	Files        *Settings           `json:"files,omitempty"        yaml:"files,omitempty"`
 	Templates    *ChiTemplateNames   `json:"templates,omitempty"    yaml:"templates,omitempty"`
 	SchemaPolicy *SchemaPolicy       `json:"schemaPolicy,omitempty" yaml:"schemaPolicy,omitempty"`
+	Insecure     *StringBool         `json:"insecure,omitempty"     yaml:"insecure,omitempty"`
 	Secure       *StringBool         `json:"secure,omitempty"       yaml:"secure,omitempty"`
 	Secret       *ClusterSecret      `json:"secret,omitempty"       yaml:"secret,omitempty"`
 	Layout       *ChiClusterLayout   `json:"layout,omitempty"       yaml:"layout,omitempty"`
@@ -301,6 +302,14 @@ func (cluster *Cluster) HostsCount() int {
 		return nil
 	})
 	return count
+}
+
+// GetInsecure is a getter
+func (cluster *Cluster) GetInsecure() *StringBool {
+	if cluster == nil {
+		return nil
+	}
+	return cluster.Insecure
 }
 
 // GetSecure is a getter
