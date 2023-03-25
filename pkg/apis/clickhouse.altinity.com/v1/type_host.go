@@ -31,6 +31,7 @@ type ChiHost struct {
 	// DEPRECATED - to be removed soon
 	Port int32 `json:"port,omitempty"                yaml:"port,omitempty"`
 
+	Insecure            *StringBool       `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
 	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
 	TLSPort             int32             `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
@@ -119,6 +120,7 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 		host.Port = from.Port
 	}
 
+	host.Insecure = host.Secure.MergeFrom(from.Insecure)
 	host.Secure = host.Secure.MergeFrom(from.Secure)
 	if isUnassigned(host.TCPPort) {
 		host.TCPPort = from.TCPPort
