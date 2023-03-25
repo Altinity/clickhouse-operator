@@ -271,6 +271,10 @@ func isUnassigned(port int32) bool {
 	return port == chiV1.PortMayBeAssignedLaterOrLeftUnused
 }
 
+func invalid(port int32) bool {
+	return (port <= 0) || (port >= 65535)
+}
+
 // hostApplyHostTemplate
 func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate) {
 	if host.Name == "" {
@@ -1726,27 +1730,27 @@ func (n *Normalizer) normalizeHostName(
 // normalizeHostPorts ensures chiV1.ChiReplica.Port is reasonable
 func (n *Normalizer) normalizeHostPorts(host *chiV1.ChiHost) {
 	// Deprecated
-	if (host.Port <= 0) || (host.Port >= 65535) {
+	if invalid(host.Port) {
 		host.Port = unassigned()
 	}
 
-	if (host.TCPPort <= 0) || (host.TCPPort >= 65535) {
+	if invalid(host.TCPPort) {
 		host.TCPPort = unassigned()
 	}
 
-	if (host.TLSPort <= 0) || (host.TLSPort >= 65535) {
+	if invalid(host.TLSPort) {
 		host.TLSPort = unassigned()
 	}
 
-	if (host.HTTPPort <= 0) || (host.HTTPPort >= 65535) {
+	if invalid(host.HTTPPort) {
 		host.HTTPPort = unassigned()
 	}
 
-	if (host.HTTPSPort <= 0) || (host.HTTPSPort >= 65535) {
+	if invalid(host.HTTPSPort) {
 		host.HTTPSPort = unassigned()
 	}
 
-	if (host.InterserverHTTPPort <= 0) || (host.InterserverHTTPPort >= 65535) {
+	if invalid(host.InterserverHTTPPort) {
 		host.InterserverHTTPPort = unassigned()
 	}
 }
