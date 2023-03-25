@@ -93,8 +93,8 @@ const (
 	chDefaultTLSPortNumber             = int32(9440)
 	chDefaultHTTPPortName              = "http"
 	chDefaultHTTPPortNumber            = int32(8123)
-	chDefaultHTTPsPortName             = "https"
-	chDefaultHTTPsPortNumber           = int32(8443)
+	chDefaultHTTPSPortName             = "https"
+	chDefaultHTTPSPortNumber           = int32(8443)
 	chDefaultInterserverHTTPPortName   = "interserver"
 	chDefaultInterserverHTTPPortNumber = int32(9009)
 )
