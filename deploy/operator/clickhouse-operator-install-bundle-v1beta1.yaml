@@ -577,9 +577,12 @@ spec:
                               - "None"
                               - "All"
                               - "DistributedTablesOnly"
+                      insecure:
+                        !!merge <<: *TypeStringBool
+                        description: optional, open insecure ports for cluster, defaults to "yes"
                       secure:
                         !!merge <<: *TypeStringBool
-                        description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
+                        description: optional, open secure ports for cluster
                       secret:
                         type: object
                         description: "optional, shared secret value to secure cluster communications"
@@ -699,11 +702,14 @@ spec:
                                         # See namePartReplicaMaxLen const
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      insecure:
+                                        !!merge <<: *TypeStringBool
+                                        description: |
+                                          optional, open insecure ports for cluster, defaults to "yes"
                                       secure:
                                         !!merge <<: *TypeStringBool
                                         description: |
-                                          optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                          if specified
+                                          optional, open secure ports
                                       tcpPort:
                                         type: integer
                                         description: |
@@ -798,11 +804,14 @@ spec:
                                         # See namePartReplicaMaxLen const
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      insecure:
+                                        !!merge <<: *TypeStringBool
+                                        description: |
+                                          optional, open insecure ports for cluster, defaults to "yes"
                                       secure:
                                         !!merge <<: *TypeStringBool
                                         description: |
-                                          optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                          if specified
+                                          optional, open secure ports
                                       tcpPort:
                                         type: integer
                                         description: |
@@ -893,11 +902,14 @@ spec:
                             # See namePartReplicaMaxLen const
                             maxLength: 15
                             pattern: "^[a-zA-Z0-9-]{0,15}$"
+                          insecure:
+                            !!merge <<: *TypeStringBool
+                            description: |
+                              optional, open insecure ports for cluster, defaults to "yes"
                           secure:
                             !!merge <<: *TypeStringBool
                             description: |
-                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                              if specified
+                              optional, open secure ports
                           tcpPort:
                             type: integer
                             description: |
@@ -1717,9 +1729,12 @@ spec:
                               - "None"
                               - "All"
                               - "DistributedTablesOnly"
+                      insecure:
+                        !!merge <<: *TypeStringBool
+                        description: optional, open insecure ports for cluster, defaults to "yes"
                       secure:
                         !!merge <<: *TypeStringBool
-                        description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
+                        description: optional, open secure ports for cluster
                       secret:
                         type: object
                         description: "optional, shared secret value to secure cluster communications"
@@ -1839,11 +1854,14 @@ spec:
                                         # See namePartReplicaMaxLen const
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      insecure:
+                                        !!merge <<: *TypeStringBool
+                                        description: |
+                                          optional, open insecure ports for cluster, defaults to "yes"
                                       secure:
                                         !!merge <<: *TypeStringBool
                                         description: |
-                                          optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                          if specified
+                                          optional, open secure ports
                                       tcpPort:
                                         type: integer
                                         description: |
@@ -1938,11 +1956,14 @@ spec:
                                         # See namePartReplicaMaxLen const
                                         maxLength: 15
                                         pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                      insecure:
+                                        !!merge <<: *TypeStringBool
+                                        description: |
+                                          optional, open insecure ports for cluster, defaults to "yes"
                                       secure:
                                         !!merge <<: *TypeStringBool
                                         description: |
-                                          optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                          if specified
+                                          optional, open secure ports
                                       tcpPort:
                                         type: integer
                                         description: |
@@ -2033,11 +2054,14 @@ spec:
                             # See namePartReplicaMaxLen const
                             maxLength: 15
                             pattern: "^[a-zA-Z0-9-]{0,15}$"
+                          insecure:
+                            !!merge <<: *TypeStringBool
+                            description: |
+                              optional, open insecure ports for cluster, defaults to "yes"
                           secure:
                             !!merge <<: *TypeStringBool
                             description: |
-                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                              if specified
+                              optional, open secure ports
                           tcpPort:
                             type: integer
                             description: |
