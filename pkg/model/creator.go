@@ -225,6 +225,16 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
+	if isAssigned(host.HTTPSPort) {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultHTTPSPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.HTTPSPort,
+				TargetPort: intstr.FromInt(int(host.HTTPSPort)),
+			},
+		)
+	}
 	if isAssigned(host.InterserverHTTPPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
@@ -780,6 +790,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 	ensurePortByName(container, chDefaultTCPPortName, host.TCPPort)
 	ensurePortByName(container, chDefaultTLSPortName, host.TLSPort)
 	ensurePortByName(container, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(container, chDefaultHTTPSPortName, host.HTTPSPort)
 	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
@@ -1130,6 +1141,7 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 			TCPPort:             unassigned(),
 			TLSPort:             unassigned(),
 			HTTPPort:            unassigned(),
+			HTTPSPort:           unassigned(),
 			InterserverHTTPPort: unassigned(),
 			Templates:           nil,
 		},
@@ -1150,6 +1162,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 			TCPPort:             unassigned(),
 			TLSPort:             unassigned(),
 			HTTPPort:            unassigned(),
+			HTTPSPort:           unassigned(),
 			InterserverHTTPPort: unassigned(),
 			Templates:           nil,
 		},
@@ -1173,6 +1186,7 @@ func newDefaultPodTemplate(name string, host *chiv1.ChiHost) *chiv1.ChiPodTempla
 
 // newDefaultLivenessProbe returns default liveness probe
 func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
+	// Introduce http probe in case http port is specified
 	if isAssigned(host.HTTPPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
@@ -1186,11 +1200,30 @@ func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
 			FailureThreshold:    10,
 		}
 	}
+
+	// Introduce https probe in case https port is specified
+	if isAssigned(host.HTTPSPort) {
+		return &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/ping",
+					Port: intstr.Parse(chDefaultHTTPSPortName), // What if it is not a default?
+					Scheme: corev1.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 60,
+			PeriodSeconds:       3,
+			FailureThreshold:    10,
+		}
+	}
+
+	// Probe is not available
 	return nil
 }
 
 // newDefaultReadinessProbe returns default readiness probe
 func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
+	// Introduce http probe in case http port is specified
 	if isAssigned(host.HTTPPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
@@ -1203,6 +1236,23 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 			PeriodSeconds:       3,
 		}
 	}
+
+	// Introduce https probe in case https port is specified
+	if isAssigned(host.HTTPSPort) {
+		return &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/ping",
+					Port: intstr.Parse(chDefaultHTTPSPortName), // What if it is not a default?
+					Scheme: corev1.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       3,
+		}
+	}
+
+	// Probe is not available
 	return nil
 }
 
@@ -1230,6 +1280,15 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			corev1.ContainerPort{
 				Name:          chDefaultHTTPPortName,
 				ContainerPort: host.HTTPPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		)
+	}
+	if isAssigned(host.HTTPSPort) {
+		container.Ports = append(container.Ports,
+			corev1.ContainerPort{
+				Name:          chDefaultHTTPSPortName,
+				ContainerPort: host.HTTPSPort,
 				Protocol:      corev1.ProtocolTCP,
 			},
 		)
