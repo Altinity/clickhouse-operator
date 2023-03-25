@@ -1229,7 +1229,7 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
+					Port: intstr.Parse(chDefaultHTTPPortName), // What if port name is not a default?
 				},
 			},
 			InitialDelaySeconds: 10,
@@ -1243,7 +1243,7 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path:   "/ping",
-					Port:   intstr.Parse(chDefaultHTTPSPortName), // What if it is not a default?
+					Port:   intstr.Parse(chDefaultHTTPSPortName), // What if port name is not a default?
 					Scheme: corev1.URISchemeHTTPS,
 				},
 			},
