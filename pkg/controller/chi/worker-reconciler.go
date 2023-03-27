@@ -283,9 +283,22 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		return nil
 	}
 
+	version := "unknown"
+	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
+		version = "not applicable"
+	} else {
+		if ver, e := w.schemer.HostVersion(ctx, host); e == nil {
+			version = ver
+		} else {
+			version = "failed to query"
+		}
+	}
+
+	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.Name, version)
 	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
 	if w.shouldForceRestartHost(host) {
+		w.a.V(1).M(host).F().Info("Reconcile host %s. Shutting host down due to force restart", host.Name)
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host)
 		// At this moment StatefulSet has 0 replicas.
@@ -293,6 +306,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 	}
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
+	w.a.V(1).M(host).F().Info("Reconcile host %s. Reconcile StatefulSet", host.Name)
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.reconcileStatefulSet(ctx, host)
 	if err == nil {
