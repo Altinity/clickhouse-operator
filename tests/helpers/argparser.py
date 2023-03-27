@@ -13,3 +13,9 @@ def argparser(parser):
         choices=["zookeeper", "clickhouse-keeper"],
         default="zookeeper",
     )
+    parser.add_argument(
+        "--tests_in_parallel",
+        action="store_true",
+        help="run tests in parallel",
+        default=False
+    )

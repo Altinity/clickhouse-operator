@@ -11,7 +11,7 @@ from testflows.core import current
 
 
 @TestStep(Given)
-def get_shell(self, timeout=300):
+def get_shell(self, timeout=600):
     """Create shell terminal."""
     try:
         shell = Shell()
@@ -25,15 +25,30 @@ def get_shell(self, timeout=300):
 @TestStep(Given)
 def create_test_namespace(self):
     """Create unique test namespace for test."""
-    try:
-        self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
-        self.context.operator_namespace = self.context.test_namespace
-        util.create_namespace(self.context.test_namespace)
-        util.install_operator_if_not_exist()
-        yield self.context.test_namespace
-    finally:
-        with Finally("I delete namespace"):
-            util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
+    if self.context.tests_in_parallel:
+        try:
+            self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
+            self.context.operator_namespace = self.context.test_namespace
+            util.create_namespace(self.context.test_namespace)
+            util.install_operator_if_not_exist()
+            yield self.context.test_namespace
+        finally:
+            with Finally("I delete namespace"):
+                shell = Shell()
+                self.context.shell = shell
+                util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
+                shell.close()
+    else:
+        try:
+            util.create_namespace(self.context.test_namespace)
+            util.install_operator_if_not_exist()
+            yield self.context.test_namespace
+        finally:
+            with Finally("I delete namespace"):
+                shell = Shell()
+                self.context.shell = shell
+                util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
+                shell.close()
 
 
 @TestStep(Given)
@@ -66,7 +81,7 @@ def set_settings(self):
 
     self.context.kubectl_cmd = define("kubectl_cmd", os.getenv("KUBECTL_CMD") if "KUBECTL_CMD" in os.environ else self.context.kubectl_cmd)
 
-    self.context.test_namespace = define("test_namespace", os.getenv("TEST_NAMESPACE") if "TEST_NAMESPACE" in os.environ else None)
+    self.context.test_namespace = define("test_namespace", os.getenv("TEST_NAMESPACE") if "TEST_NAMESPACE" in os.environ else "test")
     self.context.operator_version = define("operator_version", (
         os.getenv("OPERATOR_VERSION")
         if "OPERATOR_VERSION" in os.environ

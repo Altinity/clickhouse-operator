@@ -21,7 +21,7 @@ def get_full_path(test_file, lookup_in_host=True):
         return os.path.abspath(f"/home/master/clickhouse-operator/tests/e2e/{test_file}")
 
 
-def set_operator_version(version, ns=None, timeout=600):
+def set_operator_version(version, ns=None, timeout=600, shell=None):
     if ns is None:
         ns = current().context.operator_namespace
     if current().context.operator_install != "yes":
@@ -32,13 +32,15 @@ def set_operator_version(version, ns=None, timeout=600):
     kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator={operator_image}",
         ns=ns,
+        shell=shell
     )
     kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator metrics-exporter={metrics_exporter_image}",
         ns=ns,
+        shell=shell
     )
-    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
-    if kubectl.get_count("pod", ns=ns, label=operator_label) == 0:
+    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout, shell=shell)
+    if kubectl.get_count("pod", ns=ns, label=operator_label, shell=shell) == 0:
         fail("invalid clickhouse-operator pod count")
 
 
@@ -52,20 +54,20 @@ def set_metrics_exporter_version(version, ns=None):
     kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
 
 
-def restart_operator(ns=None, timeout=600):
+def restart_operator(ns=None, timeout=600, shell=None):
     if ns is None:
         ns = current().context.operator_namespace
     if current().context.operator_install != "yes":
         return
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     old_pod_name = pod["metadata"]["name"]
     old_pod_ip = pod["status"]["podIP"]
-    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout)
-    kubectl.wait_object("pod", name="", ns=ns, label=operator_label)
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout, shell=shell)
+    kubectl.wait_object("pod", name="", ns=ns, label=operator_label, shell=shell)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_name = pod["metadata"]["name"]
-    kubectl.wait_pod_status(new_pod_name, "Running", ns=ns)
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    kubectl.wait_pod_status(new_pod_name, "Running", ns=ns, shell=shell)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_ip = pod["status"]["podIP"]
     print(f"old operator pod: {old_pod_name} ip: {old_pod_ip}")
     print(f"new operator pod: {new_pod_name} ip: {new_pod_ip}")
@@ -240,6 +242,7 @@ def make_http_get_request(host, port, path):
 def install_operator_if_not_exist(
     reinstall=False,
     manifest=None,
+    shell=None,
 ):
     if manifest is None:
         manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
@@ -253,6 +256,7 @@ def install_operator_if_not_exist(
                 "pod",
                 ns=current().context.operator_namespace,
                 label="-l app=clickhouse-operator",
+                shell=shell
             )
             == 0
             or reinstall
@@ -268,11 +272,12 @@ def install_operator_if_not_exist(
                 f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
                 f"envsubst",
                 validate=False,
+                shell=shell
             )
-        set_operator_version(current().context.operator_version)
+        set_operator_version(current().context.operator_version, shell=shell)
 
 
-def install_operator_version(version):
+def install_operator_version(version, shell=None):
     if version == current().context.operator_version:
         manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
         manifest = f"cat {manifest}"
@@ -291,4 +296,5 @@ def install_operator_version(version):
         f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
         f"envsubst",
         validate=False,
+        shell=shell
     )
