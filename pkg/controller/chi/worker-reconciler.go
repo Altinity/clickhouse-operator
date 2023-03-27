@@ -434,6 +434,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.migrateTables(ctx, host)
 
+	version, err := w.schemer.HostVersion(ctx, host)
+	if err != nil {
+		version = "unknown"
+	}
+
 	if err := w.includeHost(ctx, host); err != nil {
 		// If host is not ready - fallback
 		return err
@@ -443,7 +448,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("Reconcile Host %s completed", host.Name)
+		Info("Reconcile Host %s completed. ClickHouse version running: %s", host.Name, version)
 
 	var (
 		hostsCompleted int
