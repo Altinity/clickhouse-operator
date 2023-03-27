@@ -156,10 +156,10 @@ func (c *Cluster) QueryHostInt(ctx context.Context, host *chop.ChiHost, sql stri
 	}
 
 	query, err := c.QueryHost(ctx, host, sql, _opts...)
-	if query == nil {
-		return 0, nil
-	}
 	defer query.Close()
+	if query == nil {
+		return 0, err
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -175,10 +175,10 @@ func (c *Cluster) QueryHostString(ctx context.Context, host *chop.ChiHost, sql s
 	}
 
 	query, err := c.QueryHost(ctx, host, sql, _opts...)
-	if query == nil {
-		return "", nil
-	}
 	defer query.Close()
+	if query == nil {
+		return "", err
+	}
 	if err != nil {
 		return "", err
 	}
