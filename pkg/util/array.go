@@ -44,15 +44,25 @@ func InArrayWithRegexp(needle string, haystack []string) bool {
 
 // MergeStringArrays appends into dst items from src that are not present in src. src items are being deduplicated
 func MergeStringArrays(dst []string, src []string) []string {
-	for _, str := range src {
-		if !InArray(str, dst) {
-			dst = append(dst, str)
+	for _, item := range src {
+		if !InArray(item, dst) {
+			dst = append(dst, item)
 		}
 	}
 	return dst
 }
 
-// RemoveFromArray removes removed the needle from the haystack
+// IntersectStringArrays intersects arrays `a` and `b`
+func IntersectStringArrays(a []string, b []string) (res []string) {
+	for _, item := range a {
+		if InArray(item, b) {
+			res = append(res, item)
+		}
+	}
+	return res
+}
+
+// RemoveFromArray removes the needle from the haystack
 func RemoveFromArray(needle string, haystack []string) []string {
 	result := []string{}
 

@@ -51,6 +51,8 @@ func (w *worker) clean(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 		WithStatusAction(chi).
 		M(chi).F().
 		Info("remove items scheduled for deletion")
+
+	chi.EnsureStatus().SyncHostTablesCreated()
 }
 
 func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {

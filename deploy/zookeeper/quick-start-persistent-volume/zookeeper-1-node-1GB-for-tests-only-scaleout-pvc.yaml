@@ -1,4 +1,4 @@
-# Following scripts based from https://github.com/pravega/zookeeper-operator/
+# Following manifests based on https://github.com/pravega/zookeeper-operator/
 ---
 # service for REST administration and reconfiguration
 apiVersion: v1
@@ -89,6 +89,8 @@ data:
     export ADMIN_SERVER_PORT=8080
     export CLUSTER_NAME=zookeeper
     export ZOO_LOG4J_PROP="WARN, CONSOLE"
+  java.env: |
+    JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"
   log4j-quiet.properties: |
     log4j.rootLogger=CONSOLE
     log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
@@ -179,8 +181,7 @@ data:
 
     set -ex
     # TODO think how to add nslookup to docker image
-    apt-get update && apt-get install --no-install-recommends -y dnsutils curl procps
-    source /cluster-size/cluster-size.sh
+    apt-get update && apt-get install --no-install-recommends -y dnsutils procps
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
@@ -220,24 +221,6 @@ data:
     if [ -f $DYNCONFIG ]; then
       ONDISK_DYN_CONFIG=true
     fi
-
-    set +e
-    # Check if envoy is up and running
-    if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
-      COUNT=0
-      MAXCOUNT=${1:-30}
-      HEALTHYSTATUSCODE="200"
-      while true; do
-        COUNT=$(expr $COUNT + 1)
-        SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
-        echo "waiting for envoy proxy to come up";
-        sleep 1;
-        if (( "$SC" == "$HEALTHYSTATUSCODE" || "$MAXCOUNT" == "$COUNT" )); then
-          break
-        fi
-      done
-    fi
-    set -e
 
     # Determine if there is an ensemble available to join by checking the service domain
     set +e
@@ -323,6 +306,7 @@ data:
     cp -f /conf/log4j-quiet.properties $ZOOCFGDIR
     cp -f /conf/logback.xml $ZOOCFGDIR
     cp -f /conf/env.sh $ZOOCFGDIR
+    cp -f /conf/java.env $ZOOCFGDIR
 
     if [ -f $DYNCONFIG ]; then
       # Node registered, start server
@@ -343,7 +327,6 @@ data:
 
     set -ex
 
-    source /cluster-size/cluster-size.sh
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
@@ -406,7 +389,6 @@ data:
     # You may obtain a copy of the License at
     #     https://www.apache.org/licenses/LICENSE-2.0
     set -ex
-    source /cluster-size/cluster-size.sh
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
@@ -487,19 +469,6 @@ data:
     fi
 
 ---
-# ConfigMap for current cluster size
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: zookeeper-cluster-size
-  labels:
-    app: zookeeper
-data:
-  cluster-size.sh: |
-    #!/usr/bin/env bash
-    CLUSTER_SIZE=1
-
----
 # Main StatefulSet
 apiVersion: apps/v1
 kind: StatefulSet
@@ -509,9 +478,11 @@ metadata:
   name: zookeeper
 
 spec:
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Delete
-    whenScaled: Delete
+#  https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention
+#  requires alpha `StatefulSetAutoDeletePVC=true` feature gate
+#  persistentVolumeClaimRetentionPolicy:
+#    whenDeleted: Delete
+#    whenScaled: Delete
   podManagementPolicy: OrderedReady
   replicas: 1
   selector:
@@ -530,27 +501,21 @@ spec:
     spec:
       affinity:
         podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - zookeeper
-                topologyKey: kubernetes.io/hostname
-              weight: 20
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                      - zookeeper
+              # TODO think about multi-AZ EKS
+              # topologyKey: topology.kubernetes.io/zone
+              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: zookeeper
           command:
             - /conf/zookeeperStart.sh
-          env:
-            - name: ENVOY_SIDECAR_STATUS
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.annotations['sidecar.istio.io/status']
-          image: zookeeper:3.8.0
+          image: docker.io/zookeeper:3.8.1
           imagePullPolicy: Always
           lifecycle:
             preStop:
@@ -593,11 +558,9 @@ spec:
               protocol: TCP
           volumeMounts:
             - mountPath: /data
-              name: data
+              name: datadir-volume
             - mountPath: /conf
               name: conf
-            - mountPath: /cluster-size
-              name: cluster-size
       restartPolicy: Always
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
@@ -606,19 +569,13 @@ spec:
             name: zookeeper-scripts
             defaultMode: 0755
           name: conf
-        - configMap:
-            name: zookeeper-cluster-size
-            defaultMode: 0755
-          name: cluster-size
   updateStrategy:
     type: RollingUpdate
   volumeClaimTemplates:
-    - apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
+    - metadata:
         labels:
           app: zookeeper
-        name: data
+        name: datadir-volume
       spec:
         accessModes:
           - ReadWriteOnce

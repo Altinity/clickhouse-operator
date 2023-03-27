@@ -104,18 +104,28 @@ func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < 1*time.Minute
 }
 
+func (w *worker) isConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
+	return chopModel.IsConfigurationChangeRequiresReboot(host)
+}
+
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
 	// For recent tasks should not do force restart
 	if w.isEarlyContext() {
 		return false
 	}
+
+	// For some configuration changes we have to force restart host
+	if w.isConfigurationChangeRequiresReboot(host) {
+		return true
+	}
+
 	// RollingUpdate purpose is to always shut the host down.
 	// It is such an interesting policy.
 	return host.GetCHI().IsRollingUpdate()
 }
 
-// isEarlyContext checks whether this context/task has been started after worker start
+// isEarlyContext checks whether this context/task has been started shortly after worker started
 func (w *worker) isEarlyContext() bool {
 	return w.task.start.Sub(w.start) < 1*time.Minute
 }
@@ -418,20 +428,20 @@ func (w *worker) isCleanRestart(chi *chiV1.ClickHouseInstallation) bool {
 	// Do we have have previously completed CHI?
 	// In case no - this means that CHI has either not completed or we are migrating from
 	// such a version of the operator, where there is no completed CHI at all
-	noCompletedCHI := chi.Status.GetNormalizedCHICompleted() == nil
+	noCompletedCHI := !chi.HasAncestor()
 	// Having status completed and not having completed CHI suggests we are migrating operator version
 	statusIsCompleted := chi.Status.GetStatus() == chiV1.StatusCompleted
 	if noCompletedCHI && statusIsCompleted {
 		// In case of a restart - assume that normalized is already completed
-		chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
+		chi.SetAncestor(chi.GetTarget())
 	}
 
 	// Check whether anything has changed in CHI spec
 	// In case the generation is the same as already completed - it is clean restart
 	generationIsOk := false
-	// However, NormalizedCHICompleted still can be missing, for example, in newly requested CHI
-	if chi.Status.GetNormalizedCHICompleted() != nil {
-		generationIsOk = chi.Generation == chi.Status.GetNormalizedCHICompleted().Generation
+	// However, completed CHI still can be missing, for example, in newly requested CHI
+	if chi.HasAncestor() {
+		generationIsOk = chi.Generation == chi.GetAncestor().Generation
 	}
 
 	return generationIsOk
@@ -473,7 +483,7 @@ func (w *worker) logCHI(name string, chi *chiV1.ClickHouseInstallation) {
 		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
 		name,
 		name,
-		chi.YAML(true, true),
+		chi.YAML(chiV1.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}),
 	)
 }
 
@@ -514,8 +524,8 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiV1.ClickHouseIn
 	})
 }
 
+// excludeStopped excludes stopped CHI from monitoring
 func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
-	// Exclude stopped CHI from monitoring
 	if chi.IsStopped() {
 		w.a.V(1).
 			WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
@@ -526,6 +536,7 @@ func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
 	}
 }
 
+// includeStopped includes previously stopped CHI into monitoring
 func (w *worker) includeStopped(chi *chiV1.ClickHouseInstallation) {
 	if !chi.IsStopped() {
 		w.a.V(1).
@@ -556,7 +567,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseIn
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
-		Info("reconcile started")
+		Info("reconcile started, task id: %s", chi.Spec.GetTaskID())
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
@@ -575,8 +586,8 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHou
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
-			chi.EnsureStatus().NormalizedCHICompleted = chi.Status.GetNormalizedCHI()
-			chi.EnsureStatus().NormalizedCHI = nil
+			chi.SetAncestor(chi.GetTarget())
+			chi.SetTarget(nil)
 			chi.EnsureStatus().ReconcileComplete()
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
@@ -595,7 +606,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHou
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
-		Info("reconcile completed")
+		Info("reconcile completed, task id: %s", _chi.Spec.GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
@@ -719,9 +730,14 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chi
 		return
 	}
 
-	// StatefulSet for a host
-	_ = w.task.creator.CreateStatefulSet(host, shutdown)
+	w.prepareDesiredStatefulSet(host, shutdown)
 	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host.StatefulSet.ObjectMeta))
+}
+
+// prepareDesiredStatefulSet prepares desired StatefulSet
+func (w *worker) prepareDesiredStatefulSet(host *chiV1.ChiHost, shutdown bool) {
+	host.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
+	host.StatefulSet = host.DesiredStatefulSet
 }
 
 // migrateTables
@@ -745,9 +761,21 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 		WithStatusAction(host.GetCHI()).
 		M(host).F().
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+
 	err := w.schemer.HostCreateTables(ctx, host)
-	if err != nil {
-		w.a.M(host).F().Error("ERROR create tables on host %s. err: %v", host.Name, err)
+	host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
+	if err == nil {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Info("Tables added successfully on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+	} else {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName, err)
 	}
 	return err
 }
@@ -756,13 +784,16 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 func (w *worker) shouldMigrateTables(host *chiV1.ChiHost) bool {
 	switch {
 	case host.GetCHI().IsStopped():
-		// Stopped host is not able to receive data
+		// Stopped host is not able to receive any data
 		return false
-	case host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame:
-		// No need to migrate on the same host
+
+	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().HostsWithTablesCreated):
+		// This host is listed as having tables created already
 		return false
+
+	default:
+		return true
 	}
-	return true
 }
 
 // excludeHost excludes host from ClickHouse clusters if required
@@ -1248,17 +1279,12 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 
 	err := w.c.createStatefulSet(ctx, host)
 
-	host.CHI.EnsureStatus().AddHost()
+	host.CHI.EnsureStatus().HostAdded()
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 			MainFields: true,
 		},
 	})
-	w.a.V(1).
-		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
-		WithStatusAction(host.CHI).
-		M(host).F().
-		Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 
 	if err == nil {
 		w.a.V(1).
@@ -1354,17 +1380,12 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 	if chopModel.IsStatefulSetReady(curStatefulSet) {
 		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 		if err == nil {
-			host.CHI.EnsureStatus().UpdateHost()
+			host.CHI.EnsureStatus().HostUpdated()
 			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 					MainFields: true,
 				},
 			})
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
-				WithStatusAction(host.CHI).
-				M(host).F().
-				Info("%s: %d of %d", eventReasonProgressHostsCompleted, host.CHI.Status.HostsCompletedCount, host.CHI.Status.HostsCount)
 			w.a.V(1).
 				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 				WithStatusAction(host.CHI).

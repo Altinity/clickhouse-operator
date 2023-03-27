@@ -22,33 +22,36 @@ import (
 
 // ChiStatus defines status section of ClickHouseInstallation resource
 type ChiStatus struct {
-	CHOpVersion            string                  `json:"chop-version,omitempty"        yaml:"chop-version,omitempty"`
-	CHOpCommit             string                  `json:"chop-commit,omitempty"         yaml:"chop-commit,omitempty"`
-	CHOpDate               string                  `json:"chop-date,omitempty"           yaml:"chop-date,omitempty"`
-	CHOpIP                 string                  `json:"chop-ip,omitempty"             yaml:"chop-ip,omitempty"`
-	ClustersCount          int                     `json:"clusters,omitempty"            yaml:"clusters,omitempty"`
-	ShardsCount            int                     `json:"shards,omitempty"              yaml:"shards,omitempty"`
-	ReplicasCount          int                     `json:"replicas,omitempty"            yaml:"replicas,omitempty"`
-	HostsCount             int                     `json:"hosts,omitempty"               yaml:"hosts,omitempty"`
-	Status                 string                  `json:"status,omitempty"              yaml:"status,omitempty"`
-	TaskID                 string                  `json:"taskID,omitempty"              yaml:"taskID,omitempty"`
-	TaskIDsStarted         []string                `json:"taskIDsStarted,omitempty"      yaml:"taskIDsStarted,omitempty"`
-	TaskIDsCompleted       []string                `json:"taskIDsCompleted,omitempty"    yaml:"taskIDsCompleted,omitempty"`
-	Action                 string                  `json:"action,omitempty"              yaml:"action,omitempty"`
-	Actions                []string                `json:"actions,omitempty"             yaml:"actions,omitempty"`
-	Error                  string                  `json:"error,omitempty"               yaml:"error,omitempty"`
-	Errors                 []string                `json:"errors,omitempty"              yaml:"errors,omitempty"`
-	HostsUpdatedCount      int                     `json:"hostsUpdated,omitempty"        yaml:"hostsUpdated,omitempty"`
-	HostsAddedCount        int                     `json:"hostsAdded,omitempty"          yaml:"hostsAdded,omitempty"`
-	HostsCompletedCount    int                     `json:"hostsCompleted,omitempty"      yaml:"hostsCompleted,omitempty"`
-	HostsDeletedCount      int                     `json:"hostsDeleted,omitempty"        yaml:"hostsDeleted,omitempty"`
-	HostsDeleteCount       int                     `json:"hostsDelete,omitempty"         yaml:"hostsDelete,omitempty"`
-	Pods                   []string                `json:"pods,omitempty"                yaml:"pods,omitempty"`
-	PodIPs                 []string                `json:"pod-ips,omitempty"             yaml:"pod-ips,omitempty"`
-	FQDNs                  []string                `json:"fqdns,omitempty"               yaml:"fqdns,omitempty"`
-	Endpoint               string                  `json:"endpoint,omitempty"            yaml:"endpoint,omitempty"`
-	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"          yaml:"normalized,omitempty"`
-	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty" yaml:"normalizedCompleted,omitempty"`
+	CHOpVersion            string                  `json:"chop-version,omitempty"           yaml:"chop-version,omitempty"`
+	CHOpCommit             string                  `json:"chop-commit,omitempty"            yaml:"chop-commit,omitempty"`
+	CHOpDate               string                  `json:"chop-date,omitempty"              yaml:"chop-date,omitempty"`
+	CHOpIP                 string                  `json:"chop-ip,omitempty"                yaml:"chop-ip,omitempty"`
+	ClustersCount          int                     `json:"clusters,omitempty"               yaml:"clusters,omitempty"`
+	ShardsCount            int                     `json:"shards,omitempty"                 yaml:"shards,omitempty"`
+	ReplicasCount          int                     `json:"replicas,omitempty"               yaml:"replicas,omitempty"`
+	HostsCount             int                     `json:"hosts,omitempty"                  yaml:"hosts,omitempty"`
+	Status                 string                  `json:"status,omitempty"                 yaml:"status,omitempty"`
+	TaskID                 string                  `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	TaskIDsStarted         []string                `json:"taskIDsStarted,omitempty"         yaml:"taskIDsStarted,omitempty"`
+	TaskIDsCompleted       []string                `json:"taskIDsCompleted,omitempty"       yaml:"taskIDsCompleted,omitempty"`
+	Action                 string                  `json:"action,omitempty"                 yaml:"action,omitempty"`
+	Actions                []string                `json:"actions,omitempty"                yaml:"actions,omitempty"`
+	Error                  string                  `json:"error,omitempty"                  yaml:"error,omitempty"`
+	Errors                 []string                `json:"errors,omitempty"                 yaml:"errors,omitempty"`
+	HostsUpdatedCount      int                     `json:"hostsUpdated,omitempty"           yaml:"hostsUpdated,omitempty"`
+	HostsAddedCount        int                     `json:"hostsAdded,omitempty"             yaml:"hostsAdded,omitempty"`
+	HostsUnchangedCount    int                     `json:"hostsUnchanged,omitempty"         yaml:"hostsUnchanged,omitempty"`
+	HostsFailedCount       int                     `json:"hostsFailed,omitempty"            yaml:"hostsFailed,omitempty"`
+	HostsCompletedCount    int                     `json:"hostsCompleted,omitempty"         yaml:"hostsCompleted,omitempty"`
+	HostsDeletedCount      int                     `json:"hostsDeleted,omitempty"           yaml:"hostsDeleted,omitempty"`
+	HostsDeleteCount       int                     `json:"hostsDelete,omitempty"            yaml:"hostsDelete,omitempty"`
+	Pods                   []string                `json:"pods,omitempty"                   yaml:"pods,omitempty"`
+	PodIPs                 []string                `json:"pod-ips,omitempty"                yaml:"pod-ips,omitempty"`
+	FQDNs                  []string                `json:"fqdns,omitempty"                  yaml:"fqdns,omitempty"`
+	Endpoint               string                  `json:"endpoint,omitempty"               yaml:"endpoint,omitempty"`
+	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
+	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
+	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
 }
 
 const (
@@ -56,6 +59,29 @@ const (
 	maxErrors  = 10
 	maxTaskIDs = 10
 )
+
+// PushHostTablesCreated pushes host to the list of hosts with created tables
+func (s *ChiStatus) PushHostTablesCreated(host string) {
+	if s == nil {
+		return
+	}
+	if util.InArray(host, s.HostsWithTablesCreated) {
+		return
+	}
+
+	s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, host)
+}
+
+// SyncHostTablesCreated syncs list of hosts with tables created with actual list of hosts
+func (s *ChiStatus) SyncHostTablesCreated() {
+	if s == nil {
+		return
+	}
+	if s.FQDNs == nil {
+		return
+	}
+	s.HostsWithTablesCreated = util.IntersectStringArrays(s.HostsWithTablesCreated, s.FQDNs)
+}
 
 // PushAction pushes action into status
 func (s *ChiStatus) PushAction(action string) {
@@ -161,11 +187,12 @@ func (s *ChiStatus) DeleteStart() {
 
 // CopyCHIStatusOptions specifies what to copy in CHI status options
 type CopyCHIStatusOptions struct {
-	Actions     bool
-	Errors      bool
-	Normalized  bool
-	MainFields  bool
-	WholeStatus bool
+	Actions           bool
+	Errors            bool
+	Normalized        bool
+	MainFields        bool
+	WholeStatus       bool
+	InheritableFields bool
 }
 
 // MergeActions merges actions
@@ -191,9 +218,21 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		return
 	}
 
+	if opts.InheritableFields {
+		s.TaskIDsStarted = from.TaskIDsStarted
+		s.TaskIDsCompleted = from.TaskIDsCompleted
+		s.Actions = from.Actions
+		s.Errors = from.Errors
+		s.HostsWithTablesCreated = from.HostsWithTablesCreated
+	}
+
 	if opts.Actions {
 		s.Action = from.Action
 		s.MergeActions(from)
+		s.HostsWithTablesCreated = nil
+		if len(from.HostsWithTablesCreated) > 0 {
+			s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
+		}
 	}
 
 	if opts.Errors {
@@ -229,7 +268,6 @@ func (s *ChiStatus) CopyFrom(from *ChiStatus, opts CopyCHIStatusOptions) {
 		s.FQDNs = from.FQDNs
 		s.Endpoint = from.Endpoint
 		s.NormalizedCHI = from.NormalizedCHI
-
 	}
 
 	if opts.Normalized {
@@ -291,12 +329,22 @@ func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	return s.NormalizedCHICompleted
 }
 
+// HasNormalizedCHICompleted is a checker
+func (s *ChiStatus) HasNormalizedCHICompleted() bool {
+	return s.GetNormalizedCHICompleted() != nil
+}
+
 // GetNormalizedCHI is a getter
 func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	if s == nil {
 		return nil
 	}
 	return s.NormalizedCHI
+}
+
+// HasNormalizedCHI is a checker
+func (s *ChiStatus) HasNormalizedCHI() bool {
+	return s.GetNormalizedCHI() != nil
 }
 
 // GetStatus is a getter
@@ -323,8 +371,8 @@ func (s *ChiStatus) GetPodIPS() []string {
 	return s.PodIPs
 }
 
-// UpdateHost updates updated hosts counter
-func (s *ChiStatus) UpdateHost() {
+// HostUpdated updates updated hosts counter
+func (s *ChiStatus) HostUpdated() {
 	if s == nil {
 		return
 	}
@@ -332,11 +380,29 @@ func (s *ChiStatus) UpdateHost() {
 	s.HostsCompletedCount++
 }
 
-// AddHost updates added hosts counter
-func (s *ChiStatus) AddHost() {
+// HostAdded updates added hosts counter
+func (s *ChiStatus) HostAdded() {
 	if s == nil {
 		return
 	}
 	s.HostsAddedCount++
+	s.HostsCompletedCount++
+}
+
+// HostUnchanged updates unchanged hosts counter
+func (s *ChiStatus) HostUnchanged() {
+	if s == nil {
+		return
+	}
+	s.HostsUnchangedCount++
+	s.HostsCompletedCount++
+}
+
+// HostFailed updates failed hosts counter
+func (s *ChiStatus) HostFailed() {
+	if s == nil {
+		return
+	}
+	s.HostsFailedCount++
 	s.HostsCompletedCount++
 }

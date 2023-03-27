@@ -63,12 +63,14 @@ func (c *ClickHouseConfigGenerator) GetQuotas() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Quotas, configQuotas)
 }
 
+// GetSettingsGlobal creates data for "settings.xml"
+func (c *ClickHouseConfigGenerator) GetSettingsGlobal() string {
+	// No host specified means request to generate common config
+	return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
+}
+
 // GetSettings creates data for "settings.xml"
 func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
-	if host == nil {
-		// No host specified means request to generate common config
-		return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
-	}
 	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }
@@ -110,10 +112,14 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 		// <node>
 		//		<host>HOST</host>
 		//		<port>PORT</port>
+		//		<secure>%d</secure>
 		// </node>
 		util.Iline(b, 8, "<node>")
 		util.Iline(b, 8, "    <host>%s</host>", node.Host)
 		util.Iline(b, 8, "    <port>%d</port>", node.Port)
+		if node.Secure.HasValue() {
+			util.Iline(b, 8, "    <secure>%d</secure>", c.getSecure(node))
+		}
 		util.Iline(b, 8, "</node>")
 	}
 
@@ -537,8 +543,8 @@ func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.
 	return CreateInstanceHostname(host)
 }
 
-// getSecure gets config-usable value for host secure flag
-func (c *ClickHouseConfigGenerator) getSecure(host *chiv1.ChiHost) int {
+// getSecure gets config-usable value for host or node secure flag
+func (c *ClickHouseConfigGenerator) getSecure(host chiv1.Secured) int {
 	if host.IsSecure() {
 		return 1
 	}

@@ -40,7 +40,7 @@ def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
         cmd += " ".join(cmd_args[1:])
 
     # save command for debug purposes
-    command = cmd
+    # command = cmd
     # print(f"run command: {cmd}")
 
     return run_shell(cmd, timeout, ok_to_fail, shell=shell)
@@ -573,8 +573,9 @@ def check_configmaps(chi_name, ns=None, shell=None):
     check_configmap(
         f"chi-{chi_name}-common-usersd",
         [
-            "01-clickhouse-user.xml",
+            "01-clickhouse-operator-profile.xml",
             "02-clickhouse-default-profile.xml",
+            "03-database-ordinary.xml",
         ],
         ns=ns,
         shell=shell

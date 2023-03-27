@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -225,6 +225,11 @@ spec:
                   type: object
                   description: "Normalized CHI completed"
                   x-kubernetes-preserve-unknown-fields: true
+                hostsWithTablesCreated:
+                  type: array
+                  description: "List of hosts with tables created by the operator"
+                  items:
+                    type: string
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -457,6 +462,9 @@ spec:
                                 description: "TCP port which used to connect to Zookeeper node"
                                 minimum: 0
                                 maximum: 65535
+                              secure:
+                                <<: *TypeStringBool
+                                description: "if a secure connection to Zookeeper is required"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -1130,7 +1138,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1345,6 +1353,11 @@ spec:
                   type: object
                   description: "Normalized CHI completed"
                   x-kubernetes-preserve-unknown-fields: true
+                hostsWithTablesCreated:
+                  type: array
+                  description: "List of hosts with tables created by the operator"
+                  items:
+                    type: string
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -1577,6 +1590,9 @@ spec:
                                 description: "TCP port which used to connect to Zookeeper node"
                                 minimum: 0
                                 maximum: 65535
+                              secure:
+                                <<: *TypeStringBool
+                                description: "if a secure connection to Zookeeper is required"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -2247,7 +2263,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2348,6 +2364,9 @@ spec:
                             hostRegexpTemplate:
                               type: string
                               description: "ClickHouse server configuration `<host_regexp>...</host_regexp>` for any <user>"
+#                    configurationRestartPolicy:
+#                      description: "Configuration restart policy describes what configuration changes require ClickHouse restart"
+#                      type: object
                     access:
                       type: object
                       description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"

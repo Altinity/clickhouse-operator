@@ -23,7 +23,8 @@ import (
 type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
-	Port                int32             `json:"port,omitempty"                yaml:"port,omitempty"`
+	Port int32 `json:"port,omitempty"                yaml:"port,omitempty"`
+
 	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
 	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
 	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
@@ -188,6 +189,11 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 	return host.CHI
 }
 
+// HasCHI checks whether host has CHI
+func (host *ChiHost) HasCHI() bool {
+	return host.GetCHI() != nil
+}
+
 // GetCluster gets cluster
 func (host *ChiHost) GetCluster() *Cluster {
 	// Host has to have filled Address
@@ -200,9 +206,29 @@ func (host *ChiHost) GetShard() *ChiShard {
 	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
 }
 
+// GetAncestor gets ancestor of a host
+func (host *ChiHost) GetAncestor() *ChiHost {
+	return host.GetCHI().GetAncestor().FindHost(host.Address.ClusterName, host.Address.ShardName, host.Address.HostName)
+}
+
+// HasAncestor checks whether host has an ancestor
+func (host *ChiHost) HasAncestor() bool {
+	return host.GetAncestor() != nil
+}
+
+// GetAncestorCHI gets ancestor of a host
+func (host *ChiHost) GetAncestorCHI() *ClickHouseInstallation {
+	return host.GetCHI().GetAncestor()
+}
+
+// HasAncestorCHI checks whether host has an ancestor
+func (host *ChiHost) HasAncestorCHI() bool {
+	return host.GetAncestorCHI() != nil
+}
+
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
 func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
-	host.CHI.WalkVolumeClaimTemplates(f)
+	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 
 // WalkVolumeMounts walks VolumeMount(s)
@@ -234,7 +260,7 @@ func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMo
 	return
 }
 
-// IsSecure checks whether host requires secure communication
+// IsSecure checks whether the host requires secure communication
 func (host *ChiHost) IsSecure() bool {
 	if host == nil {
 		return false
@@ -249,7 +275,7 @@ func (host *ChiHost) IsSecure() bool {
 	return host.GetCluster().GetSecure().Value()
 }
 
-// IsFirst checks whether host is the first host of the CHI
+// IsFirst checks whether the host is the first host of the whole CHI
 func (host *ChiHost) IsFirst() bool {
 	if host == nil {
 		return false

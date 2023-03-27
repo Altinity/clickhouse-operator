@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -217,6 +217,11 @@ spec:
               type: object
               description: "Normalized CHI completed"
               x-kubernetes-preserve-unknown-fields: true
+            hostsWithTablesCreated:
+              type: array
+              description: "List of hosts with tables created by the operator"
+              items:
+                type: string
         spec:
           type: object
           # x-kubernetes-preserve-unknown-fields: true
@@ -449,6 +454,9 @@ spec:
                             description: "TCP port which used to connect to Zookeeper node"
                             minimum: 0
                             maximum: 65535
+                          secure:
+                            !!merge <<: *TypeStringBool
+                            description: "if a secure connection to Zookeeper is required"
                     session_timeout_ms:
                       type: integer
                       description: "session timeout during connect to Zookeeper"
@@ -1120,7 +1128,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1325,6 +1333,11 @@ spec:
               type: object
               description: "Normalized CHI completed"
               x-kubernetes-preserve-unknown-fields: true
+            hostsWithTablesCreated:
+              type: array
+              description: "List of hosts with tables created by the operator"
+              items:
+                type: string
         spec:
           type: object
           # x-kubernetes-preserve-unknown-fields: true
@@ -1557,6 +1570,9 @@ spec:
                             description: "TCP port which used to connect to Zookeeper node"
                             minimum: 0
                             maximum: 65535
+                          secure:
+                            !!merge <<: *TypeStringBool
+                            description: "if a secure connection to Zookeeper is required"
                     session_timeout_ms:
                       type: integer
                       description: "session timeout during connect to Zookeeper"
@@ -2225,7 +2241,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2322,6 +2338,9 @@ spec:
                         hostRegexpTemplate:
                           type: string
                           description: "ClickHouse server configuration `<host_regexp>...</host_regexp>` for any <user>"
+                          #                    configurationRestartPolicy:
+                          #                      description: "Configuration restart policy describes what configuration changes require ClickHouse restart"
+                          #                      type: object
                 access:
                   type: object
                   description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
@@ -2578,7 +2597,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 ---
 # Template Parameters:
 #
@@ -2595,7 +2614,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 rules:
   - apiGroups:
       - ""
@@ -2743,7 +2762,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -2765,7 +2784,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -2816,14 +2835,21 @@ data:
         ##
         ################################################
         user:
+          # Default settings for user accounts, created by the operator.
+          # NB. These are not access credentials or settings for 'default' user account,
+          # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
+          # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
+          # Password for 'default' account as to be provided explicitly, if to be used
+          # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
+          # Password for CHOP account is used from `clickhouse.access.password` section
           default:
             # Default values for ClickHouse user configuration
             # 1. user/profile - string
             # 2. user/quota - string
             # 3. user/networks/ip - multiple strings
             # 4. user/password - string
-            profile: default
-            quota: default
+            profile: "default"
+            quota: "default"
             networksIP:
               - "::1"
               - "127.0.0.1"
@@ -2836,7 +2862,35 @@ data:
         network:
           # Default host_regexp to limit network connectivity from outside
           hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+
       ################################################
+      ##
+      ## Configuration Restart Policy Section
+      ## Configuration restart policy describes what configuration changes require ClickHouse restart
+      ##
+      ################################################
+      configurationRestartPolicy:
+        rules:
+          - version: "*"
+            rules:
+              - settings/*: "yes"
+              - settings/max_server_memory_*: "no"
+              - settings/max_*_to_drop: "no"
+              - settings/dictionaries_config: "no"
+              - settings/logger: "no"
+
+              - zookeeper/*: "yes"
+
+              - files/config.d/*.xml: "yes"
+              - files/users.d/*: "no"
+
+              - profiles/*: "no"
+              - profiles/default/background_*_pool_size: "yes"
+          - version: "21.*"
+            rules:
+              - settings/logger: "yes"
+
+      #################################################
       ##
       ## Access to ClickHouse instances
       ##
@@ -3024,7 +3078,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 data:
 ---
@@ -3040,7 +3094,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3119,7 +3173,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3217,10 +3271,10 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 data:
-  01-clickhouse-user.xml: |
+  01-clickhouse-operator-profile.xml: |
     <!-- IMPORTANT -->
     <!-- This file is auto-generated -->
     <!-- Do not edit this file - all changes would be lost -->
@@ -3233,15 +3287,7 @@ data:
     #
     -->
     <yandex>
-        <users>
-            <clickhouse_operator>
-                <networks>
-                    <ip>127.0.0.1</ip>
-                </networks>
-                <profile>clickhouse_operator</profile>
-                <quota>default</quota>
-            </clickhouse_operator>
-        </users>
+        <!-- clickhouse-operator user is generated by the operator based on config.yaml in runtime -->
         <profiles>
             <clickhouse_operator>
                 <log_queries>0</log_queries>
@@ -3272,27 +3318,12 @@ data:
         </default>
       </profiles>
     </yandex>
-  03-database-ordinary.xml: |
-    <!-- IMPORTANT -->
-    <!-- This file is auto-generated -->
-    <!-- Do not edit this file - all changes would be lost -->
-    <!-- Edit appropriate template in the following folder: -->
-    <!-- deploy/builder/templates-config -->
-    <!-- IMPORTANT -->
-    <!--  Remove it for ClickHouse versions before 20.4 -->
-    <yandex>
-        <profiles>
-            <default>
-                <default_database_engine>Ordinary</default_database_engine>
-            </default>
-        </profiles>
-    </yandex>
 ---
 #
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.20.3
+#   OPERATOR_VERSION=0.21.0
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -3302,7 +3333,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -3313,9 +3344,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.20.3
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.21.0
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.20.3
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.21.0
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -3326,7 +3357,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3360,7 +3391,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.20.3
+          image: altinity/clickhouse-operator:0.21.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3423,7 +3454,7 @@ spec:
                   containerName: clickhouse-operator
                   resource: limits.memory
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.20.3
+          image: altinity/metrics-exporter:0.21.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3505,7 +3536,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.20.3
+    clickhouse.altinity.com/chop: 0.21.0
     app: clickhouse-operator
 spec:
   ports:
