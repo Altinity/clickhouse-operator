@@ -775,7 +775,7 @@ def test_too_much_running_queries(self, prometheus_operator_spec, clickhouse_ope
     cmd = "export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y mysql-client"
     kubectl.launch(
         f'exec -n {kubectl.namespace} {too_many_queries_pod} -c clickhouse-pod -- bash -c  "{cmd}"',
-        ok_to_fail=True,
+        timeout=120,
     )
 
     def make_too_many_queries():
@@ -1213,6 +1213,9 @@ def test_keeper_alerts_outline(self, keeper_type):
 @TestFeature
 @Name("e2e.test_metrics_alerts")
 def test(self):
+    util.clean_namespace(delete_chi=True)
+    util.install_operator_if_not_exist()
+
     (prometheus_operator_spec, prometheus_spec, alertmanager_spec, clickhouse_operator_spec, chi,) = alerts.initialize(
         chi_file="manifests/chi/test-cluster-for-alerts.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-alerts.yaml",

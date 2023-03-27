@@ -138,6 +138,10 @@ spec:
   scrapeInterval: 5s
   evaluationInterval: 5s
   serviceAccountName: prometheus
+  # which PodMonitors to be used
+  podMonitorSelector:
+    matchLabels:
+      app: prometheus
   # which ServiceMonitors to be used
   serviceMonitorSelector:
     matchLabels:

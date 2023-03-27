@@ -329,7 +329,7 @@ spec:
         - alert: ClickHouseDiskUsage
           expr: |
             (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.1
-            or (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.15 and ALERTS{alertname="ClickHouseDiskUsage",alertstate="firing"} == 1)
+            or ( (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.15 and ALERTS{alertname="ClickHouseDiskUsage",alertstate="firing"} == 1)
           labels:
             severity: high
           annotations:

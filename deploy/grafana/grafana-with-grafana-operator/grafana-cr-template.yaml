@@ -4,9 +4,12 @@ kind: Grafana
 metadata:
   name: "$GRAFANA_NAME"
 spec:
+  deployment:
+    annotations:
+      cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
   ingress:
     enabled: False
-  baseImage: "grafana/grafana:9.3.6"
+#  baseImage: "grafana/grafana:9.3.6"
   dataStorage:
     size: 1Gi
     accessModes:
@@ -27,9 +30,9 @@ spec:
     # required for Dashboard Installation - https://github.com/integr8ly/grafana-operator/issues/92
     auth.basic:
       enabled: True
-    auth.anonymous:
-      enabled: $GRAFANA_ANONYMOUS_EDITOR
-      org_role: Editor
+#    auth.anonymous:
+#      enabled: True
+#      org_role: Editor
 # look to https://grafana.com/docs/grafana/latest/auth/generic-oauth/
 #    server:
 #      root_url: $GRAFANA_ROOT_URL
