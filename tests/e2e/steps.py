@@ -9,6 +9,8 @@ import inspect
 import pathlib
 from testflows.core import current
 
+import e2e.kubectl as kubectl
+
 
 @TestStep(Given)
 def get_shell(self, timeout=600):
@@ -123,3 +125,20 @@ def set_settings(self):
     self.context.prometheus_scrape_interval = define("prometheus_scrape_interval", 10)
 
     self.context.minio_version = define("minio_version", "latest")
+
+
+@TestStep(Given)
+def create_shell_namespace_clickhouse_template(self):
+    """Create shell, namespace and install ClickHouse template."""
+    with Given("I create shell"):
+        shell = get_shell()
+        self.context.shell = shell
+
+    if self.cflags & PARALLEL:
+        with And("I create test namespace"):
+            create_test_namespace()
+
+        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
+            kubectl.apply(
+                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
+            )

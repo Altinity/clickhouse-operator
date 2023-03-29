@@ -21,18 +21,7 @@ from e2e.steps import *
 @Name("test_001. 1 node")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Create("1.0"))
 def test_001(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-001.yaml",
@@ -55,18 +44,7 @@ def test_001(self):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Name("1.0"),
 )
 def test_002(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-002-tpl.yaml",
@@ -95,18 +73,7 @@ def test_002(self):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Name("1.0"),
 )
 def test_003(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-003-complex-layout.yaml",
@@ -129,18 +96,7 @@ def test_003(self):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Spec("1.0"),
 )
 def test_004(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-004-tpl.yaml",
@@ -157,18 +113,7 @@ def test_004(self):
 @Name("test_005. Test manifest created by ACM")
 @Requirements(RQ_SRS_026_ClickHouseOperator_ACM("1.0"))
 def test_005(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-005-acm.yaml",
@@ -183,21 +128,11 @@ def test_005(self):
 
 
 @TestScenario
+@Flags(NO_PARALLEL)
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
 def test_006(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     old_version = "clickhouse/clickhouse-server:22.3"
     new_version = "clickhouse/clickhouse-server:22.8"
@@ -237,18 +172,7 @@ def test_006(self):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_HttpPort("1.0"),
 )
 def test_007(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-007-custom-ports.yaml",
@@ -506,18 +430,7 @@ def check_remote_servers(self, chi, shards, trigger_event, shell=None, cluster="
 @Name("test_008_1. Test operator restart")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
 def test_008_1(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     with Check("Test simple chi for operator restart"):
         test_operator_restart(
@@ -529,18 +442,7 @@ def test_008_1(self):
 @TestScenario
 @Name("test_008_2. Test operator restart")
 def test_008_2(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     with Check("Test advanced chi for operator restart"):
         test_operator_restart(
@@ -552,18 +454,7 @@ def test_008_2(self):
 @TestScenario
 @Name("test_008_3. Test operator restart in the middle of reconcile")
 def test_008_3(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-008-operator-restart-3-1.yaml"
     manifest_2 = "manifests/chi/test-008-operator-restart-3-2.yaml"
@@ -635,18 +526,7 @@ def test_009_1(self, version_from="0.20.1", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     with Check("Test simple chi for operator upgrade"):
         test_operator_upgrade(
@@ -663,18 +543,7 @@ def test_009_2(self, version_from="0.20.1", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     with Check("Test advanced chi for operator upgrade"):
         test_operator_upgrade(
@@ -689,18 +558,7 @@ def test_009_2(self, version_from="0.20.1", version_to=None):
 @Name("test_010. Test zookeeper initialization")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper("1.0"))
 def test_010(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     util.set_operator_version(current().context.operator_version)
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -733,18 +591,7 @@ def get_user_xml_from_configmap(chi, user):
 @Name("test_011. Test user security and network isolation")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
 def test_011(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
 
@@ -903,18 +750,7 @@ def test_011(self):
 @Name("test_011_1. Test default user security")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
 def test_011_1(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     with Given("test-011-secured-default-1.yaml with password_sha256_hex for default user"):
         kubectl.create_and_check(
@@ -974,18 +810,7 @@ def test_011_1(self):
 @Name("test_011_2. Test k8s secrets usage")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
 def test_011_2(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     with Given("test-011-secrets.yaml with secret storage"):
         kubectl.apply(
@@ -1032,18 +857,7 @@ def test_011_2(self):
     RQ_SRS_026_ClickHouseOperator_ServiceTemplates_Annotations("1.0"),
 )
 def test_012(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-012-service-template.yaml",
@@ -1097,18 +911,7 @@ def test_012(self):
 @Name("test_013_1. Automatic schema propagation for shards")
 def test_013_1(self):
     """Check clickhouse operator supports automatic schema propagation for shards."""
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     cluster = "simple"
     manifest = f"manifests/chi/test-013-1-1-schema-propagation.yaml"
@@ -1381,18 +1184,7 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
 )
 def test_014(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -1651,18 +1443,7 @@ def test_014(self):
 @TestScenario
 @Name("test_014_1. Test replication under different configuration scenarios")
 def test_014_1(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -1752,18 +1533,7 @@ def test_014_1(self):
 @Name("test_015. Test circular replication with hostNetwork")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication("1.0"))
 def test_015(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     kubectl.create_and_check(
         manifest="manifests/chi/test-015-host-network.yaml",
@@ -1812,18 +1582,7 @@ def test_015(self):
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
 )
 def test_016(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     chi = "test-016-settings"
     kubectl.create_and_check(
@@ -1953,18 +1712,7 @@ def test_016(self):
 @Name("test_017. Test deployment of multiple versions in a cluster")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_DifferentClickHouseVersionsOnReplicasAndShards("1.0"))
 def test_017(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     pod_count = 2
     kubectl.create_and_check(
@@ -2004,18 +1752,7 @@ def test_017(self):
 @Name("test_018. Test that server settings are applied before statefulset is started")
 # Obsolete, covered by test_016
 def test_018(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     chi = "test-018-configmap"
     kubectl.create_and_check(
@@ -2228,18 +1965,7 @@ def test_019(self, step=1):
 @Name("test_019_1. Test that volume is correctly retained and can be re-attached. Provisioner: StatefulSet")
 @Requirements(RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0"))
 def test_019_1(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_019(step=1)
 
@@ -2248,18 +1974,7 @@ def test_019_1(self):
 @Name("test_019_2. Test that volume is correctly retained and can be re-attached. Provisioner: Operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates("1.0"))
 def test_019_2(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_019(step=2)
 
@@ -2302,18 +2017,7 @@ def test_020(self, step=1):
 @Name("test_020_1. Test multi-volume configuration, step=1")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0"))
 def test_020_1(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_020(step=1)
 
@@ -2322,18 +2026,7 @@ def test_020_1(self):
 @Name("test_020_2. Test multi-volume configuration, step=2")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes("1.0"))
 def test_020_2(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_020(step=2)
 
@@ -2527,18 +2220,7 @@ def test_021(self, step=1):
 @Name("test_021_1. Test rescaling storage. Provisioner: StatefulSet")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
 def test_021_1(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_021(step=1)
 
@@ -2547,18 +2229,7 @@ def test_021_1(self):
 @Name("test_021_2. Test rescaling storage. Provisioner: Operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_StorageProvisioning("1.0"))
 def test_021_2(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_021(step=2)
 
@@ -2567,18 +2238,7 @@ def test_021_2(self):
 @Name("test_022. Test that chi with broken image can be deleted")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DeleteBroken("1.0"))
 def test_022(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-022-broken-image.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -2606,18 +2266,7 @@ def test_022(self):
 @Name("test_023. Test auto templates")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating("1.0"))
 def test_023(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-023-auto-templates.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -2656,18 +2305,7 @@ def test_023(self):
 @Name("test_024. Test annotations for various template types")
 @Requirements(RQ_SRS_026_ClickHouseOperator_AnnotationsInTemplates("1.0"))
 def test_024(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-024-template-annotations.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -2746,18 +2384,7 @@ def test_024(self):
 @Name("test_025. Test that service is available during re-scaling, upgrades etc.")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicas("1.0"))
 def test_025(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -2874,18 +2501,7 @@ def test_025(self):
 @Name("test_026. Test mixed single and multi-volume configuration in one cluster")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout("1.0"))
 def test_026(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -2957,18 +2573,7 @@ def test_026(self):
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Troubleshoot("1.0"))
 def test_027(self):
     # TODO: Add a case for a custom endpoint
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-027-troubleshooting-1-bad-config.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -3016,18 +2621,7 @@ def test_027(self):
 @Name("test_028. Test restart scenarios")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
 def test_028(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -3154,18 +2748,7 @@ def test_028(self):
 )
 def test_029(self):
     # TODO: this test needs to be extended in order to handle more distribution types
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-029-distribution.yaml"
 
@@ -3199,20 +2782,10 @@ def test_029(self):
 
 
 @TestScenario
+@Flags(NO_PARALLEL)
 @Name("test_030. Test CRD deletion")
 def test_030(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-030.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -3267,18 +2840,7 @@ def test_030(self):
 @TestScenario
 @Name("test_031. Test excludeFromPropagationAnnotations work")
 def test_031(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     chi_manifest = "manifests/chi/test-031-wo-tpl.yaml"
     chi = "test-031-wo-tpl"
@@ -3401,18 +2963,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
 @Name("test_032. Test rolling update logic")
 def test_032(self):
     """Test rolling update logic."""
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
     create_table = """
@@ -3526,18 +3077,7 @@ def test_034(self):
     creating a ClickHouse-Installation with HTTPS enabled and confirming the secure connectivity between them by
     monitoring the metrics endpoint on port 8888.
     """
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
     operator_namespace = current().context.operator_namespace
@@ -3794,18 +3334,7 @@ def test_036(self):
 def test_037(self):
     """Check clickhouse-operator supports switching storageManagement
     config option from default (StatefulSet) to Operator"""
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     cluster = "default"
     manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
@@ -3962,18 +3491,7 @@ def test_039(self, step=0):
 @Requirements(RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret("1.0"))
 @Name("test_039_0. Inter-cluster communications with no secret defined")
 def test_039_0(self):
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_039(step=0)
 
@@ -3983,18 +3501,7 @@ def test_039_0(self):
 @Name("test_039_1. Inter-cluster communications with 'auto' secret")
 def test_039_1(self):
     """Check clickhouse-operator support inter-cluster communications with 'auto' secret."""
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_039(step=1)
 
@@ -4004,18 +3511,7 @@ def test_039_1(self):
 @Name("test_039_2. Inter-cluster communications with plan text secret")
 def test_039_2(self):
     """Check clickhouse-operator support inter-cluster communications with plan text secret."""
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_039(step=2)
 
@@ -4025,18 +3521,7 @@ def test_039_2(self):
 @Name("test_039_3. Inter-cluster communications with k8s secret")
 def test_039_3(self):
     """Check clickhouse-operator support inter-cluster communications with k8s secret."""
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_039(step=3)
 
@@ -4046,18 +3531,7 @@ def test_039_3(self):
 @Name("test_039_4. Inter-cluster communications over HTTPS")
 def test_039_4(self):
     """Check clickhouse-operator support inter-cluster communications over HTTPS."""
-    with Given("I create shell"):
-        shell = get_shell()
-        self.context.shell = shell
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
 
     test_039(step=4)
 
@@ -4076,15 +3550,15 @@ def test(self):
         shell = get_shell()
         self.context.shell = shell
 
-    if not self.context.tests_in_parallel:
+    # if not self.context.tests_in_parallel:
 
-        with And("I create test namespace"):
-            create_test_namespace()
+    with And("I create test namespace"):
+        create_test_namespace()
 
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
+        kubectl.apply(
+            util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
+        )
 
     # placeholder for selective test running
     # run_tests = [test_008, test_009]
@@ -4099,8 +3573,16 @@ def test(self):
     if self.context.tests_in_parallel:
         with Pool(4) as pool:
             for scenario in loads(current_module(), Scenario, Suite):
-                Scenario(run=scenario, parallel=True, executor=pool)
+                flags = getattr(scenario, "flags", Flags())
+                if not (flags & NO_PARALLEL):
+                    Scenario(run=scenario, parallel=True, executor=pool)
             join()
+
+        for scenario in loads(current_module(), Scenario, Suite):
+            flags = getattr(scenario, "flags", Flags())
+            if flags & NO_PARALLEL:
+                Scenario(run=scenario)
+
     else:
         for scenario in loads(current_module(), Scenario, Suite):
             Scenario(run=scenario)
