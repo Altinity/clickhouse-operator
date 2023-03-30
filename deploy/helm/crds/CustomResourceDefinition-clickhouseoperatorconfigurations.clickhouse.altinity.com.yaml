@@ -25,7 +25,6 @@ spec:
         - name: namespaces
           type: string
           description: Watch namespaces
-          priority: 0 # show in standard view
           jsonPath: .status
         - name: age
           type: date
