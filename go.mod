@@ -24,6 +24,7 @@ require (
 
 require (
 	github.com/MakeNowJust/heredoc v1.0.0
+	github.com/Masterminds/semver/v3 v3.2.0
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/gosimple/slug v1.12.0
