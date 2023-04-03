@@ -45,6 +45,7 @@ type ChiHost struct {
 	// Internal data
 	Address             ChiHostAddress              `json:"-" yaml:"-"`
 	Config              ChiHostConfig               `json:"-" yaml:"-"`
+	Version             *CHVersion                  `json:"-" yaml:"-"`
 	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	// StatefulSet is a stateful set which is being worked with by the host.
 	// It can be desired stateful set when host is being created or current stateful set.
