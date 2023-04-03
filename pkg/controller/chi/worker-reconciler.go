@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"fmt"
-
 	coreV1 "k8s.io/api/core/v1"
 	policyV1 "k8s.io/api/policy/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -289,6 +288,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 	} else {
 		if ver, e := w.schemer.HostVersion(ctx, host); e == nil {
 			version = ver
+			host.Version = chiV1.NewCHVersion(version)
 		} else {
 			version = "failed to query"
 		}
