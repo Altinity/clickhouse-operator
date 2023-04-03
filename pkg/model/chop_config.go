@@ -23,8 +23,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
-func isZookeeperChangeRequiresReboot(a, b *chiV1.ChiZookeeperConfig) bool {
-	return false
+func isZookeeperChangeRequiresReboot(host *chiV1.ChiHost, a, b *chiV1.ChiZookeeperConfig) bool {
+	return !a.Equals(b)
 }
 
 func makePaths(a, b *chiV1.Settings, prefix string, path *messagediff.Path, value interface{}) (sections []string) {
@@ -74,17 +74,17 @@ func makePathsFromDiff(a, b *chiV1.Settings, diff *messagediff.Diff, prefix stri
 	return res
 }
 
-func isSettingsChangeRequiresReboot(section string, a, b *chiV1.Settings) bool {
+func isSettingsChangeRequiresReboot(host *chiV1.ChiHost, section string, a, b *chiV1.Settings) bool {
 	diff, equal := messagediff.DeepDiff(a, b)
 	if equal {
 		return false
 	}
 	affectedPaths := makePathsFromDiff(a, b, diff, section)
-	return isListedChangeRequiresReboot(affectedPaths)
+	return isListedChangeRequiresReboot(host, affectedPaths)
 }
 
-func versionMatches(version chiV1.Matchable) bool {
-	return true
+func hostVersionMatches(host *chiV1.ChiHost, version string) bool {
+	return host.Version.Matches(version)
 }
 
 func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (matches bool, value bool) {
@@ -105,11 +105,11 @@ func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (mat
 }
 
 // latestConfigMatch
-func latestConfigMatch(path string) (matches bool, value bool) {
+func latestConfigMatch(host *chiV1.ChiHost, path string) (matches bool, value bool) {
 	for _, r := range chop.Config().ClickHouse.ConfigRestartPolicy.Rules {
 		// Check ClickHouse version
 		_ = fmt.Sprintf("%s", r.Version)
-		if versionMatches(r.Version) {
+		if hostVersionMatches(host, r.Version) {
 			// Check whether any rule matches path
 			for _, rule := range r.Rules {
 				if ruleMatches, ruleValue := ruleMatches(rule, path); ruleMatches {
@@ -123,11 +123,10 @@ func latestConfigMatch(path string) (matches bool, value bool) {
 }
 
 // isListedChangeRequiresReboot
-func isListedChangeRequiresReboot(paths []string) bool {
-	_ = fmt.Sprintf("%v", paths)
+func isListedChangeRequiresReboot(host *chiV1.ChiHost, paths []string) bool {
 	// Check whether any path matches ClickHouse configuration restart policy rules requires reboot
 	for _, path := range paths {
-		if matches, value := latestConfigMatch(path); matches {
+		if matches, value := latestConfigMatch(host, path); matches {
 			// This path matches config
 			if value {
 				// And this path matches and requires reboot - no need to find any other who requires reboot
@@ -147,7 +146,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 			old = host.GetAncestor().GetZookeeper()
 		}
 		new = host.GetZookeeper()
-		if isZookeeperChangeRequiresReboot(old, new) {
+		if isZookeeperChangeRequiresReboot(host, old, new) {
 			return true
 		}
 	}
@@ -160,7 +159,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 		if host.HasCHI() {
 			new = host.GetCHI().Spec.Configuration.Profiles
 		}
-		if isSettingsChangeRequiresReboot("profiles", old, new) {
+		if isSettingsChangeRequiresReboot(host, "profiles", old, new) {
 			return true
 		}
 	}
@@ -173,7 +172,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 		if host.HasCHI() {
 			new = host.GetCHI().Spec.Configuration.Quotas
 		}
-		if isSettingsChangeRequiresReboot("quotas", old, new) {
+		if isSettingsChangeRequiresReboot(host, "quotas", old, new) {
 			return true
 		}
 	}
@@ -186,7 +185,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 		if host.HasCHI() {
 			new = host.GetCHI().Spec.Configuration.Settings
 		}
-		if isSettingsChangeRequiresReboot("settings", old, new) {
+		if isSettingsChangeRequiresReboot(host, "settings", old, new) {
 			return true
 		}
 	}
@@ -197,7 +196,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 			old = host.GetAncestor().Settings
 		}
 		new = host.Settings
-		if isSettingsChangeRequiresReboot("settings", old, new) {
+		if isSettingsChangeRequiresReboot(host, "settings", old, new) {
 			return true
 		}
 	}
@@ -218,7 +217,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 				true,
 			)
 		}
-		if isSettingsChangeRequiresReboot("files", old, new) {
+		if isSettingsChangeRequiresReboot(host, "files", old, new) {
 			return true
 		}
 	}
@@ -237,7 +236,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 			[]chiV1.SettingsSection{chiV1.SectionUsers},
 			true,
 		)
-		if isSettingsChangeRequiresReboot("files", old, new) {
+		if isSettingsChangeRequiresReboot(host, "files", old, new) {
 			return true
 		}
 	}
