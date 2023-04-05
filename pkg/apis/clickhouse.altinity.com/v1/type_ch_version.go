@@ -25,7 +25,7 @@ type CHVersion struct {
 	// Version specifies original ClickHouse version reported by VERSION(), such as 21.9.6.24
 	Version string
 	// Semver specifies semver adaptation, truncated to 3 numbers, such as 21.9.6 for 21.9.6.24 original version
-	Semver  string
+	Semver string
 }
 
 // NewCHVersion creates new ClickHouse version
