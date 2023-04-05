@@ -239,10 +239,23 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 		// Optional labels
 		// TODO
 		// When we'll have Cluster Discovery functionality we can refactor this properly
-		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
-		labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
+		labels = appendConfigLabels(host, labels)
 	}
 	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))
+}
+
+func appendConfigLabels(host *chiv1.ChiHost, labels map[string]string) map[string]string {
+	if host.HasCurStatefulSet() {
+		if val, exists := host.CurStatefulSet.Labels[LabelZookeeperConfigVersion]; exists {
+			labels[LabelZookeeperConfigVersion] = val
+		}
+		if val, exists := host.CurStatefulSet.Labels[LabelSettingsConfigVersion]; exists {
+			labels[LabelSettingsConfigVersion] = val
+		}
+	}
+	//labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
+	//labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
+	return labels
 }
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
