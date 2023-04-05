@@ -329,3 +329,12 @@ func (host *ChiHost) IsFirst() bool {
 
 	return host.Address.CHIScopeIndex == 0
 }
+
+// HasCurStatefulSet checks whether host has CurStatefulSet
+func (host *ChiHost) HasCurStatefulSet() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.CurStatefulSet != nil
+}
