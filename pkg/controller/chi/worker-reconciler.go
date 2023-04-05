@@ -275,13 +275,8 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiV1.ChiHost
 	return nil
 }
 
-// reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
+// getHostStatefulSetCurStatus gets StatefulSet current status
+func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.ChiHost) string {
 	version := "unknown"
 	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
 		version = "not applicable"
@@ -294,6 +289,21 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		}
 	}
 	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
+	return version
+}
+
+// reconcileHostStatefulSet reconciles host's StatefulSet
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	version := w.getHostStatefulSetCurStatus(ctx, host)
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
 
 	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.Name, version)
 	// In case we have to force-restart host
