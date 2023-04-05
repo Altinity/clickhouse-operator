@@ -293,6 +293,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 			version = "failed to query"
 		}
 	}
+	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
 	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.Name, version)
 	// In case we have to force-restart host
@@ -642,7 +643,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	var err error
 	host.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
-	if host.CurStatefulSet != nil {
+	if host.HasCurStatefulSet() {
 		// We have StatefulSet - try to update it
 		err = w.updateStatefulSet(ctx, host)
 	}
