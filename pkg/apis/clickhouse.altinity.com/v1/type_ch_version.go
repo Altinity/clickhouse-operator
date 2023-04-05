@@ -30,7 +30,7 @@ func NewCHVersion(str string) *CHVersion {
 	if parts := strings.Split(str, "."); len(parts) == 4 {
 		return &CHVersion{
 			Version: str,
-			Semver: strings.Join(parts[0:2], "."),
+			Semver:  strings.Join(parts[0:2], "."),
 		}
 	}
 	return nil
@@ -64,4 +64,3 @@ func (v *CHVersion) String() string {
 	}
 	return v.Version
 }
-
