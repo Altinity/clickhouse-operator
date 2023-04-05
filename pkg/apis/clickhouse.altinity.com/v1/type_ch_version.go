@@ -20,8 +20,11 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
+// CHVersion specifies ClickHouse version and ClickHouse semver
 type CHVersion struct {
+	// Version specifies original ClickHouse version reported by VERSION(), such as 21.9.6.24
 	Version string
+	// Semver specifies semver adaptation, truncated to 3 numbers, such as 21.9.6 for 21.9.6.24 original version
 	Semver  string
 }
 
@@ -36,6 +39,7 @@ func NewCHVersion(str string) *CHVersion {
 	return nil
 }
 
+// Matches checks whether ClickHouse version matches specified constraint
 func (v *CHVersion) Matches(constraint string) bool {
 	if v == nil {
 		return false
