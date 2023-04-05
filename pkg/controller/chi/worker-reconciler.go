@@ -258,20 +258,6 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiV1.ChiHost
 		return err
 	}
 
-	//replicatedObjectNames, replicatedCreateSQLs, distributedObjectNames, distributedCreateSQLs := w.schemer.hostCreateTablesSQLs(task, host)
-	//names := append(replicatedObjectNames, distributedObjectNames...)
-	//sql := append(replicatedCreateSQLs, distributedCreateSQLs...)
-	//
-	// ConfigMap for a host
-	//configMap = w.creator.CreateConfigMapHostMigration(host, w.creator.MakeConfigMapData(names, sql))
-	//err = w.reconcileConfigMap(task, host.CHI, configMap)
-	//if err == nil {
-	//	w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
-	//} else {
-	//	w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
-	//	return err
-	//}
-
 	return nil
 }
 
