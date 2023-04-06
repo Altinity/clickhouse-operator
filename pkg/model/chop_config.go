@@ -23,29 +23,37 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
+// isZookeeperChangeRequiresReboot checks two ZooKeeper configs and decides,
+// whether config modifications require a reboot to be applied
 func isZookeeperChangeRequiresReboot(host *chiV1.ChiHost, a, b *chiV1.ChiZookeeperConfig) bool {
 	return !a.Equals(b)
 }
 
+// makePaths makes list of paths that were modified between two settings prefixed with the specified `prefix`
+// Ex.: `prefix` = file
+// file/setting1
+// file/setting2
 func makePaths(a, b *chiV1.Settings, prefix string, path *messagediff.Path, value interface{}) (sections []string) {
 	if settings, ok := (value).(*chiV1.Settings); ok {
-		// Whole settings such as 'files' or 'settings' is being either added or removed
+		// Provided `value` is of type chiV1.Settings, which means that the whole
+		// settings such as 'files' or 'settings' is being either added or removed
 		if settings == nil {
-			// Completely remove settings such as 'files' or 'settings', so the value changes from Settings to nil
+			// Completely removed settings such as 'files' or 'settings', so the value changed from Settings to nil
 			// List the whole settings that are removed
 			for _, name := range a.Names() {
 				sections = append(sections, prefix+"/"+name)
 			}
 		} else {
-			// Introduce new settings such as 'files' or 'settings', so the value changes from nil to Settings
+			// Introduced new settings such as 'files' or 'settings', so the value changed from nil to Settings
 			// List the whole settings that is added
 			for _, name := range b.Names() {
 				sections = append(sections, prefix+"/"+name)
 			}
 		}
 	} else {
+		// Provided `value` is not of type chiV1.Settings, expecting it to be a piece of settings.
 		// Modify settings such as 'files' or 'settings' but without full removal,
-		// something is still left in the remaining settings
+		// something is still left in the remaining part of settings in case of deletion or added in case of addition.
 		suffix := ""
 		for _, p := range *path {
 			switch mk := p.(type) {
@@ -61,6 +69,10 @@ func makePaths(a, b *chiV1.Settings, prefix string, path *messagediff.Path, valu
 	return sections
 }
 
+// makePathsFromDiff makes list of paths that were modified between two settings prefixed with the specified `prefix`
+// Ex.: `prefix` = file
+// file/setting1
+// file/setting2
 func makePathsFromDiff(a, b *chiV1.Settings, diff *messagediff.Diff, prefix string) (res []string) {
 	for path, value := range diff.Added {
 		res = append(res, makePaths(a, b, prefix, path, value)...)
@@ -74,6 +86,7 @@ func makePathsFromDiff(a, b *chiV1.Settings, diff *messagediff.Diff, prefix stri
 	return res
 }
 
+// isSettingsChangeRequiresReboot checks whether changes between two settings requires ClickHouse reboot
 func isSettingsChangeRequiresReboot(host *chiV1.ChiHost, section string, a, b *chiV1.Settings) bool {
 	diff, equal := messagediff.DeepDiff(a, b)
 	if equal {
@@ -83,10 +96,12 @@ func isSettingsChangeRequiresReboot(host *chiV1.ChiHost, section string, a, b *c
 	return isListedChangeRequiresReboot(host, affectedPaths)
 }
 
-func hostVersionMatches(host *chiV1.ChiHost, version string) bool {
-	return host.Version.Matches(version)
+// hostVersionMatches checks whether host's ClickHouse version matches specified constraint
+func hostVersionMatches(host *chiV1.ChiHost, versionConstraint string) bool {
+	return host.Version.Matches(versionConstraint)
 }
 
+// ruleMatches checks whether provided rule (rule set) matches specified `path`
 func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (matches bool, value bool) {
 	for pattern, val := range set {
 		if pattern.Match(path) {
@@ -104,15 +119,19 @@ func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (mat
 	return matches, value
 }
 
-// latestConfigMatch
-func latestConfigMatch(host *chiV1.ChiHost, path string) (matches bool, value bool) {
+// getLatestConfigMatchValue returns value of the latest match of a specified `path` in ConfigRestartPolicy.Rules
+// in case match found in ConfigRestartPolicy.Rules or false
+func getLatestConfigMatchValue(host *chiV1.ChiHost, path string) (matches bool, value bool) {
+	// Check all rules
 	for _, r := range chop.Config().ClickHouse.ConfigRestartPolicy.Rules {
-		// Check ClickHouse version
+		// Check ClickHouse version of a particular rule
 		_ = fmt.Sprintf("%s", r.Version)
 		if hostVersionMatches(host, r.Version) {
-			// Check whether any rule matches path
+			// Yes, this is ClickHouse version of the host.
+			// Check whether any rule matches specified path.
 			for _, rule := range r.Rules {
 				if ruleMatches, ruleValue := ruleMatches(rule, path); ruleMatches {
+					// Yes, rule matches specified path.
 					matches = true
 					value = ruleValue
 				}
@@ -122,11 +141,11 @@ func latestConfigMatch(host *chiV1.ChiHost, path string) (matches bool, value bo
 	return matches, value
 }
 
-// isListedChangeRequiresReboot
+// isListedChangeRequiresReboot checks whether any of the provided paths requires reboot to apply configuration
 func isListedChangeRequiresReboot(host *chiV1.ChiHost, paths []string) bool {
 	// Check whether any path matches ClickHouse configuration restart policy rules requires reboot
 	for _, path := range paths {
-		if matches, value := latestConfigMatch(host, path); matches {
+		if matches, value := getLatestConfigMatchValue(host, path); matches {
 			// This path matches config
 			if value {
 				// And this path matches and requires reboot - no need to find any other who requires reboot
