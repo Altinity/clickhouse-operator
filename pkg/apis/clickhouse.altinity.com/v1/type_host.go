@@ -338,3 +338,12 @@ func (host *ChiHost) HasCurStatefulSet() bool {
 
 	return host.CurStatefulSet != nil
 }
+
+// HasDesiredStatefulSet checks whether host has DesiredStatefulSet
+func (host *ChiHost) HasDesiredStatefulSet() bool {
+	if host == nil {
+		return false
+	}
+
+	return host.DesiredStatefulSet != nil
+}
