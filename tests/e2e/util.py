@@ -106,6 +106,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
                 kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}")
             for pod_num in range(keeper_nodes):
                 kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running")
+                kubectl.wait_container_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "true")
 
 
 def wait_clickhouse_cluster_ready(chi):

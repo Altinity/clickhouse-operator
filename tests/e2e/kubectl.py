@@ -325,6 +325,10 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
+def wait_container_status(pod, status, ns=namespace):
+    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
+
+
 def wait_field(
     kind,
     name,
