@@ -731,13 +731,12 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *chi
 	}
 
 	w.prepareDesiredStatefulSet(host, shutdown)
-	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host.StatefulSet.ObjectMeta))
+	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host.DesiredStatefulSet.ObjectMeta))
 }
 
 // prepareDesiredStatefulSet prepares desired StatefulSet
 func (w *worker) prepareDesiredStatefulSet(host *chiV1.ChiHost, shutdown bool) {
 	host.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
-	host.StatefulSet = host.DesiredStatefulSet
 }
 
 // migrateTables
@@ -1266,7 +1265,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 		return nil
 	}
 
-	statefulSet := host.StatefulSet
+	statefulSet := host.DesiredStatefulSet
 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
@@ -1357,7 +1356,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 	}
 
 	// Helpers
-	newStatefulSet := host.StatefulSet
+	newStatefulSet := host.DesiredStatefulSet
 	curStatefulSet := host.CurStatefulSet
 
 	w.a.V(2).M(host).S().Info(newStatefulSet.Name)
@@ -1419,7 +1418,7 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *chiV1.ChiHost) e
 
 	_ = w.c.deleteStatefulSet(ctx, host)
 	_ = w.reconcilePVCs(ctx, host)
-	host.StatefulSet = host.DesiredStatefulSet
+	//host.StatefulSet = host.DesiredStatefulSet
 	return w.createStatefulSet(ctx, host)
 }
 
