@@ -407,7 +407,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 	return err
 }
 
-// deleteHost deletes all kubernetes resources related to host
+// deleteHost deletes all kubernetes resources related to a host
 // chi is the new CHI in which there will be no more this host
 func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallation, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
@@ -424,7 +424,8 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 		M(host).F().
 		Info("Delete host %s/%s - started", host.Address.ClusterName, host.Name)
 
-	if _, err := w.c.getStatefulSet(host); err != nil {
+	var err error
+	if host.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(host.CHI).
 			M(host).F().
@@ -440,7 +441,6 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 	// 2. Kubernetes-level objects - such as StatefulSet, PVC(s), ConfigMap(s), Service(s)
 	// Need to delete all these items
 
-	var err error
 	_ = w.deleteTables(ctx, host)
 	err = w.c.deleteHost(ctx, host)
 
