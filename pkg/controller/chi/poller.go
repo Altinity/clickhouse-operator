@@ -50,7 +50,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chiV1.ChiHost) err
 	// Wait for StatefulSet to reach generation
 	err := c.pollStatefulSet(
 		ctx,
-		host.StatefulSet,
+		host,
 		nil,
 		func(sts *appsV1.StatefulSet) bool {
 			if sts == nil {
@@ -72,7 +72,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *chiV1.ChiHost) err
 	// Wait StatefulSet to reach ready status
 	return c.pollStatefulSet(
 		ctx,
-		host.StatefulSet,
+		host,
 		nil,
 		func(sts *appsV1.StatefulSet) bool {
 			_ = c.deleteLabelReadyPod(ctx, host)
@@ -184,7 +184,7 @@ func (o *StatefulSetPollOptions) SetCreateTimeout(timeout time.Duration) *Statef
 // pollStatefulSet polls StatefulSet with poll callback function.
 func (c *Controller) pollStatefulSet(
 	ctx context.Context,
-	entity interface{},
+	host *chiV1.ChiHost,
 	opts *StatefulSetPollOptions,
 	mainFn func(set *appsV1.StatefulSet) bool,
 	backFn func(),
@@ -194,19 +194,8 @@ func (c *Controller) pollStatefulSet(
 		return nil
 	}
 	opts = opts.Ensure().FromConfig(chop.Config())
-	namespace := ""
-	name := ""
-
-	switch entity.(type) {
-	case *appsV1.StatefulSet:
-		sts := entity.(*appsV1.StatefulSet)
-		namespace = sts.Namespace
-		name = sts.Name
-	case *chiV1.ChiHost:
-		h := entity.(*chiV1.ChiHost)
-		namespace = h.Address.Namespace
-		name = h.Address.StatefulSet
-	}
+	namespace := host.Address.Namespace
+	name := host.Address.StatefulSet
 
 	// Wait for some limited time for StatefulSet to reach target generation
 	// Wait timeout is specified in c.chopConfig.StatefulSetUpdateTimeout in seconds
