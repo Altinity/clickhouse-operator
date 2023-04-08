@@ -307,9 +307,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.reconcileStatefulSet(ctx, host)
 	if err == nil {
-		w.task.registryReconciled.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
+		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
-		w.task.registryFailed.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
+		w.task.registryFailed.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 		if err == errIgnore {
 			err = nil
 		}
@@ -624,7 +624,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 		return nil
 	}
 
-	newStatefulSet := host.StatefulSet
+	newStatefulSet := host.DesiredStatefulSet
 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
@@ -686,7 +686,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 	w.a.V(2).M(host).S().Info("host %s/%s", namespace, host.Name)
 	defer w.a.V(2).M(host).E().Info("host %s/%s", namespace, host.Name)
 
-	host.WalkVolumeMounts(func(volumeMount *coreV1.VolumeMount) {
+	host.WalkVolumeMounts(chiV1.DesiredStatefulSet, func(volumeMount *coreV1.VolumeMount) {
 		if util.IsContextDone(ctx) {
 			return
 		}
