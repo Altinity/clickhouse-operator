@@ -47,10 +47,6 @@ type ChiHost struct {
 	Config              ChiHostConfig               `json:"-" yaml:"-"`
 	Version             *CHVersion                  `json:"-" yaml:"-"`
 	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
-	// StatefulSet is a stateful set which is being worked with by the host.
-	// It can be desired stateful set when host is being created or current stateful set.
-	// Ex.: polling sts after creation.
-	StatefulSet *appsv1.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *appsv1.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
@@ -252,17 +248,43 @@ func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTem
 	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 
+type WhichStatefulSet string
+
+const (
+	CurStatefulSet     WhichStatefulSet = "cur"
+	DesiredStatefulSet WhichStatefulSet = "desired"
+)
+
+func (w WhichStatefulSet) CurStatefulSet() bool {
+	return w == CurStatefulSet
+}
+
+func (w WhichStatefulSet) DesiredStatefulSet() bool {
+	return w == DesiredStatefulSet
+}
+
 // WalkVolumeMounts walks VolumeMount(s)
-func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
+func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *corev1.VolumeMount)) {
 	if host == nil {
 		return
 	}
-	if host.StatefulSet == nil {
+
+	if !host.HasCurStatefulSet() && !host.HasDesiredStatefulSet() {
 		return
 	}
 
-	for i := range host.StatefulSet.Spec.Template.Spec.Containers {
-		container := &host.StatefulSet.Spec.Template.Spec.Containers[i]
+	var sts *appsv1.StatefulSet
+	switch {
+	case which.DesiredStatefulSet():
+		sts = host.DesiredStatefulSet
+	case which.CurStatefulSet():
+		sts = host.CurStatefulSet
+	default:
+		return
+	}
+
+	for i := range sts.Spec.Template.Spec.Containers {
+		container := &sts.Spec.Template.Spec.Containers[i]
 		for j := range container.VolumeMounts {
 			volumeMount := &container.VolumeMounts[j]
 			f(volumeMount)
@@ -271,15 +293,15 @@ func (host *ChiHost) WalkVolumeMounts(f func(volumeMount *corev1.VolumeMount)) {
 }
 
 // GetVolumeMount gets VolumeMount by the name
-func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
-	host.WalkVolumeMounts(func(volumeMount *corev1.VolumeMount) {
-		if volumeMount.Name == volumeMountName {
-			vm = volumeMount
-			ok = true
-		}
-	})
-	return
-}
+//func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
+//	host.WalkVolumeMounts(func(volumeMount *corev1.VolumeMount) {
+//		if volumeMount.Name == volumeMountName {
+//			vm = volumeMount
+//			ok = true
+//		}
+//	})
+//	return
+//}
 
 // IsSecure checks whether the host requires secure communication
 func (host *ChiHost) IsSecure() bool {
