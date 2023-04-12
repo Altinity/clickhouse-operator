@@ -3092,7 +3092,13 @@ def test_034(self):
         out = kubectl.launch(cmd, ok_to_fail=True)
         assert out == "1000", error()
 
-        kubectl.launch(f"delete pod {client_pod}")
+    with And("Confirm it CAN NOT connect to insecure ports"):
+        cmd = f"""exec {client_pod} -- clickhouse-client -h chi-test-034-https-default-0-0 --port 9000 \
+               --user=test_034_client --password=test_034 \
+               -q 'select 1000'"""
+        out = kubectl.launch(cmd, ok_to_fail=True)
+        print(out)
+        assert "NETWORK_ERROR" in out, out
 
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
@@ -3109,21 +3115,7 @@ def test_034(self):
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
-    with When("remove the ClickHouseOperatorConfiguration"):
-        kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
-
-    with And("reboot metrics exporter to update the configuration 4"):
-        util.restart_operator()
-        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
-        operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
-
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
-        check_metrics_monitoring(
-            operator_namespace,
-            operator_pod,
-            expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
-        )
-
+    kubectl.launch(f"delete pod {client_pod}")
     kubectl.delete_chi(chi)
 
 
@@ -3307,7 +3299,7 @@ def test_037(self):
 
 @TestCheck
 @Name("test_039. Inter-cluster communications with secret")
-def test_039(self, step=0):
+def test_039(self, step=0, delete_chi=0):
     """Check clickhouse-operator support inter-cluster communications with secrets."""
     cluster = "default"
     manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
@@ -3365,6 +3357,8 @@ def test_039(self, step=0):
                 "INSERT INTO secure_repl select number as a from numbers(10)",
                 pwd="qkrq",
             )
+
+    if delete_chi:
         kubectl.delete_chi(chi)
 
 
@@ -3404,8 +3398,7 @@ def test_039_3(self):
 @Name("test_039_4. Inter-cluster communications over HTTPS")
 def test_039_4(self):
     """Check clickhouse-operator support inter-cluster communications over HTTPS."""
-    test_039(step=4)
-
+    test_039(step=4, delete_chi=1)
 
 @TestModule
 @Name("e2e.test_operator")
