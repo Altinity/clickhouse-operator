@@ -25,9 +25,10 @@ def get_shell(self, timeout=600):
 
 
 @TestStep(Given)
-def create_test_namespace(self):
+def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
-    if self.context.tests_in_parallel:
+
+    if self.context.tests_in_parallel and not force:
         try:
             self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
             self.context.operator_namespace = self.context.test_namespace

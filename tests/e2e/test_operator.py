@@ -128,7 +128,6 @@ def test_005(self):
 
 
 @TestScenario
-@Flags(NO_PARALLEL)
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
 def test_006(self):
@@ -2782,7 +2781,7 @@ def test_029(self):
 
 
 @TestScenario
-@Flags(NO_PARALLEL)
+# @Flags(NO_PARALLEL)
 @Name("test_030. Test CRD deletion")
 def test_030(self):
     create_shell_namespace_clickhouse_template()
@@ -2800,25 +2799,31 @@ def test_030(self):
     )
 
     trigger_event = threading.Event()
+
+    with When("I create new shells"):
+        shell_1 = get_shell()
+        shell_2 = get_shell()
+
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
         chi=chi,
         cluster="default",
         shards=2,
         trigger_event=trigger_event,
+        shell=shell_1,
     )
 
     with When("Delete CRD"):
-        kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com")
+        kubectl.launch("delete crd clickhouseinstallations.clickhouse.altinity.com", shell=shell_2)
         with Then("CHI should be deleted"):
-            kubectl.wait_object("chi", chi, count=0)
+            kubectl.wait_object("chi", chi, count=0, shell=shell_2)
             with And("CHI objects SHOULD NOT be deleted"):
-                assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}") == object_counts
+                assert kubectl.count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", shell=shell_2) == object_counts
 
-    pod = kubectl.get_pod_names(chi)[0]
-    start_time = kubectl.get_field("pod", pod, ".status.startTime")
+    pod = kubectl.get_pod_names(chi, shell=shell_2)[0]
+    start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell_2)
 
     with When("Reinstall the operator"):
-        util.install_operator_if_not_exist(reinstall=True)
+        util.install_operator_if_not_exist(reinstall=True, shell=shell_2)
         with Then("Re-create CHI"):
             kubectl.create_and_check(
                 manifest,
@@ -2826,13 +2831,18 @@ def test_030(self):
                     "object_counts": object_counts,
                     "do_not_delete": 1,
                 },
+                shell = shell_2
             )
         with Then("Pods should not be restarted"):
-            new_start_time = kubectl.get_field("pod", pod, ".status.startTime")
+            new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell_2)
             assert start_time == new_start_time
 
     trigger_event.set()
     join()
+
+    with Then("I recreate shell"):
+        shell = get_shell()
+        self.context.shell = shell
 
     kubectl.delete_chi(chi)
 
@@ -3540,9 +3550,6 @@ def test_039_4(self):
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"))
 def test(self):
-    # util.clean_namespace(delete_chi=True)
-    # util.install_operator_if_not_exist()
-
     with Given("set settings"):
         set_settings()
 
@@ -3550,10 +3557,8 @@ def test(self):
         shell = get_shell()
         self.context.shell = shell
 
-    # if not self.context.tests_in_parallel:
-
     with And("I create test namespace"):
-        create_test_namespace()
+        create_test_namespace(force=True)
 
     with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
         kubectl.apply(
@@ -3570,19 +3575,15 @@ def test(self):
 
     # define values for Operator upgrade test (test_009)
 
-    if self.context.tests_in_parallel:
-        with Pool(4) as pool:
-            for scenario in loads(current_module(), Scenario, Suite):
-                flags = getattr(scenario, "flags", Flags())
-                if not (flags & NO_PARALLEL):
-                    Scenario(run=scenario, parallel=True, executor=pool)
-            join()
+    not_parallel = ["test_006. Test clickhouse version upgrade from one version to another using podTemplate change",
+                    "test_030. Test CRD deletion"]#todo add tag
 
+    with Pool(3) as pool:
         for scenario in loads(current_module(), Scenario, Suite):
-            flags = getattr(scenario, "flags", Flags())
-            if flags & NO_PARALLEL:
-                Scenario(run=scenario)
+            if not (scenario.name in not_parallel):
+                Scenario(run=scenario, parallel=True, executor=pool)
+        join()
 
-    else:
-        for scenario in loads(current_module(), Scenario, Suite):
+    for scenario in loads(current_module(), Scenario, Suite):
+        if scenario.name in not_parallel:
             Scenario(run=scenario)

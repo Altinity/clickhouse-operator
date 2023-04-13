@@ -586,7 +586,7 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
     cfm = get("configmap", cfg_name, ns=ns, shell=shell)
     for v in values:
         with Then(f"{cfg_name} should contain {v}"):
-            assert v in cfm["data"]
+            assert v in cfm["data"], error()
 
 
 def check_pdb(chi, clusters, ns=None, shell=None):
