@@ -288,10 +288,10 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 	//opts := clickhouse.NewQueryOptions()
 	err := s.ExecHost(ctx, host, SQLs, opts)
 	if err == nil {
-		log.V(1).M(host).F().Info("Host inside the cluster")
+		log.V(1).M(host).F().Info("The host is inside the cluster")
 		inside = true
 	} else {
-		log.V(1).M(host).F().Info("Host outside of the cluster")
+		log.V(1).M(host).F().Info("The host is outside of the cluster")
 		inside = false
 	}
 	return inside
