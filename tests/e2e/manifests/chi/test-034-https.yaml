@@ -12,11 +12,12 @@ spec:
     clusters:
     - name: default
       secure: "yes"
+      insecure: "no"
     users:
       test_034_client/password: test_034
       test_034_client/networks/ip: "::/0"
     settings:
-      tcp_port: 9000 # keep for localhost
+      # tcp_port: 9000 # keep for localhost
       tcp_port_secure: 9440
       https_port: 8443
     files:

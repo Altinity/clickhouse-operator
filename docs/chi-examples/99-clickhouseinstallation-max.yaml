@@ -220,9 +220,13 @@ spec:
                     replicaServiceTemplate: replica-service-template
 
       - name: with-secret
+        # Insecure communication.
+        # Opens/Closes insecure ports
+        insecure: "yes"
         # Secure communication.
-        # Translates into <secure>1</secure> ClickHouse setting
-        secure: "True"
+        # Opens/Closes secure ports
+        # Translates into <secure>1</secure> ClickHouse setting for remote replicas
+        secure: "yes"
         # Shared secret value to secure cluster communications
         secret:
           # Auto-generate shared secret value to secure cluster communications
@@ -243,6 +247,13 @@ spec:
         portDistribution:
           - type: "ClusterScopeIndex"
         spec:
+          # Insecure communication.
+          # Opens/Closes insecure ports
+          insecure: "yes"
+          # Secure communication.
+          # Opens/Closes secure ports
+          # Translates into <secure>1</secure> ClickHouse setting for remote replicas
+          secure: "no"
           tcpPort: 7000
           httpPort: 7001
           interserverHTTPPort: 7002

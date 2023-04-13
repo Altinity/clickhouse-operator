@@ -137,14 +137,11 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 		return err
 	}
 
-	// Cur StatefulSet fetched
-	host.StatefulSet = host.CurStatefulSet
-
 	// Scale StatefulSet down to 0 pods count.
 	// This is the proper and graceful way to delete StatefulSet
 	var zero int32 = 0
-	host.StatefulSet.Spec.Replicas = &zero
-	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, host.StatefulSet, newUpdateOptions()); err != nil {
+	host.CurStatefulSet.Spec.Replicas = &zero
+	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, host.CurStatefulSet, newUpdateOptions()); err != nil {
 		log.V(1).M(host).Error("UNABLE to update StatefulSet %s/%s", namespace, name)
 		return err
 	}
@@ -201,13 +198,16 @@ func (c *Controller) deletePVC(ctx context.Context, host *chiV1.ChiHost) error {
 			return
 		}
 
-		if !chopModel.HostCanDeletePVC(host, pvc.Name) {
+		// Check whether PVC can be deleted
+		if chopModel.HostCanDeletePVC(host, pvc.Name) {
+			log.V(1).M(host).Info("PVC %s/%s would be deleted", namespace, pvc.Name)
+		} else {
 			log.V(1).M(host).Info("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
 			// Move to the next PVC
 			return
 		}
 
-		// Actually delete PVC
+		// Delete PVC
 		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, newDeleteOptions()); err == nil {
 			log.V(1).M(host).Info("OK delete PVC %s/%s", namespace, pvc.Name)
 		} else if apiErrors.IsNotFound(err) {

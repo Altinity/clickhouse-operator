@@ -350,6 +350,10 @@ def wait_pod_status(pod, status,shell=None, ns=None):
     wait_field("pod", pod, ".status.phase", status, ns, shell=shell)
 
 
+def wait_container_status(pod, status, ns=namespace):
+    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
+
+
 def wait_field(
     kind,
     name,
@@ -575,7 +579,6 @@ def check_configmaps(chi_name, ns=None, shell=None):
         [
             "01-clickhouse-operator-profile.xml",
             "02-clickhouse-default-profile.xml",
-            "03-database-ordinary.xml",
         ],
         ns=ns,
         shell=shell

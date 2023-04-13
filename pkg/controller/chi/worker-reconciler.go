@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"fmt"
-
 	coreV1 "k8s.io/api/core/v1"
 	policyV1 "k8s.io/api/policy/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -259,21 +258,24 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiV1.ChiHost
 		return err
 	}
 
-	//replicatedObjectNames, replicatedCreateSQLs, distributedObjectNames, distributedCreateSQLs := w.schemer.hostCreateTablesSQLs(task, host)
-	//names := append(replicatedObjectNames, distributedObjectNames...)
-	//sql := append(replicatedCreateSQLs, distributedCreateSQLs...)
-	//
-	// ConfigMap for a host
-	//configMap = w.creator.CreateConfigMapHostMigration(host, w.creator.MakeConfigMapData(names, sql))
-	//err = w.reconcileConfigMap(task, host.CHI, configMap)
-	//if err == nil {
-	//	w.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
-	//} else {
-	//	w.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
-	//	return err
-	//}
-
 	return nil
+}
+
+// getHostStatefulSetCurStatus gets StatefulSet current status
+func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.ChiHost) string {
+	version := "unknown"
+	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
+		version = "not applicable"
+	} else {
+		if ver, e := w.schemer.HostVersion(ctx, host); e == nil {
+			version = ver
+			host.Version = chiV1.NewCHVersion(version)
+		} else {
+			version = "failed to query"
+		}
+	}
+	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
+	return version
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
@@ -283,9 +285,17 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		return nil
 	}
 
+	version := w.getHostStatefulSetCurStatus(ctx, host)
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.Name, version)
 	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
 	if w.shouldForceRestartHost(host) {
+		w.a.V(1).M(host).F().Info("Reconcile host %s. Shutting host down due to force restart", host.Name)
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host)
 		// At this moment StatefulSet has 0 replicas.
@@ -293,12 +303,13 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 	}
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
+	w.a.V(1).M(host).F().Info("Reconcile host %s. Reconcile StatefulSet", host.Name)
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.reconcileStatefulSet(ctx, host)
 	if err == nil {
-		w.task.registryReconciled.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
+		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
-		w.task.registryFailed.RegisterStatefulSet(host.StatefulSet.ObjectMeta)
+		w.task.registryFailed.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 		if err == errIgnore {
 			err = nil
 		}
@@ -434,6 +445,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.migrateTables(ctx, host)
 
+	version, err := w.schemer.HostVersion(ctx, host)
+	if err != nil {
+		version = "unknown"
+	}
+
 	if err := w.includeHost(ctx, host); err != nil {
 		// If host is not ready - fallback
 		return err
@@ -443,7 +459,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("Reconcile Host %s completed", host.Name)
+		Info("Reconcile Host %s completed. ClickHouse version running: %s", host.Name, version)
 
 	var (
 		hostsCompleted int
@@ -608,7 +624,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 		return nil
 	}
 
-	newStatefulSet := host.StatefulSet
+	newStatefulSet := host.DesiredStatefulSet
 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
@@ -623,7 +639,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	var err error
 	host.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
-	if host.CurStatefulSet != nil {
+	if host.HasCurStatefulSet() {
 		// We have StatefulSet - try to update it
 		err = w.updateStatefulSet(ctx, host)
 	}
@@ -670,7 +686,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 	w.a.V(2).M(host).S().Info("host %s/%s", namespace, host.Name)
 	defer w.a.V(2).M(host).E().Info("host %s/%s", namespace, host.Name)
 
-	host.WalkVolumeMounts(func(volumeMount *coreV1.VolumeMount) {
+	host.WalkVolumeMounts(chiV1.DesiredStatefulSet, func(volumeMount *coreV1.VolumeMount) {
 		if util.IsContextDone(ctx) {
 			return
 		}

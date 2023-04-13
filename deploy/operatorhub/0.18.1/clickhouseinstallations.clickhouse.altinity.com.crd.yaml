@@ -33,7 +33,6 @@ spec:
         - name: clusters
           type: integer
           description: Clusters count
-          priority: 0 # show in standard view
           jsonPath: .status.clusters
         - name: shards
           type: integer
@@ -43,7 +42,6 @@ spec:
         - name: hosts
           type: integer
           description: Hosts count
-          priority: 0 # show in standard view
           jsonPath: .status.hosts
         - name: taskID
           type: string
@@ -53,7 +51,6 @@ spec:
         - name: status
           type: string
           description: CHI status
-          priority: 0 # show in standard view
           jsonPath: .status.status
         - name: updated
           type: integer

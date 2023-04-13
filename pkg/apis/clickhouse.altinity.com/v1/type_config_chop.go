@@ -119,7 +119,7 @@ type OperatorConfigRestartPolicyRuleSet map[Matchable]StringBool
 
 // OperatorConfigRestartPolicyRule specifies ClickHouse version and rules for this version
 type OperatorConfigRestartPolicyRule struct {
-	Version Matchable
+	Version string
 	Rules   []OperatorConfigRestartPolicyRuleSet
 }
 

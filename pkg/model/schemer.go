@@ -311,6 +311,12 @@ func (s *Schemer) HostActiveQueriesNum(ctx context.Context, host *chop.ChiHost) 
 	return s.QueryHostInt(ctx, host, sql)
 }
 
+// HostVersion returns ClickHouse version on the host
+func (s *Schemer) HostVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
+	sql := `SELECT version()`
+	return s.QueryHostString(ctx, host, sql)
+}
+
 func createDatabaseDistributed(cluster string) string {
 	return heredoc.Docf(`
 		SELECT

@@ -14,6 +14,8 @@
 
 package v1
 
+import "gopkg.in/d4l3k/messagediff.v1"
+
 // ChiZookeeperConfig defines zookeeper section of .spec.configuration
 // Refers to
 // https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
@@ -89,4 +91,10 @@ func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeTy
 	}
 
 	return zkc
+}
+
+// Equals checks whether config is equal to another one
+func (zkc *ChiZookeeperConfig) Equals(b *ChiZookeeperConfig) bool {
+	_, equals := messagediff.DeepDiff(zkc, b)
+	return equals
 }

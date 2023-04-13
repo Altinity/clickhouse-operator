@@ -19,14 +19,17 @@ import (
 	"strings"
 )
 
+// Matchable defines string that can be matched against another string
 type Matchable string
 
+// Match checks whether provided string matches this matchable
 func (m *Matchable) Match(str string) bool {
 	if m == nil {
 		return false
 	}
+	// Build regex by replacing all * with .* and explicitly specifying start and end of the string
 	regex := "^" + strings.Replace(string(*m), "*", ".*", -1) + "$"
+	// Check whether string matches regexp
 	matches, _ := regexp.MatchString(regex, str)
-
 	return matches
 }
