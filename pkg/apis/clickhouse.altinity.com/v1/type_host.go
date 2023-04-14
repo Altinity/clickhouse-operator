@@ -253,7 +253,7 @@ type WhichStatefulSet string
 
 const (
 	// CurStatefulSet specifies current StatefulSet to be processed
-	CurStatefulSet     WhichStatefulSet = "cur"
+	CurStatefulSet WhichStatefulSet = "cur"
 	// DesiredStatefulSet specifies desired StatefulSet to be processed
 	DesiredStatefulSet WhichStatefulSet = "desired"
 )
