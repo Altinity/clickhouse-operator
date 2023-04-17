@@ -350,7 +350,7 @@ def wait_pod_status(pod, status,shell=None, ns=None):
     wait_field("pod", pod, ".status.phase", status, ns, shell=shell)
 
 
-def wait_container_status(pod, status, ns=namespace):
+def wait_container_status(pod, status, ns=None):
     wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
 
 

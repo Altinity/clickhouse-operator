@@ -39,7 +39,7 @@ xfails = {
 @XFails(xfails)
 @ArgumentParser(argparser)
 @Specifications(QA_SRS026_ClickHouse_Operator)
-def regression(self, native, keeper_type, tests_in_parallel):
+def regression(self, native, keeper_type):
     """ClickHouse Operator test regression suite."""
 
     def run_features():
@@ -57,7 +57,6 @@ def regression(self, native, keeper_type, tests_in_parallel):
 
     self.context.native = native
     self.context.keeper_type = keeper_type
-    self.context.tests_in_parallel = tests_in_parallel
 
     if native:
         run_features()

@@ -3539,6 +3539,7 @@ def test_039_4(self):
 
     test_039(step=4, delete_chi=1)
 
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"))
