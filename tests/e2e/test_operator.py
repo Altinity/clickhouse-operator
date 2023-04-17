@@ -928,6 +928,7 @@ def test_013_1(self):
                     "manifests/chit/tpl-persistent-volume-100Mi.yaml",
                 },
                 "pod_count": 1,
+                "pdb": ["simple"],
                 "do_not_delete": 1,
             },
         )
@@ -1050,6 +1051,7 @@ def test_013_1(self):
                     current().context.clickhouse_template,
                 },
                 "pod_count": 2,
+                "pdb": ["simple"],
                 "do_not_delete": 1,
             },
         )
@@ -1085,6 +1087,7 @@ def test_013_1(self):
             manifest=manifest,
             check={
                 "pod_count": 1,
+                "pdb": ["simple"],
                 "do_not_delete": 1,
             },
         )
@@ -1101,6 +1104,7 @@ def test_013_1(self):
             manifest="manifests/chi/test-013-1-3-schema-propagation.yaml",
             check={
                 "pod_count": 2,
+                "pdb": ["simple"],
                 "do_not_delete": 1,
             },
         )
@@ -1134,6 +1138,7 @@ def test_013_1(self):
             manifest=manifest,
             check={
                 "pod_count": 1,
+                "pdb": ["simple"],
                 "do_not_delete": 1,
             },
         )
@@ -1143,6 +1148,7 @@ def test_013_1(self):
             manifest="manifests/chi/test-013-1-4-schema-propagation.yaml",
             check={
                 "pod_count": 2,
+                "pdb": ["simple"],
                 "do_not_delete": 1,
             },
         )
@@ -1205,6 +1211,7 @@ def test_014(self):
                 "pod": 2,
                 "service": 3,
             },
+            "pdb": ["default"],
             "do_not_delete": 1,
         },
         timeout=600,
@@ -1336,6 +1343,7 @@ def test_014(self):
             manifest=manifest,
             check={
                 "pod_count": 2 + 2 * len(replicas),
+                "pdb": ["default"],
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -1357,6 +1365,7 @@ def test_014(self):
             manifest=manifest,
             check={
                 "pod_count": 2,
+                "pdb": ["default"],
                 "do_not_delete": 1,
             },
         )
@@ -1404,6 +1413,7 @@ def test_014(self):
             manifest=manifest,
             check={
                 "pod_count": 4,
+                "pdb": ["default"],
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -1424,6 +1434,7 @@ def test_014(self):
                 manifest=manifest,
                 check={
                     "pod_count": 2,
+                    "pdb": ["default"],
                     "do_not_delete": 1,
                 },
             )

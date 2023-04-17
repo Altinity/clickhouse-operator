@@ -482,15 +482,16 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 // reconcilePDB reconciles PodDisruptionBudget
 func (w *worker) reconcilePDB(ctx context.Context, cluster *chiV1.Cluster, pdb *policyV1.PodDisruptionBudget) error {
-	_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, newGetOptions())
+	cur, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, newGetOptions())
 	switch {
 	case err == nil:
+		pdb.ResourceVersion = cur.ResourceVersion
 		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, newUpdateOptions())
 		if err == nil {
 			log.V(1).Info("PDB updated %s/%s", pdb.Namespace, pdb.Name)
 		} else {
-			log.Error("FAILED update PDB %s/%s err: %v", pdb.Namespace, pdb.Name, err)
-			return err
+			log.Error("FAILED to update PDB %s/%s err: %v", pdb.Namespace, pdb.Name, err)
+			return nil
 		}
 	case apiErrors.IsNotFound(err):
 		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(ctx, pdb, newCreateOptions())

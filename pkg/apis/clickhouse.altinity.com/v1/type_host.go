@@ -248,17 +248,22 @@ func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTem
 	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 
+// WhichStatefulSet specifies which StatefulSet we are going to process in host functions
 type WhichStatefulSet string
 
 const (
-	CurStatefulSet     WhichStatefulSet = "cur"
+	// CurStatefulSet specifies current StatefulSet to be processed
+	CurStatefulSet WhichStatefulSet = "cur"
+	// DesiredStatefulSet specifies desired StatefulSet to be processed
 	DesiredStatefulSet WhichStatefulSet = "desired"
 )
 
+// CurStatefulSet checks whether WhichStatefulSet is a current one
 func (w WhichStatefulSet) CurStatefulSet() bool {
 	return w == CurStatefulSet
 }
 
+// DesiredStatefulSet checks whether WhichStatefulSet is a desired one
 func (w WhichStatefulSet) DesiredStatefulSet() bool {
 	return w == DesiredStatefulSet
 }
