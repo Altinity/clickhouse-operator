@@ -129,6 +129,7 @@ def test_005(self):
 
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
+@Tags("NO_PARALLEL")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
 def test_006(self):
     create_shell_namespace_clickhouse_template()
@@ -2792,8 +2793,8 @@ def test_029(self):
 
 
 @TestScenario
-# @Flags(NO_PARALLEL)
 @Name("test_030. Test CRD deletion")
+@Tags("NO_PARALLEL")
 def test_030(self):
     create_shell_namespace_clickhouse_template()
 
@@ -3580,15 +3581,12 @@ def test(self):
 
     # define values for Operator upgrade test (test_009)
 
-    not_parallel = ["test_006. Test clickhouse version upgrade from one version to another using podTemplate change",
-                    "test_030. Test CRD deletion"]#todo add tag
-
     with Pool(3) as pool:
         for scenario in loads(current_module(), Scenario, Suite):
-            if not (scenario.name in not_parallel):
+            if not (hasattr(scenario, "tags") and ("NO_PARALLEL" in scenario.tags)):
                 Scenario(run=scenario, parallel=True, executor=pool)
         join()
 
     for scenario in loads(current_module(), Scenario, Suite):
-        if scenario.name in not_parallel:
+        if hasattr(scenario, "tags") and ("NO_PARALLEL" in scenario.tags):
             Scenario(run=scenario)
