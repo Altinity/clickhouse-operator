@@ -180,8 +180,7 @@ data:
     #     https://www.apache.org/licenses/LICENSE-2.0
 
     set -ex
-    # TODO think how to add nslookup to docker image
-    apt-get update && apt-get install --no-install-recommends -y dnsutils procps
+    # apt-get update && apt-get install --no-install-recommends -y dnsutils procps
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
@@ -227,26 +226,29 @@ data:
     getent hosts $DOMAIN  # This only performs a dns lookup
     if [[ $? -eq 0 ]]; then
       ACTIVE_ENSEMBLE=true
-    elif nslookup $DOMAIN | grep -q "server can't find $DOMAIN"; then
-       echo "there is no active ensemble"
-       ACTIVE_ENSEMBLE=false
     else
-      # If an nslookup of the headless service domain fails, then there is no
-      # active ensemble yet, but in certain cases nslookup of headless service
-      # takes a while to come up even if there is active ensemble
       ACTIVE_ENSEMBLE=false
-      declare -i count=20
-      while [[ $count -ge 0 ]]
-      do
-        sleep 2
-        ((count=count-1))
-        getent hosts $DOMAIN
-        if [[ $? -eq 0 ]]; then
-          ACTIVE_ENSEMBLE=true
-          break
-        fi
-      done
     fi
+    # elif nslookup $DOMAIN | grep -q "server can't find $DOMAIN"; then
+    #   echo "there is no active ensemble"
+    #   ACTIVE_ENSEMBLE=false
+    # else
+    # If an nslookup of the headless service domain fails, then there is no
+    # active ensemble yet, but in certain cases nslookup of headless service
+    # takes a while to come up even if there is active ensemble
+    #  ACTIVE_ENSEMBLE=false
+    #  declare -i count=10
+    #  while [[ $count -ge 0 ]]
+    #  do
+    #    sleep 1
+    #    ((count=count-1))
+    #    getent hosts $DOMAIN
+    #    if [[ $? -eq 0 ]]; then
+    #      ACTIVE_ENSEMBLE=true
+    #      break
+    #    fi
+    #  done
+    # fi
 
     if [[ "$ONDISK_MYID_CONFIG" == true && "$ONDISK_DYN_CONFIG" == true ]]; then
       # If Configuration is present, we assume, there is no need to write configuration.
@@ -499,18 +501,18 @@ spec:
         prometheus.io/port: '7000'
         prometheus.io/scrape: 'true'
     spec:
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: "app"
-                    operator: In
-                    values:
-                      - zookeeper
-              # TODO think about multi-AZ EKS
-              # topologyKey: topology.kubernetes.io/zone
-              topologyKey: "kubernetes.io/hostname"
+#      affinity:
+#        podAntiAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            - labelSelector:
+#                matchExpressions:
+#                  - key: "app"
+#                    operator: In
+#                    values:
+#                      - zookeeper
+#              # TODO think about multi-AZ EKS
+#              # topologyKey: topology.kubernetes.io/zone
+#              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: zookeeper
           command:
