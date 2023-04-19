@@ -3,7 +3,6 @@ kind: ClickHouseInstallation
 metadata:
   name: test-011-secured-cluster
 spec:
-  # restart: RollingUpdate
   useTemplates:
     - name: clickhouse-version
   configuration:

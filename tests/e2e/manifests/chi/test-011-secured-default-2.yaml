@@ -6,11 +6,8 @@ spec:
   useTemplates:
     - name: clickhouse-version
   configuration:
-    settings:
-      logger/level: information # We need to change settings in order to make sure pod is restarted
     users:
-      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
-      test/password: abcd
+      default/profile: readonly
     clusters:
     - name: default
       layout:
