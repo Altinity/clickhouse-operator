@@ -2401,9 +2401,25 @@ spec:
                         hostRegexpTemplate:
                           type: string
                           description: "ClickHouse server configuration `<host_regexp>...</host_regexp>` for any <user>"
-                          #                    configurationRestartPolicy:
-                          #                      description: "Configuration restart policy describes what configuration changes require ClickHouse restart"
-                          #                      type: object
+                configurationRestartPolicy:
+                  type: object
+                  description: "Configuration restart policy describes what configuration changes require ClickHouse restart"
+                  properties:
+                    rules:
+                      type: array
+                      description: "Array of set of rules per specified ClickHouse versions"
+                      items:
+                        type: object
+                        properties:
+                          version:
+                            type: string
+                            description: "ClickHouse version expression"
+                          rules:
+                            type: array
+                            description: "Set of configuration rules for specified ClickHouse version"
+                            items:
+                              type: object
+                              description: "setting: value pairs for configuration restart policy"
                 access:
                   type: object
                   description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
@@ -2937,18 +2953,24 @@ data:
           - version: "*"
             rules:
               - settings/*: "yes"
-              - settings/max_server_memory_*: "no"
-              - settings/max_*_to_drop: "no"
               - settings/dictionaries_config: "no"
               - settings/logger: "no"
+              - settings/macros: "no"
+              - settings/max_server_memory_*: "no"
+              - settings/max_*_to_drop: "no"
+              - settings/max_concurrent_queries: "no"
+              - settings/models_config: "no"
+              - settings/user_defined_executable_functions_config: "no"
 
               - zookeeper/*: "yes"
 
               - files/config.d/*.xml: "yes"
+              - files/config.d/*dict*.xml: "no"
               - files/users.d/*: "no"
 
               - profiles/*: "no"
               - profiles/default/background_*_pool_size: "yes"
+              - profiles/default/max_*_for_server: "yes"
           - version: "21.*"
             rules:
               - settings/logger: "yes"

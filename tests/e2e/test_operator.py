@@ -666,7 +666,7 @@ def test_011(self):
                 print(f"users.xml: {regexp}")
                 assert regexp == "disabled"
 
-            with Then("Wait until configmap changes are propagated to the pod"):
+            with Then("Wait until configuration is reloaded by ClickHouse"):
                 time.sleep(60)
 
             test_default_user()
@@ -777,28 +777,17 @@ def test_011_1(self):
             )
             assert out == "OK"
 
-        with When("Trigger installation update"):
+        with When("Default user password is removed"):
             kubectl.create_and_check(
                 manifest="manifests/chi/test-011-secured-default-2.yaml",
                 check={
                     "do_not_delete": 1,
                 },
             )
-            with Then("Default user plain password should be removed"):
-                chi = kubectl.get("chi", "test-011-secured-default")
-                assert "default/password" in chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]
-                assert chi["status"]["normalizedCompleted"]["spec"]["configuration"]["users"]["default/password"] == ""
 
-                cfm = kubectl.get("configmap", "chi-test-011-secured-default-common-usersd")
-                assert '<password remove="1"></password>' in cfm["data"]["chop-generated-users.xml"]
+            with Then("Wait until configuration is reloaded by ClickHouse"):
+                time.sleep(60)
 
-        with When("Default user password is removed"):
-            kubectl.create_and_check(
-                manifest="manifests/chi/test-011-secured-default-3.yaml",
-                check={
-                    "do_not_delete": 1,
-                },
-            )
             with Then("Connection to localhost should succeed with default user and no password"):
                 out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
                 assert out == "OK"
@@ -2669,6 +2658,7 @@ def test_028(self):
             out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
             assert out == "30"
 
+        pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         with Then("Operator should start processing a change"):
             # TODO: Test needs to be improved
             kubectl.wait_chi_status(chi, "InProgress")
@@ -2705,11 +2695,15 @@ def test_028(self):
                     # print("Waiting 5 seconds")
                     time.sleep(5)
             end_time = time.time()
+            new_pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             print(f"Total restart time: {str(round(end_time - start_time))}")
             print(f"First replica downtime: {ch1_downtime}")
             print(f"Second replica downtime: {ch2_downtime}")
             print(f"CHI downtime: {chi_downtime}")
-            assert chi_downtime == 0
+            with Then("Cluster was restarted"):
+                assert pod_start_time != new_pod_start_time
+            with Then("There was no service downtime"):
+                assert chi_downtime == 0
 
         with Then("Check restart attribute"):
             restart = kubectl.get_field("chi", chi, ".spec.restart")
