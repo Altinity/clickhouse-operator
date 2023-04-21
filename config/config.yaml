@@ -97,9 +97,7 @@ clickhouse:
 
           - files/config.d/*.xml: "yes"
           - files/config.d/*dict*.xml: "no"
-          - files/users.d/*: "no"
 
-          - profiles/*: "no"
           - profiles/default/background_*_pool_size: "yes"
           - profiles/default/max_*_for_server: "yes"
       - version: "21.*"
