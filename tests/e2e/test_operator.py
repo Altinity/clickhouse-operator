@@ -1773,11 +1773,13 @@ def test_018(self):
         )
 
         with Then("Configmap on the pod should be updated"):
-            display_name = kubectl.launch(
-                f'exec chi-{chi}-default-0-0-0 -- bash -c "grep display_name /etc/clickhouse-server/config.d/chop-generated-settings.xml"'
-            )
-            note(display_name)
-            assert "new_display_name" in display_name
+            for attempt in retries(timeout=300, delay=10):
+                with attempt:
+                    display_name = kubectl.launch(
+                        f'exec chi-{chi}-default-0-0-0 -- bash -c "grep display_name /etc/clickhouse-server/config.d/chop-generated-settings.xml"'
+                    )
+                    note(display_name)
+                    assert "new_display_name" in display_name
             with Then("And ClickHouse should pick them up"):
                 macros = clickhouse.query(chi, "SELECT substitution from system.macros where macro = 'test'")
                 note(macros)
