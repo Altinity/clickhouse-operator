@@ -153,6 +153,10 @@ func isListedChangeRequiresReboot(host *chiV1.ChiHost, paths []string) bool {
 			}
 		}
 	}
+	// Last matching path with value "yes" not found.
+	// This means either:
+	// 1. Last matching path has value "no"
+	// 2. No matching path found
 	return false
 }
 
