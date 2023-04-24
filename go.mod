@@ -35,6 +35,7 @@ require (
 	github.com/prometheus/client_golang v1.12.2
 	github.com/sanity-io/litter v1.3.0
 	github.com/securego/gosec/v2 v2.8.1
+	github.com/stretchr/testify v1.8.2
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -75,7 +76,6 @@ require (
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.8.2 // indirect
 	github.com/xo/terminfo v0.0.0-20210125001918-ca9a967f8778 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.7.0 // indirect
