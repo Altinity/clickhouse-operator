@@ -1572,7 +1572,7 @@ def test_016(self):
         assert out == "1"
 
     # test-016-settings-02.yaml
-    with When("Update usersd settings"):
+    with When("Update users.d settings"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-02.yaml",
