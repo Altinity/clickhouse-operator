@@ -1548,7 +1548,7 @@ def test_016(self):
         out = clickhouse.query(chi, sql="select substitution from system.macros where macro='test'")
         assert out == "test"
 
-    with And("dictGet() should work"):
+    with And("Dictionary 'one' should exist"):
         out = clickhouse.query(chi, sql="select dictGet('one', 'one', toUInt64(0))")
         assert out == "0"
 
@@ -1586,8 +1586,6 @@ def test_016(self):
                 "1",
             )
 
-        with Then("Force reload config"):
-            clickhouse.query(chi, sql="SYSTEM RELOAD CONFIG")
         with Then("test_norestart user should be available"):
             version = clickhouse.query(chi, sql="select version()", user="test_norestart")
         with And("user1 user should not be available"):
@@ -1601,7 +1599,7 @@ def test_016(self):
             assert start_time == new_start_time
 
     # test-016-settings-03.yaml
-    with When("Update custom.xml settings"):
+    with When("Update macro and dictionary settings"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-03.yaml",
@@ -1611,20 +1609,24 @@ def test_016(self):
         )
         with Then("Wait for configmap changes to apply"):
             kubectl.wait_command(
-                f'exec chi-{chi}-default-0-0-0 -- bash -c "grep test-03 /etc/clickhouse-server/config.d/custom.xml | wc -l"',
+                f'exec chi-{chi}-default-0-0-0 -- bash -c "grep 03 /etc/clickhouse-server/config.d/chop-generated-settings.xml | wc -l"',
                 "1",
             )
 
-        with And("Custom macro 'test' should change the value"):
-            out = clickhouse.query(chi, sql="select substitution from system.macros where macro='test'")
-            assert out == "test-03"
+        with Then("Custom macro 'layer' should change the value"):
+            out = clickhouse.query(chi, sql="select substitution from system.macros where macro='layer'")
+            assert out == "03"
 
-        with And("ClickHouse SHOULD BE restarted"):
+        with And("Dictionary 'three' should exist"):
+            out = clickhouse.query(chi, sql="select dictGet('three', 'three', toUInt64(0))")
+            assert out == "0"
+
+        with And("ClickHouse SHOULD NOT BE restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
-            assert start_time < new_start_time
+            assert start_time == new_start_time
 
     # test-016-settings-04.yaml
-    with When("Add new custom2.xml config file"):
+    with When("Add new custom4.xml config file"):
         start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
         kubectl.create_and_check(
             manifest="manifests/chi/test-016-settings-04.yaml",
@@ -1634,14 +1636,14 @@ def test_016(self):
         )
         with Then("Wait for configmap changes to apply"):
             kubectl.wait_command(
-                f'exec chi-{chi}-default-0-0-0 -- bash -c "grep test-custom2 /etc/clickhouse-server/config.d/custom2.xml | wc -l"',
+                f'exec chi-{chi}-default-0-0-0 -- bash -c "grep test-custom4 /etc/clickhouse-server/config.d/custom4.xml | wc -l"',
                 "1",
             )
 
-        with And("Custom macro 'test-custom2' should be found"):
+        with And("Custom macro 'test-custom4' should be found"):
             out = clickhouse.query(
                 chi,
-                sql="select substitution from system.macros where macro='test-custom2'",
+                sql="select substitution from system.macros where macro='test-custom4'",
             )
             assert out == "test-custom2"
 
