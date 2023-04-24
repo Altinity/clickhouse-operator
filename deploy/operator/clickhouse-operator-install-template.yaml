@@ -2986,7 +2986,7 @@ data:
               - settings/*: "yes"
               - settings/dictionaries_config: "no"
               - settings/logger: "no"
-              - settings/macros: "no"
+              - settings/macros*: "no"
               - settings/max_server_memory_*: "no"
               - settings/max_*_to_drop: "no"
               - settings/max_concurrent_queries: "no"
