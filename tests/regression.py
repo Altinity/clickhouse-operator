@@ -7,7 +7,6 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    "/regression/e2e.test_operator/test_016*": [(Fail, "test incorrect ATM")],
     "/regression/e2e.test_operator/test_028*": [(Fail, "In case of: 1) operator restarted on the different IP and 2) long time before operator received event, this test would fail due to RollingUpdate option")],
     "/regression/e2e.test_operator/test_036*": [(Fail, "not implemented yet")],
     # test_clickhouse.py

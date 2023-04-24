@@ -1645,7 +1645,7 @@ def test_016(self):
                 chi,
                 sql="select substitution from system.macros where macro='test-custom4'",
             )
-            assert out == "test-custom2"
+            assert out == "test-custom4"
 
         with And("ClickHouse SHOULD BE restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
