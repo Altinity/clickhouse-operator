@@ -78,8 +78,7 @@ type CopyCHIStatusOptions struct {
 	InheritableFields bool
 }
 
-// Beginning of synchronized mutator functions
-
+// FillStatusParams is a struct used to fill status params
 type FillStatusParams struct {
 	CHOpIP              string
 	ClustersCount       int
@@ -100,8 +99,8 @@ type FillStatusParams struct {
 // Fill is a synchronized setter for a fairly large number of fields. We take a struct type "params" argument to avoid
 // confusion of similarly typed positional arguments, and to avoid defining a lot of separate synchronized setters
 // for these fields that are typically all set together at once (during "fills").
-func (in *ChiStatus) Fill(params *FillStatusParams) {
-	doWithWriteLock(in, func(s *ChiStatus) {
+func (s *ChiStatus) Fill(params *FillStatusParams) {
+	doWithWriteLock(s, func(s *ChiStatus) {
 		// We always set these (build-hardcoded) version fields.
 		s.CHOpVersion = version.Version
 		s.CHOpCommit = version.GitSHA
@@ -198,19 +197,21 @@ func (s *ChiStatus) PushError(error string) {
 	})
 }
 
+// SetPodIPs sets pod IPs
 func (s *ChiStatus) SetPodIPs(podIPs []string) {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.PodIPs = podIPs
 	})
 }
 
+// HostDeleted increments deleted hosts counter
 func (s *ChiStatus) HostDeleted() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsDeletedCount++
 	})
 }
 
-// HostUpdated updates the counter of updated hosts
+// HostUpdated increments updated hosts counter
 func (s *ChiStatus) HostUpdated() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsUpdatedCount++
@@ -218,7 +219,7 @@ func (s *ChiStatus) HostUpdated() {
 	})
 }
 
-// HostAdded updates added hosts counter
+// HostAdded increments added hosts counter
 func (s *ChiStatus) HostAdded() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsAddedCount++
@@ -226,7 +227,7 @@ func (s *ChiStatus) HostAdded() {
 	})
 }
 
-// HostUnchanged updates unchanged hosts counter
+// HostUnchanged increments unchanged hosts counter
 func (s *ChiStatus) HostUnchanged() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsUnchangedCount++
@@ -234,7 +235,7 @@ func (s *ChiStatus) HostUnchanged() {
 	})
 }
 
-// HostFailed updates failed hosts counter
+// HostFailed increments failed hosts counter
 func (s *ChiStatus) HostFailed() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsFailedCount++
@@ -383,193 +384,224 @@ func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyCHIStatusOptions) {
 	})
 }
 
+// ClearNormalizedCHI clears normalized CHI in status
 func (s *ChiStatus) ClearNormalizedCHI() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.NormalizedCHI = nil
 	})
 }
 
+// SetNormalizedCompletedFromCurrentNormalized sets completed CHI from current CHI
 func (s *ChiStatus) SetNormalizedCompletedFromCurrentNormalized() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.NormalizedCHICompleted = s.NormalizedCHI
 	})
 }
 
-// Beginning of synchronized getter functions
-
+// GetCHOpVersion gets operator version
 func (s *ChiStatus) GetCHOpVersion() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.CHOpVersion
 	})
 }
+
+// GetCHOpCommit gets operator build commit
 func (s *ChiStatus) GetCHOpCommit() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.CHOpCommit
 	})
 }
 
+// GetCHOpDate gets operator build date
 func (s *ChiStatus) GetCHOpDate() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.CHOpDate
 	})
 }
 
+// GetCHOpIP gets operator pod's IP
 func (s *ChiStatus) GetCHOpIP() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.CHOpIP
 	})
 }
 
+// GetClustersCount gets clusters count
 func (s *ChiStatus) GetClustersCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.ClustersCount
 	})
 }
 
+// GetShardsCount gets shards count
 func (s *ChiStatus) GetShardsCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.ShardsCount
 	})
 }
 
+// GetReplicasCount gets replicas count
 func (s *ChiStatus) GetReplicasCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.ReplicasCount
 	})
 }
 
+// GetHostsCount gets hosts count
 func (s *ChiStatus) GetHostsCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsCount
 	})
 }
 
+// GetStatus gets status
 func (s *ChiStatus) GetStatus() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.Status
 	})
 }
 
+// GetTaskID gets task ipd
 func (s *ChiStatus) GetTaskID() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.TaskID
 	})
 }
 
+// GetTaskIDsStarted gets started task id
 func (s *ChiStatus) GetTaskIDsStarted() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.TaskIDsStarted
 	})
 }
 
+// GetTaskIDsCompleted gets completed task id
 func (s *ChiStatus) GetTaskIDsCompleted() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.TaskIDsCompleted
 	})
 }
 
+// GetAction gets last action
 func (s *ChiStatus) GetAction() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.Action
 	})
 }
 
+// GetActions gets all actions
 func (s *ChiStatus) GetActions() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.Actions
 	})
 }
 
+// GetError gets last error
 func (s *ChiStatus) GetError() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.Error
 	})
 }
 
+// GetErrors gets all errors
 func (s *ChiStatus) GetErrors() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.Errors
 	})
 }
 
+// GetHostsUpdatedCount gets updated hosts counter
 func (s *ChiStatus) GetHostsUpdatedCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsUpdatedCount
 	})
 }
 
+// GetHostsAddedCount gets added hosts counter
 func (s *ChiStatus) GetHostsAddedCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsAddedCount
 	})
 }
 
+// GetHostsUnchangedCount gets unchanged hosts counter
 func (s *ChiStatus) GetHostsUnchangedCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsUnchangedCount
 	})
 }
 
+// GetHostsFailedCount gets failed hosts counter
 func (s *ChiStatus) GetHostsFailedCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsFailedCount
 	})
 }
 
+// GetHostsCompletedCount gets completed hosts counter
 func (s *ChiStatus) GetHostsCompletedCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsCompletedCount
 	})
 }
 
+// GetHostsDeletedCount gets deleted hosts counter
 func (s *ChiStatus) GetHostsDeletedCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsDeletedCount
 	})
 }
 
+// GetHostsDeleteCount gets hosts to be deleted counter
 func (s *ChiStatus) GetHostsDeleteCount() int {
 	return getIntWithReadLock(s, func(s *ChiStatus) int {
 		return s.HostsDeleteCount
 	})
 }
 
+// GetPods gets list of pods
 func (s *ChiStatus) GetPods() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.Pods
 	})
 }
 
+// GetPodIPs gets list of pod ips
 func (s *ChiStatus) GetPodIPs() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.PodIPs
 	})
 }
 
+// GetFQDNs gets list of all FQDNs of hosts
 func (s *ChiStatus) GetFQDNs() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.FQDNs
 	})
 }
 
+// GetEndpoint gets API endpoint
 func (s *ChiStatus) GetEndpoint() string {
 	return getStringWithReadLock(s, func(s *ChiStatus) string {
 		return s.Endpoint
 	})
 }
 
+// GetNormalizedCHI gets target CHI
 func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
 	return getInstallationWithReadLock(s, func(s *ChiStatus) *ClickHouseInstallation {
 		return s.NormalizedCHI
 	})
 }
 
+// GetNormalizedCHICompleted gets completed CHI
 func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
 	return getInstallationWithReadLock(s, func(s *ChiStatus) *ClickHouseInstallation {
 		return s.NormalizedCHICompleted
 	})
 }
 
+// GetHostsWithTablesCreated gets hosts with created tables
 func (s *ChiStatus) GetHostsWithTablesCreated() []string {
 	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
 		return s.HostsWithTablesCreated
@@ -665,7 +697,7 @@ func pushTaskIDStartedNoSync(s *ChiStatus) {
 	}
 }
 
-// PushTaskIDCompleted pushes task id into status
+// pushTaskIDCompletedNoSync pushes task id into status w/o sync
 func pushTaskIDCompletedNoSync(s *ChiStatus) {
 	s.TaskIDsCompleted = append([]string{s.TaskID}, s.TaskIDsCompleted...)
 	if len(s.TaskIDsCompleted) > maxTaskIDs {
