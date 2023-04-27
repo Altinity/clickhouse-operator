@@ -467,8 +467,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	)
 
 	if host.CHI != nil && host.CHI.Status != nil {
-		hostsCompleted = host.CHI.Status.HostsCompletedCount
-		hostsCount = host.CHI.Status.HostsCount
+		hostsCompleted = host.CHI.Status.GetHostsCompletedCount()
+		hostsCount = host.CHI.Status.GetHostsCount()
 	}
 
 	w.a.V(1).
