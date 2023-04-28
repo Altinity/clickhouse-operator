@@ -334,6 +334,7 @@ data:
 
     DATA_DIR=/data
     MYID_FILE=$DATA_DIR/myid
+    DYNCONFIG=$DATA_DIR/zoo.cfg.dynamic
     LOG4J_CONF=/conf/log4j-quiet.properties
 
     # Wait for client connections to drain. Kubernetes will wait until the confiugred
