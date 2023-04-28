@@ -6,7 +6,7 @@ metadata:
   annotations:
     capabilities: Full Lifecycle
     categories: Database
-    containerImage: altinity/clickhouse-operator:${OPERATOR_VERSION}
+    containerImage: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
     createdAt: '2019-11-11T10:00:00Z'
     support: Altinity Ltd. https://altinity.com
     description: ClickHouse Operator manages full lifecycle of ClickHouse clusters.
@@ -1256,10 +1256,10 @@ spec:
                         valueFrom:
                           fieldRef:
                             fieldPath: metadata.namespace
-                    image: altinity/clickhouse-operator:${OPERATOR_VERSION}
+                    image: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
                     imagePullPolicy: Always
                     name: clickhouse-operator
-                  - image: altinity/metrics-exporter:${OPERATOR_VERSION}
+                  - image: docker.io/altinity/metrics-exporter:${OPERATOR_VERSION}
                     imagePullPolicy: Always
                     name: metrics-exporter
                 serviceAccountName: clickhouse-operator
