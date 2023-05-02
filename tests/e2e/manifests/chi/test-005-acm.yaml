@@ -77,6 +77,8 @@ spec:
       dataVolumeClaimTemplate: default
       serviceTemplate: default-service-template
   configuration:
+    users:
+      admin/password: whatever
     files:
       settings.xml: |
         <yandex>

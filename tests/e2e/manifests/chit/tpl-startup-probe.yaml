@@ -6,6 +6,10 @@ metadata:
 spec:
   templating:
     policy: auto
+  configuration:
+    users:
+      probe/password: probe
+      probe/profile: readonly
   templates:
     podTemplates:
       - name: clickhouse-replica-1
@@ -14,7 +18,7 @@ spec:
             - name: clickhouse-pod
               startupProbe:
                 httpGet:
-                  path: "/?query=select throwIf(uptime()<300)"
+                  path: "/?query=select throwIf(uptime()<300)&user=probe&password=probe"
                   port: 8123
                   scheme: HTTP
                 initialDelaySeconds: 30
