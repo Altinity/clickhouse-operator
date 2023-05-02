@@ -14,9 +14,9 @@ spec:
             - name: clickhouse-pod
               startupProbe:
                 httpGet:
-                  path: /ping
-                  port: http
+                  path: "/?query=select throwIf(uptime()<300)"
+                  port: 8123
                   scheme: HTTP
-                initialDelaySeconds: 600
+                initialDelaySeconds: 30
                 periodSeconds: 3
                 failureThreshold: 10

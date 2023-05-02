@@ -3407,6 +3407,36 @@ def test_039_4(self):
     """Check clickhouse-operator support inter-cluster communications over HTTPS."""
     test_039(step=4, delete_chi=1)
 
+@TestScenario
+@Name("test_040. Inject a startup probe using an auto template")
+def test_040(self):
+    manifest = "manifests/chi/test-005-acm.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("Auto template with a startup probe is deployed"):
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
+
+    kubectl.create_and_check(
+        manifest="manifests/chi/test-005-acm.yaml",
+        check={
+            "pod_count": 1,
+            "pod_volumes": {
+                "/var/lib/clickhouse",
+            },
+            "pod_image": "clickhouse/clickhouse-server:22.8",
+            "do_not_delete": 1,
+            "chi_status": "InProgress",
+        },
+    )
+
+    with Then("Startup probe should be defined"):
+        assert "startupProbe" in kubectl.get_pod_spec(chi)
+
+
+    # kubectl.delete_chi(chi)
+    # kubectl.delete(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"))
