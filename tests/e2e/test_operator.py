@@ -3433,8 +3433,8 @@ def test_040(self):
         assert "startupProbe" in kubectl.get_pod_spec(chi)["containers"][0]
 
 
-    # kubectl.delete_chi(chi)
-    # kubectl.delete(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
+    kubectl.delete_chi(chi)
+    kubectl.delete(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
 
 
 @TestModule
