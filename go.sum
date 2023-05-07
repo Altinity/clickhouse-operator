@@ -532,8 +532,8 @@ github.com/stretchr/testify v1.8.2/go.mod h1:w2LPCIKwWwSfY2zedu0+kehJoqGctiVI29o
 github.com/subosito/gotenv v1.2.0/go.mod h1:N0PQaV/YGNqwC0u51sEeR/aUtSLEXKX9iv69rRypqCw=
 github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d h1:0e/CoQX3ZCy3rXDTflbXcj1ReYvRNpKONzr+8eDF3Hc=
 github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d/go.mod h1:EWib/APOK0SL3dFbYqvxE3UYd8E6s1ouQ7iEp/0LWV4=
-github.com/sunsingerus/mergo v0.0.0-20230507113823-1894c15cd52b h1:u+ihRBGhN12Md7m/AYwcQdNfQql/1Pxp1Xg4fo6fZYM=
-github.com/sunsingerus/mergo v0.0.0-20230507113823-1894c15cd52b/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
+github.com/sunsingerus/mergo v0.0.0-20230507185449-fc6fffa94450 h1:PvdDV9N8PrsoL3ToXH6bId0/OPyt/ExMziouOeyEhco=
+github.com/sunsingerus/mergo v0.0.0-20230507185449-fc6fffa94450/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20190109142713-0ad062ec5ee5/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20200427203606-3cfed13b9966/go.mod h1:ncp9v5uamzpCO7NfCPTXjqaC+bZgJeR0sMTm6dMHP7U=

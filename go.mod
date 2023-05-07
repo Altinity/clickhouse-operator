@@ -4,7 +4,7 @@ go 1.19
 
 replace (
 	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
-	github.com/imdario/mergo => github.com/sunsingerus/mergo v0.0.0-20230507113823-1894c15cd52b
+	github.com/imdario/mergo => github.com/sunsingerus/mergo v0.0.0-20230507185449-fc6fffa94450
 )
 
 replace (
