@@ -3432,7 +3432,6 @@ def test_040(self):
     with Then("Startup probe should be defined"):
         assert "startupProbe" in kubectl.get_pod_spec(chi)["containers"][0]
 
-
     kubectl.delete_chi(chi)
     kubectl.delete(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
 
