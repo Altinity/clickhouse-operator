@@ -2,7 +2,10 @@ module github.com/altinity/clickhouse-operator
 
 go 1.19
 
-replace github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
+replace (
+	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
+	github.com/imdario/mergo => github.com/sunsingerus/mergo v0.0.0-20230507113823-1894c15cd52b
+)
 
 replace (
 	k8s.io/api => k8s.io/api v0.21.7
@@ -28,7 +31,7 @@ require (
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.3.0
 	github.com/gosimple/slug v1.12.0
-	github.com/imdario/mergo v0.3.13
+	github.com/imdario/mergo v0.3.15
 	github.com/juliangruber/go-intersect v1.0.0
 	github.com/kubernetes-sigs/yaml v1.1.0
 	github.com/mailru/go-clickhouse v1.6.0
