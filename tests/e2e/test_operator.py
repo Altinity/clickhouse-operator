@@ -3432,6 +3432,12 @@ def test_040(self):
     with Then("Startup probe should be defined"):
         assert "startupProbe" in kubectl.get_pod_spec(chi)["containers"][0]
 
+    kubectl.wait_chi_status(chi, "Completed")
+
+    with Then("uptime() should be more than 120 seconds as defined by a probe"):
+        out = clickhouse.query(chi, "select uptime()")
+        assert int(out) > 120
+
     kubectl.delete_chi(chi)
     kubectl.delete(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
 

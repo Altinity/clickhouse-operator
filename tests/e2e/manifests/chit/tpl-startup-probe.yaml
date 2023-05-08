@@ -10,6 +10,7 @@ spec:
     users:
       probe/password: probe
       probe/profile: readonly
+      probe/networks/ip: "::/0"
   templates:
     podTemplates:
       - name: clickhouse-replica-1
@@ -18,9 +19,15 @@ spec:
             - name: clickhouse-pod
               startupProbe:
                 httpGet:
-                  path: "/?query=select throwIf(uptime()<300)&user=probe&password=probe"
+                  path: "/?query=select%20throwIf(uptime()<120)"
                   port: 8123
                   scheme: HTTP
-                initialDelaySeconds: 30
-                periodSeconds: 3
+                  httpHeaders:
+                  - name: X-ClickHouse-User
+                    value: probe
+                  - name: X-ClickHouse-Key
+                    value: probe
+                initialDelaySeconds: 100
+                periodSeconds: 5
                 failureThreshold: 10
+            - name: clickhouse-backup
