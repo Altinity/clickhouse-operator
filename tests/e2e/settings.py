@@ -62,9 +62,9 @@ clickhouse_template = (
     # "manifests/chit/tpl-clickhouse-20.3.yaml"
     # "manifests/chit/tpl-clickhouse-20.8.yaml"
     # "manifests/chit/tpl-clickhouse-21.3.yaml"
-    "manifests/chit/tpl-clickhouse-21.8.yaml"
+    # "manifests/chit/tpl-clickhouse-21.8.yaml"
     # "manifests/chit/tpl-clickhouse-22.3.yaml"
-    # "manifests/chit/tpl-clickhouse-22.8.yaml"
+    "manifests/chit/tpl-clickhouse-22.8.yaml"
 )
 clickhouse_template_old = "manifests/chit/tpl-clickhouse-22.3.yaml"
 
