@@ -30,6 +30,8 @@ spec:
     # required for Dashboard Installation - https://github.com/integr8ly/grafana-operator/issues/92
     auth.basic:
       enabled: True
+    dataproxy:
+      timeout: 600     
 #    auth.anonymous:
 #      enabled: True
 #      org_role: Editor
