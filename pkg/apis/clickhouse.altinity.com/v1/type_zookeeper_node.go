@@ -14,11 +14,27 @@
 
 package v1
 
-// Equal checks whether zookeepr node is equal to another
+// ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
+type ChiZookeeperNode struct {
+	Host   string      `json:"host,omitempty" yaml:"host,omitempty"`
+	Port   int32       `json:"port,omitempty" yaml:"port,omitempty"`
+	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
+}
+
+// Equal checks whether zookeeper node is equal to another
 func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 	if to == nil {
 		return false
 	}
 
-	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port)
+	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port) && (zkNode.Secure.Value() == zkNode.Secure.Value())
+}
+
+// IsSecure checks whether zookeeper node is secure
+func (zkNode *ChiZookeeperNode) IsSecure() bool {
+	if zkNode == nil {
+		return false
+	}
+
+	return zkNode.Secure.Value()
 }

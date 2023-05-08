@@ -86,19 +86,15 @@ const (
 )
 
 const (
-	// chPortNumberMustBeAssignedLater value means that port
-	// is not assigned yet and is expected to be assigned later.
-	chPortNumberMustBeAssignedLater = int32(0)
-
 	// ClickHouse open ports names and values
 	chDefaultTCPPortName               = "tcp"
 	chDefaultTCPPortNumber             = int32(9000)
-	chDefaultTCPPortSecureName         = "secureclient"
-	chDefaultTCPPortSecureNumber       = int32(9440)
+	chDefaultTLSPortName               = "secureclient"
+	chDefaultTLSPortNumber             = int32(9440)
 	chDefaultHTTPPortName              = "http"
 	chDefaultHTTPPortNumber            = int32(8123)
-	chDefaultHTTPsPortName             = "https"
-	chDefaultHTTPsPortNumber           = int32(8443)
+	chDefaultHTTPSPortName             = "https"
+	chDefaultHTTPSPortNumber           = int32(8443)
 	chDefaultInterserverHTTPPortName   = "interserver"
 	chDefaultInterserverHTTPPortNumber = int32(9009)
 )

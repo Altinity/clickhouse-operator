@@ -4,15 +4,15 @@
 
 This section provides an overview of the **clickhouse-operator** security model.
 
-With the default settings, the ClickHouse operator deploys ClickHouse with two users protected by network restriction rules to block unauthorized access. 
+With the default settings, the ClickHouse operator deploys ClickHouse with two users protected by network restriction rules to block unauthorized access.
 
 ### The 'default' user
 
-The '**default**' user is used to connect to ClickHouse instance from a pod where it is running, and also for distributed queries. It is deployed with an **empty password** that was a long-time default for ClickHouse out-of-the-box installation. 
+The '**default**' user is used to connect to ClickHouse instance from a pod where it is running, and also for distributed queries. It is deployed with an **empty password** that was a long-time default for ClickHouse out-of-the-box installation.
 
-To secure it, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else. 
+To secure it, the operator applies network security rules that restrict connections to the pods running the ClickHouse cluster, and nothing else.
 
-Before version **0.19.0**  `hostRegexp` was applied that captured pod names. This did not work correctly in some Kubernetes distributions, such as GKE. In later versions, the operator additionally applies a restrictive set of pod IP addresses and rebuilds this set if the IP address of a pod changes for whatever reason. 
+Before version **0.19.0**  `hostRegexp` was applied that captured pod names. This did not work correctly in some Kubernetes distributions, such as GKE. In later versions, the operator additionally applies a restrictive set of pod IP addresses and rebuilds this set if the IP address of a pod changes for whatever reason.
 
 The following `users.xml` is set up by operator for a cluster that has two nodes. In this configuration, a '**default**' user can not connect from outside of the cluster.
 
@@ -32,9 +32,9 @@ The following `users.xml` is set up by operator for a cluster that has two nodes
 </users>
 ```
 
-### The 'clickhouse_operator' user 
+### The 'clickhouse_operator' user
 
-The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing  ClickHouse replicas and shards, and also for collecting monitoring data. The **user** and **password** values are stored in a secret. 
+The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing  ClickHouse replicas and shards, and also for collecting monitoring data. The **user** and **password** values are stored in a secret.
 
 The following example shows how **secret** is referenced in the **clickhouse_operator** configuration:
 
@@ -42,7 +42,7 @@ The following example shows how **secret** is referenced in the **clickhouse_ope
 clickhouse:
   access:
     secret:
-      # Empty `namespace` means that k8s secret would be looked 
+      # Empty `namespace` means that k8s secret would be looked
       # in the same namespace where the operator's pod is running.
       namespace: ""
       name: "clickhouse-operator"
@@ -63,7 +63,7 @@ stringData:
 
 We recommend that you do not include the **user** and **password** within the operator configuration without a **secret**, though it is also supported.
 
-To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object. 
+To change '**clickhouse_operator**' user password you can modify `etc-clickhouse-operator-files` configmap or create `ClickHouseOperatorConfiguration` object.
 
 See [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for more information about operator configuration files.
 
@@ -77,9 +77,9 @@ To make sure passwords are not exposed, for the `ClickHouseInstallation` the ope
 
 ### Using hashed passwords
 
-User passwords in `ClickHouseInstallation` can be specified in plain, as sha256 and double sha1 hashes. 
+User passwords in `ClickHouseInstallation` can be specified in plain, as sha256 and double sha1 hashes.
 
-When a password is specified in plaintext, the operator hashes it when deploying to ClickHouse, but that is still left in unsecure plaintext format in the `ClickHouseInstallation`. 
+When a password is specified in plaintext, the operator hashes it when deploying to ClickHouse, but that is still left in unsecure plaintext format in the `ClickHouseInstallation`.
 
 Altinity recommends providing hashes explicitly as follows:
 
@@ -122,15 +122,15 @@ stringData:
 
 ```
 
-> **Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration. 
-> The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed. 
+> **Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration.
+> The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed.
 > This approach requires recreating the ClickHouse podTemplates when adding new users.
 
 ### Securing the 'default' user
 
-While the '**default**' user is protected by network rules, passwordless operation is often not allowed by infosec teams. The password for the '**default**' user can be changed the same way as for other users. However, the '**default**' user is also used by ClickHouse to run distributed queries. If the password changes, distributed queries may stop working. 
+While the '**default**' user is protected by network rules, passwordless operation is often not allowed by infosec teams. The password for the '**default**' user can be changed the same way as for other users. However, the '**default**' user is also used by ClickHouse to run distributed queries. If the password changes, distributed queries may stop working.
 
-To keep distributed queries running without exposing the password, configure ClickHouse to use a secret token for inter-cluster communications instead of 'default' user credentials. 
+To keep distributed queries running without exposing the password, configure ClickHouse to use a secret token for inter-cluster communications instead of 'default' user credentials.
 
 
 The operator supports the following:
@@ -143,7 +143,7 @@ The following example shows how to let ClickHouse generate the secret token auto
 spec:
   configuration:
     users:
-      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448 
+      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
     clusters:
       - name: default
         secret:
@@ -158,7 +158,7 @@ The following example shows how to define a token.
 spec:
   configuration:
     users:
-      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448 
+      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
     clusters:
       - name: "default"
         secret:
@@ -173,7 +173,7 @@ The following example shows how to define a token within a secret.
 spec:
   configuration:
     users:
-      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448 
+      default/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
     clusters:
       - name: "default"
         secret:
@@ -195,7 +195,7 @@ With default settings, the operator deploys pods and services that expose 3 port
 * 9000 -- TCP interface
 * 9009 -- used for replication protocol between cluster nodes (HTTP)
 
-For every pod, there is one service created, and also load balancer service is created to access the cluster. Additional load balancers and custom services may be created using service templates. 
+For every pod, there is one service created, and also load balancer service is created to access the cluster. Additional load balancers and custom services may be created using service templates.
 
 ### Enabling secure connections to clickhouse-server
 
@@ -203,7 +203,7 @@ For every pod, there is one service created, and also load balancer service is c
 
 The ClickHouse HTTPS/TLS configuration requires the following steps:
 
-* Generate the following certificate files: 
+* Generate the following certificate files:
 
   * `server.crt`
   * `server.key`
@@ -215,7 +215,7 @@ The ClickHouse HTTPS/TLS configuration requires the following steps:
 * Defining a custom **podTemplate** with secure ports
 * Defining a custom **serviceTemplate** if needed
 
-The **podTemplate** is automated by the operator using a '**secure**' flag in the cluster definition rather than the user doing it. 
+The **podTemplate** is automated by the operator using a '**secure**' flag in the cluster definition rather than the user doing it.
 
 The following example shows a typical secure configuration:
 
@@ -256,7 +256,20 @@ spec:
 
 ```
 
-The operator automatically adjusts services used to access individual pods when '**secure**' is used, but it does not adjust load balancer service. In real environments, the load balancer is managed by a separate **serviceTemplate**. User must define the available ports. 
+### Disabling insecure connections
+
+The operator automatically adjusts services used to access individual pods when '**secure**' flag is used. Additionally, '**inscure: "no"**' flag can be added as of version 0.21.x in order to disable insecure ports:
+
+```
+spec:
+  configuration:
+    clusters:
+    - name: default
+      secure: "yes"
+      insecure: "no"
+```
+
+That adjusts pod services properly, but it does not adjust load balancer service. In real environments, the load balancer is managed by a separate **serviceTemplate**. User must define the available ports explicitly.
 
 The following example shows how to define ports for load balancer service:
 
@@ -277,11 +290,6 @@ spec:
               port: 9440
           type: LoadBalancer
 ```
-
-**TODO**: 
-
-- We plan to add a special flag to disable insecure ports on a pod and pod service level automatically as well.
-
 
 ### Using secure connections for distributed queries
 
@@ -369,7 +377,7 @@ configuration:
 
 ### Forcing HTTPS for replication
 
-To force ClickHouse replication to use HTTPS on a securerly configured `ClickHouseInstallation`, set the required ClickHouse ports as follows: 
+To force ClickHouse replication to use HTTPS on a securerly configured `ClickHouseInstallation`, set the required ClickHouse ports as follows:
 
 ```yaml
 spec:
@@ -381,6 +389,6 @@ spec:
 
 ### Forcing HTTPS for ZooKeeper
 
-**TODO**: 
+**TODO**:
 
 - Coming soon

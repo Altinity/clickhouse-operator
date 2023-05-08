@@ -6,37 +6,23 @@ metadata:
   name: test-034-https
 
 spec:
-  templates:
-    podTemplates:
-    - name: clickhouse-replica-1
-      spec:
-        containers:
-        - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.8
-          ports:
-          - name: http
-            containerPort: 8123
-          - name: https
-            containerPort: 8443
-          - name: client
-            containerPort: 9000
-          - name: secureclient
-            containerPort: 9440
-          - name: interserver
-            containerPort: 9009
-  defaults:
-    templates:
-      podTemplate: clickhouse-replica-1
+  useTemplates:
+    - name: clickhouse-version
   configuration:
+    clusters:
+    - name: default
+      secure: "yes"
+      insecure: "no"
     users:
       test_034_client/password: test_034
       test_034_client/networks/ip: "::/0"
+    settings:
+      # tcp_port: 9000 # keep for localhost
+      tcp_port_secure: 9440
+      https_port: 8443
     files:
-      settings.xml: |
+      openssl.xml: |
         <yandex>
-          <https_port>8443</https_port>
-          <tcp_port_secure>9440</tcp_port_secure>
-
           <openSSL>
             <server>
               <certificateFile>/etc/clickhouse-server/config.d/server.crt</certificateFile>
@@ -116,5 +102,3 @@ spec:
         q0M0PPsm7i5RlwLcUjkLY3HZpPQKBl5eMxQhnoNjxLW6NM5SKhKI5AsCAQI=
         -----END DH PARAMETERS-----
 
-    clusters:
-    - name: default

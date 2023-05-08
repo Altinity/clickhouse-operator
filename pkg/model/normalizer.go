@@ -40,7 +40,7 @@ type NormalizerContext struct {
 	start *chiV1.ClickHouseInstallation
 	// chi specifies current CHI being normalized
 	chi *chiV1.ClickHouseInstallation
-	// options specifies normalizaztion options
+	// options specifies normalization options
 	options *NormalizerOptions
 }
 
@@ -126,9 +126,9 @@ func (n *Normalizer) CreateTemplatedCHI(
 	var useTemplates []chiV1.ChiUseTemplate
 	// 1. Get list of auto templates to be applied
 	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
-		log.V(2).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
+		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
-			log.V(3).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Name, template.Namespace)
+			log.V(1).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Namespace, template.Name)
 			useTemplates = append(useTemplates, chiV1.ChiUseTemplate{
 				Name:      template.Name,
 				Namespace: template.Namespace,
@@ -150,7 +150,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		if template := chop.Config().FindTemplate(useTemplate, chi.Namespace); template == nil {
-			log.V(1).M(chi).F().Warning("UNABLE to find template %s/%s referenced in useTemplates. Skip it.", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).F().Warning("UNABLE to find template referenced in useTemplates: %s/%s", useTemplate.Namespace, useTemplate.Name)
 		} else {
 			// Apply template
 			(&n.ctx.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
@@ -169,7 +169,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 					append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
 				),
 			)
-			log.V(2).M(chi).F().Info("Merge template %s/%s referenced in useTemplates", useTemplate.Namespace, useTemplate.Name)
+			log.V(1).M(chi).F().Info("Merge template referenced in useTemplates: %s/%s", useTemplate.Namespace, useTemplate.Name)
 		}
 	}
 
@@ -259,44 +259,81 @@ func (n *Normalizer) getHostTemplate(host *chiV1.ChiHost) *chiV1.ChiHostTemplate
 	return hostTemplate
 }
 
+func unassigned() int32 {
+	return chiV1.PortMayBeAssignedLaterOrLeftUnused
+}
+
+func isAssigned(port int32) bool {
+	return port != chiV1.PortMayBeAssignedLaterOrLeftUnused
+}
+
+func isUnassigned(port int32) bool {
+	return port == chiV1.PortMayBeAssignedLaterOrLeftUnused
+}
+
+func invalid(port int32) bool {
+	return (port <= 0) || (port >= 65535)
+}
+
 // hostApplyHostTemplate
 func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate) {
-	if host.Name == "" {
+	if host.GetName() == "" {
 		host.Name = template.Spec.Name
 	}
 
+	host.Insecure = host.Insecure.MergeFrom(template.Spec.Insecure)
 	host.Secure = host.Secure.MergeFrom(template.Spec.Secure)
 
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case chiV1.PortDistributionUnspecified:
-			if host.TCPPort == chPortNumberMustBeAssignedLater {
+			if isUnassigned(host.TCPPort) {
 				host.TCPPort = template.Spec.TCPPort
 			}
-			if host.HTTPPort == chPortNumberMustBeAssignedLater {
+			if isUnassigned(host.TLSPort) {
+				host.TLSPort = template.Spec.TLSPort
+			}
+			if isUnassigned(host.HTTPPort) {
 				host.HTTPPort = template.Spec.HTTPPort
 			}
-			if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
+			if isUnassigned(host.HTTPSPort) {
+				host.HTTPSPort = template.Spec.HTTPSPort
+			}
+			if isUnassigned(host.InterserverHTTPPort) {
 				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
 			}
 		case chiV1.PortDistributionClusterScopeIndex:
-			if host.TCPPort == chPortNumberMustBeAssignedLater {
+			if isUnassigned(host.TCPPort) {
 				base := chDefaultTCPPortNumber
-				if template.Spec.TCPPort != chPortNumberMustBeAssignedLater {
+				if isAssigned(template.Spec.TCPPort) {
 					base = template.Spec.TCPPort
 				}
 				host.TCPPort = base + int32(host.Address.ClusterScopeIndex)
 			}
-			if host.HTTPPort == chPortNumberMustBeAssignedLater {
+			if isUnassigned(host.TLSPort) {
+				base := chDefaultTLSPortNumber
+				if isAssigned(template.Spec.TLSPort) {
+					base = template.Spec.TLSPort
+				}
+				host.TLSPort = base + int32(host.Address.ClusterScopeIndex)
+			}
+			if isUnassigned(host.HTTPPort) {
 				base := chDefaultHTTPPortNumber
-				if template.Spec.HTTPPort != chPortNumberMustBeAssignedLater {
+				if isAssigned(template.Spec.HTTPPort) {
 					base = template.Spec.HTTPPort
 				}
 				host.HTTPPort = base + int32(host.Address.ClusterScopeIndex)
 			}
-			if host.InterserverHTTPPort == chPortNumberMustBeAssignedLater {
+			if isUnassigned(host.HTTPSPort) {
+				base := chDefaultHTTPSPortNumber
+				if isAssigned(template.Spec.HTTPSPort) {
+					base = template.Spec.HTTPSPort
+				}
+				host.HTTPSPort = base + int32(host.Address.ClusterScopeIndex)
+			}
+			if isUnassigned(host.InterserverHTTPPort) {
 				base := chDefaultInterserverHTTPPortNumber
-				if template.Spec.InterserverHTTPPort != chPortNumberMustBeAssignedLater {
+				if isAssigned(template.Spec.InterserverHTTPPort) {
 					base = template.Spec.InterserverHTTPPort
 				}
 				host.InterserverHTTPPort = base + int32(host.Address.ClusterScopeIndex)
@@ -312,42 +349,38 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 // hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
 	// Use host personal settings at first
-	ensurePortValuesFromSettings(host, host.GetSettings(), true)
+	ensurePortValuesFromSettings(host, host.GetSettings(), false)
 	// Fallback to common settings
-	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, false)
+	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
 }
 
 // ensurePortValuesFromSettings fetches port spec from settings, if any provided
-func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, intermittent bool) {
-	var (
-		fallbackTCPPort             int32
-		fallbackHTTPPort            int32
-		fallbackInterserverHTTPPort int32
-	)
-	if intermittent {
-		// For intermittent setup fallback values should be from "MustBeAssignedLater" family, because
-		// this is not final setup (just intermittent) and all these ports may be overwritten later
-		fallbackTCPPort = chPortNumberMustBeAssignedLater
-		fallbackHTTPPort = chPortNumberMustBeAssignedLater
-		fallbackInterserverHTTPPort = chPortNumberMustBeAssignedLater
-	} else {
+func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, final bool) {
+	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
+	// because this is not final setup (just intermittent) and all these ports may be overwritten later
+	fallbackTCPPort := unassigned()
+	fallbackTLSPort := unassigned()
+	fallbackHTTPPort := unassigned()
+	fallbackHTTPSPort := unassigned()
+	fallbackInterserverHTTPPort := unassigned()
+
+	if final {
 		// This is final setup and we need to assign real numbers to ports
-		if host.IsSecure() {
-			fallbackTCPPort = chDefaultTCPPortSecureNumber
-		} else {
+		if host.IsInsecure() {
 			fallbackTCPPort = chDefaultTCPPortNumber
+			fallbackHTTPPort = chDefaultHTTPPortNumber
 		}
-		fallbackHTTPPort = chDefaultHTTPPortNumber
+		if host.IsSecure() {
+			fallbackTLSPort = chDefaultTLSPortNumber
+			fallbackHTTPSPort = chDefaultHTTPSPortNumber
+		}
 		fallbackInterserverHTTPPort = chDefaultInterserverHTTPPortNumber
 	}
-	var tcpPort int32
-	if host.IsSecure() {
-		tcpPort = settings.GetTCPPortSecure()
-	} else {
-		tcpPort = settings.GetTCPPort()
-	}
-	ensurePortValue(&host.TCPPort, tcpPort, fallbackTCPPort)
+
+	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
+	ensurePortValue(&host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
 	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
+	ensurePortValue(&host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
 	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
 
@@ -357,7 +390,7 @@ func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings,
 // - or value is fell back to default
 func ensurePortValue(port *int32, value, _default int32) {
 	// Port may already be explicitly specified in podTemplate or by portDistribution
-	if *port != chPortNumberMustBeAssignedLater {
+	if isAssigned(*port) {
 		// Port has a value already
 		return
 	}
@@ -365,7 +398,7 @@ func ensurePortValue(port *int32, value, _default int32) {
 	// Port has no explicitly assigned value
 
 	// Let's use provided value real value
-	if value != chPortNumberMustBeAssignedLater {
+	if isAssigned(value) {
 		// Provided value is a real value, use it
 		*port = value
 		return
@@ -846,35 +879,43 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster 
 
 // calcFingerprints calculates fingerprints for ClickHouse configuration data
 func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
+	// Zookeeper
 	zk := host.GetZookeeper()
 	host.Config.ZookeeperFingerprint = util.Fingerprint(zk)
 
-	global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
-	local := host.Settings.AsSortedSliceOfStrings()
-	host.Config.SettingsFingerprint = util.Fingerprint(
-		fmt.Sprintf("%s%s",
-			util.Fingerprint(global),
-			util.Fingerprint(local),
-		),
-	)
-	host.Config.FilesFingerprint = util.Fingerprint(
-		fmt.Sprintf("%s%s",
-			util.Fingerprint(
-				n.ctx.chi.Spec.Configuration.Files.Filter(
-					nil,
-					[]chiV1.SettingsSection{chiV1.SectionUsers},
-					true,
-				).AsSortedSliceOfStrings(),
+	// Settings
+	{
+		global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
+		local := host.Settings.AsSortedSliceOfStrings()
+
+		host.Config.SettingsFingerprint = util.Fingerprint(
+			fmt.Sprintf("%s%s",
+				util.Fingerprint(global),
+				util.Fingerprint(local),
 			),
-			util.Fingerprint(
-				host.Files.Filter(
-					nil,
-					[]chiV1.SettingsSection{chiV1.SectionUsers},
-					true,
-				).AsSortedSliceOfStrings(),
+		)
+	}
+
+	//  Files
+	{
+		global := n.ctx.chi.Spec.Configuration.Files.Filter(
+			nil,
+			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			true,
+		).AsSortedSliceOfStrings()
+		local := host.Files.Filter(
+			nil,
+			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			true,
+		).AsSortedSliceOfStrings()
+
+		host.Config.FilesFingerprint = util.Fingerprint(
+			fmt.Sprintf("%s%s",
+				util.Fingerprint(global),
+				util.Fingerprint(local),
 			),
-		),
-	)
+		)
+	}
 
 	// Unify settings fingerprint
 	host.Config.SettingsFingerprint = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
@@ -1112,6 +1153,7 @@ func (n *Normalizer) normalizeUsersList(users *chiV1.Settings, extra ...string) 
 }
 
 const defaultUsername = "default"
+const chopProfile = "clickhouse_operator"
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *chiV1.Settings) *chiV1.Settings {
@@ -1180,7 +1222,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *ch
 	case chopUsername:
 		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
 
-		profile = ""
+		profile = chopProfile
 		quota = ""
 		ips = []string{ip}
 		regexp = ""
@@ -1245,10 +1287,13 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *chiV1.Settings, u
 	passwordPlaintext := users.Get(username + "/password").String()
 
 	// Apply default password for password-less non-default users
+	// 1. NB "default" user keeps empty password in here.
+	// 2. ClickHouse user gets password from his section of chop configuration
+	// 3. All the rest users get default password
 	if passwordPlaintext == "" {
 		switch username {
 		case defaultUsername:
-			// NB "default" user may keep empty password in here.
+			// NB "default" user keeps empty password in here.
 		case chopUsername:
 			passwordPlaintext = chop.Config().ClickHouse.Access.Password
 		default:
@@ -1256,16 +1301,16 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *chiV1.Settings, u
 		}
 	}
 
-	// NB "default" user may keep empty password in here.
-
+	// Replace plaintext password with encrypted
 	if passwordPlaintext != "" {
-		// Replace plaintext password with encrypted
 		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
 		users.Set(username+"/password_sha256_hex", chiV1.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-		// And keep it only
+		// And keep only one password specification
 		users.Delete(username + "/password_double_sha1_hex")
 		users.Delete(username + "/password")
 	}
+
+	// NB "default" user may keep empty password in here.
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
@@ -1675,7 +1720,7 @@ func (n *Normalizer) normalizeHostName(
 	replica *chiV1.ChiReplica,
 	replicaIndex int,
 ) {
-	if (len(host.Name) > 0) && !IsAutoGeneratedHostName(host.Name, host, shard, shardIndex, replica, replicaIndex) {
+	if (len(host.GetName()) > 0) && !IsAutoGeneratedHostName(host.GetName(), host, shard, shardIndex, replica, replicaIndex) {
 		// Has explicitly specified name already
 		return
 	}
@@ -1686,20 +1731,28 @@ func (n *Normalizer) normalizeHostName(
 // normalizeHostPorts ensures chiV1.ChiReplica.Port is reasonable
 func (n *Normalizer) normalizeHostPorts(host *chiV1.ChiHost) {
 	// Deprecated
-	if (host.Port <= 0) || (host.Port >= 65535) {
-		host.Port = chPortNumberMustBeAssignedLater
+	if invalid(host.Port) {
+		host.Port = unassigned()
 	}
 
-	if (host.TCPPort <= 0) || (host.TCPPort >= 65535) {
-		host.TCPPort = chPortNumberMustBeAssignedLater
+	if invalid(host.TCPPort) {
+		host.TCPPort = unassigned()
 	}
 
-	if (host.HTTPPort <= 0) || (host.HTTPPort >= 65535) {
-		host.HTTPPort = chPortNumberMustBeAssignedLater
+	if invalid(host.TLSPort) {
+		host.TLSPort = unassigned()
 	}
 
-	if (host.InterserverHTTPPort <= 0) || (host.InterserverHTTPPort >= 65535) {
-		host.InterserverHTTPPort = chPortNumberMustBeAssignedLater
+	if invalid(host.HTTPPort) {
+		host.HTTPPort = unassigned()
+	}
+
+	if invalid(host.HTTPSPort) {
+		host.HTTPSPort = unassigned()
+	}
+
+	if invalid(host.InterserverHTTPPort) {
+		host.InterserverHTTPPort = unassigned()
 	}
 }
 

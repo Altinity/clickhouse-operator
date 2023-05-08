@@ -63,12 +63,14 @@ func (c *ClickHouseConfigGenerator) GetQuotas() string {
 	return c.generateXMLConfig(c.chi.Spec.Configuration.Quotas, configQuotas)
 }
 
+// GetSettingsGlobal creates data for "settings.xml"
+func (c *ClickHouseConfigGenerator) GetSettingsGlobal() string {
+	// No host specified means request to generate common config
+	return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
+}
+
 // GetSettings creates data for "settings.xml"
 func (c *ClickHouseConfigGenerator) GetSettings(host *chiv1.ChiHost) string {
-	if host == nil {
-		// No host specified means request to generate common config
-		return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
-	}
 	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }
@@ -110,10 +112,14 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *chiv1.ChiHost) string
 		// <node>
 		//		<host>HOST</host>
 		//		<port>PORT</port>
+		//		<secure>%d</secure>
 		// </node>
 		util.Iline(b, 8, "<node>")
 		util.Iline(b, 8, "    <host>%s</host>", node.Host)
 		util.Iline(b, 8, "    <port>%d</port>", node.Port)
+		if node.Secure.HasValue() {
+			util.Iline(b, 8, "    <secure>%d</secure>", c.getSecure(node))
+		}
 		util.Iline(b, 8, "</node>")
 	}
 
@@ -289,6 +295,25 @@ func (c *ClickHouseConfigGenerator) ShardHostsNum(shard *chiv1.ChiShard, options
 	return num
 }
 
+func (c *ClickHouseConfigGenerator) getRemoteServersReplica(host *chiv1.ChiHost, b *bytes.Buffer) {
+	// <replica>
+	//		<host>XXX</host>
+	//		<port>XXX</port>
+	//		<secure>XXX</secure>
+	// </replica>
+	var port int32
+	if host.IsSecure() {
+		port = host.TLSPort
+	} else {
+		port = host.TCPPort
+	}
+	util.Iline(b, 16, "<replica>")
+	util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
+	util.Iline(b, 16, "    <port>%d</port>", port)
+	util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
+	util.Iline(b, 16, "</replica>")
+}
+
 // GetRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
 func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGeneratorOptions) string {
 	if options == nil {
@@ -342,15 +367,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 
 			shard.WalkHosts(func(host *chiv1.ChiHost) error {
 				if options.Include(host) {
-					// <replica>
-					//		<host>XXX</host>
-					//		<port>XXX</port>
-					// </replica>
-					util.Iline(b, 16, "<replica>")
-					util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-					util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-					util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
-					util.Iline(b, 16, "</replica>")
+					c.getRemoteServersReplica(host, b)
 				}
 				return nil
 			})
@@ -383,15 +400,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		util.Iline(b, 8, "        <internal_replication>true</internal_replication>")
 		c.chi.WalkHosts(func(host *chiv1.ChiHost) error {
 			if options.Include(host) {
-				// <replica>
-				//		<host>XXX</host>
-				//		<port>XXX</port>
-				// </replica>
-				util.Iline(b, 16, "<replica>")
-				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-				util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
-				util.Iline(b, 16, "</replica>")
+				c.getRemoteServersReplica(host, b)
 			}
 			return nil
 		})
@@ -413,15 +422,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 				util.Iline(b, 12, "<shard>")
 				util.Iline(b, 12, "    <internal_replication>false</internal_replication>")
 
-				// <replica>
-				//		<host>XXX</host>
-				//		<port>XXX</port>
-				// </replica>
-				util.Iline(b, 16, "<replica>")
-				util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
-				util.Iline(b, 16, "    <port>%d</port>", host.TCPPort)
-				util.Iline(b, 16, "    <secure>%d</secure>", c.getSecure(host))
-				util.Iline(b, 16, "</replica>")
+				c.getRemoteServersReplica(host, b)
 
 				// </shard>
 				util.Iline(b, 12, "</shard>")
@@ -489,8 +490,14 @@ func (c *ClickHouseConfigGenerator) GetHostHostnameAndPorts(host *chiv1.ChiHost)
 	if host.TCPPort != chDefaultTCPPortNumber {
 		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort)
 	}
+	if host.TLSPort != chDefaultTLSPortNumber {
+		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort)
+	}
 	if host.HTTPPort != chDefaultHTTPPortNumber {
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
+	}
+	if host.HTTPSPort != chDefaultHTTPSPortNumber {
+		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort)
 	}
 
 	// Interserver host and port
@@ -537,8 +544,8 @@ func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *chiv1.
 	return CreateInstanceHostname(host)
 }
 
-// getSecure gets config-usable value for host secure flag
-func (c *ClickHouseConfigGenerator) getSecure(host *chiv1.ChiHost) int {
+// getSecure gets config-usable value for host or node secure flag
+func (c *ClickHouseConfigGenerator) getSecure(host chiv1.Secured) int {
 	if host.IsSecure() {
 		return 1
 	}

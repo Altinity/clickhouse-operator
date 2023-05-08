@@ -38,23 +38,21 @@ spec:
               cpu: "1"
           volumeMounts:
             - mountPath: /var/lib/clickhouse
-              name: default-gp2
+              name: default
         - image: altinity/clickhouse-backup:2.1.3
           name: clickhouse-backup
           command:
-            - clickhouse-backup
-            - server
+          - /bin/bash
+          - -c
+          - /bin/clickhouse-backup -c /etc/clickhouse-backup/config.yml server
           ports:
             - containerPort: 7171
               name: backup
           volumeMounts:
             - mountPath: /var/lib/clickhouse
-              name: default-gp2
-      podDistribution:
-      - scope: ClickHouseInstallation
-        type: ClickHouseAntiAffinity
+              name: default
     volumeClaimTemplates:
-    - name: default-gp2
+    - name: default
       reclaimPolicy: Delete
       spec:
         accessModes:
@@ -76,9 +74,11 @@ spec:
   defaults:
     templates:
       podTemplate: clickhouse-replica-1
-      dataVolumeClaimTemplate: default-gp2
+      dataVolumeClaimTemplate: default
       serviceTemplate: default-service-template
   configuration:
+    users:
+      admin/password: whatever
     files:
       settings.xml: |
         <yandex>

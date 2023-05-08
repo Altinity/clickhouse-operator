@@ -281,16 +281,13 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiV1.ChiHos
 	if host == nil {
 		return nil
 	}
-	if host.StatefulSet.Spec.Replicas != nil {
-		if *host.StatefulSet.Spec.Replicas == 0 {
-			return nil
-		}
-	}
-
 	pod, err := c.getPod(host)
 	if apiErrors.IsNotFound(err) {
+		// Pod may be missing in case, say, StatefulSet has 0 pods because CHI is stopped
+		// This is not an error, after all
 		return nil
 	}
+
 	if err != nil {
 		log.V(1).M(host).F().Info("FAIL get pod for host '%s' err: %v", host.Address.NamespaceNameString(), err)
 		return err
@@ -340,14 +337,11 @@ func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chi
 	if host == nil {
 		return nil
 	}
-	if host.StatefulSet.Spec.Replicas != nil {
-		if *host.StatefulSet.Spec.Replicas == 0 {
-			return nil
-		}
-	}
 
 	svc, err := c.getService(host)
 	if apiErrors.IsNotFound(err) {
+		// Service may be missing in case, say, StatefulSet has 0 pods because CHI is stopped
+		// This is not an error, after all
 		return nil
 	}
 	if err != nil {
