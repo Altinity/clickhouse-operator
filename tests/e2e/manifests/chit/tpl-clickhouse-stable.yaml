@@ -13,5 +13,5 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: altinity/clickhouse-server:22.3.8.40.altinitystable
+              image: altinity/clickhouse-server:22.8.15.25.altinitystable
 
