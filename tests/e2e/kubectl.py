@@ -34,7 +34,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
         cmd += " ".join(cmd_args[1:])
 
     # save command for debug purposes
-    command = cmd
+    # command = cmd
     # print(f"run command: {cmd}")
 
     return run_shell(cmd, timeout, ok_to_fail)
@@ -325,6 +325,10 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
+def wait_container_status(pod, status, ns=namespace):
+    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
+
+
 def wait_field(
     kind,
     name,
@@ -544,7 +548,7 @@ def check_configmaps(chi_name, ns=namespace):
     check_configmap(
         f"chi-{chi_name}-common-usersd",
         [
-            "01-clickhouse-user.xml",
+            "01-clickhouse-operator-profile.xml",
             "02-clickhouse-default-profile.xml",
         ],
         ns=ns,

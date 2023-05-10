@@ -13,7 +13,7 @@ spec:
         layout:
           shardsCount: 1
     profiles:
-      default/max_memory_usage: 7000000000 # test for big value      
+      default/max_memory_usage: 7000000000 # test for big value
     users:
       user1/profile: default
       user1/quota: default

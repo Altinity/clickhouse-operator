@@ -288,10 +288,10 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 	//opts := clickhouse.NewQueryOptions()
 	err := s.ExecHost(ctx, host, SQLs, opts)
 	if err == nil {
-		log.V(1).M(host).F().Info("Host inside the cluster")
+		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
 		inside = true
 	} else {
-		log.V(1).M(host).F().Info("Host outside of the cluster")
+		log.V(1).M(host).F().Info("The host %s is outside of the cluster", host.GetName())
 		inside = false
 	}
 	return inside
@@ -309,6 +309,12 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 func (s *Schemer) HostActiveQueriesNum(ctx context.Context, host *chop.ChiHost) (int, error) {
 	sql := `SELECT count() FROM system.processes`
 	return s.QueryHostInt(ctx, host, sql)
+}
+
+// HostVersion returns ClickHouse version on the host
+func (s *Schemer) HostVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
+	sql := `SELECT version()`
+	return s.QueryHostString(ctx, host, sql)
 }
 
 func createDatabaseDistributed(cluster string) string {

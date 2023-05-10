@@ -6,7 +6,7 @@ import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.yaml_manifest as yaml_manifest
 
-from testflows.core import fail, Given, Then, current
+from testflows.core import fail, Given, Then, But, current, message
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -88,7 +88,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
             if doc["kind"] in ("StatefulSet", "ZookeeperCluster"):
                 keeper_nodes = doc["spec"]["replicas"]
         expected_docs = {
-            "zookeeper": 6 if "scaleout-pvc" in keeper_manifest else 4,
+            "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
             "clickhouse-keeper": 6,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
@@ -106,6 +106,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
                 kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}")
             for pod_num in range(keeper_nodes):
                 kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running")
+                kubectl.wait_container_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "true")
 
 
 def wait_clickhouse_cluster_ready(chi):
@@ -199,12 +200,14 @@ def install_clickhouse_and_keeper(
         return clickhouse_operator_spec, chi
 
 
-def clean_namespace(delete_chi=False):
-    with Given(f"Clean namespace {settings.test_namespace}"):
+def clean_namespace(delete_chi=False, delete_keeper=False, namespace=settings.test_namespace):
+    with Given(f"Clean namespace {namespace}"):
+        if delete_keeper:
+            kubectl.delete_all_keeper(namespace)
         if delete_chi:
-            kubectl.delete_all_chi(settings.test_namespace)
-        kubectl.delete_ns(settings.test_namespace, ok_to_fail=True)
-        kubectl.create_ns(settings.test_namespace)
+            kubectl.delete_all_chi(namespace)
+        kubectl.delete_ns(namespace, ok_to_fail=True)
+        kubectl.create_ns(namespace)
 
 
 def make_http_get_request(host, port, path):
@@ -272,3 +275,30 @@ def install_operator_version(version):
         f"envsubst",
         validate=False,
     )
+
+
+def wait_clickhouse_no_readonly_replicas(chi, retries=20):
+    expected_replicas = 1
+    layout = chi["spec"]["configuration"]["clusters"][0]["layout"]
+
+    if "replicasCount" in layout:
+        expected_replicas = layout["replicasCount"]
+    if "shardsCount" in layout:
+        expected_replicas = expected_replicas * layout["shardsCount"]
+
+    expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
+    for i in range(retries):
+        readonly_replicas = clickhouse.query(
+            chi["metadata"]["name"],
+            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
+        )
+        if readonly_replicas == expected_replicas:
+            message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
+            break
+        else:
+            with But(
+                    f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"
+            ):
+                time.sleep(i * 3)
+        if i >= (retries - 1):
+            raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")

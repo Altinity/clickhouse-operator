@@ -25,7 +25,6 @@ spec:
         - name: namespaces
           type: string
           description: Watch namespaces
-          priority: 0 # show in standard view
           jsonPath: .status
         - name: age
           type: date
@@ -108,6 +107,25 @@ spec:
                             hostRegexpTemplate:
                               type: string
                               description: "ClickHouse server configuration `<host_regexp>...</host_regexp>` for any <user>"
+                    configurationRestartPolicy:
+                      type: object
+                      description: "Configuration restart policy describes what configuration changes require ClickHouse restart"
+                      properties:
+                        rules:
+                          type: array
+                          description: "Array of set of rules per specified ClickHouse versions"
+                          items:
+                            type: object
+                            properties:
+                              version:
+                                type: string
+                                description: "ClickHouse version expression"
+                              rules:
+                                type: array
+                                description: "Set of configuration rules for specified ClickHouse version"
+                                items:
+                                  type: object
+                                  description: "setting: value pairs for configuration restart policy"
                     access:
                       type: object
                       description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"

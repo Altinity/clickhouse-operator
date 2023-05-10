@@ -282,9 +282,9 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	if a.writeStatusAction {
 		if len(args) > 0 {
-			a.chi.EnsureStatus().Action = fmt.Sprintf(format, args...)
+			a.chi.EnsureStatus().SetAction(fmt.Sprintf(format, args...))
 		} else {
-			a.chi.EnsureStatus().Action = fmt.Sprint(format)
+			a.chi.EnsureStatus().SetAction(fmt.Sprint(format))
 		}
 	}
 	if a.writeStatusActions {
@@ -296,10 +296,11 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 	}
 	if a.writeStatusError {
 		if len(args) > 0 {
-			a.chi.EnsureStatus().Error = fmt.Sprintf(format, args...)
+			// PR review question: should we prefix the string in the SetError call? If so, we can SetAndPushError.
+			a.chi.EnsureStatus().SetError(fmt.Sprintf(format, args...))
 			a.chi.EnsureStatus().PushError(prefix + fmt.Sprintf(format, args...))
 		} else {
-			a.chi.EnsureStatus().Error = fmt.Sprint(format)
+			a.chi.EnsureStatus().SetError(fmt.Sprint(format))
 			a.chi.EnsureStatus().PushError(prefix + fmt.Sprint(format))
 		}
 	}

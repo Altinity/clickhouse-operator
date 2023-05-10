@@ -156,13 +156,32 @@ func (c *Cluster) QueryHostInt(ctx context.Context, host *chop.ChiHost, sql stri
 	}
 
 	query, err := c.QueryHost(ctx, host, sql, _opts...)
-	if query == nil {
-		return 0, nil
-	}
 	defer query.Close()
+	if query == nil {
+		return 0, err
+	}
 	if err != nil {
 		return 0, err
 	}
 
 	return query.Int()
+}
+
+// QueryHostString runs specified query on specified host and returns one string as a result
+func (c *Cluster) QueryHostString(ctx context.Context, host *chop.ChiHost, sql string, _opts ...*clickhouse.QueryOptions) (string, error) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return "", nil
+	}
+
+	query, err := c.QueryHost(ctx, host, sql, _opts...)
+	defer query.Close()
+	if query == nil {
+		return "", err
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return query.String()
 }

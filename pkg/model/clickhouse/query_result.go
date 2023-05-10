@@ -109,3 +109,23 @@ func (q *QueryResult) Int() (int, error) {
 	}
 	return 0, fmt.Errorf("found no rows")
 }
+
+// String fetches one string from the query result
+func (q *QueryResult) String() (string, error) {
+	if q == nil {
+		return "", fmt.Errorf("empty query")
+	}
+	if q.Rows == nil {
+		return "", fmt.Errorf("no rows")
+	}
+
+	var result string
+	for q.Rows.Next() {
+		if err := q.Rows.Scan(&result); err != nil {
+			log.V(1).F().Error("UNABLE to scan row err: %v", err)
+			return "", err
+		}
+		return result, nil
+	}
+	return "", fmt.Errorf("found no rows")
+}
