@@ -18,11 +18,26 @@ if [[ ! -d "${CO_PATH}" ]]; then
 fi
 
 if [[ -z "${PREVIOUS_VERSION}" ]]; then
+    echo "PREVIOUS_VERSION is empty"
+    echo "Trying to figure out PREVIOUS_VERSION from releases"
+    PREVIOUS_VERSION=$(cat "${SRC_ROOT}/releases" | head -n1)
+    echo "Found the following PREVIOUS_VERSION=$PREVIOUS_VERSION"
+else
     echo "PREVIOUS_VERSION=${PREVIOUS_VERSION}"
-    echo "Please specify PREVIOUS_VERSION published on operatorhub, like"
+    echo "PREVIOUS_VERSION explicitly specified, continue"
+fi
+
+if [[ -z "${PREVIOUS_VERSION}" ]]; then
+    echo "Please specify PREVIOUS_VERSION earlier published on operatorhub, like"
     echo "PREVIOUS_VERSION=0.18.1"
     exit 1
+else
+    echo "Going to use"
+    echo "PREVIOUS_VERSION=${PREVIOUS_VERSION}"
 fi
+
+echo "Please, verify correctness of specified previous version"
+read -n 1 -r -s -p $'Press enter to continue...\n'
 
 PREVIOUS_VERSION="${PREVIOUS_VERSION}" ${SRC_ROOT}/deploy/builder/operatorhub.sh
 
