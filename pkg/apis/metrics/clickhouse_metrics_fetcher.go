@@ -76,6 +76,13 @@ const (
             'Control sum for changed settings' AS description,
             'gauge'                            AS type
 		FROM system.settings WHERE changed
+		UNION ALL
+		SELECT 
+		    concat('metric.SystemErrors_',errorCodeToName(code)) AS metric,
+		    toString(value) AS value,
+		    'Error counter from system.errors' AS description,
+			'gauge' AS type
+		FROM system.errors
 	`
 	querySystemPartsSQL = `
 		SELECT
