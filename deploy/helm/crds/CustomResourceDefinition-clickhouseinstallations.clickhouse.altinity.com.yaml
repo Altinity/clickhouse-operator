@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.0
+    clickhouse.altinity.com/chop: 0.21.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -577,9 +577,12 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          insecure:
+                            !!merge <<: *TypeStringBool
+                            description: optional, open insecure ports for cluster, defaults to "yes"
                           secure:
                             !!merge <<: *TypeStringBool
-                            description: optional, setup `secure` inside `clickhouse-server` settings for each Pod of the cluster
+                            description: optional, open secure ports for cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -699,11 +702,14 @@ spec:
                                             # See namePartReplicaMaxLen const
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                          insecure:
+                                            !!merge <<: *TypeStringBool
+                                            description: |
+                                              optional, open insecure ports for cluster, defaults to "yes"
                                           secure:
                                             !!merge <<: *TypeStringBool
                                             description: |
-                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                              if specified
+                                              optional, open secure ports
                                           tcpPort:
                                             type: integer
                                             description: |
@@ -711,11 +717,19 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
                                               optional, setup `Pod.spec.containers.ports` with name `http` for selected replica, override `chi.spec.templates.hostTemplates.spec.httpPort`
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
+                                            minimum: 1
+                                            maximum: 65535
+                                          httpsPort:
+                                            type: integer
                                             minimum: 1
                                             maximum: 65535
                                           interserverHTTPPort:
@@ -790,11 +804,14 @@ spec:
                                             # See namePartReplicaMaxLen const
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
+                                          insecure:
+                                            !!merge <<: *TypeStringBool
+                                            description: |
+                                              optional, open insecure ports for cluster, defaults to "yes"
                                           secure:
                                             !!merge <<: *TypeStringBool
                                             description: |
-                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                              if specified
+                                              optional, open secure ports
                                           tcpPort:
                                             type: integer
                                             description: |
@@ -802,11 +819,19 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
                                               optional, setup `Pod.spec.containers.ports` with name `http` for selected shard, override `chi.spec.templates.hostTemplates.spec.httpPort`
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
+                                            minimum: 1
+                                            maximum: 65535
+                                          httpsPort:
+                                            type: integer
                                             minimum: 1
                                             maximum: 65535
                                           interserverHTTPPort:
@@ -877,11 +902,14 @@ spec:
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
+                              insecure:
+                                !!merge <<: *TypeStringBool
+                                description: |
+                                  optional, open insecure ports for cluster, defaults to "yes"
                               secure:
                                 !!merge <<: *TypeStringBool
                                 description: |
-                                  optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                  if specified
+                                  optional, open secure ports
                               tcpPort:
                                 type: integer
                                 description: |
@@ -890,12 +918,20 @@ spec:
                                   More info: https://clickhouse.tech/docs/en/interfaces/tcp/
                                 minimum: 1
                                 maximum: 65535
+                              tlsPort:
+                                type: integer
+                                minimum: 1
+                                maximum: 65535
                               httpPort:
                                 type: integer
                                 description: |
                                   optional, setup `http_port` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified, should have equal value with `chi.spec.templates.podTemplates.spec.containers.ports[name=http]`
                                   More info: https://clickhouse.tech/docs/en/interfaces/http/
+                                minimum: 1
+                                maximum: 65535
+                              httpsPort:
+                                type: integer
                                 minimum: 1
                                 maximum: 65535
                               interserverHTTPPort:
