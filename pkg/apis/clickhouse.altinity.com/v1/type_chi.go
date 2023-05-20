@@ -290,11 +290,9 @@ func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
 	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
 	fCluster func(ctx context.Context, cluster *Cluster) error,
-	fShard func(ctx context.Context, shard *ChiShard) error,
-	fHost func(ctx context.Context, host *ChiHost) error,
-	fCHI func(ctx context.Context, chi *ClickHouseInstallation) error,
+	fShards func(ctx context.Context, shards []*ChiShard) error,
+	fCHIFinal func(ctx context.Context, chi *ClickHouseInstallation) error,
 ) error {
-
 	if err := fCHIPreliminary(ctx, chi); err != nil {
 		return err
 	}
@@ -304,21 +302,17 @@ func (chi *ClickHouseInstallation) WalkTillError(
 		if err := fCluster(ctx, cluster); err != nil {
 			return err
 		}
-		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
-			if err := fShard(ctx, shard); err != nil {
-				return err
-			}
-			for replicaIndex := range shard.Hosts {
-				host := shard.Hosts[replicaIndex]
-				if err := fHost(ctx, host); err != nil {
-					return err
-				}
-			}
+
+		shards := make([]*ChiShard, 0, len(cluster.Layout.Shards))
+		for shardIndex, _ := range cluster.Layout.Shards {
+			shards = append(shards, &cluster.Layout.Shards[shardIndex])
+		}
+		if err := fShards(ctx, shards); err != nil {
+			return err
 		}
 	}
 
-	if err := fCHI(ctx, chi); err != nil {
+	if err := fCHIFinal(ctx, chi); err != nil {
 		return err
 	}
 

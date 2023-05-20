@@ -17,9 +17,12 @@ package chi
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	coreV1 "k8s.io/api/core/v1"
 	policyV1 "k8s.io/api/policy/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	"math"
+	"sync"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -126,8 +129,7 @@ func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 		ctx,
 		w.reconcileCHIAuxObjectsPreliminary,
 		w.reconcileCluster,
-		w.reconcileShard,
-		w.reconcileHost,
+		w.reconcileShardsHosts,
 		w.reconcileCHIAuxObjectsFinal,
 	)
 }
@@ -374,6 +376,81 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 		w.task.registryFailed.RegisterPDB(pdb.ObjectMeta)
 	}
 
+	return nil
+}
+
+func (w *worker) safeShardWorkerCount(shards []*chiV1.ChiShard) int {
+	maxAvailableWorkers := float64(chop.Config().Reconcile.Runtime.ShardsThreadNumber)
+	maxPct := float64(chop.Config().Reconcile.Runtime.ShardsMaxConcurrencyPercent)
+
+	// Always return at least 1, up to maxAvailable, but never exceeding maxSafe
+	maxSafeWorkers := math.Max(math.Floor(maxPct/100.0)*float64(len(shards)), 1)
+	return int(math.Min(maxAvailableWorkers, maxSafeWorkers))
+}
+
+func (w *worker) reconcileShardsHosts(ctx context.Context, shards []*chiV1.ChiShard) error {
+	if len(shards) == 0 {
+		return nil
+	}
+
+	// Always process the first shard first (and all of its hosts). This gives us some early indicator of whether
+	// the reconciliation would fail, and for large clusters is small price to pay before performing concurrent fan-out.
+	firstShard := shards[0]
+	if err := w.reconcileShard(ctx, firstShard); err != nil {
+		return err
+	}
+	for _, host := range firstShard.Hosts {
+		if err := w.reconcileHost(ctx, host); err != nil {
+			return err
+		}
+	}
+
+	// If we're working on a single-shard cluster, we are done.
+	if len(shards) == 1 {
+		return nil
+	}
+
+	// Otherwise, we process the remaining n-1 shards using the configured concurrency level while maintaining
+	// the configured max concurrency percentage.
+	// The default behavior is no concurrency, but this can be adjusted in operating reconciliation runtime settings.
+	workerCount := w.safeShardWorkerCount(shards)
+	for i := 1; i < len(shards); i += workerCount {
+		endIdx := i + workerCount
+		if endIdx > len(shards) {
+			endIdx = len(shards)
+		}
+		concurrentChunk := shards[i:endIdx]
+
+		wg := sync.WaitGroup{}
+		wg.Add(len(concurrentChunk))
+		var anyErr error
+		var anyErrLock sync.Mutex
+		for j := range concurrentChunk {
+			thisShard := concurrentChunk[j] // goroutine var
+			go func() {
+				defer wg.Done()
+				if err := w.reconcileShard(ctx, thisShard); err != nil {
+					anyErrLock.Lock()
+					anyErr = err
+					anyErrLock.Unlock()
+					return
+				}
+				for replicaIndex := range thisShard.Hosts {
+					host := thisShard.Hosts[replicaIndex]
+					if err := w.reconcileHost(ctx, host); err != nil {
+						anyErrLock.Lock()
+						anyErr = err
+						anyErrLock.Unlock()
+						return
+					}
+				}
+			}()
+		}
+		wg.Wait()
+		if anyErr != nil {
+			return anyErr
+		}
+	}
 	return nil
 }
 
