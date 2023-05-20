@@ -361,8 +361,12 @@ configs:
       ################################################
       reconcile:
         runtime:
-          # Max number of concurrent reconciles in progress
-          threadsNumber: 10
+          # Max number of concurrent CHI reconciles in progress
+          reconcileCHIsThreadsNumber: 10
+          # Max number of concurrent shard reconciles in progress
+          reconcileShardsThreadsNumber: 1
+          # The maximum percentage of cluster shards that may be reconciled in parallel
+          reconcileShardsMaxConcurrencyPercent: 50
 
         statefulSet:
           create:
