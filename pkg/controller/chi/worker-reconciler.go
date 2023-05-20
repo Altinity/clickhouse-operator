@@ -129,7 +129,7 @@ func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 		ctx,
 		w.reconcileCHIAuxObjectsPreliminary,
 		w.reconcileCluster,
-		w.reconcileShardsHosts,
+		w.reconcileShardsAndHosts,
 		w.reconcileCHIAuxObjectsFinal,
 	)
 }
@@ -389,7 +389,8 @@ func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard) int {
 	return int(math.Min(maxAvailableWorkers, maxAllowedWorkers))
 }
 
-func (w *worker) reconcileShardsHosts(ctx context.Context, shards []*chiV1.ChiShard) error {
+// reconcileShardsAndHosts reconciles shards and hosts of each shard
+func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.ChiShard) error {
 	if len(shards) == 0 {
 		return nil
 	}
@@ -455,7 +456,7 @@ func (w *worker) reconcileShardsHosts(ctx context.Context, shards []*chiV1.ChiSh
 	return nil
 }
 
-// reconcileShard reconciles Shard, excluding nested replicas
+// reconcileShard reconciles specified shard, excluding nested replicas
 func (w *worker) reconcileShard(ctx context.Context, shard *chiV1.ChiShard) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -480,7 +481,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chiV1.ChiShard) erro
 	return err
 }
 
-// reconcileHost reconciles ClickHouse host
+// reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -625,6 +626,7 @@ func (w *worker) reconcileConfigMap(
 	return err
 }
 
+// hasService checks whether specified service exists
 func (w *worker) hasService(ctx context.Context, chi *chiV1.ClickHouseInstallation, service *coreV1.Service) bool {
 	// Check whether this object already exists
 	curService, _ := w.c.getService(service)
