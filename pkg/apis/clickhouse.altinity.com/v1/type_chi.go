@@ -304,7 +304,7 @@ func (chi *ClickHouseInstallation) WalkTillError(
 		}
 
 		shards := make([]*ChiShard, 0, len(cluster.Layout.Shards))
-		for shardIndex, _ := range cluster.Layout.Shards {
+		for shardIndex := range cluster.Layout.Shards {
 			shards = append(shards, &cluster.Layout.Shards[shardIndex])
 		}
 		if err := fShards(ctx, shards); err != nil {
