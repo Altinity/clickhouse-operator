@@ -2526,13 +2526,13 @@ spec:
                   properties:
                     runtime:
                       type: object
-                      description: "runtime parameters for clickhouse-operator process which use during reconciling"
+                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
                       properties:
                         reconcileCHIsThreadsNumber:
                           type: integer
                           minimum: 1
                           maximum: 65535
-                          description: "How many goroutines will be used to reconcile in parallel, 10 by default"
+                          description: "How many goroutines will be used to reconcile CHIs in parallel, 10 by default"
                         reconcileShardsThreadsNumber:
                           type: integer
                           minimum: 1
