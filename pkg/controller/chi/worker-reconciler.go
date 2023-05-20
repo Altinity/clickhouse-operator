@@ -379,13 +379,14 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 	return nil
 }
 
-func (w *worker) safeShardWorkerCount(shards []*chiV1.ChiShard) int {
+// getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
+func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard) int {
 	maxAvailableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
 	maxPct := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
 
 	// Always return at least 1, up to maxAvailable, but never exceeding maxSafe
-	maxSafeWorkers := math.Max(math.Floor(maxPct/100.0)*float64(len(shards)), 1)
-	return int(math.Min(maxAvailableWorkers, maxSafeWorkers))
+	maxAllowedWorkers := math.Max(math.Floor(maxPct/100.0)*float64(len(shards)), 1)
+	return int(math.Min(maxAvailableWorkers, maxAllowedWorkers))
 }
 
 func (w *worker) reconcileShardsHosts(ctx context.Context, shards []*chiV1.ChiShard) error {
@@ -413,7 +414,7 @@ func (w *worker) reconcileShardsHosts(ctx context.Context, shards []*chiV1.ChiSh
 	// Otherwise, we process the remaining n-1 shards using the configured concurrency level while maintaining
 	// the configured max concurrency percentage.
 	// The default behavior is no concurrency, but this can be adjusted in operating reconciliation runtime settings.
-	workerCount := w.safeShardWorkerCount(shards)
+	workerCount := w.getReconcileShardsWorkersNum(shards)
 	for i := 1; i < len(shards); i += workerCount {
 		endIdx := i + workerCount
 		if endIdx > len(shards) {
