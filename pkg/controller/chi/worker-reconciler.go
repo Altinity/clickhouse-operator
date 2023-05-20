@@ -17,15 +17,16 @@ package chi
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	coreV1 "k8s.io/api/core/v1"
-	policyV1 "k8s.io/api/policy/v1"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"math"
 	"sync"
 
+	coreV1 "k8s.io/api/core/v1"
+	policyV1 "k8s.io/api/policy/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
