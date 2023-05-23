@@ -7,36 +7,36 @@ metadata:
 spec:
   configuration:
     settings:
-      dictionaries_config: config.d/*.dict
+      dictionaries_config: config.d/*_dict.conf
     files:
-      dict_one.dict: |
+      one_dict.conf: |
         <yandex>
           <dictionary>
-        <name>one</name>
-        <source>
-            <clickhouse>
+            <name>one</name>
+            <source>
+              <clickhouse>
                 <host>localhost</host>
                 <port>9000</port>
                 <user>default</user>
                 <password/>
                 <db>system</db>
                 <table>one</table>
-            </clickhouse>
-        </source>
-        <lifetime>60</lifetime>
-        <layout><flat/></layout>
-        <structure>
-            <id>
+              </clickhouse>
+            </source>
+            <lifetime>60</lifetime>
+            <layout><flat/></layout>
+            <structure>
+              <id>
                 <name>dummy</name>
-            </id>
-            <attribute>
+              </id>
+              <attribute>
                 <name>one</name>
                 <expression>dummy</expression>
                 <type>UInt8</type>
                 <null_value>0</null_value>
-            </attribute>
-        </structure>
-        </dictionary>
+              </attribute>
+            </structure>
+          </dictionary>
         </yandex>
     clusters:
       - name: standard
