@@ -46,6 +46,7 @@ metadata:
 spec:
   type: ClusterIP
   clusterIP: None
+  publishNotReadyAddresses: false
   ports:
     - name: tcp-client
       port: 2181
@@ -123,7 +124,8 @@ data:
 
   zoo.cfg: |
     4lw.commands.whitelist=*
-    dataDir=/data
+    dataDir=/var/lib/zookeeper/data
+    dataLogDir=/var/lib/zookeeper/datalog
     standaloneEnabled=false
     reconfigEnabled=true
     skipACL=yes
@@ -147,7 +149,7 @@ data:
     autopurge.purgeInterval=1
     quorumListenOnAllIPs=false
     admin.serverPort=8080
-    dynamicConfigFile=/data/zoo.cfg.dynamic
+    dynamicConfigFile=/var/lib/zookeeper/zoo.cfg.dynamic
   zookeeperFunctions.sh: |
     #!/usr/bin/env bash
     # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
@@ -180,16 +182,26 @@ data:
     #     https://www.apache.org/licenses/LICENSE-2.0
 
     set -ex
+    # TODO think how to add nslookup to docker image
     # apt-get update && apt-get install --no-install-recommends -y dnsutils procps
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
     HOST=`hostname -s`
-    DATA_DIR=/data
-    MYID_FILE=$DATA_DIR/myid
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
     LOG4J_CONF=/conf/log4j-quiet.properties
-    DYNCONFIG=$DATA_DIR/zoo.cfg.dynamic
-    STATIC_CONFIG=/data/conf/zoo.cfg
+    DYNCONFIG=$VOLUME_DIR/zoo.cfg.dynamic
+    STATIC_CONFIG=$VOLUME_DIR/conf/zoo.cfg
+    
+    if [[ ! -d "$VOLUME_DIR/data" ]]; then
+      mkdir -p $VOLUME_DIR/data
+      chown zookeeper $VOLUME_DIR/data
+    fi
+    if [[ ! -d "$VOLUME_DIR/datalog" ]]; then
+      mkdir -p $VOLUME_DIR/datalog
+      chown zookeeper $VOLUME_DIR/datalog
+    fi
 
     # Extract resource name and this members ordinal value from pod hostname
     if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
@@ -210,9 +222,9 @@ data:
 
     # Check validity of on-disk configuration
     if [ -f $MYID_FILE ]; then
-      EXISTING_ID="`cat $DATA_DIR/myid`"
+      EXISTING_ID="`cat $MYID_FILE`"
       if [[ "$EXISTING_ID" == "$MYID" && -f $STATIC_CONFIG ]]; then
-        # If Id is correct and configuration is present under `/data/conf`
+        # If Id is correct and configuration is present under `/var/lib/zookeeper/conf`
           ONDISK_MYID_CONFIG=true
       fi
     fi
@@ -294,7 +306,7 @@ data:
         set +e
     fi
 
-    ZOOCFGDIR=/data/conf
+    ZOOCFGDIR=/var/lib/zookeeper/conf
     export ZOOCFGDIR
     echo Copying /conf contents to writable directory, to support Zookeeper dynamic reconfiguration
     if [[ ! -d "$ZOOCFGDIR" ]]; then
@@ -332,9 +344,9 @@ data:
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
-    DATA_DIR=/data
-    MYID_FILE=$DATA_DIR/myid
-    DYNCONFIG=$DATA_DIR/zoo.cfg.dynamic
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
+    DYNCONFIG=$VOLUME_DIR/zoo.cfg.dynamic
     LOG4J_CONF=/conf/log4j-quiet.properties
 
     # Wait for client connections to drain. Kubernetes will wait until the confiugred
@@ -396,10 +408,10 @@ data:
     source /conf/zookeeperFunctions.sh
 
     HOST=`hostname -s`
-    DATA_DIR=/data
-    MYID_FILE=$DATA_DIR/myid
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
     LOG4J_CONF=/conf/log4j-quiet.properties
-    STATIC_CONFIG=/data/conf/zoo.cfg
+    STATIC_CONFIG=$VOLUME_DIR/conf/zoo.cfg
 
     OK=$(exec 3<>/dev/tcp/127.0.0.1/${CLIENT_PORT} ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;)
 
@@ -428,9 +440,9 @@ data:
         MYID=$((ORD+1))
         ONDISK_CONFIG=false
         if [ -f $MYID_FILE ]; then
-          EXISTING_ID="`cat $DATA_DIR/myid`"
+          EXISTING_ID="`cat $MYID_FILE`"
           if [[ "$EXISTING_ID" == "$MYID" && -f $STATIC_CONFIG ]]; then
-          #If Id is correct and configuration is present under `/data/conf`
+          #If Id is correct and configuration is present under `/var/lib/zookeeper/conf`
               ONDISK_CONFIG=true
               DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
               DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
@@ -560,7 +572,7 @@ spec:
               name: admin-server
               protocol: TCP
           volumeMounts:
-            - mountPath: /data
+            - mountPath: /var/lib/zookeeper
               name: datadir-volume
             - mountPath: /conf
               name: conf
@@ -585,5 +597,4 @@ spec:
         resources:
           requests:
             storage: 1Gi
-        storageClassName: standard
         volumeMode: Filesystem
