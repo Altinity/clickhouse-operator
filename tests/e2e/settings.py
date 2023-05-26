@@ -56,16 +56,17 @@ image_pull_policy = os.getenv("IMAGE_PULL_POLICY") if "IMAGE_PULL_POLICY" in os.
 clickhouse_template = (
     os.getenv("CLICKHOUSE_TEMPLATE")
     if "CLICKHOUSE_TEMPLATE" in os.environ else
-    # "manifests/chit/tpl-clickhouse-stable.yaml"
+    "manifests/chit/tpl-clickhouse-stable.yaml"
     # "manifests/chit/tpl-clickhouse-19.17.yaml"
     # "manifests/chit/tpl-clickhouse-20.3.yaml"
     # "manifests/chit/tpl-clickhouse-20.8.yaml"
     # "manifests/chit/tpl-clickhouse-21.3.yaml"
     # "manifests/chit/tpl-clickhouse-21.8.yaml"
     # "manifests/chit/tpl-clickhouse-22.3.yaml"
-    "manifests/chit/tpl-clickhouse-22.8.yaml"
+    # "manifests/chit/tpl-clickhouse-22.8.yaml"
+    # "manifests/chit/tpl-clickhouse-23.3.yaml"
 )
-clickhouse_template_old = "manifests/chit/tpl-clickhouse-22.3.yaml"
+clickhouse_template_old = "manifests/chit/tpl-clickhouse-22.8.yaml"
 
 clickhouse_version = get_ch_version(clickhouse_template)
 clickhouse_version_old = get_ch_version(clickhouse_template_old)

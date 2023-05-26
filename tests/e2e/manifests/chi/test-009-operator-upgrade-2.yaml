@@ -65,7 +65,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+              image: altinity/clickhouse-server:22.8.15.25.altinitystable
               ports:
                 - name: http
                   containerPort: 8123
