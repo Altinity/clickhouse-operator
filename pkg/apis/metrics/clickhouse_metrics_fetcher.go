@@ -81,7 +81,7 @@ const (
 		    concat('metric.SystemErrors_',name) AS metric,
 		    toString(sum(value)) AS value,
 		    'Error counter from system.errors' AS description,
-			'gauge' AS type
+			'counter' AS type
 		FROM system.errors
         GROUP BY name
 	`

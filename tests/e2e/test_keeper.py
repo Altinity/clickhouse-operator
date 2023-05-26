@@ -158,7 +158,7 @@ def delete_keeper_pvc(keeper_type):
 
 
 @TestOutline
-def test_keeper_outline(
+def test_keeper_rescale_outline(
         self,
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
@@ -171,6 +171,8 @@ def test_keeper_outline(
     CH 1 -> 2 wait complete + Keeper 1 -> 3 nowait
     CH 2 -> 1 wait complete + Keeper 3 -> 1 nowait
     CH 1 -> 2 wait complete + Keeper 1 -> 3 nowait
+
+    Keeper replicas 3 > 0 > 1 > 3
     """
 
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
@@ -252,6 +254,16 @@ def test_keeper_outline(
         )
         check_zk_root_znode(chi, keeper_type, pod_count=3)
 
+    with When("Stop CH + ZK"):
+        chi = start_stop_zk_and_clickhouse(
+            zk_replicas=2,
+            keeper_node_count=3,
+            keeper_type=keeper_type,
+            keeper_manifest_1_node=keeper_manifest_1_node,
+            keeper_manifest_3_node=keeper_manifest_3_node,
+        )
+        check_zk_root_znode(chi, keeper_type, pod_count=3)
+
     with Then("check data in tables"):
         for table_name, exptected_rows in {
             "test_repl1": str(1000 + 2000 * total_iterations),
@@ -275,7 +287,7 @@ def test_keeper_outline(
 @TestScenario
 @Name("test_zookeeper_rescale. Check ZK scale-up / scale-down cases")
 def test_zookeeper_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
@@ -286,7 +298,7 @@ def test_zookeeper_rescale(self):
 @TestScenario
 @Name("test_clickhouse_keeper_rescale. Check KEEPER scale-up / scale-down cases")
 def test_clickhouse_keeper_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="clickhouse-keeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="clickhouse-keeper-1-node-256M-for-test-only.yaml",
@@ -297,7 +309,7 @@ def test_clickhouse_keeper_rescale(self):
 @TestScenario
 @Name("test_zookeeper_operator_rescale. Check Zookeeper OPERATOR scale-up / scale-down cases")
 def test_zookeeper_operator_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="zookeeper-operator",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
@@ -308,7 +320,7 @@ def test_zookeeper_operator_rescale(self):
 @TestScenario
 @Name("test_zookeeper_pvc_scaleout_rescale. Check ZK+PVC scale-up / scale-down cases")
 def test_zookeeper_pvc_scaleout_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
