@@ -273,9 +273,17 @@ data:
       # This is the first node being added to the cluster or headless service not yet available
       REGISTER_NODE=false
     else
-      # An ensemble exists, check to see if this node is already a member.
+      # If ensemble exists, check to see if this node is already a member.
       if [[ "$ONDISK_MYID_CONFIG" == false || "$ONDISK_DYN_CONFIG" == false ]]; then
         REGISTER_NODE=true
+      elif [[ -f "$STATIC_CONFIG" ]]; then
+          DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
+          DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
+          if [[ "0" == $(grep -c "server.${MYID}=" "${DYN_CFG_FILE}") ]]; then
+            REGISTER_NODE=true
+          else 
+            REGISTER_NODE=false
+          fi
       else
         REGISTER_NODE=false
       fi
@@ -295,6 +303,7 @@ data:
       fi
     fi
 
+    export ZOOCFGDIR=/var/lib/zookeeper/conf
     if [[ "$REGISTER_NODE" == true ]]; then
         ROLE=observer
         ZKURL=$(zkConnectionString)
@@ -303,11 +312,15 @@ data:
         set -e
         echo Registering node and writing local configuration to disk.
         zkCli.sh -server ${ZKURL} reconfig -add "\nserver.$MYID=$ZKCONFIG" | grep -E '^server\.[0-9]+='  > $DYNCONFIG
+        if ls $ZOOCFGDIR/zoo.cfg.dynamic.* 1> /dev/null 2>&1; then
+          DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
+          DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
+          cp -fv $DYNCONFIG $DYN_CFG_FILE  
+        fi 
         set +e
     fi
 
-    ZOOCFGDIR=/var/lib/zookeeper/conf
-    export ZOOCFGDIR
+    
     echo Copying /conf contents to writable directory, to support Zookeeper dynamic reconfiguration
     if [[ ! -d "$ZOOCFGDIR" ]]; then
       mkdir $ZOOCFGDIR
@@ -340,6 +353,8 @@ data:
     #     https://www.apache.org/licenses/LICENSE-2.0
 
     set -ex
+    exec > /proc/1/fd/1
+    exec 2> /proc/1/fd/2
 
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
@@ -349,9 +364,9 @@ data:
     DYNCONFIG=$VOLUME_DIR/zoo.cfg.dynamic
     LOG4J_CONF=/conf/log4j-quiet.properties
 
-    # Wait for client connections to drain. Kubernetes will wait until the confiugred
+    # Wait for client connections to drain. Kubernetes will wait until the configured
     # "terminationGracePeriodSeconds" before forcibly killing the container
-    CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" |grep -v "/127.0.0.1:" | wc -l`
+    CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "/127.0.0.1:" | wc -l`
     for (( i = 0; i < 6; i++ )); do
       if [[ "$CONN_COUNT" -gt 0 ]]; then
         echo "$CONN_COUNT non-local connections still connected."
@@ -446,7 +461,7 @@ data:
               ONDISK_CONFIG=true
               DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
               DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
-              SERVER_FOUND=`cat $DYN_CFG_FILE | grep "server.${MYID}=" | wc -l`
+              SERVER_FOUND=`cat $DYN_CFG_FILE | grep -c "server.${MYID}="`
               if [[ "$SERVER_FOUND" == "0" ]]; then
                 echo "Server not found in ensemble. Exiting ..."
                 exit 1
@@ -536,7 +551,9 @@ spec:
             preStop:
               exec:
                 command:
-                  - /conf/zookeeperTeardown.sh
+                  - bash
+                  - -xec
+                  - "/conf/zookeeperTeardown.sh > /dev/termination-log 2>&1"
           livenessProbe:
             exec:
               command:

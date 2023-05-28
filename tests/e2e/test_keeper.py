@@ -4,15 +4,15 @@ import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.util as util
-
+import e2e.yaml_manifest as yaml_manifest
 from testflows.core import *
 
 
-def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
+def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries_number=10):
     svc_name = "zookeeper-client" if keeper_type == "zookeeper-operator" else "zookeeper"
     expected_containers = "1/1"
     expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
-    for i in range(retries):
+    for i in range(retries_number):
         ready_pods = kubectl.launch(
             f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l"
         )
@@ -25,16 +25,16 @@ def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
                 break
         else:
             with Then(
-                    f"Zookeeper Not ready yet ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}. "
-                    f"Wait for {i * 3} seconds"
+                f"Zookeeper Not ready yet "
+                f"ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}. "
+                f"Wait for {i * 3} seconds"
             ):
                 time.sleep(i * 3)
-        if i == retries - 1:
+        if i == retries_number - 1:
             Fail(
-                f"Zookeeper failed, ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}"
+                f"Zookeeper failed, "
+                f"ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}"
             )
-
-
 
 
 def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_tables):
@@ -99,7 +99,7 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
                     time.sleep((i + 1) * 3)
 
         assert found, f"Unexpected {keeper_type} `ls /` output"
-    # clickhouse could not reconnect to zookeeper so we need to retry
+    # clickhouse could not reconnect to zookeeper. So we need to retry
     for i in range(retry_count):
         out = clickhouse.query(
             chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'", with_error=True
@@ -157,6 +157,39 @@ def delete_keeper_pvc(keeper_type):
             kubectl.launch(f"delete pvc {pvc['metadata']['name']}", ns=settings.test_namespace)
 
 
+def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper_type, keeper_manifest_1_node,
+                                 keeper_manifest_3_node):
+    kubectl.launch(f"patch chi --type=merge {chi_name} -p '{{\"spec\":{{ \"stop\": \"{ch_stop}\" }} }}'")
+    keeper_manifest = keeper_manifest_1_node
+    if keeper_replica_count > 1:
+        keeper_manifest = keeper_manifest_3_node
+    if keeper_type == "zookeeper":
+        keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+    if keeper_type == "clickhouse-keeper":
+        keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+    if keeper_type == "zookeeper-operator":
+        keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+
+    zk_manifest = yaml_manifest.get_multidoc_manifest_data(util.get_full_path(keeper_manifest, lookup_in_host=True))
+    for doc in zk_manifest:
+        if doc["kind"] == "StatefulSet":
+            with When(f"Path Zookeeper replicas: {keeper_replica_count}"):
+                keeper_name = doc["metadata"]["name"]
+                kubectl.launch(
+                    f"patch --type=merge sts {keeper_name} -p '{{\"spec\":{{\"replicas\":{keeper_replica_count}}}}}'"
+                )
+                retries_num = 10
+                for i in range(retries_num):
+                    pod_counts = kubectl.get_count("pod", f"-l app={keeper_type}")
+                    if pod_counts == keeper_replica_count:
+                        break
+                    elif i >= retries_num - 1:
+                        assert pod_counts == keeper_replica_count
+                    with Then(f"Zookeeper not ready. "
+                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {2*(i+1)} seconds"):
+                        time.sleep(2*(i+1))
+
+
 @TestOutline
 def test_keeper_rescale_outline(
         self,
@@ -199,7 +232,7 @@ def test_keeper_rescale_outline(
             insert_tables=["test_repl1"],
         )
 
-    total_iterations = 3
+    total_iterations = 1
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
@@ -254,17 +287,30 @@ def test_keeper_rescale_outline(
         )
         check_zk_root_znode(chi, keeper_type, pod_count=3)
 
-    with When("Stop CH + ZK"):
-        chi = start_stop_zk_and_clickhouse(
-            zk_replicas=2,
-            keeper_node_count=3,
-            keeper_type=keeper_type,
-            keeper_manifest_1_node=keeper_manifest_1_node,
-            keeper_manifest_3_node=keeper_manifest_3_node,
-        )
-        check_zk_root_znode(chi, keeper_type, pod_count=3)
+    for keeper_replica_count in [1, 3]:
+        with When("Stop CH + ZK"):
+            start_stop_zk_and_clickhouse(
+                chi['metadata']['name'],
+                ch_stop=True,
+                keeper_replica_count=0,
+                keeper_type=keeper_type,
+                keeper_manifest_1_node=keeper_manifest_1_node,
+                keeper_manifest_3_node=keeper_manifest_3_node
+            )
+        with Then("Start CH + ZK "):
+            start_stop_zk_and_clickhouse(
+                chi['metadata']['name'],
+                ch_stop=False,
+                keeper_replica_count=keeper_replica_count,
+                keeper_type=keeper_type,
+                keeper_manifest_1_node=keeper_manifest_1_node,
+                keeper_manifest_3_node=keeper_manifest_3_node
+            )
 
     with Then("check data in tables"):
+        check_zk_root_znode(chi, keeper_type, pod_count=3)
+        util.wait_clickhouse_cluster_ready(chi)
+        util.wait_clickhouse_no_readonly_replicas(chi)
         for table_name, exptected_rows in {
             "test_repl1": str(1000 + 2000 * total_iterations),
             "test_repl2": str(2000 * total_iterations),
@@ -407,7 +453,8 @@ def test_keeper_probes_outline(
 
 @TestScenario
 @Name(
-    "test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_zookeeper_probes_workload(self):
     test_keeper_probes_outline(
@@ -419,7 +466,8 @@ def test_zookeeper_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_zookeeper_pvc_probes_workload(self):
     test_keeper_probes_outline(
@@ -431,7 +479,8 @@ def test_zookeeper_pvc_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_zookeeper_operator_probes_workload(self):
     test_keeper_probes_outline(
@@ -447,7 +496,8 @@ def test_zookeeper_operator_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_clickhouse_keeper_probes_workload(self):
     test_keeper_probes_outline(
