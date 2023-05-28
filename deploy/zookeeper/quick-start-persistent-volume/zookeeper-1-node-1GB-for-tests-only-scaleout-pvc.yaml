@@ -551,9 +551,7 @@ spec:
             preStop:
               exec:
                 command:
-                  - bash
-                  - -xec
-                  - "/conf/zookeeperTeardown.sh > /dev/termination-log 2>&1"
+                  - /conf/zookeeperTeardown.sh
           livenessProbe:
             exec:
               command:
