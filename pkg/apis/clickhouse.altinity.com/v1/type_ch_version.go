@@ -30,7 +30,8 @@ type CHVersion struct {
 
 // NewCHVersion creates new ClickHouse version
 func NewCHVersion(str string) *CHVersion {
-	if parts := strings.Split(str, "."); len(parts) == 4 {
+	// Need to have at least 3 parts in ClickHouse version specification
+	if parts := strings.Split(str, "."); len(parts) >= 3 {
 		return &CHVersion{
 			Version: str,
 			Semver:  strings.Join(parts[0:2], "."),
