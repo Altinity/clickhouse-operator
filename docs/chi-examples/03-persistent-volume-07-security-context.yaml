@@ -17,7 +17,7 @@ spec:
         general:
           remote_storage: "none"
           disable_progress_bar: false
-          backup_to_keep_local: 1
+          backups_to_keep_local: -1
           backups_to_keep_remote: 0
         clickhouse:
           username: default
@@ -32,6 +32,8 @@ spec:
         api:
           listen: "0.0.0.0:7171"
           enable_metrics: true
+          enable_pprof: true
+          create_integration_tables: true
   templates:
     podTemplates:
       - name: pod-template-with-volumes-do-not-chown
@@ -51,7 +53,7 @@ spec:
                 - clickhouse-server
                 - --config-file=/etc/clickhouse-server/config.xml
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:2.1.3
+              image: altinity/clickhouse-backup:2.2.6
               imagePullPolicy: Always
               command:
                 - /bin/bash
