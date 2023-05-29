@@ -63,7 +63,12 @@ function main() {
     perl -pi -e 's/"datasource": "\$db"/"datasource": {"type":"vertamedia-clickhouse-datasource","uid":"\${db}"}/g' "${files_dir}/${dashboard_name}"
   done
 
-  helm-docs --chart-search-root="${chart_path}" --log-level=warning
+  if [[ $(command -v helm-docs) ]]; then
+    helm-docs --chart-search-root="${chart_path}" --log-level=warning
+  else
+    echo "WARNING"
+    echo "helm-docs is not available, skip docs generation"
+  fi
 }
 
 function process() {
