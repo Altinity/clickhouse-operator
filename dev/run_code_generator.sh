@@ -34,8 +34,9 @@ else
 fi
 
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
-    all \
+    client,deepcopy,informer,lister \
     github.com/altinity/clickhouse-operator/pkg/client \
     github.com/altinity/clickhouse-operator/pkg/apis \
     "clickhouse.altinity.com:v1" \
-    -o "${SRC_ROOT}/generator"
+    -o "${SRC_ROOT}/generator" \
+    --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
