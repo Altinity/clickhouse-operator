@@ -84,18 +84,22 @@ clickhouse:
       - version: "*"
         rules:
           - settings/*: "yes"
-          - settings/max_server_memory_*: "no"
-          - settings/max_*_to_drop: "no"
           - settings/dictionaries_config: "no"
           - settings/logger: "no"
+          - settings/macros/*: "no"
+          - settings/max_server_memory_*: "no"
+          - settings/max_*_to_drop: "no"
+          - settings/max_concurrent_queries: "no"
+          - settings/models_config: "no"
+          - settings/user_defined_executable_functions_config: "no"
 
           - zookeeper/*: "yes"
 
           - files/config.d/*.xml: "yes"
-          - files/users.d/*: "no"
+          - files/config.d/*dict*.xml: "no"
 
-          - profiles/*: "no"
           - profiles/default/background_*_pool_size: "yes"
+          - profiles/default/max_*_for_server: "yes"
       - version: "21.*"
         rules:
           - settings/logger: "yes"
@@ -164,8 +168,12 @@ template:
 ################################################
 reconcile:
   runtime:
-    # Max number of concurrent reconciles in progress
-    threadsNumber: 1
+    # Max number of concurrent CHI reconciles in progress
+    reconcileCHIsThreadsNumber: 1
+    # Max number of concurrent shard reconciles in progress
+    reconcileShardsThreadsNumber: 1
+    # The maximum percentage of cluster shards that may be reconciled in parallel
+    reconcileShardsMaxConcurrencyPercent: 50
 
   statefulSet:
     create:
