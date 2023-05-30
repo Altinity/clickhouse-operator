@@ -1,5 +1,5 @@
 channels:
-- currentCSV: clickhouse-operator.v0.18.3
+- currentCSV: clickhouse-operator.v0.20.2
   name: latest
 defaultChannel: latest
 packageName: clickhouse
