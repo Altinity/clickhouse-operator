@@ -106,23 +106,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -242,23 +225,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -378,23 +344,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -514,23 +463,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -650,18 +582,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -770,18 +690,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -891,18 +799,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1011,18 +907,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1151,18 +1035,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1271,18 +1143,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1392,23 +1252,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1528,18 +1371,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1649,18 +1480,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1769,18 +1588,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -1890,23 +1697,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2026,18 +1816,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2146,18 +1924,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2267,18 +2033,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2387,23 +2141,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2523,18 +2260,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2643,18 +2368,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2763,23 +2476,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "Replication architecture",
-          "url": "https://clickhouse.tech/docs/en/development/architecture/#replication"
-        },
-        {
-          "targetBlank": true,
-          "title": "ReplicatedMergeTree engine",
-          "url": "https://clickhouse.tech/docs/en/engines/table-engines/mergetree-family/replication/"
-        },
-        {
-          "targetBlank": true,
-          "title": "max_replica_delay_for_distributed_queries",
-          "url": "https://clickhouse.tech/docs/en/operations/settings/settings/#settings-max_replica_delay_for_distributed_queries"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -2899,18 +2595,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
@@ -3019,18 +2703,6 @@
       },
       "lines": true,
       "linewidth": 2,
-      "links": [
-        {
-          "targetBlank": true,
-          "title": "system.parts_log",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system_tables-part-log"
-        },
-        {
-          "targetBlank": true,
-          "title": "system.merge_tree_settings",
-          "url": "https://clickhouse.tech/docs/en/operations/system-tables/#system-merge_tree_settings"
-        }
-      ],
       "nullPointMode": "null",
       "options": {
         "alertThreshold": true
