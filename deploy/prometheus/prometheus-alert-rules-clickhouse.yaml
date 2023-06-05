@@ -272,7 +272,7 @@ spec:
             description: |-
               `clickhouse-server` have 
               {{ with printf "chi_clickhouse_metric_Query{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} running queries{{ end }}
-              {{ with printf "chi_clickhouse_metric_PendingAsyncInsert{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} running queries{{ end }}
+              {{ with printf "chi_clickhouse_metric_PendingAsyncInsert{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} async inserts{{ end }}
               Please analyze your workload.
               Each concurrent SELECT query use memory in JOINs use CPU for running aggregation function and can read lot of data from disk when scan parts in partitions and utilize disk I/O.
               Each concurrent INSERT query, allocate around 1MB per each column in an inserted table and utilize disk I/O.
