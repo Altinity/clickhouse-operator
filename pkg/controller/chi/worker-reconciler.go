@@ -801,14 +801,14 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 			}
 		}
 
-		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
+		newPvc, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		if err != nil {
 			w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
 			w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
 			return
 		}
 
-		w.task.registryReconciled.RegisterPVC(pvc.ObjectMeta)
+		w.task.registryReconciled.RegisterPVC(newPvc.ObjectMeta)
 	})
 
 	return nil
