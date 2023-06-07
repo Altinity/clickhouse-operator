@@ -706,6 +706,28 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
+// getContainer gets container from the StatefulSet either by name or by index
+func getContainer(statefulSet *apps.StatefulSet, name string, index int) (*corev1.Container, bool) {
+	if len(name) > 0 {
+		// Find by name
+		for i := range statefulSet.Spec.Template.Spec.Containers {
+			container := &statefulSet.Spec.Template.Spec.Containers[i]
+			if container.Name == name {
+				return container, true
+			}
+		}
+	}
+
+	if index >= 0 {
+		// Find by index
+		if len(statefulSet.Spec.Template.Spec.Containers) > index {
+			return &statefulSet.Spec.Template.Spec.Containers[index], true
+		}
+	}
+
+	return nil, false
+}
+
 // getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
 	// Find by name
@@ -724,6 +746,7 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, b
 	return nil, false
 }
 
+// getClickHouseLogContainer
 func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
 	// Find by name
 	for i := range statefulSet.Spec.Template.Spec.Containers {
