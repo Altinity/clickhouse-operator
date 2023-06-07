@@ -517,6 +517,14 @@ spec:
                 limits:
                   memory: "64Mi"
                   cpu: "100m"
+            - name: clickhouse-log
+              image: clickhouse/clickhouse-server:22.3
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "--"
+              args:
+                - "while true; do sleep 30; done;"
 
       # pod template for ClickHouse v22.2
       - name: clickhouse-v22.2
@@ -535,3 +543,11 @@ spec:
                 limits:
                   memory: "64Mi"
                   cpu: "100m"
+            - name: clickhouse-log
+              image: clickhouse/clickhouse-server:22.3
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "--"
+              args:
+                - "while true; do sleep 30; done;"
