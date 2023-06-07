@@ -730,33 +730,12 @@ func getContainer(statefulSet *apps.StatefulSet, name string, index int) (*corev
 
 // getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	// Find by name
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		if container.Name == ClickHouseContainerName {
-			return container, true
-		}
-	}
-
-	// Find by index
-	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
-		return &statefulSet.Spec.Template.Spec.Containers[0], true
-	}
-
-	return nil, false
+	return getContainer(statefulSet, ClickHouseContainerName, 0)
 }
 
 // getClickHouseLogContainer
 func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	// Find by name
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		if container.Name == ClickHouseLogContainerName {
-			return container, true
-		}
-	}
-
-	return nil, false
+	return getContainer(statefulSet, ClickHouseLogContainerName, -1)
 }
 
 // getClickHouseContainerStatus
