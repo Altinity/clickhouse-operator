@@ -483,6 +483,21 @@ func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *chi
 	)
 }
 
+// ensureClickHouseLogContainerSpecified
+func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
+	_, ok := getClickHouseLogContainer(statefulSet)
+	if ok {
+		return
+	}
+
+	// No ClickHouse Log container available, let's add one
+
+	addContainer(
+		&statefulSet.Spec.Template.Spec,
+		newDefaultLogContainer(),
+	)
+}
+
 // ensureProbesSpecified
 func ensureProbesSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	container, ok := getClickHouseContainer(statefulSet)
@@ -555,7 +570,8 @@ func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *chiv1.C
 	statefulSetName := CreateStatefulSetName(host)
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
-		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
+		ensureClickHouseLogContainerSpecified(statefulSet)
+
 		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
 	}
 }
@@ -703,6 +719,18 @@ func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, b
 	// Find by index
 	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
 		return &statefulSet.Spec.Template.Spec.Containers[0], true
+	}
+
+	return nil, false
+}
+
+func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	// Find by name
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		if container.Name == ClickHouseLogContainerName {
+			return container, true
+		}
 	}
 
 	return nil, false
