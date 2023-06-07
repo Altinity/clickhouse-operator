@@ -738,24 +738,6 @@ func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container
 	return getContainer(statefulSet, clickHouseLogContainerName, -1)
 }
 
-// getClickHouseContainerStatus
-func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
-	// Find by name
-	for i := range pod.Status.ContainerStatuses {
-		status := &pod.Status.ContainerStatuses[i]
-		if status.Name == clickHouseContainerName {
-			return status, true
-		}
-	}
-
-	// Find by index
-	if len(pod.Status.ContainerStatuses) > 0 {
-		return &pod.Status.ContainerStatuses[0], true
-	}
-
-	return nil, false
-}
-
 // IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
 func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
 	if statefulSet == nil {
