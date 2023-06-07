@@ -730,12 +730,12 @@ func getContainer(statefulSet *apps.StatefulSet, name string, index int) (*corev
 
 // getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	return getContainer(statefulSet, ClickHouseContainerName, 0)
+	return getContainer(statefulSet, clickHouseContainerName, 0)
 }
 
 // getClickHouseLogContainer
 func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	return getContainer(statefulSet, ClickHouseLogContainerName, -1)
+	return getContainer(statefulSet, clickHouseLogContainerName, -1)
 }
 
 // getClickHouseContainerStatus
@@ -743,7 +743,7 @@ func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, boo
 	// Find by name
 	for i := range pod.Status.ContainerStatuses {
 		status := &pod.Status.ContainerStatuses[i]
-		if status.Name == ClickHouseContainerName {
+		if status.Name == clickHouseContainerName {
 			return status, true
 		}
 	}
@@ -1337,7 +1337,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 // newDefaultClickHouseContainer returns default ClickHouse Container
 func newDefaultClickHouseContainer(host *chiv1.ChiHost) corev1.Container {
 	container := corev1.Container{
-		Name:           ClickHouseContainerName,
+		Name:           clickHouseContainerName,
 		Image:          defaultClickHouseDockerImage,
 		LivenessProbe:  newDefaultLivenessProbe(host),
 		ReadinessProbe: newDefaultReadinessProbe(host),
@@ -1349,7 +1349,7 @@ func newDefaultClickHouseContainer(host *chiv1.ChiHost) corev1.Container {
 // newDefaultLogContainer returns default Log Container
 func newDefaultLogContainer() corev1.Container {
 	return corev1.Container{
-		Name:  ClickHouseLogContainerName,
+		Name:  clickHouseLogContainerName,
 		Image: defaultUbiDockerImage,
 		Command: []string{
 			"/bin/sh", "-c", "--",
