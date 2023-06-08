@@ -48,7 +48,7 @@ clickhouse:
       #    - profile. Uses predefined profile called 'clickhouse_operator'
       #    - quota. Uses empty
       #    - network IPs. Specifies networks/ip to match operator pod IP only
-      #    - password. Password for CHOP account is used from `clickhouse.access.password` section
+      #    - password. Password for CHOP account is used from 'clickhouse.access.password' section
       default:
         # Default values for ClickHouse user configuration
         # 1. user/profile - string
