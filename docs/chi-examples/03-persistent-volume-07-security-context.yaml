@@ -55,7 +55,7 @@ spec:
                 - clickhouse-server
                 - --config-file=/etc/clickhouse-server/config.xml
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:2.2.6
+              image: altinity/clickhouse-backup:2.2.7
               imagePullPolicy: Always
               command:
                 - /bin/bash
