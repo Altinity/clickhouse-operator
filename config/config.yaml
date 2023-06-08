@@ -48,10 +48,13 @@ clickhouse:
       # Default settings for user accounts, created by the operator.
       # NB. These are not access credentials or settings for 'default' user account,
       # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
-      # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
-      # Password for 'default' account as to be provided explicitly, if to be used
-      # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
-      # Password for CHOP account is used from `clickhouse.access.password` section
+      # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields.
+      #    Password for 'default' account as to be provided explicitly, if to be used.
+      # 2. CHOP account, which DOES NOT use
+      #    - profile. Uses predefined profile called 'clickhouse_operator'
+      #    - quota. Uses empty
+      #    - network IPs. Specifies networks/ip to match operator pod IP only
+      #    - password. Password for CHOP account is used from 'clickhouse.access.password' section
       default:
         # Default values for ClickHouse user configuration
         # 1. user/profile - string
