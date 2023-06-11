@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"math"
 	"sync"
 
@@ -377,6 +378,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 		w.task.registryFailed.RegisterPDB(pdb.ObjectMeta)
 	}
 
+	w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
 	return nil
 }
 
