@@ -181,7 +181,7 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 }
 
 // newFetcher returns new Metrics Fetcher for specified host
-func (e *Exporter) newFetcher(hostname string) *ClickHouseMetricsFetcher {
+func (e *Exporter) newHostFetcher(hostname string) *ClickHouseMetricsFetcher {
 	return NewClickHouseFetcher(e.clusterConnectionParams.NewEndpointConnectionParams(hostname))
 }
 
@@ -197,7 +197,7 @@ func (e *Exporter) updateWatch(namespace, chiName string, hostnames []string) {
 
 // collectFromHost collects metrics from one host and writes them into chan
 func (e *Exporter) collectFromHost(ctx context.Context, chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
-	fetcher := e.newFetcher(hostname)
+	fetcher := e.newHostFetcher(hostname)
 	writer := NewPrometheusWriter(c, chi, hostname)
 
 	log.V(2).Infof("Querying metrics for %s\n", hostname)
