@@ -36,11 +36,9 @@ const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
 // NewSchemer creates new Schemer object
-func NewSchemer(scheme, username, password, rootCA string, port int) *Schemer {
+func NewSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams) *Schemer {
 	return &Schemer{
-		NewCluster().SetClusterConnectionParams(
-			clickhouse.NewClusterConnectionParams(scheme, username, password, rootCA, port),
-		),
+		NewCluster().SetClusterConnectionParams(clusterConnectionParams),
 	}
 }
 

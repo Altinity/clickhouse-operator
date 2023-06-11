@@ -33,6 +33,7 @@ import (
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -83,14 +84,8 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
 		normalizer: chopModel.NewNormalizer(c.kubeClient),
-		schemer: chopModel.NewSchemer(
-			chop.Config().ClickHouse.Access.Scheme,
-			chop.Config().ClickHouse.Access.Username,
-			chop.Config().ClickHouse.Access.Password,
-			chop.Config().ClickHouse.Access.RootCA,
-			chop.Config().ClickHouse.Access.Port,
-		),
-		start: start,
+		schemer:    chopModel.NewSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())),
+		start:      start,
 	}
 }
 
