@@ -16,6 +16,8 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"time"
 
 	coreV1 "k8s.io/api/core/v1"
@@ -519,6 +521,8 @@ func (w *worker) deleteCluster(ctx context.Context, chi *chiV1.ClickHouseInstall
 		WithStatusAction(cluster.CHI).
 		M(cluster).F().
 		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
+
+	w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(ctx, cluster)
