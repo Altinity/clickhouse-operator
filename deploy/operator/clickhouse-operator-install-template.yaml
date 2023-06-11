@@ -2930,6 +2930,8 @@ data:
     watch:
       # List of namespaces where clickhouse-operator watches for events.
       # Concurrently running operators should watch on different namespaces.
+      # IMPORTANT
+      # Regexp is applicable.
       #namespaces: ["dev", "test"]
       namespaces: []
     
@@ -2956,21 +2958,23 @@ data:
         ################################################
         user:
           # Default settings for user accounts, created by the operator.
-          # NB. These are not access credentials or settings for 'default' user account,
-          # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
-          # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields.
-          #    Password for 'default' account as to be provided explicitly, if to be used.
-          # 2. CHOP account, which DOES NOT use
-          #    - profile. Uses predefined profile called 'clickhouse_operator'
-          #    - quota. Uses empty
-          #    - network IPs. Specifies networks/ip to match operator pod IP only
-          #    - password. Password for CHOP account is used from 'clickhouse.access.password' section
+          # IMPORTANT. These are not access credentials or settings for 'default' user account,
+          # it is a template for filling out missing fields for all user accounts to be created by the operator,
+          # with the following EXCEPTIONS:
+          # 1. 'default' user account DOES NOT use provided password, but uses all the rest of the fields.
+          #    Password for 'default' user account has to be provided explicitly, if to be used.
+          # 2. CHOP user account DOES NOT use:
+          #    - profile setting. It uses predefined profile called 'clickhouse_operator'
+          #    - quota setting. It uses empty quota name.
+          #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
+          #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
           default:
-            # Default values for ClickHouse user configuration
-            # 1. user/profile - string
-            # 2. user/quota - string
-            # 3. user/networks/ip - multiple strings
-            # 4. user/password - string
+            # Default values for ClickHouse user account(s) created by the operator
+            #   1. user/profile - string
+            #   2. user/quota - string
+            #   3. user/networks/ip - multiple strings
+            #   4. user/password - string
+            # These values can be overwritten on per-user basis.
             profile: "default"
             quota: "default"
             networksIP:
@@ -3023,28 +3027,28 @@ data:
       ##
       ################################################
       access:
-        # Possible values for `scheme` are:
-        # 1. http
-        # 2. https
+        # Possible values for 'scheme' are:
+        #   1. http
+        #   2. https
         scheme: ""
         # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
-        # Used for:
-        # 1. Metrics requests
-        # 2. Schema maintenance
-        # 3. DROP DNS CACHE
+        # These credentials are used for:
+        #   1. Metrics requests
+        #   2. Schema maintenance
+        #   3. DROP DNS CACHE
         # User with these credentials can be specified in additional ClickHouse .xml config files,
-        # located in `clickhouse.configuration.file.path.user` folder
+        # located in 'clickhouse.configuration.file.path.user' folder
         username: ""
         password: ""
         rootCA: ""
     
         # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
-        # Can be used instead of explicitly specified username and password which are:
-        # clickhouse.access.username
-        # clickhouse.access.password
+        # Can be used instead of explicitly specified username and password available in sections:
+        #   - clickhouse.access.username
+        #   - clickhouse.access.password
         # Secret should have two keys:
-        # 1. username
-        # 2. password
+        #   1. username
+        #   2. password
         secret:
           # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
           namespace: ""
