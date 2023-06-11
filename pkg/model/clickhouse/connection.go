@@ -20,6 +20,7 @@ import (
 	"crypto/x509"
 	"database/sql"
 	"fmt"
+
 	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
 	goch "github.com/mailru/go-clickhouse"
 

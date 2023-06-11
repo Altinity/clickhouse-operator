@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"math"
 	"sync"
 
@@ -29,6 +28,7 @@ import (
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
