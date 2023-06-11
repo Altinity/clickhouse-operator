@@ -62,5 +62,12 @@ func (p *ClusterConnectionParams) NewEndpointConnectionParams(host string) *Endp
 	if p == nil {
 		return nil
 	}
-	return NewEndpointConnectionParams(p.Scheme, host, p.Username, p.Password, p.RootCA, p.Port).SetTimeouts(p.Timeouts)
+	return NewEndpointConnectionParams(
+		p.Scheme,
+		host,
+		p.Username,
+		p.Password,
+		p.RootCA,
+		p.Port,
+	).SetTimeouts(p.Timeouts)
 }

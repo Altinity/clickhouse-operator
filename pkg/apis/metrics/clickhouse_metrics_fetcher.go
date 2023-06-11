@@ -17,8 +17,6 @@ package metrics
 import (
 	"context"
 	"database/sql"
-	"time"
-
 	"github.com/MakeNowJust/heredoc"
 
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -146,18 +144,6 @@ func NewClickHouseFetcher(endpointConnectionParams *clickhouse.EndpointConnectio
 	return &ClickHouseMetricsFetcher{
 		connectionParams: endpointConnectionParams,
 	}
-}
-
-// SetConnectTimeout sets connect timeout
-func (f *ClickHouseMetricsFetcher) SetConnectTimeout(timeout time.Duration) *ClickHouseMetricsFetcher {
-	f.connectionParams.SetConnectTimeout(timeout)
-	return f
-}
-
-// SetQueryTimeout sets query timeout
-func (f *ClickHouseMetricsFetcher) SetQueryTimeout(timeout time.Duration) *ClickHouseMetricsFetcher {
-	f.connectionParams.SetQueryTimeout(timeout)
-	return f
 }
 
 func (f *ClickHouseMetricsFetcher) connection() *clickhouse.Connection {
