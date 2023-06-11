@@ -33,7 +33,6 @@ import (
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -47,7 +46,7 @@ type worker struct {
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
 	normalizer *chopModel.Normalizer
-	schemer    *chopModel.Schemer
+	schemer    *chopModel.ClusterSchemer
 	start      time.Time
 	task       task
 }
@@ -84,7 +83,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
 		normalizer: chopModel.NewNormalizer(c.kubeClient),
-		schemer:    chopModel.NewSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())),
+		schemer:    nil, //
 		start:      start,
 	}
 }
