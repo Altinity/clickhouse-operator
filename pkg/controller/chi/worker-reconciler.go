@@ -270,7 +270,7 @@ func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.Ch
 	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
 		version = "not applicable"
 	} else {
-		if ver, e := w.ensureClusterSchemer().HostVersion(ctx, host); e == nil {
+		if ver, e := w.ensureClusterSchemer(host).HostVersion(ctx, host); e == nil {
 			version = ver
 			host.Version = chiV1.NewCHVersion(version)
 		} else {
@@ -525,7 +525,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.migrateTables(ctx, host)
 
-	version, err := w.ensureClusterSchemer().HostVersion(ctx, host)
+	version, err := w.ensureClusterSchemer(host).HostVersion(ctx, host)
 	if err != nil {
 		version = "unknown"
 	}
