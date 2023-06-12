@@ -4,7 +4,7 @@ echo "External value for \$GRAFANA_NAMESPACE=$GRAFANA_NAMESPACE"
 echo "External value for \$GRAFANA_OPERATOR_VERSION=$GRAFANA_OPERATOR_VERSION"
 
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
-GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v4.4.1}"
+GRAFANA_OPERATOR_VERSION="${GRAFANA_OPERATOR_VERSION:-v4.8.0}"
 
 echo "Setup Grafana"
 echo "OPTIONS"
@@ -55,7 +55,7 @@ trap "clean_dir ${TMP_DIR}" SIGHUP SIGINT SIGQUIT SIGFPE SIGALRM SIGTERM
 
 # Continue with sources
 echo "Download Grafana operator sources into ${GRAFANA_OPERATOR_DIR}"
-git clone -b ${GRAFANA_OPERATOR_VERSION} --single-branch "https://github.com/integr8ly/grafana-operator" "${GRAFANA_OPERATOR_DIR}"
+git clone -b ${GRAFANA_OPERATOR_VERSION} --single-branch "https://github.com/grafana-operator/grafana-operator" "${GRAFANA_OPERATOR_DIR}"
 
 
 echo "Setup Grafana operator into ${GRAFANA_NAMESPACE} namespace"

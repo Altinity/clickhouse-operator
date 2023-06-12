@@ -41,6 +41,11 @@ const (
 	// OPERATOR_CONTAINER_MEM_LIMIT from .containers.resources.limits.memory
 	OPERATOR_CONTAINER_MEM_LIMIT = "OPERATOR_CONTAINER_MEM_LIMIT"
 
+	// OPERATOR_K8S_CLIENT_QPS_LIMIT specifies an override for the default k8s client QPS rate limit.
+	OPERATOR_K8S_CLIENT_QPS_LIMIT = "OPERATOR_K8S_CLIENT_QPS_LIMIT"
+	// OPERATOR_K8S_CLIENT_BURST_LIMIT specifies an override for the default k8s client QPS burst limit.
+	OPERATOR_K8S_CLIENT_BURST_LIMIT = "OPERATOR_K8S_CLIENT_BURST_LIMIT"
+
 	// WATCH_NAMESPACE and WATCH_NAMESPACES specifies what namespaces to watch
 	WATCH_NAMESPACE = "WATCH_NAMESPACE"
 	// WATCH_NAMESPACES and WATCH_NAMESPACE specifies what namespaces to watch

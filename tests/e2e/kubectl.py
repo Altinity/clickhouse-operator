@@ -34,7 +34,7 @@ def launch(command, ok_to_fail=False, ns=namespace, timeout=600):
         cmd += " ".join(cmd_args[1:])
 
     # save command for debug purposes
-    command = cmd
+    # command = cmd
     # print(f"run command: {cmd}")
 
     return run_shell(cmd, timeout, ok_to_fail)
@@ -60,7 +60,12 @@ def run_shell(cmd, timeout=600, ok_to_fail=False):
 
 def delete_chi(chi, ns=namespace, wait=True, ok_to_fail=False):
     with When(f"Delete chi {chi}"):
-        launch(f"delete chi {chi} -v 5 --now --timeout=600s", ns=ns, timeout=600, ok_to_fail=ok_to_fail)
+        launch(
+            f"delete chi {chi} -v 5 --now --timeout=600s",
+            ns=ns,
+            timeout=600,
+            ok_to_fail=ok_to_fail,
+        )
         if wait:
             wait_objects(
                 chi,
@@ -87,21 +92,29 @@ def delete_all_chi(ns=namespace):
 
 
 def delete_all_keeper(ns=namespace):
-    for keeper_type in ('zookeeper-operator', 'zookeeper', 'clickhouse-keeper'):
-        expected_resource_types = ("zookeepercluster", ) if keeper_type == "zookeeper-operator" else ("sts", "pvc", "cm", "svc")
+    for keeper_type in ("zookeeper-operator", "zookeeper", "clickhouse-keeper"):
+        expected_resource_types = (
+            ("zookeepercluster",) if keeper_type == "zookeeper-operator" else ("sts", "pvc", "cm", "svc")
+        )
         for resource_type in expected_resource_types:
             try:
-                item_list = get(resource_type, "", label=f"-l app={keeper_type}", ns=ns, ok_to_fail=True)
+                item_list = get(
+                    resource_type,
+                    "",
+                    label=f"-l app={keeper_type}",
+                    ns=ns,
+                    ok_to_fail=True,
+                )
             except Exception as e:
                 item_list = {}
             if "items" in item_list:
                 for item in item_list["items"]:
-                    name = item['metadata']['name']
+                    name = item["metadata"]["name"]
                     launch(f"delete {resource_type} -n {ns} {name}", ok_to_fail=True)
 
 
 def create_and_check(manifest, check, ns=namespace, timeout=900):
-    chi_name = yaml_manifest.get_chi_name(util.get_full_path(f'{manifest}'))
+    chi_name = yaml_manifest.get_chi_name(util.get_full_path(f"{manifest}"))
 
     # state_field = ".status.taskID"
     # prev_state = get_field("chi", chi_name, state_field, ns)
@@ -128,7 +141,13 @@ def create_and_check(manifest, check, ns=namespace, timeout=900):
         wait_objects(chi_name, check["object_counts"], ns=ns)
 
     if "pod_count" in check:
-        wait_object("pod", "", label=f"-l clickhouse.altinity.com/chi={chi_name}", count=check["pod_count"], ns=ns)
+        wait_object(
+            "pod",
+            "",
+            label=f"-l clickhouse.altinity.com/chi={chi_name}",
+            count=check["pod_count"],
+            ns=ns,
+        )
 
     if "pod_image" in check:
         check_pod_image(chi_name, check["pod_image"], ns=ns)
@@ -166,14 +185,32 @@ def create_ns(ns):
 
 
 def delete_ns(ns, ok_to_fail=False, timeout=600):
-    launch(f"delete ns {ns} -v 5 --now --timeout={timeout}s", ns=None, ok_to_fail=ok_to_fail, timeout=timeout)
+    launch(
+        f"delete ns {ns} -v 5 --now --timeout={timeout}s",
+        ns=None,
+        ok_to_fail=ok_to_fail,
+        timeout=timeout,
+    )
 
 
-def get_count(kind, name="", label="", ns=namespace):
-    out = launch(f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}", ns=ns, ok_to_fail=True)
+def get_count(kind, name="", label="", chi="", ns=namespace):
+    if chi != "" and label == "":
+        label = f"-l clickhouse.altinity.com/chi={chi}"
+
+    if kind == "pv":
+        # pv is not namespaced so need to search namespace in claimRef
+        out = launch(f'get pv {label} -o yaml | grep "namespace: {ns}"', ok_to_fail=True)
+    else:
+        out = launch(
+            f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}",
+            ns=ns,
+            ok_to_fail=True,
+        )
+
     if (out is None) or (len(out) == 0):
         return 0
-    return len(out.splitlines()) - 1
+    else:
+        return len(out.splitlines()) - 1
 
 
 def count_objects(label="", ns=namespace):
@@ -187,10 +224,13 @@ def count_objects(label="", ns=namespace):
 def apply(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is applied"):
         if " | " not in manifest:
-            manifest = f"\"{manifest}\""
+            manifest = f'"{manifest}"'
             launch(f"apply --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
         else:
-            run_shell(f"{manifest} | {kubectl_cmd} apply --namespace={ns} --validate={validate} -f -", timeout=timeout)
+            run_shell(
+                f"{manifest} | {kubectl_cmd} apply --namespace={ns} --validate={validate} -f -",
+                timeout=timeout,
+            )
 
 
 def apply_chi(manifest, ns=namespace, validate=True, timeout=600):
@@ -208,21 +248,21 @@ def apply_chi(manifest, ns=namespace, validate=True, timeout=600):
 def create(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is created"):
         if "<(" not in manifest:
-            manifest = f"\"{manifest}\""
+            manifest = f'"{manifest}"'
         launch(f"create --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
 
 def replace(manifest, ns=namespace, validate=True, timeout=600):
     with When(f"{manifest} is replaced"):
         if "<(" not in manifest:
-            manifest = f"\"{manifest}\""
+            manifest = f'"{manifest}"'
         launch(f"replace --validate={validate} -f {manifest}", ns=ns, timeout=timeout)
 
 
 def delete(manifest, ns=namespace, timeout=600):
     with When(f"{manifest} is deleted"):
         if " | " not in manifest:
-            manifest = f"\"{manifest}\""
+            manifest = f'"{manifest}"'
             return launch(f"delete -f {manifest}", ns=ns, timeout=timeout)
         else:
             run_shell(f"{manifest} | {kubectl_cmd} delete -f -", timeout=timeout)
@@ -230,22 +270,22 @@ def delete(manifest, ns=namespace, timeout=600):
 
 def wait_objects(chi, object_counts, ns=namespace):
     with Then(
-            f"Waiting for: "
-            f"{object_counts['statefulset']} statefulsets, "
-            f"{object_counts['pod']} pods and "
-            f"{object_counts['service']} services "
-            f"to be available"
+        f"Waiting for: "
+        f"{object_counts['statefulset']} statefulsets, "
+        f"{object_counts['pod']} pods and "
+        f"{object_counts['service']} services "
+        f"to be available"
     ):
         for i in range(1, max_retries):
             cur_object_counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns)
             if cur_object_counts == object_counts:
                 break
             with Then(
-                    f"Not ready yet. [ "
-                    f"statefulset: {cur_object_counts['statefulset']} "
-                    f"pod: {cur_object_counts['pod']} "
-                    f"service: {cur_object_counts['service']} ]. "
-                    f"Wait for {i * 5} seconds"
+                f"Not ready yet. [ "
+                f"statefulset: {cur_object_counts['statefulset']} "
+                f"pod: {cur_object_counts['pod']} "
+                f"service: {cur_object_counts['service']} ]. "
+                f"Wait for {i * 5} seconds"
             ):
                 time.sleep(i * 5)
         assert cur_object_counts == object_counts, error()
@@ -285,7 +325,20 @@ def wait_pod_status(pod, status, ns=namespace):
     wait_field("pod", pod, ".status.phase", status, ns)
 
 
-def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, backoff=5, throw_error=True):
+def wait_container_status(pod, status, ns=namespace):
+    wait_field("pod", pod, ".status.containerStatuses[0].ready", status, ns)
+
+
+def wait_field(
+    kind,
+    name,
+    field,
+    value,
+    ns=namespace,
+    retries=max_retries,
+    backoff=5,
+    throw_error=True,
+):
     with Then(f"{kind} {name} {field} should be {value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
@@ -296,7 +349,16 @@ def wait_field(kind, name, field, value, ns=namespace, retries=max_retries, back
         assert cur_value == value or throw_error is False, error()
 
 
-def wait_field_changed(kind, name, field, prev_value, ns=namespace, retries=max_retries, backoff=5, throw_error = True):
+def wait_field_changed(
+    kind,
+    name,
+    field,
+    prev_value,
+    ns=namespace,
+    retries=max_retries,
+    backoff=5,
+    throw_error=True,
+):
     with Then(f"{kind} {name} {field} should be different from {prev_value}"):
         for i in range(1, retries):
             cur_value = get_field(kind, name, field, ns)
@@ -329,7 +391,7 @@ def get_field(kind, name, field, ns=namespace):
 
 
 def get_jsonpath(kind, name, field, ns=namespace):
-    out = launch(f"get {kind} {name} -o jsonpath=\"{field}\"", ns=ns).splitlines()
+    out = launch(f'get {kind} {name} -o jsonpath="{field}"', ns=ns).splitlines()
     return out[0]
 
 
@@ -337,7 +399,7 @@ def get_default_storage_class(ns=namespace):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f"DEFAULT:\".metadata.annotations.storageclass\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
+        f'DEFAULT:".metadata.annotations.storageclass\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:
@@ -347,7 +409,7 @@ def get_default_storage_class(ns=namespace):
     out = launch(
         f"get storageclass "
         f"-o=custom-columns="
-        f"DEFAULT:\".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class\",NAME:.metadata.name",
+        f'DEFAULT:".metadata.annotations.storageclass\.beta\.kubernetes\.io/is-default-class",NAME:.metadata.name',
         ns=ns,
     ).splitlines()
     for line in out[1:]:
@@ -386,7 +448,7 @@ def get_obj_names(chi_name, obj_type="pods", ns=namespace):
     return pod_names[1:]
 
 
-def get_pod_volumes(chi_name, pod_name="",  ns=namespace):
+def get_pod_volumes(chi_name, pod_name="", ns=namespace):
     volume_mounts = get_pod_spec(chi_name, pod_name, ns)["containers"][0]["volumeMounts"]
     return volume_mounts
 
@@ -435,14 +497,20 @@ def get_pv_size(pvc_name, ns=namespace):
     return get_field("pv", get_pv_name(pvc_name, ns), ".spec.capacity.storage", ns)
 
 
-def check_pod_antiaffinity(chi_name, pod_name="", match_labels={}, topologyKey="kubernetes.io/hostname", ns=namespace):
+def check_pod_antiaffinity(
+    chi_name,
+    pod_name="",
+    match_labels={},
+    topologyKey="kubernetes.io/hostname",
+    ns=namespace,
+):
     pod_spec = get_pod_spec(chi_name, pod_name, ns)
     if match_labels == {}:
         match_labels = {
-                        "clickhouse.altinity.com/app": "chop",
-                        "clickhouse.altinity.com/chi": f"{chi_name}",
-                        "clickhouse.altinity.com/namespace": f"{ns}",
-                    }
+            "clickhouse.altinity.com/app": "chop",
+            "clickhouse.altinity.com/chi": f"{chi_name}",
+            "clickhouse.altinity.com/namespace": f"{ns}",
+        }
     expected = {
         "requiredDuringSchedulingIgnoredDuringExecution": [
             {
@@ -480,7 +548,7 @@ def check_configmaps(chi_name, ns=namespace):
     check_configmap(
         f"chi-{chi_name}-common-usersd",
         [
-            "01-clickhouse-user.xml",
+            "01-clickhouse-operator-profile.xml",
             "02-clickhouse-default-profile.xml",
         ],
         ns=ns,

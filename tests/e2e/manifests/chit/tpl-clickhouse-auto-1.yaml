@@ -1,3 +1,5 @@
+# test_023
+
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 
@@ -16,7 +18,6 @@ spec:
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:22.8
-          #    command:
-          #      - "/bin/bash"
-          #      - "-c"
-          #      - "/entrypoint.sh; while true; do sleep 600; done"
+              env:
+                - name: TEST_ENV
+                  value: TEST_ENV_VALUE

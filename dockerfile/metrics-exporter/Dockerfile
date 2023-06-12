@@ -12,6 +12,10 @@ ARG GCFLAGS
 # Install required packages
 RUN apt-get update && apt-get install -y apt-utils && apt-get install -y gettext-base wget
 RUN wget --progress=bar:force:noscroll "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64" -O /usr/bin/yq && chmod +x /usr/bin/yq
+RUN PLATFORM="x86_64" && if [ "${TARGETARCH}" = "arm64" ]; then PLATFORM="aarch64"; fi && wget -O /tmp/bash --progress=bar:force:noscroll https://github.com/robxu9/bash-static/releases/latest/download/bash-linux-${PLATFORM}
+RUN PLATFORM="amd64" && if [ "${TARGETARCH}" = "arm64" ]; then PLATFORM="aarch64"; fi && \
+    wget -O /tmp/curl --progress=bar:force:noscroll https://github.com/moparisthebest/static-curl/releases/latest/download/curl-${PLATFORM} && \
+    chmod +x /tmp/bash /tmp/curl
 
 # Reconstruct source tree inside docker
 WORKDIR /clickhouse-operator
@@ -33,8 +37,7 @@ RUN CGO_ENABLED=0 GO111MODULE=on GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go in
 # ===== Image Base =====
 # ======================
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest AS image-base
-RUN microdnf update && microdnf clean all
+FROM gcr.io/distroless/static-debian11:latest AS image-base
 
 MAINTAINER "Altinity <support@altinity.com>"
 
@@ -59,6 +62,9 @@ ADD config/users.d/*     /etc/clickhouse-operator/users.d/
 
 # Copy clickhouse-operator binary into operator image from builder
 COPY --from=builder /tmp/metrics-exporter .
+COPY --from=builder /tmp/bash /bin/bash
+COPY --from=builder /tmp/bash /bin/sh
+COPY --from=builder /tmp/curl /bin/curl
 
 # =======================
 # ===== Image Debug =====

@@ -17,7 +17,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -40,7 +40,6 @@ spec:
         - name: clusters
           type: integer
           description: Clusters count
-          priority: 0 # show in standard view
           jsonPath: .status.clusters
         - name: shards
           type: integer
@@ -50,7 +49,6 @@ spec:
         - name: hosts
           type: integer
           description: Hosts count
-          priority: 0 # show in standard view
           jsonPath: .status.hosts
         - name: taskID
           type: string
@@ -60,7 +58,6 @@ spec:
         - name: status
           type: string
           description: CHI status
-          priority: 0 # show in standard view
           jsonPath: .status.status
         - name: hosts-updated
           type: integer
@@ -75,7 +72,6 @@ spec:
         - name: hosts-completed
           type: integer
           description: Completed hosts count
-          priority: 0 # show in standard view
           jsonPath: .status.hostsCompleted
         - name: hosts-deleted
           type: integer
@@ -232,6 +228,11 @@ spec:
                   type: object
                   description: "Normalized CHI completed"
                   x-kubernetes-preserve-unknown-fields: true
+                hostsWithTablesCreated:
+                  type: array
+                  description: "List of hosts with tables created by the operator"
+                  items:
+                    type: string
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -464,6 +465,9 @@ spec:
                                 description: "TCP port which used to connect to Zookeeper node"
                                 minimum: 0
                                 maximum: 65535
+                              secure:
+                                <<: *TypeStringBool
+                                description: "if a secure connection to Zookeeper is required"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -584,6 +588,12 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          insecure:
+                            <<: *TypeStringBool
+                            description: optional, open insecure ports for cluster, defaults to "yes"
+                          secure:
+                            <<: *TypeStringBool
+                            description: optional, open secure ports for cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -703,11 +713,14 @@ spec:
                                             # See namePartReplicaMaxLen const
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                          secure:
-                                            type: boolean
+                                          insecure:
+                                            <<: *TypeStringBool
                                             description: |
-                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                              if specified
+                                              optional, open insecure ports for cluster, defaults to "yes"
+                                          secure:
+                                            <<: *TypeStringBool
+                                            description: |
+                                              optional, open secure ports
                                           tcpPort:
                                             type: integer
                                             description: |
@@ -715,11 +728,19 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
                                               optional, setup `Pod.spec.containers.ports` with name `http` for selected replica, override `chi.spec.templates.hostTemplates.spec.httpPort`
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
+                                            minimum: 1
+                                            maximum: 65535
+                                          httpsPort:
+                                            type: integer
                                             minimum: 1
                                             maximum: 65535
                                           interserverHTTPPort:
@@ -794,11 +815,14 @@ spec:
                                             # See namePartReplicaMaxLen const
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                          secure:
-                                            type: boolean
+                                          insecure:
+                                            <<: *TypeStringBool
                                             description: |
-                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                              if specified
+                                              optional, open insecure ports for cluster, defaults to "yes"
+                                          secure:
+                                            <<: *TypeStringBool
+                                            description: |
+                                              optional, open secure ports
                                           tcpPort:
                                             type: integer
                                             description: |
@@ -806,11 +830,19 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
                                               optional, setup `Pod.spec.containers.ports` with name `http` for selected shard, override `chi.spec.templates.hostTemplates.spec.httpPort`
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
+                                            minimum: 1
+                                            maximum: 65535
+                                          httpsPort:
+                                            type: integer
                                             minimum: 1
                                             maximum: 65535
                                           interserverHTTPPort:
@@ -881,11 +913,14 @@ spec:
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
-                              secure:
-                                type: boolean
+                              insecure:
+                                <<: *TypeStringBool
                                 description: |
-                                  optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                  if specified
+                                  optional, open insecure ports for cluster, defaults to "yes"
+                              secure:
+                                <<: *TypeStringBool
+                                description: |
+                                  optional, open secure ports
                               tcpPort:
                                 type: integer
                                 description: |
@@ -894,12 +929,20 @@ spec:
                                   More info: https://clickhouse.tech/docs/en/interfaces/tcp/
                                 minimum: 1
                                 maximum: 65535
+                              tlsPort:
+                                type: integer
+                                minimum: 1
+                                maximum: 65535
                               httpPort:
                                 type: integer
                                 description: |
                                   optional, setup `http_port` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified, should have equal value with `chi.spec.templates.podTemplates.spec.containers.ports[name=http]`
                                   More info: https://clickhouse.tech/docs/en/interfaces/http/
+                                minimum: 1
+                                maximum: 65535
+                              httpsPort:
+                                type: integer
                                 minimum: 1
                                 maximum: 65535
                               interserverHTTPPort:
@@ -964,7 +1007,7 @@ spec:
                               - "OnePerHost"
                           podDistribution:
                             type: array
-                            description: "define ClickHouse Pod distibution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                            description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                             # nullable: true
                             items:
                               type: object
@@ -1134,7 +1177,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1157,7 +1200,6 @@ spec:
         - name: clusters
           type: integer
           description: Clusters count
-          priority: 0 # show in standard view
           jsonPath: .status.clusters
         - name: shards
           type: integer
@@ -1167,7 +1209,6 @@ spec:
         - name: hosts
           type: integer
           description: Hosts count
-          priority: 0 # show in standard view
           jsonPath: .status.hosts
         - name: taskID
           type: string
@@ -1177,7 +1218,6 @@ spec:
         - name: status
           type: string
           description: CHI status
-          priority: 0 # show in standard view
           jsonPath: .status.status
         - name: hosts-updated
           type: integer
@@ -1192,7 +1232,6 @@ spec:
         - name: hosts-completed
           type: integer
           description: Completed hosts count
-          priority: 0 # show in standard view
           jsonPath: .status.hostsCompleted
         - name: hosts-deleted
           type: integer
@@ -1349,6 +1388,11 @@ spec:
                   type: object
                   description: "Normalized CHI completed"
                   x-kubernetes-preserve-unknown-fields: true
+                hostsWithTablesCreated:
+                  type: array
+                  description: "List of hosts with tables created by the operator"
+                  items:
+                    type: string
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -1581,6 +1625,9 @@ spec:
                                 description: "TCP port which used to connect to Zookeeper node"
                                 minimum: 0
                                 maximum: 65535
+                              secure:
+                                <<: *TypeStringBool
+                                description: "if a secure connection to Zookeeper is required"
                         session_timeout_ms:
                           type: integer
                           description: "session timeout during connect to Zookeeper"
@@ -1701,6 +1748,12 @@ spec:
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
+                          insecure:
+                            <<: *TypeStringBool
+                            description: optional, open insecure ports for cluster, defaults to "yes"
+                          secure:
+                            <<: *TypeStringBool
+                            description: optional, open secure ports for cluster
                           secret:
                             type: object
                             description: "optional, shared secret value to secure cluster communications"
@@ -1820,11 +1873,14 @@ spec:
                                             # See namePartReplicaMaxLen const
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                          secure:
-                                            type: boolean
+                                          insecure:
+                                            <<: *TypeStringBool
                                             description: |
-                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                              if specified
+                                              optional, open insecure ports for cluster, defaults to "yes"
+                                          secure:
+                                            <<: *TypeStringBool
+                                            description: |
+                                              optional, open secure ports
                                           tcpPort:
                                             type: integer
                                             description: |
@@ -1832,11 +1888,19 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
                                               optional, setup `Pod.spec.containers.ports` with name `http` for selected replica, override `chi.spec.templates.hostTemplates.spec.httpPort`
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
+                                            minimum: 1
+                                            maximum: 65535
+                                          httpsPort:
+                                            type: integer
                                             minimum: 1
                                             maximum: 65535
                                           interserverHTTPPort:
@@ -1911,11 +1975,14 @@ spec:
                                             # See namePartReplicaMaxLen const
                                             maxLength: 15
                                             pattern: "^[a-zA-Z0-9-]{0,15}$"
-                                          secure:
-                                            type: boolean
+                                          insecure:
+                                            <<: *TypeStringBool
                                             description: |
-                                              optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                              if specified
+                                              optional, open insecure ports for cluster, defaults to "yes"
+                                          secure:
+                                            <<: *TypeStringBool
+                                            description: |
+                                              optional, open secure ports
                                           tcpPort:
                                             type: integer
                                             description: |
@@ -1923,11 +1990,19 @@ spec:
                                               allows connect to `clickhouse-server` via TCP Native protocol via kubernetes `Service`
                                             minimum: 1
                                             maximum: 65535
+                                          tlsPort:
+                                            type: integer
+                                            minimum: 1
+                                            maximum: 65535
                                           httpPort:
                                             type: integer
                                             description: |
                                               optional, setup `Pod.spec.containers.ports` with name `http` for selected shard, override `chi.spec.templates.hostTemplates.spec.httpPort`
                                               allows connect to `clickhouse-server` via HTTP protocol via kubernetes `Service`
+                                            minimum: 1
+                                            maximum: 65535
+                                          httpsPort:
+                                            type: integer
                                             minimum: 1
                                             maximum: 65535
                                           interserverHTTPPort:
@@ -1998,11 +2073,14 @@ spec:
                                 # See namePartReplicaMaxLen const
                                 maxLength: 15
                                 pattern: "^[a-zA-Z0-9-]{0,15}$"
-                              secure:
-                                type: boolean
+                              insecure:
+                                <<: *TypeStringBool
                                 description: |
-                                  optional, setup `secure` inside `clickhouse-server` settings for each Pod where current template will apply
-                                  if specified
+                                  optional, open insecure ports for cluster, defaults to "yes"
+                              secure:
+                                <<: *TypeStringBool
+                                description: |
+                                  optional, open secure ports
                               tcpPort:
                                 type: integer
                                 description: |
@@ -2011,12 +2089,20 @@ spec:
                                   More info: https://clickhouse.tech/docs/en/interfaces/tcp/
                                 minimum: 1
                                 maximum: 65535
+                              tlsPort:
+                                type: integer
+                                minimum: 1
+                                maximum: 65535
                               httpPort:
                                 type: integer
                                 description: |
                                   optional, setup `http_port` inside `clickhouse-server` settings for each Pod where current template will apply
                                   if specified, should have equal value with `chi.spec.templates.podTemplates.spec.containers.ports[name=http]`
                                   More info: https://clickhouse.tech/docs/en/interfaces/http/
+                                minimum: 1
+                                maximum: 65535
+                              httpsPort:
+                                type: integer
                                 minimum: 1
                                 maximum: 65535
                               interserverHTTPPort:
@@ -2081,7 +2167,7 @@ spec:
                               - "OnePerHost"
                           podDistribution:
                             type: array
-                            description: "define ClickHouse Pod distibution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
+                            description: "define ClickHouse Pod distribution policy between Kubernetes Nodes inside Shard, Replica, Namespace, CHI, another ClickHouse cluster"
                             # nullable: true
                             items:
                               type: object
@@ -2248,7 +2334,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2266,7 +2352,6 @@ spec:
         - name: namespaces
           type: string
           description: Watch namespaces
-          priority: 0 # show in standard view
           jsonPath: .status
         - name: age
           type: date
@@ -2349,6 +2434,25 @@ spec:
                             hostRegexpTemplate:
                               type: string
                               description: "ClickHouse server configuration `<host_regexp>...</host_regexp>` for any <user>"
+                    configurationRestartPolicy:
+                      type: object
+                      description: "Configuration restart policy describes what configuration changes require ClickHouse restart"
+                      properties:
+                        rules:
+                          type: array
+                          description: "Array of set of rules per specified ClickHouse versions"
+                          items:
+                            type: object
+                            properties:
+                              version:
+                                type: string
+                                description: "ClickHouse version expression"
+                              rules:
+                                type: array
+                                description: "Set of configuration rules for specified ClickHouse version"
+                                items:
+                                  type: object
+                                  description: "setting: value pairs for configuration restart policy"
                     access:
                       type: object
                       description: "parameters which use for connect to clickhouse from clickhouse-operator deployment"
@@ -2393,6 +2497,19 @@ spec:
                               minimum: 1
                               maximum: 600
                               description: "Query timeout. In seconds."
+                    metrics:
+                      type: object
+                      description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"
+                      properties:
+                        timeouts:
+                          type: object
+                          description: "Timeouts used to limit connection and queries from the operator to ClickHouse instances, In seconds"
+                          properties:
+                            collect:
+                              type: integer
+                              minimum: 1
+                              maximum: 600
+                              description: "Collect timeout. In seconds."
                 template:
                   type: object
                   description: "Parameters which are used if you want to generate ClickHouseInstallationTemplate custom resources from files which are stored inside clickhouse-operator deployment"
@@ -2409,13 +2526,23 @@ spec:
                   properties:
                     runtime:
                       type: object
-                      description: "runtime parameters for clickhouse-operator process which use during reconciling"
+                      description: "runtime parameters for clickhouse-operator process which are used during reconcile cycle"
                       properties:
-                        threadsNumber:
+                        reconcileCHIsThreadsNumber:
                           type: integer
                           minimum: 1
                           maximum: 65535
-                          description: "How many goroutines will be used to reconcile in parallel, 10 by default"
+                          description: "How many goroutines will be used to reconcile CHIs in parallel, 10 by default"
+                        reconcileShardsThreadsNumber:
+                          type: integer
+                          minimum: 1
+                          maximum: 65535
+                          description: "How many goroutines will be used to reconcile shards of a cluster in parallel, 1 by default"
+                        reconcileShardsMaxConcurrencyPercent:
+                          type: integer
+                          minimum: 0
+                          maximum: 100
+                          description: "The maximum percentage of cluster shards that may be reconciled in parallel, 50 percent by default."
                     statefulSet:
                       type: object
                       description: "Allow change default behavior for reconciling StatefulSet which generated by clickhouse-operator"
@@ -2597,7 +2724,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
 ---
 # Template Parameters:
 #
@@ -2614,7 +2741,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
 rules:
 - apiGroups:
     - ""
@@ -2762,7 +2889,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -2784,7 +2911,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -2810,6 +2937,8 @@ data:
     watch:
       # List of namespaces where clickhouse-operator watches for events.
       # Concurrently running operators should watch on different namespaces.
+      # IMPORTANT
+      # Regexp is applicable.
       #namespaces: ["dev", "test"]
       namespaces: [{{ namespace }}]
     
@@ -2835,14 +2964,26 @@ data:
         ##
         ################################################
         user:
+          # Default settings for user accounts, created by the operator.
+          # IMPORTANT. These are not access credentials or settings for 'default' user account,
+          # it is a template for filling out missing fields for all user accounts to be created by the operator,
+          # with the following EXCEPTIONS:
+          # 1. 'default' user account DOES NOT use provided password, but uses all the rest of the fields.
+          #    Password for 'default' user account has to be provided explicitly, if to be used.
+          # 2. CHOP user account DOES NOT use:
+          #    - profile setting. It uses predefined profile called 'clickhouse_operator'
+          #    - quota setting. It uses empty quota name.
+          #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
+          #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
           default:
-            # Default values for ClickHouse user configuration
-            # 1. user/profile - string
-            # 2. user/quota - string
-            # 3. user/networks/ip - multiple strings
-            # 4. user/password - string
-            profile: default
-            quota: default
+            # Default values for ClickHouse user account(s) created by the operator
+            #   1. user/profile - string
+            #   2. user/quota - string
+            #   3. user/networks/ip - multiple strings
+            #   4. user/password - string
+            # These values can be overwritten on per-user basis.
+            profile: "default"
+            quota: "default"
             networksIP:
               - "::1"
               - "127.0.0.1"
@@ -2855,34 +2996,66 @@ data:
         network:
           # Default host_regexp to limit network connectivity from outside
           hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+    
       ################################################
+      ##
+      ## Configuration Restart Policy Section
+      ## Configuration restart policy describes what configuration changes require ClickHouse restart
+      ##
+      ################################################
+      configurationRestartPolicy:
+        rules:
+          - version: "*"
+            rules:
+              - settings/*: "yes"
+              - settings/dictionaries_config: "no"
+              - settings/logger: "no"
+              - settings/macros/*: "no"
+              - settings/max_server_memory_*: "no"
+              - settings/max_*_to_drop: "no"
+              - settings/max_concurrent_queries: "no"
+              - settings/models_config: "no"
+              - settings/user_defined_executable_functions_config: "no"
+    
+              - zookeeper/*: "yes"
+    
+              - files/config.d/*.xml: "yes"
+              - files/config.d/*dict*.xml: "no"
+    
+              - profiles/default/background_*_pool_size: "yes"
+              - profiles/default/max_*_for_server: "yes"
+          - version: "21.*"
+            rules:
+              - settings/logger: "yes"
+    
+      #################################################
       ##
       ## Access to ClickHouse instances
       ##
       ################################################
       access:
-        # Possible values for `scheme` are:
-        # 1. http
-        # 2. https
+        # Possible values for 'scheme' are:
+        #   1. http
+        #   2. https
         scheme: ""
         # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
-        # Used for:
-        # 1. Metrics requests
-        # 2. Schema maintenance
-        # 3. DROP DNS CACHE
+        # These credentials are used for:
+        #   1. Metrics requests
+        #   2. Schema maintenance
+        #   3. DROP DNS CACHE
         # User with these credentials can be specified in additional ClickHouse .xml config files,
-        # located in `clickhouse.configuration.file.path.user` folder
+        # located in 'clickhouse.configuration.file.path.user' folder
         username: ""
         password: ""
         rootCA: ""
     
         # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
-        # Can be used instead of explicitly specified username and password which are:
-        # clickhouse.access.username
-        # clickhouse.access.password
+        # Can be used instead of explicitly specified username and password available in sections:
+        #   - clickhouse.access.username
+        #   - clickhouse.access.password
         # Secret should have two keys:
-        # 1. username
-        # 2. password
+        #   1. username
+        #   2. password
         secret:
           # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
           namespace: ""
@@ -2896,6 +3069,10 @@ data:
         timeouts:
           connect: 2
           query: 5
+    
+      metrics:
+        timeouts:
+          collect: 9
     
     ################################################
     ##
@@ -2915,8 +3092,12 @@ data:
     ################################################
     reconcile:
       runtime:
-        # Max number of concurrent reconciles in progress
-        threadsNumber: 10
+        # Max number of concurrent CHI reconciles in progress
+        reconcileCHIsThreadsNumber: 10
+        # Max number of concurrent shard reconciles in progress
+        reconcileShardsThreadsNumber: 1
+        # The maximum percentage of cluster shards that may be reconciled in parallel
+        reconcileShardsMaxConcurrencyPercent: 50
     
       statefulSet:
         create:
@@ -3040,7 +3221,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
 ---
@@ -3056,7 +3237,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3126,6 +3307,22 @@ data:
         </part_log>
     </yandex>
 
+  01-clickhouse-05-trace_log.xml: |
+    <!-- IMPORTANT -->
+    <!-- This file is auto-generated -->
+    <!-- Do not edit this file - all changes would be lost -->
+    <!-- Edit appropriate template in the following folder: -->
+    <!-- deploy/builder/templates-config -->
+    <!-- IMPORTANT -->
+    <yandex>
+        <trace_log replace="1">
+            <database>system</database>
+            <table>trace_log</table>
+            <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + interval 30 day</engine>
+            <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        </trace_log>
+    </yandex>
+
 ---
 # Template Parameters:
 #
@@ -3139,7 +3336,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3239,10 +3436,10 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
-  01-clickhouse-user.xml: |
+  01-clickhouse-operator-profile.xml: |
     <!-- IMPORTANT -->
     <!-- This file is auto-generated -->
     <!-- Do not edit this file - all changes would be lost -->
@@ -3255,20 +3452,14 @@ data:
     #
     -->
     <yandex>
-        <users>
-            <clickhouse_operator>
-                <networks>
-                    <ip>127.0.0.1</ip>
-                </networks>
-                <profile>clickhouse_operator</profile>
-                <quota>default</quota>
-            </clickhouse_operator>
-        </users>
+        <!-- clickhouse-operator user is generated by the operator based on config.yaml in runtime -->
         <profiles>
             <clickhouse_operator>
                 <log_queries>0</log_queries>
                 <skip_unavailable_shards>1</skip_unavailable_shards>
                 <http_connection_timeout>10</http_connection_timeout>
+                <max_concurrent_queries_for_all_users>0</max_concurrent_queries_for_all_users>
+                <os_thread_priority>0</os_thread_priority>
             </clickhouse_operator>
         </profiles>
     </yandex>
@@ -3283,34 +3474,22 @@ data:
     <yandex>
       <profiles>
         <default>
+          <os_thread_priority>2</os_thread_priority>
           <log_queries>1</log_queries>
           <connect_timeout_with_failover_ms>1000</connect_timeout_with_failover_ms>
           <distributed_aggregation_memory_efficient>1</distributed_aggregation_memory_efficient>
           <parallel_view_processing>1</parallel_view_processing>
+          <do_not_merge_across_partitions_select_final>1</do_not_merge_across_partitions_select_final>
+          <load_balancing>nearest_hostname</load_balancing>
         </default>
       </profiles>
-    </yandex>
-  03-database-ordinary.xml: |
-    <!-- IMPORTANT -->
-    <!-- This file is auto-generated -->
-    <!-- Do not edit this file - all changes would be lost -->
-    <!-- Edit appropriate template in the following folder: -->
-    <!-- deploy/builder/templates-config -->
-    <!-- IMPORTANT -->
-    <!--  Remove it for ClickHouse versions before 20.4 -->
-    <yandex>
-        <profiles>
-            <default>
-                <default_database_engine>Ordinary</default_database_engine>
-            </default>
-        </profiles>
     </yandex>
 ---
 #
 # Template parameters available:
 #   NAMESPACE={{ namespace }}
 #   COMMENT=
-#   OPERATOR_VERSION=0.20.1
+#   OPERATOR_VERSION=0.21.2
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN={{ password }}
 #
@@ -3320,7 +3499,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -3331,9 +3510,9 @@ stringData:
 #
 # NAMESPACE={{ namespace }}
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.20.1
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.21.2
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.20.1
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.21.2
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -3344,7 +3523,7 @@ metadata:
   name: clickhouse-operator
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3378,7 +3557,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.20.1
+          image: altinity/clickhouse-operator:0.21.2
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3443,7 +3622,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.20.1
+          image: altinity/metrics-exporter:0.21.2
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3526,7 +3705,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: {{ namespace }}
   labels:
-    clickhouse.altinity.com/chop: 0.20.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 spec:
   ports:

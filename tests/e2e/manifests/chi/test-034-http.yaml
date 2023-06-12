@@ -1,0 +1,14 @@
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-034-http
+
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+

@@ -7,24 +7,29 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
-    "/regression/e2e.test_operator/test_035*": [(Fail, "Does not work yet")],
-
+    "/regression/e2e.test_operator/test_028*": [(Fail, "In case of: 1) operator restarted on the different IP and 2) long time before operator received event, this test would fail due to RollingUpdate option")],
+    "/regression/e2e.test_operator/test_036*": [(Fail, "not implemented yet")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
-
     # test_metrics_alerts.py
+    "/regression/e2e.test_metrics_alerts/test_clickhouse_keeper_alerts*": [
+        (Fail, "clickhouse-keeper wrong prometheus endpoint format, look https://github.com/ClickHouse/ClickHouse/issues/46136")
+    ],
+    # test_keeper.py
+    # "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
+    #     (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465. --force-recovery useless https://github.com/ClickHouse/ClickHouse/issues/37434"),
+    # ],
     # "/regression/e2e.test_metrics_alerts/test_clickhouse_dns_errors*": [
     #     (Fail, "DNSError behavior changed on 21.9, look https://github.com/ClickHouse/ClickHouse/issues/29624")
     # ],
 
     # test_keeper.py
-    # "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
-    #     (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465. --force-recovery useless https://github.com/ClickHouse/ClickHouse/issues/37434"),
-    # ],
     "/regression/e2e.test_keeper/test_zookeeper_operator_probes_workload*": [
-        (Fail, "zookeeper liveness probe doesn't work, wait when https://github.com/pravega/zookeeper-operator/pull/476 will merge")
-        ],
-    "/regression/e2e.test_operator/test_036*": [(Fail, "not implemented yet")],
+        (
+            Fail,
+            "zookeeper liveness probe doesn't work, wait when https://github.com/pravega/zookeeper-operator/pull/476 will merge",
+        )
+    ],
     # "/regression/e2e.test_keeper/test_clickhouse_keeper_probes_workload*": [
     #     (Fail, "clickhouse-keeper fail after insert 10000 parts, look https://github.com/ClickHouse/ClickHouse/issues/35712")
     # ],
@@ -34,12 +39,10 @@ xfails = {
 @TestSuite
 @XFails(xfails)
 @ArgumentParser(argparser)
-@Specifications(
-    QA_SRS026_ClickHouse_Operator
-)
+@Specifications(QA_SRS026_ClickHouse_Operator)
 def regression(self, native, keeper_type):
-    """ClickHouse Operator test regression suite.
-    """
+    """ClickHouse Operator test regression suite."""
+
     def run_features():
         features = [
             "e2e.test_metrics_exporter",

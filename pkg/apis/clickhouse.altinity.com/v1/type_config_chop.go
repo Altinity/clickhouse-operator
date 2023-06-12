@@ -58,12 +58,28 @@ const (
 	defaultChRootCA   = ""
 
 	// Timeouts used to limit connection and queries from the operator to ClickHouse instances. In seconds
+	// defaultTimeoutConnect specifies default timeout to connect to the ClickHouse instance. In seconds
 	defaultTimeoutConnect = 2
-	defaultTimeoutQuery   = 5
+	// defaultTimeoutQuery specifies default timeout to query the CLickHouse instance. In seconds
+	defaultTimeoutQuery = 5
+	// defaultTimeoutCollect specifies default timeout to collect metrics from the ClickHouse instance. In seconds
+	defaultTimeoutCollect = 8
 
-	// defaultReconcileThreadsNumber specifies default number of controller threads running concurrently.
+	// defaultReconcileCHIsThreadsNumber specifies default number of controller threads running concurrently.
 	// Used in case no other specified in config
-	defaultReconcileThreadsNumber = 1
+	defaultReconcileCHIsThreadsNumber = 1
+
+	// defaultReconcileShardsThreadsNumber specifies the default number of threads usable for concurrent shard reconciliation
+	// within a single cluster reconciliation. Defaults to 1, which means strictly sequential shard reconciliation.
+	defaultReconcileShardsThreadsNumber = 1
+
+	// defaultReconcileShardsMaxConcurrencyPercent specifies the maximum integer percentage of shards that may be reconciled
+	// concurrently during cluster reconciliation. This counterbalances the fact that this is an operator setting,
+	// that different clusters will have different shard counts, and that the shard concurrency capacity is specified
+	// above in terms of a number of threads to use (up to). Example: overriding to 100 means all shards may be
+	// reconciled concurrently, if the number of shard reconciliation threads is greater than or equal to the number
+	// of shards in the cluster.
+	defaultReconcileShardsMaxConcurrencyPercent = 50
 
 	// DefaultReconcileThreadsWarmup specifies default reconcile threads warmup time
 	DefaultReconcileThreadsWarmup = 10 * time.Second
@@ -110,6 +126,20 @@ type OperatorConfigConfig struct {
 	} `json:"network" yaml:"network"`
 }
 
+// OperatorConfigRestartPolicyRuleSet specifies set of rules
+type OperatorConfigRestartPolicyRuleSet map[Matchable]StringBool
+
+// OperatorConfigRestartPolicyRule specifies ClickHouse version and rules for this version
+type OperatorConfigRestartPolicyRule struct {
+	Version string
+	Rules   []OperatorConfigRestartPolicyRuleSet
+}
+
+// OperatorConfigRestartPolicy specifies operator's configuration changes restart policy
+type OperatorConfigRestartPolicy struct {
+	Rules []OperatorConfigRestartPolicyRule
+}
+
 // OperatorConfigFile specifies File section
 type OperatorConfigFile struct {
 	Path struct {
@@ -148,9 +178,12 @@ type OperatorConfigDefault struct {
 	Password   string   `json:"password"   yaml:"password"`
 }
 
+// type RestartPolicy map[Matchable]StringBool
+
 // OperatorConfigClickHouse specifies ClickHouse section
 type OperatorConfigClickHouse struct {
-	Config OperatorConfigConfig `json:"configuration" yaml:"configuration"`
+	Config              OperatorConfigConfig        `json:"configuration" yaml:"configuration"`
+	ConfigRestartPolicy OperatorConfigRestartPolicy `json:"configurationRestartPolicy" yaml:"configurationRestartPolicy"`
 
 	Access struct {
 		// Username and Password to be used by operator to connect to ClickHouse instances
@@ -188,6 +221,13 @@ type OperatorConfigClickHouse struct {
 			Query   time.Duration `json:"query"   yaml:"query"`
 		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"access" yaml:"access"`
+
+	// Metrics used to specify how the operator fetches metrics from ClickHouse instances
+	Metrics struct {
+		Timeouts struct {
+			Collect time.Duration `json:"collect" yaml:"collect"`
+		} `json:"timeouts" yaml:"timeouts"`
+	} `json:"metrics" yaml:"metrics"`
 }
 
 // OperatorConfigTemplate specifies template section
@@ -216,6 +256,11 @@ type OperatorConfigCHIRuntime struct {
 // OperatorConfigReconcile specifies reconcile section
 type OperatorConfigReconcile struct {
 	Runtime struct {
+		ReconcileCHIsThreadsNumber           int `json:"reconcileCHIsThreadsNumber"           yaml:"reconcileCHIsThreadsNumber"`
+		ReconcileShardsThreadsNumber         int `json:"reconcileShardsThreadsNumber"         yaml:"reconcileShardsThreadsNumber"`
+		ReconcileShardsMaxConcurrencyPercent int `json:"reconcileShardsMaxConcurrencyPercent" yaml:"reconcileShardsMaxConcurrencyPercent"`
+
+		// DEPRECATED, is replaced with reconcileCHIsThreadsNumber
 		ThreadsNumber int `json:"threadsNumber" yaml:"threadsNumber"`
 	} `json:"runtime" yaml:"runtime"`
 
@@ -231,12 +276,18 @@ type OperatorConfigReconcile struct {
 		} `json:"update" yaml:"update"`
 	} `json:"statefulSet" yaml:"statefulSet"`
 
-	Host struct {
-		Wait struct {
-			Exclude StringBool `json:"exclude" yaml:"exclude"`
-			Include StringBool `json:"include" yaml:"include"`
-		} `json:"wait" yaml:"wait"`
-	} `json:"host" yaml:"host"`
+	Host OperatorConfigReconcileHost `json:"host" yaml:"host"`
+}
+
+// OperatorConfigReconcileHost defines reconcile host config
+type OperatorConfigReconcileHost struct {
+	Wait OperatorConfigReconcileHostWait `json:"wait" yaml:"wait"`
+}
+
+// OperatorConfigReconcileHostWait defines reconcile host wait config
+type OperatorConfigReconcileHostWait struct {
+	Exclude *StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+	Include *StringBool `json:"include,omitempty" yaml:"include,omitempty"`
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -269,12 +320,12 @@ type OperatorConfig struct {
 		// Namespace specifies namespace where operator runs
 		Namespace string
 	}
-	Watch       OperatorConfigWatch      `json:"watch" yaml:"watch"`
+	Watch       OperatorConfigWatch      `json:"watch"      yaml:"watch"`
 	ClickHouse  OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
-	Template    OperatorConfigTemplate   `json:"template" yaml:"template"`
-	Reconcile   OperatorConfigReconcile  `json:"reconcile" yaml:"reconcile"`
+	Template    OperatorConfigTemplate   `json:"template"   yaml:"template"`
+	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
 	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
-	Label       OperatorConfigLabel      `json:"label" yaml:"label"`
+	Label       OperatorConfigLabel      `json:"label"      yaml:"label"`
 	StatefulSet struct {
 		// Revision history limit
 		RevisionHistoryLimit int `json:"revisionHistoryLimit" yaml:"revisionHistoryLimit"`
@@ -706,6 +757,13 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	}
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
+
+	if c.ClickHouse.Metrics.Timeouts.Collect == 0 {
+		c.ClickHouse.Metrics.Timeouts.Collect = defaultTimeoutCollect
+	}
+	// Adjust seconds to time.Duration
+	c.ClickHouse.Metrics.Timeouts.Collect = c.ClickHouse.Metrics.Timeouts.Collect * time.Second
+
 }
 
 func (c *OperatorConfig) normalizeLogSection() {
@@ -719,7 +777,16 @@ func (c *OperatorConfig) normalizeLogSection() {
 
 func (c *OperatorConfig) normalizeRuntimeSection() {
 	if c.Reconcile.Runtime.ThreadsNumber == 0 {
-		c.Reconcile.Runtime.ThreadsNumber = defaultReconcileThreadsNumber
+		c.Reconcile.Runtime.ThreadsNumber = defaultReconcileCHIsThreadsNumber
+	}
+	if c.Reconcile.Runtime.ReconcileCHIsThreadsNumber == 0 {
+		c.Reconcile.Runtime.ReconcileCHIsThreadsNumber = defaultReconcileCHIsThreadsNumber
+	}
+	if c.Reconcile.Runtime.ReconcileShardsThreadsNumber == 0 {
+		c.Reconcile.Runtime.ReconcileShardsThreadsNumber = defaultReconcileShardsThreadsNumber
+	}
+	if c.Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent == 0 {
+		c.Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent = defaultReconcileShardsMaxConcurrencyPercent
 	}
 
 	//reconcileWaitExclude: true

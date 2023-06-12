@@ -238,18 +238,15 @@ func (s *Setting) String() string {
 }
 
 // Settings specifies settings
-type Settings struct {
-	m map[string]*Setting
-}
+type Settings map[string]*Setting
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
-	return &Settings{
-		m: makeM(),
-	}
+	m := makeSettings()
+	return &m
 }
 
-func makeM() map[string]*Setting {
+func makeSettings() Settings {
 	return make(map[string]*Setting)
 }
 
@@ -258,7 +255,7 @@ func (settings *Settings) Len() int {
 	if settings == nil {
 		return 0
 	}
-	return len(settings.m)
+	return len(*settings)
 }
 
 // IsZero checks whether settings is zero
@@ -277,7 +274,7 @@ func (settings *Settings) Walk(f func(name string, setting *Setting)) {
 	if settings.Len() == 0 {
 		return
 	}
-	for name := range settings.m {
+	for name := range *settings {
 		f(name, settings.Get(name))
 	}
 }
@@ -290,7 +287,7 @@ func (settings *Settings) Has(name string) bool {
 	if settings.Len() == 0 {
 		return false
 	}
-	_, ok := settings.m[name]
+	_, ok := (*settings)[name]
 	return ok
 }
 
@@ -302,7 +299,7 @@ func (settings *Settings) Get(name string) *Setting {
 	if settings.Len() == 0 {
 		return nil
 	}
-	return settings.m[name]
+	return (*settings)[name]
 }
 
 // Set sets named setting
@@ -311,10 +308,10 @@ func (settings *Settings) Set(name string, setting *Setting) {
 		return
 	}
 	// Lazy load
-	if settings.m == nil {
-		settings.m = makeM()
+	if *settings == nil {
+		*settings = makeSettings()
 	}
-	settings.m[name] = setting
+	(*settings)[name] = setting
 }
 
 // SetIfNotExists sets named setting
@@ -327,6 +324,14 @@ func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
 	}
 }
 
+// Names gets names of the settings
+func (settings *Settings) Names() (names []string) {
+	settings.Walk(func(name string, setting *Setting) {
+		names = append(names, name)
+	})
+	return names
+}
+
 // Delete deletes named setting
 func (settings *Settings) Delete(name string) {
 	if settings == nil {
@@ -335,7 +340,7 @@ func (settings *Settings) Delete(name string) {
 	if !settings.Has(name) {
 		return
 	}
-	delete(settings.m, name)
+	delete(*settings, name)
 }
 
 // UnmarshalJSON unmarshal JSON
@@ -517,9 +522,19 @@ func (settings *Settings) GetTCPPort() int32 {
 	return settings.fetchPort("tcp_port")
 }
 
+// GetTCPPortSecure gets TCP port secure from settings
+func (settings *Settings) GetTCPPortSecure() int32 {
+	return settings.fetchPort("tcp_port_secure")
+}
+
 // GetHTTPPort gets HTTP port from settings
 func (settings *Settings) GetHTTPPort() int32 {
 	return settings.fetchPort("http_port")
+}
+
+// GetHTTPSPort gets HTTPS port from settings
+func (settings *Settings) GetHTTPSPort() int32 {
+	return settings.fetchPort("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
@@ -533,11 +548,11 @@ func (settings *Settings) MergeFrom(src *Settings) *Settings {
 		return settings
 	}
 
-	if settings == nil {
-		settings = NewSettings()
-	}
-
 	src.Walk(func(key string, value *Setting) {
+		// Lazy load
+		if settings == nil {
+			settings = NewSettings()
+		}
 		settings.SetIfNotExists(key, value)
 	})
 
@@ -550,12 +565,12 @@ func (settings *Settings) MergeFromCB(src *Settings, filter func(path string, se
 		return settings
 	}
 
-	if settings == nil {
-		settings = NewSettings()
-	}
-
 	src.Walk(func(key string, value *Setting) {
 		if filter(key, value) {
+			// Lazy load
+			if settings == nil {
+				settings = NewSettings()
+			}
 			// Accept
 			settings.Set(key, value)
 		}
@@ -565,12 +580,10 @@ func (settings *Settings) MergeFromCB(src *Settings, filter func(path string, se
 }
 
 // GetSectionStringMap returns map of settings sections
-func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) map[string]string {
+func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) (m map[string]string) {
 	if settings == nil {
 		return nil
 	}
-
-	m := make(map[string]string)
 
 	settings.Walk(func(path string, _ *Setting) {
 		_section, err := getSectionFromPath(path)
@@ -596,6 +609,10 @@ func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUn
 		}
 
 		if scalar, ok := settings.getValueAsScalar(path); ok {
+			if m == nil {
+				// Lazy load
+				m = make(map[string]string)
+			}
 			m[filename] = scalar
 		} else {
 			// Skip vector for now
@@ -620,9 +637,7 @@ func (settings *Settings) Filter(
 	includeSections []SettingsSection,
 	excludeSections []SettingsSection,
 	includeUnspecified bool,
-) *Settings {
-	res := NewSettings()
-
+) (res *Settings) {
 	if settings.Len() == 0 {
 		return res
 	}
@@ -654,6 +669,9 @@ func (settings *Settings) Filter(
 		}
 
 		// We'd like to get this section
+		if res == nil {
+			res = NewSettings()
+		}
 		res.Set(path, settings.Get(path))
 	})
 

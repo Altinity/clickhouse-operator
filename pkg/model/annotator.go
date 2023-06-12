@@ -67,7 +67,7 @@ func (a *Annotator) getServiceCHI(chi *chiv1.ClickHouseInstallation) map[string]
 }
 
 // getServiceCluster
-func (a *Annotator) getServiceCluster(cluster *chiv1.ChiCluster) map[string]string {
+func (a *Annotator) getServiceCluster(cluster *chiv1.Cluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getClusterScope(cluster),
 		nil,
@@ -97,7 +97,7 @@ func (a *Annotator) getCHIScope() map[string]string {
 }
 
 // getClusterScope gets annotations for Cluster-scoped object
-func (a *Annotator) getClusterScope(cluster *chiv1.ChiCluster) map[string]string {
+func (a *Annotator) getClusterScope(cluster *chiv1.Cluster) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }

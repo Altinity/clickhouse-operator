@@ -7,10 +7,13 @@
 <yandex>
   <profiles>
     <default>
+      <os_thread_priority>2</os_thread_priority>
       <log_queries>1</log_queries>
       <connect_timeout_with_failover_ms>1000</connect_timeout_with_failover_ms>
       <distributed_aggregation_memory_efficient>1</distributed_aggregation_memory_efficient>
       <parallel_view_processing>1</parallel_view_processing>
+      <do_not_merge_across_partitions_select_final>1</do_not_merge_across_partitions_select_final>
+      <load_balancing>nearest_hostname</load_balancing>
     </default>
   </profiles>
 </yandex>

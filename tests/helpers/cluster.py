@@ -12,6 +12,7 @@ from testflows.connect import Shell as ShellBase
 
 class Shell(ShellBase):
     timeout = 600
+
     def __exit__(self, type, value, traceback):
         # send exit and Ctrl-D repeatedly
         # to terminate any open shell commands.
@@ -23,16 +24,16 @@ class Shell(ShellBase):
         for i in range(10):
             if self.child is not None:
                 try:
-                    self.send('exit\r', eol='')
-                    self.send('\x04\r', eol='')
+                    self.send("exit\r", eol="")
+                    self.send("\x04\r", eol="")
                 except OSError:
                     pass
         return super(Shell, self).__exit__(type, value, traceback)
 
 
 class Cluster(object):
-    """Simple object around docker-compose cluster.
-    """
+    """Simple object around docker-compose cluster."""
+
     def __init__(self, configs_dir=None):
 
         self.environ = {}
@@ -56,7 +57,9 @@ class Cluster(object):
 
         docker_compose_file_path = os.path.join(docker_compose_project_dir or "", "docker-compose.yml")
 
-        self.docker_compose += f" --project-directory \"{docker_compose_project_dir}\" --file \"{docker_compose_file_path}\""
+        self.docker_compose += (
+            f' --project-directory "{docker_compose_project_dir}" --file "{docker_compose_file_path}"'
+        )
 
     def __enter__(self):
         with Given("docker-compose cluster"):
@@ -82,7 +85,9 @@ class Cluster(object):
                         self.shell(f"set -o pipefail && {self.docker_compose} ps | tee")
 
                     with And("executing docker-compose down just in case it is up"):
-                        cmd = self.shell(f"set -o pipefail && {self.docker_compose} down --timeout={timeout} -v --remove-orphans 2>&1 | tee")
+                        cmd = self.shell(
+                            f"set -o pipefail && {self.docker_compose} down --timeout={timeout} -v --remove-orphans 2>&1 | tee"
+                        )
                         if cmd.exitcode != 0:
                             continue
 
@@ -92,12 +97,14 @@ class Cluster(object):
                     with And("executing docker-compose up"):
                         for up_attempt in range(max_up_attempts):
                             with By(f"attempt {up_attempt}/{max_up_attempts}"):
-                                cmd = self.shell(f"set -o pipefail && {self.docker_compose} up --force-recreate --timeout {timeout} -d 2>&1 | tee")
+                                cmd = self.shell(
+                                    f"set -o pipefail && {self.docker_compose} up --force-recreate --timeout {timeout} -d 2>&1 | tee"
+                                )
                                 if "is unhealthy" not in cmd.output:
                                     break
 
                     with Then("check there are no unhealthy containers"):
-                        ps_cmd = self.shell(f"set -o pipefail && {self.docker_compose} ps | tee | grep -v \"Exit 0\"")
+                        ps_cmd = self.shell(f'set -o pipefail && {self.docker_compose} ps | tee | grep -v "Exit 0"')
                         if "is unhealthy" in cmd.output or "Exit" in ps_cmd.output:
                             self.shell(f"set -o pipefail && {self.docker_compose} logs | tee")
                             continue

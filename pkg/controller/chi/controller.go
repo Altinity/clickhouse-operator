@@ -105,7 +105,7 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < chop.Config().Reconcile.Runtime.ThreadsNumber+chiV1.DefaultReconcileSystemThreadsNumber; i++ {
+	for i := 0; i < chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber+chiV1.DefaultReconcileSystemThreadsNumber; i++ {
 		c.queues = append(
 			c.queues,
 			queue.New(),
@@ -800,7 +800,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chiV1.Cli
 
 	// Update status of a real object.
 	cur.EnsureStatus().CopyFrom(chi.Status, opts.CopyCHIStatusOptions)
-	cur.EnsureStatus().PodIPs = podIPs
+	cur.EnsureStatus().SetPodIPs(podIPs)
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
 	if err != nil {

@@ -14,7 +14,7 @@ import e2e.util as util
 @Name("Check metrics server setup and version")
 def test_metrics_exporter_setup(self):
     with Given("clickhouse-operator is installed"):
-        assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
+        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
         with Then(f"Set metrics-exporter version {settings.operator_version}"):
             util.set_metrics_exporter_version(settings.operator_version)
 
@@ -29,13 +29,13 @@ def test_metrics_exporter_reboot(self):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
                 kubectl.launch(
                     f"exec {operator_pod} -c metrics-exporter -- {url_cmd}",
-                    ns=operator_namespace
+                    ns=operator_namespace,
                 )
                 # check /chi after refresh monitored instances
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/chi")
                 out = kubectl.launch(
                     f"exec {operator_pod} -c metrics-exporter -- {url_cmd}",
-                    ns=operator_namespace
+                    ns=operator_namespace,
                 )
                 out = json.loads(out)
                 if out == expect_result:
@@ -45,16 +45,19 @@ def test_metrics_exporter_reboot(self):
             assert out == expect_result, error()
 
     with Given("clickhouse-operator is installed"):
-        kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
-                           ns=settings.operator_namespace)
-        assert kubectl.get_count("pod", ns='--all-namespaces', label=util.operator_label) > 0, error()
+        kubectl.wait_field(
+            "pods",
+            util.operator_label,
+            ".status.containerStatuses[*].ready",
+            "true,true",
+            ns=settings.operator_namespace,
+        )
+        assert kubectl.get_count("pod", ns="--all-namespaces", label=util.operator_label) > 0, error()
 
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
-        operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
-        operator_namespace = settings.operator_namespace
-        kubectl.delete_ns(kubectl.namespace, ok_to_fail=True)
-        kubectl.create_ns(kubectl.namespace)
-        check_monitoring_chi(operator_namespace, operator_pod, [])
+        operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
+        kubectl.delete_all_chi(settings.test_namespace)
+        check_monitoring_chi(settings.operator_namespace, operator_pod, [])
         with And("created simple clickhouse installation"):
             manifest = "../../docs/chi-examples/01-simple-layout-01-1shard-1repl.yaml"
             kubectl.create_and_check(
@@ -66,21 +69,30 @@ def test_metrics_exporter_reboot(self):
                         "service": 2,
                     },
                     "do_not_delete": True,
-                })
-            expected_chi = [{
-                "namespace": "test", "name": "simple-01",
-                "hostnames": ["chi-simple-01-simple-0-0.test.svc.cluster.local"]
-            }]
-            check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
+                },
+            )
+            expected_chi = [
+                {
+                    "namespace": "test",
+                    "name": "simple-01",
+                    "hostnames": ["chi-simple-01-simple-0-0.test.svc.cluster.local"],
+                }
+            ]
+            check_monitoring_chi(settings.operator_namespace, operator_pod, expected_chi)
             with When("reboot metrics exporter"):
-                kubectl.launch(f"exec -n {operator_namespace} {operator_pod} -c metrics-exporter -- bash -c 'kill 1'")
+                kubectl.launch(f"exec -n {settings.operator_namespace} {operator_pod} -c metrics-exporter -- bash -c 'kill 1'")
                 time.sleep(15)
-                kubectl.wait_field("pods", util.operator_label, ".status.containerStatuses[*].ready", "true,true",
-                                   ns=settings.operator_namespace)
+                kubectl.wait_field(
+                    "pods",
+                    util.operator_label,
+                    ".status.containerStatuses[*].ready",
+                    "true,true",
+                    ns=settings.operator_namespace,
+                )
                 with Then("check metrics exporter still contains chi objects"):
-                    check_monitoring_chi(operator_namespace, operator_pod, expected_chi)
+                    check_monitoring_chi(settings.operator_namespace, operator_pod, expected_chi)
                     kubectl.delete(util.get_full_path(manifest, lookup_in_host=False), timeout=600)
-                    check_monitoring_chi(operator_namespace, operator_pod, [])
+                    check_monitoring_chi(settings.operator_namespace, operator_pod, [])
 
 
 @TestScenario
@@ -92,11 +104,11 @@ def test_metrics_exporter_with_multiple_clickhouse_version(self):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
                 out = kubectl.launch(
                     f"exec {operator_pod} -c metrics-exporter -- {url_cmd}",
-                    ns=operator_namespace
+                    ns=operator_namespace,
                 )
                 all_strings_expected_done = True
                 for string, exists in expect_result.items():
-                    all_strings_expected_done = (exists == (string in out))
+                    all_strings_expected_done = exists == (string in out)
                     if not all_strings_expected_done:
                         break
 
@@ -107,16 +119,18 @@ def test_metrics_exporter_with_multiple_clickhouse_version(self):
             assert all_strings_expected_done, error()
 
     with Given("clickhouse-operator pod exists"):
-        out = kubectl.launch("get pods -l app=clickhouse-operator", ns='kube-system').splitlines()[1]
-        operator_pod = re.split(r'[\t\r\n\s]+', out)[0]
-        operator_namespace = "kube-system"
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=settings.operator_namespace).splitlines()[1]
+        operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
         with Then("check empty /metrics"):
-            kubectl.delete_ns(kubectl.namespace, ok_to_fail=True)
-            kubectl.create_ns(kubectl.namespace)
-            check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
-                'chi_clickhouse_metric_VersionInteger': False,
-            })
+            kubectl.delete_all_chi(settings.test_namespace)
+            check_monitoring_metrics(
+                settings.operator_namespace,
+                operator_pod,
+                expect_result={
+                    "chi_clickhouse_metric_VersionInteger": False,
+                },
+            )
 
         with Then("Install multiple clickhouse version"):
             manifest = "manifests/chi/test-017-multi-version.yaml"
@@ -129,20 +143,29 @@ def test_metrics_exporter_with_multiple_clickhouse_version(self):
                         "service": 3,
                     },
                     "do_not_delete": True,
-                })
+                },
+            )
             with And("Check not empty /metrics"):
-                check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
-                    '# HELP chi_clickhouse_metric_VersionInteger': True,
-                    '# TYPE chi_clickhouse_metric_VersionInteger gauge': True,
-                    'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-0-0': True,
-                    'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-1-0': True,
-                })
+                check_monitoring_metrics(
+                    settings.operator_namespace,
+                    operator_pod,
+                    expect_result={
+                        "# HELP chi_clickhouse_metric_VersionInteger": True,
+                        "# TYPE chi_clickhouse_metric_VersionInteger gauge": True,
+                        'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-0-0': True,
+                        'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-1-0': True,
+                    },
+                )
 
         with Then("check empty /metrics after delete namespace"):
-            kubectl.delete_ns(kubectl.namespace)
-            check_monitoring_metrics(operator_namespace, operator_pod, expect_result={
-                'chi_clickhouse_metric_VersionInteger': False,
-            })
+            kubectl.delete_all_chi(settings.test_namespace)
+            check_monitoring_metrics(
+                settings.operator_namespace,
+                operator_pod,
+                expect_result={
+                    "chi_clickhouse_metric_VersionInteger": False,
+                },
+            )
 
 
 @TestFeature

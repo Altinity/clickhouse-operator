@@ -16,8 +16,8 @@ package model
 
 import (
 	"fmt"
-	"github.com/gosimple/slug"
 
+	"github.com/gosimple/slug"
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -101,12 +101,12 @@ func (c *Creator) CreateServiceCHI() *corev1.Service {
 			ExternalTrafficPolicy: corev1.ServiceExternalTrafficPolicyTypeLocal,
 		},
 	}
-	MakeObjectVersionLabel(&svc.ObjectMeta, svc)
+	MakeObjectVersion(&svc.ObjectMeta, svc)
 	return svc
 }
 
 // CreateServiceCluster creates new corev1.Service for specified Cluster
-func (c *Creator) CreateServiceCluster(cluster *chiv1.ChiCluster) *corev1.Service {
+func (c *Creator) CreateServiceCluster(cluster *chiv1.Cluster) *corev1.Service {
 	serviceName := CreateClusterServiceName(cluster)
 	ownerReferences := getOwnerReferences(c.chi)
 
@@ -183,34 +183,68 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 			OwnerReferences: ownerReferences,
 		},
 		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       chDefaultHTTPPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.HTTPPort,
-					TargetPort: intstr.FromInt(int(host.HTTPPort)),
-				},
-				{
-					Name:       chDefaultTCPPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.TCPPort,
-					TargetPort: intstr.FromInt(int(host.TCPPort)),
-				},
-				{
-					Name:       chDefaultInterserverHTTPPortName,
-					Protocol:   corev1.ProtocolTCP,
-					Port:       host.InterserverHTTPPort,
-					TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
-				},
-			},
 			Selector:                 GetSelectorHostScope(host),
 			ClusterIP:                templateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
 		},
 	}
-	MakeObjectVersionLabel(&svc.ObjectMeta, svc)
+	appendServicePorts(svc, host)
+	MakeObjectVersion(&svc.ObjectMeta, svc)
 	return svc
+}
+
+func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
+	if isAssigned(host.TCPPort) {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultTCPPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.TCPPort,
+				TargetPort: intstr.FromInt(int(host.TCPPort)),
+			},
+		)
+	}
+	if isAssigned(host.TLSPort) {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultTLSPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.TLSPort,
+				TargetPort: intstr.FromInt(int(host.TLSPort)),
+			},
+		)
+	}
+	if isAssigned(host.HTTPPort) {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultHTTPPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.HTTPPort,
+				TargetPort: intstr.FromInt(int(host.HTTPPort)),
+			},
+		)
+	}
+	if isAssigned(host.HTTPSPort) {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultHTTPSPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.HTTPSPort,
+				TargetPort: intstr.FromInt(int(host.HTTPSPort)),
+			},
+		)
+	}
+	if isAssigned(host.InterserverHTTPPort) {
+		service.Spec.Ports = append(service.Spec.Ports,
+			corev1.ServicePort{
+				Name:       chDefaultInterserverHTTPPortName,
+				Protocol:   corev1.ProtocolTCP,
+				Port:       host.InterserverHTTPPort,
+				TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
+			},
+		)
+	}
 }
 
 // verifyServiceTemplatePorts verifies ChiServiceTemplate to have reasonable ports specified
@@ -262,7 +296,7 @@ func (c *Creator) createServiceFromTemplate(
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&service.ObjectMeta, service)
+	MakeObjectVersion(&service.ObjectMeta, service)
 
 	return service
 }
@@ -281,7 +315,7 @@ func (c *Creator) CreateConfigMapCHICommon(options *ClickHouseConfigFilesGenerat
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
 	}
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	MakeObjectVersion(&cm.ObjectMeta, cm)
 	return cm
 }
 
@@ -299,7 +333,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *corev1.ConfigMap {
 		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	MakeObjectVersion(&cm.ObjectMeta, cm)
 	return cm
 }
 
@@ -316,7 +350,7 @@ func (c *Creator) createConfigMapHost(host *chiv1.ChiHost, name string, data map
 		Data: data,
 	}
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&cm.ObjectMeta, cm)
+	MakeObjectVersion(&cm.ObjectMeta, cm)
 	return cm
 }
 
@@ -379,34 +413,9 @@ func (c *Creator) CreateStatefulSet(host *chiv1.ChiHost, shutdown bool) *apps.St
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
-	c.setupStatefulSetVersion(statefulSet)
-
-	host.StatefulSet = statefulSet
-	host.DesiredStatefulSet = statefulSet
+	MakeObjectVersion(&statefulSet.ObjectMeta, statefulSet)
 
 	return statefulSet
-}
-
-// setupStatefulSetVersion
-// TODO property of the labeler?
-func (c *Creator) setupStatefulSetVersion(statefulSet *apps.StatefulSet) {
-	// Version can drift from instance to instance of the CHI StatefulSet even for the same CHI because
-	// StatefulSet has owner already specified, which has UID of owner, which is different for different CHIs
-	statefulSet.Labels = util.MergeStringMapsOverwrite(
-		statefulSet.Labels,
-		map[string]string{
-			LabelObjectVersion: util.Fingerprint(statefulSet),
-		},
-	)
-	// TODO fix this with verbosity update
-	// c.a.V(3).F().Info("StatefulSet(%s/%s)\n%s", statefulSet.Namespace, statefulSet.Name, util.Dump(statefulSet))
-}
-
-// GetObjectVersion gets version of the StatefulSet
-// TODO property of the labeler?
-func (c *Creator) GetObjectVersion(meta metav1.ObjectMeta) (string, bool) {
-	label, ok := meta.Labels[LabelObjectVersion]
-	return label, ok
 }
 
 // PreparePersistentVolume prepares PV labels
@@ -414,7 +423,7 @@ func (c *Creator) PreparePersistentVolume(pv *corev1.PersistentVolume, host *chi
 	pv.Labels = macro(host).Map(c.labels.getPV(pv, host))
 	pv.Annotations = macro(host).Map(c.annotations.getPV(pv, host))
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&pv.ObjectMeta, pv)
+	MakeObjectVersion(&pv.ObjectMeta, pv)
 	return pv
 }
 
@@ -427,7 +436,7 @@ func (c *Creator) PreparePersistentVolumeClaim(
 	pvc.Labels = macro(host).Map(c.labels.getPVC(pvc, host, template))
 	pvc.Annotations = macro(host).Map(c.annotations.getPVC(pvc, host, template))
 	// And after the object is ready we can put version label
-	MakeObjectVersionLabel(&pvc.ObjectMeta, pvc)
+	MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
 }
 
@@ -445,8 +454,8 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 // ensureStatefulSetTemplateIntegrity
 func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
-	ensureClickHouseContainerSpecified(statefulSet)
-	ensureProbesSpecified(statefulSet)
+	ensureClickHouseContainerSpecified(statefulSet, host)
+	ensureProbesSpecified(statefulSet, host)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
 
@@ -461,7 +470,7 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 }
 
 // ensureClickHouseContainerSpecified
-func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
+func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	_, ok := getClickHouseContainer(statefulSet)
 	if ok {
 		return
@@ -470,21 +479,36 @@ func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet) {
 	// No ClickHouse container available, let's add one
 	addContainer(
 		&statefulSet.Spec.Template.Spec,
-		newDefaultClickHouseContainer(),
+		newDefaultClickHouseContainer(host),
+	)
+}
+
+// ensureClickHouseLogContainerSpecified
+func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
+	_, ok := getClickHouseLogContainer(statefulSet)
+	if ok {
+		return
+	}
+
+	// No ClickHouse Log container available, let's add one
+
+	addContainer(
+		&statefulSet.Spec.Template.Spec,
+		newDefaultLogContainer(),
 	)
 }
 
 // ensureProbesSpecified
-func ensureProbesSpecified(statefulSet *apps.StatefulSet) {
+func ensureProbesSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	container, ok := getClickHouseContainer(statefulSet)
 	if !ok {
 		return
 	}
 	if container.LivenessProbe == nil {
-		container.LivenessProbe = newDefaultLivenessProbe()
+		container.LivenessProbe = newDefaultLivenessProbe(host)
 	}
 	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = newDefaultReadinessProbe()
+		container.ReadinessProbe = newDefaultReadinessProbe(host)
 	}
 }
 
@@ -546,7 +570,8 @@ func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *chiv1.C
 	statefulSetName := CreateStatefulSetName(host)
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
-		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
+		ensureClickHouseLogContainerSpecified(statefulSet)
+
 		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
 	}
 }
@@ -561,10 +586,10 @@ func (c *Creator) getPodTemplate(host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		c.a.V(1).F().Info("statefulSet %s use custom template %s", statefulSetName, podTemplate.Name)
+		c.a.V(1).F().Info("statefulSet %s use custom template: %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = newDefaultPodTemplate(statefulSetName)
+		podTemplate = newDefaultPodTemplate(statefulSetName, host)
 		c.a.V(1).F().Info("statefulSet %s use default generated template", statefulSetName)
 	}
 
@@ -681,40 +706,36 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
-// getClickHouseContainer
-func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	// Find by name
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		if container.Name == ClickHouseContainerName {
-			return container, true
+// getContainer gets container from the StatefulSet either by name or by index
+func getContainer(statefulSet *apps.StatefulSet, name string, index int) (*corev1.Container, bool) {
+	if len(name) > 0 {
+		// Find by name
+		for i := range statefulSet.Spec.Template.Spec.Containers {
+			container := &statefulSet.Spec.Template.Spec.Containers[i]
+			if container.Name == name {
+				return container, true
+			}
 		}
 	}
 
-	// Find by index
-	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
-		return &statefulSet.Spec.Template.Spec.Containers[0], true
+	if index >= 0 {
+		// Find by index
+		if len(statefulSet.Spec.Template.Spec.Containers) > index {
+			return &statefulSet.Spec.Template.Spec.Containers[index], true
+		}
 	}
 
 	return nil, false
 }
 
-// getClickHouseContainerStatus
-func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
-	// Find by name
-	for i := range pod.Status.ContainerStatuses {
-		status := &pod.Status.ContainerStatuses[i]
-		if status.Name == ClickHouseContainerName {
-			return status, true
-		}
-	}
+// getClickHouseContainer
+func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	return getContainer(statefulSet, clickHouseContainerName, 0)
+}
 
-	// Find by index
-	if len(pod.Status.ContainerStatuses) > 0 {
-		return &pod.Status.ContainerStatuses[0], true
-	}
-
-	return nil, false
+// getClickHouseLogContainer
+func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	return getContainer(statefulSet, clickHouseLogContainerName, -1)
 }
 
 // IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
@@ -779,16 +800,23 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 		return
 	}
 	ensurePortByName(container, chDefaultTCPPortName, host.TCPPort)
+	ensurePortByName(container, chDefaultTLSPortName, host.TLSPort)
 	ensurePortByName(container, chDefaultHTTPPortName, host.HTTPPort)
+	ensurePortByName(container, chDefaultHTTPSPortName, host.HTTPSPort)
 	ensurePortByName(container, chDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
 }
 
 // ensurePortByName
 func ensurePortByName(container *corev1.Container, name string, port int32) {
+	if isUnassigned(port) {
+		return
+	}
+
 	// Find port with specified name
 	for i := range container.Ports {
 		containerPort := &container.Ports[i]
 		if containerPort.Name == name {
+			// Assign value to existing port
 			containerPort.HostPort = 0
 			containerPort.ContainerPort = port
 			return
@@ -803,7 +831,7 @@ func ensurePortByName(container *corev1.Container, name string, port int32) {
 }
 
 // NewPodDisruptionBudget creates new PodDisruptionBudget
-func (c *Creator) NewPodDisruptionBudget(cluster *chiv1.ChiCluster) *policyv1.PodDisruptionBudget {
+func (c *Creator) NewPodDisruptionBudget(cluster *chiv1.Cluster) *policyv1.PodDisruptionBudget {
 	ownerReferences := getOwnerReferences(c.chi)
 	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1122,9 +1150,11 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
-			TCPPort:             chPortNumberMustBeAssignedLater,
-			HTTPPort:            chPortNumberMustBeAssignedLater,
-			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
+			TCPPort:             unassigned(),
+			TLSPort:             unassigned(),
+			HTTPPort:            unassigned(),
+			HTTPSPort:           unassigned(),
+			InterserverHTTPPort: unassigned(),
 			Templates:           nil,
 		},
 	}
@@ -1141,16 +1171,18 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
-			TCPPort:             chPortNumberMustBeAssignedLater,
-			HTTPPort:            chPortNumberMustBeAssignedLater,
-			InterserverHTTPPort: chPortNumberMustBeAssignedLater,
+			TCPPort:             unassigned(),
+			TLSPort:             unassigned(),
+			HTTPPort:            unassigned(),
+			HTTPSPort:           unassigned(),
+			InterserverHTTPPort: unassigned(),
 			Templates:           nil,
 		},
 	}
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
-func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
+func newDefaultPodTemplate(name string, host *chiv1.ChiHost) *chiv1.ChiPodTemplate {
 	podTemplate := &chiv1.ChiPodTemplate{
 		Name: name,
 		Spec: corev1.PodSpec{
@@ -1159,71 +1191,147 @@ func newDefaultPodTemplate(name string) *chiv1.ChiPodTemplate {
 		},
 	}
 
-	addContainer(
-		&podTemplate.Spec,
-		newDefaultClickHouseContainer(),
-	)
+	addContainer(&podTemplate.Spec, newDefaultClickHouseContainer(host))
 
 	return podTemplate
 }
 
-// newDefaultLivenessProbe
-func newDefaultLivenessProbe() *corev1.Probe {
-	return &corev1.Probe{
-		Handler: corev1.Handler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/ping",
-				Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
+// newDefaultLivenessProbe returns default liveness probe
+func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
+	// Introduce http probe in case http port is specified
+	if isAssigned(host.HTTPPort) {
+		return &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/ping",
+					Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
+				},
 			},
-		},
-		InitialDelaySeconds: 60,
-		PeriodSeconds:       3,
-		FailureThreshold:    10,
+			InitialDelaySeconds: 60,
+			PeriodSeconds:       3,
+			FailureThreshold:    10,
+		}
 	}
+
+	// Introduce https probe in case https port is specified
+	if isAssigned(host.HTTPSPort) {
+		return &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path:   "/ping",
+					Port:   intstr.Parse(chDefaultHTTPSPortName), // What if it is not a default?
+					Scheme: corev1.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 60,
+			PeriodSeconds:       3,
+			FailureThreshold:    10,
+		}
+	}
+
+	// Probe is not available
+	return nil
 }
 
-// newDefaultReadinessProbe
-func newDefaultReadinessProbe() *corev1.Probe {
-	return &corev1.Probe{
-		Handler: corev1.Handler{
-			HTTPGet: &corev1.HTTPGetAction{
-				Path: "/ping",
-				Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
+// newDefaultReadinessProbe returns default readiness probe
+func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
+	// Introduce http probe in case http port is specified
+	if isAssigned(host.HTTPPort) {
+		return &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path: "/ping",
+					Port: intstr.Parse(chDefaultHTTPPortName), // What if port name is not a default?
+				},
 			},
-		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       3,
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       3,
+		}
+	}
+
+	// Introduce https probe in case https port is specified
+	if isAssigned(host.HTTPSPort) {
+		return &corev1.Probe{
+			Handler: corev1.Handler{
+				HTTPGet: &corev1.HTTPGetAction{
+					Path:   "/ping",
+					Port:   intstr.Parse(chDefaultHTTPSPortName), // What if port name is not a default?
+					Scheme: corev1.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       3,
+		}
+	}
+
+	// Probe is not available
+	return nil
+}
+
+func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
+	if isAssigned(host.TCPPort) {
+		container.Ports = append(container.Ports,
+			corev1.ContainerPort{
+				Name:          chDefaultTCPPortName,
+				ContainerPort: host.TCPPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		)
+	}
+	if isAssigned(host.TLSPort) {
+		container.Ports = append(container.Ports,
+			corev1.ContainerPort{
+				Name:          chDefaultTLSPortName,
+				ContainerPort: host.TLSPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		)
+	}
+	if isAssigned(host.HTTPPort) {
+		container.Ports = append(container.Ports,
+			corev1.ContainerPort{
+				Name:          chDefaultHTTPPortName,
+				ContainerPort: host.HTTPPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		)
+	}
+	if isAssigned(host.HTTPSPort) {
+		container.Ports = append(container.Ports,
+			corev1.ContainerPort{
+				Name:          chDefaultHTTPSPortName,
+				ContainerPort: host.HTTPSPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		)
+	}
+	if isAssigned(host.InterserverHTTPPort) {
+		container.Ports = append(container.Ports,
+			corev1.ContainerPort{
+				Name:          chDefaultInterserverHTTPPortName,
+				ContainerPort: host.InterserverHTTPPort,
+				Protocol:      corev1.ProtocolTCP,
+			},
+		)
 	}
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
-func newDefaultClickHouseContainer() corev1.Container {
-	return corev1.Container{
-		Name:  ClickHouseContainerName,
-		Image: defaultClickHouseDockerImage,
-		Ports: []corev1.ContainerPort{
-			{
-				Name:          chDefaultHTTPPortName,
-				ContainerPort: chDefaultHTTPPortNumber,
-			},
-			{
-				Name:          chDefaultTCPPortName,
-				ContainerPort: chDefaultTCPPortNumber,
-			},
-			{
-				Name:          chDefaultInterserverHTTPPortName,
-				ContainerPort: chDefaultInterserverHTTPPortNumber,
-			},
-		},
-		LivenessProbe:  newDefaultLivenessProbe(),
-		ReadinessProbe: newDefaultReadinessProbe(),
+func newDefaultClickHouseContainer(host *chiv1.ChiHost) corev1.Container {
+	container := corev1.Container{
+		Name:           clickHouseContainerName,
+		Image:          defaultClickHouseDockerImage,
+		LivenessProbe:  newDefaultLivenessProbe(host),
+		ReadinessProbe: newDefaultReadinessProbe(host),
 	}
+	appendContainerPorts(&container, host)
+	return container
 }
 
 // newDefaultLogContainer returns default Log Container
 func newDefaultLogContainer() corev1.Container {
 	return corev1.Container{
-		Name:  ClickHouseLogContainerName,
+		Name:  clickHouseLogContainerName,
 		Image: defaultUbiDockerImage,
 		Command: []string{
 			"/bin/sh", "-c", "--",

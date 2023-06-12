@@ -22,7 +22,6 @@ import (
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -70,7 +69,8 @@ func (w *PrometheusWriter) WriteMetrics(data [][]string) {
 		} else {
 			metricType = prometheus.GaugeValue
 		}
-		writeSingleMetricToPrometheus(w.out,
+		writeSingleMetricToPrometheus(
+			w.out,
 			convertMetricName(metric[0]),
 			metric[2],
 			metric[1],
@@ -109,7 +109,7 @@ func (w *PrometheusWriter) WriteTableSizes(data [][]string) {
 	}
 }
 
-// WriteSystemParts pushesh set of prometheus.Metric object related to system.parts
+// WriteSystemParts pushes set of prometheus.Metric object related to system.parts
 func (w *PrometheusWriter) WriteSystemParts(data [][]string) {
 	var diskDataBytes, memoryPrimaryKeyBytesAllocated int64
 	var err error
@@ -195,7 +195,15 @@ func (w *PrometheusWriter) WriteOKFetch(fetchType string) {
 		w.chi.Name, w.chi.Namespace, w.hostname, fetchType)
 }
 
-func writeSingleMetricToPrometheus(out chan<- prometheus.Metric, name string, desc string, value string, metricType prometheus.ValueType, labels []string, labelValues ...string) {
+func writeSingleMetricToPrometheus(
+	out chan<- prometheus.Metric,
+	name string,
+	desc string,
+	value string,
+	metricType prometheus.ValueType,
+	labels []string,
+	labelValues ...string,
+) {
 	floatValue, _ := strconv.ParseFloat(value, 64)
 	m, err := prometheus.NewConstMetric(
 		newDescription(name, desc, labels),

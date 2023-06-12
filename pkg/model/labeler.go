@@ -31,48 +31,48 @@ import (
 const (
 	// Main labels
 
-	LabelReadyName                    = clickhousealtinitycom.GroupName + "/ready"
+	LabelReadyName                    = clickhousealtinitycom.GroupName + "/" + "ready"
 	LabelReadyValueReady              = "yes"
 	LabelReadyValueNotReady           = "no"
-	LabelAppName                      = clickhousealtinitycom.GroupName + "/app"
+	LabelAppName                      = clickhousealtinitycom.GroupName + "/" + "app"
 	LabelAppValue                     = "chop"
-	LabelCHOP                         = clickhousealtinitycom.GroupName + "/chop"
-	LabelCHOPCommit                   = clickhousealtinitycom.GroupName + "/chop-commit"
-	LabelCHOPDate                     = clickhousealtinitycom.GroupName + "/chop-date"
-	LabelNamespace                    = clickhousealtinitycom.GroupName + "/namespace"
-	LabelCHIName                      = clickhousealtinitycom.GroupName + "/chi"
-	LabelClusterName                  = clickhousealtinitycom.GroupName + "/cluster"
-	LabelShardName                    = clickhousealtinitycom.GroupName + "/shard"
-	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/replica"
-	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/ConfigMap"
+	LabelCHOP                         = clickhousealtinitycom.GroupName + "/" + "chop"
+	LabelCHOPCommit                   = clickhousealtinitycom.GroupName + "/" + "chop-commit"
+	LabelCHOPDate                     = clickhousealtinitycom.GroupName + "/" + "chop-date"
+	LabelNamespace                    = clickhousealtinitycom.GroupName + "/" + "namespace"
+	LabelCHIName                      = clickhousealtinitycom.GroupName + "/" + "chi"
+	LabelClusterName                  = clickhousealtinitycom.GroupName + "/" + "cluster"
+	LabelShardName                    = clickhousealtinitycom.GroupName + "/" + "shard"
+	LabelReplicaName                  = clickhousealtinitycom.GroupName + "/" + "replica"
+	LabelConfigMap                    = clickhousealtinitycom.GroupName + "/" + "ConfigMap"
 	labelConfigMapValueCHICommon      = "ChiCommon"
 	labelConfigMapValueCHICommonUsers = "ChiCommonUsers"
 	labelConfigMapValueHost           = "Host"
-	LabelService                      = clickhousealtinitycom.GroupName + "/Service"
+	LabelService                      = clickhousealtinitycom.GroupName + "/" + "Service"
 	labelServiceValueCHI              = "chi"
 	labelServiceValueCluster          = "cluster"
 	labelServiceValueShard            = "shard"
 	labelServiceValueHost             = "host"
-	LabelPVCReclaimPolicyName         = clickhousealtinitycom.GroupName + "/reclaimPolicy"
+	LabelPVCReclaimPolicyName         = clickhousealtinitycom.GroupName + "/" + "reclaimPolicy"
 
 	// Supplementary service labels - used to cooperate with k8s
 
-	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/zookeeper-version"
-	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/settings-version"
-	LabelObjectVersion          = clickhousealtinitycom.GroupName + "/object-version"
+	LabelZookeeperConfigVersion = clickhousealtinitycom.GroupName + "/" + "zookeeper-version"
+	LabelSettingsConfigVersion  = clickhousealtinitycom.GroupName + "/" + "settings-version"
+	LabelObjectVersion          = clickhousealtinitycom.GroupName + "/" + "object-version"
 
 	// Optional labels
 
-	LabelShardScopeIndex         = clickhousealtinitycom.GroupName + "/shardScopeIndex"
-	LabelReplicaScopeIndex       = clickhousealtinitycom.GroupName + "/replicaScopeIndex"
-	LabelCHIScopeIndex           = clickhousealtinitycom.GroupName + "/chiScopeIndex"
-	LabelCHIScopeCycleSize       = clickhousealtinitycom.GroupName + "/chiScopeCycleSize"
-	LabelCHIScopeCycleIndex      = clickhousealtinitycom.GroupName + "/chiScopeCycleIndex"
-	LabelCHIScopeCycleOffset     = clickhousealtinitycom.GroupName + "/chiScopeCycleOffset"
-	LabelClusterScopeIndex       = clickhousealtinitycom.GroupName + "/clusterScopeIndex"
-	LabelClusterScopeCycleSize   = clickhousealtinitycom.GroupName + "/clusterScopeCycleSize"
-	LabelClusterScopeCycleIndex  = clickhousealtinitycom.GroupName + "/clusterScopeCycleIndex"
-	LabelClusterScopeCycleOffset = clickhousealtinitycom.GroupName + "/clusterScopeCycleOffset"
+	LabelShardScopeIndex         = clickhousealtinitycom.GroupName + "/" + "shardScopeIndex"
+	LabelReplicaScopeIndex       = clickhousealtinitycom.GroupName + "/" + "replicaScopeIndex"
+	LabelCHIScopeIndex           = clickhousealtinitycom.GroupName + "/" + "chiScopeIndex"
+	LabelCHIScopeCycleSize       = clickhousealtinitycom.GroupName + "/" + "chiScopeCycleSize"
+	LabelCHIScopeCycleIndex      = clickhousealtinitycom.GroupName + "/" + "chiScopeCycleIndex"
+	LabelCHIScopeCycleOffset     = clickhousealtinitycom.GroupName + "/" + "chiScopeCycleOffset"
+	LabelClusterScopeIndex       = clickhousealtinitycom.GroupName + "/" + "clusterScopeIndex"
+	LabelClusterScopeCycleSize   = clickhousealtinitycom.GroupName + "/" + "clusterScopeCycleSize"
+	LabelClusterScopeCycleIndex  = clickhousealtinitycom.GroupName + "/" + "clusterScopeCycleIndex"
+	LabelClusterScopeCycleOffset = clickhousealtinitycom.GroupName + "/" + "clusterScopeCycleOffset"
 )
 
 // Labeler is an entity which can label CHI artifacts
@@ -124,7 +124,7 @@ func (l *Labeler) getServiceCHI(chi *chiv1.ClickHouseInstallation) map[string]st
 }
 
 // getServiceCluster
-func (l *Labeler) getServiceCluster(cluster *chiv1.ChiCluster) map[string]string {
+func (l *Labeler) getServiceCluster(cluster *chiv1.Cluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getClusterScope(cluster),
 		map[string]string{
@@ -174,13 +174,13 @@ func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
 }
 
 // getClusterScope gets labels for Cluster-scoped object
-func (l *Labeler) getClusterScope(cluster *chiv1.ChiCluster) map[string]string {
+func (l *Labeler) getClusterScope(cluster *chiv1.Cluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorClusterScope(cluster)))
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
-func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
+func getSelectorClusterScope(cluster *chiv1.Cluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   labelsNamer.getNamePartNamespace(cluster),
@@ -191,7 +191,7 @@ func getSelectorClusterScope(cluster *chiv1.ChiCluster) map[string]string {
 }
 
 // getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
-func getSelectorClusterScopeReady(cluster *chiv1.ChiCluster) map[string]string {
+func getSelectorClusterScopeReady(cluster *chiv1.Cluster) map[string]string {
 	return appendKeyReady(getSelectorClusterScope(cluster))
 }
 
@@ -239,10 +239,23 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 		// Optional labels
 		// TODO
 		// When we'll have Cluster Discovery functionality we can refactor this properly
-		labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
-		labels[LabelSettingsConfigVersion] = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
+		labels = appendConfigLabels(host, labels)
 	}
 	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))
+}
+
+func appendConfigLabels(host *chiv1.ChiHost, labels map[string]string) map[string]string {
+	if host.HasCurStatefulSet() {
+		if val, exists := host.CurStatefulSet.Labels[LabelZookeeperConfigVersion]; exists {
+			labels[LabelZookeeperConfigVersion] = val
+		}
+		if val, exists := host.CurStatefulSet.Labels[LabelSettingsConfigVersion]; exists {
+			labels[LabelSettingsConfigVersion] = val
+		}
+	}
+	//labels[LabelZookeeperConfigVersion] = host.Config.ZookeeperFingerprint
+	//labels[LabelSettingsConfigVersion] = host.Config.SettingsFingerprint
+	return labels
 }
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
@@ -383,14 +396,20 @@ func GetClusterNameFromObjectMeta(meta *meta.ObjectMeta) (string, error) {
 	return meta.Labels[LabelClusterName], nil
 }
 
-// MakeObjectVersionLabel makes object version label
-func MakeObjectVersionLabel(meta *meta.ObjectMeta, obj interface{}) {
+// MakeObjectVersion makes object version label
+func MakeObjectVersion(meta *meta.ObjectMeta, obj interface{}) {
 	meta.Labels = util.MergeStringMapsOverwrite(
 		meta.Labels,
 		map[string]string{
 			LabelObjectVersion: util.Fingerprint(obj),
 		},
 	)
+}
+
+// GetObjectVersion gets version of the object
+func GetObjectVersion(meta meta.ObjectMeta) (string, bool) {
+	label, ok := meta.Labels[LabelObjectVersion]
+	return label, ok
 }
 
 // isObjectVersionLabelTheSame checks whether object version in meta.Labels is the same as provided value

@@ -108,7 +108,7 @@ func (c *Cluster) ExecCHI(ctx context.Context, chi *chop.ClickHouseInstallation,
 }
 
 // ExecCluster runs set of SQL queries over the cluster
-func (c *Cluster) ExecCluster(ctx context.Context, cluster *chop.ChiCluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
+func (c *Cluster) ExecCluster(ctx context.Context, cluster *chop.Cluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
 	hosts := CreateFQDNs(cluster, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)
@@ -156,13 +156,32 @@ func (c *Cluster) QueryHostInt(ctx context.Context, host *chop.ChiHost, sql stri
 	}
 
 	query, err := c.QueryHost(ctx, host, sql, _opts...)
-	if query == nil {
-		return 0, nil
-	}
 	defer query.Close()
+	if query == nil {
+		return 0, err
+	}
 	if err != nil {
 		return 0, err
 	}
 
 	return query.Int()
+}
+
+// QueryHostString runs specified query on specified host and returns one string as a result
+func (c *Cluster) QueryHostString(ctx context.Context, host *chop.ChiHost, sql string, _opts ...*clickhouse.QueryOptions) (string, error) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return "", nil
+	}
+
+	query, err := c.QueryHost(ctx, host, sql, _opts...)
+	defer query.Close()
+	if query == nil {
+		return "", err
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return query.String()
 }

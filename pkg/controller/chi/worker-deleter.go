@@ -51,6 +51,8 @@ func (w *worker) clean(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 		WithStatusAction(chi).
 		M(chi).F().
 		Info("remove items scheduled for deletion")
+
+	chi.EnsureStatus().SyncHostTablesCreated()
 }
 
 func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
@@ -62,7 +64,7 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstalla
 	w.a.V(1).M(chi).F().S().Info("drop replicas based on AP")
 	cnt := 0
 	ap.WalkRemoved(
-		func(cluster *chiV1.ChiCluster) {
+		func(cluster *chiV1.Cluster) {
 		},
 		func(shard *chiV1.ChiShard) {
 		},
@@ -118,6 +120,94 @@ func shouldPurgePDB(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chop
 	return true
 }
 
+func (w *worker) purgeStatefulSet(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) int {
+	if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+		return 1
+	}
+	return 0
+}
+
+func (w *worker) purgePVC(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgePVC(chi, reconcileFailedObjs, m) {
+		if chopModel.GetReclaimPolicy(m) == chiV1.PVCReclaimPolicyDelete {
+			w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
+			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+				w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
+			}
+		}
+	}
+}
+
+func (w *worker) purgeConfigMap(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
+func (w *worker) purgeService(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgeService(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
+func (w *worker) purgeSecret(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
+func (w *worker) purgePDB(
+	ctx context.Context,
+	chi *chiV1.ClickHouseInstallation,
+	reconcileFailedObjs *chopModel.Registry,
+	m metaV1.ObjectMeta,
+) {
+	if shouldPurgePDB(chi, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
+		if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
+		}
+	}
+}
+
 // purge
 func (w *worker) purge(
 	ctx context.Context,
@@ -133,50 +223,17 @@ func (w *worker) purge(
 	reg.Walk(func(entityType chopModel.EntityType, m metaV1.ObjectMeta) {
 		switch entityType {
 		case chopModel.StatefulSet:
-			if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-				cnt++
-			}
+			cnt += w.purgeStatefulSet(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.PVC:
-			if shouldPurgePVC(chi, reconcileFailedObjs, m) {
-				if chopModel.GetReclaimPolicy(m) == chiV1.PVCReclaimPolicyDelete {
-					w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
-					if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-						w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
-					}
-				}
-			}
+			w.purgePVC(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.ConfigMap:
-			if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgeConfigMap(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.Service:
-			if shouldPurgeService(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgeService(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.Secret:
-			if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgeSecret(ctx, chi, reconcileFailedObjs, m)
 		case chopModel.PDB:
-			if shouldPurgePDB(chi, reconcileFailedObjs, m) {
-				w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
-				if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
-					w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
-				}
-			}
+			w.purgePDB(ctx, chi, reconcileFailedObjs, m)
 		}
 	})
 	return cnt
@@ -192,7 +249,7 @@ func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *chiV1.ClickHous
 	objs := w.c.discovery(ctx, chi)
 	if objs.NumStatefulSet() > 0 {
 		chi.WalkHosts(func(host *chiV1.ChiHost) error {
-			_ = w.schemer.HostSyncTables(ctx, host)
+			_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
 			return nil
 		})
 	}
@@ -247,12 +304,12 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 	_ = w.c.deleteServiceCHI(ctx, chi)
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		_ = w.schemer.HostSyncTables(ctx, host)
+		_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
 		return nil
 	})
 
 	// Delete all clusters
-	chi.WalkClusters(func(cluster *chiV1.ChiCluster) error {
+	chi.WalkClusters(func(cluster *chiV1.Cluster) error {
 		return w.deleteCluster(ctx, chi, cluster)
 	})
 
@@ -303,19 +360,19 @@ func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiV1.C
 		return nil
 	}
 
-	err := w.schemer.HostDropReplica(ctx, hostToRun, hostToDrop)
+	err := w.ensureClusterSchemer().HostDropReplica(ctx, hostToRun, hostToDrop)
 
 	if err == nil {
 		w.a.V(1).
 			WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(hostToRun.CHI).
 			M(hostToRun).F().
-			Info("Drop replica host %s in cluster %s", hostToDrop.Name, hostToDrop.Address.ClusterName)
+			Info("Drop replica host %s in cluster %s", hostToDrop.GetName(), hostToDrop.Address.ClusterName)
 	} else {
 		w.a.WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(hostToRun.CHI).
 			M(hostToRun).F().
-			Error("FAILED to drop replica on host %s with error %v", hostToDrop.Name, err)
+			Error("FAILED to drop replica on host %s with error %v", hostToDrop.GetName(), err)
 	}
 
 	return err
@@ -331,7 +388,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 	if !chopModel.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
-	err := w.schemer.HostDropTables(ctx, host)
+	err := w.ensureClusterSchemer().HostDropTables(ctx, host)
 
 	if err == nil {
 		w.a.V(1).
@@ -339,18 +396,18 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
-				host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+				host.GetName(), host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	} else {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(host.CHI).
 			M(host).F().
-			Error("FAILED to delete tables on host %s with error %v", host.Name, err)
+			Error("FAILED to delete tables on host %s with error %v", host.GetName(), err)
 	}
 
 	return err
 }
 
-// deleteHost deletes all kubernetes resources related to host
+// deleteHost deletes all kubernetes resources related to a host
 // chi is the new CHI in which there will be no more this host
 func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallation, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
@@ -365,14 +422,15 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("Delete host %s/%s - started", host.Address.ClusterName, host.Name)
+		Info("Delete host %s/%s - started", host.Address.ClusterName, host.GetName())
 
-	if _, err := w.c.getStatefulSet(host); err != nil {
+	var err error
+	if host.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Delete host %s/%s - completed StatefulSet not found - already deleted? err: %v",
-				host.Address.ClusterName, host.Name, err)
+				host.Address.ClusterName, host.GetName(), err)
 		return nil
 	}
 
@@ -383,12 +441,11 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 	// 2. Kubernetes-level objects - such as StatefulSet, PVC(s), ConfigMap(s), Service(s)
 	// Need to delete all these items
 
-	var err error
 	_ = w.deleteTables(ctx, host)
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
-	chi.EnsureStatus().HostsDeletedCount++
+	chi.EnsureStatus().HostDeleted()
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence: true,
 		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
@@ -401,12 +458,12 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(host.CHI).
 			M(host).F().
-			Info("Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
+			Info("Delete host %s/%s - completed", host.Address.ClusterName, host.GetName())
 	} else {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(host.CHI).
 			M(host).F().
-			Error("FAILED Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
+			Error("FAILED Delete host %s/%s - completed", host.Address.ClusterName, host.GetName())
 	}
 
 	return err
@@ -448,7 +505,7 @@ func (w *worker) deleteShard(ctx context.Context, chi *chiV1.ClickHouseInstallat
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 // chi is the new CHI in which there will be no more this cluster
-func (w *worker) deleteCluster(ctx context.Context, chi *chiV1.ClickHouseInstallation, cluster *chiV1.ChiCluster) error {
+func (w *worker) deleteCluster(ctx context.Context, chi *chiV1.ClickHouseInstallation, cluster *chiV1.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

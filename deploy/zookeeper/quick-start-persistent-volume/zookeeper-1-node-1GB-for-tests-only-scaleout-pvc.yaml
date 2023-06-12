@@ -1,4 +1,4 @@
-# Following scripts based from https://github.com/pravega/zookeeper-operator/
+# Following manifests based on https://github.com/pravega/zookeeper-operator/
 ---
 # service for REST administration and reconfiguration
 apiVersion: v1
@@ -46,6 +46,7 @@ metadata:
 spec:
   type: ClusterIP
   clusterIP: None
+  publishNotReadyAddresses: false
   ports:
     - name: tcp-client
       port: 2181
@@ -89,6 +90,8 @@ data:
     export ADMIN_SERVER_PORT=8080
     export CLUSTER_NAME=zookeeper
     export ZOO_LOG4J_PROP="WARN, CONSOLE"
+  java.env: |
+    JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"
   log4j-quiet.properties: |
     log4j.rootLogger=CONSOLE
     log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
@@ -121,7 +124,8 @@ data:
 
   zoo.cfg: |
     4lw.commands.whitelist=*
-    dataDir=/data
+    dataDir=/var/lib/zookeeper/data
+    dataLogDir=/var/lib/zookeeper/datalog
     standaloneEnabled=false
     reconfigEnabled=true
     skipACL=yes
@@ -145,7 +149,7 @@ data:
     autopurge.purgeInterval=1
     quorumListenOnAllIPs=false
     admin.serverPort=8080
-    dynamicConfigFile=/data/zoo.cfg.dynamic
+    dynamicConfigFile=/var/lib/zookeeper/zoo.cfg.dynamic
   zookeeperFunctions.sh: |
     #!/usr/bin/env bash
     # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
@@ -179,17 +183,25 @@ data:
 
     set -ex
     # TODO think how to add nslookup to docker image
-    apt-get update && apt-get install --no-install-recommends -y dnsutils curl procps
-    source /cluster-size/cluster-size.sh
+    # apt-get update && apt-get install --no-install-recommends -y dnsutils procps
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
     HOST=`hostname -s`
-    DATA_DIR=/data
-    MYID_FILE=$DATA_DIR/myid
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
     LOG4J_CONF=/conf/log4j-quiet.properties
-    DYNCONFIG=$DATA_DIR/zoo.cfg.dynamic
-    STATIC_CONFIG=/data/conf/zoo.cfg
+    DYNCONFIG=$VOLUME_DIR/zoo.cfg.dynamic
+    STATIC_CONFIG=$VOLUME_DIR/conf/zoo.cfg
+    
+    if [[ ! -d "$VOLUME_DIR/data" ]]; then
+      mkdir -p $VOLUME_DIR/data
+      chown zookeeper $VOLUME_DIR/data
+    fi
+    if [[ ! -d "$VOLUME_DIR/datalog" ]]; then
+      mkdir -p $VOLUME_DIR/datalog
+      chown zookeeper $VOLUME_DIR/datalog
+    fi
 
     # Extract resource name and this members ordinal value from pod hostname
     if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
@@ -210,9 +222,9 @@ data:
 
     # Check validity of on-disk configuration
     if [ -f $MYID_FILE ]; then
-      EXISTING_ID="`cat $DATA_DIR/myid`"
+      EXISTING_ID="`cat $MYID_FILE`"
       if [[ "$EXISTING_ID" == "$MYID" && -f $STATIC_CONFIG ]]; then
-        # If Id is correct and configuration is present under `/data/conf`
+        # If Id is correct and configuration is present under `/var/lib/zookeeper/conf`
           ONDISK_MYID_CONFIG=true
       fi
     fi
@@ -221,49 +233,34 @@ data:
       ONDISK_DYN_CONFIG=true
     fi
 
-    set +e
-    # Check if envoy is up and running
-    if [[ -n "$ENVOY_SIDECAR_STATUS" ]]; then
-      COUNT=0
-      MAXCOUNT=${1:-30}
-      HEALTHYSTATUSCODE="200"
-      while true; do
-        COUNT=$(expr $COUNT + 1)
-        SC=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:15000/ready)
-        echo "waiting for envoy proxy to come up";
-        sleep 1;
-        if (( "$SC" == "$HEALTHYSTATUSCODE" || "$MAXCOUNT" == "$COUNT" )); then
-          break
-        fi
-      done
-    fi
-    set -e
-
     # Determine if there is an ensemble available to join by checking the service domain
     set +e
     getent hosts $DOMAIN  # This only performs a dns lookup
     if [[ $? -eq 0 ]]; then
       ACTIVE_ENSEMBLE=true
-    elif nslookup $DOMAIN | grep -q "server can't find $DOMAIN"; then
-       echo "there is no active ensemble"
-       ACTIVE_ENSEMBLE=false
     else
-      # If an nslookup of the headless service domain fails, then there is no
-      # active ensemble yet, but in certain cases nslookup of headless service
-      # takes a while to come up even if there is active ensemble
       ACTIVE_ENSEMBLE=false
-      declare -i count=20
-      while [[ $count -ge 0 ]]
-      do
-        sleep 2
-        ((count=count-1))
-        getent hosts $DOMAIN
-        if [[ $? -eq 0 ]]; then
-          ACTIVE_ENSEMBLE=true
-          break
-        fi
-      done
     fi
+    # elif nslookup $DOMAIN | grep -q "server can't find $DOMAIN"; then
+    #   echo "there is no active ensemble"
+    #   ACTIVE_ENSEMBLE=false
+    # else
+    # If an nslookup of the headless service domain fails, then there is no
+    # active ensemble yet, but in certain cases nslookup of headless service
+    # takes a while to come up even if there is active ensemble
+    #  ACTIVE_ENSEMBLE=false
+    #  declare -i count=10
+    #  while [[ $count -ge 0 ]]
+    #  do
+    #    sleep 1
+    #    ((count=count-1))
+    #    getent hosts $DOMAIN
+    #    if [[ $? -eq 0 ]]; then
+    #      ACTIVE_ENSEMBLE=true
+    #      break
+    #    fi
+    #  done
+    # fi
 
     if [[ "$ONDISK_MYID_CONFIG" == true && "$ONDISK_DYN_CONFIG" == true ]]; then
       # If Configuration is present, we assume, there is no need to write configuration.
@@ -276,9 +273,17 @@ data:
       # This is the first node being added to the cluster or headless service not yet available
       REGISTER_NODE=false
     else
-      # An ensemble exists, check to see if this node is already a member.
+      # If ensemble exists, check to see if this node is already a member.
       if [[ "$ONDISK_MYID_CONFIG" == false || "$ONDISK_DYN_CONFIG" == false ]]; then
         REGISTER_NODE=true
+      elif [[ -f "$STATIC_CONFIG" ]]; then
+          DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
+          DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
+          if [[ "0" == $(grep -c "server.${MYID}=" "${DYN_CFG_FILE}") ]]; then
+            REGISTER_NODE=true
+          else 
+            REGISTER_NODE=false
+          fi
       else
         REGISTER_NODE=false
       fi
@@ -298,6 +303,7 @@ data:
       fi
     fi
 
+    export ZOOCFGDIR=/var/lib/zookeeper/conf
     if [[ "$REGISTER_NODE" == true ]]; then
         ROLE=observer
         ZKURL=$(zkConnectionString)
@@ -306,11 +312,15 @@ data:
         set -e
         echo Registering node and writing local configuration to disk.
         zkCli.sh -server ${ZKURL} reconfig -add "\nserver.$MYID=$ZKCONFIG" | grep -E '^server\.[0-9]+='  > $DYNCONFIG
+        if ls $ZOOCFGDIR/zoo.cfg.dynamic.* 1> /dev/null 2>&1; then
+          DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
+          DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
+          cp -fv $DYNCONFIG $DYN_CFG_FILE  
+        fi 
         set +e
     fi
 
-    ZOOCFGDIR=/data/conf
-    export ZOOCFGDIR
+    
     echo Copying /conf contents to writable directory, to support Zookeeper dynamic reconfiguration
     if [[ ! -d "$ZOOCFGDIR" ]]; then
       mkdir $ZOOCFGDIR
@@ -323,6 +333,7 @@ data:
     cp -f /conf/log4j-quiet.properties $ZOOCFGDIR
     cp -f /conf/logback.xml $ZOOCFGDIR
     cp -f /conf/env.sh $ZOOCFGDIR
+    cp -f /conf/java.env $ZOOCFGDIR
 
     if [ -f $DYNCONFIG ]; then
       # Node registered, start server
@@ -342,18 +353,20 @@ data:
     #     https://www.apache.org/licenses/LICENSE-2.0
 
     set -ex
+    exec > /proc/1/fd/1
+    exec 2> /proc/1/fd/2
 
-    source /cluster-size/cluster-size.sh
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
-    DATA_DIR=/data
-    MYID_FILE=$DATA_DIR/myid
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
+    DYNCONFIG=$VOLUME_DIR/zoo.cfg.dynamic
     LOG4J_CONF=/conf/log4j-quiet.properties
 
-    # Wait for client connections to drain. Kubernetes will wait until the confiugred
+    # Wait for client connections to drain. Kubernetes will wait until the configured
     # "terminationGracePeriodSeconds" before forcibly killing the container
-    CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" |grep -v "/127.0.0.1:" | wc -l`
+    CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "/127.0.0.1:" | wc -l`
     for (( i = 0; i < 6; i++ )); do
       if [[ "$CONN_COUNT" -gt 0 ]]; then
         echo "$CONN_COUNT non-local connections still connected."
@@ -406,15 +419,14 @@ data:
     # You may obtain a copy of the License at
     #     https://www.apache.org/licenses/LICENSE-2.0
     set -ex
-    source /cluster-size/cluster-size.sh
     source /conf/env.sh
     source /conf/zookeeperFunctions.sh
 
     HOST=`hostname -s`
-    DATA_DIR=/data
-    MYID_FILE=$DATA_DIR/myid
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
     LOG4J_CONF=/conf/log4j-quiet.properties
-    STATIC_CONFIG=/data/conf/zoo.cfg
+    STATIC_CONFIG=$VOLUME_DIR/conf/zoo.cfg
 
     OK=$(exec 3<>/dev/tcp/127.0.0.1/${CLIENT_PORT} ; printf "ruok" >&3 ; IFS=; tee <&3; exec 3<&- ;)
 
@@ -443,13 +455,13 @@ data:
         MYID=$((ORD+1))
         ONDISK_CONFIG=false
         if [ -f $MYID_FILE ]; then
-          EXISTING_ID="`cat $DATA_DIR/myid`"
+          EXISTING_ID="`cat $MYID_FILE`"
           if [[ "$EXISTING_ID" == "$MYID" && -f $STATIC_CONFIG ]]; then
-          #If Id is correct and configuration is present under `/data/conf`
+          #If Id is correct and configuration is present under `/var/lib/zookeeper/conf`
               ONDISK_CONFIG=true
               DYN_CFG_FILE_LINE=`cat $STATIC_CONFIG|grep "dynamicConfigFile\="`
               DYN_CFG_FILE=${DYN_CFG_FILE_LINE##dynamicConfigFile=}
-              SERVER_FOUND=`cat $DYN_CFG_FILE | grep "server.${MYID}=" | wc -l`
+              SERVER_FOUND=`cat $DYN_CFG_FILE | grep -c "server.${MYID}="`
               if [[ "$SERVER_FOUND" == "0" ]]; then
                 echo "Server not found in ensemble. Exiting ..."
                 exit 1
@@ -487,19 +499,6 @@ data:
     fi
 
 ---
-# ConfigMap for current cluster size
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: zookeeper-cluster-size
-  labels:
-    app: zookeeper
-data:
-  cluster-size.sh: |
-    #!/usr/bin/env bash
-    CLUSTER_SIZE=1
-
----
 # Main StatefulSet
 apiVersion: apps/v1
 kind: StatefulSet
@@ -509,9 +508,11 @@ metadata:
   name: zookeeper
 
 spec:
-  persistentVolumeClaimRetentionPolicy:
-    whenDeleted: Delete
-    whenScaled: Delete
+#  https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention
+#  requires alpha `StatefulSetAutoDeletePVC=true` feature gate
+#  persistentVolumeClaimRetentionPolicy:
+#    whenDeleted: Delete
+#    whenScaled: Delete
   podManagementPolicy: OrderedReady
   replicas: 1
   selector:
@@ -528,29 +529,23 @@ spec:
         prometheus.io/port: '7000'
         prometheus.io/scrape: 'true'
     spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - zookeeper
-                topologyKey: kubernetes.io/hostname
-              weight: 20
+#      affinity:
+#        podAntiAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            - labelSelector:
+#                matchExpressions:
+#                  - key: "app"
+#                    operator: In
+#                    values:
+#                      - zookeeper
+#              # TODO think about multi-AZ EKS
+#              # topologyKey: topology.kubernetes.io/zone
+#              topologyKey: "kubernetes.io/hostname"
       containers:
         - name: zookeeper
           command:
             - /conf/zookeeperStart.sh
-          env:
-            - name: ENVOY_SIDECAR_STATUS
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.annotations['sidecar.istio.io/status']
-          image: zookeeper:3.8.0
+          image: docker.io/zookeeper:3.8.1
           imagePullPolicy: Always
           lifecycle:
             preStop:
@@ -592,12 +587,10 @@ spec:
               name: admin-server
               protocol: TCP
           volumeMounts:
-            - mountPath: /data
-              name: data
+            - mountPath: /var/lib/zookeeper
+              name: datadir-volume
             - mountPath: /conf
               name: conf
-            - mountPath: /cluster-size
-              name: cluster-size
       restartPolicy: Always
       schedulerName: default-scheduler
       terminationGracePeriodSeconds: 30
@@ -606,24 +599,17 @@ spec:
             name: zookeeper-scripts
             defaultMode: 0755
           name: conf
-        - configMap:
-            name: zookeeper-cluster-size
-            defaultMode: 0755
-          name: cluster-size
   updateStrategy:
     type: RollingUpdate
   volumeClaimTemplates:
-    - apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
+    - metadata:
         labels:
           app: zookeeper
-        name: data
+        name: datadir-volume
       spec:
         accessModes:
           - ReadWriteOnce
         resources:
           requests:
             storage: 1Gi
-        storageClassName: standard
         volumeMode: Filesystem

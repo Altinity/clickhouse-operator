@@ -16,7 +16,7 @@ package v1
 
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	ReplicasUseFQDN   StringBool         `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
+	ReplicasUseFQDN   *StringBool        `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
 	DistributedDDL    *ChiDistributedDDL `json:"distributedDDL,omitempty"     yaml:"distributedDDL,omitempty"`
 	StorageManagement *StorageManagement `json:"storageManagement,omitempty"  yaml:"storageManagement,omitempty"`
 	Templates         *ChiTemplateNames  `json:"templates,omitempty"          yaml:"templates,omitempty"`
@@ -39,13 +39,13 @@ func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) *ChiD
 
 	switch _type {
 	case MergeTypeFillEmptyValues:
-		if from.ReplicasUseFQDN == "" {
-			defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
+		if !from.ReplicasUseFQDN.HasValue() {
+			defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.MergeFrom(from.ReplicasUseFQDN)
 		}
 	case MergeTypeOverrideByNonEmptyValues:
-		if from.ReplicasUseFQDN != "" {
+		if from.ReplicasUseFQDN.HasValue() {
 			// Override by non-empty values only
-			defaults.ReplicasUseFQDN = from.ReplicasUseFQDN
+			defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.MergeFrom(from.ReplicasUseFQDN)
 		}
 	}
 

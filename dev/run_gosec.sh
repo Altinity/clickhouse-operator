@@ -8,11 +8,11 @@ set -o nounset
 set -o pipefail
 
 # Source configuration
-CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-source "${CUR_DIR}/go_build_config.sh"
+GOSEC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+source "${GOSEC_DIR}/go_build_config.sh"
 
 if [[ ! $(command -v gosec) ]]; then
-    CGO_ENABLED=0 GO111MODULE=on go install -ldflags "-s -w -extldflags '-static'" github.com/securego/gosec/cmd/gosec@latest
+    CGO_ENABLED=0 GO111MODULE=on go install -ldflags "-s -w -extldflags '-static'" github.com/securego/gosec/v2/cmd/gosec
 fi
 
 if [[ ! $(command -v gosec) ]]; then
@@ -20,7 +20,8 @@ if [[ ! $(command -v gosec) ]]; then
     exit 1
 fi
 
-gosec -quiet "${CMD_ROOT}"/... "${PKG_ROOT}"/...
+cd "${GOSEC_DIR}/../"
+gosec "./..."
 
 #  gosec -exclude-dir=rules -exclude-dir=cmd ./...
 # gosec -tests ./...

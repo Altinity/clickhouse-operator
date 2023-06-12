@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,8 @@ type ClickHouseInstallation struct {
 	Status            *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
 	Attributes ComparableAttributes `json:"-" yaml:"-"`
+
+	statusMu sync.Mutex
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable
@@ -72,9 +75,9 @@ type ClickHouseOperatorConfiguration struct {
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
 	TaskID                 *string          `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	Stop                   StringBool       `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Stop                   *StringBool      `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                string           `json:"restart,omitempty"                yaml:"restart,omitempty"`
-	Troubleshoot           StringBool       `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	Troubleshoot           *StringBool      `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
@@ -525,7 +528,7 @@ type ChiTemplateNames struct {
 type ChiShard struct {
 	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
 	Weight              int               `json:"weight,omitempty"              yaml:"weight,omitempty"`
-	InternalReplication StringBool        `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
+	InternalReplication *StringBool       `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
@@ -628,75 +631,119 @@ func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add == to.add) && (s.remove == to.remove) && (s.modify == to.modify) && (s.found == to.found)
+	return true &&
+		(s.add == to.add) &&
+		(s.remove == to.remove) &&
+		(s.modify == to.modify) &&
+		(s.found == to.found)
 }
 
 // Any checks whether any of the attributes is set
-func (s *ChiHostReconcileAttributes) Any(to ChiHostReconcileAttributes) bool {
+func (s *ChiHostReconcileAttributes) Any(of *ChiHostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
-	return (s.add && to.add) || (s.remove && to.remove) || (s.modify && to.modify) || (s.found && to.found)
+	if of == nil {
+		return false
+	}
+	return false ||
+		(s.add && of.add) ||
+		(s.remove && of.remove) ||
+		(s.modify && of.modify) ||
+		(s.found && of.found)
 }
 
 // SetStatus sets status
 func (s *ChiHostReconcileAttributes) SetStatus(status StatefulSetStatus) *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.status = status
 	return s
 }
 
 // GetStatus gets status
 func (s *ChiHostReconcileAttributes) GetStatus() StatefulSetStatus {
+	if s == nil {
+		return StatefulSetStatus("")
+	}
 	return s.status
 }
 
 // SetAdd sets 'add' attribute
 func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.add = true
 	return s
 }
 
 // UnsetAdd unsets 'add' attribute
 func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.add = false
 	return s
 }
 
 // SetRemove sets 'remove' attribute
 func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.remove = true
 	return s
 }
 
 // SetModify sets 'modify' attribute
 func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.modify = true
 	return s
 }
 
 // SetFound sets 'found' attribute
 func (s *ChiHostReconcileAttributes) SetFound() *ChiHostReconcileAttributes {
+	if s == nil {
+		return s
+	}
 	s.found = true
 	return s
 }
 
 // IsAdd checks whether 'add' attribute is set
 func (s *ChiHostReconcileAttributes) IsAdd() bool {
+	if s == nil {
+		return false
+	}
 	return s.add
 }
 
 // IsRemove checks whether 'remove' attribute is set
 func (s *ChiHostReconcileAttributes) IsRemove() bool {
+	if s == nil {
+		return false
+	}
 	return s.remove
 }
 
 // IsModify checks whether 'modify' attribute is set
 func (s *ChiHostReconcileAttributes) IsModify() bool {
+	if s == nil {
+		return false
+	}
 	return s.modify
 }
 
 // IsFound checks whether 'found' attribute is set
 func (s *ChiHostReconcileAttributes) IsFound() bool {
+	if s == nil {
+		return false
+	}
 	return s.found
 }
 
@@ -768,23 +815,6 @@ type ChiDistributedDDL struct {
 	Profile string `json:"profile,omitempty" yaml:"profile"`
 }
 
-// ChiZookeeperConfig defines zookeeper section of .spec.configuration
-// Refers to
-// https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
-type ChiZookeeperConfig struct {
-	Nodes              []ChiZookeeperNode `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
-	SessionTimeoutMs   int                `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
-	OperationTimeoutMs int                `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
-	Root               string             `json:"root,omitempty"                 yaml:"root,omitempty"`
-	Identity           string             `json:"identity,omitempty"             yaml:"identity,omitempty"`
-}
-
-// ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
-type ChiZookeeperNode struct {
-	Host string `json:"host,omitempty" yaml:"host,omitempty"`
-	Port int32  `json:"port,omitempty" yaml:"port,omitempty"`
-}
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClickHouseInstallationList defines a list of ClickHouseInstallation resources
@@ -810,4 +840,9 @@ type ClickHouseOperatorConfigurationList struct {
 	metav1.TypeMeta `json:",inline"  yaml:",inline"`
 	metav1.ListMeta `json:"metadata" yaml:"metadata"`
 	Items           []ClickHouseOperatorConfiguration `json:"items" yaml:"items"`
+}
+
+// Secured interface for nodes and hosts
+type Secured interface {
+	IsSecure() bool
 }

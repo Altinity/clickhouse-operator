@@ -1,4 +1,16 @@
-
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
 
 ################################################
 ##
@@ -33,14 +45,21 @@ clickhouse:
     ##
     ################################################
     user:
+      # Default settings for user accounts, created by the operator.
+      # NB. These are not access credentials or settings for 'default' user account,
+      # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
+      # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
+      # Password for 'default' account as to be provided explicitly, if to be used
+      # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
+      # Password for CHOP account is used from `clickhouse.access.password` section
       default:
         # Default values for ClickHouse user configuration
         # 1. user/profile - string
         # 2. user/quota - string
         # 3. user/networks/ip - multiple strings
         # 4. user/password - string
-        profile: default
-        quota: default
+        profile: "default"
+        quota: "default"
         networksIP:
           - "::1"
           - "127.0.0.1"
@@ -53,7 +72,39 @@ clickhouse:
     network:
       # Default host_regexp to limit network connectivity from outside
       hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
+
   ################################################
+  ##
+  ## Configuration Restart Policy Section
+  ## Configuration restart policy describes what configuration changes require ClickHouse restart
+  ##
+  ################################################
+  configurationRestartPolicy:
+    rules:
+      - version: "*"
+        rules:
+          - settings/*: "yes"
+          - settings/dictionaries_config: "no"
+          - settings/logger: "no"
+          - settings/macros/*: "no"
+          - settings/max_server_memory_*: "no"
+          - settings/max_*_to_drop: "no"
+          - settings/max_concurrent_queries: "no"
+          - settings/models_config: "no"
+          - settings/user_defined_executable_functions_config: "no"
+
+          - zookeeper/*: "yes"
+
+          - files/config.d/*.xml: "yes"
+          - files/config.d/*dict*.xml: "no"
+
+          - profiles/default/background_*_pool_size: "yes"
+          - profiles/default/max_*_for_server: "yes"
+      - version: "21.*"
+        rules:
+          - settings/logger: "yes"
+
+  #################################################
   ##
   ## Access to ClickHouse instances
   ##
@@ -89,6 +140,16 @@ clickhouse:
     # Port where to connect to ClickHouse instances to
     port: 8123
 
+    # Timeouts used to limit connection and queries from the operator to ClickHouse instances
+    # Specified in seconds.
+    timeouts:
+      connect: 2
+      query: 5
+
+  metrics:
+    timeouts:
+      collect: 9
+
 ################################################
 ##
 ## Templates Section
@@ -107,36 +168,40 @@ template:
 ################################################
 reconcile:
   runtime:
-    # Max number of concurrent reconciles in progress
-    threadsNumber: 1
+    # Max number of concurrent CHI reconciles in progress
+    reconcileCHIsThreadsNumber: 1
+    # Max number of concurrent shard reconciles in progress
+    reconcileShardsThreadsNumber: 1
+    # The maximum percentage of cluster shards that may be reconciled in parallel
+    reconcileShardsMaxConcurrencyPercent: 50
 
   statefulSet:
     create:
-      # What to do in case created StatefulSet is not in Ready after `reconcile.statefulSet.update.timeout` seconds
+      # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for admin
+      # 1. abort - do nothing, just break the process and wait for an admin to assist
       # 2. delete - delete newly created problematic StatefulSet
-      # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
+      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
       onFailure: ignore
 
     update:
-      # How many seconds to wait for created/updated StatefulSet to be Ready
+      # How many seconds to wait for created/updated StatefulSet to be 'Ready'
       timeout: 300
-      # How many seconds to wait between checks for created/updated StatefulSet status
+      # How many seconds to wait between checks/polls for created/updated StatefulSet status
       pollInterval: 15
-      # What to do in case updated StatefulSet is not in Ready after `reconcile.statefulSet.update.timeout` seconds
+      # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for admin
+      # 1. abort - do nothing, just break the process and wait for an admin to assist
       # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
       # Pod would be recreated by StatefulSet based on rollback-ed configuration
-      # 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet
+      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
       onFailure: rollback
 
   host:
-    # Whether reconciler should wait for host:
-    # - to be excluded from cluster
+    # Whether reconciler should wait for a host:
+    # - to be excluded from a cluster
     # OR
-    # - to be included into cluster
+    # - to be included into a cluster
     # respectfully
     wait:
       exclude: true
@@ -170,9 +235,10 @@ label:
   # Applied only when not empty. Empty list means "include all, no selection"
   include: []
   # Exclude labels from the following list:
+  # Applied only when not empty. Empty list means "nothing to exclude, no selection"
   exclude: []
   # Whether to append *Scope* labels to StatefulSet and Pod.
-  # Full list of available *scope* labels check in labeler.go
+  # Full list of available *scope* labels check in 'labeler.go'
   #  LabelShardScopeIndex
   #  LabelReplicaScopeIndex
   #  LabelCHIScopeIndex
