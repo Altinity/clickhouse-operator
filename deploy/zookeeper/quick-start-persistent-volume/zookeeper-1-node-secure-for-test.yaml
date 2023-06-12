@@ -1,0 +1,307 @@
+# Setup Service to provide access to Zookeeper for clients
+apiVersion: v1
+kind: Service
+metadata:
+  # DNS would be like zookeeper.zoons
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  ports:
+    - port: 2281
+      name: client
+    - port: 7000
+      name: prometheus
+  selector:
+    app: zookeeper
+    what: node
+---
+# Setup Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  # DNS would be like zookeeper-0.zookeepers.etc
+  name: zookeepers
+  labels:
+    app: zookeeper
+spec:
+  ports:
+    - port: 2888
+      name: server
+    - port: 3888
+      name: leader-election
+  clusterIP: None
+  selector:
+    app: zookeeper
+    what: node
+---
+# Setup max number of unavailable pods in StatefulSet
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zookeeper-pod-disruption-budget
+spec:
+  selector:
+    matchLabels:
+      app: zookeeper
+  maxUnavailable: 1
+---
+# Setup Zookeeper StatefulSet
+# Possible params:
+# 1. replicas
+# 2. memory
+# 3. cpu
+# 4. storage
+# 5. storageClassName
+# 6. user to run app
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  # nodes would be named as zookeeper-0, zookeeper-1, zookeeper-2
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  selector:
+    matchLabels:
+      app: zookeeper
+  serviceName: zookeepers
+  replicas: 1
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: OrderedReady
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+        what: node
+      annotations:
+        prometheus.io/port: '7000'
+        prometheus.io/scrape: 'true'
+    spec:
+      containers:
+        - name: kubernetes-zookeeper
+          imagePullPolicy: IfNotPresent
+          image: "docker.io/zookeeper:3.8.1"
+          ports:
+            - containerPort: 2281
+              name: client
+            - containerPort: 2888
+              name: server
+            - containerPort: 3888
+              name: leader-election
+            - containerPort: 7000
+              name: prometheus
+          env:
+            - name: SERVERS
+              value: "1"
+
+# See those links for proper startup settings:
+# https://github.com/kow3ns/kubernetes-zookeeper/blob/master/docker/scripts/start-zookeeper
+# https://clickhouse.yandex/docs/en/operations/tips/#zookeeper
+# https://github.com/ClickHouse/ClickHouse/issues/11781
+          command:
+            - bash
+            - -x
+            - -c
+            - |
+              HOST=`hostname -s` &&
+              DOMAIN=`hostname -d` &&
+              CLIENT_PORT=2281 &&
+              SERVER_PORT=2888 &&
+              ELECTION_PORT=3888 &&
+              PROMETHEUS_PORT=7000 &&
+              ZOO_DATA_DIR=/var/lib/zookeeper/data &&
+              ZOO_DATA_LOG_DIR=/var/lib/zookeeper/datalog &&
+              {
+                echo "secureClientPortAddress=$(hostname -f)"
+                echo "secureClientPort=${CLIENT_PORT}"
+                echo 'tickTime=2000'
+                echo 'initLimit=300'
+                echo 'syncLimit=10'
+                echo 'maxClientCnxns=2000'
+                echo 'maxTimeToWaitForEpoch=2000'
+                echo 'maxSessionTimeout=60000000'
+                echo "dataDir=${ZOO_DATA_DIR}"
+                echo "dataLogDir=${ZOO_DATA_LOG_DIR}"
+                echo 'autopurge.snapRetainCount=10'
+                echo 'autopurge.purgeInterval=1'
+                echo 'preAllocSize=131072'
+                echo 'snapCount=3000000'
+                echo 'leaderServes=yes'
+                echo 'standaloneEnabled=true'
+                echo '4lw.commands.whitelist=*'
+                echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
+                echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
+                echo "skipACL=true"
+                echo "fastleader.maxNotificationInterval=10000"
+                echo "serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory"
+                echo "ssl.keyStore.location=/keystore.jks" 
+                echo "ssl.keyStore.password=keystore"
+                echo "ssl.trustStore.location=/truststore.jks"
+                echo "ssl.trustStore.password=truststore"
+                echo "admin.enableServer=true"
+              } > /conf/zoo.cfg &&
+              {
+                echo "zookeeper.root.logger=CONSOLE"
+                echo "zookeeper.console.threshold=INFO"
+                echo "log4j.rootLogger=\${zookeeper.root.logger}"
+                echo "log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender"
+                echo "log4j.appender.CONSOLE.Threshold=\${zookeeper.console.threshold}"
+                echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
+                echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} - %-5p [%t:%C{1}@%L] - %m%n"
+              } > /conf/log4j.properties &&
+              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"' > /conf/java.env &&
+              if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+                  NAME=${BASH_REMATCH[1]} &&
+                  ORD=${BASH_REMATCH[2]};
+              else
+                  echo "Failed to parse name and ordinal of Pod" &&
+                  exit 1;
+              fi &&
+              mkdir -p ${ZOO_DATA_DIR} &&
+              mkdir -p ${ZOO_DATA_LOG_DIR} &&
+              export MY_ID=$((ORD+1)) &&
+              echo $MY_ID > $ZOO_DATA_DIR/myid &&
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
+              done &&
+              if [[ $SERVERS -eq 1 ]]; then
+                  echo "group.1=1" >> /conf/zoo.cfg;
+              else
+                  echo "group.1=1:2:3" >> /conf/zoo.cfg;
+              fi &&
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  WEIGHT=1
+                  if [[ $i == 1 ]]; then
+                    WEIGHT=10
+                  fi
+                  echo "weight.$i=$WEIGHT" >> /conf/zoo.cfg;
+              done &&
+              sed -i 's/# keyUsage = cRLSign, keyCertSign/keyUsage = cRLSign, keyCertSign/' /usr/lib/ssl/openssl.cnf &&
+              cat << EOF > /usr/local/share/ca-certificates/my_own_ca.crt &&
+              -----BEGIN CERTIFICATE-----
+              MIIDljCCAn6gAwIBAgIUWCSwiZeH4eBrc+WT3cYqX6pUrjYwDQYJKoZIhvcNAQEL
+              BQAwVDELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+              GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDENMAsGA1UEAwwEcm9vdDAeFw0yMzA2
+              MDcxMTE5MTRaFw0zMzA2MDQxMTE5MTRaMFQxCzAJBgNVBAYTAkFVMRMwEQYDVQQI
+              DApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQx
+              DTALBgNVBAMMBHJvb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCI
+              fMKmdtx5BGna7LqGdu0C+xacNb6TjZ10SeEbeznRJ+axHG5UgyVWspN2w6PX4CUH
+              gHNDBfYbeNyfJ2HQSCprxDhxv9p9s0wfta70S1hEzsuNjgKtk8vm7f6B4SkZx56A
+              OumnENzGlx0oiGEW7qalez5QPa5veUbFDnmIBk6VLn6ILPXTKBgk22RT0I4fCq73
+              RKdtJFirPjnnOl16ognN+0I3Okfu05j52wi1HqK8L6bI+Gw02Ke9Zz0UtG0ssdcj
+              OQPzslTie5ZzpGcytv6WxpBPYKFcCNQrzyE8AUlNnOzxwIEZcE8Nx/SiT6W9NAIJ
+              PiPiEZcHfxid/0a1B15NAgMBAAGjYDBeMB0GA1UdDgQWBBTiZPq3TeMW9fr4syd0
+              F34J4x9SBDAfBgNVHSMEGDAWgBTiZPq3TeMW9fr4syd0F34J4x9SBDAPBgNVHRMB
+              Af8EBTADAQH/MAsGA1UdDwQEAwIBBjANBgkqhkiG9w0BAQsFAAOCAQEAKGuPxfzt
+              +268pzmxpYDMoMdKcTZ3JduhBBPsQKHV+ShV4EiEQ/0IduHnnjtzFIBBzVyYe8kt
+              FH/dI3F0umhNIxRtkchr3R26DfNhpBYzlE4Sm6WTeCGsYdYxhWU7deB72KmG2jiU
+              w4/ZfYp/JCM0TQ/uZpetYmoFwpPfNMqAAyiDiWiL8Fheky2VL7l51FMPe5H49BMY
+              JG6QmpCooEQ34Fxbc2FifyjcBagfJAUDdnxs9lgEYquY8uaEb0zBF9rtZH3IpJ1o
+              H+5YdoDBJBlV/EtJsET8wzQr/bJIodUs1qSSreL3QiXgAy9X9HFeEcN0dhReR8M+
+              /Fa9ElbT45l+4g==
+              -----END CERTIFICATE-----
+              EOF
+              
+              update-ca-certificates &&
+              
+              cat << EOF > /my_own_ca.key &&
+              -----BEGIN PRIVATE KEY-----
+              MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCIfMKmdtx5BGna
+              7LqGdu0C+xacNb6TjZ10SeEbeznRJ+axHG5UgyVWspN2w6PX4CUHgHNDBfYbeNyf
+              J2HQSCprxDhxv9p9s0wfta70S1hEzsuNjgKtk8vm7f6B4SkZx56AOumnENzGlx0o
+              iGEW7qalez5QPa5veUbFDnmIBk6VLn6ILPXTKBgk22RT0I4fCq73RKdtJFirPjnn
+              Ol16ognN+0I3Okfu05j52wi1HqK8L6bI+Gw02Ke9Zz0UtG0ssdcjOQPzslTie5Zz
+              pGcytv6WxpBPYKFcCNQrzyE8AUlNnOzxwIEZcE8Nx/SiT6W9NAIJPiPiEZcHfxid
+              /0a1B15NAgMBAAECggEAHpxwoZoV75RkU2P1n5PLq3f6BbXuFLTVxA+Py7SS7ox2
+              6nEYc57oQG4TsbbGJ/QPCgQulbEgFeBBBvbzsp2E2h+rkyN20utkHtaGMyc02FXT
+              BF/9zMVRnWzyQFnp+GyzaUoNPlmDUozwzrbro5OJz6J5AtEarsix7R9GdZIIjN+J
+              S2NjO/mcD6wujaqbjXSHFUqXAcZDcGZuhmwra0Y3izepaHSPGgNM1BzZnqhXaytj
+              UKggu1MAYnPz4YsxFz3JkJqNeTTR85YSE5gx8JzZAs+ikqj8Qc/ndH9o16Lk12Xa
+              qoEOT1kNf6FNsbCsS3CqazPpG3XSeYusHvT6E/lq1wKBgQC7i1dZnwBY3f0izncb
+              AXAg7ncUPMK70dLkdZ3UEXKa3DRbPCEZCPyE1U2346OJBF64ncxGNjLs+bfKquiU
+              Yxi6xotdTVjn/xXE/1624JqXO7YwV7W7B8B4G4Mm0s6rDLcepNWHyUgfteVpeENK
+              8f1IyRGVM9ggoicNJ1u4t/20uwKBgQC6ToQJZoBGng+VvgDWkqbMUd84vMyQsIbq
+              G2C2h6mHJWn9j0Nfz71xqdtNx2fsXVkln24iOY4yJfQUm1QGp9i4WSh49g+F+o2K
+              /eu0XWIe7OjDM/InLxqTNyoj5ZWAi06rw/mQSrU6eCuZ6FrIU2Mjh6n+/GjR2n69
+              6/2/I6sMlwKBgQCWKZmFHrRuc0ANsHbZXqtjEsyxnXzmWbicSDhY5qd2qz4YluqB
+              WxqlWQzjYhc8zAzzkRVQWnEoIUIxueqDdV0Fn5dS222GRE4v77DsiKX+1UapKnFO
+              EYTgJlc6rKvhdUrh9GUsVdOz4DaR3kMzLNL6hlPXvS0d4/eUpqDgJCG1pQKBgFhv
+              jsN7kWZz/wfgkjtIj76rGl+vVxdThCc6abUbPoC1ZNOEnsGrNczviPcpsY4EXZ27
+              SScb1QC+/VaOyNsD757KS6jnfETnwyp4D9uk/D+by31legvZky7QX8N8ZnQHLIfi
+              VeOFYvNnOaMsJXO0CXpDGpG8NPFwWvtCO0fw4W/vAoGAaYpk6VTWTw4cih/1dnRf
+              2LQbEO05lFkRSMtEuqgkWUKvWZjnNRdDU3yXqaz0Pgee7drObUwRnKL3Ywj1QY7H
+              zbaEWIZEZ2PId2Bs/5bSOA9VcExZZDNpGd7I2pBosKpHXT5Y+VszdxLMCnmsRzyq
+              LRSX0TaG3xyggkcVlyyAcPw=
+              -----END PRIVATE KEY-----
+              EOF
+
+              keytool -genkeypair -alias server -keyalg RSA -keystore /keystore.jks -keysize 2048 -dname "CN=$(hostname -f),OU=Dept,O=Example.com,L=City,ST=State,C=US" -storepass keystore &&
+              
+              keytool -certreq -alias server -keystore /keystore.jks -file /server.csr -storepass keystore &&
+              
+              openssl x509 -sha256 -req -in /server.csr -CA /usr/local/share/ca-certificates/my_own_ca.crt -CAkey /my_own_ca.key -CAcreateserial -out /server.crt -days 365 &&
+              
+              openssl verify -x509_strict -CAfile /usr/local/share/ca-certificates/my_own_ca.crt /server.crt &&
+              
+              keytool -importcert -alias ca -file /usr/local/share/ca-certificates/my_own_ca.crt -keystore /keystore.jks -storepass keystore -storetype JKS -noprompt &&
+              
+              keytool -importcert -alias server -file /server.crt -keystore /keystore.jks -storepass keystore -storetype JKS -noprompt &&
+              
+              keytool -importcert -alias my_own_ca -file /usr/local/share/ca-certificates/my_own_ca.crt -keystore /truststore.jks -storepass truststore -storetype JKS -noprompt &&
+              
+              export CLIENT_JVMFLAGS="-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty -Dzookeeper.client.secure=true -Dzookeeper.ssl.keyStore.location=/keystore.jks -Dzookeeper.ssl.keyStore.password=keystore -Dzookeeper.ssl.trustStore.location=/truststore.jks -Dzookeeper.ssl.trustStore.password=truststore" &&
+
+              zkServer.sh start-foreground
+
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - '
+                  export CLIENT_JVMFLAGS="-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty -Dzookeeper.client.secure=true -Dzookeeper.ssl.keyStore.location=/keystore.jks -Dzookeeper.ssl.keyStore.password=keystore -Dzookeeper.ssl.trustStore.location=/truststore.jks -Dzookeeper.ssl.trustStore.password=truststore"; 
+                  export status=$(zkServer.sh status | grep Mode);
+                  if [[ $status ]] ; then
+                    exit 0;
+                  else
+                    exit 1;
+                  fi
+                   '
+            initialDelaySeconds: 10
+            periodSeconds: 60
+            timeoutSeconds: 60
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - '
+                  export CLIENT_JVMFLAGS="-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty -Dzookeeper.client.secure=true -Dzookeeper.ssl.keyStore.location=/keystore.jks -Dzookeeper.ssl.keyStore.password=keystore -Dzookeeper.ssl.trustStore.location=/truststore.jks -Dzookeeper.ssl.trustStore.password=truststore"; 
+                  export status=$(zkServer.sh status | grep Mode);
+                  if [[ $status ]] ; then
+                    exit 0;
+                  else
+                    exit 1;
+                  fi
+                   '
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: datadir-volume
+              mountPath: /var/lib/zookeeper
+      # Run as a non-privileged user
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

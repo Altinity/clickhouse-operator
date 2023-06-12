@@ -3548,6 +3548,67 @@ def test_039_4(self):
     test_039(step=4, delete_chi=1)
 
 
+@TestScenario
+@Requirements()#todo
+@Name("test_041. Secure zookeeper")
+def test_041(self):
+    """Check clickhouse operator support secure zookeeper."""
+
+    create_shell_namespace_clickhouse_template()
+
+    cluster = "default"
+    manifest = f"manifests/chi/test-041-secure-zookeeper.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type, keeper_manifest="zookeeper-1-node-secure-for-test.yaml")
+
+    with Given("chi exists"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I create distributed table and insert data into it"):
+        clickhouse.query(
+            chi,
+            "CREATE TABLE secure_repl on cluster '{cluster}' (a UInt32) "
+            "ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{uuid}', '{replica}')  "
+            "PARTITION BY tuple() ORDER BY a"
+        )
+        clickhouse.query(
+            chi,
+            "CREATE TABLE secure on cluster '{cluster}' (a UInt32) "
+            "ENGINE = MergeTree() PARTITION BY tuple() ORDER BY a"
+        )
+        clickhouse.query(
+            chi,
+            "CREATE TABLE secure_dist on cluster '{cluster}' as secure "
+            "ENGINE = Distributed('{cluster}', default, secure, a%2)"
+        )
+        clickhouse.query(
+            chi,
+            "INSERT INTO secure_dist select number as a from numbers(10)"
+        )
+
+    with Then("I check clickhouse can successfully connect to zookeeper"):
+        clickhouse.query(chi, "SELECT * FROM system.zookeeper WHERE path = '/'")
+
+    with And("I check data is distributed"):
+        r = clickhouse.query(chi, "SELECT count(*) FROM secure_dist")
+        assert r == "10"
+
+    with And("I check connection is secured"):
+        with By("checking chop-generated-zookeeper.xml is properly configured"):
+            r = kubectl.launch(f'exec chi-{chi}-default-0-0-0 -- bash -c "cat '
+                               f'/etc/clickhouse-server/conf.d/chop-generated-zookeeper.xml | head -n6 | tail -n1"')
+
+            assert "<secure>1</secure>" in r
+
+    kubectl.delete_chi(chi)
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"))

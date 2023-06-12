@@ -14,11 +14,6 @@ import e2e.util as util
 current_dir = os.path.dirname(os.path.abspath(__file__))
 max_retries = 20
 
-# shell = Shell()#todo delete
-# shell.timeout = 300
-# namespace = "test"
-# kubectl_cmd = settings.kubectl_cmd
-
 
 def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
     # Build commanddef launch
