@@ -27,20 +27,18 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Schemer specifies schema manager
-type Schemer struct {
+// ClusterSchemer specifies cluster schema manager
+type ClusterSchemer struct {
 	*Cluster
 }
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
-// NewSchemer creates new Schemer object
-func NewSchemer(scheme, username, password, rootCA string, port int) *Schemer {
-	return &Schemer{
-		NewCluster().SetClusterConnectionParams(
-			clickhouse.NewClusterConnectionParams(scheme, username, password, rootCA, port),
-		),
+// NewClusterSchemer creates new Schemer object
+func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams) *ClusterSchemer {
+	return &ClusterSchemer{
+		NewCluster().SetClusterConnectionParams(clusterConnectionParams),
 	}
 }
 
@@ -63,7 +61,7 @@ func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
 
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
 // That includes all distributed tables, corresponding local tables and databases, if necessary
-func (s *Schemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
@@ -120,7 +118,7 @@ func shouldCreateReplicatedObjects(host *chop.ChiHost) bool {
 }
 
 // getReplicatedObjectsSQLs returns a list of objects that needs to be created on a host in a cluster
-func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
@@ -148,53 +146,8 @@ func (s *Schemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHo
 	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
 }
 
-// getDropTablesSQLs returns set of 'DROP TABLE ...' SQLs
-func (s *Schemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
-	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
-	// See https://clickhouse.yandex/docs/en/query_language/create/
-	sql := heredoc.Docf(`
-	    SELECT
-	        DISTINCT name,
-	        concat('DROP DICTIONARY IF EXISTS "', database, '"."', name, '"') AS drop_table_query
-	    FROM
-	        system.dictionaries
-	    WHERE database != ''
-	    UNION ALL
-		SELECT
-			DISTINCT name,
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
-		FROM
-			system.tables
-		WHERE
-			database NOT IN (%s) AND
-			(engine like 'Replicated%%' OR engine like '%%View%%')
-		`,
-		ignoredDBs,
-	)
-
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
-	return names, sqlStatements, nil
-}
-
-// getSyncTablesSQLs returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
-func (s *Schemer) getSyncTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
-	sql := heredoc.Doc(`
-		SELECT
-			DISTINCT name,
-			concat('SYSTEM SYNC REPLICA "', database, '"."', name, '"') AS sync_table_query
-		FROM
-			system.tables
-		WHERE
-			engine LIKE 'Replicated%'
-		`,
-	)
-
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
-	return names, sqlStatements, nil
-}
-
 // HostSyncTables calls SYSTEM SYNC REPLICA for replicated tables
-func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error {
+func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, syncTableSQLs, _ := s.getSyncTablesSQLs(ctx, host)
 	log.V(1).M(host).F().Info("Sync tables: %v as %v", tableNames, syncTableSQLs)
 	opts := clickhouse.NewQueryOptions()
@@ -203,13 +156,13 @@ func (s *Schemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error 
 }
 
 // HostDropReplica calls SYSTEM DROP REPLICA
-func (s *Schemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
+func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
 	log.V(1).M(hostToRun).F().Info("Drop replica: %v at %v", CreateInstanceHostname(hostToDrop), hostToRun.Address.HostName)
 	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
 }
 
 // createTablesSQLs makes all SQL for migrating tables
-func (s *Schemer) createTablesSQLs(
+func (s *ClusterSchemer) createTablesSQLs(
 	ctx context.Context,
 	host *chop.ChiHost,
 ) (
@@ -230,7 +183,7 @@ func (s *Schemer) createTablesSQLs(
 }
 
 // HostCreateTables creates tables on a new host
-func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) error {
+func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -268,14 +221,14 @@ func (s *Schemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) erro
 }
 
 // HostDropTables drops tables on a host
-func (s *Schemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
+func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.getDropTablesSQLs(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
 	return s.ExecHost(ctx, host, dropTableSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 }
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
-func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool {
+func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool {
 	inside := false
 	SQLs := []string{
 		heredoc.Docf(
@@ -288,17 +241,17 @@ func (s *Schemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool 
 	//opts := clickhouse.NewQueryOptions()
 	err := s.ExecHost(ctx, host, SQLs, opts)
 	if err == nil {
-		log.V(1).M(host).F().Info("The host is inside the cluster")
+		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
 		inside = true
 	} else {
-		log.V(1).M(host).F().Info("The host is outside of the cluster")
+		log.V(1).M(host).F().Info("The host %s is outside of the cluster", host.GetName())
 		inside = false
 	}
 	return inside
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
-func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+func (s *ClusterSchemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInstallation) error {
 	SQLs := []string{
 		`SYSTEM DROP DNS CACHE`,
 	}
@@ -306,133 +259,15 @@ func (s *Schemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInsta
 }
 
 // HostActiveQueriesNum returns how many active queries are on the host
-func (s *Schemer) HostActiveQueriesNum(ctx context.Context, host *chop.ChiHost) (int, error) {
+func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *chop.ChiHost) (int, error) {
 	sql := `SELECT count() FROM system.processes`
 	return s.QueryHostInt(ctx, host, sql)
 }
 
 // HostVersion returns ClickHouse version on the host
-func (s *Schemer) HostVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
+func (s *ClusterSchemer) HostVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
 	sql := `SELECT version()`
 	return s.QueryHostString(ctx, host, sql)
-}
-
-func createDatabaseDistributed(cluster string) string {
-	return heredoc.Docf(`
-		SELECT
-			DISTINCT name,
-			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine AS create_db_query
-		FROM (
-			SELECT
-				*
-			FROM
-				clusterAllReplicas('%s', system.databases) databases
-			SETTINGS skip_unavailable_shards = 1
-		)
-		WHERE name IN (
-			SELECT
-				DISTINCT arrayJoin([database, extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+')]) database
-			FROM
-				clusterAllReplicas('%s', system.tables) tables
-			WHERE
-				engine = 'Distributed'
-			SETTINGS skip_unavailable_shards = 1
-		)
-		`,
-		cluster,
-		cluster,
-	)
-}
-
-func createTableDistributed(cluster string) string {
-	return heredoc.Docf(`
-		SELECT
-			DISTINCT concat(database, '.', name) AS name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
-			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
-			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
-		FROM
-		(
-			SELECT
-				database,
-				name,
-				create_table_query,
-				2 AS order
-			FROM
-				clusterAllReplicas('%s', system.tables) tables
-			WHERE
-				engine = 'Distributed'
-			SETTINGS skip_unavailable_shards = 1
-			UNION ALL
-			SELECT
-				extract(engine_full, 'Distributed\\([^,]+, *\'?([^,\']+)\'?, *[^,]+') AS database,
-				extract(engine_full, 'Distributed\\([^,]+, [^,]+, *\'?([^,\\\')]+)') AS name,
-				t.create_table_query,
-				1 AS order
-			FROM
-				clusterAllReplicas('%s', system.tables) tables
-				LEFT JOIN
-				(
-					SELECT
-						DISTINCT database,
-						name,
-						create_table_query
-					FROM
-						clusterAllReplicas('%s', system.tables)
-					SETTINGS skip_unavailable_shards = 1, show_table_uuid_in_table_create_query_if_not_nil=1
-				) t
-				USING (database, name)
-			WHERE
-				engine = 'Distributed' AND t.create_table_query != ''
-			SETTINGS skip_unavailable_shards = 1
-		) tables
-		WHERE database IN (select name from system.databases where engine in (%s))
-		ORDER BY order
-		`,
-		cluster,
-		cluster,
-		cluster,
-		createTableDBEngines,
-	)
-}
-
-func createDatabaseReplicated(cluster string) string {
-	return heredoc.Docf(`
-		SELECT
-			DISTINCT name,
-			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine  AS create_db_query
-		FROM
-			clusterAllReplicas('%s', system.databases) databases
-		WHERE
-			name NOT IN (%s)
-		SETTINGS skip_unavailable_shards = 1
-		`,
-		cluster,
-		ignoredDBs,
-	)
-}
-
-func createTableReplicated(cluster string) string {
-	return heredoc.Docf(`
-		SELECT
-			DISTINCT name,
-			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS'),
-			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
-			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
-		FROM
-			clusterAllReplicas('%s', system.tables) tables
-		WHERE
-			database NOT IN (%s) AND
-			database IN (select name from system.databases where engine in (%s)) AND
-			create_table_query != '' AND
-			name NOT LIKE '.inner.%%' AND
-			name NOT LIKE '.inner_id.%%'
-		SETTINGS skip_unavailable_shards=1, show_table_uuid_in_table_create_query_if_not_nil=1
-		`,
-		cluster,
-		ignoredDBs,
-		createTableDBEngines,
-	)
 }
 
 func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {

@@ -249,7 +249,7 @@ func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *chiV1.ClickHous
 	objs := w.c.discovery(ctx, chi)
 	if objs.NumStatefulSet() > 0 {
 		chi.WalkHosts(func(host *chiV1.ChiHost) error {
-			_ = w.schemer.HostSyncTables(ctx, host)
+			_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
 			return nil
 		})
 	}
@@ -304,7 +304,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 	_ = w.c.deleteServiceCHI(ctx, chi)
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		_ = w.schemer.HostSyncTables(ctx, host)
+		_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
 		return nil
 	})
 
@@ -360,19 +360,19 @@ func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiV1.C
 		return nil
 	}
 
-	err := w.schemer.HostDropReplica(ctx, hostToRun, hostToDrop)
+	err := w.ensureClusterSchemer().HostDropReplica(ctx, hostToRun, hostToDrop)
 
 	if err == nil {
 		w.a.V(1).
 			WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(hostToRun.CHI).
 			M(hostToRun).F().
-			Info("Drop replica host %s in cluster %s", hostToDrop.Name, hostToDrop.Address.ClusterName)
+			Info("Drop replica host %s in cluster %s", hostToDrop.GetName(), hostToDrop.Address.ClusterName)
 	} else {
 		w.a.WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(hostToRun.CHI).
 			M(hostToRun).F().
-			Error("FAILED to drop replica on host %s with error %v", hostToDrop.Name, err)
+			Error("FAILED to drop replica on host %s with error %v", hostToDrop.GetName(), err)
 	}
 
 	return err
@@ -388,7 +388,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 	if !chopModel.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
-	err := w.schemer.HostDropTables(ctx, host)
+	err := w.ensureClusterSchemer().HostDropTables(ctx, host)
 
 	if err == nil {
 		w.a.V(1).
@@ -396,12 +396,12 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
-				host.Name, host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+				host.GetName(), host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	} else {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(host.CHI).
 			M(host).F().
-			Error("FAILED to delete tables on host %s with error %v", host.Name, err)
+			Error("FAILED to delete tables on host %s with error %v", host.GetName(), err)
 	}
 
 	return err
@@ -422,7 +422,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("Delete host %s/%s - started", host.Address.ClusterName, host.Name)
+		Info("Delete host %s/%s - started", host.Address.ClusterName, host.GetName())
 
 	var err error
 	if host.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
@@ -430,7 +430,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Delete host %s/%s - completed StatefulSet not found - already deleted? err: %v",
-				host.Address.ClusterName, host.Name, err)
+				host.Address.ClusterName, host.GetName(), err)
 		return nil
 	}
 
@@ -445,7 +445,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 	err = w.c.deleteHost(ctx, host)
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
-	chi.EnsureStatus().HostsDeletedCount++
+	chi.EnsureStatus().HostDeleted()
 	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		TolerateAbsence: true,
 		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
@@ -458,12 +458,12 @@ func (w *worker) deleteHost(ctx context.Context, chi *chiV1.ClickHouseInstallati
 			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
 			WithStatusAction(host.CHI).
 			M(host).F().
-			Info("Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
+			Info("Delete host %s/%s - completed", host.Address.ClusterName, host.GetName())
 	} else {
 		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(host.CHI).
 			M(host).F().
-			Error("FAILED Delete host %s/%s - completed", host.Address.ClusterName, host.Name)
+			Error("FAILED Delete host %s/%s - completed", host.Address.ClusterName, host.GetName())
 	}
 
 	return err

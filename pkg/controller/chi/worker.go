@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -46,7 +47,7 @@ type worker struct {
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
 	normalizer *chopModel.Normalizer
-	schemer    *chopModel.Schemer
+	schemer    *chopModel.ClusterSchemer
 	start      time.Time
 	task       task
 }
@@ -83,14 +84,8 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
 		normalizer: chopModel.NewNormalizer(c.kubeClient),
-		schemer: chopModel.NewSchemer(
-			chop.Config().ClickHouse.Access.Scheme,
-			chop.Config().ClickHouse.Access.Username,
-			chop.Config().ClickHouse.Access.Password,
-			chop.Config().ClickHouse.Access.RootCA,
-			chop.Config().ClickHouse.Access.Port,
-		),
-		start: start,
+		schemer:    nil, //
+		start:      start,
 	}
 }
 
@@ -99,9 +94,12 @@ func (w *worker) newTask(chi *chiV1.ClickHouseInstallation) {
 	w.task = newTask(chopModel.NewCreator(chi))
 }
 
+// timeToStart specifies time that operator does not accept changes
+const timeToStart = 1 * time.Minute
+
 // isJustStarted checks whether worked just started
 func (w *worker) isJustStarted() bool {
-	return time.Since(w.start) < 1*time.Minute
+	return time.Since(w.start) < timeToStart
 }
 
 func (w *worker) isConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
@@ -110,24 +108,31 @@ func (w *worker) isConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
-	// For recent tasks should not do force restart
-	if w.isEarlyContext() {
+	// RollingUpdate purpose is to always shut the host down.
+	// It is such an interesting policy.
+	if host.GetCHI().IsRollingUpdate() {
+		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
+		return true
+	}
+
+	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
+		w.a.V(1).M(host).F().Info("Host is new, no restart applicable. Host: %s", host.GetName())
+		return false
+	}
+
+	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame && !host.HasAncestor() {
+		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
 	}
 
 	// For some configuration changes we have to force restart host
 	if w.isConfigurationChangeRequiresReboot(host) {
+		w.a.V(1).M(host).F().Info("Config changes requires force restart. Host: %s", host.GetName())
 		return true
 	}
 
-	// RollingUpdate purpose is to always shut the host down.
-	// It is such an interesting policy.
-	return host.GetCHI().IsRollingUpdate()
-}
-
-// isEarlyContext checks whether this context/task has been started shortly after worker started
-func (w *worker) isEarlyContext() bool {
-	return w.task.start.Sub(w.start) < 1*time.Minute
+	w.a.V(1).M(host).F().Info("Force restart is not required. Host: %s", host.GetName())
+	return false
 }
 
 // run is an endless work loop, expected to be run in a thread
@@ -231,7 +236,7 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
-		_ = w.schemer.CHIDropDnsCache(ctx, chi)
+		_ = w.ensureClusterSchemer().CHIDropDnsCache(ctx, chi)
 	} else {
 		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.Labels, err)
 	}
@@ -412,17 +417,29 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 // isCleanRestartOnTheSameIP checks whether it is just a restart of the operator on the same IP
 func (w *worker) isCleanRestartOnTheSameIP(chi *chiV1.ClickHouseInstallation) bool {
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
-	ipIsTheSame := ip == chi.Status.GetCHOpIP()
-	return w.isCleanRestart(chi) && ipIsTheSame
+	operatorIpIsTheSame := ip == chi.Status.GetCHOpIP()
+	log.V(1).Info("Operator IPs. Previous: %s Cur: %s", chi.Status.GetCHOpIP(), ip)
+
+	if !operatorIpIsTheSame {
+		// Operator has restarted on the different IP address.
+		// We may need to reconcile config files
+		log.V(1).Info("Operator IPs are different. Is NOT restart on the same IP")
+		return false
+	}
+
+	log.V(1).Info("Operator IPs are the same. It is restart on the same IP")
+	return w.isCleanRestart(chi)
 }
 
 // isCleanRestart checks whether it is just a restart of the operator and CHI has no changes since last processed
 func (w *worker) isCleanRestart(chi *chiV1.ClickHouseInstallation) bool {
-	// Operator just recently started
+	// Clean restart may be only in case operator has just recently started
 	if !w.isJustStarted() {
-		// Need to have operator recently started
+		log.V(1).Info("Operator is not just started. May not be clean restart")
 		return false
 	}
+
+	log.V(1).Info("Operator just started. May be clean restart")
 
 	// Migration support
 	// Do we have have previously completed CHI?
@@ -442,8 +459,18 @@ func (w *worker) isCleanRestart(chi *chiV1.ClickHouseInstallation) bool {
 	// However, completed CHI still can be missing, for example, in newly requested CHI
 	if chi.HasAncestor() {
 		generationIsOk = chi.Generation == chi.GetAncestor().Generation
+		log.V(1).Info(
+			"CHI %s has ancestor. Generations. Prev: %d Cur: %d Generation is the same: %t",
+			chi.Name,
+			chi.GetAncestor().Generation,
+			chi.Generation,
+			generationIsOk,
+		)
+	} else {
+		log.V(1).Info("CHI %s has NO ancestor, meaning reconcile cycle was never completed.", chi.Name)
 	}
 
+	log.V(1).Info("Is CHI %s clean on operator restart: %t", chi.Name, generationIsOk)
 	return generationIsOk
 }
 
@@ -508,7 +535,7 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiV1.ClickHouseIn
 	}
 	start := time.Now()
 	w.c.poll(ctx, chi, func(c *chiV1.ClickHouseInstallation, e error) bool {
-		if len(c.Status.GetPodIPS()) >= len(c.Status.GetPods()) {
+		if len(c.Status.GetPodIPs()) >= len(c.Status.GetPods()) {
 			// Stop polling
 			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
@@ -636,11 +663,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 					// StatefulSet of this host already exist, we can't ADD it for sure
 					// It looks like FOUND is the most correct approach
 					host.GetReconcileAttributes().SetFound()
-					w.a.V(1).M(chi).Info("Add host as FOUND. Host was found as sts %s", host.Name)
+					w.a.V(1).M(chi).Info("Add host as FOUND. Host was found as sts %s", host.GetName())
 				} else {
 					// StatefulSet of this host does not exist, looks like we need to ADD it
 					host.GetReconcileAttributes().SetAdd()
-					w.a.V(1).M(chi).Info("Add host as ADD. Host was not found as sts %s", host.Name)
+					w.a.V(1).M(chi).Info("Add host as ADD. Host was not found as sts %s", host.GetName())
 				}
 
 				return nil
@@ -715,7 +742,7 @@ func (w *worker) options(excludeHosts ...*chiV1.ChiHost) *chopModel.ClickHouseCo
 	// Stringify
 	str := ""
 	for _, host := range excludeHosts {
-		str += fmt.Sprintf("name: '%s' sts: '%s'", host.Name, host.Address.StatefulSet)
+		str += fmt.Sprintf("name: '%s' sts: '%s'", host.GetName(), host.Address.StatefulSet)
 	}
 
 	opts := w.baseRemoteServersGeneratorOptions().ExcludeHosts(excludeHosts...)
@@ -761,7 +788,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 		M(host).F().
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 
-	err := w.schemer.HostCreateTables(ctx, host)
+	err := w.ensureClusterSchemer().HostCreateTables(ctx, host)
 	host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
 	if err == nil {
 		w.a.V(1).
@@ -786,7 +813,7 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost) bool {
 		// Stopped host is not able to receive any data
 		return false
 
-	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().HostsWithTablesCreated):
+	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated()):
 		// This host is listed as having tables created already
 		return false
 
@@ -989,20 +1016,20 @@ func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
 
 // waitHostInCluster
 func (w *worker) waitHostInCluster(ctx context.Context, host *chiV1.ChiHost) error {
-	return w.c.pollHostContext(ctx, host, nil, w.schemer.IsHostInCluster)
+	return w.c.pollHostContext(ctx, host, nil, w.ensureClusterSchemer().IsHostInCluster)
 }
 
 // waitHostNotInCluster
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiV1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
-		return !w.schemer.IsHostInCluster(ctx, host)
+		return !w.ensureClusterSchemer().IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiV1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
-		n, _ := w.schemer.HostActiveQueriesNum(ctx, host)
+		n, _ := w.ensureClusterSchemer().HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})
 }
@@ -1227,7 +1254,7 @@ func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetS
 		if curHasLabel && newHasLabel {
 			if curLabel == newLabel {
 				w.a.M(meta).F().Info(
-					"cur and new StatefulSets ARE EQUAL based on labels. No reconcile is required for: %s",
+					"cur and new StatefulSets ARE EQUAL based on labels. No StatefulSet reconcile is required for: %s",
 					util.NamespaceNameString(meta),
 				)
 				return chiV1.StatefulSetStatusSame
@@ -1240,7 +1267,7 @@ func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetS
 			//	//					return chop.StatefulSetStatusModified
 			//}
 			w.a.M(meta).F().Info(
-				"cur and new StatefulSets ARE DIFFERENT based on labels. Reconcile is required for: %s",
+				"cur and new StatefulSets ARE DIFFERENT based on labels. StatefulSet reconcile is required for: %s",
 				util.NamespaceNameString(meta),
 			)
 			return chiV1.StatefulSetStatusModified
@@ -1486,4 +1513,14 @@ func (w *worker) applyResource(
 	// Update resource
 	curResourceList[resourceName] = desiredResourceList[resourceName]
 	return true
+}
+
+func (w *worker) ensureClusterSchemer() *chopModel.ClusterSchemer {
+	if w == nil {
+		return nil
+	}
+	if w.schemer == nil {
+		w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
+	}
+	return w.schemer
 }

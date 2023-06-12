@@ -25,30 +25,28 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // FillStatus fills .Status
 func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string) {
-	chi.EnsureStatus().CHOpVersion = version.Version
-	chi.EnsureStatus().CHOpCommit = version.GitSHA
-	chi.EnsureStatus().CHOpDate = version.BuiltAt
-	chi.EnsureStatus().CHOpIP = ip
-	chi.EnsureStatus().ClustersCount = chi.ClustersCount()
-	chi.EnsureStatus().ShardsCount = chi.ShardsCount()
-	chi.EnsureStatus().HostsCount = chi.HostsCount()
-	chi.EnsureStatus().TaskID = chi.Spec.GetTaskID()
-	chi.EnsureStatus().HostsUpdatedCount = 0
-	chi.EnsureStatus().HostsAddedCount = 0
-	chi.EnsureStatus().HostsCompletedCount = 0
-	chi.EnsureStatus().HostsDeleteCount = 0
-	chi.EnsureStatus().HostsDeletedCount = 0
-	chi.EnsureStatus().Pods = pods
-	chi.EnsureStatus().FQDNs = fqdns
-	chi.EnsureStatus().Endpoint = endpoint
-	chi.EnsureStatus().NormalizedCHI = chi.Copy(CopyCHIOptions{
-		SkipStatus:        true,
-		SkipManagedFields: true,
+	chi.EnsureStatus().Fill(&FillStatusParams{
+		CHOpIP:              ip,
+		ClustersCount:       chi.ClustersCount(),
+		ShardsCount:         chi.ShardsCount(),
+		HostsCount:          chi.HostsCount(),
+		TaskID:              chi.Spec.GetTaskID(),
+		HostsUpdatedCount:   0,
+		HostsAddedCount:     0,
+		HostsCompletedCount: 0,
+		HostsDeleteCount:    0,
+		HostsDeletedCount:   0,
+		Pods:                pods,
+		FQDNs:               fqdns,
+		Endpoint:            endpoint,
+		NormalizedCHI: chi.Copy(CopyCHIOptions{
+			SkipStatus:        true,
+			SkipManagedFields: true,
+		}),
 	})
 }
 
@@ -292,11 +290,9 @@ func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
 	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
 	fCluster func(ctx context.Context, cluster *Cluster) error,
-	fShard func(ctx context.Context, shard *ChiShard) error,
-	fHost func(ctx context.Context, host *ChiHost) error,
-	fCHI func(ctx context.Context, chi *ClickHouseInstallation) error,
+	fShards func(ctx context.Context, shards []*ChiShard) error,
+	fCHIFinal func(ctx context.Context, chi *ClickHouseInstallation) error,
 ) error {
-
 	if err := fCHIPreliminary(ctx, chi); err != nil {
 		return err
 	}
@@ -306,21 +302,17 @@ func (chi *ClickHouseInstallation) WalkTillError(
 		if err := fCluster(ctx, cluster); err != nil {
 			return err
 		}
+
+		shards := make([]*ChiShard, 0, len(cluster.Layout.Shards))
 		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
-			if err := fShard(ctx, shard); err != nil {
-				return err
-			}
-			for replicaIndex := range shard.Hosts {
-				host := shard.Hosts[replicaIndex]
-				if err := fHost(ctx, host); err != nil {
-					return err
-				}
-			}
+			shards = append(shards, &cluster.Layout.Shards[shardIndex])
+		}
+		if err := fShards(ctx, shards); err != nil {
+			return err
 		}
 	}
 
-	if err := fCHI(ctx, chi); err != nil {
+	if err := fCHIFinal(ctx, chi); err != nil {
 		return err
 	}
 
@@ -706,10 +698,18 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	if chi == nil {
 		return nil
 	}
-	if chi.Status == nil {
-		chi.Status = &ChiStatus{}
+
+	// Assume that most of the time, we'll see a non-nil value.
+	if chi.Status != nil {
+		return chi.Status
 	}
 
+	// Otherwise, we need to acquire a lock to initialize the field.
+	chi.statusMu.Lock()
+	defer chi.statusMu.Unlock()
+	if chi.Status == nil { // Note that we have to check this property again to avoid a TOCTOU bug.
+		chi.Status = &ChiStatus{}
+	}
 	return chi.Status
 }
 

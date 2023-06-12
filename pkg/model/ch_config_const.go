@@ -79,10 +79,10 @@ const (
 	// Name of container within Pod with ClickHouse instance.
 	// Pod may have other containers included, such as monitoring, logging
 
-	// ClickHouseContainerName specifies name of the clickhouse container in the pod
-	ClickHouseContainerName = "clickhouse"
-	// ClickHouseLogContainerName specifies name of the logger container in the pod
-	ClickHouseLogContainerName = "clickhouse-log"
+	// clickHouseContainerName specifies name of the clickhouse container in the pod
+	clickHouseContainerName = "clickhouse"
+	// clickHouseLogContainerName specifies name of the logger container in the pod
+	clickHouseLogContainerName = "clickhouse-log"
 )
 
 const (

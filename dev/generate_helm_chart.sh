@@ -4,7 +4,7 @@ function usage() {
 cat << EOT
  Script splits clickhouse-operator-install-bundle.yaml to separate files and adjusts them to conform the helm standards
  NOTE script requires some pre-installed tools:
- - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x
+ - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x. Do not use brew install yq in MacOS，Version is lower than it.
  - jq ( https://github.com/stedolan/jq )
  - helm-docs ( https://github.com/norwoodj/helm-docs )
  - perl ( https://learn.perl.org/installing/ )
@@ -63,7 +63,12 @@ function main() {
     perl -pi -e 's/"datasource": "\$db"/"datasource": {"type":"vertamedia-clickhouse-datasource","uid":"\${db}"}/g' "${files_dir}/${dashboard_name}"
   done
 
-  helm-docs --chart-search-root="${chart_path}" --log-level=warning
+  if [[ $(command -v helm-docs) ]]; then
+    helm-docs --chart-search-root="${chart_path}" --log-level=warning
+  else
+    echo "WARNING"
+    echo "helm-docs is not available, skip docs generation"
+  fi
 }
 
 function process() {

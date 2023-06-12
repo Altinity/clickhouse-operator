@@ -483,6 +483,21 @@ func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *chi
 	)
 }
 
+// ensureClickHouseLogContainerSpecified
+func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
+	_, ok := getClickHouseLogContainer(statefulSet)
+	if ok {
+		return
+	}
+
+	// No ClickHouse Log container available, let's add one
+
+	addContainer(
+		&statefulSet.Spec.Template.Spec,
+		newDefaultLogContainer(),
+	)
+}
+
 // ensureProbesSpecified
 func ensureProbesSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	container, ok := getClickHouseContainer(statefulSet)
@@ -555,7 +570,8 @@ func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *chiv1.C
 	statefulSetName := CreateStatefulSetName(host)
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
-		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
+		ensureClickHouseLogContainerSpecified(statefulSet)
+
 		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
 	}
 }
@@ -690,40 +706,36 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
-// getClickHouseContainer
-func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	// Find by name
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		if container.Name == ClickHouseContainerName {
-			return container, true
+// getContainer gets container from the StatefulSet either by name or by index
+func getContainer(statefulSet *apps.StatefulSet, name string, index int) (*corev1.Container, bool) {
+	if len(name) > 0 {
+		// Find by name
+		for i := range statefulSet.Spec.Template.Spec.Containers {
+			container := &statefulSet.Spec.Template.Spec.Containers[i]
+			if container.Name == name {
+				return container, true
+			}
 		}
 	}
 
-	// Find by index
-	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
-		return &statefulSet.Spec.Template.Spec.Containers[0], true
+	if index >= 0 {
+		// Find by index
+		if len(statefulSet.Spec.Template.Spec.Containers) > index {
+			return &statefulSet.Spec.Template.Spec.Containers[index], true
+		}
 	}
 
 	return nil, false
 }
 
-// getClickHouseContainerStatus
-func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
-	// Find by name
-	for i := range pod.Status.ContainerStatuses {
-		status := &pod.Status.ContainerStatuses[i]
-		if status.Name == ClickHouseContainerName {
-			return status, true
-		}
-	}
+// getClickHouseContainer
+func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	return getContainer(statefulSet, clickHouseContainerName, 0)
+}
 
-	// Find by index
-	if len(pod.Status.ContainerStatuses) > 0 {
-		return &pod.Status.ContainerStatuses[0], true
-	}
-
-	return nil, false
+// getClickHouseLogContainer
+func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	return getContainer(statefulSet, clickHouseLogContainerName, -1)
 }
 
 // IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
@@ -1307,7 +1319,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 // newDefaultClickHouseContainer returns default ClickHouse Container
 func newDefaultClickHouseContainer(host *chiv1.ChiHost) corev1.Container {
 	container := corev1.Container{
-		Name:           ClickHouseContainerName,
+		Name:           clickHouseContainerName,
 		Image:          defaultClickHouseDockerImage,
 		LivenessProbe:  newDefaultLivenessProbe(host),
 		ReadinessProbe: newDefaultReadinessProbe(host),
@@ -1319,7 +1331,7 @@ func newDefaultClickHouseContainer(host *chiv1.ChiHost) corev1.Container {
 // newDefaultLogContainer returns default Log Container
 func newDefaultLogContainer() corev1.Container {
 	return corev1.Container{
-		Name:  ClickHouseLogContainerName,
+		Name:  clickHouseLogContainerName,
 		Image: defaultUbiDockerImage,
 		Command: []string{
 			"/bin/sh", "-c", "--",

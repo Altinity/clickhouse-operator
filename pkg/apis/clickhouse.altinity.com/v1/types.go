@@ -19,6 +19,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,8 @@ type ClickHouseInstallation struct {
 	Status            *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
 	Attributes ComparableAttributes `json:"-" yaml:"-"`
+
+	statusMu sync.Mutex
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable

@@ -17,8 +17,6 @@ package metrics
 import (
 	"context"
 	"database/sql"
-	"time"
-
 	"github.com/MakeNowJust/heredoc"
 
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -76,6 +74,14 @@ const (
             'Control sum for changed settings' AS description,
             'gauge'                            AS type
 		FROM system.settings WHERE changed
+		UNION ALL
+		SELECT 
+		    concat('metric.SystemErrors_',name) AS metric,
+		    toString(sum(value)) AS value,
+		    'Error counter from system.errors' AS description,
+			'counter' AS type
+		FROM system.errors
+        GROUP BY name
 	`
 	querySystemPartsSQL = `
 		SELECT
@@ -138,18 +144,6 @@ func NewClickHouseFetcher(endpointConnectionParams *clickhouse.EndpointConnectio
 	return &ClickHouseMetricsFetcher{
 		connectionParams: endpointConnectionParams,
 	}
-}
-
-// SetConnectTimeout sets connect timeout
-func (f *ClickHouseMetricsFetcher) SetConnectTimeout(timeout time.Duration) *ClickHouseMetricsFetcher {
-	f.connectionParams.SetConnectTimeout(timeout)
-	return f
-}
-
-// SetQueryTimeout sets query timeout
-func (f *ClickHouseMetricsFetcher) SetQueryTimeout(timeout time.Duration) *ClickHouseMetricsFetcher {
-	f.connectionParams.SetQueryTimeout(timeout)
-	return f
 }
 
 func (f *ClickHouseMetricsFetcher) connection() *clickhouse.Connection {

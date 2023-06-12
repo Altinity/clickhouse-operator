@@ -1,0 +1,10 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: grants-example
+spec:
+  configuration:
+    users:
+      user_name/grants/query:
+        - "GRANT SHOW ON *.*"
+        - "GRANT SELECT ON *.* WITH GRANT OPTION"

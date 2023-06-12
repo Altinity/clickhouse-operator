@@ -75,7 +75,7 @@ func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
 				// Receiver already have such a template
 				sameNameFound = true
 				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
 				// Receiver `to` template is processed
 				break
 			}
@@ -107,8 +107,13 @@ func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
 			if toTemplate.Name == fromTemplate.Name {
 				// Receiver already have such a template
 				sameNameFound = true
+
+				//toSpec := &toTemplate.Spec
+				//fromSpec := &fromTemplate.Spec
+				//_ = mergo.Merge(toSpec, *fromSpec, mergo.WithGrowSlice, mergo.WithOverride, mergo.WithOverrideEmptySlice)
+
 				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
 				// Receiver `to` template is processed
 				break
 			}
@@ -141,7 +146,7 @@ func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
 				// Receiver already have such a template
 				sameNameFound = true
 				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
 				// Receiver `to` template is processed
 				break
 			}
@@ -174,7 +179,7 @@ func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
 				// Receiver already have such a template
 				sameNameFound = true
 				// Merge `to` template with `from` template
-				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverrideEmptySlice)
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepCopy)
 				// Receiver `to` template is processed
 				break
 			}
