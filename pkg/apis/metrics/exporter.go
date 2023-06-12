@@ -33,8 +33,7 @@ import (
 
 // Exporter implements prometheus.Collector interface
 type Exporter struct {
-	clusterConnectionParams *clickhouse.ClusterConnectionParams
-	collectorTimeout        time.Duration
+	collectorTimeout time.Duration
 
 	// chInstallations maps CHI name to list of hostnames (of string type) of this installation
 	chInstallations chInstallationsIndex
@@ -44,9 +43,7 @@ type Exporter struct {
 }
 
 // Type compatibility
-var (
-	_ prometheus.Collector = &Exporter{}
-)
+var _ prometheus.Collector = &Exporter{}
 
 type chInstallationsIndex map[string]*WatchedCHI
 
@@ -60,14 +57,10 @@ func (i chInstallationsIndex) Slice() []*WatchedCHI {
 }
 
 // NewExporter returns a new instance of Exporter type
-func NewExporter(
-	connectionParams *clickhouse.ClusterConnectionParams,
-	collectorTimeout time.Duration,
-) *Exporter {
+func NewExporter(collectorTimeout time.Duration) *Exporter {
 	return &Exporter{
-		chInstallations:         make(map[string]*WatchedCHI),
-		clusterConnectionParams: connectionParams,
-		collectorTimeout:        collectorTimeout,
+		chInstallations:  make(map[string]*WatchedCHI),
+		collectorTimeout: collectorTimeout,
 	}
 }
 
@@ -182,7 +175,10 @@ func (e *Exporter) updateWatched(chi *WatchedCHI) {
 
 // newFetcher returns new Metrics Fetcher for specified host
 func (e *Exporter) newHostFetcher(hostname string) *ClickHouseMetricsFetcher {
-	return NewClickHouseFetcher(e.clusterConnectionParams.NewEndpointConnectionParams(hostname))
+	return NewClickHouseFetcher(
+		clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()).
+			NewEndpointConnectionParams(hostname),
+	)
 }
 
 // updateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state

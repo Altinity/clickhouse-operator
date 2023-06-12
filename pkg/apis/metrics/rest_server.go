@@ -23,14 +23,10 @@ import (
 	// log "k8s.io/klog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
 // StartMetricsREST start Prometheus metrics exporter in background
 func StartMetricsREST(
-	connectionParams *clickhouse.ClusterConnectionParams,
-
 	metricsAddress string,
 	metricsPath string,
 	collectorTimeout time.Duration,
@@ -40,7 +36,7 @@ func StartMetricsREST(
 ) *Exporter {
 	log.V(1).Infof("Starting metrics exporter at '%s%s'\n", metricsAddress, metricsPath)
 
-	exporter := NewExporter(connectionParams, collectorTimeout)
+	exporter := NewExporter(collectorTimeout)
 	prometheus.MustRegister(exporter)
 
 	http.Handle(metricsPath, promhttp.Handler())
