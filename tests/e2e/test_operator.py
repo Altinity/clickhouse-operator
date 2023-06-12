@@ -3589,7 +3589,6 @@ def test_040(self):
 
 
 @TestScenario
-@Requirements()#todo
 @Name("test_041. Secure zookeeper")
 def test_041(self):
     """Check clickhouse operator support secure zookeeper."""
