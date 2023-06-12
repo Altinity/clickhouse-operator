@@ -23,9 +23,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -251,7 +249,7 @@ func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *chiV1.ClickHous
 	objs := w.c.discovery(ctx, chi)
 	if objs.NumStatefulSet() > 0 {
 		chi.WalkHosts(func(host *chiV1.ChiHost) error {
-			_ = w.schemer.HostSyncTables(ctx, host)
+			_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
 			return nil
 		})
 	}
@@ -306,7 +304,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 	_ = w.c.deleteServiceCHI(ctx, chi)
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		_ = w.schemer.HostSyncTables(ctx, host)
+		_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
 		return nil
 	})
 
@@ -362,7 +360,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiV1.C
 		return nil
 	}
 
-	err := w.schemer.HostDropReplica(ctx, hostToRun, hostToDrop)
+	err := w.ensureClusterSchemer().HostDropReplica(ctx, hostToRun, hostToDrop)
 
 	if err == nil {
 		w.a.V(1).
@@ -390,7 +388,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 	if !chopModel.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
-	err := w.schemer.HostDropTables(ctx, host)
+	err := w.ensureClusterSchemer().HostDropTables(ctx, host)
 
 	if err == nil {
 		w.a.V(1).
@@ -521,8 +519,6 @@ func (w *worker) deleteCluster(ctx context.Context, chi *chiV1.ClickHouseInstall
 		WithStatusAction(cluster.CHI).
 		M(cluster).F().
 		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
-
-	w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
 
 	// Delete Cluster Service
 	_ = w.c.deleteServiceCluster(ctx, cluster)

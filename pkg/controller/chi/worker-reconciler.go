@@ -28,7 +28,6 @@ import (
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -271,7 +270,7 @@ func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.Ch
 	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
 		version = "not applicable"
 	} else {
-		if ver, e := w.schemer.HostVersion(ctx, host); e == nil {
+		if ver, e := w.ensureClusterSchemer().HostVersion(ctx, host); e == nil {
 			version = ver
 			host.Version = chiV1.NewCHVersion(version)
 		} else {
@@ -378,7 +377,6 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 		w.task.registryFailed.RegisterPDB(pdb.ObjectMeta)
 	}
 
-	w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
 	return nil
 }
 
@@ -527,7 +525,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.migrateTables(ctx, host)
 
-	version, err := w.schemer.HostVersion(ctx, host)
+	version, err := w.ensureClusterSchemer().HostVersion(ctx, host)
 	if err != nil {
 		version = "unknown"
 	}
