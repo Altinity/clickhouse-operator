@@ -30,7 +30,7 @@ kubectl_cmd = (
 
 kubectl_cmd = os.getenv("KUBECTL_CMD") if "KUBECTL_CMD" in os.environ else kubectl_cmd
 
-test_namespace = os.getenv("TEST_NAMESPACE") if "TEST_NAMESPACE" in os.environ else "test"
+test_namespace = os.getenv("TEST_NAMESPACE") if "TEST_NAMESPACE" in os.environ else None
 operator_version = (
     os.getenv("OPERATOR_VERSION")
     if "OPERATOR_VERSION" in os.environ else

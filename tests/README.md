@@ -40,7 +40,9 @@ docker pull registry.gitlab.com/altinity-public/container-images/clickhouse-oper
 COMPOSE_HTTP_TIMEOUT=1800 python3 ./tests/regression.py --only "/regression/e2e.test_operator/*"
 ```
 
-To execute tests natively (not in docker), you need to add `--native` parameter
+To execute tests natively (not in docker), you need to add `--native` parameter.
+
+Tests running in parallel by default, to run it consistently, add `--parallel off` parameter. 
 
 If you need only one certain test, you may execute
 
