@@ -298,7 +298,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 	// Start delete protocol
 
 	// Exclude this CHI from monitoring
-	w.c.deleteWatch(chi.Namespace, chi.Name)
+	w.c.deleteWatch(chi)
 
 	// Delete Service
 	_ = w.c.deleteServiceCHI(ctx, chi)
