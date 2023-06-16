@@ -47,9 +47,9 @@ const (
 	defaultChConfigUserDefaultNetworkIP = "::/0"
 	defaultChConfigUserDefaultPassword  = "default"
 
-	ChSchemeHTTP = "http"
+	ChSchemeHTTP  = "http"
 	ChSchemeHTTPS = "https"
-	ChSchemeAuto = "auto"
+	ChSchemeAuto  = "auto"
 
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
