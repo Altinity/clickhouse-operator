@@ -1625,7 +1625,7 @@ def test_016(self):
 
     with And("system.clusters should have a custom cluster"):
         out = clickhouse.query(chi, sql="select count() from system.clusters where cluster='custom'")
-        assert out == "1"
+        assert out == "1", error()
 
     # test-016-settings-02.yaml
     with When("Update users.d settings"):
@@ -3598,7 +3598,7 @@ def test_041(self):
     cluster = "default"
     manifest = f"manifests/chi/test-041-secure-zookeeper.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-    util.require_keeper(keeper_type=self.context.keeper_type, keeper_manifest="zookeeper-1-node-secure-for-test.yaml")
+    util.require_keeper(keeper_type=self.context.keeper_type, keeper_manifest="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc-secure.yaml")
 
     with Given("chi exists"):
         kubectl.create_and_check(
@@ -3640,10 +3640,10 @@ def test_041(self):
 
     with And("I check connection is secured"):
         with By("checking chop-generated-zookeeper.xml is properly configured"):
-            r = kubectl.launch(f'exec chi-{chi}-default-0-0-0 -- bash -c "cat '
-                               f'/etc/clickhouse-server/conf.d/chop-generated-zookeeper.xml | head -n6 | tail -n1"')
+            r = kubectl.launch(f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
+                               f"""/etc/clickhouse-server/conf.d/chop-generated-zookeeper.xml | grep -c "<secure>1</secure>"'""")
 
-            assert "<secure>1</secure>" in r
+            assert r == "1"
 
     kubectl.delete_chi(chi)
 
