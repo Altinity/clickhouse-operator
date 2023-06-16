@@ -19,12 +19,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	// PortMayBeAssignedLaterOrLeftUnused value means that port
-	// is not assigned yet and is expected to be assigned later.
-	PortMayBeAssignedLaterOrLeftUnused = int32(0)
-)
-
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
