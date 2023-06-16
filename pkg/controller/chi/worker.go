@@ -559,7 +559,7 @@ func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("exclude CHI from monitoring")
-		w.c.deleteWatch(chi.Namespace, chi.Name)
+		w.c.deleteWatch(chi)
 	}
 }
 
@@ -571,7 +571,7 @@ func (w *worker) includeStopped(chi *chiV1.ClickHouseInstallation) {
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("add CHI to monitoring")
-		w.c.updateWatch(chi.Namespace, chi.Name, chopModel.CreateFQDNs(chi, nil, false))
+		w.c.updateWatch(chi)
 	}
 }
 
