@@ -1,0 +1,60 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package v1
+
+const (
+	// PortMayBeAssignedLaterOrLeftUnused value means that port
+	// is not assigned yet and is expected to be assigned later.
+	PortMayBeAssignedLaterOrLeftUnused = int32(0)
+)
+
+func PortUnassigned() int32 {
+	return PortMayBeAssignedLaterOrLeftUnused
+}
+
+func IsPortAssigned(port int32) bool {
+	return port != PortMayBeAssignedLaterOrLeftUnused
+}
+
+func IsPortUnassigned(port int32) bool {
+	return port == PortMayBeAssignedLaterOrLeftUnused
+}
+
+func IsPortInvalid(port int32) bool {
+	return (port <= 0) || (port >= 65535)
+}
+
+// EnsurePortValue ensures port either:
+// - already has own value assigned
+// - or has provided value
+// - or value is fell back to default
+func EnsurePortValue(port int32, value, _default int32) int32 {
+	// Port may already be explicitly specified in podTemplate or by portDistribution
+	if IsPortAssigned(port) {
+		// Port has a value already
+		return port
+	}
+
+	// Port has no explicitly assigned value
+
+	// Let's use provided value real value
+	if IsPortAssigned(value) {
+		// Provided value is a real value, use it
+		return value
+	}
+
+	// Fallback to default value
+	return _default
+}
