@@ -1,5 +1,6 @@
 import e2e.kubectl as kubectl
 import e2e.settings as settings
+from testflows.core import *
 
 
 def query(
@@ -10,7 +11,7 @@ def query(
     port="9000",
     user="",
     pwd="",
-    ns=settings.test_namespace,
+    ns=None,
     timeout=60,
     advanced_params="",
     pod="",
@@ -28,23 +29,23 @@ def query(
 
     if with_error:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns} -c {container}"
+            f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
             f" --"
             f" clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f' --query="{sql}"'
             f" 2>&1",
             timeout=timeout,
-            ns=ns,
+            ns=current().context.test_namespace,
             ok_to_fail=True,
         )
     else:
         return kubectl.launch(
-            f"exec {pod_name} -n {ns} -c {container}"
+            f"exec {pod_name} -n {current().context.test_namespace} -c {container}"
             f" -- "
             f"clickhouse-client -mn -h {host} --port={port} {user_str} {pwd_str} {advanced_params}"
             f'--query="{sql}"',
             timeout=timeout,
-            ns=ns,
+            ns=current().context.test_namespace,
         )
 
 
@@ -55,7 +56,7 @@ def query_with_error(
     port="9000",
     user="",
     pwd="",
-    ns=settings.test_namespace,
+    ns=None,
     timeout=60,
     advanced_params="",
     pod="",
@@ -69,7 +70,7 @@ def query_with_error(
         port=port,
         user=user,
         pwd=pwd,
-        ns=ns,
+        ns=current().context.test_namespace,
         timeout=timeout,
         advanced_params=advanced_params,
         pod=pod,

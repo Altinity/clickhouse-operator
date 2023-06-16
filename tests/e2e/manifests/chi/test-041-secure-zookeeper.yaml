@@ -1,0 +1,208 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-041-secure-zookeeper"
+spec:
+  defaults:
+    templates:
+      podTemplate: default
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.8
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/bash
+                - -x
+                - -c
+                - |
+                  
+                  cat << EOF > /usr/local/share/ca-certificates/my_own_ca.crt &&
+                  -----BEGIN CERTIFICATE-----
+                  MIIDljCCAn6gAwIBAgIUWCSwiZeH4eBrc+WT3cYqX6pUrjYwDQYJKoZIhvcNAQEL
+                  BQAwVDELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+                  GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDENMAsGA1UEAwwEcm9vdDAeFw0yMzA2
+                  MDcxMTE5MTRaFw0zMzA2MDQxMTE5MTRaMFQxCzAJBgNVBAYTAkFVMRMwEQYDVQQI
+                  DApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQx
+                  DTALBgNVBAMMBHJvb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCI
+                  fMKmdtx5BGna7LqGdu0C+xacNb6TjZ10SeEbeznRJ+axHG5UgyVWspN2w6PX4CUH
+                  gHNDBfYbeNyfJ2HQSCprxDhxv9p9s0wfta70S1hEzsuNjgKtk8vm7f6B4SkZx56A
+                  OumnENzGlx0oiGEW7qalez5QPa5veUbFDnmIBk6VLn6ILPXTKBgk22RT0I4fCq73
+                  RKdtJFirPjnnOl16ognN+0I3Okfu05j52wi1HqK8L6bI+Gw02Ke9Zz0UtG0ssdcj
+                  OQPzslTie5ZzpGcytv6WxpBPYKFcCNQrzyE8AUlNnOzxwIEZcE8Nx/SiT6W9NAIJ
+                  PiPiEZcHfxid/0a1B15NAgMBAAGjYDBeMB0GA1UdDgQWBBTiZPq3TeMW9fr4syd0
+                  F34J4x9SBDAfBgNVHSMEGDAWgBTiZPq3TeMW9fr4syd0F34J4x9SBDAPBgNVHRMB
+                  Af8EBTADAQH/MAsGA1UdDwQEAwIBBjANBgkqhkiG9w0BAQsFAAOCAQEAKGuPxfzt
+                  +268pzmxpYDMoMdKcTZ3JduhBBPsQKHV+ShV4EiEQ/0IduHnnjtzFIBBzVyYe8kt
+                  FH/dI3F0umhNIxRtkchr3R26DfNhpBYzlE4Sm6WTeCGsYdYxhWU7deB72KmG2jiU
+                  w4/ZfYp/JCM0TQ/uZpetYmoFwpPfNMqAAyiDiWiL8Fheky2VL7l51FMPe5H49BMY
+                  JG6QmpCooEQ34Fxbc2FifyjcBagfJAUDdnxs9lgEYquY8uaEb0zBF9rtZH3IpJ1o
+                  H+5YdoDBJBlV/EtJsET8wzQr/bJIodUs1qSSreL3QiXgAy9X9HFeEcN0dhReR8M+
+                  /Fa9ElbT45l+4g==
+                  -----END CERTIFICATE-----
+                  EOF
+                  
+                  update-ca-certificates &&
+                  
+                  openssl verify -x509_strict -CAfile /usr/local/share/ca-certificates/my_own_ca.crt /etc/clickhouse-server/config.d/server.crt &&
+                  
+                  cat << EOF > /client.crt &&
+                  -----BEGIN CERTIFICATE-----
+                  MIIDIDCCAggCFCKfcPe/PGW8TtarQJwRTgXRkrEYMA0GCSqGSIb3DQEBCwUAMFQx
+                  CzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRl
+                  cm5ldCBXaWRnaXRzIFB0eSBMdGQxDTALBgNVBAMMBHJvb3QwHhcNMjMwNjA3MTEy
+                  NTE4WhcNMjQwNjA2MTEyNTE4WjBFMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29t
+                  ZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjAN
+                  BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwR4Orl3cP8N0SI/UaDzgnLH102Zf
+                  H0MRAM6WTxcD0mXU3FAjh3wgzXvx8SjIBOnerscrPv90Hfoa2AB94PDc723hWUOb
+                  J0rIPni/y7+dGQDIswLK+duRsU953ASHogu5TvQMdAR/yR4WV+83ve2TMbdw/hyx
+                  PSg7+U/Z3FRuirKAF3i3OT/+zottEcSFnOo8+oqOGTOzX+YHitwk1iKns6fHSK2n
+                  MJs4FE5S02g0CO60WGGSK1wiB6cvzzMa8AMbB9maug+Sew1VZhXgL04d7v08PrIt
+                  xqOVknWXJJ+yoDSlVpUprCUC3wIrZPenWkIWz/TmgLnrSqHTjRoWXETuuQIDAQAB
+                  MA0GCSqGSIb3DQEBCwUAA4IBAQBv/r2z88huc3ghDgswaecM7hqDBZYzfB+Uxf3Z
+                  fQZg5gqfBCZ4OgUcgYzoWP/vLa/9sal4fwweTGGCBc+nFmv/mMptRd6FT7xPiKCw
+                  P6BRMMP8jknOpj6KpSnLJWkmfsScvdugAn+DyZMb96IHWD6i7fvPJlOM1dOjoFEb
+                  M1tUH2JGd56JuTHYCxpS5zfUTcFgsAn5gOHQvc7Iq6OvZVjLeeP2zeksb135k1wd
+                  pUxmLNXOa99jRRVJL05tdGrPbb4DpZPyK9n8KRPnSXHpOwzU3/2JDhyswQj1KbhH
+                  U6T8Pt3rU1lBqAWIVAxtH4DoTvLtwWc9pr9AJBSfRQmvseSB
+                  -----END CERTIFICATE-----
+                  EOF
+                  
+                  cat << EOF > /client.key &&
+                  -----BEGIN PRIVATE KEY-----
+                  MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDBHg6uXdw/w3RI
+                  j9RoPOCcsfXTZl8fQxEAzpZPFwPSZdTcUCOHfCDNe/HxKMgE6d6uxys+/3Qd+hrY
+                  AH3g8NzvbeFZQ5snSsg+eL/Lv50ZAMizAsr525GxT3ncBIeiC7lO9Ax0BH/JHhZX
+                  7ze97ZMxt3D+HLE9KDv5T9ncVG6KsoAXeLc5P/7Oi20RxIWc6jz6io4ZM7Nf5geK
+                  3CTWIqezp8dIracwmzgUTlLTaDQI7rRYYZIrXCIHpy/PMxrwAxsH2Zq6D5J7DVVm
+                  FeAvTh3u/Tw+si3Go5WSdZckn7KgNKVWlSmsJQLfAitk96daQhbP9OaAuetKodON
+                  GhZcRO65AgMBAAECggEADbHbeasHTPBH5UNp3TB//yyxkZm/YiCn6oY764TmzPtS
+                  soLuWhPH4bqJ6D+rm4mYNI3EN9X2vo93atzyEEsUZ9hDdEiSjqFDfQakF0dR1S2U
+                  jflDOp/C/69ypVMe6TNqozo0Td/pzfHXxMmeitX3q71mAmc3fG5HfoEWooTMSAKL
+                  7sNxH3watvJaSKmPcSgK60dJQPZ2Lj+H4+gyNLCSK1dVgB8ASCqXRunCBtc4HkAf
+                  CGVQNbwxNqTvdFmHlBmiIyN8uVKXvxGhP/wY2Ozu1zpPTXl8UxFOWJl/S3MEzMp7
+                  +pGGRoyFygUlCzTAbEUM/hOXLbosh2MQGgxQGvoFWQKBgQDP+7PUvVTmZRvtRdEY
+                  B3v92P6Rdg9Qv/bvqpjae2KGuWK886I77cO6/ncLwW0RlG+ot2/huV7fABtY/Fkk
+                  XtxmzjQbB6E4+eou8+xwLPZh7RT86O+E4B7d1TQvWBH5A18lt77+Fj/TXs92lucZ
+                  SEZ84KlVw7t6SHEtCxkERutM/QKBgQDts8BDkpKXyhNcC/djaK0ewHqGDnzeab9w
+                  Qr9G4/m56+SLAmthK+8fXFiBrGvWYvdxLIiqvdEkk87QqogAxx8Iym0g6LLCZt6N
+                  xqsO10CHljX+9FRdypV+0NikiApISgAeQfdBpHLJSozt6DaHIOlv2BKtgHckfpAx
+                  cxTPQFXzbQKBgBclzmf5An/59Ne9k333J0ejZQHPf/jexJ77/7MhVF/mNiUNgJrm
+                  5YfkVl+KkZcJTDwc3mji9rofCuwmec1geWs/u/DeMoVi2zuKjmAVwP45IsLbMf05
+                  7HWICxzR0n5Cb86E2s7wrv3ZaYGrXeEkeCPh5TbUaAM+GMqIl6owMnQJAoGAIpcy
+                  1mKBBKe6c32mTYgREVWPPuzizPb0jeCYtzc7wwuJ4ZTDjYt4K8cjdhNiSfty6LxD
+                  Ux12Tu1XflQioIJZiMz0XoKeaN3Ray5K/EjkshZw2x4xHMj7Qk4gCKlnXaevJrgQ
+                  xDOrJJG9um09aiKm9ciqxybXr67fSuLlV1eUam0CgYAvfKK7d5eqspeYLIhSdAnD
+                  9RGTDb6k/LTHIdqNG5pRbmVu/MY8t8POeRPyxU6FK462azol4Vkk4KxOrfkCoBfc
+                  /kbPwDOctv5avxVvzJ+6lmZB6+6DUFmxLQJGhm3j+FogCx+dATF8RS/LhZSkP2ox
+                  ciPq4SysQPk8R3R/kQ5RvQ==
+                  -----END PRIVATE KEY-----
+                  EOF
+                  
+                  openssl verify -x509_strict -CAfile /usr/local/share/ca-certificates/my_own_ca.crt /client.crt &&
+                  
+                  /entrypoint.sh
+
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2281
+          secure: "1"
+    clusters:
+      - name: "default"
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+    settings:
+      tcp_port: 9000 # keep for localhost
+      tcp_port_secure: 9440
+      interserver_http_port: _removed_
+      interserver_https_port: 9009
+      https_port: 8443
+    files:
+      settings.xml: |
+        <?xml version="1.0" encoding="utf-8"?>
+        <yandex>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/config.d/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/config.d/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/config.d/dhparam.pem</dhParamsFile>
+              <verificationMode>none</verificationMode>
+              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+            <client>
+                <certificateFile>/etc/clickhouse-server/config.d/server.crt</certificateFile>
+                <privateKeyFile>/etc/clickhouse-server/config.d/server.key</privateKeyFile>
+                <loadDefaultCAFile>true</loadDefaultCAFile>
+                <cacheSessions>false</cacheSessions>
+                <disableProtocols>sslv2,sslv3</disableProtocols>
+                <preferServerCiphers>true</preferServerCiphers>
+                <verificationMode>strict</verificationMode>
+                <invalidCertificateHandler>
+                    <name>RejectCertificateHandler</name>
+                </invalidCertificateHandler>
+            </client>
+          </openSSL>
+        </yandex>
+      server.crt: |
+        -----BEGIN CERTIFICATE-----
+        MIIDNTCCAh0CFH/MwjgGWFFMEdjjVFvdgj9FAPAFMA0GCSqGSIb3DQEBCwUAMFQx
+        CzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRl
+        cm5ldCBXaWRnaXRzIFB0eSBMdGQxDTALBgNVBAMMBHJvb3QwHhcNMjMwNjA3MTEx
+        OTQ2WhcNMjQwNjA2MTExOTQ2WjBaMQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29t
+        ZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMRMwEQYD
+        VQQDDApjbGlja2hvdXNlMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA
+        wih1QXFQ1jlRr8gdD+uXg8AG2TYSJpsbV6JBRU9fAYXyZSIVKKW3btRMxVZhlAF8
+        hlGWcL78FNH4eMfQJZMz87ysm7MThULAdCcBhH4ReH3GT8N/Ro9LQuRlRUDEwfat
+        bbpq4LZCNr4nyq7x7IbtW4xbwQ1r33v8XcJXza/qsaJkOfOGe5yn5GVH29Axidku
+        hE+wkCFwm15Vo+f7SAa2rrQmVM1HQuxmvs8dbF6EHLG913aZuzkNw6hiWPSUz5QB
+        peC936a0O5eDtxgz8oauJFbiglG8mBLhShBkF5LYnsfkA7ySrF+2vCLxKp9tXQNO
+        FMzyz9LPJyyfmzhPL0iMjwIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQAIcG8wkfo5
+        Cdc8rSwObXNzmptHkl3fCecMgxLBaCQwwcsAOmVW2gsZdUe16YicF9mcDxLL/rtX
+        JNcw5KHKzsGo9X41yFHdRdrtSRZhhHpnRz4WMysIBqt942Tn2P+b14q9LyKd4TAy
+        gMxiJnlhN6YPRwjZwm2dOqJb6VBnAOV/jYe3F7lq9za7NatqMINUadhleiQiAdQQ
+        N9H7kwRnU2C9DqkYheUqTDtk94UB7U2P8QbEUwvVdH60RsfNwyGFhtdYdhcYwxJ2
+        L/N584I4iQ5dxK4p1Usj2cIer4o+akpolSZx+vymMqxm6JTyA0uX1Rio5fMC6o/V
+        52UeNBDoFDlO
+        -----END CERTIFICATE-----
+      server.key: |
+        -----BEGIN PRIVATE KEY-----
+        MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDCKHVBcVDWOVGv
+        yB0P65eDwAbZNhImmxtXokFFT18BhfJlIhUopbdu1EzFVmGUAXyGUZZwvvwU0fh4
+        x9AlkzPzvKybsxOFQsB0JwGEfhF4fcZPw39Gj0tC5GVFQMTB9q1tumrgtkI2vifK
+        rvHshu1bjFvBDWvfe/xdwlfNr+qxomQ584Z7nKfkZUfb0DGJ2S6ET7CQIXCbXlWj
+        5/tIBrautCZUzUdC7Ga+zx1sXoQcsb3Xdpm7OQ3DqGJY9JTPlAGl4L3fprQ7l4O3
+        GDPyhq4kVuKCUbyYEuFKEGQXktiex+QDvJKsX7a8IvEqn21dA04UzPLP0s8nLJ+b
+        OE8vSIyPAgMBAAECggEAKcbV0BKHT8j+lCGtay8Ip38qmhNB3Y+zVuxhOf4llajS
+        KsOmJNxfd1fz+uQm09dsCWTFx5W4nOw/GBH6bhNZ8uCOjWP/V8Wwrm10LKOJs9Dw
+        WlpY6QBNM+P8DGYu0AN5dqpNc/OTlL7exgRVpsyzhubRGV1/cBN4Dl6SUP5AtB66
+        I76X4xxFl1ecYGsC10oV+txvJzPNq1AKUiMz35rf0WJB13tNkG3Wt5rK190arxKF
+        YuYYqetS9NK3N9hwN/ekrUkdrkxSuHjHRcO7lfm2piOp4kEI8FxnLufoWnsfcHgH
+        zuVIMTke3/H5gKKE9zJPrZCh+BIb1R8G/Z3tTa96MQKBgQD2GX2OOvQKr+WBjl7L
+        gEwCb6PxzI3gi1XGNFT1A8oB9V3ft2e1garGq87f5Gtq/Fx3yVFOtAX8MtKgkO+S
+        RpcPYiprdAdiW1EBdd62HXeQJOc+epafF82hNWz7gzxlojRKpp2na1AC39uUUv1s
+        4qFAWvZ0IYacuviykXUBlik1/wKBgQDJ+AlXoWh0Lw7svkgjgZQezU8F2ln9Rovg
+        IvtUIgoVq9aMcLLgs+7ZWfcSz8b5R+Mcw+VOzcvkXlPBNVc4NZvbCaHFqgboIdbG
+        ZTlbq+qbZl+L9ZixCpJAB5V4dQyuct6EGPpM8PW0Qjd85DHvTzd1EgQIpfaoF+XT
+        MXMCTU5JcQKBgEqukZuH6GcV2d/nBH1dAbP7jRTjrmpl3jG3z9BKxhKyEzrAvYgn
+        QVvo526qMq7UxnrTbQklOGvAQIrZcNpC8bSJZbYWD+eZLovy6RL6/j2P9VzQdsTw
+        xEYXoGry+HEfOB8vUMhtmGpG5KuuQ5m3bJfLAt9bDS6izrXhzlAc8YShAoGALlyl
+        qFwA4kq7HlU/sgbYvYlbjnhlF+LN0RG2p8V4kyjzAyILrdEgDvy73rGbdzWtSLkf
+        Nku/dhjBGSTpdJm5wTogzIMPOtIpvzkVRZndLPb/D928w0ct80zKXvBfjNwJgEFL
+        k8XsYQiiPCUV4V1J2bHdAy81w7hYpXZAdFLSmcECgYEAuB59xRlwRvdyxaf9FcBJ
+        P5oibgSr/mN6NJmOdj/qj1DO85aF5RH1zhmU8JUGh876WhRaFAU59wQgesSxjQKU
+        FBLOebx9UlK1rDhilvi2Ikdz3TId19ky+okUSYG+494lHPJ3yjbrvkaaxzZQ6LkU
+        0mNumy71LG8NjLQnKIxXbM8=
+        -----END PRIVATE KEY-----
+      dhparam.pem: |
+        -----BEGIN DH PARAMETERS-----
+        MEYCQQC1JnfnoI5MEPmmEu384Wkj47hagc/VakF19qOjF3GF6GrAVnLK5NpMmYKB
+        CDT4aZsVmVfQpQ/tQn4i9jqpJxi/AgEC
+        -----END DH PARAMETERS-----

@@ -58,6 +58,7 @@ def regression(self, native, keeper_type):
 
     self.context.native = native
     self.context.keeper_type = keeper_type
+
     if native:
         run_features()
     else:

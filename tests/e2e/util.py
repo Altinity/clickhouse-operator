@@ -21,26 +21,32 @@ def get_full_path(test_file, lookup_in_host=True):
         return os.path.abspath(f"/home/master/clickhouse-operator/tests/e2e/{test_file}")
 
 
-def set_operator_version(version, ns=settings.operator_namespace, timeout=600):
-    if settings.operator_install != "yes":
+def set_operator_version(version, ns=None, timeout=600, shell=None):
+    if ns is None:
+        ns = current().context.operator_namespace
+    if current().context.operator_install != "yes":
         return
-    operator_image = f"{settings.operator_docker_repo}:{version}"
-    metrics_exporter_image = f"{settings.metrics_exporter_docker_repo}:{version}"
+    operator_image = f"{current().context.operator_docker_repo}:{version}"
+    metrics_exporter_image = f"{current().context.metrics_exporter_docker_repo}:{version}"
 
     kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator={operator_image}",
         ns=ns,
+        shell=shell
     )
     kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator metrics-exporter={metrics_exporter_image}",
         ns=ns,
+        shell=shell
     )
-    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
-    if kubectl.get_count("pod", ns=ns, label=operator_label) == 0:
+    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout, shell=shell)
+    if kubectl.get_count("pod", ns=ns, label=operator_label, shell=shell) == 0:
         fail("invalid clickhouse-operator pod count")
 
 
-def set_metrics_exporter_version(version, ns=settings.operator_namespace):
+def set_metrics_exporter_version(version, ns=None):
+    if ns is None:
+        ns = current().context.operator_namespace
     kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator metrics-exporter=altinity/metrics-exporter:{version}",
         ns=ns,
@@ -48,18 +54,20 @@ def set_metrics_exporter_version(version, ns=settings.operator_namespace):
     kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
 
 
-def restart_operator(ns=settings.operator_namespace, timeout=600):
-    if settings.operator_install != "yes":
+def restart_operator(ns=None, timeout=600, shell=None):
+    if ns is None:
+        ns = current().context.operator_namespace
+    if current().context.operator_install != "yes":
         return
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     old_pod_name = pod["metadata"]["name"]
     old_pod_ip = pod["status"]["podIP"]
-    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout)
-    kubectl.wait_object("pod", name="", ns=ns, label=operator_label)
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout, shell=shell)
+    kubectl.wait_object("pod", name="", ns=ns, label=operator_label, shell=shell)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_name = pod["metadata"]["name"]
-    kubectl.wait_pod_status(new_pod_name, "Running", ns=ns)
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    kubectl.wait_pod_status(new_pod_name, "Running", ns=ns, shell=shell)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_ip = pod["status"]["podIP"]
     print(f"old operator pod: {old_pod_name} ip: {old_pod_ip}")
     print(f"new operator pod: {new_pod_name} ip: {new_pod_ip}")
@@ -122,7 +130,7 @@ def wait_clickhouse_cluster_ready(chi):
                     pod=pod,
                 )
                 for host in chi["status"]["fqdns"]:
-                    svc_short_name = host.replace(f".{settings.test_namespace}.svc.cluster.local", "")
+                    svc_short_name = host.replace(f".{current().context.test_namespace}.svc.cluster.local", "")
                     if svc_short_name not in cluster_response:
                         with Then("Not ready, sleep 5 seconds"):
                             all_pods_ready = False
@@ -150,8 +158,8 @@ def install_clickhouse_and_keeper(
 
     with Given("install zookeeper/clickhouse-keeper + clickhouse"):
         if clean_ns:
-            kubectl.delete_all_chi(settings.test_namespace)
-            kubectl.delete_all_keeper(settings.test_namespace)
+            kubectl.delete_all_chi(current().context.test_namespace)
+            kubectl.delete_all_keeper(current().context.test_namespace)
 
         # when create clickhouse, need install ZK before CH
         if keeper_install_first:
@@ -184,10 +192,10 @@ def install_clickhouse_and_keeper(
         clickhouse_operator_spec = kubectl.get(
             "pod",
             name="",
-            ns=settings.operator_namespace,
+            ns=current().context.operator_namespace,
             label="-l app=clickhouse-operator",
         )
-        chi = kubectl.get("chi", ns=settings.test_namespace, name=chi_name)
+        chi = kubectl.get("chi", ns=current().context.test_namespace, name=chi_name)
 
         # when re-scale clickhouse, need install Keeper after CH to follow ACM logic
         if not keeper_install_first:
@@ -200,7 +208,9 @@ def install_clickhouse_and_keeper(
         return clickhouse_operator_spec, chi
 
 
-def clean_namespace(delete_chi=False, delete_keeper=False, namespace=settings.test_namespace):
+def clean_namespace(delete_chi=False, delete_keeper=False, namespace=None):
+    if namespace is None:
+        namespace = current().context.test_namespace
     with Given(f"Clean namespace {namespace}"):
         if delete_keeper:
             kubectl.delete_all_keeper(namespace)
@@ -209,6 +219,14 @@ def clean_namespace(delete_chi=False, delete_keeper=False, namespace=settings.te
         kubectl.delete_ns(namespace, ok_to_fail=True)
         kubectl.create_ns(namespace)
 
+def delete_namespace(namespace, delete_chi=False):
+    if delete_chi:
+        kubectl.delete_all_chi(namespace)
+    kubectl.delete_ns(namespace, ok_to_fail=True)
+
+
+def create_namespace(namespace):
+    kubectl.create_ns(namespace)
 
 def make_http_get_request(host, port, path):
     # thanks to https://github.com/falzm/burl
@@ -226,54 +244,62 @@ def make_http_get_request(host, port, path):
 
 def install_operator_if_not_exist(
     reinstall=False,
-    manifest=get_full_path(settings.clickhouse_operator_install_manifest),
+    manifest=None,
+    shell=None,
 ):
-    if settings.operator_install != "yes":
+    if manifest is None:
+        manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
+
+    if current().context.operator_install != "yes":
         return
-    with Given(f"clickhouse-operator version {settings.operator_version} is installed"):
+
+    with Given(f"clickhouse-operator version {current().context.operator_version} is installed"):
         if (
             kubectl.get_count(
                 "pod",
-                ns=settings.operator_namespace,
+                ns=current().context.operator_namespace,
                 label="-l app=clickhouse-operator",
+                shell=shell
             )
             == 0
             or reinstall
         ):
             kubectl.apply(
-                ns=settings.operator_namespace,
+                ns=current().context.operator_namespace,
                 manifest=f"cat {manifest} | "
-                f'OPERATOR_NAMESPACE="{settings.operator_namespace}" '
-                f'OPERATOR_IMAGE="{settings.operator_docker_repo}:{settings.operator_version}" '
-                f'OPERATOR_IMAGE_PULL_POLICY="{settings.image_pull_policy}" '
-                f'METRICS_EXPORTER_NAMESPACE="{settings.operator_namespace}" '
-                f'METRICS_EXPORTER_IMAGE="{settings.metrics_exporter_docker_repo}:{settings.operator_version}" '
-                f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{settings.image_pull_policy}" '
+                f'OPERATOR_NAMESPACE="{current().context.operator_namespace}" '
+                f'OPERATOR_IMAGE="{current().context.operator_docker_repo}:{current().context.operator_version}" '
+                f'OPERATOR_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
+                f'METRICS_EXPORTER_NAMESPACE="{current().context.operator_namespace}" '
+                f'METRICS_EXPORTER_IMAGE="{current().context.metrics_exporter_docker_repo}:{current().context.operator_version}" '
+                f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
                 f"envsubst",
                 validate=False,
+                shell=shell
             )
-        set_operator_version(settings.operator_version)
+        set_operator_version(current().context.operator_version, shell=shell)
 
 
-def install_operator_version(version):
-    if version == settings.operator_version:
-        manifest = get_full_path(settings.clickhouse_operator_install_manifest)
+def install_operator_version(version, shell=None):
+    if version == current().context.operator_version:
+        manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
         manifest = f"cat {manifest}"
     else:
         manifest = f"https://github.com/Altinity/clickhouse-operator/raw/{version}/deploy/operator/clickhouse-operator-install-template.yaml"
         manifest = f"curl -sL {manifest}"
 
     kubectl.apply(
-        ns=settings.operator_namespace,
+        ns=current().context.operator_namespace,
         manifest=f"{manifest} | "
-        f'OPERATOR_NAMESPACE="{settings.operator_namespace}" '
-        f'OPERATOR_IMAGE="{settings.operator_docker_repo}:{version}" '
-        f'OPERATOR_IMAGE_PULL_POLICY="{settings.image_pull_policy}" '
-        f'METRICS_EXPORTER_NAMESPACE="{settings.operator_namespace}" '
-        f'METRICS_EXPORTER_IMAGE="{settings.metrics_exporter_docker_repo}:{version}" '
-        f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{settings.image_pull_policy}" '
+        f'OPERATOR_NAMESPACE="{current().context.operator_namespace}" '
+        f'OPERATOR_IMAGE="{current().context.operator_docker_repo}:{version}" '
+        f'OPERATOR_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
+        f'METRICS_EXPORTER_NAMESPACE="{current().context.operator_namespace}" '
+        f'METRICS_EXPORTER_IMAGE="{current().context.metrics_exporter_docker_repo}:{version}" '
+        f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
         f"envsubst",
         validate=False,
+        shell=shell
     )
 
 
