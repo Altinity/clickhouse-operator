@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	kube "k8s.io/client-go/kubernetes"
 	"net/http"
 	"sync"
 	"time"
@@ -26,6 +28,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopAPI "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -45,17 +48,6 @@ type Exporter struct {
 // Type compatibility
 var _ prometheus.Collector = &Exporter{}
 
-type chInstallationsIndex map[string]*WatchedCHI
-
-// Slice
-func (i chInstallationsIndex) Slice() []*WatchedCHI {
-	res := make([]*WatchedCHI, 0)
-	for _, chi := range i {
-		res = append(res, chi)
-	}
-	return res
-}
-
 // NewExporter returns a new instance of Exporter type
 func NewExporter(collectorTimeout time.Duration) *Exporter {
 	return &Exporter{
@@ -66,7 +58,7 @@ func NewExporter(collectorTimeout time.Duration) *Exporter {
 
 // getWatchedCHIs
 func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
-	return e.chInstallations.Slice()
+	return e.chInstallations.slice()
 }
 
 // Collect implements prometheus.Collector Collect method
@@ -90,26 +82,15 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	defer cancel()
 
 	var wg = sync.WaitGroup{}
-	e.walkWatchedChi(func(chi *WatchedCHI, hostname string) {
+	e.chInstallations.walk(func(chi *WatchedCHI, _ *WatchedCluster, host *WatchedHost) {
 		wg.Add(1)
-		go func(chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
+		go func(c *WatchedCHI, h *WatchedHost, _chan chan<- prometheus.Metric) {
 			defer wg.Done()
-			e.collectFromHost(ctx, chi, hostname, c)
-		}(chi, hostname, ch)
+			e.collectFromHost(ctx, c, h, _chan)
+		}(chi, host, ch)
 	})
 	wg.Wait()
 	log.V(2).Info("Completed Collect")
-}
-
-// walkWatchedChi walks over watched CHI objects
-func (e *Exporter) walkWatchedChi(f func(chi *WatchedCHI, hostname string)) {
-	// Loop over ClickHouseInstallations
-	for _, chi := range e.chInstallations {
-		// Loop over all hostnames of this installation
-		for _, hostname := range chi.Hostnames {
-			f(chi, hostname)
-		}
-	}
 }
 
 // Describe implements prometheus.Collector Describe method
@@ -142,126 +123,113 @@ func (e *Exporter) cleanup() {
 func (e *Exporter) removeFromWatched(chi *WatchedCHI) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-	_, ok := e.chInstallations[chi.indexKey()]
-	if ok {
-		// CHI is known
-		delete(e.chInstallations, chi.indexKey())
-	}
+	log.V(1).Infof("Remove ClickHouseInstallation (%s/%s)", chi.Namespace, chi.Name)
+	e.chInstallations.remove(chi.indexKey())
 }
 
 // updateWatched updates Exporter.chInstallation map with values from chInstances slice
 func (e *Exporter) updateWatched(chi *WatchedCHI) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
-
-	knownChi, ok := e.chInstallations[chi.indexKey()]
-	if ok {
-		// CHI is known
-		if chi.equal(knownChi) {
-			// Already watched
-			return
-		}
-	}
-
-	// CHI is not watched
-	log.V(1).Infof(
-		"Added ClickHouseInstallation (%s/%s): including hostnames into Exporter",
-		chi.Namespace,
-		chi.Name,
-	)
-
-	e.chInstallations[chi.indexKey()] = chi
+	log.V(1).Infof("Update ClickHouseInstallation (%s/%s): %s", chi.Namespace, chi.Name, chi)
+	e.chInstallations.set(chi.indexKey(), chi)
 }
 
 // newFetcher returns new Metrics Fetcher for specified host
-func (e *Exporter) newHostFetcher(hostname string) *ClickHouseMetricsFetcher {
-	return NewClickHouseFetcher(
-		clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()).
-			NewEndpointConnectionParams(hostname),
-	)
-}
-
-// updateWatch ensures hostnames of the Pods from CHI object included into metrics.Exporter state
-func (e *Exporter) updateWatch(namespace, chiName string, hostnames []string) {
-	chi := &WatchedCHI{
-		Namespace: namespace,
-		Name:      chiName,
-		Hostnames: hostnames,
+func (e *Exporter) newHostFetcher(host *WatchedHost) *ClickHouseMetricsFetcher {
+	// Make base cluster connection params
+	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
+	// Adjust base cluster connection params with per-host props
+	switch clusterConnectionParams.Scheme {
+	case chiv1.ChSchemeAuto:
+		switch {
+		case chiv1.IsPortAssigned(host.HTTPPort):
+			clusterConnectionParams.Scheme = "http"
+			clusterConnectionParams.Port = int(host.HTTPPort)
+		case chiv1.IsPortAssigned(host.HTTPSPort):
+			clusterConnectionParams.Scheme = "https"
+			clusterConnectionParams.Port = int(host.HTTPSPort)
+		}
+	case chiv1.ChSchemeHTTP:
+		clusterConnectionParams.Port = int(host.HTTPPort)
+	case chiv1.ChSchemeHTTPS:
+		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
-	e.updateWatched(chi)
+
+	return NewClickHouseFetcher(clusterConnectionParams.NewEndpointConnectionParams(host.Hostname))
 }
 
 // collectFromHost collects metrics from one host and writes them into chan
-func (e *Exporter) collectFromHost(ctx context.Context, chi *WatchedCHI, hostname string, c chan<- prometheus.Metric) {
-	fetcher := e.newHostFetcher(hostname)
-	writer := NewPrometheusWriter(c, chi, hostname)
+func (e *Exporter) collectFromHost(ctx context.Context, chi *WatchedCHI, host *WatchedHost, c chan<- prometheus.Metric) {
+	fetcher := e.newHostFetcher(host)
+	writer := NewPrometheusWriter(c, chi.Namespace, chi.Name, host.Hostname)
 
-	log.V(2).Infof("Querying metrics for %s\n", hostname)
+	log.V(2).Infof("Querying metrics for %s\n", host.Hostname)
 	if metrics, err := fetcher.getClickHouseQueryMetrics(ctx); err == nil {
-		log.V(2).Infof("Extracted %d metrics for %s\n", len(metrics), hostname)
+		log.V(2).Infof("Extracted %d metrics for %s\n", len(metrics), host.Hostname)
 		writer.WriteMetrics(metrics)
 		writer.WriteOKFetch("system.metrics")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.metrics for host %s err: %s\n", hostname, err)
+		log.Warningf("Error querying system.metrics for host %s err: %s\n", host.Hostname, err)
 		writer.WriteErrorFetch("system.metrics")
 	}
 
-	log.V(2).Infof("Querying table sizes for %s\n", hostname)
+	log.V(2).Infof("Querying table sizes for %s\n", host.Hostname)
 	if systemPartsData, err := fetcher.getClickHouseSystemParts(ctx); err == nil {
-		log.V(2).Infof("Extracted %d table sizes for %s\n", len(systemPartsData), hostname)
+		log.V(2).Infof("Extracted %d table sizes for %s\n", len(systemPartsData), host.Hostname)
 		writer.WriteTableSizes(systemPartsData)
 		writer.WriteOKFetch("table sizes")
 		writer.WriteSystemParts(systemPartsData)
 		writer.WriteOKFetch("system parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.parts for host %s err: %s\n", hostname, err)
+		log.Warningf("Error querying system.parts for host %s err: %s\n", host.Hostname, err)
 		writer.WriteErrorFetch("table sizes")
 		writer.WriteErrorFetch("system parts")
 	}
 
-	log.V(2).Infof("Querying system replicas for %s\n", hostname)
+	log.V(2).Infof("Querying system replicas for %s\n", host.Hostname)
 	if systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(ctx); err == nil {
-		log.V(2).Infof("Extracted %d system replicas for %s\n", len(systemReplicas), hostname)
+		log.V(2).Infof("Extracted %d system replicas for %s\n", len(systemReplicas), host.Hostname)
 		writer.WriteSystemReplicas(systemReplicas)
 		writer.WriteOKFetch("system.replicas")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.replicas for host %s err: %s\n", hostname, err)
+		log.Warningf("Error querying system.replicas for host %s err: %s\n", host.Hostname, err)
 		writer.WriteErrorFetch("system.replicas")
 	}
 
-	log.V(2).Infof("Querying mutations for %s\n", hostname)
+	log.V(2).Infof("Querying mutations for %s\n", host.Hostname)
 	if mutations, err := fetcher.getClickHouseQueryMutations(ctx); err == nil {
-		log.V(2).Infof("Extracted %d mutations for %s\n", len(mutations), hostname)
+		log.V(2).Infof("Extracted %d mutations for %s\n", len(mutations), host.Hostname)
 		writer.WriteMutations(mutations)
 		writer.WriteOKFetch("system.mutations")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.mutations for host %s err: %s\n", hostname, err)
+		log.Warningf("Error querying system.mutations for host %s err: %s\n", host.Hostname, err)
 		writer.WriteErrorFetch("system.mutations")
 	}
 
-	log.V(2).Infof("Querying disks for %s\n", hostname)
+	log.V(2).Infof("Querying disks for %s\n", host.Hostname)
 	if disks, err := fetcher.getClickHouseQuerySystemDisks(ctx); err == nil {
-		log.V(2).Infof("Extracted %d disks for %s\n", len(disks), hostname)
+		log.V(2).Infof("Extracted %d disks for %s\n", len(disks), host.Hostname)
 		writer.WriteSystemDisks(disks)
 		writer.WriteOKFetch("system.disks")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.disks for host %s err: %s\n", hostname, err)
+		log.Warningf("Error querying system.disks for host %s err: %s\n", host.Hostname, err)
 		writer.WriteErrorFetch("system.disks")
 	}
 
-	log.V(2).Infof("Querying detached parts for %s\n", hostname)
+	log.V(2).Infof("Querying detached parts for %s\n", host.Hostname)
 	if detachedParts, err := fetcher.getClickHouseQueryDetachedParts(ctx); err == nil {
-		log.V(2).Infof("Extracted %d detached parts info for %s\n", len(detachedParts), hostname)
+		log.V(2).Infof("Extracted %d detached parts info for %s\n", len(detachedParts), host.Hostname)
 		writer.WriteDetachedParts(detachedParts)
 		writer.WriteOKFetch("system.detached_parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.detached_parts for host %s err: %s\n", hostname, err)
+		log.Warningf("Error querying system.detached_parts for host %s err: %s\n", host.Hostname, err)
 		writer.WriteErrorFetch("system.detached_parts")
 	}
 }
@@ -272,7 +240,7 @@ func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(e.getWatchedCHIs())
 }
 
-// fetchCHI decodes chi from request
+// fetchCHI decodes chi from the request
 func (e *Exporter) fetchCHI(r *http.Request) (*WatchedCHI, error) {
 	chi := &WatchedCHI{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
@@ -305,7 +273,7 @@ func (e *Exporter) deleteWatchedCHI(w http.ResponseWriter, r *http.Request) {
 }
 
 // DiscoveryWatchedCHIs discovers all ClickHouseInstallation objects available for monitoring and adds them to watched list
-func (e *Exporter) DiscoveryWatchedCHIs(chopClient *chopAPI.Clientset) {
+func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *chopAPI.Clientset) {
 	// Get all CHI objects from watched namespace(s)
 	watchedNamespace := chop.Config().GetInformerNamespace()
 	list, err := chopClient.ClickhouseV1().ClickHouseInstallations(watchedNamespace).List(context.TODO(), v1.ListOptions{})
@@ -321,15 +289,18 @@ func (e *Exporter) DiscoveryWatchedCHIs(chopClient *chopAPI.Clientset) {
 	for i := range list.Items {
 		chi := &list.Items[i]
 		if chi.IsStopped() {
-			log.V(1).Infof("Skip stopped CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.GetFQDNs()))
+			log.V(1).Infof("Skip stopped CHI %s/%s\n", chi.Namespace, chi.Name)
 		} else {
-			log.V(1).Infof("Add explicitly found CHI %s/%s with %d hosts\n", chi.Namespace, chi.Name, len(chi.Status.GetFQDNs()))
-			watchedCHI := &WatchedCHI{
-				Namespace: chi.Namespace,
-				Name:      chi.Name,
-				Hostnames: chi.Status.GetFQDNs(),
+			log.V(1).Infof("Add explicitly found CHI %s/%s", chi.Namespace, chi.Name)
+			if chi.Status.NormalizedCHICompleted == nil {
+				log.V(1).Infof("Explicitly found CHI %s/%s is not completed yet, skip it\n", chi.Namespace, chi.Name)
+			} else {
+				log.V(1).Infof("Explicitly found CHI %s/%s is completed, adding it\n", chi.Namespace, chi.Name)
+				normalizer := chopModel.NewNormalizer(kubeClient)
+				normalized, _ := normalizer.CreateTemplatedCHI(chi, chopModel.NewNormalizerOptions())
+				watchedCHI := NewWatchedCHI(normalized)
+				e.updateWatched(watchedCHI)
 			}
-			e.updateWatched(watchedCHI)
 		}
 	}
 }
