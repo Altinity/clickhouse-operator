@@ -47,11 +47,15 @@ const (
 	defaultChConfigUserDefaultNetworkIP = "::/0"
 	defaultChConfigUserDefaultPassword  = "default"
 
+	ChSchemeHTTP = "http"
+	ChSchemeHTTPS = "https"
+	ChSchemeAuto = "auto"
+
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	defaultChScheme   = "http"
+	defaultChScheme   = ChSchemeHTTP
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
@@ -719,7 +723,14 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	if c.ClickHouse.Access.Scheme == "" {
+	switch strings.ToLower(c.ClickHouse.Access.Scheme) {
+	case ChSchemeHTTP:
+		c.ClickHouse.Access.Scheme = ChSchemeHTTP
+	case ChSchemeHTTPS:
+		c.ClickHouse.Access.Scheme = ChSchemeHTTPS
+	case ChSchemeAuto:
+		c.ClickHouse.Access.Scheme = ChSchemeAuto
+	default:
 		c.ClickHouse.Access.Scheme = defaultChScheme
 	}
 	if c.ClickHouse.Access.Username == "" {
