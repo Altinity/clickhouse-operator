@@ -198,6 +198,5 @@ func createFunction(cluster string) string {
 		`,
 		cluster,
 		ignoredDBs,
-		createTableDBEngines,
 	)
 }
