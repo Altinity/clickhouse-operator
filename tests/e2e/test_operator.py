@@ -1242,7 +1242,7 @@ def test_014(self):
         "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
-        "CREATE FUNCTION IF NOT EXISTS test_014 AS (x, k, b) -> ((k * x) + b)"
+        "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)"
     ]
     with Given(f"Cluster {cluster} is properly configured"):
         with By(f"remote_servers have {n_shards} shards"):
@@ -1317,10 +1317,10 @@ def test_014(self):
                 print("Checking functions")
                 out = clickhouse.query(
                     chi_name,
-                    f"SELECT name FROM system.functions WHERE name = 'test_014'",
+                    f"SELECT count() FROM system.functions WHERE name = 'test_014'",
                     host=host,
                 )
-                assert out == "Atomic"
+                assert out == "1"
 
         with And("Replicated table should have the data"):
             for replica in replicas:
@@ -3696,3 +3696,9 @@ def test(self):
     for scenario in loads(current_module(), Scenario, Suite):
         if hasattr(scenario, "tags") and ("NO_PARALLEL" in scenario.tags):
             Scenario(run=scenario)
+
+    with Finally("I delete namespace"):
+        shell = get_shell()
+        self.context.shell = shell
+        util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
+        shell.close()
