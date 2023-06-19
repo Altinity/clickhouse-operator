@@ -1019,6 +1019,7 @@ def test_013_1(self):
         "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = "
         "ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', "
         "'test_replicas', 'postgres', 'mysecretpassword')",
+
         # "CREATE TABLE materialized_postgresql_table (key UInt64, value UInt64) ENGINE = "
         # "MaterializedPostgreSQL('localhost:5433', 'postgres_database', 'postgresql_replica', "
         # "'postgres_user', 'postgres_password')PRIMARY KEY key",
@@ -1241,6 +1242,7 @@ def test_014(self):
         "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
+        "CREATE FUNCTION IF NOT EXISTS test_014 AS (x, k, b) -> ((k * x) + b)"
     ]
     with Given(f"Cluster {cluster} is properly configured"):
         with By(f"remote_servers have {n_shards} shards"):
@@ -1308,6 +1310,14 @@ def test_014(self):
                 out = clickhouse.query(
                     chi_name,
                     f"SELECT engine FROM system.databases WHERE name = 'test_atomic_014'",
+                    host=host,
+                )
+                assert out == "Atomic"
+
+                print("Checking functions")
+                out = clickhouse.query(
+                    chi_name,
+                    f"SELECT name FROM system.functions WHERE name = 'test_014'",
                     host=host,
                 )
                 assert out == "Atomic"

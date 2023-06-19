@@ -86,7 +86,16 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ch
 			createTableDistributed(host.Address.ClusterName),
 		),
 	)
-	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
+	functionNames, createFunctionSQLs := debugCreateSQLs(
+		s.QueryUnzip2Columns(
+			ctx,
+			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			createFuction(host.Address.ClusterName),
+		),
+	)
+	return append(databaseNames, tableNames, functionNames...),
+	       append(createDatabaseSQLs, createTableSQLs, createFunctionSQLs...),
+	       nil
 }
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
@@ -143,7 +152,16 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *cho
 			createTableReplicated(host.Address.ClusterName),
 		),
 	)
-	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
+	functionNames, createFunctionSQLs := debugCreateSQLs(
+		s.QueryUnzip2Columns(
+			ctx,
+			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			createFuction(host.Address.ClusterName),
+		),
+	)
+	return append(databaseNames, tableNames, functionNames...),
+	       append(createDatabaseSQLs, createTableSQLs, createFunctionSQLs...),
+	       nil
 }
 
 // HostSyncTables calls SYSTEM SYNC REPLICA for replicated tables
