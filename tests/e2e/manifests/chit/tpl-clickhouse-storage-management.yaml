@@ -1,6 +1,5 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
-
 metadata:
   name: storage-management
 spec:
