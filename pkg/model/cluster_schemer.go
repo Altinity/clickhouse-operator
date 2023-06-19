@@ -59,6 +59,24 @@ func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
 	return true
 }
 
+func concatSlices[T any](slices [][]T) []T {
+	var totalLen int
+
+	for _, s := range slices {
+		totalLen += len(s)
+	}
+
+	result := make([]T, totalLen)
+
+	var i int
+
+	for _, s := range slices {
+		i += copy(result[i:], s)
+	}
+
+	return result
+}
+
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
 // That includes all distributed tables, corresponding local tables and databases, if necessary
 func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
@@ -93,8 +111,8 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ch
 			createFuction(host.Address.ClusterName),
 		),
 	)
-	return append(databaseNames, tableNames, functionNames...),
-	       append(createDatabaseSQLs, createTableSQLs, createFunctionSQLs...),
+	return concatSlices([][]String {databaseNames, tableNames, functionNames}),
+	       concatSlices([][]String {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
 	       nil
 }
 
@@ -159,8 +177,8 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *cho
 			createFuction(host.Address.ClusterName),
 		),
 	)
-	return append(databaseNames, tableNames, functionNames...),
-	       append(createDatabaseSQLs, createTableSQLs, createFunctionSQLs...),
+	return concatSlices([][]String {databaseNames, tableNames, functionNames}),
+	       concatSlices([][]String {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
 	       nil
 }
 
