@@ -111,9 +111,9 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ch
 			createFunction(host.Address.ClusterName),
 		),
 	)
-	return concatSlices([][]string {databaseNames, tableNames, functionNames}),
-	       concatSlices([][]string {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
-	       nil
+	return concatSlices([][]string{databaseNames, tableNames, functionNames}),
+		concatSlices([][]string{createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
+		nil
 }
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
@@ -177,9 +177,9 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *cho
 			createFunction(host.Address.ClusterName),
 		),
 	)
-	return concatSlices([][]string {databaseNames, tableNames, functionNames}),
-	       concatSlices([][]string {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
-	       nil
+	return concatSlices([][]string{databaseNames, tableNames, functionNames}),
+		concatSlices([][]string{createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
+		nil
 }
 
 // HostSyncTables calls SYSTEM SYNC REPLICA for replicated tables
