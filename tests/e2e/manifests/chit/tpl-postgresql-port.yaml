@@ -1,0 +1,29 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: postgresql-port
+spec:
+  templating:
+    policy: auto
+  configuration:
+    settings:
+      postgresql_port: 9005
+  templates:
+    podTemplates:
+      - name: clickhouse-replica-1
+        spec:
+          containers:
+            - name: clickhouse-pod
+              ports:
+              - containerPort: 9005
+                name: postgresql
+                protocol: TCP
+      - name: clickhouse-replica-2
+        spec:
+          containers:
+            - name: clickhouse-pod
+              ports:
+              - containerPort: 9005
+                name: postgresql
+                protocol: TCP

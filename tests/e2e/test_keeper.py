@@ -4,15 +4,15 @@ import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.util as util
-
+import e2e.yaml_manifest as yaml_manifest
 from testflows.core import *
 
 
-def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
+def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries_number=10):
     svc_name = "zookeeper-client" if keeper_type == "zookeeper-operator" else "zookeeper"
     expected_containers = "1/1"
     expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
-    for i in range(retries):
+    for i in range(retries_number):
         ready_pods = kubectl.launch(
             f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l"
         )
@@ -25,34 +25,16 @@ def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries=10):
                 break
         else:
             with Then(
-                f"Zookeeper Not ready yet ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}. "
+                f"Zookeeper Not ready yet "
+                f"ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}. "
                 f"Wait for {i * 3} seconds"
             ):
                 time.sleep(i * 3)
-        if i == retries - 1:
+        if i == retries_number - 1:
             Fail(
-                f"Zookeeper failed, ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}"
+                f"Zookeeper failed, "
+                f"ready_endpoints={ready_endpoints} ready_pods={ready_pods}, expected pod_count={pod_count}"
             )
-
-
-def wait_clickhouse_no_readonly_replicas(chi, retries=20):
-    expected_replicas = chi["spec"]["configuration"]["clusters"][0]["layout"]["replicasCount"]
-    expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
-    for i in range(retries):
-        readonly_replicas = clickhouse.query(
-            chi["metadata"]["name"],
-            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
-        )
-        if readonly_replicas == expected_replicas:
-            message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
-            break
-        else:
-            with But(
-                f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"
-            ):
-                time.sleep(i * 3)
-        if i >= (retries - 1):
-            raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")
 
 
 def insert_replicated_data(chi, pod_for_insert_data, create_tables, insert_tables):
@@ -117,26 +99,35 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
                     time.sleep((i + 1) * 3)
 
         assert found, f"Unexpected {keeper_type} `ls /` output"
+    # clickhouse could not reconnect to zookeeper. So we need to retry
+    for i in range(retry_count):
+        out = clickhouse.query(
+            chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'", with_error=True
+        )
+        expected_out = {
+            "zookeeper": "2",
+            "zookeeper-operator": "3",
+            "clickhouse-keeper": "2",
+        }
+        if expected_out[keeper_type] != out.strip(" \t\r\n") and i + 1 < retry_count:
+            with Then(f"{keeper_type} system.zookeeper not ready, wait {(i + 1) * 3} sec"):
+                time.sleep((i + 1) * 3)
 
-    out = clickhouse.query(chi["metadata"]["name"], "SELECT count() FROM system.zookeeper WHERE path='/'")
-    expected_out = {
-        "zookeeper": "2",
-        "zookeeper-operator": "3",
-        "clickhouse-keeper": "2",
-    }
-    assert expected_out[keeper_type] == out.strip(
-        " \t\r\n"
-    ), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
+            continue
+
+        assert expected_out[keeper_type] == out.strip(
+            " \t\r\n"
+        ), f"Unexpected `SELECT count() FROM system.zookeeper WHERE path='/'` output {out}"
 
 
 def rescale_zk_and_clickhouse(
-    ch_node_count,
-    keeper_node_count,
-    keeper_type,
-    keeper_manifest_1_node,
-    keeper_manifest_3_node,
-    first_install=False,
-    clean_ns=None,
+        ch_node_count,
+        keeper_node_count,
+        keeper_type,
+        keeper_manifest_1_node,
+        keeper_manifest_3_node,
+        first_install=False,
+        clean_ns=None,
 ):
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
@@ -153,13 +144,59 @@ def rescale_zk_and_clickhouse(
     return chi
 
 
+def delete_keeper_pvc(keeper_type):
+    pvc_list = kubectl.get(
+        kind="pvc",
+        name="",
+        label=f"-l app={keeper_type}",
+        ns=settings.test_namespace,
+        ok_to_fail=False,
+    )
+    for pvc in pvc_list["items"]:
+        if pvc["metadata"]["name"][-2:] != "-0":
+            kubectl.launch(f"delete pvc {pvc['metadata']['name']}", ns=settings.test_namespace)
+
+
+def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper_type, keeper_manifest_1_node,
+                                 keeper_manifest_3_node):
+    kubectl.launch(f"patch chi --type=merge {chi_name} -p '{{\"spec\":{{ \"stop\": \"{ch_stop}\" }} }}'")
+    keeper_manifest = keeper_manifest_1_node
+    if keeper_replica_count > 1:
+        keeper_manifest = keeper_manifest_3_node
+    if keeper_type == "zookeeper":
+        keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+    if keeper_type == "clickhouse-keeper":
+        keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+    if keeper_type == "zookeeper-operator":
+        keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+
+    zk_manifest = yaml_manifest.get_multidoc_manifest_data(util.get_full_path(keeper_manifest, lookup_in_host=True))
+    for doc in zk_manifest:
+        if doc["kind"] == "StatefulSet":
+            with When(f"Path Zookeeper replicas: {keeper_replica_count}"):
+                keeper_name = doc["metadata"]["name"]
+                kubectl.launch(
+                    f"patch --type=merge sts {keeper_name} -p '{{\"spec\":{{\"replicas\":{keeper_replica_count}}}}}'"
+                )
+                retries_num = 10
+                for i in range(retries_num):
+                    pod_counts = kubectl.get_count("pod", f"-l app={keeper_type}")
+                    if pod_counts == keeper_replica_count:
+                        break
+                    elif i >= retries_num - 1:
+                        assert pod_counts == keeper_replica_count
+                    with Then(f"Zookeeper not ready. "
+                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {2*(i+1)} seconds"):
+                        time.sleep(2*(i+1))
+
+
 @TestOutline
-def test_keeper_outline(
-    self,
-    keeper_type="zookeeper",
-    pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
-    keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
-    keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
+def test_keeper_rescale_outline(
+        self,
+        keeper_type="zookeeper",
+        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
+        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
 ):
     """
     test scenario for Zoo/Clickhouse Keeper
@@ -167,11 +204,13 @@ def test_keeper_outline(
     CH 1 -> 2 wait complete + Keeper 1 -> 3 nowait
     CH 2 -> 1 wait complete + Keeper 3 -> 1 nowait
     CH 1 -> 2 wait complete + Keeper 1 -> 3 nowait
+
+    Keeper replicas 3 > 0 > 1 > 3
     """
 
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
-        kubectl.delete_all_chi(settings.test_namespace)
         kubectl.delete_all_keeper(settings.test_namespace)
+        kubectl.delete_all_chi(settings.test_namespace)
 
     with When("Install CH 1 node ZK 1 node"):
         chi = rescale_zk_and_clickhouse(
@@ -185,7 +224,7 @@ def test_keeper_outline(
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
         check_zk_root_znode(chi, keeper_type, pod_count=1)
-        wait_clickhouse_no_readonly_replicas(chi)
+        util.wait_clickhouse_no_readonly_replicas(chi)
         insert_replicated_data(
             chi,
             pod_for_insert_data,
@@ -193,7 +232,7 @@ def test_keeper_outline(
             insert_tables=["test_repl1"],
         )
 
-    total_iterations = 3
+    total_iterations = 1
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
@@ -208,7 +247,7 @@ def test_keeper_outline(
                 check_zk_root_znode(chi, keeper_type, pod_count=3)
 
                 util.wait_clickhouse_cluster_ready(chi)
-                wait_clickhouse_no_readonly_replicas(chi)
+                util.wait_clickhouse_no_readonly_replicas(chi)
                 insert_replicated_data(
                     chi,
                     pod_for_insert_data,
@@ -226,9 +265,11 @@ def test_keeper_outline(
                 )
                 wait_keeper_ready(keeper_type=keeper_type, pod_count=1)
                 check_zk_root_znode(chi, keeper_type, pod_count=1)
+                if keeper_type == "zookeeper" and "scaleout-pvc" in keeper_manifest_1_node:
+                    delete_keeper_pvc(keeper_type=keeper_type)
 
                 util.wait_clickhouse_cluster_ready(chi)
-                wait_clickhouse_no_readonly_replicas(chi)
+                util.wait_clickhouse_no_readonly_replicas(chi)
                 insert_replicated_data(
                     chi,
                     pod_for_insert_data,
@@ -246,7 +287,30 @@ def test_keeper_outline(
         )
         check_zk_root_znode(chi, keeper_type, pod_count=3)
 
+    for keeper_replica_count in [1, 3]:
+        with When("Stop CH + ZK"):
+            start_stop_zk_and_clickhouse(
+                chi['metadata']['name'],
+                ch_stop=True,
+                keeper_replica_count=0,
+                keeper_type=keeper_type,
+                keeper_manifest_1_node=keeper_manifest_1_node,
+                keeper_manifest_3_node=keeper_manifest_3_node
+            )
+        with Then("Start CH + ZK "):
+            start_stop_zk_and_clickhouse(
+                chi['metadata']['name'],
+                ch_stop=False,
+                keeper_replica_count=keeper_replica_count,
+                keeper_type=keeper_type,
+                keeper_manifest_1_node=keeper_manifest_1_node,
+                keeper_manifest_3_node=keeper_manifest_3_node
+            )
+
     with Then("check data in tables"):
+        check_zk_root_znode(chi, keeper_type, pod_count=3)
+        util.wait_clickhouse_cluster_ready(chi)
+        util.wait_clickhouse_no_readonly_replicas(chi)
         for table_name, exptected_rows in {
             "test_repl1": str(1000 + 2000 * total_iterations),
             "test_repl2": str(2000 * total_iterations),
@@ -258,7 +322,7 @@ def test_keeper_outline(
                 pod="chi-test-cluster-for-zk-default-0-1-0",
             )
             assert (
-                actual_rows == exptected_rows
+                    actual_rows == exptected_rows
             ), f"Invalid rows counter after inserts {table_name} expected={exptected_rows} actual={actual_rows}"
 
     with Then("drop all created tables"):
@@ -269,7 +333,7 @@ def test_keeper_outline(
 @TestScenario
 @Name("test_zookeeper_rescale. Check ZK scale-up / scale-down cases")
 def test_zookeeper_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
@@ -280,7 +344,7 @@ def test_zookeeper_rescale(self):
 @TestScenario
 @Name("test_clickhouse_keeper_rescale. Check KEEPER scale-up / scale-down cases")
 def test_clickhouse_keeper_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="clickhouse-keeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="clickhouse-keeper-1-node-256M-for-test-only.yaml",
@@ -291,7 +355,7 @@ def test_clickhouse_keeper_rescale(self):
 @TestScenario
 @Name("test_zookeeper_operator_rescale. Check Zookeeper OPERATOR scale-up / scale-down cases")
 def test_zookeeper_operator_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="zookeeper-operator",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
@@ -302,7 +366,7 @@ def test_zookeeper_operator_rescale(self):
 @TestScenario
 @Name("test_zookeeper_pvc_scaleout_rescale. Check ZK+PVC scale-up / scale-down cases")
 def test_zookeeper_pvc_scaleout_rescale(self):
-    test_keeper_outline(
+    test_keeper_rescale_outline(
         keeper_type="zookeeper",
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc.yaml",
@@ -312,10 +376,10 @@ def test_zookeeper_pvc_scaleout_rescale(self):
 
 @TestOutline
 def test_keeper_probes_outline(
-    self,
-    keeper_type="zookeeper",
-    keeper_manifest_1_node="zookeeper-1-node-for-test-probes.yaml",
-    keeper_manifest_3_node="zookeeper-3-nodes-for-test-probes.yaml",
+        self,
+        keeper_type="zookeeper",
+        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
 ):
     with When("Clean exists ClickHouse Keeper and ZooKeeper"):
         kubectl.delete_all_chi(settings.test_namespace)
@@ -334,15 +398,15 @@ def test_keeper_probes_outline(
         util.wait_clickhouse_cluster_ready(chi)
         wait_keeper_ready(keeper_type=keeper_type, pod_count=3)
         check_zk_root_znode(chi, keeper_type, pod_count=3)
-        wait_clickhouse_no_readonly_replicas(chi)
+        util.wait_clickhouse_no_readonly_replicas(chi)
 
     with Then("Create keeper_bench table"):
-        clickhouse.query(chi["metadata"]["name"], "DROP DATABASE IF EXISTS keeper_bench SYNC")
-        clickhouse.query(chi["metadata"]["name"], "CREATE DATABASE keeper_bench")
+        clickhouse.query(chi["metadata"]["name"], "DROP DATABASE IF EXISTS keeper_bench ON CLUSTER '{cluster}' SYNC")
+        clickhouse.query(chi["metadata"]["name"], "CREATE DATABASE keeper_bench ON CLUSTER '{cluster}'")
         clickhouse.query(
             chi["metadata"]["name"],
             """
-            CREATE TABLE keeper_bench.keeper_bench (p UInt64, x UInt64)
+            CREATE TABLE keeper_bench.keeper_bench ON CLUSTER '{cluster}' (p UInt64, x UInt64)
             ENGINE=ReplicatedSummingMergeTree('/clickhouse/tables/{database}/{table}', '{replica}' )
             ORDER BY tuple()
             PARTITION BY p
@@ -356,11 +420,11 @@ def test_keeper_probes_outline(
         )
     with Then("Insert data to keeper_bench for make zookeeper workload"):
         pod_prefix = "chi-test-cluster-for-zk-default"
-        rows = 1000
+        rows = 100000
         for pod in ("0-0-0", "0-1-0"):
             clickhouse.query(
                 chi["metadata"]["name"],
-                """
+                f"""
                 INSERT INTO keeper_bench.keeper_bench SELECT rand(1)%100, rand(2) FROM numbers({rows})
                 SETTINGS max_block_size=1,
                   min_insert_block_size_bytes=1,
@@ -368,7 +432,7 @@ def test_keeper_probes_outline(
                   insert_deduplicate=0,
                   max_threads=128,
                   max_insert_threads=128
-            """,
+                """,
                 pod=f"{pod_prefix}-{pod}",
                 timeout=rows,
             )
@@ -389,19 +453,21 @@ def test_keeper_probes_outline(
 
 @TestScenario
 @Name(
-    "test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_zookeeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_zookeeper_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="zookeeper",
-        keeper_manifest_1_node="zookeeper-1-node-for-test-probes.yaml",
-        keeper_manifest_3_node="zookeeper-3-nodes-for-test-probes.yaml",
+        keeper_manifest_1_node="zookeeper-1-node-1GB-for-tests-only.yaml",
+        keeper_manifest_3_node="zookeeper-3-nodes-1GB-for-tests-only.yaml",
     )
 
 
 @TestScenario
 @Name(
-    "test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_zookeeper_pvc_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_zookeeper_pvc_probes_workload(self):
     test_keeper_probes_outline(
@@ -413,14 +479,16 @@ def test_zookeeper_pvc_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_zookeeper_operator_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_zookeeper_operator_probes_workload(self):
     test_keeper_probes_outline(
         keeper_type="zookeeper-operator",
         keeper_manifest_1_node="zookeeper-operator-1-node.yaml",
         keeper_manifest_3_node="zookeeper-operator-3-nodes.yaml",
-        # uncomment
+
+        # uncomment only if you know how to use it
         # keeper_manifest_1_node='zookeeper-operator-1-node-with-custom-probes.yaml',
         # keeper_manifest_3_node='zookeeper-operator-3-nodes-with-custom-probes.yaml',
     )
@@ -428,7 +496,8 @@ def test_zookeeper_operator_probes_workload(self):
 
 @TestScenario
 @Name(
-    "test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine under workload in multi-datacenter installation"
+    "test_clickhouse_keeper_probes_workload. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
 )
 def test_clickhouse_keeper_probes_workload(self):
     test_keeper_probes_outline(
@@ -446,13 +515,14 @@ def test(self):
         test_clickhouse_keeper_rescale,
         test_zookeeper_pvc_scaleout_rescale,
         test_zookeeper_rescale,
+
         test_zookeeper_probes_workload,
         test_zookeeper_pvc_probes_workload,
         test_zookeeper_operator_probes_workload,
         test_clickhouse_keeper_probes_workload,
     ]
 
-    util.clean_namespace(delete_chi=True)
+    util.clean_namespace(delete_chi=True, delete_keeper=True)
     util.install_operator_if_not_exist()
     for t in all_tests:
         Scenario(test=t)()

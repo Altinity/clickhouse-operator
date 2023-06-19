@@ -39,7 +39,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 		return nil
 	}
 
-	statefulSet := host.StatefulSet
+	statefulSet := host.DesiredStatefulSet
 
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, newCreateOptions()); err != nil {
@@ -201,13 +201,13 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.
 
 	case chiV1.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
-		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(host.StatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(host.DesiredStatefulSet.ObjectMeta))
 		_ = c.deleteHost(ctx, host)
 		return c.shouldContinueOnCreateFailed()
 
 	case chiV1.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(host.StatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(host.DesiredStatefulSet.ObjectMeta))
 		return errIgnore
 
 	default:

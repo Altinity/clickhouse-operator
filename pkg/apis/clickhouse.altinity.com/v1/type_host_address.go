@@ -20,6 +20,7 @@ import "fmt"
 type ChiHostAddress struct {
 	Namespace               string `json:"namespace"               yaml:"namespace"`
 	StatefulSet             string `json:"statefulSet"             yaml:"statefulSet"`
+	FQDN                    string `json:"fqdn"                    yaml:"fqdn"`
 	CHIName                 string `json:"chiName"                 yaml:"chiName"`
 	ClusterName             string `json:"clusterName"             yaml:"clusterName"`
 	ClusterIndex            int    `json:"clusterIndex"            yaml:"clusterIndex"`

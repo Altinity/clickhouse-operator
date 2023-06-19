@@ -14,6 +14,10 @@
 
 package clickhouse
 
+import (
+	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
 // ClusterConnectionParams represents connection parameters to the whole cluster
 type ClusterConnectionParams struct {
 	*ClusterCredentials
@@ -26,6 +30,22 @@ func NewClusterConnectionParams(scheme, username, password, rootCA string, port 
 		NewClusterCredentials(scheme, username, password, rootCA, port),
 		NewTimeouts(),
 	}
+}
+
+// NewClusterConnectionParamsFromCHOpConfig is the same as NewClusterConnectionParams, but works with
+// CHOp config to get parameters from
+func NewClusterConnectionParamsFromCHOpConfig(config *v1.OperatorConfig) *ClusterConnectionParams {
+	params := NewClusterConnectionParams(
+		config.ClickHouse.Access.Scheme,
+		config.ClickHouse.Access.Username,
+		config.ClickHouse.Access.Password,
+		config.ClickHouse.Access.RootCA,
+		config.ClickHouse.Access.Port,
+	)
+	params.SetConnectTimeout(config.ClickHouse.Access.Timeouts.Connect)
+	params.SetQueryTimeout(config.ClickHouse.Access.Timeouts.Query)
+
+	return params
 }
 
 // SetTimeouts sets timeout
@@ -42,5 +62,12 @@ func (p *ClusterConnectionParams) NewEndpointConnectionParams(host string) *Endp
 	if p == nil {
 		return nil
 	}
-	return NewEndpointConnectionParams(p.Scheme, host, p.Username, p.Password, p.RootCA, p.Port).SetTimeouts(p.Timeouts)
+	return NewEndpointConnectionParams(
+		p.Scheme,
+		host,
+		p.Username,
+		p.Password,
+		p.RootCA,
+		p.Port,
+	).SetTimeouts(p.Timeouts)
 }

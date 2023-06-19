@@ -19,6 +19,7 @@
 1. [README.md](./README.md) - this doc
 1. [replication_setup.md](./replication_setup.md) - how to set up replication
 1. [schema_migration.md](./schema_migration.md) - how operator migrates schema during cluster resize
+1. [security_hardening.md](./security_hardening.md) -- security hardening
 1. [start_new_release.md](./start_new_release.md) - how to start new release branch
 1. [storage.md](./storage.md) - storage explained
 1. [zookeeper_setup.md](./zookeeper_setup.md) - how to set up zookeeper

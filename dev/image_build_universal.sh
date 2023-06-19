@@ -26,9 +26,14 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
     eval "$(minikube docker-env)"
 fi
 
-if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
-    sudo apt-get install -y qemu binfmt-support qemu-user-static
-    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+ARCHITECTURE=$(uname -m)
+# Do nothing if architecture is arm，such as MacOS M1/M2
+
+if [[ ! "${ARCHITECTURE}" =~ "arm" ]]; then
+    if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
+        sudo apt-get install -y qemu binfmt-support qemu-user-static
+        docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    fi
 fi
 
 if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive') ]]; then

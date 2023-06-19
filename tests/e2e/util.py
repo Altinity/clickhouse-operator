@@ -6,7 +6,7 @@ import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.yaml_manifest as yaml_manifest
 
-from testflows.core import fail, Given, Then, current
+from testflows.core import fail, Given, Then, But, current, message
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -21,7 +21,7 @@ def get_full_path(test_file, lookup_in_host=True):
         return os.path.abspath(f"/home/master/clickhouse-operator/tests/e2e/{test_file}")
 
 
-def set_operator_version(version, ns=None, timeout=600):
+def set_operator_version(version, ns=None, timeout=600, shell=None):
     if ns is None:
         ns = current().context.operator_namespace
     if current().context.operator_install != "yes":
@@ -32,13 +32,15 @@ def set_operator_version(version, ns=None, timeout=600):
     kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator clickhouse-operator={operator_image}",
         ns=ns,
+        shell=shell
     )
     kubectl.launch(
         f"set image deployment.v1.apps/clickhouse-operator metrics-exporter={metrics_exporter_image}",
         ns=ns,
+        shell=shell
     )
-    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout)
-    if kubectl.get_count("pod", ns=ns, label=operator_label) == 0:
+    kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns, timeout=timeout, shell=shell)
+    if kubectl.get_count("pod", ns=ns, label=operator_label, shell=shell) == 0:
         fail("invalid clickhouse-operator pod count")
 
 
@@ -52,20 +54,20 @@ def set_metrics_exporter_version(version, ns=None):
     kubectl.launch("rollout status deployment.v1.apps/clickhouse-operator", ns=ns)
 
 
-def restart_operator(ns=None, timeout=600):
+def restart_operator(ns=None, timeout=600, shell=None):
     if ns is None:
         ns = current().context.operator_namespace
     if current().context.operator_install != "yes":
         return
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     old_pod_name = pod["metadata"]["name"]
     old_pod_ip = pod["status"]["podIP"]
-    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout)
-    kubectl.wait_object("pod", name="", ns=ns, label=operator_label)
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    kubectl.launch(f"delete pod {old_pod_name}", ns=ns, timeout=timeout, shell=shell)
+    kubectl.wait_object("pod", name="", ns=ns, label=operator_label, shell=shell)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_name = pod["metadata"]["name"]
-    kubectl.wait_pod_status(new_pod_name, "Running", ns=ns)
-    pod = kubectl.get("pod", name="", ns=ns, label=operator_label)["items"][0]
+    kubectl.wait_pod_status(new_pod_name, "Running", ns=ns, shell=shell)
+    pod = kubectl.get("pod", name="", ns=ns, label=operator_label, shell=shell)["items"][0]
     new_pod_ip = pod["status"]["podIP"]
     print(f"old operator pod: {old_pod_name} ip: {old_pod_ip}")
     print(f"new operator pod: {new_pod_name} ip: {new_pod_ip}")
@@ -94,7 +96,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
             if doc["kind"] in ("StatefulSet", "ZookeeperCluster"):
                 keeper_nodes = doc["spec"]["replicas"]
         expected_docs = {
-            "zookeeper": 6 if "scaleout-pvc" in keeper_manifest else 4,
+            "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
             "clickhouse-keeper": 6,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
@@ -112,6 +114,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
                 kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}")
             for pod_num in range(keeper_nodes):
                 kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running")
+                kubectl.wait_container_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "true")
 
 
 def wait_clickhouse_cluster_ready(chi):
@@ -205,12 +208,16 @@ def install_clickhouse_and_keeper(
         return clickhouse_operator_spec, chi
 
 
-def clean_namespace(delete_chi=False):
-    with Given(f"Clean namespace {current().context.test_namespace}"):
+def clean_namespace(delete_chi=False, delete_keeper=False, namespace=None):
+    if namespace is None:
+        namespace = current().context.test_namespace
+    with Given(f"Clean namespace {namespace}"):
+        if delete_keeper:
+            kubectl.delete_all_keeper(namespace)
         if delete_chi:
-            kubectl.delete_all_chi(current().context.test_namespace)
-        kubectl.delete_ns(current().context.test_namespace, ok_to_fail=True)
-        kubectl.create_ns(current().context.test_namespace)
+            kubectl.delete_all_chi(namespace)
+        kubectl.delete_ns(namespace, ok_to_fail=True)
+        kubectl.create_ns(namespace)
 
 
 def delete_namespace(namespace, delete_chi=False):
@@ -240,6 +247,7 @@ def make_http_get_request(host, port, path):
 def install_operator_if_not_exist(
     reinstall=False,
     manifest=None,
+    shell=None,
 ):
     if manifest is None:
         manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
@@ -253,6 +261,7 @@ def install_operator_if_not_exist(
                 "pod",
                 ns=current().context.operator_namespace,
                 label="-l app=clickhouse-operator",
+                shell=shell
             )
             == 0
             or reinstall
@@ -268,11 +277,12 @@ def install_operator_if_not_exist(
                 f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
                 f"envsubst",
                 validate=False,
+                shell=shell
             )
-        set_operator_version(current().context.operator_version)
+        set_operator_version(current().context.operator_version, shell=shell)
 
 
-def install_operator_version(version):
+def install_operator_version(version, shell=None):
     if version == current().context.operator_version:
         manifest = get_full_path(current().context.clickhouse_operator_install_manifest)
         manifest = f"cat {manifest}"
@@ -291,4 +301,32 @@ def install_operator_version(version):
         f'METRICS_EXPORTER_IMAGE_PULL_POLICY="{current().context.image_pull_policy}" '
         f"envsubst",
         validate=False,
+        shell=shell
     )
+
+
+def wait_clickhouse_no_readonly_replicas(chi, retries=20):
+    expected_replicas = 1
+    layout = chi["spec"]["configuration"]["clusters"][0]["layout"]
+
+    if "replicasCount" in layout:
+        expected_replicas = layout["replicasCount"]
+    if "shardsCount" in layout:
+        expected_replicas = expected_replicas * layout["shardsCount"]
+
+    expected_replicas = "[" + ",".join(["0"] * expected_replicas) + "]"
+    for i in range(retries):
+        readonly_replicas = clickhouse.query(
+            chi["metadata"]["name"],
+            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
+        )
+        if readonly_replicas == expected_replicas:
+            message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")
+            break
+        else:
+            with But(
+                    f"CHECK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}, Wait for {i * 3} seconds"
+            ):
+                time.sleep(i * 3)
+        if i >= (retries - 1):
+            raise RuntimeError(f"FAIL ReadonlyReplica failed, actual={readonly_replicas}, expected={expected_replicas}")

@@ -5,8 +5,8 @@ description: |-
 
   The ClickHouse Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
 type: application
-version: 0.20.2
-appVersion: 0.20.2
+version: 0.21.2
+appVersion: 0.21.2
 home: https://github.com/Altinity/clickhouse-operator
 icon: https://logosandtypes.com/wp-content/uploads/2020/12/altinity.svg
 maintainers:

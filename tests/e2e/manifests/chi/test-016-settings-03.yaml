@@ -13,7 +13,7 @@ spec:
         layout:
           shardsCount: 1
     profiles:
-      default/max_memory_usage: 7000000000 # test for big value      
+      default/max_memory_usage: 7000000000 # test for big value
     users:
       user2/profile: default
       user2/quota: default
@@ -21,13 +21,13 @@ spec:
       user2/networks/ip: "::/0"
     settings:
       dictionaries_config: config.d/dict_*.xml
-      macros/layer: "01"
+      macros/layer: "03"
       query_log: _removed_
     files:
       custom.xml: |
          <yandex>
             <macros>
-              <test>test-03</test>
+              <test>test</test>
             </macros>
          </yandex>
       users.d/my_users.xml:
@@ -44,7 +44,7 @@ spec:
                <quota>default</quota>
              </test_norestart>
           </users>
-        </yandex> 
+        </yandex>
       config.d/remote_servers.xml:
         <yandex>
            <remote_servers>
@@ -59,11 +59,11 @@ spec:
               </custom>
            </remote_servers>
         </yandex>
-      config.f/dict_one.xml: |
+      config.d/dict_three.xml: |
         <yandex>
           <dictionary>
-        <name>one</name>
-        <source>
+          <name>three</name>
+          <source>
             <clickhouse>
                 <host>localhost</host>
                 <port>9000</port>
@@ -72,15 +72,15 @@ spec:
                 <db>system</db>
                 <table>one</table>
             </clickhouse>
-        </source>
-        <lifetime>60</lifetime>
-        <layout><flat/></layout>
-        <structure>
+          </source>
+          <lifetime>60</lifetime>
+          <layout><flat/></layout>
+          <structure>
             <id>
                 <name>dummy</name>
             </id>
             <attribute>
-                <name>one</name>
+                <name>three</name>
                 <expression>dummy</expression>
                 <type>UInt8</type>
                 <null_value>0</null_value>

@@ -220,9 +220,13 @@ spec:
                     replicaServiceTemplate: replica-service-template
 
       - name: with-secret
+        # Insecure communication.
+        # Opens/Closes insecure ports
+        insecure: "yes"
         # Secure communication.
-        # Translates into <secure>1</secure> ClickHouse setting
-        secure: "True"
+        # Opens/Closes secure ports
+        # Translates into <secure>1</secure> ClickHouse setting for remote replicas
+        secure: "yes"
         # Shared secret value to secure cluster communications
         secret:
           # Auto-generate shared secret value to secure cluster communications
@@ -243,6 +247,13 @@ spec:
         portDistribution:
           - type: "ClusterScopeIndex"
         spec:
+          # Insecure communication.
+          # Opens/Closes insecure ports
+          insecure: "yes"
+          # Secure communication.
+          # Opens/Closes secure ports
+          # Translates into <secure>1</secure> ClickHouse setting for remote replicas
+          secure: "no"
           tcpPort: 7000
           httpPort: 7001
           interserverHTTPPort: 7002
@@ -506,6 +517,14 @@ spec:
                 limits:
                   memory: "64Mi"
                   cpu: "100m"
+            - name: clickhouse-log
+              image: clickhouse/clickhouse-server:22.3
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "--"
+              args:
+                - "while true; do sleep 30; done;"
 
       # pod template for ClickHouse v22.2
       - name: clickhouse-v22.2
@@ -524,3 +543,11 @@ spec:
                 limits:
                   memory: "64Mi"
                   cpu: "100m"
+            - name: clickhouse-log
+              image: clickhouse/clickhouse-server:22.3
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "--"
+              args:
+                - "while true; do sleep 30; done;"

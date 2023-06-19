@@ -18,7 +18,7 @@ import (
 	"github.com/imdario/mergo"
 )
 
-// NewChiTemplates creates new ChiTemplate object
+// NewChiTemplates creates new ChiTemplates object
 func NewChiTemplates() *ChiTemplates {
 	return new(ChiTemplates)
 }
@@ -46,6 +46,8 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *C
 		templates = NewChiTemplates()
 	}
 
+	// Merge sections
+
 	templates.mergeHostTemplates(from)
 	templates.mergePodTemplates(from)
 	templates.mergeVolumeClaimTemplates(from)
@@ -54,19 +56,14 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *C
 	return templates
 }
 
+// mergeHostTemplates merges host templates section
 func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
 	if len(from.HostTemplates) == 0 {
 		return
 	}
 
-	// We have templates to copy from
-	// Append HostTemplates from `from` to receiver
-
-	if templates.HostTemplates == nil {
-		templates.HostTemplates = make([]ChiHostTemplate, 0)
-	}
-
-	// Loop over all 'from' templates and copy it in case no such template in receiver
+	// We have templates to merge from
+	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
 	for fromIndex := range from.HostTemplates {
 		fromTemplate := &from.HostTemplates[fromIndex]
 
@@ -77,11 +74,9 @@ func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
 			if toTemplate.Name == fromTemplate.Name {
 				// Receiver already have such a template
 				sameNameFound = true
-				// Override `to` template with `from` template
-				//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+				// Merge `to` template with `from` template
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
+				// Receiver `to` template is processed
 				break
 			}
 		}
@@ -94,18 +89,14 @@ func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
 	}
 }
 
+// mergePodTemplates merges pod templates section
 func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
 	if len(from.PodTemplates) == 0 {
 		return
 	}
 
-	// We have templates to copy from
-	// Append PodTemplates from `from` to receiver
-
-	if templates.PodTemplates == nil {
-		templates.PodTemplates = make([]ChiPodTemplate, 0)
-	}
-	// Loop over all 'from' templates and copy it in case no such template in receiver
+	// We have templates to merge from
+	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
 	for fromIndex := range from.PodTemplates {
 		fromTemplate := &from.PodTemplates[fromIndex]
 
@@ -116,11 +107,14 @@ func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
 			if toTemplate.Name == fromTemplate.Name {
 				// Receiver already have such a template
 				sameNameFound = true
-				// Override `to` template with `from` template
-				//templates.PodTemplates[toIndex] = *fromTemplate.DeepCopy()
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+
+				//toSpec := &toTemplate.Spec
+				//fromSpec := &fromTemplate.Spec
+				//_ = mergo.Merge(toSpec, *fromSpec, mergo.WithGrowSlice, mergo.WithOverride, mergo.WithOverrideEmptySlice)
+
+				// Merge `to` template with `from` template
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
+				// Receiver `to` template is processed
 				break
 			}
 		}
@@ -133,18 +127,14 @@ func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
 	}
 }
 
+// mergeVolumeClaimTemplates merges volume claim templates section
 func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
 	if len(from.VolumeClaimTemplates) == 0 {
 		return
 	}
 
-	// We have templates to copy from
-	// Append VolumeClaimTemplates from `from` to receiver
-
-	if templates.VolumeClaimTemplates == nil {
-		templates.VolumeClaimTemplates = make([]ChiVolumeClaimTemplate, 0)
-	}
-	// Loop over all 'from' templates and copy it in case no such template in receiver
+	// We have templates to merge from
+	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
 	for fromIndex := range from.VolumeClaimTemplates {
 		fromTemplate := &from.VolumeClaimTemplates[fromIndex]
 
@@ -155,11 +145,9 @@ func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
 			if toTemplate.Name == fromTemplate.Name {
 				// Receiver already have such a template
 				sameNameFound = true
-				// Override `to` template with `from` template
-				//templates.VolumeClaimTemplates[toIndex] = *fromTemplate.DeepCopy()
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+				// Merge `to` template with `from` template
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepMerge)
+				// Receiver `to` template is processed
 				break
 			}
 		}
@@ -172,18 +160,14 @@ func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
 	}
 }
 
+// mergeServiceTemplates merges service templates section
 func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
 	if len(from.ServiceTemplates) == 0 {
 		return
 	}
 
-	// We have templates to copy from
-	// Append ServiceTemplates from `from` to receiver
-
-	if templates.ServiceTemplates == nil {
-		templates.ServiceTemplates = make([]ChiServiceTemplate, 0)
-	}
-	// Loop over all 'from' templates and copy it in case no such template in receiver
+	// We have templates to merge from
+	// Loop over all 'from' templates and either copy it in case no such template in receiver or merge it
 	for fromIndex := range from.ServiceTemplates {
 		fromTemplate := &from.ServiceTemplates[fromIndex]
 
@@ -194,11 +178,9 @@ func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
 			if toTemplate.Name == fromTemplate.Name {
 				// Receiver already have such a template
 				sameNameFound = true
-				// Override `to` template with `from` template
-				//templates.ServiceTemplates[toIndex] = *fromTemplate.DeepCopy()
-				if err := mergo.Merge(toTemplate, *fromTemplate, mergo.WithOverride); err != nil {
-					//errs = append(errs, fmt.Errorf("ERROR merge template(%s): %v", toTemplate.Name, err))
-				}
+				// Merge `to` template with `from` template
+				_ = mergo.Merge(toTemplate, *fromTemplate, mergo.WithSliceDeepCopy)
+				// Receiver `to` template is processed
 				break
 			}
 		}
@@ -293,13 +275,14 @@ func (templates *ChiTemplates) EnsureServiceTemplatesIndex() *ServiceTemplatesIn
 
 // HostTemplatesIndex describes index of host templates
 type HostTemplatesIndex struct {
-	v map[string]*ChiHostTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	// templates maps 'name of the template' -> 'template itself'
+	templates map[string]*ChiHostTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // NewHostTemplatesIndex creates new HostTemplatesIndex object
 func NewHostTemplatesIndex() *HostTemplatesIndex {
 	return &HostTemplatesIndex{
-		v: make(map[string]*ChiHostTemplate),
+		templates: make(map[string]*ChiHostTemplate),
 	}
 }
 
@@ -308,10 +291,10 @@ func (i *HostTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return false
 	}
-	_, ok := i.v[name]
+	_, ok := i.templates[name]
 	return ok
 }
 
@@ -320,7 +303,7 @@ func (i *HostTemplatesIndex) Get(name string) *ChiHostTemplate {
 	if !i.Has(name) {
 		return nil
 	}
-	return i.v[name]
+	return i.templates[name]
 }
 
 // Set sets named template into index
@@ -328,31 +311,32 @@ func (i *HostTemplatesIndex) Set(name string, entry *ChiHostTemplate) {
 	if i == nil {
 		return
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return
 	}
-	i.v[name] = entry
+	i.templates[name] = entry
 }
 
-// Walk calls specified function over each items in the index
+// Walk calls specified function over each entry in the index
 func (i *HostTemplatesIndex) Walk(f func(template *ChiHostTemplate)) {
 	if i == nil {
 		return
 	}
-	for _, entry := range i.v {
+	for _, entry := range i.templates {
 		f(entry)
 	}
 }
 
 // PodTemplatesIndex describes index of pod templates
 type PodTemplatesIndex struct {
-	v map[string]*ChiPodTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	// templates maps 'name of the template' -> 'template itself'
+	templates map[string]*ChiPodTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // NewPodTemplatesIndex creates new PodTemplatesIndex object
 func NewPodTemplatesIndex() *PodTemplatesIndex {
 	return &PodTemplatesIndex{
-		v: make(map[string]*ChiPodTemplate),
+		templates: make(map[string]*ChiPodTemplate),
 	}
 }
 
@@ -361,10 +345,10 @@ func (i *PodTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return false
 	}
-	_, ok := i.v[name]
+	_, ok := i.templates[name]
 	return ok
 }
 
@@ -373,7 +357,7 @@ func (i *PodTemplatesIndex) Get(name string) *ChiPodTemplate {
 	if !i.Has(name) {
 		return nil
 	}
-	return i.v[name]
+	return i.templates[name]
 }
 
 // Set sets named template into index
@@ -381,31 +365,32 @@ func (i *PodTemplatesIndex) Set(name string, entry *ChiPodTemplate) {
 	if i == nil {
 		return
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return
 	}
-	i.v[name] = entry
+	i.templates[name] = entry
 }
 
-// Walk calls specified function over each items in the index
+// Walk calls specified function over each entry in the index
 func (i *PodTemplatesIndex) Walk(f func(template *ChiPodTemplate)) {
 	if i == nil {
 		return
 	}
-	for _, entry := range i.v {
+	for _, entry := range i.templates {
 		f(entry)
 	}
 }
 
 // VolumeClaimTemplatesIndex describes index of volume claim templates
 type VolumeClaimTemplatesIndex struct {
-	v map[string]*ChiVolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	// templates maps 'name of the template' -> 'template itself'
+	templates map[string]*ChiVolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // NewVolumeClaimTemplatesIndex creates new VolumeClaimTemplatesIndex object
 func NewVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	return &VolumeClaimTemplatesIndex{
-		v: make(map[string]*ChiVolumeClaimTemplate),
+		templates: make(map[string]*ChiVolumeClaimTemplate),
 	}
 }
 
@@ -414,10 +399,10 @@ func (i *VolumeClaimTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return false
 	}
-	_, ok := i.v[name]
+	_, ok := i.templates[name]
 	return ok
 }
 
@@ -426,7 +411,7 @@ func (i *VolumeClaimTemplatesIndex) Get(name string) *ChiVolumeClaimTemplate {
 	if !i.Has(name) {
 		return nil
 	}
-	return i.v[name]
+	return i.templates[name]
 }
 
 // Set sets named template into index
@@ -434,31 +419,32 @@ func (i *VolumeClaimTemplatesIndex) Set(name string, entry *ChiVolumeClaimTempla
 	if i == nil {
 		return
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return
 	}
-	i.v[name] = entry
+	i.templates[name] = entry
 }
 
-// Walk calls specified function over each items in the index
+// Walk calls specified function over each entry in the index
 func (i *VolumeClaimTemplatesIndex) Walk(f func(template *ChiVolumeClaimTemplate)) {
 	if i == nil {
 		return
 	}
-	for _, entry := range i.v {
+	for _, entry := range i.templates {
 		f(entry)
 	}
 }
 
 // ServiceTemplatesIndex describes index of service templates
 type ServiceTemplatesIndex struct {
-	v map[string]*ChiServiceTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	// templates maps 'name of the template' -> 'template itself'
+	templates map[string]*ChiServiceTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // NewServiceTemplatesIndex creates new ServiceTemplatesIndex object
 func NewServiceTemplatesIndex() *ServiceTemplatesIndex {
 	return &ServiceTemplatesIndex{
-		v: make(map[string]*ChiServiceTemplate),
+		templates: make(map[string]*ChiServiceTemplate),
 	}
 }
 
@@ -467,10 +453,10 @@ func (i *ServiceTemplatesIndex) Has(name string) bool {
 	if i == nil {
 		return false
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return false
 	}
-	_, ok := i.v[name]
+	_, ok := i.templates[name]
 	return ok
 }
 
@@ -479,7 +465,7 @@ func (i *ServiceTemplatesIndex) Get(name string) *ChiServiceTemplate {
 	if !i.Has(name) {
 		return nil
 	}
-	return i.v[name]
+	return i.templates[name]
 }
 
 // Set sets named template into index
@@ -487,18 +473,18 @@ func (i *ServiceTemplatesIndex) Set(name string, entry *ChiServiceTemplate) {
 	if i == nil {
 		return
 	}
-	if i.v == nil {
+	if i.templates == nil {
 		return
 	}
-	i.v[name] = entry
+	i.templates[name] = entry
 }
 
-// Walk calls specified function over each items in the index
+// Walk calls specified function over each entry in the index
 func (i *ServiceTemplatesIndex) Walk(f func(template *ChiServiceTemplate)) {
 	if i == nil {
 		return
 	}
-	for _, entry := range i.v {
+	for _, entry := range i.templates {
 		f(entry)
 	}
 }

@@ -22,6 +22,7 @@ type Cluster struct {
 	Files        *Settings           `json:"files,omitempty"        yaml:"files,omitempty"`
 	Templates    *ChiTemplateNames   `json:"templates,omitempty"    yaml:"templates,omitempty"`
 	SchemaPolicy *SchemaPolicy       `json:"schemaPolicy,omitempty" yaml:"schemaPolicy,omitempty"`
+	Insecure     *StringBool         `json:"insecure,omitempty"     yaml:"insecure,omitempty"`
 	Secure       *StringBool         `json:"secure,omitempty"       yaml:"secure,omitempty"`
 	Secret       *ClusterSecret      `json:"secret,omitempty"       yaml:"secret,omitempty"`
 	Layout       *ChiClusterLayout   `json:"layout,omitempty"       yaml:"layout,omitempty"`
@@ -178,7 +179,8 @@ func (cluster *Cluster) GetReplica(replica int) *ChiReplica {
 	return &cluster.Layout.Replicas[replica]
 }
 
-// FindShard finds shard by either name or index
+// FindShard finds shard by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
 func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 	var resultShard *ChiShard
 	cluster.WalkShards(func(index int, shard *ChiShard) error {
@@ -197,19 +199,10 @@ func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 	return resultShard
 }
 
-// FindHost finds host in the cluster
-func (cluster *Cluster) FindHost(needle interface{}) *ChiHost {
-	var result *ChiHost
-	cluster.WalkHosts(func(host *ChiHost) error {
-		switch typed := needle.(type) {
-		case *ChiHost:
-			if typed == host {
-				result = host
-			}
-		}
-		return nil
-	})
-	return result
+// FindHost finds host by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (cluster *Cluster) FindHost(needleShard interface{}, needleHost interface{}) *ChiHost {
+	return cluster.FindShard(needleShard).FindHost(needleHost)
 }
 
 // FirstHost finds first host in the cluster
@@ -228,6 +221,9 @@ func (cluster *Cluster) FirstHost() *ChiHost {
 func (cluster *Cluster) WalkShards(
 	f func(index int, shard *ChiShard) error,
 ) []error {
+	if cluster == nil {
+		return nil
+	}
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
@@ -306,6 +302,14 @@ func (cluster *Cluster) HostsCount() int {
 		return nil
 	})
 	return count
+}
+
+// GetInsecure is a getter
+func (cluster *Cluster) GetInsecure() *StringBool {
+	if cluster == nil {
+		return nil
+	}
+	return cluster.Insecure
 }
 
 // GetSecure is a getter
