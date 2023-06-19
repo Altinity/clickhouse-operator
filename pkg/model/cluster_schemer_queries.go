@@ -192,11 +192,9 @@ func createFunction(cluster string) string {
 		FROM
 			clusterAllReplicas('%s', system.functions) tables
 		WHERE
-			database IN (select name from system.databases where engine in (%s)) AND
 			create_query != ''
 		SETTINGS skip_unavailable_shards=1
 		`,
 		cluster,
-		ignoredDBs,
 	)
 }
