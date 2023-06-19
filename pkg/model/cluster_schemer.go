@@ -108,11 +108,11 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ch
 		s.QueryUnzip2Columns(
 			ctx,
 			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
-			createFuction(host.Address.ClusterName),
+			createFunction(host.Address.ClusterName),
 		),
 	)
-	return concatSlices([][]String {databaseNames, tableNames, functionNames}),
-	       concatSlices([][]String {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
+	return concatSlices([][]string {databaseNames, tableNames, functionNames}),
+	       concatSlices([][]string {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
 	       nil
 }
 
@@ -174,11 +174,11 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *cho
 		s.QueryUnzip2Columns(
 			ctx,
 			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
-			createFuction(host.Address.ClusterName),
+			createFunction(host.Address.ClusterName),
 		),
 	)
-	return concatSlices([][]String {databaseNames, tableNames, functionNames}),
-	       concatSlices([][]String {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
+	return concatSlices([][]string {databaseNames, tableNames, functionNames}),
+	       concatSlices([][]string {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
 	       nil
 }
 
