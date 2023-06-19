@@ -183,3 +183,21 @@ func createTableReplicated(cluster string) string {
 		createTableDBEngines,
 	)
 }
+
+func createFunction(cluster string) string {
+	return heredoc.Docf(`
+		SELECT
+			DISTINCT name,
+			replaceRegexpOne(create_query, 'CREATE (FUNCTION)', 'CREATE \\1 IF NOT EXISTS')
+		FROM
+			clusterAllReplicas('%s', system.functions) tables
+		WHERE
+			database IN (select name from system.databases where engine in (%s)) AND
+			create_query != ''
+		SETTINGS skip_unavailable_shards=1
+		`,
+		cluster,
+		ignoredDBs,
+		createTableDBEngines,
+	)
+}

@@ -59,6 +59,24 @@ func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
 	return true
 }
 
+func concatSlices[T any](slices [][]T) []T {
+	var totalLen int
+
+	for _, s := range slices {
+		totalLen += len(s)
+	}
+
+	result := make([]T, totalLen)
+
+	var i int
+
+	for _, s := range slices {
+		i += copy(result[i:], s)
+	}
+
+	return result
+}
+
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
 // That includes all distributed tables, corresponding local tables and databases, if necessary
 func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
@@ -86,7 +104,16 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ch
 			createTableDistributed(host.Address.ClusterName),
 		),
 	)
-	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
+	functionNames, createFunctionSQLs := debugCreateSQLs(
+		s.QueryUnzip2Columns(
+			ctx,
+			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			createFunction(host.Address.ClusterName),
+		),
+	)
+	return concatSlices([][]string {databaseNames, tableNames, functionNames}),
+	       concatSlices([][]string {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
+	       nil
 }
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
@@ -143,7 +170,16 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *cho
 			createTableReplicated(host.Address.ClusterName),
 		),
 	)
-	return append(databaseNames, tableNames...), append(createDatabaseSQLs, createTableSQLs...), nil
+	functionNames, createFunctionSQLs := debugCreateSQLs(
+		s.QueryUnzip2Columns(
+			ctx,
+			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			createFunction(host.Address.ClusterName),
+		),
+	)
+	return concatSlices([][]string {databaseNames, tableNames, functionNames}),
+	       concatSlices([][]string {createDatabaseSQLs, createTableSQLs, createFunctionSQLs}),
+	       nil
 }
 
 // HostSyncTables calls SYSTEM SYNC REPLICA for replicated tables

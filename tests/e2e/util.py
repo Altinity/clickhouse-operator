@@ -219,6 +219,7 @@ def clean_namespace(delete_chi=False, delete_keeper=False, namespace=None):
         kubectl.delete_ns(namespace, ok_to_fail=True)
         kubectl.create_ns(namespace)
 
+
 def delete_namespace(namespace, delete_chi=False):
     if delete_chi:
         kubectl.delete_all_chi(namespace)
@@ -227,6 +228,7 @@ def delete_namespace(namespace, delete_chi=False):
 
 def create_namespace(namespace):
     kubectl.create_ns(namespace)
+
 
 def make_http_get_request(host, port, path):
     # thanks to https://github.com/falzm/burl

@@ -249,7 +249,7 @@ func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *chiV1.ClickHous
 	objs := w.c.discovery(ctx, chi)
 	if objs.NumStatefulSet() > 0 {
 		chi.WalkHosts(func(host *chiV1.ChiHost) error {
-			_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
+			_ = w.ensureClusterSchemer(host).HostSyncTables(ctx, host)
 			return nil
 		})
 	}
@@ -298,13 +298,13 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 	// Start delete protocol
 
 	// Exclude this CHI from monitoring
-	w.c.deleteWatch(chi.Namespace, chi.Name)
+	w.c.deleteWatch(chi)
 
 	// Delete Service
 	_ = w.c.deleteServiceCHI(ctx, chi)
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		_ = w.ensureClusterSchemer().HostSyncTables(ctx, host)
+		_ = w.ensureClusterSchemer(host).HostSyncTables(ctx, host)
 		return nil
 	})
 
@@ -360,7 +360,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiV1.C
 		return nil
 	}
 
-	err := w.ensureClusterSchemer().HostDropReplica(ctx, hostToRun, hostToDrop)
+	err := w.ensureClusterSchemer(hostToRun).HostDropReplica(ctx, hostToRun, hostToDrop)
 
 	if err == nil {
 		w.a.V(1).
@@ -388,7 +388,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 	if !chopModel.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
-	err := w.ensureClusterSchemer().HostDropTables(ctx, host)
+	err := w.ensureClusterSchemer(host).HostDropTables(ctx, host)
 
 	if err == nil {
 		w.a.V(1).

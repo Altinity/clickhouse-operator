@@ -221,6 +221,7 @@ func (n *Normalizer) finalizeCHI() {
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.ctx.chi.WalkHosts(func(host *chiV1.ChiHost) error {
 		host.Address.StatefulSet = CreateStatefulSetName(host)
+		host.Address.FQDN = CreateFQDN(host)
 		return nil
 	})
 }
@@ -259,22 +260,6 @@ func (n *Normalizer) getHostTemplate(host *chiV1.ChiHost) *chiV1.ChiHostTemplate
 	return hostTemplate
 }
 
-func unassigned() int32 {
-	return chiV1.PortMayBeAssignedLaterOrLeftUnused
-}
-
-func isAssigned(port int32) bool {
-	return port != chiV1.PortMayBeAssignedLaterOrLeftUnused
-}
-
-func isUnassigned(port int32) bool {
-	return port == chiV1.PortMayBeAssignedLaterOrLeftUnused
-}
-
-func invalid(port int32) bool {
-	return (port <= 0) || (port >= 65535)
-}
-
 // hostApplyHostTemplate
 func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate) {
 	if host.GetName() == "" {
@@ -287,53 +272,53 @@ func hostApplyHostTemplate(host *chiV1.ChiHost, template *chiV1.ChiHostTemplate)
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case chiV1.PortDistributionUnspecified:
-			if isUnassigned(host.TCPPort) {
+			if chiV1.IsPortUnassigned(host.TCPPort) {
 				host.TCPPort = template.Spec.TCPPort
 			}
-			if isUnassigned(host.TLSPort) {
+			if chiV1.IsPortUnassigned(host.TLSPort) {
 				host.TLSPort = template.Spec.TLSPort
 			}
-			if isUnassigned(host.HTTPPort) {
+			if chiV1.IsPortUnassigned(host.HTTPPort) {
 				host.HTTPPort = template.Spec.HTTPPort
 			}
-			if isUnassigned(host.HTTPSPort) {
+			if chiV1.IsPortUnassigned(host.HTTPSPort) {
 				host.HTTPSPort = template.Spec.HTTPSPort
 			}
-			if isUnassigned(host.InterserverHTTPPort) {
+			if chiV1.IsPortUnassigned(host.InterserverHTTPPort) {
 				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
 			}
 		case chiV1.PortDistributionClusterScopeIndex:
-			if isUnassigned(host.TCPPort) {
+			if chiV1.IsPortUnassigned(host.TCPPort) {
 				base := chDefaultTCPPortNumber
-				if isAssigned(template.Spec.TCPPort) {
+				if chiV1.IsPortAssigned(template.Spec.TCPPort) {
 					base = template.Spec.TCPPort
 				}
 				host.TCPPort = base + int32(host.Address.ClusterScopeIndex)
 			}
-			if isUnassigned(host.TLSPort) {
+			if chiV1.IsPortUnassigned(host.TLSPort) {
 				base := chDefaultTLSPortNumber
-				if isAssigned(template.Spec.TLSPort) {
+				if chiV1.IsPortAssigned(template.Spec.TLSPort) {
 					base = template.Spec.TLSPort
 				}
 				host.TLSPort = base + int32(host.Address.ClusterScopeIndex)
 			}
-			if isUnassigned(host.HTTPPort) {
+			if chiV1.IsPortUnassigned(host.HTTPPort) {
 				base := chDefaultHTTPPortNumber
-				if isAssigned(template.Spec.HTTPPort) {
+				if chiV1.IsPortAssigned(template.Spec.HTTPPort) {
 					base = template.Spec.HTTPPort
 				}
 				host.HTTPPort = base + int32(host.Address.ClusterScopeIndex)
 			}
-			if isUnassigned(host.HTTPSPort) {
+			if chiV1.IsPortUnassigned(host.HTTPSPort) {
 				base := chDefaultHTTPSPortNumber
-				if isAssigned(template.Spec.HTTPSPort) {
+				if chiV1.IsPortAssigned(template.Spec.HTTPSPort) {
 					base = template.Spec.HTTPSPort
 				}
 				host.HTTPSPort = base + int32(host.Address.ClusterScopeIndex)
 			}
-			if isUnassigned(host.InterserverHTTPPort) {
+			if chiV1.IsPortUnassigned(host.InterserverHTTPPort) {
 				base := chDefaultInterserverHTTPPortNumber
-				if isAssigned(template.Spec.InterserverHTTPPort) {
+				if chiV1.IsPortAssigned(template.Spec.InterserverHTTPPort) {
 					base = template.Spec.InterserverHTTPPort
 				}
 				host.InterserverHTTPPort = base + int32(host.Address.ClusterScopeIndex)
@@ -358,11 +343,11 @@ func hostApplyPortsFromSettings(host *chiV1.ChiHost) {
 func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings, final bool) {
 	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
 	// because this is not final setup (just intermittent) and all these ports may be overwritten later
-	fallbackTCPPort := unassigned()
-	fallbackTLSPort := unassigned()
-	fallbackHTTPPort := unassigned()
-	fallbackHTTPSPort := unassigned()
-	fallbackInterserverHTTPPort := unassigned()
+	fallbackTCPPort := chiV1.PortUnassigned()
+	fallbackTLSPort := chiV1.PortUnassigned()
+	fallbackHTTPPort := chiV1.PortUnassigned()
+	fallbackHTTPSPort := chiV1.PortUnassigned()
+	fallbackInterserverHTTPPort := chiV1.PortUnassigned()
 
 	if final {
 		// This is final setup and we need to assign real numbers to ports
@@ -377,35 +362,11 @@ func ensurePortValuesFromSettings(host *chiV1.ChiHost, settings *chiV1.Settings,
 		fallbackInterserverHTTPPort = chDefaultInterserverHTTPPortNumber
 	}
 
-	ensurePortValue(&host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
-	ensurePortValue(&host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
-	ensurePortValue(&host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
-	ensurePortValue(&host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
-	ensurePortValue(&host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
-}
-
-// ensurePortValue ensures port either:
-// - already has own value assigned
-// - or has provided value
-// - or value is fell back to default
-func ensurePortValue(port *int32, value, _default int32) {
-	// Port may already be explicitly specified in podTemplate or by portDistribution
-	if isAssigned(*port) {
-		// Port has a value already
-		return
-	}
-
-	// Port has no explicitly assigned value
-
-	// Let's use provided value real value
-	if isAssigned(value) {
-		// Provided value is a real value, use it
-		*port = value
-		return
-	}
-
-	// Fallback to default value
-	*port = _default
+	host.TCPPort = chiV1.EnsurePortValue(host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
+	host.TLSPort = chiV1.EnsurePortValue(host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
+	host.HTTPPort = chiV1.EnsurePortValue(host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
+	host.HTTPSPort = chiV1.EnsurePortValue(host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
+	host.InterserverHTTPPort = chiV1.EnsurePortValue(host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
 
 // fillStatus fills .status section of a CHI with values based on current CHI
@@ -932,7 +893,7 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *chiV1.ChiZookeeperConfi
 	for i := range zk.Nodes {
 		// Convenience wrapper
 		node := &zk.Nodes[i]
-		if node.Port == 0 {
+		if chiV1.IsPortUnassigned(node.Port) {
 			node.Port = zkDefaultPort
 		}
 	}
@@ -1734,28 +1695,28 @@ func (n *Normalizer) normalizeHostName(
 // normalizeHostPorts ensures chiV1.ChiReplica.Port is reasonable
 func (n *Normalizer) normalizeHostPorts(host *chiV1.ChiHost) {
 	// Deprecated
-	if invalid(host.Port) {
-		host.Port = unassigned()
+	if chiV1.IsPortInvalid(host.Port) {
+		host.Port = chiV1.PortUnassigned()
 	}
 
-	if invalid(host.TCPPort) {
-		host.TCPPort = unassigned()
+	if chiV1.IsPortInvalid(host.TCPPort) {
+		host.TCPPort = chiV1.PortUnassigned()
 	}
 
-	if invalid(host.TLSPort) {
-		host.TLSPort = unassigned()
+	if chiV1.IsPortInvalid(host.TLSPort) {
+		host.TLSPort = chiV1.PortUnassigned()
 	}
 
-	if invalid(host.HTTPPort) {
-		host.HTTPPort = unassigned()
+	if chiV1.IsPortInvalid(host.HTTPPort) {
+		host.HTTPPort = chiV1.PortUnassigned()
 	}
 
-	if invalid(host.HTTPSPort) {
-		host.HTTPSPort = unassigned()
+	if chiV1.IsPortInvalid(host.HTTPSPort) {
+		host.HTTPSPort = chiV1.PortUnassigned()
 	}
 
-	if invalid(host.InterserverHTTPPort) {
-		host.InterserverHTTPPort = unassigned()
+	if chiV1.IsPortInvalid(host.InterserverHTTPPort) {
+		host.InterserverHTTPPort = chiV1.PortUnassigned()
 	}
 }
 

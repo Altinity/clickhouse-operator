@@ -69,17 +69,17 @@ const (
 	    FROM system.processes
 		UNION ALL
 		SELECT
-            'metric.ChangedSettingsHash'       AS metric,
+            'metric.ChangedSettingsHash'                  AS metric,
             toString(groupBitXor(cityHash64(name,value))) AS value,
-            'Control sum for changed settings' AS description,
-            'gauge'                            AS type
+            'Control sum for changed settings'            AS description,
+            'gauge'                                       AS type
 		FROM system.settings WHERE changed
 		UNION ALL
 		SELECT 
 		    concat('metric.SystemErrors_',name) AS metric,
-		    toString(sum(value)) AS value,
-		    'Error counter from system.errors' AS description,
-			'counter' AS type
+		    toString(sum(value))                AS value,
+		    'Error counter from system.errors'  AS description,
+			'counter'                           AS type
 		FROM system.errors
         GROUP BY name
 	`
@@ -113,7 +113,7 @@ const (
 	querySystemDisksSQL = `
 	    SELECT 
 	        name,
-            toString(free_space) AS free_space,
+            toString(free_space)  AS free_space,
 			toString(total_space) AS total_space			
         FROM system.disks
 	`

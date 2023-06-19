@@ -73,19 +73,23 @@ def test_metrics_exporter_reboot(self):
                 },
             )
             expected_chi = [
-                {'namespace': 'test',
-                 'name': 'simple-01',
-                 'clusters':
-                     [{'name': 'simple',
-                       'hosts':
-                           [
-                               {'name': '0-0',
-                                'hostname': 'chi-simple-01-simple-0-0.test.svc.cluster.local',
-                                'tcpPort': 9000,
-                                'httpPort': 8123}
-                           ]
-                       }]
-                 }
+                {
+                    "namespace": "test",
+                    "name": "simple-01",
+                    "clusters": [
+                        {
+                            "name": "simple",
+                            "hosts": [
+                                {
+                                    "name": "0-0",
+                                    "hostname": "chi-simple-01-simple-0-0.test.svc.cluster.local",
+                                    "tcpPort": 9000,
+                                    "httpPort": 8123
+                                }
+                            ]
+                        }
+                    ]
+                }
             ]
             check_monitoring_chi(self.context.operator_namespace, operator_pod, expected_chi)
             with When("reboot metrics exporter"):

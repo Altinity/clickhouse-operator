@@ -236,7 +236,7 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
-		_ = w.ensureClusterSchemer().CHIDropDnsCache(ctx, chi)
+		_ = w.ensureClusterSchemer(chi).CHIDropDnsCache(ctx, chi)
 	} else {
 		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.Labels, err)
 	}
@@ -559,7 +559,7 @@ func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("exclude CHI from monitoring")
-		w.c.deleteWatch(chi.Namespace, chi.Name)
+		w.c.deleteWatch(chi)
 	}
 }
 
@@ -571,7 +571,7 @@ func (w *worker) includeStopped(chi *chiV1.ClickHouseInstallation) {
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("add CHI to monitoring")
-		w.c.updateWatch(chi.Namespace, chi.Name, chopModel.CreateFQDNs(chi, nil, false))
+		w.c.updateWatch(chi)
 	}
 }
 
@@ -788,7 +788,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 		M(host).F().
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 
-	err := w.ensureClusterSchemer().HostCreateTables(ctx, host)
+	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
 	host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
 	if err == nil {
 		w.a.V(1).
@@ -1016,20 +1016,20 @@ func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
 
 // waitHostInCluster
 func (w *worker) waitHostInCluster(ctx context.Context, host *chiV1.ChiHost) error {
-	return w.c.pollHostContext(ctx, host, nil, w.ensureClusterSchemer().IsHostInCluster)
+	return w.c.pollHostContext(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
 }
 
 // waitHostNotInCluster
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiV1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
-		return !w.ensureClusterSchemer().IsHostInCluster(ctx, host)
+		return !w.ensureClusterSchemer(host).IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiV1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
-		n, _ := w.ensureClusterSchemer().HostActiveQueriesNum(ctx, host)
+		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})
 }
@@ -1515,12 +1515,17 @@ func (w *worker) applyResource(
 	return true
 }
 
-func (w *worker) ensureClusterSchemer() *chopModel.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(obj interface{}) *chopModel.ClusterSchemer {
 	if w == nil {
 		return nil
 	}
 	if w.schemer == nil {
-		w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
+		switch obj.(type) {
+		case *chiV1.ClickHouseInstallation:
+			w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
+		case *chiV1.ChiHost:
+			w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
+		}
 	}
 	return w.schemer
 }

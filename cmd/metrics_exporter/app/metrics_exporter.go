@@ -27,7 +27,6 @@ import (
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
@@ -98,8 +97,6 @@ func Run() {
 	log.Info(chop.Config().String(true))
 
 	exporter := metrics.StartMetricsREST(
-		clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()),
-
 		metricsEP,
 		metricsPath,
 		chop.Config().ClickHouse.Metrics.Timeouts.Collect,
@@ -108,7 +105,7 @@ func Run() {
 		chiListPath,
 	)
 
-	exporter.DiscoveryWatchedCHIs(chopClient)
+	exporter.DiscoveryWatchedCHIs(kubeClient, chopClient)
 
 	<-ctx.Done()
 }

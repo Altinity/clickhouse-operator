@@ -22,7 +22,7 @@ import (
 	"net/http"
 )
 
-func makeRESTCall(chi *WatchedCHI, op string) error {
+func makeRESTCall(chi *WatchedCHI, method string) error {
 	url := "http://127.0.0.1:8888/chi"
 
 	json, err := json.Marshal(chi)
@@ -30,7 +30,7 @@ func makeRESTCall(chi *WatchedCHI, op string) error {
 		return err
 	}
 
-	req, err := http.NewRequest(op, url, bytes.NewBuffer(json))
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(json))
 	if err != nil {
 		return err
 	}
