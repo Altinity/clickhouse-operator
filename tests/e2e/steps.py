@@ -29,29 +29,16 @@ def create_test_namespace(self, force=False):
     """Create unique test namespace for test."""
 
     if (self.cflags & PARALLEL) and not force:
-        try:
-            self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
-            self.context.operator_namespace = self.context.test_namespace
-            util.create_namespace(self.context.test_namespace)
-            util.install_operator_if_not_exist()
-            yield self.context.test_namespace
-        finally:
-            with Finally("I delete namespace"):
-                shell = Shell()
-                self.context.shell = shell
-                util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
-                shell.close()
+        self.context.test_namespace = self.name[self.name.find('test_0'):self.name.find('. ')].replace("_", "-") + "-" + str(uuid.uuid1())
+        self.context.operator_namespace = self.context.test_namespace
+        util.create_namespace(self.context.test_namespace)
+        util.install_operator_if_not_exist()
+        return self.context.test_namespace
     else:
-        try:
-            util.create_namespace(self.context.test_namespace)
-            util.install_operator_if_not_exist()
-            yield self.context.test_namespace
-        finally:
-            with Finally("I delete namespace"):
-                shell = Shell()
-                self.context.shell = shell
-                util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
-                shell.close()
+        self.context.operator_namespace = self.context.test_namespace
+        util.create_namespace(self.context.test_namespace)
+        util.install_operator_if_not_exist()
+        return self.context.test_namespace
 
 
 @TestStep(Given)
@@ -135,11 +122,10 @@ def create_shell_namespace_clickhouse_template(self):
         shell = get_shell()
         self.context.shell = shell
 
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
+    with And("I create test namespace"):
+        create_test_namespace()
 
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
+        kubectl.apply(
+            util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
+        )
