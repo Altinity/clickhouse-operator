@@ -313,7 +313,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
 		w.task.registryFailed.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
-		if err == errIgnore {
+		if err == errCRUDIgnore {
 			err = nil
 		}
 	}

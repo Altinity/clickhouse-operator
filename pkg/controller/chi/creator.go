@@ -31,7 +31,7 @@ import (
 )
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
+func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) ErrorCRUD {
 	log.V(1).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -63,7 +63,7 @@ func (c *Controller) updateStatefulSet(
 	oldStatefulSet *appsV1.StatefulSet,
 	newStatefulSet *appsV1.StatefulSet,
 	host *chiV1.ChiHost,
-) error {
+) ErrorCRUD {
 	log.V(2).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -179,17 +179,21 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 	return pvc, err
 }
 
-var errAbort = errors.New("onStatefulSetCreateFailed - abort")
-var errStop = errors.New("onStatefulSetCreateFailed - stop")
-var errIgnore = errors.New("onStatefulSetCreateFailed - ignore")
-var errUnexpectedFlow = errors.New("unexpected flow")
+type ErrorCRUD error
+
+var (
+	errCRUDAbort          ErrorCRUD = errors.New("crud error - should abort")
+	errCRUDStop           ErrorCRUD = errors.New("crud error - should stop")
+	errCRUDIgnore         ErrorCRUD = errors.New("crud error - should ignore")
+	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
+)
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
-func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.ChiHost) error {
+func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.ChiHost) ErrorCRUD {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
-		return errIgnore
+		return errCRUDIgnore
 	}
 
 	// What to do with StatefulSet - look into chop configuration settings
@@ -197,7 +201,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.
 	case chiV1.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort")
-		return errAbort
+		return errCRUDAbort
 
 	case chiV1.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
@@ -208,22 +212,22 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.
 	case chiV1.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(host.DesiredStatefulSet.ObjectMeta))
-		return errIgnore
+		return errCRUDIgnore
 
 	default:
 		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", chop.Config().Reconcile.StatefulSet.Create.OnFailure)
-		return errIgnore
+		return errCRUDIgnore
 	}
 
-	return errUnexpectedFlow
+	return errCRUDUnexpectedFlow
 }
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
-func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *appsV1.StatefulSet, host *chiV1.ChiHost) error {
+func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *appsV1.StatefulSet, host *chiV1.ChiHost) ErrorCRUD {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
-		return errIgnore
+		return errCRUDIgnore
 	}
 
 	// Convenience shortcuts
@@ -235,7 +239,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case chiV1.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
-		return errAbort
+		return errCRUDAbort
 
 	case chiV1.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
@@ -260,42 +264,42 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case chiV1.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
-		return errIgnore
+		return errCRUDIgnore
 
 	default:
 		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetUpdateFailureAction=%s", chop.Config().Reconcile.StatefulSet.Update.OnFailure)
-		return errIgnore
+		return errCRUDIgnore
 	}
 
-	return errUnexpectedFlow
+	return errCRUDUnexpectedFlow
 }
 
 // shouldContinueOnCreateFailed return nil in case 'continue' or error in case 'do not continue'
-func (c *Controller) shouldContinueOnCreateFailed() error {
+func (c *Controller) shouldContinueOnCreateFailed() ErrorCRUD {
 	// Check configuration option regarding should we continue when errors met on the way
 	// c.chopConfig.OnStatefulSetUpdateFailureAction
 	var continueUpdate = false
 	if continueUpdate {
 		// Continue update
-		return errIgnore
+		return errCRUDIgnore
 	}
 
 	// Do not continue update
-	return errStop
+	return errCRUDStop
 }
 
 // shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'
-func (c *Controller) shouldContinueOnUpdateFailed() error {
+func (c *Controller) shouldContinueOnUpdateFailed() ErrorCRUD {
 	// Check configuration option regarding should we continue when errors met on the way
 	// c.chopConfig.OnStatefulSetUpdateFailureAction
 	var continueUpdate = false
 	if continueUpdate {
 		// Continue update
-		return errIgnore
+		return errCRUDIgnore
 	}
 
 	// Do not continue update
-	return errStop
+	return errCRUDStop
 }
 
 func (c *Controller) createSecret(ctx context.Context, secret *coreV1.Secret) error {

@@ -1318,7 +1318,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
-	} else if err == errIgnore {
+	} else if err == errCRUDIgnore {
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
 			M(host).F().
