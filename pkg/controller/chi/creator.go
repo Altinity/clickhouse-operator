@@ -43,7 +43,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, newCreateOptions()); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
-		return c.onStatefulSetCreateFailed(ctx, host)
+		return errCRUDRecreate
 	}
 
 	// StatefulSet created, wait until host is ready
@@ -99,7 +99,7 @@ func (c *Controller) updateStatefulSet(
 		}
 		log.V(1).M(host).F().Error("%s", str)
 
-		return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
+		return errCRUDRecreate
 	}
 
 	// After calling "Update()"
@@ -275,7 +275,7 @@ func (c *Controller) shouldContinueOnCreateFailed() ErrorCRUD {
 	}
 
 	// Do not continue update
-	return errCRUDStop
+	return errCRUDAbort
 }
 
 // shouldContinueOnUpdateFailed return nil in case 'continue' or error in case 'do not continue'
@@ -289,7 +289,7 @@ func (c *Controller) shouldContinueOnUpdateFailed() ErrorCRUD {
 	}
 
 	// Do not continue update
-	return errCRUDStop
+	return errCRUDAbort
 }
 
 func (c *Controller) createSecret(ctx context.Context, secret *coreV1.Secret) error {

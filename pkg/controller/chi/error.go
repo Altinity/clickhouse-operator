@@ -22,7 +22,7 @@ type ErrorCRUD error
 
 var (
 	errCRUDAbort          ErrorCRUD = errors.New("crud error - should abort")
-	errCRUDStop           ErrorCRUD = errors.New("crud error - should stop")
 	errCRUDIgnore         ErrorCRUD = errors.New("crud error - should ignore")
+	errCRUDRecreate       ErrorCRUD = errors.New("crud error - should recreate")
 	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
 )
