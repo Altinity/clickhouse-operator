@@ -16,7 +16,6 @@ package chi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"gopkg.in/d4l3k/messagediff.v1"
@@ -178,15 +177,6 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 	}
 	return pvc, err
 }
-
-type ErrorCRUD error
-
-var (
-	errCRUDAbort          ErrorCRUD = errors.New("crud error - should abort")
-	errCRUDStop           ErrorCRUD = errors.New("crud error - should stop")
-	errCRUDIgnore         ErrorCRUD = errors.New("crud error - should ignore")
-	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
-)
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
