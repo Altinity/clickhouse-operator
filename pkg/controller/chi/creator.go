@@ -74,8 +74,7 @@ func (c *Controller) updateStatefulSet(
 	// Apply newStatefulSet and wait for Generation to change
 	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(ctx, newStatefulSet, newUpdateOptions())
 	if err != nil {
-		// Update failed
-		log.V(1).M(host).F().Error("%v", err)
+		log.V(1).M(host).F().Error("StatefulSet update failed. err: %v", err)
 		diff, equal := messagediff.DeepDiff(oldStatefulSet.Spec, newStatefulSet.Spec)
 
 		str := ""
@@ -101,7 +100,7 @@ func (c *Controller) updateStatefulSet(
 		}
 		log.V(1).M(host).F().Error("%s", str)
 
-		return err
+		return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
 	}
 
 	// After calling "Update()"
@@ -116,12 +115,13 @@ func (c *Controller) updateStatefulSet(
 
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := c.waitHostReady(ctx, host); err == nil {
-		// Target generation reached, StatefulSet updated successfully
-		return nil
+	if err := c.waitHostReady(ctx, host); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet update wait failed. err: %v", err)
+		return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
 	}
-	// Unable to run StatefulSet, StatefulSet update failed, time to rollback?
-	return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
+
+	// Target generation reached, StatefulSet updated successfully
+	return nil
 }
 
 // updatePersistentVolume
@@ -242,7 +242,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions())
 		if err != nil {
-			// Unable to fetch current StatefulSet
+			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta), err)
 			return err
 		}
 
