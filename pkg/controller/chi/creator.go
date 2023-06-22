@@ -120,7 +120,7 @@ func (c *Controller) updateStatefulSet(
 		return c.onStatefulSetUpdateFailed(ctx, oldStatefulSet, host)
 	}
 
-	// Target generation reached, StatefulSet updated successfully
+	log.V(2).M(host).F().Info("Target generation reached, StatefulSet updated successfully")
 	return nil
 }
 
