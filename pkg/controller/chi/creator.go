@@ -243,7 +243,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions())
 		if err != nil {
 			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta), err)
-			return err
+			return c.shouldContinueOnUpdateFailed()
 		}
 
 		// Make copy of "previous" .Spec just to be sure nothing gets corrupted
