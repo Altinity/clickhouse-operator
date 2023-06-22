@@ -43,18 +43,18 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, newCreateOptions()); err != nil {
-		// Unable to create StatefulSet at all
-		return err
+		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
+		return c.onStatefulSetCreateFailed(ctx, host)
 	}
 
 	// StatefulSet created, wait until host is ready
-	if err := c.waitHostReady(ctx, host); err == nil {
-		// Target generation reached, StatefulSet created successfully
-		return nil
+	if err := c.waitHostReady(ctx, host); err != nil {
+		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
+		return c.onStatefulSetCreateFailed(ctx, host)
 	}
 
-	// StatefulSet create failed, time to rollback?
-	return c.onStatefulSetCreateFailed(ctx, host)
+	log.V(2).M(host).F().Info("Target generation reached, StatefulSet created successfully")
+	return nil
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
