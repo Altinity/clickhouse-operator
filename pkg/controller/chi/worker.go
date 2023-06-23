@@ -1303,7 +1303,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 		M(host).F().
 		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
 
-	err := w.c.createStatefulSet(ctx, host)
+	action := w.c.createStatefulSet(ctx, host)
 
 	host.CHI.EnsureStatus().HostAdded()
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
@@ -1312,26 +1312,37 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 		},
 	})
 
-	if err == nil {
+	switch action {
+	case nil:
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
-	} else if err == errCRUDIgnore {
-		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
-			WithStatusAction(host.CHI).
-			M(host).F().
-			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
-	} else {
+		return nil
+	case errCRUDAbort:
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
 			M(host).F().
-			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, err)
+			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, action)
+		return action
+	case errCRUDIgnore:
+		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.CHI).
+			M(host).F().
+			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
+		return nil
+	case errCRUDRecreate:
+		w.a.V(1).M(host).Warning("Got recreate action. Ignore and continue for now")
+		return nil
+	case errCRUDUnexpectedFlow:
+		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
+		return nil
 	}
 
-	return err
+	w.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+	return nil
 }
 
 // waitConfigMapPropagation
@@ -1403,37 +1414,47 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 		return nil
 	}
 
+	action := errCRUDRecreate
 	if chopModel.IsStatefulSetReady(curStatefulSet) {
-		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
-		if err == nil {
-			host.CHI.EnsureStatus().HostUpdated()
-			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
-					MainFields: true,
-				},
-			})
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(host.CHI).
-				M(host).F().
-				Info("Update StatefulSet(%s/%s) - completed", namespace, name)
-			return nil
-		}
+		action = w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
+	}
 
+	switch action {
+	case nil:
+		host.CHI.EnsureStatus().HostUpdated()
+		_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+			CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
+				MainFields: true,
+			},
+		})
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(host.CHI).
+			M(host).F().
+			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
+		return nil
+	case errCRUDAbort:
+		w.a.V(1).M(host).Info("Got abort. Abort")
+		return errCRUDAbort
+	case errCRUDIgnore:
+		w.a.V(1).M(host).Info("Got ignore. Ignore")
+		return nil
+	case errCRUDRecreate:
 		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateInProgress).
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
-
-		w.a.V(2).
-			M(host).F().
-			Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 		diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
 		w.a.V(2).M(host).Info("StatefulSet.Spec diff:")
 		w.a.V(2).M(host).Info(util.MessageDiffString(diff, equal))
+		return w.recreateStatefulSet(ctx, host)
+	case errCRUDUnexpectedFlow:
+		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
+		return nil
 	}
 
-	return w.recreateStatefulSet(ctx, host)
+	w.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+	return nil
 }
 
 // recreateStatefulSet
