@@ -3542,7 +3542,7 @@ def test_039(self, step=0, delete_chi=0):
     with Then("I delete namespace"):
         shell = get_shell()
         self.context.shell = shell
-        util.delete_namespace(namespace=self.context.test_namespace, delete_chi=delete_chi)
+        util.delete_namespace(namespace=self.context.test_namespace, delete_chi=1)
         shell.close()
 
 
