@@ -746,17 +746,18 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	return err
 }
 
+// Comment out PV
 // reconcilePersistentVolumes reconciles all PVs of a host
-func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiV1.ChiHost) {
-	if util.IsContextDone(ctx) {
-		return
-	}
-
-	w.c.walkPVs(host, func(pv *coreV1.PersistentVolume) {
-		pv = w.task.creator.PreparePersistentVolume(pv, host)
-		_, _ = w.c.updatePersistentVolume(ctx, pv)
-	})
-}
+//func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiV1.ChiHost) {
+//	if util.IsContextDone(ctx) {
+//		return
+//	}
+//
+//	w.c.walkPVs(host, func(pv *coreV1.PersistentVolume) {
+//		pv = w.task.creator.PreparePersistentVolume(pv, host)
+//		_, _ = w.c.updatePersistentVolume(ctx, pv)
+//	})
+//}
 
 // reconcilePVCs reconciles all PVCs of a host
 func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {

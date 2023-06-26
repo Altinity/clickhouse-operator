@@ -38,7 +38,8 @@ func (c *Controller) discovery(ctx context.Context, chi *chiV1.ClickHouseInstall
 	c.discoveryServices(ctx, r, chi, opts)
 	c.discoverySecrets(ctx, r, chi, opts)
 	c.discoveryPVCs(ctx, r, chi, opts)
-	c.discoveryPVs(ctx, r, chi, opts)
+	// Comment out PV
+	//c.discoveryPVs(ctx, r, chi, opts)
 	c.discoveryPDBs(ctx, r, chi, opts)
 	return r
 }
@@ -118,20 +119,21 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *chopModel.Registry, c
 	}
 }
 
-func (c *Controller) discoveryPVs(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
-	list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts)
-	if err != nil {
-		log.M(chi).F().Error("FAIL list PV err: %v", err)
-		return
-	}
-	if list == nil {
-		log.M(chi).F().Error("FAIL list PV list is nil")
-		return
-	}
-	for _, obj := range list.Items {
-		r.RegisterPV(obj.ObjectMeta)
-	}
-}
+// Comment out PV
+//func (c *Controller) discoveryPVs(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
+//	list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts)
+//	if err != nil {
+//		log.M(chi).F().Error("FAIL list PV err: %v", err)
+//		return
+//	}
+//	if list == nil {
+//		log.M(chi).F().Error("FAIL list PV list is nil")
+//		return
+//	}
+//	for _, obj := range list.Items {
+//		r.RegisterPV(obj.ObjectMeta)
+//	}
+//}
 
 func (c *Controller) discoveryPDBs(ctx context.Context, r *chopModel.Registry, chi *chiV1.ClickHouseInstallation, opts metaV1.ListOptions) {
 	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).List(ctx, opts)

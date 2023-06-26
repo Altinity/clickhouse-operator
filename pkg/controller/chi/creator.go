@@ -123,24 +123,25 @@ func (c *Controller) updateStatefulSet(
 	return nil
 }
 
+// Comment out PV
 // updatePersistentVolume
-func (c *Controller) updatePersistentVolume(ctx context.Context, pv *coreV1.PersistentVolume) (*coreV1.PersistentVolume, error) {
-	log.V(2).M(pv).F().P()
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil, fmt.Errorf("task is done")
-	}
-
-	var err error
-	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(ctx, pv, newUpdateOptions())
-	if err != nil {
-		// Update failed
-		log.V(1).M(pv).F().Error("%v", err)
-		return nil, err
-	}
-
-	return pv, err
-}
+//func (c *Controller) updatePersistentVolume(ctx context.Context, pv *coreV1.PersistentVolume) (*coreV1.PersistentVolume, error) {
+//	log.V(2).M(pv).F().P()
+//	if util.IsContextDone(ctx) {
+//		log.V(2).Info("task is done")
+//		return nil, fmt.Errorf("task is done")
+//	}
+//
+//	var err error
+//	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(ctx, pv, newUpdateOptions())
+//	if err != nil {
+//		// Update failed
+//		log.V(1).M(pv).F().Error("%v", err)
+//		return nil, err
+//	}
+//
+//	return pv, err
+//}
 
 // updatePersistentVolumeClaim
 func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV1.PersistentVolumeClaim) (*coreV1.PersistentVolumeClaim, error) {
