@@ -55,7 +55,7 @@ const (
 	// 1. Metrics requests
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
-	defaultChScheme   = ChSchemeHTTP
+	defaultChScheme   = ChSchemeAuto
 	defaultChUsername = ""
 	defaultChPassword = ""
 	defaultChPort     = 8123
