@@ -3708,6 +3708,51 @@ def test_041(self):
 
     delete_test_namespace()
 
+@TestScenario
+@Name("test_042. Test configuration rollback")
+def test_042(self):
+    create_shell_namespace_clickhouse_template()
+
+    cluster = "default"
+    manifest = f"manifests/chi/test-042-rollback.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                    },
+                "pod_image": current().context.clickhouse_version,
+                "do_not_delete": 1,
+                },
+            )
+
+    with When("Update with a spec that crashes ClickHouse"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-042-rollback-2.yaml",
+            check={
+                "chi_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Operator should rollback, and both pods should be working"):
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+        with And("remote_servers.xml should contain 2 shards"):
+            assert get_shards_from_remote_servers(chi, cluster) == 2
+
+        with And("Both shards are working"):
+            res = clickhouse.query(chi, "select count() from cluster('all-sharded', system.one)")
+            assert res == "2"
+
+    kubectl.delete_chi(chi)
+
+    delete_test_namespace()
 
 @TestModule
 @Name("e2e.test_operator")
@@ -3719,6 +3764,16 @@ def test(self):
     with Given("I create shell"):
         shell = get_shell()
         self.context.shell = shell
+
+    with Given("Cleanup CHIs"):
+        ns = kubectl.get("ns", name="", ns = "--all-namespaces")
+        if "items" in ns:
+            for n in ns["items"]:
+                ns_name = n["metadata"]["name"]
+                if ns_name.startswith("test-"):
+                    with Then(f"Delete ns {ns_name}"):
+                        util.delete_namespace(namespace = ns_name, delete_chi=True)
+
 
     # placeholder for selective test running
     # run_tests = [test_008, test_009]
