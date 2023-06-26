@@ -3143,7 +3143,7 @@ def test_034(self):
     chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
     operator_namespace = current().context.operator_namespace
 
-    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=10):
+    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=6):
         with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
             for i in range(1, max_retries):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
@@ -3184,7 +3184,7 @@ def test_034(self):
             timeout=600,
         )
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end 1"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
         check_metrics_monitoring(
@@ -3201,7 +3201,7 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with non zero value `1` at the end"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is not zero"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3216,7 +3216,7 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3265,6 +3265,13 @@ def test_034(self):
         print(out)
         assert "NETWORK_ERROR" in out, out
 
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"): # 0.21.2+
+        check_metrics_monitoring(
+            operator_namespace,
+            operator_pod,
+            expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
+        )
+
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
@@ -3273,7 +3280,7 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3281,6 +3288,8 @@ def test_034(self):
         )
 
     kubectl.launch(f"delete pod {client_pod}")
+
+    kubectl.delete_chi(chi)
 
     delete_test_namespace()
 
