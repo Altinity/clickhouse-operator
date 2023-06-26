@@ -6,6 +6,7 @@ import e2e.settings as settings
 import e2e.util as util
 import e2e.yaml_manifest as yaml_manifest
 from testflows.core import *
+from e2e.steps import *
 
 
 def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries_number=10):
@@ -510,6 +511,14 @@ def test_clickhouse_keeper_probes_workload(self):
 @TestModule
 @Name("e2e.test_keeper")
 def test(self):
+    with Given("set settings"):
+        set_settings()
+        self.context.test_namespace = "test"
+        self.context.operator_namespace = "test"
+    with Given("I create shell"):
+        shell = get_shell()
+        self.context.shell = shell
+
     all_tests = [
         test_zookeeper_operator_rescale,
         test_clickhouse_keeper_rescale,
