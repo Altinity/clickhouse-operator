@@ -3143,7 +3143,7 @@ def test_034(self):
     chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
     operator_namespace = current().context.operator_namespace
 
-    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=6):
+    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=7):
         with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
             for i in range(1, max_retries):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
@@ -3208,7 +3208,7 @@ def test_034(self):
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 1$",
         )
 
-    with When("remove the ClickHouseOperatorConfiguration"):
+    with When("Reset ClickHouseOperatorConfiguration to default"):
         kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration 2"):
@@ -3265,13 +3265,6 @@ def test_034(self):
         print(out)
         assert "NETWORK_ERROR" in out, out
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"): # 0.21.2+
-        check_metrics_monitoring(
-            operator_namespace,
-            operator_pod,
-            expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
-        )
-
     with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
@@ -3281,6 +3274,21 @@ def test_034(self):
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
+        check_metrics_monitoring(
+            operator_namespace,
+            operator_pod,
+            expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
+        )
+
+    with When("Reset ClickHouseOperatorConfiguration to default"):
+        kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
+
+    with And("reboot metrics exporter to update the configuration 4"):
+        util.restart_operator()
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
+        operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
+
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"): # 0.21.2+
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
