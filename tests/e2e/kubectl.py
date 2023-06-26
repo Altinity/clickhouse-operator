@@ -194,16 +194,20 @@ def create_ns(ns):
         launch(f"get ns {ns}", ns=None)
 
 
-def delete_ns(ns, ok_to_fail=False, timeout=1000):
+def delete_ns(ns = None, delete_chi=False, ok_to_fail=False, timeout=1000):
+    if ns == None:
+        ns = current().context.test_namespace
+    if delete_chi:
+        delete_all_chi(ns)
     launch(
-        f"delete ns {current().context.test_namespace} -v 5 --now --timeout={timeout}s",
+        f"delete ns {ns} -v 5 --now --timeout={timeout}s",
         ns=None,
         ok_to_fail=ok_to_fail,
         timeout=timeout,
     )
     for attempt in retries(timeout=300, delay=10):
         with attempt:
-            out = launch(f"get namespace {current().context.test_namespace}", ok_to_fail=True)
+            out = launch(f"get namespace {ns}", ok_to_fail=True)
             assert "Error" in out
 
 
