@@ -38,8 +38,9 @@ const (
 	Secret EntityType = "Secret"
 	// PVC describes PersistentVolumeClaim entity type
 	PVC EntityType = "PVC"
+	// Comment out PV
 	// PV describes PersistentVolume entity type
-	PV EntityType = "PV"
+	//PV EntityType = "PV"
 	// PDB describes PodDisruptionBudget entity type
 	PDB EntityType = "PDB"
 )
@@ -260,25 +261,26 @@ func (r *Registry) WalkPVC(f func(meta v1.ObjectMeta)) {
 	r.WalkEntityType(PVC, f)
 }
 
-// RegisterPV register PV
-func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
-	r.registerEntity(PV, meta)
-}
-
-// HasPV checks whether registry has specified PV
-func (r *Registry) HasPV(meta v1.ObjectMeta) bool {
-	return r.hasEntity(PV, meta)
-}
-
-// NumPV gets number of PV
-func (r *Registry) NumPV() int {
-	return r.Len(PV)
-}
-
-// WalkPV walk over specified entity types
-func (r *Registry) WalkPV(f func(meta v1.ObjectMeta)) {
-	r.WalkEntityType(PV, f)
-}
+// Comment out PV
+//// RegisterPV register PV
+//func (r *Registry) RegisterPV(meta v1.ObjectMeta) {
+//	r.registerEntity(PV, meta)
+//}
+//
+//// HasPV checks whether registry has specified PV
+//func (r *Registry) HasPV(meta v1.ObjectMeta) bool {
+//	return r.hasEntity(PV, meta)
+//}
+//
+//// NumPV gets number of PV
+//func (r *Registry) NumPV() int {
+//	return r.Len(PV)
+//}
+//
+//// WalkPV walk over specified entity types
+//func (r *Registry) WalkPV(f func(meta v1.ObjectMeta)) {
+//	r.WalkEntityType(PV, f)
+//}
 
 // RegisterPDB register PDB
 func (r *Registry) RegisterPDB(meta v1.ObjectMeta) {

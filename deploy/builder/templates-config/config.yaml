@@ -180,9 +180,10 @@ reconcile:
     create:
       # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for an admin to assist
-      # 2. delete - delete newly created problematic StatefulSet
-      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
+      # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
+      #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+      # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
       onFailure: ignore
 
     update:
@@ -192,10 +193,12 @@ reconcile:
       pollInterval: 5
       # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for an admin to assist
+      # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
+      #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
       # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
-      # Pod would be recreated by StatefulSet based on rollback-ed configuration
-      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
+      #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
+      #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
       onFailure: rollback
 
   host:
@@ -203,7 +206,7 @@ reconcile:
     # - to be excluded from a cluster
     # OR
     # - to be included into a cluster
-    # respectfully
+    # respectfully before proceeding to the host reconciliation.
     wait:
       exclude: true
       include: false

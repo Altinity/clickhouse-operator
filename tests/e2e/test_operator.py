@@ -3143,7 +3143,7 @@ def test_034(self):
     chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
     operator_namespace = current().context.operator_namespace
 
-    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=10):
+    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=7):
         with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
             for i in range(1, max_retries):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
@@ -3184,7 +3184,7 @@ def test_034(self):
             timeout=600,
         )
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end 1"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
         check_metrics_monitoring(
@@ -3201,14 +3201,14 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with non zero value `1` at the end"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is not zero"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 1$",
         )
 
-    with When("remove the ClickHouseOperatorConfiguration"):
+    with When("Reset ClickHouseOperatorConfiguration to default"):
         kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
     with And("reboot metrics exporter to update the configuration 2"):
@@ -3216,7 +3216,7 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3273,7 +3273,22 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Then("check for `chi_clickhouse_metric_fetch_errors` string with zero value at the end"):
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"):
+        check_metrics_monitoring(
+            operator_namespace,
+            operator_pod,
+            expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
+        )
+
+    with When("Reset ClickHouseOperatorConfiguration to default"):
+        kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
+
+    with And("reboot metrics exporter to update the configuration 4"):
+        util.restart_operator()
+        out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
+        operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
+
+    with Then("check for `chi_clickhouse_metric_fetch_errors` is zero"): # 0.21.2+
         check_metrics_monitoring(
             operator_namespace,
             operator_pod,
@@ -3281,6 +3296,8 @@ def test_034(self):
         )
 
     kubectl.launch(f"delete pod {client_pod}")
+
+    kubectl.delete_chi(chi)
 
     delete_test_namespace()
 
@@ -3691,6 +3708,51 @@ def test_041(self):
 
     delete_test_namespace()
 
+@TestScenario
+@Name("test_042. Test configuration rollback")
+def test_042(self):
+    create_shell_namespace_clickhouse_template()
+
+    cluster = "default"
+    manifest = f"manifests/chi/test-042-rollback.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                    },
+                "pod_image": current().context.clickhouse_version,
+                "do_not_delete": 1,
+                },
+            )
+
+    with When("Update with a spec that crashes ClickHouse"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-042-rollback-2.yaml",
+            check={
+                "chi_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Operator should rollback, and both pods should be working"):
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+        with And("remote_servers.xml should contain 2 shards"):
+            assert get_shards_from_remote_servers(chi, cluster) == 2
+
+        with And("Both shards are working"):
+            res = clickhouse.query(chi, "select count() from cluster('all-sharded', system.one)")
+            assert res == "2"
+
+    kubectl.delete_chi(chi)
+
+    delete_test_namespace()
 
 @TestModule
 @Name("e2e.test_operator")
@@ -3702,6 +3764,16 @@ def test(self):
     with Given("I create shell"):
         shell = get_shell()
         self.context.shell = shell
+
+    with Given("Cleanup CHIs"):
+        ns = kubectl.get("ns", name="", ns = "--all-namespaces")
+        if "items" in ns:
+            for n in ns["items"]:
+                ns_name = n["metadata"]["name"]
+                if ns_name.startswith("test-"):
+                    with Then(f"Delete ns {ns_name}"):
+                        util.delete_namespace(namespace = ns_name, delete_chi=True)
+
 
     # placeholder for selective test running
     # run_tests = [test_008, test_009]

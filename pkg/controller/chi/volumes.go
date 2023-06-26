@@ -65,13 +65,14 @@ func (c *Controller) walkDiscoveredPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.
 	}
 }
 
-func (c *Controller) walkPVs(host *chiV1.ChiHost, f func(pv *coreV1.PersistentVolume)) {
-	c.walkPVCs(host, func(pvc *coreV1.PersistentVolumeClaim) {
-		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(newContext(), pvc.Spec.VolumeName, newGetOptions())
-		if err != nil {
-			log.M(host).F().Error("FAIL get PV %s err:%v", pvc.Spec.VolumeName, err)
-			return
-		}
-		f(pv)
-	})
-}
+// Comment out PV
+//func (c *Controller) walkPVs(host *chiV1.ChiHost, f func(pv *coreV1.PersistentVolume)) {
+//	c.walkPVCs(host, func(pvc *coreV1.PersistentVolumeClaim) {
+//		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(newContext(), pvc.Spec.VolumeName, newGetOptions())
+//		if err != nil {
+//			log.M(host).F().Error("FAIL get PV %s err:%v", pvc.Spec.VolumeName, err)
+//			return
+//		}
+//		f(pv)
+//	})
+//}

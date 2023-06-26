@@ -221,9 +221,7 @@ def clean_namespace(delete_chi=False, delete_keeper=False, namespace=None):
 
 
 def delete_namespace(namespace, delete_chi=False):
-    if delete_chi:
-        kubectl.delete_all_chi(namespace)
-    kubectl.delete_ns(namespace, ok_to_fail=True)
+    kubectl.delete_ns(namespace, delete_chi, ok_to_fail=True)
 
 
 def create_namespace(namespace):
