@@ -3028,9 +3028,10 @@ data:
       ################################################
       access:
         # Possible values for 'scheme' are:
-        #   1. http
-        #   2. https
-        scheme: ""
+        #   1. http - force http to be used to connect to ClickHouse instances
+        #   2. https - force https to be used to connect to ClickHouse instances
+        #   3. auto - either http or https is selected based on open ports
+        scheme: "auto"
         # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
         # These credentials are used for:
         #   1. Metrics requests
