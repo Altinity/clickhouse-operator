@@ -236,7 +236,7 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
-		_ = w.ensureClusterSchemer(chi).CHIDropDnsCache(ctx, chi)
+		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
 		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.Labels, err)
 	}
@@ -1536,17 +1536,29 @@ func (w *worker) applyResource(
 	return true
 }
 
-func (w *worker) ensureClusterSchemer(obj interface{}) *chopModel.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(host *chiV1.ChiHost) *chopModel.ClusterSchemer {
 	if w == nil {
 		return nil
 	}
-	if w.schemer == nil {
-		switch obj.(type) {
-		case *chiV1.ClickHouseInstallation:
-			w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
-		case *chiV1.ChiHost:
-			w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
+	// Make base cluster connection params
+	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
+	// Adjust base cluster connection params with per-host props
+	switch clusterConnectionParams.Scheme {
+	case chiV1.ChSchemeAuto:
+		switch {
+		case chiV1.IsPortAssigned(host.HTTPPort):
+			clusterConnectionParams.Scheme = "http"
+			clusterConnectionParams.Port = int(host.HTTPPort)
+		case chiV1.IsPortAssigned(host.HTTPSPort):
+			clusterConnectionParams.Scheme = "https"
+			clusterConnectionParams.Port = int(host.HTTPSPort)
 		}
+	case chiV1.ChSchemeHTTP:
+		clusterConnectionParams.Port = int(host.HTTPPort)
+	case chiV1.ChSchemeHTTPS:
+		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
+	w.schemer = chopModel.NewClusterSchemer(clusterConnectionParams)
+
 	return w.schemer
 }
