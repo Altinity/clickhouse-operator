@@ -3741,9 +3741,8 @@ def test_042(self):
         )
 
         with Then("Operator should apply changes, and both pods should be created"):
-            # THIS IS A DESIRED BEHAVIOUR, UNCOMMENT WHEN FIXED
-            # kubectl.wait_chi_status(chi, "Completed", retries=20)
-            # kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
             kubectl.wait_field("pod", f"chi-{chi}-{cluster}-0-0-0",
                     ".status.containerStatuses[0].state.waiting.reason",
@@ -3757,17 +3756,18 @@ def test_042(self):
             res = clickhouse.query_with_error(chi, host = f"chi-{chi}-{cluster}-1-0-0", sql = "select 1")
             assert res == "1"
 
-    with When("CHI is reverted to a good one"):
-        kubectl.create_and_check(
-            manifest=manifest,
-            check={
-                "do_not_delete": 1,
-                },
-            )
-
-        with Then("Both nodes are working"):
-            res = clickhouse.query_with_error(chi, "select count() from cluster('all-sharded', system.one)")
-            assert res == "2"
+    # With reconcile.statefulSet.update.onFailure == abort we do not expect working nodes
+    # with When("CHI is reverted to a good one"):
+    #     kubectl.create_and_check(
+    #         manifest=manifest,
+    #         check={
+    #             "do_not_delete": 1,
+    #             },
+    #         )
+    #
+    #     with Then("Both nodes are working"):
+    #         res = clickhouse.query_with_error(chi, "select count() from cluster('all-sharded', system.one)")
+    #         assert res == "2"
 
     kubectl.delete_chi(chi)
 
