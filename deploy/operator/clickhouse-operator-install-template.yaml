@@ -3116,7 +3116,7 @@ data:
           #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
           #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
           # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
-          onFailure: rollback
+          onFailure: abort
     
       host:
         # Whether reconciler should wait for a host:
