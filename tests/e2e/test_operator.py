@@ -3761,11 +3761,14 @@ def test_042(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
+                "pod_count": 2,
                 "do_not_delete": 1,
-                },
-            )
+                "chi_status": "Completed",
+            },
+        )
 
         with Then("Both nodes are working"):
+            time.sleep(60)
             res = clickhouse.query_with_error(chi, "select count() from cluster('all-sharded', system.one)")
             assert res == "2"
 
