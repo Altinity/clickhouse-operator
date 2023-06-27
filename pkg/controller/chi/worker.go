@@ -598,7 +598,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseIn
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
-func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHouseInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *chiV1.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -633,7 +633,28 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHou
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
-		Info("reconcile completed, task id: %s", _chi.Spec.GetTaskID())
+		Info("reconcile completed successfully, task id: %s", _chi.Spec.GetTaskID())
+}
+
+func (w *worker) markReconcileComplete(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return
+	}
+
+	chi.EnsureStatus().ReconcileComplete()
+	w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
+			MainFields: true,
+		},
+	})
+
+	w.a.V(1).
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		WithStatusAction(chi).
+		WithStatusActions(chi).
+		M(chi).F().
+		Info("reconcile completed unsuccessfully, task id: %s", chi.Spec.GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
