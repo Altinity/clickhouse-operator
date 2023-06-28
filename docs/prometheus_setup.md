@@ -44,27 +44,27 @@ We can either run [create-prometheus.sh][create-prometheus.sh] or setup the whol
   
   - Create CRD for prometheus-operator like kind:Prometheus, kind:PrometheusRule etc.
   ```bash
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_thanosrulers.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheuses.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_alertmanagers.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/prometheus-operator-crd/monitoring.coreos.com_thanosrulers.yaml
   ```
 
   - Create RBAC settings for `prometheus-operator`
   ```bash
-  kubectl --namespace=prometheus apply -f <( \
+  kubectl --namespace=prometheus apply --server-side -f <( \
     wget -qO- https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role-binding.yaml | \
     sed "s/namespace: default/namespace: prometheus/" \
   )
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role.yaml
-  kubectl --namespace=prometheus apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/rbac/prometheus/prometheus-service-account.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/rbac/prometheus/prometheus-cluster-role.yaml
+  kubectl --namespace=prometheus apply --server-side -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/example/rbac/prometheus/prometheus-service-account.yaml
   ```
 
   - Setup `prometheus-operator` into dedicated namespace
   ```bash
-    kubectl --namespace=prometheus apply -f  <( \
+    kubectl --namespace=prometheus apply --server-side -f  <( \
         wget -qO- https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/master/bundle.yaml | \
         sed "s/namespace: default/namespace: prometheus/" \
     )
@@ -72,7 +72,7 @@ We can either run [create-prometheus.sh][create-prometheus.sh] or setup the whol
     
   - Setup `prometheus` into dedicated namespace. `prometheus-operator` would be used to create `prometheus` instance
   ```bash
-  kubectl apply --namespace=prometheus -f <(wget -qO- https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/prometheus/prometheus-template.yaml | PROMETHEUS_NAMESPACE=prometheus envsubst)
+  kubectl apply --namespace=prometheus --server-side -f <(wget -qO- https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/prometheus/prometheus-template.yaml | PROMETHEUS_NAMESPACE=prometheus envsubst)
   ```
 
   - Setup `alertmanager` slack webhook, look at https://api.slack.com/incoming-webhooks how to enable external webhooks in Slack API
