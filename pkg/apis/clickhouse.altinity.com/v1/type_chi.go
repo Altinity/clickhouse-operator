@@ -768,3 +768,14 @@ func (chi *ClickHouseInstallation) SetTarget(a *ClickHouseInstallation) {
 	}
 	chi.EnsureStatus().NormalizedCHI = a
 }
+
+func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
+	var result *ChiHost
+	chi.WalkHosts(func(host *ChiHost) error {
+		if result == nil {
+			result = host
+		}
+		return nil
+	})
+	return result
+}

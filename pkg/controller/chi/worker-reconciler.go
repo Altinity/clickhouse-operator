@@ -88,30 +88,25 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
 			M(new).F().
-			Error("FAILED update: %v", err)
-		return nil
+			Error("FAILED to update err: %v", err)
+		w.markReconcileComplete(ctx, new)
+	} else {
+		// Post-process added items
+		if util.IsContextDone(ctx) {
+			log.V(2).Info("task is done")
+			return nil
+		}
+		w.a.V(1).
+			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(new).
+			M(new).F().
+			Info("remove items scheduled for deletion")
+		w.clean(ctx, new)
+		w.dropReplicas(ctx, new, actionPlan)
+		w.includeStopped(new)
+		w.waitForIPAddresses(ctx, new)
+		w.finalizeReconcileAndMarkCompleted(ctx, new)
 	}
-
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	// Post-process added items
-	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-		WithStatusAction(new).
-		M(new).F().
-		Info("remove items scheduled for deletion")
-	w.clean(ctx, new)
-	w.dropReplicas(ctx, new, actionPlan)
-	w.includeStopped(new)
-	w.waitForIPAddresses(ctx, new)
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-	w.markReconcileComplete(ctx, new)
 
 	return nil
 }

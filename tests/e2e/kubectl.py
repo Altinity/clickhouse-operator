@@ -292,7 +292,7 @@ def delete(manifest, ns=None, timeout=600):
             run_shell(f"{manifest} | {current().context.kubectl_cmd} delete -f -", timeout=timeout)
 
 
-def wait_objects(chi, object_counts, ns=None, shell=None):
+def wait_objects(chi, object_counts, ns=None, shell=None, retries = max_retries):
     with Then(
         f"Waiting for: "
         f"{object_counts['statefulset']} statefulsets, "
@@ -300,7 +300,7 @@ def wait_objects(chi, object_counts, ns=None, shell=None):
         f"{object_counts['service']} services "
         f"to be available"
     ):
-        for i in range(1, max_retries):
+        for i in range(1, retries):
             cur_object_counts = count_objects(label=f"-l clickhouse.altinity.com/chi={chi}", ns=ns, shell=shell)
             if cur_object_counts == object_counts:
                 break

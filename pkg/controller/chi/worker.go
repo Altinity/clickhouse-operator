@@ -236,7 +236,7 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
-		_ = w.ensureClusterSchemer(chi).CHIDropDnsCache(ctx, chi)
+		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
 		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.Labels, err)
 	}
@@ -598,7 +598,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseIn
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
-func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHouseInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *chiV1.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -633,7 +633,28 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHou
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
-		Info("reconcile completed, task id: %s", _chi.Spec.GetTaskID())
+		Info("reconcile completed successfully, task id: %s", _chi.Spec.GetTaskID())
+}
+
+func (w *worker) markReconcileComplete(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return
+	}
+
+	chi.EnsureStatus().ReconcileComplete()
+	w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
+			MainFields: true,
+		},
+	})
+
+	w.a.V(1).
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		WithStatusAction(chi).
+		WithStatusActions(chi).
+		M(chi).F().
+		Info("reconcile completed unsuccessfully, task id: %s", chi.Spec.GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
@@ -1536,17 +1557,29 @@ func (w *worker) applyResource(
 	return true
 }
 
-func (w *worker) ensureClusterSchemer(obj interface{}) *chopModel.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(host *chiV1.ChiHost) *chopModel.ClusterSchemer {
 	if w == nil {
 		return nil
 	}
-	if w.schemer == nil {
-		switch obj.(type) {
-		case *chiV1.ClickHouseInstallation:
-			w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
-		case *chiV1.ChiHost:
-			w.schemer = chopModel.NewClusterSchemer(clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config()))
+	// Make base cluster connection params
+	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
+	// Adjust base cluster connection params with per-host props
+	switch clusterConnectionParams.Scheme {
+	case chiV1.ChSchemeAuto:
+		switch {
+		case chiV1.IsPortAssigned(host.HTTPPort):
+			clusterConnectionParams.Scheme = "http"
+			clusterConnectionParams.Port = int(host.HTTPPort)
+		case chiV1.IsPortAssigned(host.HTTPSPort):
+			clusterConnectionParams.Scheme = "https"
+			clusterConnectionParams.Port = int(host.HTTPSPort)
 		}
+	case chiV1.ChSchemeHTTP:
+		clusterConnectionParams.Port = int(host.HTTPPort)
+	case chiV1.ChSchemeHTTPS:
+		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
+	w.schemer = chopModel.NewClusterSchemer(clusterConnectionParams)
+
 	return w.schemer
 }
