@@ -10,7 +10,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1170,7 +1170,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2327,7 +2327,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2452,7 +2452,7 @@ spec:
                       properties:
                         scheme:
                           type: string
-                          description: "The scheme to user for connecting to ClickHouse. One of http or https"
+                          description: "The scheme to user for connecting to ClickHouse. Possible values: http, https, auto"
                         username:
                           type: string
                           description: "ClickHouse username to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"
@@ -2717,7 +2717,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
 ---
 # Template Parameters:
 #
@@ -2734,7 +2734,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
 rules:
 - apiGroups:
     - ""
@@ -2882,7 +2882,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -2904,7 +2904,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -2930,6 +2930,8 @@ data:
     watch:
       # List of namespaces where clickhouse-operator watches for events.
       # Concurrently running operators should watch on different namespaces.
+      # IMPORTANT
+      # Regexp is applicable.
       #namespaces: ["dev", "test"]
       namespaces: []
     
@@ -2956,18 +2958,23 @@ data:
         ################################################
         user:
           # Default settings for user accounts, created by the operator.
-          # NB. These are not access credentials or settings for 'default' user account,
-          # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
-          # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
-          # Password for 'default' account as to be provided explicitly, if to be used
-          # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
-          # Password for CHOP account is used from `clickhouse.access.password` section
+          # IMPORTANT. These are not access credentials or settings for 'default' user account,
+          # it is a template for filling out missing fields for all user accounts to be created by the operator,
+          # with the following EXCEPTIONS:
+          # 1. 'default' user account DOES NOT use provided password, but uses all the rest of the fields.
+          #    Password for 'default' user account has to be provided explicitly, if to be used.
+          # 2. CHOP user account DOES NOT use:
+          #    - profile setting. It uses predefined profile called 'clickhouse_operator'
+          #    - quota setting. It uses empty quota name.
+          #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
+          #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
           default:
-            # Default values for ClickHouse user configuration
-            # 1. user/profile - string
-            # 2. user/quota - string
-            # 3. user/networks/ip - multiple strings
-            # 4. user/password - string
+            # Default values for ClickHouse user account(s) created by the operator
+            #   1. user/profile - string
+            #   2. user/quota - string
+            #   3. user/networks/ip - multiple strings
+            #   4. user/password - string
+            # These values can be overwritten on per-user basis.
             profile: "default"
             quota: "default"
             networksIP:
@@ -3020,28 +3027,29 @@ data:
       ##
       ################################################
       access:
-        # Possible values for `scheme` are:
-        # 1. http
-        # 2. https
-        scheme: ""
+        # Possible values for 'scheme' are:
+        #   1. http - force http to be used to connect to ClickHouse instances
+        #   2. https - force https to be used to connect to ClickHouse instances
+        #   3. auto - either http or https is selected based on open ports
+        scheme: "auto"
         # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
-        # Used for:
-        # 1. Metrics requests
-        # 2. Schema maintenance
-        # 3. DROP DNS CACHE
+        # These credentials are used for:
+        #   1. Metrics requests
+        #   2. Schema maintenance
+        #   3. DROP DNS CACHE
         # User with these credentials can be specified in additional ClickHouse .xml config files,
-        # located in `clickhouse.configuration.file.path.user` folder
+        # located in 'clickhouse.configuration.file.path.user' folder
         username: ""
         password: ""
         rootCA: ""
     
         # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
-        # Can be used instead of explicitly specified username and password which are:
-        # clickhouse.access.username
-        # clickhouse.access.password
+        # Can be used instead of explicitly specified username and password available in sections:
+        #   - clickhouse.access.username
+        #   - clickhouse.access.password
         # Secret should have two keys:
-        # 1. username
-        # 2. password
+        #   1. username
+        #   2. password
         secret:
           # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
           namespace: ""
@@ -3089,9 +3097,10 @@ data:
         create:
           # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
           # Possible options:
-          # 1. abort - do nothing, just break the process and wait for an admin to assist
-          # 2. delete - delete newly created problematic StatefulSet
-          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
+          # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
+          #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+          # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
           onFailure: ignore
     
         update:
@@ -3101,18 +3110,20 @@ data:
           pollInterval: 5
           # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
           # Possible options:
-          # 1. abort - do nothing, just break the process and wait for an admin to assist
+          # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
+          #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
           # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
-          # Pod would be recreated by StatefulSet based on rollback-ed configuration
-          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
-          onFailure: rollback
+          #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
+          #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+          onFailure: abort
     
       host:
         # Whether reconciler should wait for a host:
         # - to be excluded from a cluster
         # OR
         # - to be included into a cluster
-        # respectfully
+        # respectfully before proceeding to the host reconciliation.
         wait:
           exclude: true
           include: false
@@ -3207,7 +3218,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
 ---
@@ -3223,7 +3234,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3322,7 +3333,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3422,7 +3433,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -3475,7 +3486,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.21.1
+#   OPERATOR_VERSION=0.21.2
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -3485,7 +3496,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -3496,9 +3507,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.21.1
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.21.2
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.21.1
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.21.2
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -3509,7 +3520,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3543,7 +3554,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.21.1
+          image: altinity/clickhouse-operator:0.21.2
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3608,7 +3619,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.21.1
+          image: altinity/metrics-exporter:0.21.2
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3691,7 +3702,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
     app: clickhouse-operator
 spec:
   ports:

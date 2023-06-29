@@ -7,7 +7,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.1
+    clickhouse.altinity.com/chop: 0.21.2
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -132,7 +132,7 @@ spec:
                       properties:
                         scheme:
                           type: string
-                          description: "The scheme to user for connecting to ClickHouse. One of http or https"
+                          description: "The scheme to user for connecting to ClickHouse. Possible values: http, https, auto"
                         username:
                           type: string
                           description: "ClickHouse username to be used by operator to connect to ClickHouse instances, deprecated, use chCredentialsSecretName"

@@ -3,9 +3,10 @@
 package model
 
 import (
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sync"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const testNamespace = "mynamespace"

@@ -14,6 +14,11 @@ ONLY="${ONLY:-"*"}"
 # replace | apply
 KUBECTL_MODE="${KUBECTL_MODE:-"replace"}"
 
+EXECUTABLE="${EXECUTABLE:-"run_tests_operator.sh"}"
+# EXECUTABLE="run_tests_metrics.sh" ./run_tests_local.sh
+#EXECUTABLE="${EXECUTABLE:-"run_tests_metrics.sh"}"
+
+
 echo "Build" && \
 ${CUR_DIR}/../../dev/image_build_all_dev.sh && \
 echo "Load images" && \
@@ -28,4 +33,4 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}" \
 OPERATOR_INSTALL="${OPERATOR_INSTALL}" \
 ONLY="${ONLY}" \
 KUBECTL_MODE="${KUBECTL_MODE}" \
-"${CUR_DIR}/run_tests.sh"
+"${CUR_DIR}/${EXECUTABLE}"

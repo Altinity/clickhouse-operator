@@ -35,6 +35,8 @@ spec:
             runAsUser: 101
             runAsGroup: 101
             fsGroup: 101
+            capabilities:
+              add: [ "CAP_NICE", "CAP_IPC_LOCK" ]
           containers:
             - name: clickhouse
               image: clickhouse/clickhouse-server:latest

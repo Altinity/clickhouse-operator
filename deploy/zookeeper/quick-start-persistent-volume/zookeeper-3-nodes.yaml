@@ -88,6 +88,8 @@ spec:
                     operator: In
                     values:
                       - zookeeper
+              # TODO think about multi-AZ EKS
+              # topologyKey: topology.kubernetes.io/zone
               topologyKey: "kubernetes.io/hostname"
       containers:
         - name: kubernetes-zookeeper
@@ -169,8 +171,10 @@ spec:
                   echo "Failed to parse name and ordinal of Pod" &&
                   exit 1;
               fi &&
-              mkdir -p ${ZOO_DATA_DIR} &&
-              mkdir -p ${ZOO_DATA_LOG_DIR} &&
+              mkdir -pv ${ZOO_DATA_DIR} &&
+              mkdir -pv ${ZOO_DATA_LOG_DIR} &&
+              whoami &&
+              chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" &&
               export MY_ID=$((ORD+1)) &&
               echo $MY_ID > $ZOO_DATA_DIR/myid &&
               for (( i=1; i<=$SERVERS; i++ )); do
@@ -188,7 +192,6 @@ spec:
                   fi
                   echo "weight.$i=$WEIGHT" >> /conf/zoo.cfg;
               done &&
-              chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" &&
               zkServer.sh start-foreground
           readinessProbe:
             exec:

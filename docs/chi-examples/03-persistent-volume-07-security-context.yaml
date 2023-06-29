@@ -42,6 +42,8 @@ spec:
             runAsUser: 101
             runAsGroup: 101
             fsGroup: 101
+            capabilities:
+              add: [ "CAP_NICE", "CAP_IPC_LOCK" ]
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:22.3
@@ -53,7 +55,7 @@ spec:
                 - clickhouse-server
                 - --config-file=/etc/clickhouse-server/config.xml
             - name: clickhouse-backup
-              image: altinity/clickhouse-backup:2.2.6
+              image: altinity/clickhouse-backup:2.2.7
               imagePullPolicy: Always
               command:
                 - /bin/bash

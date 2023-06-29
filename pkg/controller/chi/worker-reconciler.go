@@ -88,30 +88,25 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
 			M(new).F().
-			Error("FAILED update: %v", err)
-		return nil
+			Error("FAILED to update err: %v", err)
+		w.markReconcileComplete(ctx, new)
+	} else {
+		// Post-process added items
+		if util.IsContextDone(ctx) {
+			log.V(2).Info("task is done")
+			return nil
+		}
+		w.a.V(1).
+			WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
+			WithStatusAction(new).
+			M(new).F().
+			Info("remove items scheduled for deletion")
+		w.clean(ctx, new)
+		w.dropReplicas(ctx, new, actionPlan)
+		w.includeStopped(new)
+		w.waitForIPAddresses(ctx, new)
+		w.finalizeReconcileAndMarkCompleted(ctx, new)
 	}
-
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	// Post-process added items
-	w.a.V(1).
-		WithEvent(new, eventActionReconcile, eventReasonReconcileInProgress).
-		WithStatusAction(new).
-		M(new).F().
-		Info("remove items scheduled for deletion")
-	w.clean(ctx, new)
-	w.dropReplicas(ctx, new, actionPlan)
-	w.includeStopped(new)
-	w.waitForIPAddresses(ctx, new)
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-	w.markReconcileComplete(ctx, new)
 
 	return nil
 }
@@ -270,7 +265,7 @@ func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.Ch
 	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
 		version = "not applicable"
 	} else {
-		if ver, e := w.schemer.HostVersion(ctx, host); e == nil {
+		if ver, e := w.ensureClusterSchemer(host).HostVersion(ctx, host); e == nil {
 			version = ver
 			host.Version = chiV1.NewCHVersion(version)
 		} else {
@@ -313,7 +308,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
 		w.task.registryFailed.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
-		if err == errIgnore {
+		if err == errCRUDIgnore {
 			err = nil
 		}
 	}
@@ -525,7 +520,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.migrateTables(ctx, host)
 
-	version, err := w.schemer.HostVersion(ctx, host)
+	version, err := w.ensureClusterSchemer(host).HostVersion(ctx, host)
 	if err != nil {
 		version = "unknown"
 	}
@@ -746,17 +741,18 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	return err
 }
 
+// Comment out PV
 // reconcilePersistentVolumes reconciles all PVs of a host
-func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiV1.ChiHost) {
-	if util.IsContextDone(ctx) {
-		return
-	}
-
-	w.c.walkPVs(host, func(pv *coreV1.PersistentVolume) {
-		pv = w.task.creator.PreparePersistentVolume(pv, host)
-		_, _ = w.c.updatePersistentVolume(ctx, pv)
-	})
-}
+//func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *chiV1.ChiHost) {
+//	if util.IsContextDone(ctx) {
+//		return
+//	}
+//
+//	w.c.walkPVs(host, func(pv *coreV1.PersistentVolume) {
+//		pv = w.task.creator.PreparePersistentVolume(pv, host)
+//		_, _ = w.c.updatePersistentVolume(ctx, pv)
+//	})
+//}
 
 // reconcilePVCs reconciles all PVCs of a host
 func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
@@ -801,14 +797,14 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 			}
 		}
 
-		pvc, err = w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
+		newPvc, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		if err != nil {
 			w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
 			w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
 			return
 		}
 
-		w.task.registryReconciled.RegisterPVC(pvc.ObjectMeta)
+		w.task.registryReconciled.RegisterPVC(newPvc.ObjectMeta)
 	})
 
 	return nil

@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -46,7 +47,7 @@ type worker struct {
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
 	normalizer *chopModel.Normalizer
-	schemer    *chopModel.Schemer
+	schemer    *chopModel.ClusterSchemer
 	start      time.Time
 	task       task
 }
@@ -83,14 +84,8 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
 		normalizer: chopModel.NewNormalizer(c.kubeClient),
-		schemer: chopModel.NewSchemer(
-			chop.Config().ClickHouse.Access.Scheme,
-			chop.Config().ClickHouse.Access.Username,
-			chop.Config().ClickHouse.Access.Password,
-			chop.Config().ClickHouse.Access.RootCA,
-			chop.Config().ClickHouse.Access.Port,
-		),
-		start: start,
+		schemer:    nil, //
+		start:      start,
 	}
 }
 
@@ -241,7 +236,7 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
-		_ = w.schemer.CHIDropDnsCache(ctx, chi)
+		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
 		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.Labels, err)
 	}
@@ -564,7 +559,7 @@ func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("exclude CHI from monitoring")
-		w.c.deleteWatch(chi.Namespace, chi.Name)
+		w.c.deleteWatch(chi)
 	}
 }
 
@@ -576,7 +571,7 @@ func (w *worker) includeStopped(chi *chiV1.ClickHouseInstallation) {
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("add CHI to monitoring")
-		w.c.updateWatch(chi.Namespace, chi.Name, chopModel.CreateFQDNs(chi, nil, false))
+		w.c.updateWatch(chi)
 	}
 }
 
@@ -603,7 +598,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseIn
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
-func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHouseInstallation) {
+func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *chiV1.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -638,7 +633,28 @@ func (w *worker) markReconcileComplete(ctx context.Context, _chi *chiV1.ClickHou
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
-		Info("reconcile completed, task id: %s", _chi.Spec.GetTaskID())
+		Info("reconcile completed successfully, task id: %s", _chi.Spec.GetTaskID())
+}
+
+func (w *worker) markReconcileComplete(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return
+	}
+
+	chi.EnsureStatus().ReconcileComplete()
+	w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+		CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
+			MainFields: true,
+		},
+	})
+
+	w.a.V(1).
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		WithStatusAction(chi).
+		WithStatusActions(chi).
+		M(chi).F().
+		Info("reconcile completed unsuccessfully, task id: %s", chi.Spec.GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
@@ -793,7 +809,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 		M(host).F().
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 
-	err := w.schemer.HostCreateTables(ctx, host)
+	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
 	host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
 	if err == nil {
 		w.a.V(1).
@@ -1021,20 +1037,20 @@ func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
 
 // waitHostInCluster
 func (w *worker) waitHostInCluster(ctx context.Context, host *chiV1.ChiHost) error {
-	return w.c.pollHostContext(ctx, host, nil, w.schemer.IsHostInCluster)
+	return w.c.pollHostContext(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
 }
 
 // waitHostNotInCluster
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *chiV1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
-		return !w.schemer.IsHostInCluster(ctx, host)
+		return !w.ensureClusterSchemer(host).IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiV1.ChiHost) error {
 	return w.c.pollHostContext(ctx, host, nil, func(ctx context.Context, host *chiV1.ChiHost) bool {
-		n, _ := w.schemer.HostActiveQueriesNum(ctx, host)
+		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})
 }
@@ -1308,7 +1324,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 		M(host).F().
 		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
 
-	err := w.c.createStatefulSet(ctx, host)
+	action := w.c.createStatefulSet(ctx, host)
 
 	host.CHI.EnsureStatus().HostAdded()
 	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
@@ -1317,26 +1333,37 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 		},
 	})
 
-	if err == nil {
+	switch action {
+	case nil:
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionCreate, eventReasonCreateCompleted).
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
-	} else if err == errIgnore {
-		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
-			WithStatusAction(host.CHI).
-			M(host).F().
-			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
-	} else {
+		return nil
+	case errCRUDAbort:
 		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
 			WithStatusAction(host.CHI).
 			WithStatusError(host.CHI).
 			M(host).F().
-			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, err)
+			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, action)
+		return action
+	case errCRUDIgnore:
+		w.a.WithEvent(host.CHI, eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.CHI).
+			M(host).F().
+			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
+		return nil
+	case errCRUDRecreate:
+		w.a.V(1).M(host).Warning("Got recreate action. Ignore and continue for now")
+		return nil
+	case errCRUDUnexpectedFlow:
+		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
+		return nil
 	}
 
-	return err
+	w.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+	return nil
 }
 
 // waitConfigMapPropagation
@@ -1408,37 +1435,47 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 		return nil
 	}
 
+	action := errCRUDRecreate
 	if chopModel.IsStatefulSetReady(curStatefulSet) {
-		err := w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
-		if err == nil {
-			host.CHI.EnsureStatus().HostUpdated()
-			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
-					MainFields: true,
-				},
-			})
-			w.a.V(1).
-				WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
-				WithStatusAction(host.CHI).
-				M(host).F().
-				Info("Update StatefulSet(%s/%s) - completed", namespace, name)
-			return nil
-		}
+		action = w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
+	}
 
+	switch action {
+	case nil:
+		host.CHI.EnsureStatus().HostUpdated()
+		_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+			CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
+				MainFields: true,
+			},
+		})
+		w.a.V(1).
+			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(host.CHI).
+			M(host).F().
+			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
+		return nil
+	case errCRUDAbort:
+		w.a.V(1).M(host).Info("Got abort. Abort")
+		return errCRUDAbort
+	case errCRUDIgnore:
+		w.a.V(1).M(host).Info("Got ignore. Ignore")
+		return nil
+	case errCRUDRecreate:
 		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateInProgress).
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
-
-		w.a.V(2).
-			M(host).F().
-			Error("Update StatefulSet(%s/%s) - failed with error\n---\n%v\n--\nContinue with recreate", namespace, name, err)
 		diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
 		w.a.V(2).M(host).Info("StatefulSet.Spec diff:")
 		w.a.V(2).M(host).Info(util.MessageDiffString(diff, equal))
+		return w.recreateStatefulSet(ctx, host)
+	case errCRUDUnexpectedFlow:
+		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
+		return nil
 	}
 
-	return w.recreateStatefulSet(ctx, host)
+	w.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
+	return nil
 }
 
 // recreateStatefulSet
@@ -1518,4 +1555,31 @@ func (w *worker) applyResource(
 	// Update resource
 	curResourceList[resourceName] = desiredResourceList[resourceName]
 	return true
+}
+
+func (w *worker) ensureClusterSchemer(host *chiV1.ChiHost) *chopModel.ClusterSchemer {
+	if w == nil {
+		return nil
+	}
+	// Make base cluster connection params
+	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
+	// Adjust base cluster connection params with per-host props
+	switch clusterConnectionParams.Scheme {
+	case chiV1.ChSchemeAuto:
+		switch {
+		case chiV1.IsPortAssigned(host.HTTPPort):
+			clusterConnectionParams.Scheme = "http"
+			clusterConnectionParams.Port = int(host.HTTPPort)
+		case chiV1.IsPortAssigned(host.HTTPSPort):
+			clusterConnectionParams.Scheme = "https"
+			clusterConnectionParams.Port = int(host.HTTPSPort)
+		}
+	case chiV1.ChSchemeHTTP:
+		clusterConnectionParams.Port = int(host.HTTPPort)
+	case chiV1.ChSchemeHTTPS:
+		clusterConnectionParams.Port = int(host.HTTPSPort)
+	}
+	w.schemer = chopModel.NewClusterSchemer(clusterConnectionParams)
+
+	return w.schemer
 }

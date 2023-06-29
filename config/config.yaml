@@ -20,6 +20,8 @@
 watch:
   # List of namespaces where clickhouse-operator watches for events.
   # Concurrently running operators should watch on different namespaces.
+  # IMPORTANT
+  # Regexp is applicable.
   #namespaces: ["dev", "test"]
   namespaces: []
 
@@ -46,18 +48,23 @@ clickhouse:
     ################################################
     user:
       # Default settings for user accounts, created by the operator.
-      # NB. These are not access credentials or settings for 'default' user account,
-      # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
-      # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
-      # Password for 'default' account as to be provided explicitly, if to be used
-      # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
-      # Password for CHOP account is used from `clickhouse.access.password` section
+      # IMPORTANT. These are not access credentials or settings for 'default' user account,
+      # it is a template for filling out missing fields for all user accounts to be created by the operator,
+      # with the following EXCEPTIONS:
+      # 1. 'default' user account DOES NOT use provided password, but uses all the rest of the fields.
+      #    Password for 'default' user account has to be provided explicitly, if to be used.
+      # 2. CHOP user account DOES NOT use:
+      #    - profile setting. It uses predefined profile called 'clickhouse_operator'
+      #    - quota setting. It uses empty quota name.
+      #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
+      #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
       default:
-        # Default values for ClickHouse user configuration
-        # 1. user/profile - string
-        # 2. user/quota - string
-        # 3. user/networks/ip - multiple strings
-        # 4. user/password - string
+        # Default values for ClickHouse user account(s) created by the operator
+        #   1. user/profile - string
+        #   2. user/quota - string
+        #   3. user/networks/ip - multiple strings
+        #   4. user/password - string
+        # These values can be overwritten on per-user basis.
         profile: "default"
         quota: "default"
         networksIP:
@@ -110,28 +117,29 @@ clickhouse:
   ##
   ################################################
   access:
-    # Possible values for `scheme` are:
-    # 1. http
-    # 2. https
-    scheme: ""
+    # Possible values for 'scheme' are:
+    #   1. http - force http to be used to connect to ClickHouse instances
+    #   2. https - force https to be used to connect to ClickHouse instances
+    #   3. auto - either http or https is selected based on open ports
+    scheme: "auto"
     # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
-    # Used for:
-    # 1. Metrics requests
-    # 2. Schema maintenance
-    # 3. DROP DNS CACHE
+    # These credentials are used for:
+    #   1. Metrics requests
+    #   2. Schema maintenance
+    #   3. DROP DNS CACHE
     # User with these credentials can be specified in additional ClickHouse .xml config files,
-    # located in `clickhouse.configuration.file.path.user` folder
+    # located in 'clickhouse.configuration.file.path.user' folder
     username: ""
     password: ""
     rootCA: ""
 
     # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
-    # Can be used instead of explicitly specified username and password which are:
-    # clickhouse.access.username
-    # clickhouse.access.password
+    # Can be used instead of explicitly specified username and password available in sections:
+    #   - clickhouse.access.username
+    #   - clickhouse.access.password
     # Secret should have two keys:
-    # 1. username
-    # 2. password
+    #   1. username
+    #   2. password
     secret:
       # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
       namespace: ""
@@ -179,9 +187,10 @@ reconcile:
     create:
       # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for an admin to assist
-      # 2. delete - delete newly created problematic StatefulSet
-      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
+      # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
+      #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+      # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
       onFailure: ignore
 
     update:
@@ -191,18 +200,20 @@ reconcile:
       pollInterval: 5
       # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for an admin to assist
+      # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
+      #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
       # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
-      # Pod would be recreated by StatefulSet based on rollback-ed configuration
-      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
-      onFailure: rollback
+      #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
+      #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+      onFailure: abort
 
   host:
     # Whether reconciler should wait for a host:
     # - to be excluded from a cluster
     # OR
     # - to be included into a cluster
-    # respectfully
+    # respectfully before proceeding to the host reconciliation.
     wait:
       exclude: true
       include: false

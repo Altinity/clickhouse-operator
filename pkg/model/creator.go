@@ -195,7 +195,7 @@ func (c *Creator) CreateServiceHost(host *chiv1.ChiHost) *corev1.Service {
 }
 
 func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
-	if isAssigned(host.TCPPort) {
+	if chiv1.IsPortAssigned(host.TCPPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultTCPPortName,
@@ -205,7 +205,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.TLSPort) {
+	if chiv1.IsPortAssigned(host.TLSPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultTLSPortName,
@@ -215,7 +215,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.HTTPPort) {
+	if chiv1.IsPortAssigned(host.HTTPPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultHTTPPortName,
@@ -225,7 +225,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.HTTPSPort) {
+	if chiv1.IsPortAssigned(host.HTTPSPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultHTTPSPortName,
@@ -235,7 +235,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.InterserverHTTPPort) {
+	if chiv1.IsPortAssigned(host.InterserverHTTPPort) {
 		service.Spec.Ports = append(service.Spec.Ports,
 			corev1.ServicePort{
 				Name:       chDefaultInterserverHTTPPortName,
@@ -251,7 +251,7 @@ func appendServicePorts(service *corev1.Service, host *chiv1.ChiHost) {
 func (c *Creator) verifyServiceTemplatePorts(template *chiv1.ChiServiceTemplate) error {
 	for i := range template.Spec.Ports {
 		servicePort := &template.Spec.Ports[i]
-		if (servicePort.Port < 1) || (servicePort.Port > 65535) {
+		if chiv1.IsPortInvalid(servicePort.Port) {
 			msg := fmt.Sprintf("template:%s INCORRECT PORT:%d", template.Name, servicePort.Port)
 			c.a.V(1).F().Warning(msg)
 			return fmt.Errorf(msg)
@@ -483,6 +483,21 @@ func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *chi
 	)
 }
 
+// ensureClickHouseLogContainerSpecified
+func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
+	_, ok := getClickHouseLogContainer(statefulSet)
+	if ok {
+		return
+	}
+
+	// No ClickHouse Log container available, let's add one
+
+	addContainer(
+		&statefulSet.Spec.Template.Spec,
+		newDefaultLogContainer(),
+	)
+}
+
 // ensureProbesSpecified
 func ensureProbesSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHost) {
 	container, ok := getClickHouseContainer(statefulSet)
@@ -555,7 +570,8 @@ func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *chiv1.C
 	statefulSetName := CreateStatefulSetName(host)
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
-		addContainer(&statefulSet.Spec.Template.Spec, newDefaultLogContainer())
+		ensureClickHouseLogContainerSpecified(statefulSet)
+
 		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
 	}
 }
@@ -690,40 +706,36 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
-// getClickHouseContainer
-func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
-	// Find by name
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		if container.Name == ClickHouseContainerName {
-			return container, true
+// getContainer gets container from the StatefulSet either by name or by index
+func getContainer(statefulSet *apps.StatefulSet, name string, index int) (*corev1.Container, bool) {
+	if len(name) > 0 {
+		// Find by name
+		for i := range statefulSet.Spec.Template.Spec.Containers {
+			container := &statefulSet.Spec.Template.Spec.Containers[i]
+			if container.Name == name {
+				return container, true
+			}
 		}
 	}
 
-	// Find by index
-	if len(statefulSet.Spec.Template.Spec.Containers) > 0 {
-		return &statefulSet.Spec.Template.Spec.Containers[0], true
+	if index >= 0 {
+		// Find by index
+		if len(statefulSet.Spec.Template.Spec.Containers) > index {
+			return &statefulSet.Spec.Template.Spec.Containers[index], true
+		}
 	}
 
 	return nil, false
 }
 
-// getClickHouseContainerStatus
-func getClickHouseContainerStatus(pod *corev1.Pod) (*corev1.ContainerStatus, bool) {
-	// Find by name
-	for i := range pod.Status.ContainerStatuses {
-		status := &pod.Status.ContainerStatuses[i]
-		if status.Name == ClickHouseContainerName {
-			return status, true
-		}
-	}
+// getClickHouseContainer
+func getClickHouseContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	return getContainer(statefulSet, clickHouseContainerName, 0)
+}
 
-	// Find by index
-	if len(pod.Status.ContainerStatuses) > 0 {
-		return &pod.Status.ContainerStatuses[0], true
-	}
-
-	return nil, false
+// getClickHouseLogContainer
+func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*corev1.Container, bool) {
+	return getContainer(statefulSet, clickHouseLogContainerName, -1)
 }
 
 // IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
@@ -796,7 +808,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *chiv1.ChiHos
 
 // ensurePortByName
 func ensurePortByName(container *corev1.Container, name string, port int32) {
-	if isUnassigned(port) {
+	if chiv1.IsPortUnassigned(port) {
 		return
 	}
 
@@ -1138,11 +1150,11 @@ func newDefaultHostTemplate(name string) *chiv1.ChiHostTemplate {
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
-			TCPPort:             unassigned(),
-			TLSPort:             unassigned(),
-			HTTPPort:            unassigned(),
-			HTTPSPort:           unassigned(),
-			InterserverHTTPPort: unassigned(),
+			TCPPort:             chiv1.PortUnassigned(),
+			TLSPort:             chiv1.PortUnassigned(),
+			HTTPPort:            chiv1.PortUnassigned(),
+			HTTPSPort:           chiv1.PortUnassigned(),
+			InterserverHTTPPort: chiv1.PortUnassigned(),
 			Templates:           nil,
 		},
 	}
@@ -1159,11 +1171,11 @@ func newDefaultHostTemplateForHostNetwork(name string) *chiv1.ChiHostTemplate {
 		},
 		Spec: chiv1.ChiHost{
 			Name:                "",
-			TCPPort:             unassigned(),
-			TLSPort:             unassigned(),
-			HTTPPort:            unassigned(),
-			HTTPSPort:           unassigned(),
-			InterserverHTTPPort: unassigned(),
+			TCPPort:             chiv1.PortUnassigned(),
+			TLSPort:             chiv1.PortUnassigned(),
+			HTTPPort:            chiv1.PortUnassigned(),
+			HTTPSPort:           chiv1.PortUnassigned(),
+			InterserverHTTPPort: chiv1.PortUnassigned(),
 			Templates:           nil,
 		},
 	}
@@ -1187,7 +1199,7 @@ func newDefaultPodTemplate(name string, host *chiv1.ChiHost) *chiv1.ChiPodTempla
 // newDefaultLivenessProbe returns default liveness probe
 func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	// Introduce http probe in case http port is specified
-	if isAssigned(host.HTTPPort) {
+	if chiv1.IsPortAssigned(host.HTTPPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -1202,7 +1214,7 @@ func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	}
 
 	// Introduce https probe in case https port is specified
-	if isAssigned(host.HTTPSPort) {
+	if chiv1.IsPortAssigned(host.HTTPSPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -1224,7 +1236,7 @@ func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
 // newDefaultReadinessProbe returns default readiness probe
 func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	// Introduce http probe in case http port is specified
-	if isAssigned(host.HTTPPort) {
+	if chiv1.IsPortAssigned(host.HTTPPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -1238,7 +1250,7 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	}
 
 	// Introduce https probe in case https port is specified
-	if isAssigned(host.HTTPSPort) {
+	if chiv1.IsPortAssigned(host.HTTPSPort) {
 		return &corev1.Probe{
 			Handler: corev1.Handler{
 				HTTPGet: &corev1.HTTPGetAction{
@@ -1257,7 +1269,7 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 }
 
 func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
-	if isAssigned(host.TCPPort) {
+	if chiv1.IsPortAssigned(host.TCPPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultTCPPortName,
@@ -1266,7 +1278,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.TLSPort) {
+	if chiv1.IsPortAssigned(host.TLSPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultTLSPortName,
@@ -1275,7 +1287,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.HTTPPort) {
+	if chiv1.IsPortAssigned(host.HTTPPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultHTTPPortName,
@@ -1284,7 +1296,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.HTTPSPort) {
+	if chiv1.IsPortAssigned(host.HTTPSPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultHTTPSPortName,
@@ -1293,7 +1305,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 			},
 		)
 	}
-	if isAssigned(host.InterserverHTTPPort) {
+	if chiv1.IsPortAssigned(host.InterserverHTTPPort) {
 		container.Ports = append(container.Ports,
 			corev1.ContainerPort{
 				Name:          chDefaultInterserverHTTPPortName,
@@ -1307,7 +1319,7 @@ func appendContainerPorts(container *corev1.Container, host *chiv1.ChiHost) {
 // newDefaultClickHouseContainer returns default ClickHouse Container
 func newDefaultClickHouseContainer(host *chiv1.ChiHost) corev1.Container {
 	container := corev1.Container{
-		Name:           ClickHouseContainerName,
+		Name:           clickHouseContainerName,
 		Image:          defaultClickHouseDockerImage,
 		LivenessProbe:  newDefaultLivenessProbe(host),
 		ReadinessProbe: newDefaultReadinessProbe(host),
@@ -1319,7 +1331,7 @@ func newDefaultClickHouseContainer(host *chiv1.ChiHost) corev1.Container {
 // newDefaultLogContainer returns default Log Container
 func newDefaultLogContainer() corev1.Container {
 	return corev1.Container{
-		Name:  ClickHouseLogContainerName,
+		Name:  clickHouseLogContainerName,
 		Image: defaultUbiDockerImage,
 		Command: []string{
 			"/bin/sh", "-c", "--",

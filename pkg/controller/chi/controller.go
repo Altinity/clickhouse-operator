@@ -105,7 +105,7 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < chop.Config().Reconcile.Runtime.ThreadsNumber+chiV1.DefaultReconcileSystemThreadsNumber; i++ {
+	for i := 0; i < chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber+chiV1.DefaultReconcileSystemThreadsNumber; i++ {
 		c.queues = append(
 			c.queues,
 			queue.New(),
@@ -596,30 +596,32 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 }
 
 // updateWatch
-func (c *Controller) updateWatch(namespace, name string, hostnames []string) {
-	go c.updateWatchAsync(namespace, name, hostnames)
+func (c *Controller) updateWatch(chi *chiV1.ClickHouseInstallation) {
+	watched := metrics.NewWatchedCHI(chi)
+	go c.updateWatchAsync(watched)
 }
 
 // updateWatchAsync
-func (c *Controller) updateWatchAsync(namespace, name string, hostnames []string) {
-	if err := metrics.InformMetricsExporterAboutWatchedCHI(namespace, name, hostnames); err != nil {
-		log.V(1).F().Info("FAIL update watch (%s/%s): %q", namespace, name, err)
+func (c *Controller) updateWatchAsync(chi *metrics.WatchedCHI) {
+	if err := metrics.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
+		log.V(1).F().Info("FAIL update watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
-		log.V(2).Info("OK update watch (%s/%s)", namespace, name)
+		log.V(1).Info("OK update watch (%s/%s): %s", chi.Namespace, chi.Name, chi)
 	}
 }
 
 // deleteWatch
-func (c *Controller) deleteWatch(namespace, name string) {
-	go c.deleteWatchAsync(namespace, name)
+func (c *Controller) deleteWatch(chi *chiV1.ClickHouseInstallation) {
+	watched := metrics.NewWatchedCHI(chi)
+	go c.deleteWatchAsync(watched)
 }
 
 // deleteWatchAsync
-func (c *Controller) deleteWatchAsync(namespace, name string) {
-	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(namespace, name); err != nil {
-		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", namespace, name, err)
+func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCHI) {
+	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(chi); err != nil {
+		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
-		log.V(2).Info("OK delete watch (%s/%s)", namespace, name)
+		log.V(1).Info("OK delete watch (%s/%s)", chi.Namespace, chi.Name)
 	}
 }
 

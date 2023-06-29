@@ -66,7 +66,7 @@ func (c *Cluster) SetHosts(hosts []string) *Cluster {
 }
 
 // getConnection gets connection
-func (c *Cluster) getConnection(host string) *Connection {
+func (c *Cluster) getHostConnection(host string) *Connection {
 	return GetPooledDBConnection(c.NewEndpointConnectionParams(host)).SetLog(c.l)
 }
 
@@ -82,7 +82,7 @@ func (c *Cluster) QueryAny(ctx context.Context, sql string) (*QueryResult, error
 		}
 
 		c.l.V(1).Info("Run query on: %s of %v", host, c.Hosts)
-		query, err := c.getConnection(host).QueryContext(ctx, sql)
+		query, err := c.getHostConnection(host).QueryContext(ctx, sql)
 		if err == nil {
 			// Endpoint returned result, no need to iterate more
 			return query, nil
@@ -135,7 +135,7 @@ func (c *Cluster) exec(ctx context.Context, host string, queries []string, _opts
 		c.l.V(2).Info("ctx is done")
 		return nil
 	}
-	conn := c.getConnection(host)
+	conn := c.getHostConnection(host)
 	if conn == nil {
 		c.l.V(1).M(host).F().Warning("Unable to get conn to host %s", host)
 		return nil
