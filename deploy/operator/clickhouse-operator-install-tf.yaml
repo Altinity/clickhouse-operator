@@ -2973,8 +2973,8 @@ data:
           # 2. CHOP user account DOES NOT use:
           #    - profile setting. It uses predefined profile called 'clickhouse_operator'
           #    - quota setting. It uses empty quota name.
-          #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
-          #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
+          #    - networks IP setting. Operator specifies 'networks/ip' user setting to match operators' pod IP only.
+          #    - password setting. Password for CHOP account is used from 'clickhouse.access.*' section
           default:
             # Default values for ClickHouse user account(s) created by the operator
             #   1. user/profile - string
