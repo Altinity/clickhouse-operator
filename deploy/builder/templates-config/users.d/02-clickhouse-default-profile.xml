@@ -8,6 +8,7 @@
       <parallel_view_processing>1</parallel_view_processing>
       <do_not_merge_across_partitions_select_final>1</do_not_merge_across_partitions_select_final>
       <load_balancing>nearest_hostname</load_balancing>
+      <allow_experimental_database_materialized_postgresql>1</allow_experimental_database_materialized_postgresql>
     </default>
   </profiles>
 </yandex>
