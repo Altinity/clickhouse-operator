@@ -295,7 +295,7 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 			continue
 		}
 
-		if !chi.GetStatus().HasNormalizedCHICompleted() {
+		if !chi.EnsureStatus().HasNormalizedCHICompleted() {
 			log.V(1).Infof("CHI %s/%s is not completed yet, skip it\n", chi.Namespace, chi.Name)
 			continue
 		}
