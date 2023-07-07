@@ -287,20 +287,23 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 
 	// Walk over the list of ClickHouseInstallation objects and add them as watched
 	for i := range list.Items {
+		// Convenience wrapper
 		chi := &list.Items[i]
+
 		if chi.IsStopped() {
-			log.V(1).Infof("Skip stopped CHI %s/%s\n", chi.Namespace, chi.Name)
-		} else {
-			log.V(1).Infof("Add explicitly found CHI %s/%s", chi.Namespace, chi.Name)
-			if !chi.GetStatus().HasNormalizedCHICompleted() {
-				log.V(1).Infof("Explicitly found CHI %s/%s is not completed yet, skip it\n", chi.Namespace, chi.Name)
-			} else {
-				log.V(1).Infof("Explicitly found CHI %s/%s is completed, adding it\n", chi.Namespace, chi.Name)
-				normalizer := chopModel.NewNormalizer(kubeClient)
-				normalized, _ := normalizer.CreateTemplatedCHI(chi, chopModel.NewNormalizerOptions())
-				watchedCHI := NewWatchedCHI(normalized)
-				e.updateWatched(watchedCHI)
-			}
+			log.V(1).Infof("CHI %s/%s is stopped, skip it\n", chi.Namespace, chi.Name)
+			continue
 		}
+
+		if !chi.GetStatus().HasNormalizedCHICompleted() {
+			log.V(1).Infof("CHI %s/%s is not completed yet, skip it\n", chi.Namespace, chi.Name)
+			continue
+		}
+
+		log.V(1).Infof("CHI %s/%s is completed, add it\n", chi.Namespace, chi.Name)
+		normalizer := chopModel.NewNormalizer(kubeClient)
+		normalized, _ := normalizer.CreateTemplatedCHI(chi, chopModel.NewNormalizerOptions())
+		watchedCHI := NewWatchedCHI(normalized)
+		e.updateWatched(watchedCHI)
 	}
 }
