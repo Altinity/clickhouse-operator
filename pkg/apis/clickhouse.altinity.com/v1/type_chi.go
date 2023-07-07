@@ -713,6 +713,14 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	return chi.Status
 }
 
+// GetStatus gets Status
+func (chi *ClickHouseInstallation) GetStatus() *ChiStatus {
+	if chi == nil {
+		return nil
+	}
+	return chi.Status
+}
+
 // HasStatus checks whether CHI has Status
 func (chi *ClickHouseInstallation) HasStatus() bool {
 	if chi == nil {
