@@ -527,7 +527,7 @@ type ChiTemplateNames struct {
 // TODO unify with ChiReplica based on HostsSet
 type ChiShard struct {
 	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
-	Weight              int               `json:"weight,omitempty"              yaml:"weight,omitempty"`
+	Weight              *int              `json:"weight,omitempty"              yaml:"weight,omitempty"`
 	InternalReplication *StringBool       `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
 	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
