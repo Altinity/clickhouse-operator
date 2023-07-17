@@ -13,7 +13,7 @@ cat << EOT
 EOT
 }
 
-for cmd in "yq jq helm-docs perl"; do
+for cmd in yq jq helm-docs perl; do
   if ! command -v ${cmd} &> /dev/null; then
     usage
     exit 1
