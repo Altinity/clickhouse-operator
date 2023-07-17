@@ -337,8 +337,8 @@ spec:
                     <name>AcceptCertificateHandler</name>
                 </invalidCertificateHandler>
             </client>
+          </openSSL>
         </clickhouse>
-      </openSSL>
 ```
 
 **Note:** To secure connections for external users only, but keep inter-cluster communications insecure, instead of using the '**secure**' flag, specify the **podTemplate** explicitly and open the proper ports:
@@ -348,20 +348,20 @@ spec:
   templates:
     podTemplates:
     - name: default
-        containers:
-        - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.8
-          ports:
-          - name: http
-            containerPort: 8123
-          - name: https
-            containerPort: 8443
-          - name: client
-            containerPort: 9000
-          - name: secureclient
-            containerPort: 9440
-          - name: interserver
-            containerPort: 9009
+      containers:
+      - name: clickhouse-pod
+        image: clickhouse/clickhouse-server:22.8
+        ports:
+        - name: http
+          containerPort: 8123
+        - name: https
+          containerPort: 8443
+        - name: client
+          containerPort: 9000
+        - name: secureclient
+          containerPort: 9440
+        - name: interserver
+          containerPort: 9009
 ```
 
 ### Forcing HTTPS for operator connections
