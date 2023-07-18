@@ -22,6 +22,9 @@ spec:
 
   templating:
     policy: "manual"
+    selector:
+      name1: value1
+      name2: value2
 
   reconciling:
     policy: "nowait"

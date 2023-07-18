@@ -183,7 +183,7 @@ reconcile:
       # Possible options:
       # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
       #    do not try to fix or delete or update it, just abort reconcile cycle.
-      #    Do not process next StatefulSet(s) and wait for an admin to assist.
+      #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
       # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
       # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
       onFailure: ignore
@@ -197,7 +197,7 @@ reconcile:
       # Possible options:
       # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
       #    do not try to fix or delete or update it, just abort reconcile cycle.
-      #    Do not process next StatefulSet(s) and wait for an admin to assist.
+      #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
       # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
       #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
       #    Follow 'abort' path afterwards.
