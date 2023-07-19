@@ -79,7 +79,14 @@ function process() {
   name=$(yq e '.metadata.name' "${file}")
 
   local processed_file="${kind}-${name}.yaml"
+  # crds folder use for `helm install` or `helm upgrade --install` to install CRD before deployment
   if [[ "${kind}" == "CustomResourceDefinition" ]]; then
+    # additional copy to templates for CRD, to fix `helm upgrade` wrong behavior
+    local templates_dir="${chart_path}/templates/generated"
+    copied_file="${templates_dir}/${processed_file}"
+    mkdir -p "$(dirname "${copied_file}")"
+    cp -f "${file}" "${copied_file}"
+
     local crds_dir="${chart_path}/crds"
     processed_file="${crds_dir}/${processed_file}"
   else
@@ -88,7 +95,7 @@ function process() {
   fi
   echo $(basename "${processed_file}")
   mkdir -p "$(dirname "${processed_file}")"
-  mv "${file}" "${processed_file}"
+  mv -f "${file}" "${processed_file}"
 
   case ${kind} in
   Service)
