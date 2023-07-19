@@ -5,7 +5,7 @@ description: |-
 
   The ClickHouse Operator creates, configures and manages ClickHouse clusters running on Kubernetes.
 
-  For upgrade from version prior 0.21.3, Please install CRDs separately:
+  For upgrade please install CRDs separately:
   ```bash
     kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/crds/CustomResourceDefinition-clickhouseinstallations.clickhouse.altinity.com.yaml
     kubectl apply -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/helm/crds/CustomResourceDefinition-clickhouseinstallationtemplates.clickhouse.altinity.com.yaml
