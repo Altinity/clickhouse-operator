@@ -117,15 +117,18 @@ func (n *Normalizer) CreateTemplatedCHI(
 	}
 
 	// At this moment n.chi is either empty CHI or a system-wide template
-	// We need to apply templates
 
-	// Apply CHOP-specified templates
-	// TODO
+	// Apply templates - both auto and explicitly requested
+	n.applyCHITemplates(chi)
 
-	//
-	// Apply templates both auto-templates as well as explicitly requested
-	//
+	// After all templates applied, place provided CHI on top of the whole stack
+	n.ctx.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
 
+	return n.normalize()
+}
+
+func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
+	// At this moment n.chi is either empty CHI or a system-wide template
 	// useTemplates specifies list of templated to be applied to the CHI
 	var useTemplates []chiV1.ChiUseTemplate
 
@@ -188,11 +191,6 @@ func (n *Normalizer) CreateTemplatedCHI(
 			),
 		)
 	}
-
-	// After all templates applied, place provided CHI on top of the whole stack
-	n.ctx.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
-
-	return n.normalize()
 }
 
 // normalize normalizes whole CHI.
