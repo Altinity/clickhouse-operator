@@ -164,13 +164,13 @@ func (n *Normalizer) CreateTemplatedCHI(
 		selector := template.Spec.Templating.GetCHISelector()
 		labels := chi.Labels
 
-		if selector.Matches(labels) {
-			log.V(1).M(chi).F().Info("Skip template: %s/%s. Selector %v does not match labels %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
+		if !selector.Matches(labels) {
+			log.V(1).M(chi).F().Info("Skip template: %s/%s. Selector: %v does not match labels: %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
 			continue // skip to the next template
 		}
 
 		// Apply template
-		log.V(1).M(chi).F().Info("Apply template: %s/%s. Selector %v matches labels %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
+		log.V(1).M(chi).F().Info("Apply template: %s/%s. Selector: %v matches labels: %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
 		(&n.ctx.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
 		n.ctx.chi.Labels = util.MergeStringMapsOverwrite(
 			n.ctx.chi.Labels,
