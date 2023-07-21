@@ -472,8 +472,9 @@ func (c *OperatorConfig) readCHITemplates() (errs []error) {
 		if err := yaml.Unmarshal([]byte(c.Template.CHI.Runtime.TemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
 			errs = append(errs, fmt.Errorf("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err))
-			continue
+			continue // skip to the next template
 		}
+		// Template read successfully, let's append it to the list
 		c.enlistCHITemplate(template)
 	}
 
