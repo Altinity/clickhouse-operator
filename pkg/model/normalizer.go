@@ -154,7 +154,7 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 		n.normalizeUseTemplates(useTemplates)
 	}
 
-	// Apply templates (both auto and explicitly requested)
+	// Apply templates - both auto and explicitly requested
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		template := chop.Config().FindTemplate(useTemplate, chi.Namespace)
