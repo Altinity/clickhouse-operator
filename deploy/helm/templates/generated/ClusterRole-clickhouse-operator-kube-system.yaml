@@ -48,6 +48,15 @@ rules:
       - ""
     resources:
       - persistentvolumes
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
       - pods
     verbs:
       - get
@@ -55,6 +64,7 @@ rules:
       - patch
       - update
       - watch
+      - delete
   - apiGroups:
       - apps
     resources:
