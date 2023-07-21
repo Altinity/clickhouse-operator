@@ -589,64 +589,19 @@ func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
 	return res
 }
 
-// buildUnifiedCHITemplate builds combined CHI Template from templates catalog
-func (c *OperatorConfig) buildUnifiedCHITemplate() {
-
-	return
-	/*
-		// Build unified template in case there are templates to build from only
-		if len(config.CHITemplates) == 0 {
-			return
-		}
-
-		// Sort CHI templates by their names and in order to apply orderly
-		// Extract file names into slice and sort it
-		// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
-		var sortedTemplateNames []string
-		for name := range config.CHITemplates {
-			// Convenience wrapper
-			template := config.CHITemplates[name]
-			sortedTemplateNames = append(sortedTemplateNames, template.Name)
-		}
-		sort.Strings(sortedTemplateNames)
-
-		// Create final combined template
-		config.CHITemplate = new(ClickHouseInstallation)
-
-		// Extract templates in sorted order - according to sorted template names
-		for _, name := range sortedTemplateNames {
-			// Convenience wrapper
-			template := config.CHITemplates[name]
-			// Merge into accumulated target template from current template
-			config.CHITemplate.MergeFrom(template)
-		}
-
-		// Log final CHI template obtained
-		// Marshaling is done just to print nice yaml
-		if bytes, err := yaml.Marshal(config.CHITemplate); err == nil {
-			log.V(1).Infof("Unified CHITemplate:\n%s\n", string(bytes))
-		} else {
-			log.V(1).Infof("FAIL unable to Marshal Unified CHITemplate")
-		}
-	*/
-}
-
 // AddCHITemplate adds CHI template
 func (c *OperatorConfig) AddCHITemplate(template *ClickHouseInstallation) {
 	c.enlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // UpdateCHITemplate updates CHI template
 func (c *OperatorConfig) UpdateCHITemplate(template *ClickHouseInstallation) {
 	c.enlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // DeleteCHITemplate deletes CHI template
 func (c *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
 	c.unlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // Postprocess runs all postprocessors
@@ -654,7 +609,6 @@ func (c *OperatorConfig) Postprocess() {
 	c.normalize()
 	c.readClickHouseCustomConfigFiles()
 	c.readCHITemplates()
-	c.buildUnifiedCHITemplate()
 	c.applyEnvVarParams()
 	c.applyDefaultWatchNamespace()
 }
