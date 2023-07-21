@@ -289,6 +289,10 @@ spec:
                       enum:
                         - "auto"
                         - "manual"
+                    chiSelector:
+                      type: object
+                      # nullable: true
+                      description: "optional, define selector applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
                 reconciling:
                   type: object
                   description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
