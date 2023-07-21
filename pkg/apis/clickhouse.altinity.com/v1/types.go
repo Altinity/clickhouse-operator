@@ -102,7 +102,7 @@ type ChiTemplating struct {
 
 type CHISelector map[string]string
 
-func (s CHISelector)Matches(labels map[string]string) bool {
+func (s CHISelector) Matches(labels map[string]string) bool {
 	if s == nil {
 		// Empty selector matches all labels
 		return true
