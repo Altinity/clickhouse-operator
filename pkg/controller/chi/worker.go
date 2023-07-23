@@ -140,8 +140,10 @@ func (w *worker) run() {
 	w.a.V(2).S().P()
 	defer w.a.V(2).E().P()
 
+	// For system thread let's wait its 'offisial start time', thus giving it time to bootstrap
 	util.WaitContextDoneUntil(context.Background(), w.start)
 
+	// Events loop
 	for {
 		// Get() blocks until it can return an item
 		item, ctx, ok := w.queue.Get()
