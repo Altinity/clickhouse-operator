@@ -68,9 +68,9 @@ yq -i ".metadata.annotations.alm-examples = strload(\"${EXAMPLES_FILE}\")" "${CV
 rm "${EXAMPLES_FILE}"
 
 cat "${CVV_FILE_TEMPLATE}" | \
-    OPERATOR_VERSION="${VERSION}" \
-    PREVIOUS_OPERATOR_VERSION="${PREVIOUS_VERSION}" \
-    envsubst > "${CVV_FILE}"
+  OPERATOR_VERSION="${VERSION}" \
+  PREVIOUS_OPERATOR_VERSION="${PREVIOUS_VERSION}" \
+  envsubst > "${CVV_FILE}"
 
 rm "${CVV_FILE_TEMPLATE}"
 
