@@ -640,14 +640,14 @@ func (c *Controller) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) 
 		return nil
 	}
 
-	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+	log.V(1).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
 	chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
 	return nil
 }
 
 // deleteChit deletes CHIT
 func (c *Controller) deleteChit(chit *chiV1.ClickHouseInstallationTemplate) error {
-	log.V(2).M(chit).F().P()
+	log.V(1).M(chit).F().P()
 	chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
 	return nil
 }
