@@ -190,6 +190,13 @@ spec:
                     chi:
                       type: object
                       properties:
+                        policy:
+                          type: string
+                          description: |
+                            CHI template updates handling policy
+                            Possible policy values:
+                              - ReadOnStart. Accept CHIT updates on the operators start only.
+                              - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
                         path:
                           type: string
                           description: "Path to folder where ClickHouseInstallationTemplate .yaml manifests are located."
