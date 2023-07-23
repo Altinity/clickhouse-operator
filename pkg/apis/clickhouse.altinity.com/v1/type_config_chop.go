@@ -240,8 +240,9 @@ type OperatorConfigTemplate struct {
 }
 
 type OperatorConfigCHIPolicy string
+
 const (
-	OperatorConfigCHIPolicyReadOnStart 			OperatorConfigCHIPolicy = "ReadOnStart"
+	OperatorConfigCHIPolicyReadOnStart          OperatorConfigCHIPolicy = "ReadOnStart"
 	OperatorConfigCHIPolicyApplyOnNextReconcile OperatorConfigCHIPolicy = "ApplyOnNextReconcile"
 	defaultOperatorConfigCHIPolicy              OperatorConfigCHIPolicy = OperatorConfigCHIPolicyApplyOnNextReconcile
 )
@@ -622,7 +623,7 @@ func (c *OperatorConfig) Postprocess() {
 	c.applyDefaultWatchNamespace()
 }
 
-func (c *OperatorConfig) normalizeConfigurationFilesSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
@@ -633,7 +634,7 @@ func (c *OperatorConfig) normalizeConfigurationFilesSection() {
 	util.PreparePath(&c.Template.CHI.Path, c.Runtime.ConfigFolderPath, TemplatesDir)
 }
 
-func (c *OperatorConfig) normalizeUpdateSection() {
+func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 	// Process Create/Update section
 
 	// Timeouts
@@ -660,7 +661,7 @@ func (c *OperatorConfig) normalizeUpdateSection() {
 	}
 }
 
-func (c *OperatorConfig) normalizeSettingsSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
 	// 2. user/quota
@@ -682,7 +683,7 @@ func (c *OperatorConfig) normalizeSettingsSection() {
 	// chConfigNetworksHostRegexpTemplate
 }
 
-func (c *OperatorConfig) normalizeAccessSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
@@ -733,15 +734,17 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
 
+}
+
+func (c *OperatorConfig) normalizeSectionClickHouseMetrics() {
 	if c.ClickHouse.Metrics.Timeouts.Collect == 0 {
 		c.ClickHouse.Metrics.Timeouts.Collect = defaultTimeoutCollect
 	}
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Metrics.Timeouts.Collect = c.ClickHouse.Metrics.Timeouts.Collect * time.Second
-
 }
 
-func (c *OperatorConfig) normalizeLogSection() {
+func (c *OperatorConfig) normalizeSectionLogger() {
 	// Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
 	// Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
 	// V                string `json:"v"                yaml:"v"`
@@ -750,7 +753,7 @@ func (c *OperatorConfig) normalizeLogSection() {
 	// Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 }
 
-func (c *OperatorConfig) normalizeRuntimeSection() {
+func (c *OperatorConfig) normalizeSectionReconcileRuntime() {
 	if c.Reconcile.Runtime.ThreadsNumber == 0 {
 		c.Reconcile.Runtime.ThreadsNumber = defaultReconcileCHIsThreadsNumber
 	}
@@ -768,7 +771,7 @@ func (c *OperatorConfig) normalizeRuntimeSection() {
 	//reconcileWaitInclude: false
 }
 
-func (c *OperatorConfig) normalizeLabelsSection() {
+func (c *OperatorConfig) normalizeSectionLabel() {
 	//config.IncludeIntoPropagationAnnotations
 	//config.ExcludeFromPropagationAnnotations
 	//config.IncludeIntoPropagationLabels
@@ -777,12 +780,15 @@ func (c *OperatorConfig) normalizeLabelsSection() {
 	c.Label.Runtime.AppendScope = c.Label.AppendScopeString.Value()
 }
 
-func (c *OperatorConfig) normalizePodManagementSection() {
-	if c.Pod.TerminationGracePeriod == 0 {
-		c.Pod.TerminationGracePeriod = defaultTerminationGracePeriod
-	}
+func (c *OperatorConfig) normalizeSectionStatefulSet() {
 	if c.StatefulSet.RevisionHistoryLimit == 0 {
 		c.StatefulSet.RevisionHistoryLimit = defaultRevisionHistoryLimit
+	}
+}
+
+func (c *OperatorConfig) normalizeSectionPod() {
+	if c.Pod.TerminationGracePeriod == 0 {
+		c.Pod.TerminationGracePeriod = defaultTerminationGracePeriod
 	}
 }
 
@@ -791,14 +797,16 @@ func (c *OperatorConfig) normalize() {
 	c.move()
 	c.Runtime.Namespace = os.Getenv(OPERATOR_POD_NAMESPACE)
 
-	c.normalizeConfigurationFilesSection()
-	c.normalizeUpdateSection()
-	c.normalizeSettingsSection()
-	c.normalizeAccessSection()
-	c.normalizeLogSection()
-	c.normalizeRuntimeSection()
-	c.normalizeLabelsSection()
-	c.normalizePodManagementSection()
+	c.normalizeSectionClickHouseConfigurationFile()
+	c.normalizeSectionClickHouseConfigurationUserDefault()
+	c.normalizeSectionClickHouseAccess()
+	c.normalizeSectionClickHouseMetrics()
+	c.normalizeSectionReconcileStatefulSet()
+	c.normalizeSectionReconcileRuntime()
+	c.normalizeSectionLogger()
+	c.normalizeSectionLabel()
+	c.normalizeSectionStatefulSet()
+	c.normalizeSectionPod()
 }
 
 // applyEnvVarParams applies ENV VARS over config
