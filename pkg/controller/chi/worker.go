@@ -194,11 +194,11 @@ func (w *worker) processReconcileCHI(ctx context.Context, cmd *ReconcileCHI) err
 func (w *worker) processReconcileCHIT(cmd *ReconcileCHIT) error {
 	switch cmd.cmd {
 	case reconcileAdd:
-		return w.c.addChit(cmd.new)
+		return w.addChit(cmd.new)
 	case reconcileUpdate:
-		return w.c.updateChit(cmd.old, cmd.new)
+		return w.updateChit(cmd.old, cmd.new)
 	case reconcileDelete:
-		return w.c.deleteChit(cmd.old)
+		return w.deleteChit(cmd.old)
 	}
 
 	// Unknown item type, don't know what to do with it
