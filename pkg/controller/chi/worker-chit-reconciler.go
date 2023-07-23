@@ -20,10 +20,27 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
+func (w *worker) shouldUpdateCHITList() bool {
+	update := false
+	switch chop.Config().Template.CHI.Policy {
+	case chiV1.OperatorConfigCHIPolicyReadOnStart:
+		update = w.isJustStarted()
+	case chiV1.OperatorConfigCHIPolicyApplyOnNextReconcile:
+		update = true
+	default:
+		update = false
+	}
+	return update
+}
+
 // addChit sync new CHIT - creates all its resources
 func (w *worker) addChit(chit *chiV1.ClickHouseInstallationTemplate) error {
 	log.V(1).M(chit).F().P()
-	chop.Config().AddCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+
+	if w.shouldUpdateCHITList() {
+		log.V(1).M(chit).F().Info("Add CHIT: %s/%s", chit.Namespace, chit.Name)
+		chop.Config().AddCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+	}
 	return nil
 }
 
@@ -36,13 +53,20 @@ func (w *worker) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) erro
 	}
 
 	log.V(1).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
-	chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
+	if w.shouldUpdateCHITList() {
+		log.V(1).M(new).F().Info("Update CHIT: %s/%s", new.Namespace, new.Name)
+		chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
+	}
 	return nil
 }
 
 // deleteChit deletes CHIT
 func (w *worker) deleteChit(chit *chiV1.ClickHouseInstallationTemplate) error {
 	log.V(1).M(chit).F().P()
-	chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+
+	if w.shouldUpdateCHITList() {
+		log.V(1).M(chit).F().Info("Delete CHIT: %s/%s", chit.Namespace, chit.Name)
+		chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+	}
 	return nil
 }
