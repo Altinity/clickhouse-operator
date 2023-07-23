@@ -241,6 +241,18 @@ type OperatorConfigTemplate struct {
 
 type OperatorConfigCHIPolicy string
 
+func (p OperatorConfigCHIPolicy) String() string {
+	return string(p)
+}
+
+func (p OperatorConfigCHIPolicy) ToLower() string {
+	return strings.ToLower(p.String())
+}
+
+func (p OperatorConfigCHIPolicy) Equals(another OperatorConfigCHIPolicy) bool {
+	return p.ToLower() == another.ToLower()
+}
+
 const (
 	OperatorConfigCHIPolicyReadOnStart          OperatorConfigCHIPolicy = "ReadOnStart"
 	OperatorConfigCHIPolicyApplyOnNextReconcile OperatorConfigCHIPolicy = "ApplyOnNextReconcile"
@@ -633,6 +645,16 @@ func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 }
 
 func (c *OperatorConfig) normalizeSectionTemplate() {
+	p := c.Template.CHI.Policy
+	switch {
+	case p.Equals(OperatorConfigCHIPolicyReadOnStart):
+		c.Template.CHI.Policy = OperatorConfigCHIPolicyReadOnStart
+	case p.Equals(OperatorConfigCHIPolicyApplyOnNextReconcile):
+		c.Template.CHI.Policy = OperatorConfigCHIPolicyApplyOnNextReconcile
+	default:
+		c.Template.CHI.Policy = defaultOperatorConfigCHIPolicy
+	}
+
 	// Process ClickHouseInstallation templates section
 	util.PreparePath(&c.Template.CHI.Path, c.Runtime.ConfigFolderPath, TemplatesDir)
 }
