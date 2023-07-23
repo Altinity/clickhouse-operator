@@ -239,8 +239,17 @@ type OperatorConfigTemplate struct {
 	CHI OperatorConfigCHI `json:"chi" yaml:"chi"`
 }
 
+type OperatorConfigCHIPolicy string
+const (
+	OperatorConfigCHIPolicyReadOnStart 			OperatorConfigCHIPolicy = "ReadOnStart"
+	OperatorConfigCHIPolicyApplyOnNextReconcile OperatorConfigCHIPolicy = "ApplyOnNextReconcile"
+	defaultOperatorConfigCHIPolicy              OperatorConfigCHIPolicy = OperatorConfigCHIPolicyApplyOnNextReconcile
+)
+
 // OperatorConfigCHI specifies template CHI section
 type OperatorConfigCHI struct {
+	// Policy specifies how to handle CHITs
+	Policy OperatorConfigCHIPolicy `json:"policy" yaml:"policy"`
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	Path string `json:"path" yaml:"path"`
 
