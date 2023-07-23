@@ -630,6 +630,9 @@ func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
 
+}
+
+func (c *OperatorConfig) normalizeSectionTemplate() {
 	// Process ClickHouseInstallation templates section
 	util.PreparePath(&c.Template.CHI.Path, c.Runtime.ConfigFolderPath, TemplatesDir)
 }
@@ -801,6 +804,7 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionClickHouseConfigurationUserDefault()
 	c.normalizeSectionClickHouseAccess()
 	c.normalizeSectionClickHouseMetrics()
+	c.normalizeSectionTemplate()
 	c.normalizeSectionReconcileStatefulSet()
 	c.normalizeSectionReconcileRuntime()
 	c.normalizeSectionLogger()
