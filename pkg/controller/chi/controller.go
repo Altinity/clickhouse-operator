@@ -625,33 +625,6 @@ func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCHI) {
 	}
 }
 
-// addChit sync new CHIT - creates all its resources
-func (c *Controller) addChit(chit *chiV1.ClickHouseInstallationTemplate) error {
-	log.V(1).M(chit).F().P()
-	chop.Config().AddCHITemplate((*chiV1.ClickHouseInstallation)(chit))
-	return nil
-}
-
-// updateChit sync CHIT which was already created earlier
-func (c *Controller) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) error {
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
-		// No need to react
-		return nil
-	}
-
-	log.V(1).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
-	chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
-	return nil
-}
-
-// deleteChit deletes CHIT
-func (c *Controller) deleteChit(chit *chiV1.ClickHouseInstallationTemplate) error {
-	log.V(1).M(chit).F().P()
-	chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
-	return nil
-}
-
 // addChopConfig
 func (c *Controller) addChopConfig(chopConfig *chiV1.ClickHouseOperatorConfiguration) error {
 	if chop.Get().ConfigManager.IsConfigListed(chopConfig) {
