@@ -165,14 +165,15 @@ clickhouse:
 ################################################
 template:
   chi:
+    # ReadOnStart
+    # LazyUpdate
+    # ForceUpdate
+    policy: LazyUpdate
+    
     # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
     # Templates are added to the list of all templates and used when CHI is reconciled.
     # Templates are applied in sorted alpha-numeric order.
     path: templates.d
-    # ReadOnStart
-    # LazyUpdate
-    # ForceUpdate
-    policy:
 
 ################################################
 ##
