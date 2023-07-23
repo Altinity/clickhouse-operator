@@ -5,7 +5,8 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 # Where community-operators sources are located
-CO_PATH=~/dev/community-operators/operators/clickhouse/
+DEFAULT_CO_PATH=~/dev/community-operators/operators/clickhouse/
+CO_PATH=${CO_PATH:-${DEFAULT_CO_PATH}}
 
 # Ask to prepare copy of required files
 echo "Please ensure new clickhouse folder in operatorhub repo is available :"
@@ -13,12 +14,12 @@ echo "${CO_PATH}"
 read -n 1 -r -s -p $'Press enter to continue...\n'
 
 if [[ ! -d "${CO_PATH}" ]]; then
-    echo "No ${CO_PATH} available! Abort."
+    echo "Folder ${CO_PATH} is not available! Abort."
     exit 1
 fi
 
 if [[ -z "${PREVIOUS_VERSION}" ]]; then
-    echo "PREVIOUS_VERSION is empty"
+    echo "PREVIOUS_VERSION is not explicitly specified"
     echo "Trying to figure out PREVIOUS_VERSION from releases"
     PREVIOUS_VERSION=$(cat "${SRC_ROOT}/releases" | head -n1)
     echo "Found the following PREVIOUS_VERSION=$PREVIOUS_VERSION"
@@ -36,7 +37,7 @@ else
     echo "PREVIOUS_VERSION=${PREVIOUS_VERSION}"
 fi
 
-echo "Please, verify correctness of specified previous version"
+echo "Please, verify correctness of the specified previous version"
 read -n 1 -r -s -p $'Press enter to continue...\n'
 
 PREVIOUS_VERSION="${PREVIOUS_VERSION}" ${SRC_ROOT}/deploy/builder/operatorhub.sh
