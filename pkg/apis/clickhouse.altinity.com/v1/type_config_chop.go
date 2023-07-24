@@ -48,9 +48,12 @@ const (
 	defaultChConfigUserDefaultPassword  = "default"
 
 	// Possible values for ClickHouse scheme
-	ChSchemeHTTP  = "http"
+	// ChSchemeHTTP specifies HTTP access scheme
+	ChSchemeHTTP = "http"
+	// ChSchemeHTTPS specifies HTTPS access scheme
 	ChSchemeHTTPS = "https"
-	ChSchemeAuto  = "auto"
+	// ChSchemeAuto specifies that operator has to decide itself should https or http be used
+	ChSchemeAuto = "auto"
 
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
