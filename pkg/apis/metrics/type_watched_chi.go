@@ -19,18 +19,20 @@ import (
 	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// WatchedCHI specifies watched CLickHouseInstallation
+// WatchedCHI specifies watched ClickHouseInstallation
 type WatchedCHI struct {
 	Namespace string            `json:"namespace"`
 	Name      string            `json:"name"`
 	Clusters  []*WatchedCluster `json:"clusters"`
 }
 
+// WatchedCluster specifies watched cluster
 type WatchedCluster struct {
 	Name  string         `json:"name,omitempty"  yaml:"name,omitempty"`
 	Hosts []*WatchedHost `json:"hosts,omitempty" yaml:"hosts,omitempty"`
 }
 
+// WatchedHost specifies watched host
 type WatchedHost struct {
 	Name      string `json:"name,omitempty"      yaml:"name,omitempty"`
 	Hostname  string `json:"hostname,omitempty"  yaml:"hostname,omitempty"`
@@ -40,6 +42,7 @@ type WatchedHost struct {
 	HTTPSPort int32  `json:"httpsPort,omitempty" yaml:"httpsPort,omitempty"`
 }
 
+// NewWatchedCHI creates new watched CHI
 func NewWatchedCHI(c *v1.ClickHouseInstallation) *WatchedCHI {
 	chi := &WatchedCHI{}
 	chi.readFrom(c)
@@ -84,6 +87,7 @@ func (chi *WatchedCHI) walkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHo
 	}
 }
 
+// String is a stringifier
 func (chi *WatchedCHI) String() string {
 	if chi == nil {
 		return "nil"
