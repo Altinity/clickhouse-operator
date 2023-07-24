@@ -48,6 +48,7 @@ const (
 	defaultChConfigUserDefaultPassword  = "default"
 
 	// Possible values for ClickHouse scheme
+
 	// ChSchemeHTTP specifies HTTP access scheme
 	ChSchemeHTTP = "http"
 	// ChSchemeHTTPS specifies HTTPS access scheme
