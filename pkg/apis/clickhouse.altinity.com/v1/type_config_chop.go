@@ -47,6 +47,7 @@ const (
 	defaultChConfigUserDefaultNetworkIP = "::/0"
 	defaultChConfigUserDefaultPassword  = "default"
 
+	// Possible values for ClickHouse scheme
 	ChSchemeHTTP  = "http"
 	ChSchemeHTTPS = "https"
 	ChSchemeAuto  = "auto"
@@ -239,20 +240,25 @@ type OperatorConfigTemplate struct {
 	CHI OperatorConfigCHI `json:"chi" yaml:"chi"`
 }
 
+// OperatorConfigCHIPolicy specifies string value of .template.chi.policy
 type OperatorConfigCHIPolicy string
 
+// String is a stringifier
 func (p OperatorConfigCHIPolicy) String() string {
 	return string(p)
 }
 
+// ToLower provides the same functionality as strings.ToLower()
 func (p OperatorConfigCHIPolicy) ToLower() string {
 	return strings.ToLower(p.String())
 }
 
+// Equals checks whether OperatorConfigCHIPolicy is equal to another one
 func (p OperatorConfigCHIPolicy) Equals(another OperatorConfigCHIPolicy) bool {
 	return p.ToLower() == another.ToLower()
 }
 
+// Possible values for OperatorConfigCHIPolicy
 const (
 	OperatorConfigCHIPolicyReadOnStart          OperatorConfigCHIPolicy = "ReadOnStart"
 	OperatorConfigCHIPolicyApplyOnNextReconcile OperatorConfigCHIPolicy = "ApplyOnNextReconcile"
