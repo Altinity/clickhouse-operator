@@ -777,6 +777,7 @@ func (chi *ClickHouseInstallation) SetTarget(a *ClickHouseInstallation) {
 	chi.EnsureStatus().NormalizedCHI = a
 }
 
+// FirstHost returns first host of the CHI
 func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
 	var result *ChiHost
 	chi.WalkHosts(func(host *ChiHost) error {
