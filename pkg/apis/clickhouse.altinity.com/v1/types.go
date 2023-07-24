@@ -100,8 +100,10 @@ type ChiTemplating struct {
 	CHISelector CHISelector `json:"chiSelector,omitempty" yaml:"chiSelector,omitempty"`
 }
 
+// CHISelector specifies CHI label selector
 type CHISelector map[string]string
 
+// Matches checks whether CHISelector matches provided set of labels
 func (s CHISelector) Matches(labels map[string]string) bool {
 	if s == nil {
 		// Empty selector matches all labels
