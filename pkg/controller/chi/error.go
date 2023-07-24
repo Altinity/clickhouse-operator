@@ -18,6 +18,7 @@ import (
 	"errors"
 )
 
+// ErrorCRUD specifies errors of the CRUD operations
 type ErrorCRUD error
 
 var (
