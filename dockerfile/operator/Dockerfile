@@ -36,8 +36,12 @@ RUN CGO_ENABLED=0 GO111MODULE=on GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" go in
 # ======================
 # ===== Image Base =====
 # ======================
+FROM gcr.io/distroless/static-debian11:latest AS image-base-amd64
 
-FROM gcr.io/distroless/static-debian11:latest AS image-base
+FROM gcr.io/distroless/static-debian11:latest-arm64 AS image-base-arm64
+
+ARG TARGETARCH
+FROM image-base-${TARGETARCH} AS image-base
 
 MAINTAINER "Altinity <support@altinity.com>"
 

@@ -17,10 +17,6 @@ fi
 GOOS=${GOOS:-linux}
 GOARCH=${GOARCH:-amd64}
 
-if [[ ! -z "${GCFLAGS}" ]]; then
-    GCFLAGS=-gcflags "${GCFLAGS}"
-fi
-
 if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
     -mod="vendor" \
     -a \
@@ -29,7 +25,7 @@ if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" go build \
         -X ${REPO}/pkg/version.GitSHA=${GIT_SHA}  \
         -X ${REPO}/pkg/version.BuiltAt=${NOW}     \
     " \
-    ${GCFLAGS} \
+    ${GCFLAGS:+-gcflags "${GCFLAGS}"} \
     -o "${OUTPUT_BINARY}" \
     "${MAIN_SRC_FILE}"
 then

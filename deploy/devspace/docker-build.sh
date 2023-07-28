@@ -13,9 +13,13 @@ else
 fi
 
 if [[ "${DEVSPACE_DEBUG}" == "--debug=delve" ]]; then
-    time docker buildx build --progress plain --output "type=image,name=${DOCKER_IMAGE}" --platform="${TARGET_PLATFORM}" -f ${DOCKER_FILE} --target image-debug --build-arg GCFLAGS="all=-N -l" -t "${DOCKER_IMAGE}" .
+    time docker buildx build --progress plain --output "type=docker" --load --platform="${TARGET_PLATFORM}" -f ${DOCKER_FILE} --target image-debug --build-arg GCFLAGS='all=-N -l' -t "${DOCKER_IMAGE}" .
 else
-    time docker buildx build --progress plain --output "type=image,name=${DOCKER_IMAGE}" --platform="${TARGET_PLATFORM}" -f ${DOCKER_FILE} -t "${DOCKER_IMAGE}" .
+    time docker buildx build --progress plain --output "type=docker" --load --platform="${TARGET_PLATFORM}" -f ${DOCKER_FILE} -t "${DOCKER_IMAGE}" .
 fi
 
 docker images "${DOCKER_IMAGE%:*}"
+
+if [[ "yes" == "${MINIKUBE}" ]]; then
+  minikube image load --daemon=true "${DOCKER_IMAGE}"
+fi
