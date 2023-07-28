@@ -18,7 +18,7 @@ GOOS=${GOOS:-linux}
 GOARCH=${GOARCH:-amd64}
 
 if [[ ! -z "${GCFLAGS}" ]]; then
-    GCFLAGS="-gcflags '${GCFLAGS}'"
+    GCFLAGS="-gcflags \"${GCFLAGS}\""
 fi
 
 if CGO_ENABLED=0 GO111MODULE=on GOOS="${GOOS}" GOARCH="${GOARCH}" go build \

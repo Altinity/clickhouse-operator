@@ -13,7 +13,7 @@ else
 fi
 
 if [[ "${DEVSPACE_DEBUG}" == "--debug=delve" ]]; then
-    time docker buildx build --progress plain --output "type=image,name=${DOCKER_IMAGE}" --platform="${TARGET_PLATFORM}" -f ${DOCKER_FILE} --target image-debug --build-arg GCFLAGS='-N -l' -t "${DOCKER_IMAGE}" .
+    time docker buildx build --progress plain --output "type=image,name=${DOCKER_IMAGE}" --platform="${TARGET_PLATFORM}" -f ${DOCKER_FILE} --target image-debug --build-arg GCFLAGS="all=-N -l" -t "${DOCKER_IMAGE}" .
 else
     time docker buildx build --progress plain --output "type=image,name=${DOCKER_IMAGE}" --platform="${TARGET_PLATFORM}" -f ${DOCKER_FILE} -t "${DOCKER_IMAGE}" .
 fi
