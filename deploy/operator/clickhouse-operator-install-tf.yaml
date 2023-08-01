@@ -233,6 +233,11 @@ spec:
                   description: "List of hosts with tables created by the operator"
                   items:
                     type: string
+                usedTemplates:
+                  type: array
+                  description: "List of templates used to build this CHI"
+                  items:
+                    type: object
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -1397,6 +1402,11 @@ spec:
                   description: "List of hosts with tables created by the operator"
                   items:
                     type: string
+                usedTemplates:
+                  type: array
+                  description: "List of templates used to build this CHI"
+                  items:
+                    type: object
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
