@@ -221,8 +221,10 @@ spec:
             usedTemplates:
               type: array
               description: "List of templates used to build this CHI"
+              x-kubernetes-preserve-unknown-fields: true
               items:
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
         spec:
           type: object
           # x-kubernetes-preserve-unknown-fields: true
@@ -1378,8 +1380,10 @@ spec:
             usedTemplates:
               type: array
               description: "List of templates used to build this CHI"
+              x-kubernetes-preserve-unknown-fields: true
               items:
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
         spec:
           type: object
           # x-kubernetes-preserve-unknown-fields: true
