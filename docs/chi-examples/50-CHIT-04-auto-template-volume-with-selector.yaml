@@ -19,5 +19,8 @@ spec:
               storage: 1Gi
   templating:
     policy: auto
+    # chiSelector works exactly as nodeSelector
+    # https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+    # Specify labels of the target CHIs to apply this CHIT
     chiSelector:
       target-chi-label-auto: target-chi-label-auto-value
