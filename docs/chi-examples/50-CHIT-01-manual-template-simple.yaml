@@ -1,0 +1,9 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+metadata:
+  name: chit-01
+  annotations:
+    chit-01-annotation: chit-01-annotation-value
+spec:
+  templating:
+    policy: "manual"

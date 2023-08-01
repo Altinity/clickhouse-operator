@@ -1,0 +1,20 @@
+#
+# Check docs/config-examples/templates/
+#
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "use-templates-all"
+  # Use for chiSelector in CHIT to pick this CHI
+  labels:
+    target-chi-label-manual: target-chi-label-manual-value
+    target-chi-label-auto: target-chi-label-auto-value
+spec:
+  # Use "manual" CHIT explicitly
+  # "auto" CHITs will be applied automatically
+  useTemplates:
+    - name: "chit-01"
+    - name: "chit-02"
+  configuration:
+    clusters:
+      - name: "c1"

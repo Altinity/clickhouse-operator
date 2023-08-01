@@ -1,21 +1,15 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 metadata:
-  name: "simple-template-01"
+  name: chit-04
+  annotations:
+    chit-04-annotation: chit-04-annotation-value
 spec:
   defaults:
     templates:
-      dataVolumeClaimTemplate: data-volumeclaim-template
       logVolumeClaimTemplate: log-volumeclaim-template
   templates:
     volumeClaimTemplates:
-      - name: data-volumeclaim-template
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 2Gi
       - name: log-volumeclaim-template
         spec:
           accessModes:
@@ -25,3 +19,5 @@ spec:
               storage: 1Gi
   templating:
     policy: auto
+    chiSelector:
+      target-chi-label-auto: target-chi-label-auto-value
