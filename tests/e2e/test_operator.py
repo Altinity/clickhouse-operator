@@ -3750,11 +3750,11 @@ def test_042(self):
                     "CrashLoopBackOff")
 
         with And("First node is down"):
-            res = clickhouse.query_with_error(chi, host = f"chi-{chi}-{cluster}-0-0-0", sql = "select 1")
+            res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-0-0-0", sql="select 1")
             assert res != "1"
 
         with And("Second node is up"):
-            res = clickhouse.query_with_error(chi, host = f"chi-{chi}-{cluster}-1-0-0", sql = "select 1")
+            res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-1-0-0", sql="select 1")
             assert res == "1"
 
     with When("CHI is reverted to a good one"):
