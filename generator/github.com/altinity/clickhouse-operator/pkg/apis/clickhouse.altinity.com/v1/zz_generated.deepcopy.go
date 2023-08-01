@@ -795,6 +795,17 @@ func (in *ChiStatus) DeepCopyInto(out *ChiStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.UsedTemplates != nil {
+		in, out := &in.UsedTemplates, &out.UsedTemplates
+		*out = make([]*ChiUseTemplate, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ChiUseTemplate)
+				**out = **in
+			}
+		}
+	}
 	out.mu = in.mu
 	return
 }
