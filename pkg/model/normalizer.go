@@ -156,6 +156,7 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 
 	// Apply templates - both auto and explicitly requested
 	for i := range useTemplates {
+		// Convenience wrapper
 		useTemplate := &useTemplates[i]
 		template := chop.Config().FindTemplate(useTemplate, chi.Namespace)
 
@@ -172,7 +173,10 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 			continue // skip to the next template
 		}
 
-		// Apply template
+		//
+		// Template is found and matches, let's apply template
+		//
+
 		log.V(1).M(chi).F().Info("Apply template: %s/%s. Selector: %v matches labels: %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
 		(&n.ctx.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
 		n.ctx.chi.Labels = util.MergeStringMapsOverwrite(
