@@ -194,6 +194,9 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 				append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
 			),
 		)
+
+		// And append used template to the list of used templates
+		n.ctx.chi.EnsureStatus().PushUsedTemplate(useTemplate)
 	}
 }
 
