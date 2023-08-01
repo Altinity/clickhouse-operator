@@ -5,7 +5,7 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: "use-templates-all"
-  # Use for chiSelector in CHIT to pick this CHI
+  # Labels are used for chiSelector in CHIT to pick this CHI
   labels:
     target-chi-label-manual: target-chi-label-manual-value
     target-chi-label-auto: target-chi-label-auto-value
