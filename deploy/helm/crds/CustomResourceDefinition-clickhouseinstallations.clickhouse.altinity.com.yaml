@@ -298,8 +298,9 @@ spec:
                         - "manual"
                     chiSelector:
                       type: object
-                      # nullable: true
                       description: "optional, define selector applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                      # nullable: true
+                      x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
                   description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"

@@ -197,6 +197,9 @@ spec:
                             Possible policy values:
                               - ReadOnStart. Accept CHIT updates on the operators start only.
                               - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+                          enum:
+                            - "ReadOnStart"
+                            - "ApplyOnNextReconcile"
                         path:
                           type: string
                           description: "Path to folder where ClickHouseInstallationTemplate .yaml manifests are located."
