@@ -2367,9 +2367,6 @@ def test_023(self):
     with Then("Annotation from selector-1 template should be populated"):
         assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-1") == "selector-test-1"
     with Then("Annotation from selector-2 template should NOT be populated"):
-        print(f"output====")
-        print(kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-2"))
-        print(f"output====")
         assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-2") == "<none>"
 
     delete_test_namespace()
