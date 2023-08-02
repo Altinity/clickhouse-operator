@@ -11,4 +11,4 @@ spec:
   templating:
     policy: auto
     chiSelector:
-      clickhouse.altinity.com/chi: test-023 # should match CHI nameed test-023
+      clickhouse.altinity.com/chi: test-023 # should match CHI named test-023
