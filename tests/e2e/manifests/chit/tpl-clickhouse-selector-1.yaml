@@ -1,0 +1,14 @@
+# test_023
+
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: selector-test-1
+  annotations:
+    selector-test-1: selector-test-1
+spec:
+  templating:
+    policy: auto
+    chiSelector:
+      clickhouse.altinity.com/chi: test-023 # should match CHI nameed test-023

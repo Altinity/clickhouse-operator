@@ -2329,6 +2329,11 @@ def test_023(self):
             "do_not_delete": 1,
         },
     )
+    with Then(".status.usedTemplates has two values"):
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
+        # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
+
     with Then("Annotation from a template should be populated"):
         assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
     with Then("Pod annotation should populated from template"):
@@ -2338,6 +2343,27 @@ def test_023(self):
         env = pod["containers"][0]["env"][0]
         assert env["name"] == "TEST_ENV"
         assert env["value"] == "TEST_ENV_VALUE"
+
+    with Given("Twp selector templates are deployed"):
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-1.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-2.yaml"))
+
+    with Then("Trigger CHI update"):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
+        kubectl.launch(cmd)
+
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Then(".status.usedTemplates has 3 values"):
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "selector-test-1"
+        # assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == ""
+
+    with Then("Annotation from selector-1 template should be populated"):
+        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-1") == "selector-test-1"
+    with Then("Annotation from selector-2 template should NOT be populated"):
+        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-2") == ""
 
     delete_test_namespace()
 
