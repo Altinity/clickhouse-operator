@@ -4,6 +4,7 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
+# OPERATOR_VERSION=0.21.3
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -1166,6 +1167,7 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
+# OPERATOR_VERSION=0.21.3
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
