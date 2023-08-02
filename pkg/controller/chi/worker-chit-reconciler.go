@@ -40,6 +40,8 @@ func (w *worker) addChit(chit *chiV1.ClickHouseInstallationTemplate) error {
 	if w.shouldUpdateCHITList() {
 		log.V(1).M(chit).F().Info("Add CHIT: %s/%s", chit.Namespace, chit.Name)
 		chop.Config().AddCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+	} else {
+		log.V(1).M(chit).F().Info("CHIT will not be added: %s/%s", chit.Namespace, chit.Name)
 	}
 	return nil
 }
@@ -56,6 +58,8 @@ func (w *worker) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) erro
 	if w.shouldUpdateCHITList() {
 		log.V(1).M(new).F().Info("Update CHIT: %s/%s", new.Namespace, new.Name)
 		chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
+	} else {
+		log.V(1).M(new).F().Info("CHIT will not be updated: %s/%s", new.Namespace, new.Name)
 	}
 	return nil
 }
@@ -67,6 +71,8 @@ func (w *worker) deleteChit(chit *chiV1.ClickHouseInstallationTemplate) error {
 	if w.shouldUpdateCHITList() {
 		log.V(1).M(chit).F().Info("Delete CHIT: %s/%s", chit.Namespace, chit.Name)
 		chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+	} else {
+		log.V(1).M(chit).F().Info("CHIT will not be deleted: %s/%s", chit.Namespace, chit.Name)
 	}
 	return nil
 }
