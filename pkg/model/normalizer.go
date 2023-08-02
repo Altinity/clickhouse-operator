@@ -136,7 +136,7 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
-			log.V(1).M(chi).F().Info("Adding auto-template to merge list: %s/%s ", template.Namespace, template.Name)
+			log.V(1).M(chi).F().Info("Adding auto-template to list of possible templates: %s/%s ", template.Namespace, template.Name)
 			useTemplates = append(useTemplates, chiV1.ChiUseTemplate{
 				Name:      template.Name,
 				Namespace: template.Namespace,
@@ -146,6 +146,7 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 	}
 	// 2. Append templates, explicitly requested in CHI
 	if len(chi.Spec.UseTemplates) > 0 {
+		log.V(1).M(chi).F().Info("Found manual-templates num: %d", len(chi.Spec.UseTemplates))
 		useTemplates = append(useTemplates, chi.Spec.UseTemplates...)
 	}
 
@@ -198,6 +199,7 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 		// And append used template to the list of used templates
 		n.ctx.chi.EnsureStatus().PushUsedTemplate(useTemplate)
 	}
+	log.V(1).M(chi).F().Info("Used templates count: %d", n.ctx.chi.EnsureStatus().GetUsedTemplatesCount())
 }
 
 // normalize normalizes whole CHI.
