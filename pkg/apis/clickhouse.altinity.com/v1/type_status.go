@@ -170,6 +170,13 @@ func (s *ChiStatus) PushUsedTemplate(usedTemplate *ChiUseTemplate) {
 	})
 }
 
+// GetUsedTemplatesCount gets used templates count
+func (s *ChiStatus) GetUsedTemplatesCount() int {
+	return getIntWithReadLock(s, func(s *ChiStatus) int {
+		return len(s.UsedTemplates)
+	})
+}
+
 // SetAction action setter
 func (s *ChiStatus) SetAction(action string) {
 	doWithWriteLock(s, func(s *ChiStatus) {
@@ -309,7 +316,6 @@ func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyCHIStatusOptions) {
 				s.Actions = from.Actions
 				s.Errors = from.Errors
 				s.HostsWithTablesCreated = from.HostsWithTablesCreated
-				s.UsedTemplates = from.UsedTemplates
 			}
 
 			if opts.Actions {
