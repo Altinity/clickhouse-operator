@@ -2365,9 +2365,9 @@ def test_023(self):
         # assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == ""
 
     with Then("Annotation from selector-1 template should be populated"):
-        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-1") == "selector-test-1"
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.selector-test-1") == "selector-test-1"
     with Then("Annotation from selector-2 template should NOT be populated"):
-        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-2") == "<none>"
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.selector-test-2") == "<none>"
 
     delete_test_namespace()
 
