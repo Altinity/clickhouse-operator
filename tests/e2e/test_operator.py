@@ -2317,6 +2317,8 @@ def test_023(self):
     with Given("Auto templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
+    with Given("Give templates some time to be applied"):
+        time.sleep(15)
 
     chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
     expected_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
@@ -2344,9 +2346,11 @@ def test_023(self):
         assert env["name"] == "TEST_ENV"
         assert env["value"] == "TEST_ENV_VALUE"
 
-    with Given("Twp selector templates are deployed"):
+    with Given("Two selector templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-1.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-2.yaml"))
+    with Given("Give templates some time to be applied"):
+        time.sleep(15)
 
     with Then("Trigger CHI update"):
         cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
@@ -2363,7 +2367,10 @@ def test_023(self):
     with Then("Annotation from selector-1 template should be populated"):
         assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-1") == "selector-test-1"
     with Then("Annotation from selector-2 template should NOT be populated"):
-        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-2") == ""
+        print(f"output====")
+        print(kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-2"))
+        print(f"output====")
+        assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.selector-test-2") == "<none>"
 
     delete_test_namespace()
 
