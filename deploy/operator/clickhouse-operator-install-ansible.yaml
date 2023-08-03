@@ -3148,9 +3148,18 @@ data:
       runtime:
         # Max number of concurrent CHI reconciles in progress
         reconcileCHIsThreadsNumber: 10
-        # Max number of concurrent shard reconciles in progress
+    
+        # The operator reconciles shards concurrently in each CHI with the following limitations:
+        #   1. Number of shards being reconciled (thus unavailable) in each CHI concurrently
+        #      can not be greater than 'reconcileShardsThreadsNumber'.
+        #   2. Percentage of shards being reconciled (thus unavailable) in each CHI concurrently
+        #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
+        #   3. The first shard is always reconciled alone. Concurrency starts from second shard.
+        # Thus limiting number of shards being reconciled (thus unavailable) in each CHI by both number and percentage
+    
+        # Max number of concurrent shard reconciles within one CHI in progress
         reconcileShardsThreadsNumber: 1
-        # The maximum percentage of cluster shards that may be reconciled in parallel
+        # Max percentage of concurrent shard reconciles within one CHI in progress
         reconcileShardsMaxConcurrencyPercent: 50
     
       statefulSet:
