@@ -379,9 +379,11 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard) int {
 	maxAvailableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
 	maxPct := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
+	_100Pct := float64(100)
+	shardsNum := float64(len(shards))
 
-	// Always return at least 1, up to maxAvailable, but never exceeding maxSafe
-	maxAllowedWorkers := math.Max(math.Floor(maxPct/100.0)*float64(len(shards)), 1)
+	// Always allow at least 1 worker
+	maxAllowedWorkers := math.Max(math.Round((maxPct/_100Pct)*shardsNum), 1)
 	return int(math.Min(maxAvailableWorkers, maxAllowedWorkers))
 }
 
