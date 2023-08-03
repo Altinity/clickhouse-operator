@@ -249,8 +249,8 @@ configs:
             # 2. CHOP user account DOES NOT use:
             #    - profile setting. It uses predefined profile called 'clickhouse_operator'
             #    - quota setting. It uses empty quota name.
-            #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
-            #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
+            #    - networks IP setting. Operator specifies 'networks/ip' user setting to match operators' pod IP only.
+            #    - password setting. Password for CHOP account is used from 'clickhouse.access.*' section
             default:
               # Default values for ClickHouse user account(s) created by the operator
               #   1. user/profile - string
@@ -358,8 +358,15 @@ configs:
       ################################################
       template:
         chi:
-          # Path to the folder where ClickHouseInstallation .yaml manifests are located.
-          # Manifests are applied in sorted alpha-numeric order.
+          # CHI template updates handling policy
+          # Possible policy values:
+          #   - ReadOnStart. Accept CHIT updates on the operators start only.
+          #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+          policy: ApplyOnNextReconcile
+
+          # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+          # Templates are added to the list of all templates and used when CHI is reconciled.
+          # Templates are applied in sorted alpha-numeric order.
           path: templates.d
 
       ################################################
@@ -380,10 +387,11 @@ configs:
           create:
             # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
             # Possible options:
-            # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-            #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+            # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+            #    do not try to fix or delete or update it, just abort reconcile cycle.
+            #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
             # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
-            # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+            # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
             onFailure: ignore
 
           update:
@@ -393,12 +401,13 @@ configs:
             pollInterval: 5
             # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
             # Possible options:
-            # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-            #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+            # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+            #    do not try to fix or delete or update it, just abort reconcile cycle.
+            #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
             # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
             #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
-            #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
-            # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+            #    Follow 'abort' path afterwards.
+            # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
             onFailure: abort
 
         host:

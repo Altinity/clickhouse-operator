@@ -4176,7 +4176,7 @@
       "timeFrom": null,
       "timeShift": null,
       "title": "CPU Time total",
-      "type": "grafana-piechart-panel",
+      "type": "piechart",
       "valueName": "total"
     },
     {

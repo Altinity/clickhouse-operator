@@ -47,9 +47,14 @@ const (
 	defaultChConfigUserDefaultNetworkIP = "::/0"
 	defaultChConfigUserDefaultPassword  = "default"
 
-	ChSchemeHTTP  = "http"
+	// Possible values for ClickHouse scheme
+
+	// ChSchemeHTTP specifies HTTP access scheme
+	ChSchemeHTTP = "http"
+	// ChSchemeHTTPS specifies HTTPS access scheme
 	ChSchemeHTTPS = "https"
-	ChSchemeAuto  = "auto"
+	// ChSchemeAuto specifies that operator has to decide itself should https or http be used
+	ChSchemeAuto = "auto"
 
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
@@ -239,8 +244,35 @@ type OperatorConfigTemplate struct {
 	CHI OperatorConfigCHI `json:"chi" yaml:"chi"`
 }
 
+// OperatorConfigCHIPolicy specifies string value of .template.chi.policy
+type OperatorConfigCHIPolicy string
+
+// String is a stringifier
+func (p OperatorConfigCHIPolicy) String() string {
+	return string(p)
+}
+
+// ToLower provides the same functionality as strings.ToLower()
+func (p OperatorConfigCHIPolicy) ToLower() string {
+	return strings.ToLower(p.String())
+}
+
+// Equals checks whether OperatorConfigCHIPolicy is equal to another one
+func (p OperatorConfigCHIPolicy) Equals(another OperatorConfigCHIPolicy) bool {
+	return p.ToLower() == another.ToLower()
+}
+
+// Possible values for OperatorConfigCHIPolicy
+const (
+	OperatorConfigCHIPolicyReadOnStart          OperatorConfigCHIPolicy = "ReadOnStart"
+	OperatorConfigCHIPolicyApplyOnNextReconcile OperatorConfigCHIPolicy = "ApplyOnNextReconcile"
+	defaultOperatorConfigCHIPolicy              OperatorConfigCHIPolicy = OperatorConfigCHIPolicyApplyOnNextReconcile
+)
+
 // OperatorConfigCHI specifies template CHI section
 type OperatorConfigCHI struct {
+	// Policy specifies how to handle CHITs
+	Policy OperatorConfigCHIPolicy `json:"policy" yaml:"policy"`
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	Path string `json:"path" yaml:"path"`
 
@@ -472,8 +504,9 @@ func (c *OperatorConfig) readCHITemplates() (errs []error) {
 		if err := yaml.Unmarshal([]byte(c.Template.CHI.Runtime.TemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
 			errs = append(errs, fmt.Errorf("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err))
-			continue
+			continue // skip to the next template
 		}
+		// Template read successfully, let's append it to the list
 		c.enlistCHITemplate(template)
 	}
 
@@ -588,64 +621,19 @@ func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
 	return res
 }
 
-// buildUnifiedCHITemplate builds combined CHI Template from templates catalog
-func (c *OperatorConfig) buildUnifiedCHITemplate() {
-
-	return
-	/*
-		// Build unified template in case there are templates to build from only
-		if len(config.CHITemplates) == 0 {
-			return
-		}
-
-		// Sort CHI templates by their names and in order to apply orderly
-		// Extract file names into slice and sort it
-		// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
-		var sortedTemplateNames []string
-		for name := range config.CHITemplates {
-			// Convenience wrapper
-			template := config.CHITemplates[name]
-			sortedTemplateNames = append(sortedTemplateNames, template.Name)
-		}
-		sort.Strings(sortedTemplateNames)
-
-		// Create final combined template
-		config.CHITemplate = new(ClickHouseInstallation)
-
-		// Extract templates in sorted order - according to sorted template names
-		for _, name := range sortedTemplateNames {
-			// Convenience wrapper
-			template := config.CHITemplates[name]
-			// Merge into accumulated target template from current template
-			config.CHITemplate.MergeFrom(template)
-		}
-
-		// Log final CHI template obtained
-		// Marshaling is done just to print nice yaml
-		if bytes, err := yaml.Marshal(config.CHITemplate); err == nil {
-			log.V(1).Infof("Unified CHITemplate:\n%s\n", string(bytes))
-		} else {
-			log.V(1).Infof("FAIL unable to Marshal Unified CHITemplate")
-		}
-	*/
-}
-
 // AddCHITemplate adds CHI template
 func (c *OperatorConfig) AddCHITemplate(template *ClickHouseInstallation) {
 	c.enlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // UpdateCHITemplate updates CHI template
 func (c *OperatorConfig) UpdateCHITemplate(template *ClickHouseInstallation) {
 	c.enlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // DeleteCHITemplate deletes CHI template
 func (c *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
 	c.unlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // Postprocess runs all postprocessors
@@ -653,23 +641,35 @@ func (c *OperatorConfig) Postprocess() {
 	c.normalize()
 	c.readClickHouseCustomConfigFiles()
 	c.readCHITemplates()
-	c.buildUnifiedCHITemplate()
 	c.applyEnvVarParams()
 	c.applyDefaultWatchNamespace()
 }
 
-func (c *OperatorConfig) normalizeConfigurationFilesSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
 
+}
+
+func (c *OperatorConfig) normalizeSectionTemplate() {
+	p := c.Template.CHI.Policy
+	switch {
+	case p.Equals(OperatorConfigCHIPolicyReadOnStart):
+		c.Template.CHI.Policy = OperatorConfigCHIPolicyReadOnStart
+	case p.Equals(OperatorConfigCHIPolicyApplyOnNextReconcile):
+		c.Template.CHI.Policy = OperatorConfigCHIPolicyApplyOnNextReconcile
+	default:
+		c.Template.CHI.Policy = defaultOperatorConfigCHIPolicy
+	}
+
 	// Process ClickHouseInstallation templates section
 	util.PreparePath(&c.Template.CHI.Path, c.Runtime.ConfigFolderPath, TemplatesDir)
 }
 
-func (c *OperatorConfig) normalizeUpdateSection() {
+func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 	// Process Create/Update section
 
 	// Timeouts
@@ -696,7 +696,7 @@ func (c *OperatorConfig) normalizeUpdateSection() {
 	}
 }
 
-func (c *OperatorConfig) normalizeSettingsSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
 	// 2. user/quota
@@ -718,7 +718,7 @@ func (c *OperatorConfig) normalizeSettingsSection() {
 	// chConfigNetworksHostRegexpTemplate
 }
 
-func (c *OperatorConfig) normalizeAccessSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
@@ -769,15 +769,17 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
 
+}
+
+func (c *OperatorConfig) normalizeSectionClickHouseMetrics() {
 	if c.ClickHouse.Metrics.Timeouts.Collect == 0 {
 		c.ClickHouse.Metrics.Timeouts.Collect = defaultTimeoutCollect
 	}
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Metrics.Timeouts.Collect = c.ClickHouse.Metrics.Timeouts.Collect * time.Second
-
 }
 
-func (c *OperatorConfig) normalizeLogSection() {
+func (c *OperatorConfig) normalizeSectionLogger() {
 	// Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
 	// Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
 	// V                string `json:"v"                yaml:"v"`
@@ -786,7 +788,7 @@ func (c *OperatorConfig) normalizeLogSection() {
 	// Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 }
 
-func (c *OperatorConfig) normalizeRuntimeSection() {
+func (c *OperatorConfig) normalizeSectionReconcileRuntime() {
 	if c.Reconcile.Runtime.ThreadsNumber == 0 {
 		c.Reconcile.Runtime.ThreadsNumber = defaultReconcileCHIsThreadsNumber
 	}
@@ -804,7 +806,7 @@ func (c *OperatorConfig) normalizeRuntimeSection() {
 	//reconcileWaitInclude: false
 }
 
-func (c *OperatorConfig) normalizeLabelsSection() {
+func (c *OperatorConfig) normalizeSectionLabel() {
 	//config.IncludeIntoPropagationAnnotations
 	//config.ExcludeFromPropagationAnnotations
 	//config.IncludeIntoPropagationLabels
@@ -813,12 +815,15 @@ func (c *OperatorConfig) normalizeLabelsSection() {
 	c.Label.Runtime.AppendScope = c.Label.AppendScopeString.Value()
 }
 
-func (c *OperatorConfig) normalizePodManagementSection() {
-	if c.Pod.TerminationGracePeriod == 0 {
-		c.Pod.TerminationGracePeriod = defaultTerminationGracePeriod
-	}
+func (c *OperatorConfig) normalizeSectionStatefulSet() {
 	if c.StatefulSet.RevisionHistoryLimit == 0 {
 		c.StatefulSet.RevisionHistoryLimit = defaultRevisionHistoryLimit
+	}
+}
+
+func (c *OperatorConfig) normalizeSectionPod() {
+	if c.Pod.TerminationGracePeriod == 0 {
+		c.Pod.TerminationGracePeriod = defaultTerminationGracePeriod
 	}
 }
 
@@ -827,14 +832,17 @@ func (c *OperatorConfig) normalize() {
 	c.move()
 	c.Runtime.Namespace = os.Getenv(OPERATOR_POD_NAMESPACE)
 
-	c.normalizeConfigurationFilesSection()
-	c.normalizeUpdateSection()
-	c.normalizeSettingsSection()
-	c.normalizeAccessSection()
-	c.normalizeLogSection()
-	c.normalizeRuntimeSection()
-	c.normalizeLabelsSection()
-	c.normalizePodManagementSection()
+	c.normalizeSectionClickHouseConfigurationFile()
+	c.normalizeSectionClickHouseConfigurationUserDefault()
+	c.normalizeSectionClickHouseAccess()
+	c.normalizeSectionClickHouseMetrics()
+	c.normalizeSectionTemplate()
+	c.normalizeSectionReconcileStatefulSet()
+	c.normalizeSectionReconcileRuntime()
+	c.normalizeSectionLogger()
+	c.normalizeSectionLabel()
+	c.normalizeSectionStatefulSet()
+	c.normalizeSectionPod()
 }
 
 // applyEnvVarParams applies ENV VARS over config

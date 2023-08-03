@@ -707,8 +707,17 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	// Otherwise, we need to acquire a lock to initialize the field.
 	chi.statusMu.Lock()
 	defer chi.statusMu.Unlock()
-	if chi.Status == nil { // Note that we have to check this property again to avoid a TOCTOU bug.
+	// Note that we have to check this property again to avoid a TOCTOU bug.
+	if chi.Status == nil {
 		chi.Status = &ChiStatus{}
+	}
+	return chi.Status
+}
+
+// GetStatus gets Status
+func (chi *ClickHouseInstallation) GetStatus() *ChiStatus {
+	if chi == nil {
+		return nil
 	}
 	return chi.Status
 }
@@ -769,6 +778,7 @@ func (chi *ClickHouseInstallation) SetTarget(a *ClickHouseInstallation) {
 	chi.EnsureStatus().NormalizedCHI = a
 }
 
+// FirstHost returns first host of the CHI
 func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
 	var result *ChiHost
 	chi.WalkHosts(func(host *ChiHost) error {

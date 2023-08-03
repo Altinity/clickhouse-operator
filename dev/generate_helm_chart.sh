@@ -13,7 +13,7 @@ cat << EOT
 EOT
 }
 
-for cmd in "yq jq helm-docs perl"; do
+for cmd in yq jq helm-docs perl; do
   if ! command -v ${cmd} &> /dev/null; then
     usage
     exit 1
@@ -79,7 +79,15 @@ function process() {
   name=$(yq e '.metadata.name' "${file}")
 
   local processed_file="${kind}-${name}.yaml"
+  local copied_file="${processed_file}"
+# crds folder use for `helm install` or `helm upgrade --install` to install CRD before deployment
   if [[ "${kind}" == "CustomResourceDefinition" ]]; then
+# additional copy to templates for CRD, to fix `helm upgrade` wrong behavior
+#    local templates_dir="${chart_path}/templates/generated"
+#    copied_file="${templates_dir}/${processed_file}"
+#    mkdir -p "$(dirname "${copied_file}")"
+#    cp -f "${file}" "${copied_file}"
+
     local crds_dir="${chart_path}/crds"
     processed_file="${crds_dir}/${processed_file}"
   else
@@ -88,9 +96,13 @@ function process() {
   fi
   echo $(basename "${processed_file}")
   mkdir -p "$(dirname "${processed_file}")"
-  mv "${file}" "${processed_file}"
+  mv -f "${file}" "${processed_file}"
 
   case ${kind} in
+#  CustomResourceDefinition)
+#    update_crd_resource "${copied_file}"
+#    generate_crd_resource "${processed_file}"
+#    ;;
   Service)
     update_service_resource "${processed_file}"
     ;;
@@ -119,6 +131,20 @@ function process() {
     exit 1
     ;;
   esac
+}
+
+function generate_crd_resource() {
+  local file="${1}"
+  version=$(yq e '.version' "${chart_path}/Chart.yaml") chart_name=$(yq e '.name' "${chart_path}/Chart.yaml") yq e -i '.metadata.labels."app.kubernetes.io/managed-by" = "Helm" | .metadata.labels."helm.sh/chart" = env(chart_name) + "-" + env(version) | .metadata.labels."app.kubernetes.io/name" = env(chart_name) | .metadata.labels."app.kubernetes.io/version"= env(version)' "${file}"
+}
+
+
+function update_crd_resource() {
+  local file="${1}"
+  yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+
+  perl -pi -e "s/'{/{/g" "${file}"
+  perl -pi -e "s/}'/}/g" "${file}"
 }
 
 function update_service_resource() {

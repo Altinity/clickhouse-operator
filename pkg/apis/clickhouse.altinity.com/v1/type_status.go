@@ -64,6 +64,7 @@ type ChiStatus struct {
 	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
 	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
 	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
+	UsedTemplates          []*ChiUseTemplate       `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
 
 	mu sync.RWMutex
 }
@@ -159,6 +160,20 @@ func (s *ChiStatus) SyncHostTablesCreated() {
 			return
 		}
 		s.HostsWithTablesCreated = util.IntersectStringArrays(s.HostsWithTablesCreated, s.FQDNs)
+	})
+}
+
+// PushUsedTemplate pushes used template to the list of used templates
+func (s *ChiStatus) PushUsedTemplate(usedTemplate *ChiUseTemplate) {
+	doWithWriteLock(s, func(s *ChiStatus) {
+		s.UsedTemplates = append(s.UsedTemplates, usedTemplate)
+	})
+}
+
+// GetUsedTemplatesCount gets used templates count
+func (s *ChiStatus) GetUsedTemplatesCount() int {
+	return getIntWithReadLock(s, func(s *ChiStatus) int {
+		return len(s.UsedTemplates)
 	})
 }
 
@@ -309,6 +324,10 @@ func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyCHIStatusOptions) {
 				s.HostsWithTablesCreated = nil
 				if len(from.HostsWithTablesCreated) > 0 {
 					s.HostsWithTablesCreated = append(s.HostsWithTablesCreated, from.HostsWithTablesCreated...)
+				}
+				s.UsedTemplates = nil
+				if len(from.UsedTemplates) > 0 {
+					s.UsedTemplates = append(s.UsedTemplates, from.UsedTemplates...)
 				}
 			}
 

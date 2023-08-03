@@ -11,13 +11,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
+# OPERATOR_VERSION=0.21.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -233,6 +234,13 @@ spec:
                   description: "List of hosts with tables created by the operator"
                   items:
                     type: string
+                usedTemplates:
+                  type: array
+                  description: "List of templates used to build this CHI"
+                  x-kubernetes-preserve-unknown-fields: true
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -300,6 +308,11 @@ spec:
                       enum:
                         - "auto"
                         - "manual"
+                    chiSelector:
+                      type: object
+                      description: "optional, define selector applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                      # nullable: true
+                      x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
                   description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
@@ -1171,13 +1184,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
+# OPERATOR_VERSION=0.21.3
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1393,6 +1407,13 @@ spec:
                   description: "List of hosts with tables created by the operator"
                   items:
                     type: string
+                usedTemplates:
+                  type: array
+                  description: "List of templates used to build this CHI"
+                  x-kubernetes-preserve-unknown-fields: true
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -1460,6 +1481,11 @@ spec:
                       enum:
                         - "auto"
                         - "manual"
+                    chiSelector:
+                      type: object
+                      description: "optional, define selector applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                      # nullable: true
+                      x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
                   description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
@@ -2334,7 +2360,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2517,6 +2543,16 @@ spec:
                     chi:
                       type: object
                       properties:
+                        policy:
+                          type: string
+                          description: |
+                            CHI template updates handling policy
+                            Possible policy values:
+                              - ReadOnStart. Accept CHIT updates on the operators start only.
+                              - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+                          enum:
+                            - "ReadOnStart"
+                            - "ApplyOnNextReconcile"
                         path:
                           type: string
                           description: "Path to folder where ClickHouseInstallationTemplate .yaml manifests are located."
@@ -2724,7 +2760,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
 ---
 # Template Parameters:
 #
@@ -2741,7 +2777,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
 rules:
 - apiGroups:
     - ""
@@ -2776,6 +2812,15 @@ rules:
     - ""
   resources:
     - persistentvolumes
+  verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - ""
+  resources:
     - pods
   verbs:
     - get
@@ -2783,6 +2828,7 @@ rules:
     - patch
     - update
     - watch
+    - delete
 - apiGroups:
     - apps
   resources:
@@ -2889,7 +2935,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -2911,7 +2957,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -2973,8 +3019,8 @@ data:
           # 2. CHOP user account DOES NOT use:
           #    - profile setting. It uses predefined profile called 'clickhouse_operator'
           #    - quota setting. It uses empty quota name.
-          #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
-          #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
+          #    - networks IP setting. Operator specifies 'networks/ip' user setting to match operators' pod IP only.
+          #    - password setting. Password for CHOP account is used from 'clickhouse.access.*' section
           default:
             # Default values for ClickHouse user account(s) created by the operator
             #   1. user/profile - string
@@ -3082,8 +3128,15 @@ data:
     ################################################
     template:
       chi:
-        # Path to the folder where ClickHouseInstallation .yaml manifests are located.
-        # Manifests are applied in sorted alpha-numeric order.
+        # CHI template updates handling policy
+        # Possible policy values:
+        #   - ReadOnStart. Accept CHIT updates on the operators start only.
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        policy: ApplyOnNextReconcile
+    
+        # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+        # Templates are added to the list of all templates and used when CHI is reconciled.
+        # Templates are applied in sorted alpha-numeric order.
         path: templates.d
     
     ################################################
@@ -3104,10 +3157,11 @@ data:
         create:
           # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
           # Possible options:
-          # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-          #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+          # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+          #    do not try to fix or delete or update it, just abort reconcile cycle.
+          #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
           # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
-          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+          # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: ignore
     
         update:
@@ -3117,12 +3171,13 @@ data:
           pollInterval: 5
           # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
           # Possible options:
-          # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-          #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+          # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+          #    do not try to fix or delete or update it, just abort reconcile cycle.
+          #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
           # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
           #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
-          #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
-          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+          #    Follow 'abort' path afterwards.
+          # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: abort
     
       host:
@@ -3225,7 +3280,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 data:
 ---
@@ -3241,7 +3296,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3340,7 +3395,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3440,7 +3495,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -3493,7 +3548,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${namespace}
 #   COMMENT=
-#   OPERATOR_VERSION=0.21.2
+#   OPERATOR_VERSION=0.21.3
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=${password}
 #
@@ -3503,7 +3558,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -3514,9 +3569,9 @@ stringData:
 #
 # NAMESPACE=${namespace}
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.21.2
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.21.3
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.21.2
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.21.3
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -3527,7 +3582,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3561,7 +3616,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.21.2
+          image: altinity/clickhouse-operator:0.21.3
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3626,7 +3681,7 @@ spec:
                   resource: limits.memory
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.21.2
+          image: altinity/metrics-exporter:0.21.3
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3709,7 +3764,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${namespace}
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.21.3
     app: clickhouse-operator
 spec:
   ports:

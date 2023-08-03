@@ -96,7 +96,37 @@ type ChiUseTemplate struct {
 
 // ChiTemplating defines templating policy struct
 type ChiTemplating struct {
-	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
+	Policy      string      `json:"policy,omitempty"      yaml:"policy,omitempty"`
+	CHISelector CHISelector `json:"chiSelector,omitempty" yaml:"chiSelector,omitempty"`
+}
+
+// CHISelector specifies CHI label selector
+type CHISelector map[string]string
+
+// Matches checks whether CHISelector matches provided set of labels
+func (s CHISelector) Matches(labels map[string]string) bool {
+	if s == nil {
+		// Empty selector matches all labels
+		return true
+	}
+
+	// Walk over selector keys
+	for key, selectorValue := range s {
+		if labelValue, ok := labels[key]; !ok {
+			// Labels have no key specified in selector.
+			// Selector does not match the labels
+			return false
+		} else if selectorValue != labelValue {
+			// Labels have the key specified in selector, but selector value is not the same as labels value
+			// Selector does not match the labels
+			return false
+		}
+	}
+
+	// All keys are in place with the same values
+	// Selector matches the labels
+
+	return true
 }
 
 // NewChiTemplating creates new templating
@@ -120,6 +150,14 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
+// GetCHISelector gets CGHI selector
+func (t *ChiTemplating) GetCHISelector() CHISelector {
+	if t == nil {
+		return nil
+	}
+	return t.CHISelector
+}
+
 // MergeFrom merges from specified templating
 func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemplating {
 	if from == nil {
@@ -135,10 +173,17 @@ func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemp
 		if t.Policy == "" {
 			t.Policy = from.Policy
 		}
+		if t.CHISelector == nil {
+			t.CHISelector = from.CHISelector
+		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.Policy != "" {
 			// Override by non-empty values only
 			t.Policy = from.Policy
+		}
+		if from.CHISelector != nil {
+			// Override by non-empty values only
+			t.CHISelector = from.CHISelector
 		}
 	}
 

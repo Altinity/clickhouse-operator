@@ -2317,6 +2317,8 @@ def test_023(self):
     with Given("Auto templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-2.yaml"))
+    with Given("Give templates some time to be applied"):
+        time.sleep(15)
 
     chit_data = yaml_manifest.get_manifest_data(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
     expected_image = chit_data["spec"]["templates"]["podTemplates"][0]["spec"]["containers"][0]["image"]
@@ -2329,6 +2331,11 @@ def test_023(self):
             "do_not_delete": 1,
         },
     )
+    with Then(".status.usedTemplates has two values"):
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
+        # assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == ""
+
     with Then("Annotation from a template should be populated"):
         assert kubectl.get_field("chi", chi, ".status.normalizedCompleted.metadata.annotations.test") == "test"
     with Then("Pod annotation should populated from template"):
@@ -2338,6 +2345,29 @@ def test_023(self):
         env = pod["containers"][0]["env"][0]
         assert env["name"] == "TEST_ENV"
         assert env["value"] == "TEST_ENV_VALUE"
+
+    with Given("Two selector templates are deployed"):
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-1.yaml"))
+        kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-selector-2.yaml"))
+    with Given("Give templates some time to be applied"):
+        time.sleep(15)
+
+    with Then("Trigger CHI update"):
+        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
+        kubectl.launch(cmd)
+
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Then(".status.usedTemplates has 3 values"):
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[0].name") == "clickhouse-stable"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[1].name") == "extension-annotations"
+        assert kubectl.get_field("chi", chi, ".status.usedTemplates[2].name") == "selector-test-1"
+        # assert kubectl.get_field("chi", chi, ".status.usedTemplates[3].name") == ""
+
+    with Then("Annotation from selector-1 template should be populated"):
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.selector-test-1") == "selector-test-1"
+    with Then("Annotation from selector-2 template should NOT be populated"):
+        assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.selector-test-2") == "<none>"
 
     delete_test_namespace()
 
@@ -3750,11 +3780,11 @@ def test_042(self):
                     "CrashLoopBackOff")
 
         with And("First node is down"):
-            res = clickhouse.query_with_error(chi, host = f"chi-{chi}-{cluster}-0-0-0", sql = "select 1")
+            res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-0-0-0", sql="select 1")
             assert res != "1"
 
         with And("Second node is up"):
-            res = clickhouse.query_with_error(chi, host = f"chi-{chi}-{cluster}-1-0-0", sql = "select 1")
+            res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-1-0-0", sql="select 1")
             assert res == "1"
 
     with When("CHI is reverted to a good one"):

@@ -140,8 +140,10 @@ func (w *worker) run() {
 	w.a.V(2).S().P()
 	defer w.a.V(2).E().P()
 
+	// For system thread let's wait its 'official start time', thus giving it time to bootstrap
 	util.WaitContextDoneUntil(context.Background(), w.start)
 
+	// Events loop
 	for {
 		// Get() blocks until it can return an item
 		item, ctx, ok := w.queue.Get()
@@ -192,11 +194,11 @@ func (w *worker) processReconcileCHI(ctx context.Context, cmd *ReconcileCHI) err
 func (w *worker) processReconcileCHIT(cmd *ReconcileCHIT) error {
 	switch cmd.cmd {
 	case reconcileAdd:
-		return w.c.addChit(cmd.new)
+		return w.addChit(cmd.new)
 	case reconcileUpdate:
-		return w.c.updateChit(cmd.old, cmd.new)
+		return w.updateChit(cmd.old, cmd.new)
 	case reconcileDelete:
-		return w.c.deleteChit(cmd.old)
+		return w.deleteChit(cmd.old)
 	}
 
 	// Unknown item type, don't know what to do with it
