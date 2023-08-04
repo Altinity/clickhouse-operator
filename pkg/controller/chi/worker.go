@@ -1133,28 +1133,43 @@ func (w *worker) updateService(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
 	curService *coreV1.Service,
-	newService *coreV1.Service,
+	newService1 *coreV1.Service,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
+	newService := newService1.DeepCopy()
+
 	// Updating a Service is a complicated business
 
-	// spec.resourceVersion is required in order to update object
+	// spec.resourceVersion is required in order to update an object
 	newService.ResourceVersion = curService.ResourceVersion
 
+	//
+	// Migrate ClusterIP to the new service
+	//
+	// spec.clusterIP field is immutable, need to use already assigned value
+	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
+	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
+	// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
+	// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
+	newService.Spec.ClusterIP = curService.Spec.ClusterIP
+
+	//
+	// Migrate existing ports to the new service for NodePort and LoadBalancer services
+	//
 	// The port on each node on which this service is exposed when type=NodePort or LoadBalancer.
-	// Usually assigned by the system. If specified, it will be allocated to the service
-	// if unused or else creation of the service will fail.
+	// Usually assigned by the system. If specified, it will be allocated to the service if unused
+	// or else creation of the service will fail.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
 	if ((curService.Spec.Type == coreV1.ServiceTypeNodePort) && (newService.Spec.Type == coreV1.ServiceTypeNodePort)) ||
 		((curService.Spec.Type == coreV1.ServiceTypeLoadBalancer) && (newService.Spec.Type == coreV1.ServiceTypeLoadBalancer)) {
-		// No changes in service type and service type assumes NodePort to be allocated.
 		// !!! IMPORTANT !!!
-		// The same exposed port details can not be changed. This is important limitation
+		// No changes in service type is allowed.
+		// Already exposed port details can not be changed.
 		for i := range newService.Spec.Ports {
 			newPort := &newService.Spec.Ports[i]
 			for j := range curService.Spec.Ports {
@@ -1170,13 +1185,9 @@ func (w *worker) updateService(
 		}
 	}
 
-	// spec.clusterIP field is immutable, need to use already assigned value
-	// From https://kubernetes.io/docs/concepts/services-networking/service/#defining-a-service
-	// Kubernetes assigns this Service an IP address (sometimes called the “cluster IP”), which is used by the Service proxies
-	// See also https://kubernetes.io/docs/concepts/services-networking/service/#virtual-ips-and-service-proxies
-	// You can specify your own cluster IP address as part of a Service creation request. To do this, set the .spec.clusterIP
-	newService.Spec.ClusterIP = curService.Spec.ClusterIP
-
+	//
+	// Migrate HealthCheckNodePort to the new service
+	//
 	// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
 	// In case ExternalTrafficPolicy is changed it seems to be irrelevant
 	// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
@@ -1185,11 +1196,26 @@ func (w *worker) updateService(
 		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
 	}
 
+	//
+	// Migrate LoadBalancerClass to the new service
+	//
+	// This field can only be set when creating or updating a Service to type 'LoadBalancer'.
+	// Once set, it can not be changed. This field will be wiped when a service is updated to a non 'LoadBalancer' type.
+	if curService.Spec.LoadBalancerClass != nil {
+		newService.Spec.LoadBalancerClass = curService.Spec.LoadBalancerClass
+	}
+
+	//
+	// Migrate labels, annotations and finalizers to the new service
+	//
 	newService.ObjectMeta.Labels = util.MergeStringMapsPreserve(newService.ObjectMeta.Labels, curService.ObjectMeta.Labels)
 	newService.ObjectMeta.Annotations = util.MergeStringMapsPreserve(newService.ObjectMeta.Annotations, curService.ObjectMeta.Annotations)
 	newService.ObjectMeta.Finalizers = util.MergeStringArrays(newService.ObjectMeta.Finalizers, curService.ObjectMeta.Finalizers)
 
+	//
 	// And only now we are ready to actually update the service with new version of the service
+	//
+
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
