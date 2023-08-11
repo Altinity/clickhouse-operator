@@ -1,0 +1,59 @@
+apiVersion: "clickhouse.com/v1alpha1"
+kind: "ClickHouseKeeper"
+metadata:
+  name: chk-1-node
+spec:
+  replicas: 1
+  settings:
+    logger/level: "trace"
+    logger/console: "true"
+    listen_host: "0.0.0.0"
+    keeper_server/storage_path: /var/lib/clickhouse-keeper
+    keeper_server/tcp_port: "2181"
+    keeper_server/four_letter_word_white_list: "*"
+    keeper_server/coordination_settings/raft_logs_level: "information"
+    keeper_server/raft_configuration/server/port: "9444"
+    prometheus/endpoint: "/metrics"
+    prometheus/port: "7000"
+    prometheus/metrics: "true"
+    prometheus/events: "true"
+    prometheus/asynchronous_metrics: "true"
+    prometheus/status_info: "false"
+  podTemplate:
+    metadata:
+      labels:
+        app: clickhouse-keeper
+        what: node
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 50
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: "app"
+                      operator: In
+                      values:
+                        - clickhouse-keeper
+                topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: clickhouse-keeper
+          imagePullPolicy: IfNotPresent
+          image: "clickhouse/clickhouse-keeper:head-alpine"
+          resources:
+            requests:
+              memory: "256M"
+              cpu: "1"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+  volumeClaimTemplates:
+    - metadata:
+        name: both-paths
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 25Gi

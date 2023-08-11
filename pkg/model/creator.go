@@ -1201,7 +1201,7 @@ func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	// Introduce http probe in case http port is specified
 	if chiv1.IsPortAssigned(host.HTTPPort) {
 		return &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/ping",
 					Port: intstr.Parse(chDefaultHTTPPortName), // What if it is not a default?
@@ -1216,7 +1216,7 @@ func newDefaultLivenessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	// Introduce https probe in case https port is specified
 	if chiv1.IsPortAssigned(host.HTTPSPort) {
 		return &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path:   "/ping",
 					Port:   intstr.Parse(chDefaultHTTPSPortName), // What if it is not a default?
@@ -1238,7 +1238,7 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	// Introduce http probe in case http port is specified
 	if chiv1.IsPortAssigned(host.HTTPPort) {
 		return &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path: "/ping",
 					Port: intstr.Parse(chDefaultHTTPPortName), // What if port name is not a default?
@@ -1252,7 +1252,7 @@ func newDefaultReadinessProbe(host *chiv1.ChiHost) *corev1.Probe {
 	// Introduce https probe in case https port is specified
 	if chiv1.IsPortAssigned(host.HTTPSPort) {
 		return &corev1.Probe{
-			Handler: corev1.Handler{
+			ProbeHandler: corev1.ProbeHandler{
 				HTTPGet: &corev1.HTTPGetAction{
 					Path:   "/ping",
 					Port:   intstr.Parse(chDefaultHTTPSPortName), // What if port name is not a default?
