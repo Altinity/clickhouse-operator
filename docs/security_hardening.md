@@ -122,9 +122,18 @@ stringData:
 
 ```
 
-> **Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration.
-> The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed.
-> This approach requires recreating the ClickHouse podTemplates when adding new users.
+**Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration.
+The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed.
+This approach requires recreating the ClickHouse podTemplates when adding new users. It can be configured as follows:
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/k8s_secret_env_password: clickhouse-secret/pwduser1
+      user2/k8s_secret_env_password_sha256_hex: clickhouse-secret/pwduser2
+      user3/k8s_secret_env_password_double_sha1_hex: clickhouse-secret/pwduser3
+```
 
 ### Securing the 'default' user
 
