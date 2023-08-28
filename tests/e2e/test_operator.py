@@ -851,6 +851,10 @@ def test_011_2(self):
             out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user3", pwd="pwduser3")
             assert out == "OK"
 
+        with And("Connection to localhost should succeed with user4"):
+            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user4", pwd="pwduser4")
+            assert out == "OK"
+
         kubectl.delete_chi("test-011-secrets")
         kubectl.launch(
             "delete secret test-011-secret",
