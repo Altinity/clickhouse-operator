@@ -10,7 +10,7 @@
 
 Verify the Docker manifest is available based on the version table, replacing `{OPERATOR_VERSION}` with the specific version.  For example, for version `0.16.0`, the URL would be `https://github.com/Altinity/clickhouse-operator/raw/0.16.0/deploy/operator/clickhouse-operator-install-bundle.yaml`.
 
-| `clickhouse-operator` version | Kubernetes version | Docker manifest URL |
+| `clickhouse-operator` version | Kubernetes version | Kubernetes manifest URL |
 |---|---|---|
 | Current | Kubernetes 1.16+ | https://raw.githubusercontent.com/Altinity/clickhouse-operator/master/deploy/operator/clickhouse-operator-install-bundle.yaml |
 | Current | Kubernetes before 1.16 | **(Beta)** https://github.com/Altinity/clickhouse-operator/raw/master/deploy/operator/clickhouse-operator-install-bundle-v1beta1.yaml |
