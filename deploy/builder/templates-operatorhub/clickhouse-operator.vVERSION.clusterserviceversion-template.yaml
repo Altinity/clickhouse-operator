@@ -7,7 +7,7 @@ metadata:
     capabilities: Full Lifecycle
     categories: Database
     containerImage: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
-    createdAt: '2019-11-11T10:00:00Z'
+    createdAt: '${OPERATOR_RELEASE_DATE}'
     support: Altinity Ltd. https://altinity.com
     description: ClickHouse Operator manages full lifecycle of ClickHouse clusters.
     repository: https://github.com/altinity/clickhouse-operator
