@@ -53,13 +53,13 @@ metadata:
 data:
   keeper_config.xml: |
     <clickhouse>
-        <include_from>/tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml</include_from>
+        <enable_reconfiguration>true</enable_reconfiguration>
         <logger>
             <level>trace</level>
             <console>true</console>
         </logger>
         <listen_host>0.0.0.0</listen_host>
-        <keeper_server incl="keeper_server">
+        <keeper_server>
             <path>/var/lib/clickhouse-keeper</path>
             <tcp_port>2181</tcp_port>
             <four_letter_word_white_list>*</four_letter_word_white_list>
@@ -74,8 +74,7 @@ data:
             <metrics>true</metrics>
             <events>true</events>
             <asynchronous_metrics>true</asynchronous_metrics>
-            <!-- https://github.com/ClickHouse/ClickHouse/issues/46136 -->
-            <status_info>false</status_info>
+            <status_info>true</status_info>
         </prometheus>
     </clickhouse>
 
