@@ -381,7 +381,7 @@ func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard) int {
 	maxPct := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
 
 	// Always return at least 1, up to maxAvailable, but never exceeding maxSafe
-	maxAllowedWorkers := math.Max(math.Floor(maxPct/100.0)*float64(len(shards)), 1)
+	maxAllowedWorkers := math.Max(math.Floor(maxPct/100.0*float64(len(shards))), 1)
 	return int(math.Min(maxAvailableWorkers, maxAllowedWorkers))
 }
 
