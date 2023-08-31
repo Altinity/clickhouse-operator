@@ -520,7 +520,14 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	host.GetReconcileAttributes().UnsetAdd()
 
-	_ = w.migrateTables(ctx, host)
+	_ = w.migrateTables(
+		ctx,
+		host,
+		&migrateTableOptions{
+			forceMigrate: false,
+			dropReplica:  false,
+		},
+	)
 
 	version, err := w.ensureClusterSchemer(host).HostVersion(ctx, host)
 	if err != nil {
