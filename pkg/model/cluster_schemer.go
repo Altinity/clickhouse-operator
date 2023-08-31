@@ -192,9 +192,9 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *chop.ChiHost)
 }
 
 // HostDropReplica calls SYSTEM DROP REPLICA
-func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
-	log.V(1).M(hostToRun).F().Info("Drop replica: %v at %v", CreateInstanceHostname(hostToDrop), hostToRun.Address.HostName)
-	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
+func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *chop.ChiHost) error {
+	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", CreateInstanceHostname(hostToDrop), hostToRunOn.Address.HostName)
+	return s.ExecHost(ctx, hostToRunOn, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
 }
 
 // createTablesSQLs makes all SQL for migrating tables
