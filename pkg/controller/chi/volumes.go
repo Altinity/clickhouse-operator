@@ -40,7 +40,7 @@ func (c *Controller) walkPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.Persistent
 		pvcName := volume.PersistentVolumeClaim.ClaimName
 		pvc, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(newContext(), pvcName, newGetOptions())
 		if err != nil {
-			log.M(host).F().Error("FAIL get PVC %s/%s err:%v", namespace, pvcName, err)
+			log.M(host).F().Error("FAIL get PVC %s/%s for the host %s/%s with err:%v", namespace, pvcName, namespace, host.GetName(), err)
 			continue
 		}
 
@@ -53,7 +53,7 @@ func (c *Controller) walkDiscoveredPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newContext(), newListOptions(chopModel.GetSelectorHostScope(host)))
 	if err != nil {
-		log.M(host).F().Error("FAIL get list of PVC for host %s/%s err:%v", namespace, host.GetName(), err)
+		log.M(host).F().Error("FAIL get list of PVCs for the host %s/%s err:%v", namespace, host.GetName(), err)
 		return
 	}
 
