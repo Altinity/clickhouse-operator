@@ -3376,11 +3376,7 @@ def test_036(self):
             Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
             PARTITION BY tuple()
             ORDER BY a
-            """.replace(
-            "\r", ""
-        ).replace(
-            "\n", ""
-        )
+            """.replace("\r", "").replace("\n", "")
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
