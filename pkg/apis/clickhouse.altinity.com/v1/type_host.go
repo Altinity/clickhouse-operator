@@ -268,19 +268,23 @@ func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount
 		return
 	}
 
-	if !host.HasCurStatefulSet() && !host.HasDesiredStatefulSet() {
-		return
-	}
-
 	var sts *appsv1.StatefulSet
 	switch {
 	case which.DesiredStatefulSet():
+		if !host.HasDesiredStatefulSet() {
+			return
+		}
 		sts = host.DesiredStatefulSet
 	case which.CurStatefulSet():
+		if !host.HasCurStatefulSet() {
+			return
+		}
 		sts = host.CurStatefulSet
 	default:
 		return
 	}
+
+	// TODO ensure sts.Spec.Template.Spec.Containers
 
 	for i := range sts.Spec.Template.Spec.Containers {
 		container := &sts.Spec.Template.Spec.Containers[i]
