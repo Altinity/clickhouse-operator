@@ -778,14 +778,16 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 			return
 		}
 
-		volumeClaimTemplateName := volumeMount.Name
-		volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
+		pvcName, ok := chopModel.CreatePVCNameByVolumeMount(host, volumeMount)
 		if !ok {
 			// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
 			return
 		}
-
-		pvcName := chopModel.CreatePVCName(host, volumeMount, volumeClaimTemplate)
+		volumeClaimTemplate, ok := chopModel.GetVolumeClaimTemplate(host, volumeMount)
+		if !ok {
+			// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
+			return
+		}
 		w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - start", namespace, host.GetName(), volumeMount.Name, pvcName)
 		defer w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - end", namespace, host.GetName(), volumeMount.Name, pvcName)
 
@@ -800,20 +802,20 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 					return
 				}
 			} else {
-				// Any non-NotFound API error - unable to proceed
+				// In case of any non-NotFound API error - unable to proceed
 				w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
 				return
 			}
 		}
 
-		newPvc, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
+		pvcReconciled, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
 		if err != nil {
 			w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
 			w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
 			return
 		}
 
-		w.task.registryReconciled.RegisterPVC(newPvc.ObjectMeta)
+		w.task.registryReconciled.RegisterPVC(pvcReconciled.ObjectMeta)
 	})
 
 	return nil

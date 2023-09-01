@@ -27,14 +27,13 @@ func HostCanDeletePVC(host *chiv1.ChiHost, pvcName string) bool {
 
 	// What host, VolumeMount and VolumeClaimTemplate this PVC is made from?
 	host.WalkVolumeMounts(chiv1.CurStatefulSet, func(volumeMount *v1.VolumeMount) {
-		volumeClaimTemplateName := volumeMount.Name
-		volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
+		volumeClaimTemplate, ok := GetVolumeClaimTemplate(host, volumeMount)
 		if !ok {
 			// No this is not a reference to VolumeClaimTemplate
 			return
 		}
 
-		if pvcName == CreatePVCName(host, volumeMount, volumeClaimTemplate) {
+		if pvcName == CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate) {
 			// This PVC is made from these host, VolumeMount and VolumeClaimTemplate
 			// So, what policy does this PVC have?
 			policy = getPVCReclaimPolicy(host, volumeClaimTemplate)

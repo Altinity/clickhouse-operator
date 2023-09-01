@@ -642,11 +642,7 @@ func (c *Creator) statefulSetAppendUsedPVCTemplates(statefulSet *apps.StatefulSe
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
 		for j := range container.VolumeMounts {
-			// Convenience wrapper
-			volumeMount := &container.VolumeMounts[j]
-			if volumeClaimTemplate, ok := c.chi.GetVolumeClaimTemplate(volumeMount.Name); ok {
-				// This VolumeClaimTemplate is referenced by name in VolumeMount.
-				// Found VolumeClaimTemplate to mount by VolumeMount
+			if volumeClaimTemplate, ok := c.getVolumeClaimTemplate(&container.VolumeMounts[j]); ok {
 				c.statefulSetAppendPVCTemplate(statefulSet, host, volumeClaimTemplate)
 			}
 		}
@@ -864,28 +860,17 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 	// Sanity checks
 	//
 
-	// VolumeMount has to have reasonable data - name and mountPath
-	if (volumeMount.Name == "") || (volumeMount.MountPath == "") {
-		return nil
-	}
-
-	volumeClaimTemplateName := volumeMount.Name
-	// volumeClaimTemplateName has to be reasonable
-	if volumeClaimTemplateName == "" {
-		return nil
-	}
-
-	// Specified (by volumeClaimTemplateName) VolumeClaimTemplate has to be available as well
-	if _, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); !ok {
+	// Specified (referenced from volumeMount) VolumeClaimTemplate has to be available as well
+	if _, ok := c.getVolumeClaimTemplate(&volumeMount); !ok {
 		// Incorrect/unknown .templates.VolumeClaimTemplate specified
-		c.a.V(1).F().Warning("Can not find volumeClaimTemplate %s. Volume claim can not be mounted", volumeClaimTemplateName)
+		c.a.V(1).F().Warning("Can not find VolumeClaimTemplate for VolumeMount: %s. Volume claim can not be mounted", volumeMount.Name)
 		return nil
 	}
 
 	// Specified container has to be available
 	container := getContainerByName(statefulSet, containerName)
 	if container == nil {
-		c.a.V(1).F().Warning("Can not find container %s. Volume claim can not be mounted", containerName)
+		c.a.V(1).F().Warning("Can not find container: %s. Volume claim can not be mounted", containerName)
 		return nil
 	}
 
@@ -905,7 +890,7 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 		if volumeMount.Name == existingVolumeMount.Name {
 			// This .templates.VolumeClaimTemplate is already used in VolumeMount
 			c.a.V(1).F().Warning(
-				"StatefulSet:%s container:%s volumeClaimTemplateName:%s already used",
+				"StatefulSet:%s container:%s volumeClaimTemplateName:%s already used. Skip it and all the rest.",
 				statefulSet.Name,
 				container.Name,
 				volumeMount.Name,
@@ -917,7 +902,7 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 		if volumeMount.MountPath == existingVolumeMount.MountPath {
 			// `mountPath` (say /var/lib/clickhouse) is already mounted
 			c.a.V(1).F().Warning(
-				"StatefulSet:%s container:%s mountPath:%s already used",
+				"StatefulSet:%s container:%s mountPath:%s already used. Skip it and all the rest.",
 				statefulSet.Name,
 				container.Name,
 				volumeMount.MountPath,
@@ -928,9 +913,9 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 
 	// This VolumeClaimTemplate is not used explicitly by name and `mountPath` (say /var/lib/clickhouse) is not used also.
 	// Let's mount this VolumeClaimTemplate into `mountPath` (say '/var/lib/clickhouse') of a container
-	if template, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName); ok {
+	if volumeClaimTemplate, ok := c.getVolumeClaimTemplate(&volumeMount); ok {
 		// Add VolumeClaimTemplate to StatefulSet
-		c.statefulSetAppendPVCTemplate(statefulSet, host, template)
+		c.statefulSetAppendPVCTemplate(statefulSet, host, volumeClaimTemplate)
 		// Add VolumeMount to ClickHouse container to `mountPath` point
 		c.containerAppendVolumeMounts(
 			container,
@@ -939,7 +924,7 @@ func (c *Creator) setupStatefulSetApplyVolumeMount(
 	}
 
 	c.a.V(1).F().Info(
-		"StatefulSet:%s container:%s mounted %s on %s",
+		"StatefulSet: %s container: %s mounted VolumeMount: %s onto path: %s",
 		statefulSet.Name,
 		container.Name,
 		volumeMount.Name,
@@ -1106,7 +1091,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	// so, let's add it
 
 	if c.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-		claimName := CreatePVCName(host, nil, volumeClaimTemplate)
+		claimName := CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
 		statefulSet.Spec.Template.Spec.Volumes = append(
 			statefulSet.Spec.Template.Spec.Volumes,
 			newVolumeForPVC(volumeClaimTemplate.Name, claimName),
