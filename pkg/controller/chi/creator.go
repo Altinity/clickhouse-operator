@@ -161,7 +161,7 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 			}
 			return pvc, err
 		}
-		// Any non-NotFound API error - unable to proceed
+		// In case of any non-NotFound API error - unable to proceed
 		log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
 		return nil, err
 	}
