@@ -166,7 +166,7 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 		return nil, err
 	}
 
-	_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
+	pvcUpdated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
 	if err != nil {
 		// Update failed
 		//if strings.Contains(err.Error(), "field can not be less than previous value") {
@@ -176,7 +176,7 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 		//	return nil, err
 		//}
 	}
-	return pvc, err
+	return pvcUpdated, err
 }
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed

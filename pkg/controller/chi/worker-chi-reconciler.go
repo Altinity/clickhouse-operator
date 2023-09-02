@@ -798,7 +798,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 				if w.task.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 					pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
 				} else {
-					// Not created and we are not expected to create PVC by ourselves
+					// PVC is not available and we are not expected to create PVC by ourselves
 					return
 				}
 			} else {
