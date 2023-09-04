@@ -97,7 +97,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
                 keeper_nodes = doc["spec"]["replicas"]
         expected_docs = {
             "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
-            "clickhouse-keeper": 6,
+            "clickhouse-keeper": 7,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
         expected_pod_prefix = {
