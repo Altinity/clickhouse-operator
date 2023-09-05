@@ -19,6 +19,7 @@ import (
 	"time"
 
 	coreV1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -650,4 +651,36 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 
 	// CHI's child resources were deleted
 	return true
+}
+
+func (w *worker) deleteLostPVC(ctx context.Context, pvc *coreV1.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+
+	if pvc.Status.Phase != coreV1.ClaimLost {
+		return false
+	}
+
+	w.a.V(1).M(pvc).F().Info("delete lost PVC start: %s/%s", pvc.Namespace, pvc.Name)
+	defer w.a.V(1).M(pvc).F().Info("delete lost PVC end: %s/%s", pvc.Namespace, pvc.Name)
+
+	w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, newDeleteOptions())
+
+	for i := 0; i < 360; i++ {
+		curPVC, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
+		if err != nil {
+			if apiErrors.IsNotFound(err) {
+				return true
+			}
+		}
+		if len(curPVC.Finalizers) > 0 {
+			w.a.V(1).M(pvc).F().Info("clean finalizers for lost PVC: %s/%s", pvc.Namespace, pvc.Name)
+			curPVC.Finalizers = nil
+			w.c.updatePersistentVolumeClaim(ctx, pvc)
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	return false
 }
