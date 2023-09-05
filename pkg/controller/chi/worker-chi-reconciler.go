@@ -276,8 +276,32 @@ func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.Ch
 	return version
 }
 
+type reconcileHostStatefulSetOptions struct {
+	forceRecreate bool
+}
+
+func (o *reconcileHostStatefulSetOptions) ForceRecreate() bool {
+	if o == nil {
+		return false
+	}
+	return o.forceRecreate
+}
+
+type reconcileHostStatefulSetOptionsArr []*reconcileHostStatefulSetOptions
+
+func NewReconcileHostStatefulSetOptionsArr(opts ...*reconcileHostStatefulSetOptions) (res reconcileHostStatefulSetOptionsArr) {
+	return append(res, opts...)
+}
+
+func (a reconcileHostStatefulSetOptionsArr) First() *reconcileHostStatefulSetOptions {
+	if len(a) > 0 {
+		return a[0]
+	}
+	return nil
+}
+
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHost, opts ...*reconcileHostStatefulSetOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -303,7 +327,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host %s. Reconcile StatefulSet", host.GetName())
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
-	err := w.reconcileStatefulSet(ctx, host)
+	err := w.reconcileStatefulSet(ctx, host, opts...)
 	if err == nil {
 		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
@@ -481,6 +505,11 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chiV1.ChiShard) erro
 
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
+	var (
+		reconcileHostStatefulSetOpts *reconcileHostStatefulSetOptions
+		migrateTableOpts             *migrateTableOptions
+	)
+
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -509,9 +538,19 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
 		return err
 	}
-	//w.reconcilePersistentVolumes(task, host)
-	_ = w.reconcilePVCs(ctx, host)
-	if err := w.reconcileHostStatefulSet(ctx, host); err != nil {
+
+	errPVC := w.reconcilePVCs(ctx, host)
+	if errPVC == errLostPVCDeleted {
+		reconcileHostStatefulSetOpts = &reconcileHostStatefulSetOptions{
+			forceRecreate: true,
+		}
+		migrateTableOpts = &migrateTableOptions{
+			forceMigrate: true,
+			dropReplica:  true,
+		}
+	}
+
+	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
 		return err
 	}
 	_ = w.reconcilePVCs(ctx, host)
@@ -520,14 +559,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	host.GetReconcileAttributes().UnsetAdd()
 
-	_ = w.migrateTables(
-		ctx,
-		host,
-		&migrateTableOptions{
-			forceMigrate: false,
-			dropReplica:  false,
-		},
-	)
+	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	version, err := w.ensureClusterSchemer(host).HostVersion(ctx, host)
 	if err != nil {
@@ -704,7 +736,7 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *chiV1.ClickHouseInsta
 }
 
 // reconcileStatefulSet reconciles StatefulSet of a host
-func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
+func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost, opts ...*reconcileHostStatefulSetOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -725,7 +757,12 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	var err error
 	host.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
-	if host.HasCurStatefulSet() {
+	opt := NewReconcileHostStatefulSetOptionsArr(opts...).First()
+	switch {
+	case opt.ForceRecreate():
+		// Force recreate prevails over all other requests
+		w.recreateStatefulSet(ctx, host)
+	case host.HasCurStatefulSet():
 		// We have StatefulSet - try to update it
 		err = w.updateStatefulSet(ctx, host)
 	}
@@ -764,7 +801,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 //}
 
 // reconcilePVCs reconciles all PVCs of a host
-func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
+func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) (res ErrorPVC) {
 	if util.IsContextDone(ctx) {
 		return nil
 	}
@@ -777,48 +814,85 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 		if util.IsContextDone(ctx) {
 			return
 		}
-
-		pvcName, ok := chopModel.CreatePVCNameByVolumeMount(host, volumeMount)
-		if !ok {
-			// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
-			return
-		}
-		volumeClaimTemplate, ok := chopModel.GetVolumeClaimTemplate(host, volumeMount)
-		if !ok {
-			// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
-			return
-		}
-		w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - start", namespace, host.GetName(), volumeMount.Name, pvcName)
-		defer w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - end", namespace, host.GetName(), volumeMount.Name, pvcName)
-
-		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, newGetOptions())
-		if err != nil {
-			if apiErrors.IsNotFound(err) {
-				// This is not an error per se, means PVC is not created (yet)?
-				if w.task.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-					pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
-				} else {
-					// PVC is not available and we are not expected to create PVC by ourselves
-					return
-				}
-			} else {
-				// In case of any non-NotFound API error - unable to proceed
-				w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
-				return
+		if e := w.reconcilePVCFromVolumeMount(ctx, host, volumeMount); e != nil {
+			if res == nil {
+				res = e
 			}
 		}
-
-		pvcReconciled, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
-		if err != nil {
-			w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
-			w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
-			return
-		}
-
-		w.task.registryReconciled.RegisterPVC(pvcReconciled.ObjectMeta)
 	})
 
-	return nil
+	return
+}
+
+func (w *worker) reconcilePVCFromVolumeMount(ctx context.Context, host *chiV1.ChiHost, volumeMount *coreV1.VolumeMount) (res ErrorPVC) {
+	// Which PVC are we going to reconcile
+	pvc, volumeClaimTemplate, ok := w.fetchOrCreatePVC(ctx, host, volumeMount)
+	if !ok {
+		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
+		return
+	}
+
+	namespace := host.Address.Namespace
+
+	w.a.V(2).M(host).S().Info("reconcile volumeMount (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvc.Name)
+	defer w.a.V(2).M(host).E().Info("reconcile volumeMount (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvc.Name)
+
+	if w.deleteLostPVC(ctx, pvc) {
+		res = errLostPVCDeleted
+		w.a.V(1).M(host).Info("deleted lost PVC (%s/%s/%s/%s) - start", namespace, host.GetName(), volumeMount.Name, pvc.Name)
+		pvc, volumeClaimTemplate, ok = w.fetchOrCreatePVC(ctx, host, volumeMount)
+		if !ok {
+			// We are not expected to create this PVC, StatefulSet should do this
+			return
+		}
+	}
+
+	pvcReconciled, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
+	if err != nil {
+		w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvc.Name, err)
+		w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
+		return
+	}
+
+	w.task.registryReconciled.RegisterPVC(pvcReconciled.ObjectMeta)
+	return
+}
+
+func (w *worker) fetchOrCreatePVC(
+	ctx context.Context,
+	host *chiV1.ChiHost,
+	volumeMount *coreV1.VolumeMount,
+) (*coreV1.PersistentVolumeClaim, *chiV1.ChiVolumeClaimTemplate, bool) {
+	namespace := host.Address.Namespace
+	pvcName, ok := chopModel.CreatePVCNameByVolumeMount(host, volumeMount)
+	if !ok {
+		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
+		return nil, nil, false
+	}
+	volumeClaimTemplate, ok := chopModel.GetVolumeClaimTemplate(host, volumeMount)
+	if !ok {
+		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
+		return nil, nil, false
+	}
+
+	pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, newGetOptions())
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			// This is not an error per se, means PVC is not created (yet)?
+			if w.task.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+				pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
+			} else {
+				// PVC is not available and we are not expected to create PVC by ourselves
+				return nil, nil, false
+			}
+		} else {
+			// In case of any non-NotFound API error - unable to proceed
+			w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+			return nil, nil, false
+		}
+	}
+
+	return pvc, volumeClaimTemplate, true
 }
 
 // reconcilePVC reconciles specified PVC
