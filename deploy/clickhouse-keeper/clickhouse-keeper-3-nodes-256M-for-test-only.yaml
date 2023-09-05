@@ -215,19 +215,6 @@ data:
     exec 2> /proc/1/fd/2
     source /conf/env.sh
     source /conf/keeperFunctions.sh
-    # Wait for client connections to drain. Kubernetes will wait until the configured
-    # "terminationGracePeriodSeconds" before forcibly killing the container
-    for (( i = 0; i < 6; i++ )); do
-      CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "127.0.0.1" | wc -l`
-      if [[ "$CONN_COUNT" -gt 0 ]]; then
-        echo "$CONN_COUNT non-local connections still connected."
-        sleep 5
-      else
-        echo "$CONN_COUNT non-local connections"
-        break
-      fi
-    done
-    # Check to see if zookeeper service for this node is a participant
     set +e
     KEEPER_URL=$(keeperConnectionString)
     ZK_URL=$(zkConnectionString)
@@ -247,9 +234,20 @@ data:
     if [[ "$MY_ID" -gt "1" ]]; then
       # If ClusterSize < MyId, this server is being permanently removed from raft_configuration.
       zk-shell --run-once "reconfig remove $MY_ID" "$ZK_URL"
-      echo $?
-      sleep 5
     fi
+
+    # Wait for client connections to drain. Kubernetes will wait until the configured
+    # "terminationGracePeriodSeconds" before forcibly killing the container
+    for (( i = 0; i < 10; i++ )); do
+      CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "127.0.0.1" | wc -l`
+      if [[ "$CONN_COUNT" -gt 0 ]]; then
+        echo "$CONN_COUNT non-local connections still connected."
+        sleep 3
+      else
+        echo "$CONN_COUNT non-local connections"
+        break
+      fi
+    done
 
     # Kill the primary process ourselves to circumvent the terminationGracePeriodSeconds
     ps -ef | grep clickhouse-keeper | grep -v grep | awk '{print $1}' | xargs kill

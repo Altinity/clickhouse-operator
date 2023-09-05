@@ -298,7 +298,7 @@ def test_keeper_rescale_outline(
                 keeper_manifest_1_node=keeper_manifest_1_node,
                 keeper_manifest_3_node=keeper_manifest_3_node
             )
-        with Then("Start CH + ZK "):
+        with Then(f"Start CH + ZK, expect keeper node count={keeper_replica_count}"):
             start_stop_zk_and_clickhouse(
                 chi['metadata']['name'],
                 ch_stop=False,
