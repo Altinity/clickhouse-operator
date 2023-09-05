@@ -3195,9 +3195,8 @@ data:
     
       # Reconcile Host scenario
       host:
-        # Whether the operation during reconcile procedure should wait for a host:
+        # Whether the operator during reconcile procedure should wait for a host:
         # - to be excluded from a cluster
-        # OR
         # - to be included into a cluster
         # respectfully before proceeding to the host reconciliation.
         wait:
