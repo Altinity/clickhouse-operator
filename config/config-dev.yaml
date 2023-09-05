@@ -14,12 +14,14 @@
 
 ################################################
 ##
-## Watch Section
+## Watch section
 ##
 ################################################
 watch:
   # List of namespaces where clickhouse-operator watches for events.
   # Concurrently running operators should watch on different namespaces.
+  # IMPORTANT
+  # Regexp is applicable.
   #namespaces: ["dev", "test"]
   namespaces: [dev, test]
 
@@ -27,7 +29,7 @@ clickhouse:
   configuration:
     ################################################
     ##
-    ## Configuration Files Section
+    ## Configuration files section
     ##
     ################################################
     file:
@@ -41,23 +43,28 @@ clickhouse:
         user: users.d
     ################################################
     ##
-    ## Configuration Users Section
+    ## Configuration users section
     ##
     ################################################
     user:
       # Default settings for user accounts, created by the operator.
-      # NB. These are not access credentials or settings for 'default' user account,
-      # it is a template for filling out missing fields for all user accounts to be created by the operator, except:
-      # 1. 'default' account, which DOES NOT use provided password, but uses all the rest of the fields
-      # Password for 'default' account as to be provided explicitly, if to be used
-      # 2. CHOP account, which DOES NOT use profile, quota, password and regexp, but uses network IPs - extending them
-      # Password for CHOP account is used from `clickhouse.access.password` section
+      # IMPORTANT. These are not access credentials or settings for 'default' user account,
+      # it is a template for filling out missing fields for all user accounts to be created by the operator,
+      # with the following EXCEPTIONS:
+      # 1. 'default' user account DOES NOT use provided password, but uses all the rest of the fields.
+      #    Password for 'default' user account has to be provided explicitly, if to be used.
+      # 2. CHOP user account DOES NOT use:
+      #    - profile setting. It uses predefined profile called 'clickhouse_operator'
+      #    - quota setting. It uses empty quota name.
+      #    - networks IP setting. Operator specifies 'networks/ip' user setting to match operators' pod IP only.
+      #    - password setting. Password for CHOP account is used from 'clickhouse.access.*' section
       default:
-        # Default values for ClickHouse user configuration
-        # 1. user/profile - string
-        # 2. user/quota - string
-        # 3. user/networks/ip - multiple strings
-        # 4. user/password - string
+        # Default values for ClickHouse user account(s) created by the operator
+        #   1. user/profile - string
+        #   2. user/quota - string
+        #   3. user/networks/ip - multiple strings
+        #   4. user/password - string
+        # These values can be overwritten on per-user basis.
         profile: "default"
         quota: "default"
         networksIP:
@@ -66,7 +73,7 @@ clickhouse:
         password: "default"
     ################################################
     ##
-    ## Configuration Network Section
+    ## Configuration network section
     ##
     ################################################
     network:
@@ -75,7 +82,7 @@ clickhouse:
 
   ################################################
   ##
-  ## Configuration Restart Policy Section
+  ## Configuration restart policy section
   ## Configuration restart policy describes what configuration changes require ClickHouse restart
   ##
   ################################################
@@ -110,28 +117,29 @@ clickhouse:
   ##
   ################################################
   access:
-    # Possible values for `scheme` are:
-    # 1. http
-    # 2. https
+    # Possible values for 'scheme' are:
+    #   1. http - force http to be used to connect to ClickHouse instances
+    #   2. https - force https to be used to connect to ClickHouse instances
+    #   3. auto - either http or https is selected based on open ports
     scheme: ""
     # ClickHouse credentials (username, password and port) to be used by the operator to connect to ClickHouse instances.
-    # Used for:
-    # 1. Metrics requests
-    # 2. Schema maintenance
-    # 3. DROP DNS CACHE
+    # These credentials are used for:
+    #   1. Metrics requests
+    #   2. Schema maintenance
+    #   3. DROP DNS CACHE
     # User with these credentials can be specified in additional ClickHouse .xml config files,
-    # located in `clickhouse.configuration.file.path.user` folder
+    # located in 'clickhouse.configuration.file.path.user' folder
     username: "clickhouse_operator"
     password: "clickhouse_operator_password"
     rootCA: ""
 
     # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
-    # Can be used instead of explicitly specified username and password which are:
-    # clickhouse.access.username
-    # clickhouse.access.password
+    # Can be used instead of explicitly specified username and password available in sections:
+    #   - clickhouse.access.username
+    #   - clickhouse.access.password
     # Secret should have two keys:
-    # 1. username
-    # 2. password
+    #   1. username
+    #   2. password
     secret:
       # Empty `namespace` means that k8s secret would be looked in the same namespace where operator's pod is running.
       namespace: ""
@@ -152,38 +160,60 @@ clickhouse:
 
 ################################################
 ##
-## Templates Section
+## Template(s) management section
 ##
 ################################################
 template:
   chi:
-    # Path to the folder where ClickHouseInstallation .yaml manifests are located.
-    # Manifests are applied in sorted alpha-numeric order.
+    # CHI template updates handling policy
+    # Possible policy values:
+    #   - ReadOnStart. Accept CHIT updates on the operators start only.
+    #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+    policy: ApplyOnNextReconcile
+
+    # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+    # Templates are added to the list of all templates and used when CHI is reconciled.
+    # Templates are applied in sorted alpha-numeric order.
     path: templates.d
 
 ################################################
 ##
-## Reconcile Section
+## Reconcile section
 ##
 ################################################
 reconcile:
+  # Reconcile runtime settings
   runtime:
     # Max number of concurrent CHI reconciles in progress
     reconcileCHIsThreadsNumber: 1
-    # Max number of concurrent shard reconciles in progress
+
+    # The operator reconciles shards concurrently in each CHI with the following limitations:
+    #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
+    #      can not be greater than 'reconcileShardsThreadsNumber'.
+    #   2. Percentage of shards being reconciled (and thus having hosts down) in each CHI concurrently
+    #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
+    #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
+    # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
+
+    # Max number of concurrent shard reconciles within one CHI in progress
     reconcileShardsThreadsNumber: 1
-    # The maximum percentage of cluster shards that may be reconciled in parallel
+    # Max percentage of concurrent shard reconciles within one CHI in progress
     reconcileShardsMaxConcurrencyPercent: 50
 
+  # Reconcile StatefulSet scenario
   statefulSet:
+    # Create StatefulSet scenario
     create:
       # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for an admin to assist
-      # 2. delete - delete newly created problematic StatefulSet
-      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
+      # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+      #    do not try to fix or delete or update it, just abort reconcile cycle.
+      #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
+      # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
+      # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
       onFailure: ignore
 
+    # Update StatefulSet scenario
     update:
       # How many seconds to wait for created/updated StatefulSet to be 'Ready'
       timeout: 300
@@ -191,25 +221,29 @@ reconcile:
       pollInterval: 15
       # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
       # Possible options:
-      # 1. abort - do nothing, just break the process and wait for an admin to assist
+      # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+      #    do not try to fix or delete or update it, just abort reconcile cycle.
+      #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
       # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
-      # Pod would be recreated by StatefulSet based on rollback-ed configuration
-      # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet
+      #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
+      #    Follow 'abort' path afterwards.
+      # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
       onFailure: rollback
 
+  # Reconcile Host scenario
   host:
-    # Whether reconciler should wait for a host:
+    # Whether the operation during reconcile procedure should wait for a host:
     # - to be excluded from a cluster
     # OR
     # - to be included into a cluster
-    # respectfully
+    # respectfully before proceeding to the host reconciliation.
     wait:
       exclude: true
       include: false
 
 ################################################
 ##
-## Annotations management
+## Annotations management section
 ##
 ################################################
 annotation:
@@ -224,7 +258,7 @@ annotation:
 
 ################################################
 ##
-## Labels management
+## Labels management section
 ##
 ################################################
 label:
@@ -253,7 +287,7 @@ label:
 
 ################################################
 ##
-## StatefulSet management
+## StatefulSet management section
 ##
 ################################################
 statefulSet:
@@ -261,7 +295,7 @@ statefulSet:
 
 ################################################
 ##
-## Pod management
+## Pod management section
 ##
 ################################################
 pod:
@@ -273,7 +307,7 @@ pod:
 
 ################################################
 ##
-## Log parameters
+## Log parameters section
 ##
 ################################################
 logger:
