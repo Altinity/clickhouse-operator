@@ -174,12 +174,12 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
     zk_manifest = yaml_manifest.get_multidoc_manifest_data(util.get_full_path(keeper_manifest, lookup_in_host=True))
     for doc in zk_manifest:
         if doc["kind"] == "StatefulSet":
-            with When(f"Path Zookeeper replicas: {keeper_replica_count}"):
+            with When(f"Patch {keeper_type} replicas: {keeper_replica_count}"):
                 keeper_name = doc["metadata"]["name"]
                 kubectl.launch(
                     f"patch --type=merge sts {keeper_name} -p '{{\"spec\":{{\"replicas\":{keeper_replica_count}}}}}'"
                 )
-                retries_num = 10
+                retries_num = 20
                 for i in range(retries_num):
                     pod_counts = kubectl.get_count("pod", f"-l app={keeper_type}")
                     if pod_counts == keeper_replica_count:
@@ -187,8 +187,8 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
                     elif i >= retries_num - 1:
                         assert pod_counts == keeper_replica_count
                     with Then(f"Zookeeper not ready. "
-                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {2*(i+1)} seconds"):
-                        time.sleep(2*(i+1))
+                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {3*(i+1)} seconds"):
+                        time.sleep(3*(i+1))
 
 
 @TestOutline

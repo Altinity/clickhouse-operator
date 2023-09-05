@@ -205,7 +205,8 @@ data:
     fi
     
     # run clickhouse-keeper    
-    cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml 
+    cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml
+    rm -rfv /var/lib/clickhouse-keeper/terminated
     clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
 
   keeperTeardown.sh: |
@@ -229,20 +230,33 @@ data:
     fi
     export MY_ID=$((ORD+1))
 
-    CLUSTER_SIZE=$(clickhouse-keeper client ${KEEPER_URL} -q "get /keeper/config" | grep -c -E '^server\.[0-9]+=') 
+    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
+    CLUSTER_SIZE=$(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E '^server\.[0-9]+=') 
     echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MY_ID"
     if [[ "$MY_ID" -gt "1" ]]; then
       # If ClusterSize < MyId, this server is being permanently removed from raft_configuration.
-      zk-shell --run-once "reconfig remove $MY_ID" "$ZK_URL"
+      zk-shell --run-once "reconfig remove $MY_ID" "localhost:2181"
+      touch /var/lib/clickhouse-keeper/terminated
     fi
 
+    # Wait to remove $MY_ID from quorum
+    for (( i = 0; i < 6; i++ )); do
+        CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
+        if [[ "0" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=$HOST.+participant;[0-1]$") ]]; then
+          echo "$MY_ID removed from quorum"
+          break
+        else
+          echo "$MY_ID still present in quorum"
+        fi
+        sleep 1
+    done
     # Wait for client connections to drain. Kubernetes will wait until the configured
     # "terminationGracePeriodSeconds" before forcibly killing the container
-    for (( i = 0; i < 10; i++ )); do
+    for (( i = 0; i < 3; i++ )); do
       CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "127.0.0.1" | wc -l`
       if [[ "$CONN_COUNT" -gt 0 ]]; then
         echo "$CONN_COUNT non-local connections still connected."
-        sleep 3
+        sleep 1
       else
         echo "$CONN_COUNT non-local connections"
         break
@@ -280,6 +294,9 @@ data:
     getent hosts $DOMAIN
     if [[ $? -ne 0 ]]; then
       echo "no active DNS records in service, first running pod"
+      exit 0
+    elif [[ -f /var/lib/clickhouse-keeper/terminated ]]; then
+      echo "termination in progress"
       exit 0
     else
       set -e
