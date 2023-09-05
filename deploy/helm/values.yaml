@@ -207,7 +207,7 @@ configs:
 
       ################################################
       ##
-      ## Watch Section
+      ## Watch section
       ##
       ################################################
       watch:
@@ -222,7 +222,7 @@ configs:
         configuration:
           ################################################
           ##
-          ## Configuration Files Section
+          ## Configuration files section
           ##
           ################################################
           file:
@@ -236,7 +236,7 @@ configs:
               user: users.d
           ################################################
           ##
-          ## Configuration Users Section
+          ## Configuration users section
           ##
           ################################################
           user:
@@ -266,7 +266,7 @@ configs:
               password: "default"
           ################################################
           ##
-          ## Configuration Network Section
+          ## Configuration network section
           ##
           ################################################
           network:
@@ -275,7 +275,7 @@ configs:
 
         ################################################
         ##
-        ## Configuration Restart Policy Section
+        ## Configuration restart policy section
         ## Configuration restart policy describes what configuration changes require ClickHouse restart
         ##
         ################################################
@@ -353,7 +353,7 @@ configs:
 
       ################################################
       ##
-      ## Templates Section
+      ## Template(s) management section
       ##
       ################################################
       template:
@@ -371,28 +371,31 @@ configs:
 
       ################################################
       ##
-      ## Reconcile Section
+      ## Reconcile section
       ##
       ################################################
       reconcile:
+        # Reconcile runtime settings
         runtime:
           # Max number of concurrent CHI reconciles in progress
           reconcileCHIsThreadsNumber: 10
 
           # The operator reconciles shards concurrently in each CHI with the following limitations:
-          #   1. Number of shards being reconciled (thus unavailable) in each CHI concurrently
+          #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
           #      can not be greater than 'reconcileShardsThreadsNumber'.
-          #   2. Percentage of shards being reconciled (thus unavailable) in each CHI concurrently
+          #   2. Percentage of shards being reconciled (and thus having hosts down) in each CHI concurrently
           #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
-          #   3. The first shard is always reconciled alone. Concurrency starts from second shard.
-          # Thus limiting number of shards being reconciled (thus unavailable) in each CHI by both number and percentage
+          #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
+          # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
 
           # Max number of concurrent shard reconciles within one CHI in progress
           reconcileShardsThreadsNumber: 1
           # Max percentage of concurrent shard reconciles within one CHI in progress
           reconcileShardsMaxConcurrencyPercent: 50
 
+        # Reconcile StatefulSet scenario
         statefulSet:
+          # Create StatefulSet scenario
           create:
             # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
             # Possible options:
@@ -403,6 +406,7 @@ configs:
             # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
             onFailure: ignore
 
+          # Update StatefulSet scenario
           update:
             # How many seconds to wait for created/updated StatefulSet to be 'Ready'
             timeout: 300
@@ -419,8 +423,9 @@ configs:
             # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
             onFailure: abort
 
+        # Reconcile Host scenario
         host:
-          # Whether reconciler should wait for a host:
+          # Whether the operation during reconcile procedure should wait for a host:
           # - to be excluded from a cluster
           # OR
           # - to be included into a cluster
@@ -431,7 +436,7 @@ configs:
 
       ################################################
       ##
-      ## Annotations management
+      ## Annotations management section
       ##
       ################################################
       annotation:
@@ -446,7 +451,7 @@ configs:
 
       ################################################
       ##
-      ## Labels management
+      ## Labels management section
       ##
       ################################################
       label:
@@ -475,7 +480,7 @@ configs:
 
       ################################################
       ##
-      ## StatefulSet management
+      ## StatefulSet management section
       ##
       ################################################
       statefulSet:
@@ -483,7 +488,7 @@ configs:
 
       ################################################
       ##
-      ## Pod management
+      ## Pod management section
       ##
       ################################################
       pod:
@@ -495,7 +500,7 @@ configs:
 
       ################################################
       ##
-      ## Log parameters
+      ## Log parameters section
       ##
       ################################################
       logger:
