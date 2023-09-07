@@ -535,6 +535,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		return err
 	}
 
+	_ = w.completeQueries(ctx, host)
+
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
 		return err
 	}
