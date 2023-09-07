@@ -1997,6 +1997,11 @@ func (in *OperatorConfigReconcileHostWait) DeepCopyInto(out *OperatorConfigRecon
 		*out = new(StringBool)
 		**out = **in
 	}
+	if in.Queries != nil {
+		in, out := &in.Queries, &out.Queries
+		*out = new(StringBool)
+		**out = **in
+	}
 	if in.Include != nil {
 		in, out := &in.Include, &out.Include
 		*out = new(StringBool)
