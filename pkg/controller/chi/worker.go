@@ -919,7 +919,14 @@ func (w *worker) excludeHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 		_ = w.excludeHostFromService(ctx, host)
 		w.excludeHostFromClickHouseCluster(ctx, host)
-		_ = w.waitHostNoActiveQueries(ctx, host)
+	}
+	return nil
+}
+
+// completeQueries wait for running queries to complete
+func (w *worker) completeQueries(ctx context.Context, host *chiV1.ChiHost) error {
+	if w.shouldWaitQueries() {
+		return w.waitHostNoActiveQueries(ctx, host)
 	}
 	return nil
 }
@@ -1051,7 +1058,7 @@ func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 	return true
 }
 
-// shouldWaitExcludeHost determines whether reconciler should wait for host to be excluded from cluster
+// shouldWaitExcludeHost determines whether reconciler should wait for the host to be excluded from cluster
 func (w *worker) shouldWaitExcludeHost(host *chiV1.ChiHost) bool {
 	// Check CHI settings
 	switch {
@@ -1073,7 +1080,12 @@ func (w *worker) shouldWaitExcludeHost(host *chiV1.ChiHost) bool {
 	return chop.Config().Reconcile.Host.Wait.Exclude.Value()
 }
 
-// shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
+// shouldWaitQueries determines whether reconciler should wait for the host to complete running queries
+func (w *worker) shouldWaitQueries() bool {
+	return chop.Config().Reconcile.Host.Wait.Queries.Value()
+}
+
+// shouldWaitIncludeHost determines whether reconciler should wait for the host to be included into cluster
 func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
 	status := host.GetReconcileAttributes().GetStatus()
 	switch {
