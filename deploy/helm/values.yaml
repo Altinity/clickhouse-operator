@@ -425,12 +425,14 @@ configs:
 
         # Reconcile Host scenario
         host:
-          # Whether the operator during reconcile procedure should wait for a host:
-          # - to be excluded from a cluster
-          # - to be included into a cluster
-          # respectfully before proceeding to the host reconciliation.
+          # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+          #   - to be excluded from a ClickHouse cluster
+          #   - to complete all running queries
+          #   - to be included into a ClickHouse cluster
+          # respectfully before moving forward
           wait:
             exclude: true
+            queries: true
             include: false
 
       ################################################

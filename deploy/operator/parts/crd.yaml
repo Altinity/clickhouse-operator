@@ -2608,14 +2608,20 @@ spec:
                                 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet.
                     host:
                       type: object
-                      description: "allow define how to wait host include to system.cluster behavior during scale up and scale down cluster operations"
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+
                       properties:
                         wait:
                           type: object
                           properties:
                             exclude:  &TypeStringBool
                               type: string
-                              description: "wait when a pod will be removed from the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
                               enum:
                                 # List StringBoolXXX constants from model
                                 - ""
@@ -2641,9 +2647,12 @@ spec:
                                 - "disabled"
                                 - "Enabled"
                                 - "enabled"
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
                             include:
                               <<: *TypeStringBool
-                              description: "wait when a pod will be added to the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
