@@ -559,8 +559,8 @@ func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
 			"/entrypoint.sh" + sleep,
 		}
 	}
-	// Appended `sleep` is not able to respond to probes, and probes would cause unexpected restart.
-	// Thus we need to disable all probes.
+	// Appended `sleep` command makes Pod unable to respond to probes, and probes would cause unexpected restart.
+	// Thus we need to disable all probes in troubleshooting mode.
 	container.LivenessProbe = nil
 	container.ReadinessProbe = nil
 }
