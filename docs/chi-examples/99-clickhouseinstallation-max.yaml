@@ -13,22 +13,60 @@ metadata:
     annotation2: annotation2_value
 
 spec:
+  # Allows to define custom taskID for CHI update and watch status of this update execution.
+  # Displayed in all .status.taskID* fields.
+  # By default (if not filled) every update of CHI manifest will generate random taskID
+  taskId: "qweqwe"
 
+  taskIdMode:
+    id: ""
+    mode: ""
+
+  # Allows to stop all ClickHouse clusters defined in a CHI.
+  # Works as the following:
+  #  - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
+  #  - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
   stop: "no"
+
+  # In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
+  # This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
   restart: "RollingUpdate"
+
+  # Allows to troubleshoot Pods during CrashLoopBack state.
+  # This may happen when wrong configuration applied, in this case `clickhouse-server` wouldn't start.
+  # Command within ClickHouse container is modified with `sleep` in order to avoid quick restarts
+  # and give time to troubleshoot via CLI.
+  # Liveness and Readiness probes are disabled as well.
   troubleshoot: "no"
 
   namespaceDomainPattern:  "%s.svc.my.test"
 
+  # Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)
   templating:
+    # When defined as `auto` inside ClickhouseInstallationTemplate, this ClickhouseInstallationTemplate
+    # will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
+    # Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
+    # Possible values:
+    #  - "auto"
+    #  - "manual"
     policy: "manual"
+    # Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate
     chiSelector:
       name1: value1
       name2: value2
 
   reconciling:
+    # Overrides both 'reconcile.host.wait.{exclude, include}' values from the operator's config
+    # Possible values:
+    #  - wait
+    #  - nowait
+    # DEPRECATED
     policy: "nowait"
+
+    # Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
+    # More details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
     configMapPropagationTimeout: 90
+
     cleanup:
       unknownObjects:
         statefulSet: Delete
