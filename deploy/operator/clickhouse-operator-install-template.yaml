@@ -297,7 +297,10 @@ spec:
                     Liveness and Readiness probes are disabled as well.
                 namespaceDomainPattern:
                   type: string
-                  description: "custom domain suffix which will add to end of `Service` or `Pod` name, use it when you use custom cluster domain in your Kubernetes cluster"
+                  description: |
+                    Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+                    Typical use scenario - custom cluster domain in Kubernetes cluster
+                    Example: %s.svc.my.test
                 templating:
                   type: object
                   # nullable: true
@@ -1481,7 +1484,10 @@ spec:
                     Liveness and Readiness probes are disabled as well.
                 namespaceDomainPattern:
                   type: string
-                  description: "custom domain suffix which will add to end of `Service` or `Pod` name, use it when you use custom cluster domain in your Kubernetes cluster"
+                  description: |
+                    Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+                    Typical use scenario - custom cluster domain in Kubernetes cluster
+                    Example: %s.svc.my.test
                 templating:
                   type: object
                   # nullable: true
