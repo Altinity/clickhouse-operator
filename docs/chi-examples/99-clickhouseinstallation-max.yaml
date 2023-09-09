@@ -18,10 +18,6 @@ spec:
   # By default (if not filled) every update of CHI manifest will generate random taskID
   taskId: "qweqwe"
 
-  taskIdMode:
-    id: ""
-    mode: ""
-
   # Allows to stop all ClickHouse clusters defined in a CHI.
   # Works as the following:
   #  - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
