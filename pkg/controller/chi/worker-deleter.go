@@ -662,8 +662,8 @@ func (w *worker) deleteLostPVC(ctx context.Context, pvc *coreV1.PersistentVolume
 		return false
 	}
 
-	w.a.V(1).M(pvc).F().Info("delete lost PVC start: %s/%s", pvc.Namespace, pvc.Name)
-	defer w.a.V(1).M(pvc).F().Info("delete lost PVC end: %s/%s", pvc.Namespace, pvc.Name)
+	w.a.V(1).M(pvc).F().S().Info("delete lost PVC start: %s/%s", pvc.Namespace, pvc.Name)
+	defer w.a.V(1).M(pvc).F().E().Info("delete lost PVC end: %s/%s", pvc.Namespace, pvc.Name)
 
 	w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, newDeleteOptions())
 
@@ -677,7 +677,7 @@ func (w *worker) deleteLostPVC(ctx context.Context, pvc *coreV1.PersistentVolume
 		if len(curPVC.Finalizers) > 0 {
 			w.a.V(1).M(pvc).F().Info("clean finalizers for lost PVC: %s/%s", pvc.Namespace, pvc.Name)
 			curPVC.Finalizers = nil
-			w.c.updatePersistentVolumeClaim(ctx, pvc)
+			w.c.updatePersistentVolumeClaim(ctx, curPVC)
 		}
 		time.Sleep(10 * time.Second)
 	}
