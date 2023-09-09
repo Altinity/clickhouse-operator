@@ -16,7 +16,7 @@ spec:
   # Allows to define custom taskID for CHI update and watch status of this update execution.
   # Displayed in all .status.taskID* fields.
   # By default (if not filled) every update of CHI manifest will generate random taskID
-  taskId: "qweqwe"
+  taskID: "qweqwe"
 
   # Allows to stop all ClickHouse clusters defined in a CHI.
   # Works as the following:
