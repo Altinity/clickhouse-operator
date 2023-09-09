@@ -35,6 +35,8 @@ spec:
   # Liveness and Readiness probes are disabled as well.
   troubleshoot: "no"
 
+  # Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+  # Typical use scenario - custom cluster domain in Kubernetes cluster
   namespaceDomainPattern:  "%s.svc.my.test"
 
   # Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)
