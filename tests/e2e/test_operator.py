@@ -3356,7 +3356,7 @@ def test_036(self):
                 util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
             )
 
-    manifest = f"manifests/chi/test-036-volume-re-provisioning.yaml"
+    manifest = f"manifests/chi/test-036-volume-re-provisioning-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -3396,8 +3396,19 @@ def test_036(self):
             "Lost",
         )
 
+    with Then("Kick operator to start reconcile cycle to fix lost PV"):
+        kubectl.create_and_check(
+            manifest=f"manifests/chi/test-036-volume-re-provisioning-2.yaml",
+            check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
     with Then("I check PV is recreated"):
-        assert not "NOT IMPLEMENTED"
         kubectl.wait_field(
             "pvc",
             "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
