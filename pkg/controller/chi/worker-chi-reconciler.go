@@ -841,7 +841,7 @@ func (w *worker) reconcilePVCFromVolumeMount(ctx context.Context, host *chiV1.Ch
 
 	if w.deleteLostPVC(ctx, pvc) {
 		res = errLostPVCDeleted
-		w.a.V(1).M(host).Info("deleted lost PVC (%s/%s/%s/%s) - start", namespace, host.GetName(), volumeMount.Name, pvc.Name)
+		w.a.V(1).M(host).Info("deleted lost PVC (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvc.Name)
 		pvc, volumeClaimTemplate, ok = w.fetchOrCreatePVC(ctx, host, volumeMount)
 		if !ok {
 			// We are not expected to create this PVC, StatefulSet should do this
