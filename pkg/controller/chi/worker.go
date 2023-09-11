@@ -673,6 +673,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 
 	objs := w.c.discovery(ctx, chi)
 	ap.WalkAdded(
+		// Walk over added clusters
 		func(cluster *chiV1.Cluster) {
 			cluster.WalkHosts(func(host *chiV1.ChiHost) error {
 
@@ -702,12 +703,15 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 				return nil
 			})
 		},
+		// Walk over added shards
 		func(shard *chiV1.ChiShard) {
+			// Mark all hosts of the shard as newly added
 			shard.WalkHosts(func(host *chiV1.ChiHost) error {
 				host.GetReconcileAttributes().SetAdd()
 				return nil
 			})
 		},
+		// Walk over added hosts
 		func(host *chiV1.ChiHost) {
 			host.GetReconcileAttributes().SetAdd()
 		},
@@ -738,19 +742,16 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 	})
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		if host.GetReconcileAttributes().IsAdd() {
+		switch {
+		case host.GetReconcileAttributes().IsAdd():
 			w.a.M(host).Info("ADD host: %s", host.Address.CompactString())
-			return nil
-		}
-		if host.GetReconcileAttributes().IsModify() {
+		case host.GetReconcileAttributes().IsModify():
 			w.a.M(host).Info("MODIFY host: %s", host.Address.CompactString())
-			return nil
-		}
-		if host.GetReconcileAttributes().IsFound() {
+		case host.GetReconcileAttributes().IsFound():
 			w.a.M(host).Info("FOUND host: %s", host.Address.CompactString())
-			return nil
+		default:
+			w.a.M(host).Info("UNTOUCHED host: %s", host.Address.CompactString())
 		}
-		w.a.M(host).Info("UNTOUCHED host: %s", host.Address.CompactString())
 		return nil
 	})
 }
