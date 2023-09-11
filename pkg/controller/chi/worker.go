@@ -553,28 +553,34 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *chiV1.ClickHouseIn
 	})
 }
 
-// excludeStopped excludes stopped CHI from monitoring
-func (w *worker) excludeStopped(chi *chiV1.ClickHouseInstallation) {
-	if chi.IsStopped() {
-		w.a.V(1).
-			WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
-			WithStatusAction(chi).
-			M(chi).F().
-			Info("exclude CHI from monitoring")
-		w.c.deleteWatch(chi)
+// excludeStoppedCHIFromMonitoring excludes stopped CHI from monitoring
+func (w *worker) excludeStoppedCHIFromMonitoring(chi *chiV1.ClickHouseInstallation) {
+	if !chi.IsStopped() {
+		// No need to exclude non-stopped CHI
+		return
 	}
+
+	w.a.V(1).
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+		WithStatusAction(chi).
+		M(chi).F().
+		Info("exclude CHI from monitoring")
+	w.c.deleteWatch(chi)
 }
 
-// includeStopped includes previously stopped CHI into monitoring
-func (w *worker) includeStopped(chi *chiV1.ClickHouseInstallation) {
-	if !chi.IsStopped() {
-		w.a.V(1).
-			WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
-			WithStatusAction(chi).
-			M(chi).F().
-			Info("add CHI to monitoring")
-		w.c.updateWatch(chi)
+// addCHIToMonitoring adds CHI to monitoring
+func (w *worker) addCHIToMonitoring(chi *chiV1.ClickHouseInstallation) {
+	if chi.IsStopped() {
+		// No need to add stopped CHI
+		return
 	}
+
+	w.a.V(1).
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+		WithStatusAction(chi).
+		M(chi).F().
+		Info("add CHI to monitoring")
+	w.c.updateWatch(chi)
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {

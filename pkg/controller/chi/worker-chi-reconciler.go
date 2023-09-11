@@ -81,7 +81,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 
 	w.newTask(new)
 	w.markReconcileStart(ctx, new, actionPlan)
-	w.excludeStopped(new)
+	w.excludeStoppedCHIFromMonitoring(new)
 	w.walkHosts(ctx, new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
@@ -103,7 +103,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 			Info("remove items scheduled for deletion")
 		w.clean(ctx, new)
 		w.dropReplicas(ctx, new, actionPlan)
-		w.includeStopped(new)
+		w.addCHIToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 	}
