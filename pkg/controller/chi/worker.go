@@ -728,16 +728,17 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 	)
 
 	chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		if host.GetReconcileAttributes().IsAdd() {
+		switch {
+		case host.GetReconcileAttributes().IsAdd():
 			// Already added
 			return nil
-		}
-		if host.GetReconcileAttributes().IsModify() {
+		case host.GetReconcileAttributes().IsModify():
 			// Already modified
 			return nil
+		default:
+			// Not clear yet
+			host.GetReconcileAttributes().SetFound()
 		}
-		// Not clear yet
-		host.GetReconcileAttributes().SetFound()
 		return nil
 	})
 
@@ -750,7 +751,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 		case host.GetReconcileAttributes().IsFound():
 			w.a.M(host).Info("FOUND host: %s", host.Address.CompactString())
 		default:
-			w.a.M(host).Info("UNTOUCHED host: %s", host.Address.CompactString())
+			w.a.M(host).Info("UNKNOWN host: %s", host.Address.CompactString())
 		}
 		return nil
 	})
