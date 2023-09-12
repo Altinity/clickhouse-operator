@@ -301,8 +301,8 @@ func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *chop.Ch
 	return s.QueryHostInt(ctx, host, sql)
 }
 
-// HostVersion returns ClickHouse version on the host
-func (s *ClusterSchemer) HostVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
+// HostClickHouseVersion returns ClickHouse version on the host
+func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
 	sql := `SELECT version()`
 	return s.QueryHostString(ctx, host, sql)
 }

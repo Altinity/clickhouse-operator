@@ -259,20 +259,18 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiV1.ChiHost
 	return nil
 }
 
-// getHostStatefulSetCurStatus gets StatefulSet current status
-func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.ChiHost) string {
-	version := "unknown"
-	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew {
-		version = "not applicable"
-	} else {
-		if ver, e := w.ensureClusterSchemer(host).HostVersion(ctx, host); e == nil {
-			version = ver
-			host.Version = chiV1.NewCHVersion(version)
-		} else {
-			version = "failed to query"
-		}
+// getHostClickHouseVersion gets host ClickHouse version
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *chiV1.ChiHost, skipNewHost bool) string {
+	if skipNewHost && (host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew) {
+		return "not applicable"
 	}
-	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
+
+	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
+	if err != nil {
+		return "failed to query"
+	}
+	host.Version = chiV1.NewCHVersion(version)
+
 	return version
 }
 
@@ -307,11 +305,8 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		return nil
 	}
 
-	version := w.getHostStatefulSetCurStatus(ctx, host)
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
+	version := w.getHostClickHouseVersion(ctx, host, true)
+	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
 	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.GetName(), version)
 	// In case we have to force-restart host
@@ -563,16 +558,12 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
-	version, err := w.ensureClusterSchemer(host).HostVersion(ctx, host)
-	if err != nil {
-		version = "unknown"
-	}
-
 	if err := w.includeHost(ctx, host); err != nil {
 		// If host is not ready - fallback
 		return err
 	}
 
+	version := w.getHostClickHouseVersion(ctx, host, false)
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
