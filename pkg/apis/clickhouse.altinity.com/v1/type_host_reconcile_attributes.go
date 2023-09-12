@@ -18,20 +18,20 @@ import (
 	"fmt"
 )
 
-// StatefulSetStatus specifies StatefulSet status
-type StatefulSetStatus string
+// ObjectStatus specifies object status
+type ObjectStatus string
 
-// Possible values for StatefulSet status
+// Possible values for object status
 const (
-	StatefulSetStatusModified StatefulSetStatus = "modified"
-	StatefulSetStatusNew      StatefulSetStatus = "new"
-	StatefulSetStatusSame     StatefulSetStatus = "same"
-	StatefulSetStatusUnknown  StatefulSetStatus = "unknown"
+	ObjectStatusModified ObjectStatus = "modified"
+	ObjectStatusNew      ObjectStatus = "new"
+	ObjectStatusSame     ObjectStatus = "same"
+	ObjectStatusUnknown  ObjectStatus = "unknown"
 )
 
 // ChiHostReconcileAttributes defines host reconcile status and attributes
 type ChiHostReconcileAttributes struct {
-	status StatefulSetStatus
+	status ObjectStatus
 
 	// Attributes are used by config generator
 
@@ -74,7 +74,7 @@ func (s *ChiHostReconcileAttributes) Any(of *ChiHostReconcileAttributes) bool {
 }
 
 // SetStatus sets status
-func (s *ChiHostReconcileAttributes) SetStatus(status StatefulSetStatus) *ChiHostReconcileAttributes {
+func (s *ChiHostReconcileAttributes) SetStatus(status ObjectStatus) *ChiHostReconcileAttributes {
 	if s == nil {
 		return s
 	}
@@ -83,9 +83,9 @@ func (s *ChiHostReconcileAttributes) SetStatus(status StatefulSetStatus) *ChiHos
 }
 
 // GetStatus gets status
-func (s *ChiHostReconcileAttributes) GetStatus() StatefulSetStatus {
+func (s *ChiHostReconcileAttributes) GetStatus() ObjectStatus {
 	if s == nil {
-		return StatefulSetStatus("")
+		return ObjectStatus("")
 	}
 	return s.status
 }

@@ -262,7 +262,7 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiV1.ChiHost
 // getHostStatefulSetCurStatus gets StatefulSet current status
 func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.ChiHost) string {
 	version := "unknown"
-	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
+	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew {
 		version = "not applicable"
 	} else {
 		if ver, e := w.ensureClusterSchemer(host).HostVersion(ctx, host); e == nil {
@@ -749,7 +749,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost, 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
-	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame {
+	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusSame {
 		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
 		host.CHI.EnsureStatus().HostUnchanged()
 		return nil

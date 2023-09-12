@@ -115,12 +115,12 @@ func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
 		return true
 	}
 
-	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
+	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew {
 		w.a.V(1).M(host).F().Info("Host is new, no restart applicable. Host: %s", host.GetName())
 		return false
 	}
 
-	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame && !host.HasAncestor() {
+	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusSame && !host.HasAncestor() {
 		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
 	}
@@ -1042,12 +1042,12 @@ func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 			M(host).F().
 			Info("While rolling update host would be restarted host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
-	case host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew:
+	case host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew:
 		w.a.V(1).
 			M(host).F().
 			Info("Nothing to exclude, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
-	case host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame:
+	case host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusSame:
 		w.a.V(1).
 			M(host).F().
 			Info("The same host would not be updated host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
@@ -1097,9 +1097,9 @@ func (w *worker) shouldWaitQueries() bool {
 func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
 	status := host.GetReconcileAttributes().GetStatus()
 	switch {
-	case status == chiV1.StatefulSetStatusNew:
+	case status == chiV1.ObjectStatusNew:
 		return false
-	case status == chiV1.StatefulSetStatusSame:
+	case status == chiV1.ObjectStatusSame:
 		// The same host was not modified and no need to wait it to be included - it already is
 		return false
 	case host.GetShard().HostsCount() == 1:
@@ -1369,7 +1369,7 @@ func (w *worker) createSecret(ctx context.Context, chi *chiV1.ClickHouseInstalla
 }
 
 // getStatefulSetStatus gets StatefulSet status
-func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetStatus {
+func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.ObjectStatus {
 	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
 	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
 
@@ -1381,22 +1381,22 @@ func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetS
 
 	case apiErrors.IsNotFound(err):
 		// No cur StatefulSet available and it is not found - adding new one
-		return chiV1.StatefulSetStatusNew
+		return chiV1.ObjectStatusNew
 
 	default:
-		return chiV1.StatefulSetStatusUnknown
+		return chiV1.ObjectStatusUnknown
 	}
 }
 
 // getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
-func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) chiV1.StatefulSetStatus {
+func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) chiV1.ObjectStatus {
 	// Try to perform label-based version comparison
 	curVersion, curHasLabel := chopModel.GetObjectVersion(curMeta)
 	newVersion, newHasLabel := chopModel.GetObjectVersion(newMeta)
 
 	if !curHasLabel || !newHasLabel {
 		// No labels to compare, we can not say for sure what exactly is going on
-		return chiV1.StatefulSetStatusUnknown
+		return chiV1.ObjectStatusUnknown
 	}
 
 	//
@@ -1408,22 +1408,22 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) ch
 			"cur and new ARE EQUAL based on labels. No reconcile is required for: %s",
 			util.NamespaceNameString(newMeta),
 		)
-		return chiV1.StatefulSetStatusSame
+		return chiV1.ObjectStatusSame
 	}
 
 	//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
 	//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
-	//	//					return chop.StatefulSetStatusSame
+	//	//					return chop.ObjectStatusSame
 	//} else {
 	//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
-	//	//					return chop.StatefulSetStatusModified
+	//	//					return chop.ObjectStatusModified
 	//}
 	w.a.M(newMeta).F().Info(
 		"cur and new ARE DIFFERENT based on labels. Reconcile is required for: %s",
 		util.NamespaceNameString(newMeta),
 	)
 
-	return chiV1.StatefulSetStatusModified
+	return chiV1.ObjectStatusModified
 }
 
 // createStatefulSet
