@@ -69,7 +69,7 @@ See [LICENSE](./LICENSE) for more details.
 ## Commercial Support
 
 Altinity is the primary maintainer of the operator. It is the basis of Altinity.Cloud and
-is also used in self-managed installations. Altinity offers a range of  
+is also used in self-managed installations. Altinity offers a range of 
 services related to ClickHouse and analytic applications on Kubernetes. 
 
 - [Official website](https://altinity.com/) - Get a high level overview of Altinity and our offerings.
