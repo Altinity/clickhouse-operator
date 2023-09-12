@@ -789,14 +789,46 @@ func (w *worker) prepareDesiredStatefulSet(host *chiV1.ChiHost, shutdown bool) {
 	host.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
 }
 
+type migrateTableOptions struct {
+	forceMigrate bool
+	dropReplica  bool
+}
+
+func (o *migrateTableOptions) ForceMigrate() bool {
+	if o == nil {
+		return false
+	}
+	return o.forceMigrate
+}
+
+func (o *migrateTableOptions) DropReplica() bool {
+	if o == nil {
+		return false
+	}
+	return o.dropReplica
+}
+
+type migrateTableOptionsArr []*migrateTableOptions
+
+func NewMigrateTableOptionsArr(opts ...*migrateTableOptions) (res migrateTableOptionsArr) {
+	return append(res, opts...)
+}
+
+func (a migrateTableOptionsArr) First() *migrateTableOptions {
+	if len(a) > 0 {
+		return a[0]
+	}
+	return nil
+}
+
 // migrateTables
-func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
+func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost, opts ...*migrateTableOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	if !w.shouldMigrateTables(host) {
+	if !w.shouldMigrateTables(host, opts...) {
 		w.a.V(1).
 			M(host).F().
 			Info("No need to add tables on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
@@ -804,6 +836,13 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 	}
 
 	// Need to migrate tables
+
+	if w.shouldDropReplica(host, opts...) {
+		w.a.V(1).
+			M(host).F().
+			Info("Need to drop replica on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		w.dropReplica(ctx, host, &dropReplicaOptions{forceDrop: true})
+	}
 
 	w.a.V(1).
 		WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).
@@ -830,19 +869,40 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost) error {
 }
 
 // shouldMigrateTables
-func (w *worker) shouldMigrateTables(host *chiV1.ChiHost) bool {
+func (w *worker) shouldMigrateTables(host *chiV1.ChiHost, opts ...*migrateTableOptions) bool {
+	o := NewMigrateTableOptionsArr(opts...).First()
+
+	// Deal with special cases
 	switch {
 	case host.GetCHI().IsStopped():
-		// Stopped host is not able to receive any data
+		// Stopped host is not able to receive any data, migration is inapplicable
 		return false
+
+	case o.ForceMigrate():
+		// Force migration requested
+		return true
 
 	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated()):
-		// This host is listed as having tables created already
+		// This host is listed as having tables created already, no need to migrate again
 		return false
-
-	default:
-		return true
 	}
+
+	// In all the rest cases - perform migration
+	return true
+}
+
+// shouldDropTables
+func (w *worker) shouldDropReplica(host *chiV1.ChiHost, opts ...*migrateTableOptions) bool {
+	o := NewMigrateTableOptionsArr(opts...).First()
+
+	// Deal with special cases
+	switch {
+	case o.DropReplica():
+		return true
+
+	}
+
+	return false
 }
 
 // excludeHost excludes host from ClickHouse clusters if required
@@ -859,7 +919,14 @@ func (w *worker) excludeHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 		_ = w.excludeHostFromService(ctx, host)
 		w.excludeHostFromClickHouseCluster(ctx, host)
-		_ = w.waitHostNoActiveQueries(ctx, host)
+	}
+	return nil
+}
+
+// completeQueries wait for running queries to complete
+func (w *worker) completeQueries(ctx context.Context, host *chiV1.ChiHost) error {
+	if w.shouldWaitQueries() {
+		return w.waitHostNoActiveQueries(ctx, host)
 	}
 	return nil
 }
@@ -991,7 +1058,7 @@ func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 	return true
 }
 
-// shouldWaitExcludeHost determines whether reconciler should wait for host to be excluded from cluster
+// shouldWaitExcludeHost determines whether reconciler should wait for the host to be excluded from cluster
 func (w *worker) shouldWaitExcludeHost(host *chiV1.ChiHost) bool {
 	// Check CHI settings
 	switch {
@@ -1013,7 +1080,12 @@ func (w *worker) shouldWaitExcludeHost(host *chiV1.ChiHost) bool {
 	return chop.Config().Reconcile.Host.Wait.Exclude.Value()
 }
 
-// shouldWaitIncludeHost determines whether reconciler should wait for host to be included into cluster
+// shouldWaitQueries determines whether reconciler should wait for the host to complete running queries
+func (w *worker) shouldWaitQueries() bool {
+	return chop.Config().Reconcile.Host.Wait.Queries.Value()
+}
+
+// shouldWaitIncludeHost determines whether reconciler should wait for the host to be included into cluster
 func (w *worker) shouldWaitIncludeHost(host *chiV1.ChiHost) bool {
 	status := host.GetReconcileAttributes().GetStatus()
 	switch {

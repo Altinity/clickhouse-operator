@@ -323,6 +323,7 @@ type OperatorConfigReconcileHost struct {
 // OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
 	Exclude *StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+	Queries *StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
 	Include *StringBool `json:"include,omitempty" yaml:"include,omitempty"`
 }
 

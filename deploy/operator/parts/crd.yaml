@@ -244,15 +244,16 @@ spec:
                 taskID:
                   type: string
                   description: |
-                    Allows to define custom taskID for named update operation and watch status of this update execution in .status.taskIDs field.
-                    By default every update of chi manifest will generate random taskID
+                    Allows to define custom taskID for CHI update and watch status of this update execution.
+                    Displayed in all .status.taskID* fields.
+                    By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
                   type: string
                   description: |
-                    Allow stop all ClickHouse clusters described in current chi.
-                    Stop mechanism works as follows:
-                     - When `stop` is `1` then setup `Replicas: 0` in each related to current `chi` StatefulSet resource, all `Pods` and `Service` resources will desctroy, but PVCs still live
-                     - When `stop` is `0` then `Pods` will created again and will attach retained PVCs and `Service` also will created again
+                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Works as the following:
+                     - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
+                     - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
@@ -280,30 +281,43 @@ spec:
                     - "enabled"
                 restart:
                   type: string
-                  description: "This is a 'soft restart' button. When set to 'RollingUpdate' operator will restart ClickHouse pods in a graceful way. Remove it after the use in order to avoid unneeded restarts"
+                  description: |
+                    In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
+                    This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
                   enum:
                     - ""
                     - "RollingUpdate"
                 troubleshoot:
                   <<: *TypeStringBool
-                  description: "allows troubleshoot Pods during CrashLoopBack state, when you apply wrong configuration, `clickhouse-server` wouldn't startup"
+                  description: |
+                    Allows to troubleshoot Pods during CrashLoopBack state.
+                    This may happen when wrong configuration applied, in this case `clickhouse-server` wouldn't start.
+                    Command within ClickHouse container is modified with `sleep` in order to avoid quick restarts
+                    and give time to troubleshoot via CLI.
+                    Liveness and Readiness probes are disabled as well.
                 namespaceDomainPattern:
                   type: string
-                  description: "custom domain suffix which will add to end of `Service` or `Pod` name, use it when you use custom cluster domain in your Kubernetes cluster"
+                  description: |
+                    Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+                    Typical use scenario - custom cluster domain in Kubernetes cluster
+                    Example: %s.svc.my.test
                 templating:
                   type: object
                   # nullable: true
-                  description: "optional, define policy for auto applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                  description: "Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)"
                   properties:
                     policy:
                       type: string
-                      description: "when defined as `auto` inside ClickhouseInstallationTemplate, it will auto add into all ClickHouseInstallation, manual value is default"
+                      description: |
+                        When defined as `auto` inside ClickhouseInstallationTemplate, this ClickhouseInstallationTemplate
+                        will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
+                        Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
                         - "auto"
                         - "manual"
                     chiSelector:
                       type: object
-                      description: "optional, define selector applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                      description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                 reconciling:
@@ -317,8 +331,8 @@ spec:
                     configMapPropagationTimeout:
                       type: integer
                       description: |
-                        timeout in seconds when `clickhouse-operator` will wait when applied `ConfigMap` during reconcile `ClickhouseInstallation` pods will updated from cache
-                        see details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
+                        Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
+                        More details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
                       minimum: 0
                       maximum: 3600
                     cleanup:
@@ -1417,15 +1431,16 @@ spec:
                 taskID:
                   type: string
                   description: |
-                    Allows to define custom taskID for named update operation and watch status of this update execution in .status.taskIDs field.
-                    By default every update of chi manifest will generate random taskID
+                    Allows to define custom taskID for CHI update and watch status of this update execution.
+                    Displayed in all .status.taskID* fields.
+                    By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
                   type: string
                   description: |
-                    Allow stop all ClickHouse clusters described in current chi.
-                    Stop mechanism works as follows:
-                     - When `stop` is `1` then setup `Replicas: 0` in each related to current `chi` StatefulSet resource, all `Pods` and `Service` resources will desctroy, but PVCs still live
-                     - When `stop` is `0` then `Pods` will created again and will attach retained PVCs and `Service` also will created again
+                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Works as the following:
+                     - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
+                     - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
@@ -1453,30 +1468,43 @@ spec:
                     - "enabled"
                 restart:
                   type: string
-                  description: "This is a 'soft restart' button. When set to 'RollingUpdate' operator will restart ClickHouse pods in a graceful way. Remove it after the use in order to avoid unneeded restarts"
+                  description: |
+                    In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
+                    This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
                   enum:
                     - ""
                     - "RollingUpdate"
                 troubleshoot:
                   <<: *TypeStringBool
-                  description: "allows troubleshoot Pods during CrashLoopBack state, when you apply wrong configuration, `clickhouse-server` wouldn't startup"
+                  description: |
+                    Allows to troubleshoot Pods during CrashLoopBack state.
+                    This may happen when wrong configuration applied, in this case `clickhouse-server` wouldn't start.
+                    Command within ClickHouse container is modified with `sleep` in order to avoid quick restarts
+                    and give time to troubleshoot via CLI.
+                    Liveness and Readiness probes are disabled as well.
                 namespaceDomainPattern:
                   type: string
-                  description: "custom domain suffix which will add to end of `Service` or `Pod` name, use it when you use custom cluster domain in your Kubernetes cluster"
+                  description: |
+                    Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+                    Typical use scenario - custom cluster domain in Kubernetes cluster
+                    Example: %s.svc.my.test
                 templating:
                   type: object
                   # nullable: true
-                  description: "optional, define policy for auto applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                  description: "Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)"
                   properties:
                     policy:
                       type: string
-                      description: "when defined as `auto` inside ClickhouseInstallationTemplate, it will auto add into all ClickHouseInstallation, manual value is default"
+                      description: |
+                        When defined as `auto` inside ClickhouseInstallationTemplate, this ClickhouseInstallationTemplate
+                        will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
+                        Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
                         - "auto"
                         - "manual"
                     chiSelector:
                       type: object
-                      description: "optional, define selector applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                      description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
                       # nullable: true
                       x-kubernetes-preserve-unknown-fields: true
                 reconciling:
@@ -1490,8 +1518,8 @@ spec:
                     configMapPropagationTimeout:
                       type: integer
                       description: |
-                        timeout in seconds when `clickhouse-operator` will wait when applied `ConfigMap` during reconcile `ClickhouseInstallation` pods will updated from cache
-                        see details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
+                        Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
+                        More details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
                       minimum: 0
                       maximum: 3600
                     cleanup:
@@ -2608,14 +2636,20 @@ spec:
                                 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet.
                     host:
                       type: object
-                      description: "allow define how to wait host include to system.cluster behavior during scale up and scale down cluster operations"
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+
                       properties:
                         wait:
                           type: object
                           properties:
                             exclude:  &TypeStringBool
                               type: string
-                              description: "wait when a pod will be removed from the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
                               enum:
                                 # List StringBoolXXX constants from model
                                 - ""
@@ -2641,9 +2675,12 @@ spec:
                                 - "disabled"
                                 - "Enabled"
                                 - "enabled"
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
                             include:
                               <<: *TypeStringBool
-                              description: "wait when a pod will be added to the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"

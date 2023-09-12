@@ -19,6 +19,7 @@ import (
 	"time"
 
 	coreV1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -55,6 +56,7 @@ func (w *worker) clean(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 	chi.EnsureStatus().SyncHostTablesCreated()
 }
 
+// dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
 func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -69,12 +71,7 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstalla
 		func(shard *chiV1.ChiShard) {
 		},
 		func(host *chiV1.ChiHost) {
-			var run *chiV1.ChiHost
-			if shard := host.GetShard(); shard != nil {
-				run = shard.FirstHost()
-			}
-
-			_ = w.dropReplica(ctx, run, host)
+			_ = w.dropReplica(ctx, host)
 			cnt++
 		},
 	)
@@ -331,7 +328,13 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 }
 
 // canDropReplica
-func (w *worker) canDropReplica(host *chiV1.ChiHost) (can bool) {
+func (w *worker) canDropReplica(host *chiV1.ChiHost, opts ...*dropReplicaOptions) (can bool) {
+	o := NewDropReplicaOptionsArr(opts...).First()
+
+	if o.ForceDrop() {
+		return true
+	}
+
 	can = true
 	w.c.walkDiscoveredPVCs(host, func(pvc *coreV1.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
@@ -344,34 +347,71 @@ func (w *worker) canDropReplica(host *chiV1.ChiHost) (can bool) {
 	return can
 }
 
-// dropReplica
-func (w *worker) dropReplica(ctx context.Context, hostToRun, hostToDrop *chiV1.ChiHost) error {
-	if (hostToRun == nil) || (hostToDrop == nil) {
-		w.a.V(1).F().Error("FAILED to drop replica. hostToRun:%s, hostToDrop:%s", hostToRun.GetName(), hostToDrop.GetName())
-		return nil
+type dropReplicaOptions struct {
+	forceDrop bool
+}
+
+func (o *dropReplicaOptions) ForceDrop() bool {
+	if o == nil {
+		return false
 	}
 
+	return o.forceDrop
+}
+
+type dropReplicaOptionsArr []*dropReplicaOptions
+
+func NewDropReplicaOptionsArr(opts ...*dropReplicaOptions) (res dropReplicaOptionsArr) {
+	return append(res, opts...)
+}
+
+func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
+	if len(a) > 0 {
+		return a[0]
+	}
+	return nil
+}
+
+// dropReplica drops replica's info from Zookeeper
+func (w *worker) dropReplica(ctx context.Context, hostToDrop *chiV1.ChiHost, opts ...*dropReplicaOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
-	if !w.canDropReplica(hostToDrop) {
-		w.a.V(1).F().Warning("UNABLE to drop replica. hostToRun:%s, hostToDrop:%s", hostToRun.GetName(), hostToDrop.GetName())
+
+	if hostToDrop == nil {
+		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop:%s", hostToDrop.GetName())
 		return nil
 	}
 
-	err := w.ensureClusterSchemer(hostToRun).HostDropReplica(ctx, hostToRun, hostToDrop)
+	if !w.canDropReplica(hostToDrop, opts...) {
+		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop:%s", hostToDrop.GetName())
+		return nil
+	}
+
+	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard
+	var hostToRunOn *chiV1.ChiHost
+	if shard := hostToDrop.GetShard(); shard != nil {
+		hostToRunOn = shard.FirstHost()
+	}
+
+	if hostToRunOn == nil {
+		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn:%s, hostToDrop:%s", hostToRunOn.GetName(), hostToDrop.GetName())
+		return nil
+	}
+
+	err := w.ensureClusterSchemer(hostToRunOn).HostDropReplica(ctx, hostToRunOn, hostToDrop)
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(hostToRun.CHI).
-			M(hostToRun).F().
+			WithEvent(hostToRunOn.CHI, eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(hostToRunOn.CHI).
+			M(hostToRunOn).F().
 			Info("Drop replica host %s in cluster %s", hostToDrop.GetName(), hostToDrop.Address.ClusterName)
 	} else {
-		w.a.WithEvent(hostToRun.CHI, eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(hostToRun.CHI).
-			M(hostToRun).F().
+		w.a.WithEvent(hostToRunOn.CHI, eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(hostToRunOn.CHI).
+			M(hostToRunOn).F().
 			Error("FAILED to drop replica on host %s with error %v", hostToDrop.GetName(), err)
 	}
 
@@ -611,4 +651,36 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 
 	// CHI's child resources were deleted
 	return true
+}
+
+func (w *worker) deleteLostPVC(ctx context.Context, pvc *coreV1.PersistentVolumeClaim) bool {
+	if pvc == nil {
+		return false
+	}
+
+	if pvc.Status.Phase != coreV1.ClaimLost {
+		return false
+	}
+
+	w.a.V(1).M(pvc).F().S().Info("delete lost PVC start: %s/%s", pvc.Namespace, pvc.Name)
+	defer w.a.V(1).M(pvc).F().E().Info("delete lost PVC end: %s/%s", pvc.Namespace, pvc.Name)
+
+	w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, newDeleteOptions())
+
+	for i := 0; i < 360; i++ {
+		curPVC, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
+		if err != nil {
+			if apiErrors.IsNotFound(err) {
+				return true
+			}
+		}
+		if len(curPVC.Finalizers) > 0 {
+			w.a.V(1).M(pvc).F().Info("clean finalizers for lost PVC: %s/%s", pvc.Namespace, pvc.Name)
+			curPVC.Finalizers = nil
+			w.c.updatePersistentVolumeClaim(ctx, curPVC)
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	return false
 }

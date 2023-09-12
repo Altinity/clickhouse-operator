@@ -48,6 +48,7 @@ def delete_test_namespace(self):
     util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
     shell.close()
 
+
 @TestStep(Given)
 def get_ch_version(self, test_file):
     current_dir = os.path.dirname(os.path.abspath(__file__))
