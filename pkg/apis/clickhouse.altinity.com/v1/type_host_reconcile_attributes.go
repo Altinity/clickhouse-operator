@@ -29,9 +29,12 @@ const (
 	StatefulSetStatusUnknown  StatefulSetStatus = "unknown"
 )
 
-// ChiHostReconcileAttributes defines host reconcile status
+// ChiHostReconcileAttributes defines host reconcile status and attributes
 type ChiHostReconcileAttributes struct {
 	status StatefulSetStatus
+
+	// Attributes are used by config generator
+
 	add    bool
 	remove bool
 	modify bool

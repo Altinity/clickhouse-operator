@@ -1368,50 +1368,62 @@ func (w *worker) createSecret(ctx context.Context, chi *chiV1.ClickHouseInstalla
 	return err
 }
 
-// getStatefulSetStatus
+// getStatefulSetStatus gets StatefulSet status
 func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.StatefulSetStatus {
 	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
 	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
 
-	// Check whether this object already exists in k8s
 	curStatefulSet, err := w.c.getStatefulSet(&meta, false)
+	switch {
+	case curStatefulSet != nil:
+		// Have StatefulSet available, try to perform label-based comparison
+		return w.getObjectStatusFromMetas(curStatefulSet.ObjectMeta, meta)
 
-	if curStatefulSet != nil {
-		// Try to perform label-based comparison
-		curLabel, curHasLabel := chopModel.GetObjectVersion(curStatefulSet.ObjectMeta)
-		newLabel, newHasLabel := chopModel.GetObjectVersion(meta)
-		if curHasLabel && newHasLabel {
-			if curLabel == newLabel {
-				w.a.M(meta).F().Info(
-					"cur and new StatefulSets ARE EQUAL based on labels. No StatefulSet reconcile is required for: %s",
-					util.NamespaceNameString(meta),
-				)
-				return chiV1.StatefulSetStatusSame
-			}
-			//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-			//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
-			//	//					return chop.StatefulSetStatusSame
-			//} else {
-			//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
-			//	//					return chop.StatefulSetStatusModified
-			//}
-			w.a.M(meta).F().Info(
-				"cur and new StatefulSets ARE DIFFERENT based on labels. StatefulSet reconcile is required for: %s",
-				util.NamespaceNameString(meta),
-			)
-			return chiV1.StatefulSetStatusModified
-		}
+	case apiErrors.IsNotFound(err):
+		// No cur StatefulSet available and it is not found - adding new one
+		return chiV1.StatefulSetStatusNew
+
+	default:
+		return chiV1.StatefulSetStatusUnknown
+	}
+}
+
+// getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
+func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) chiV1.StatefulSetStatus {
+	// Try to perform label-based version comparison
+	curVersion, curHasLabel := chopModel.GetObjectVersion(curMeta)
+	newVersion, newHasLabel := chopModel.GetObjectVersion(newMeta)
+
+	if !curHasLabel || !newHasLabel {
 		// No labels to compare, we can not say for sure what exactly is going on
 		return chiV1.StatefulSetStatusUnknown
 	}
 
-	// No cur StatefulSet available
+	//
+	// We have both set of labels, can compare both sets
+	//
 
-	if apiErrors.IsNotFound(err) {
-		return chiV1.StatefulSetStatusNew
+	if curVersion == newVersion {
+		w.a.M(newMeta).F().Info(
+			"cur and new ARE EQUAL based on labels. No reconcile is required for: %s",
+			util.NamespaceNameString(newMeta),
+		)
+		return chiV1.StatefulSetStatusSame
 	}
 
-	return chiV1.StatefulSetStatusUnknown
+	//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
+	//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
+	//	//					return chop.StatefulSetStatusSame
+	//} else {
+	//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
+	//	//					return chop.StatefulSetStatusModified
+	//}
+	w.a.M(newMeta).F().Info(
+		"cur and new ARE DIFFERENT based on labels. Reconcile is required for: %s",
+		util.NamespaceNameString(newMeta),
+	)
+
+	return chiV1.StatefulSetStatusModified
 }
 
 // createStatefulSet
