@@ -276,8 +276,6 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 
 // normalize
 func (w *worker) normalize(c *chiV1.ClickHouseInstallation) *chiV1.ClickHouseInstallation {
-	w.a.V(3).M(c).S().P()
-	defer w.a.V(3).M(c).E().P()
 
 	chi, err := w.normalizer.CreateTemplatedCHI(c, chopModel.NewNormalizerOptions())
 	if err != nil {
@@ -382,8 +380,11 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 	defer w.a.V(1).M(new).E().P()
 
 	if w.ensureFinalizer(context.Background(), new) {
-		w.a.M(new).F().Info("finalizer installed, let's restart reconcile cycle")
+		w.a.M(new).F().Info("finalizer installed, let's restart reconcile cycle. CHI: %s/%s", new.Namespace, new.Name)
+		w.a.M(new).F().Info("---------------------------------------------------------------------")
 		return nil
+	} else {
+		w.a.M(new).F().Info("finalizer in place, proceed to reconcile cycle. CHI: %s/%s", new.Namespace, new.Name)
 	}
 
 	if util.IsContextDone(ctx) {
@@ -425,7 +426,7 @@ func (w *worker) isCleanRestartOnTheSameIP(chi *chiV1.ClickHouseInstallation) bo
 	if !operatorIpIsTheSame {
 		// Operator has restarted on the different IP address.
 		// We may need to reconcile config files
-		log.V(1).Info("Operator IPs are different. Is NOT restart on the same IP")
+		log.V(1).Info("Operator IPs are different. It is NOT restart on the same IP")
 		return false
 	}
 
