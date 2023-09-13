@@ -197,7 +197,9 @@ type ChiHostReconcileAttributesCounters struct {
 
 // NewChiHostReconcileAttributesCounters creates new reconcile attributes
 func NewChiHostReconcileAttributesCounters() *ChiHostReconcileAttributesCounters {
-	return &ChiHostReconcileAttributesCounters{}
+	return &ChiHostReconcileAttributesCounters{
+		status: make(map[ObjectStatus]int),
+	}
 }
 
 // Add adds to counters provided ChiHostReconcileAttributes
