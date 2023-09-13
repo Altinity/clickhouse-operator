@@ -361,10 +361,12 @@ func (o *dropReplicaOptions) ForceDrop() bool {
 
 type dropReplicaOptionsArr []*dropReplicaOptions
 
+// NewDropReplicaOptionsArr creates new dropReplicaOptions array
 func NewDropReplicaOptionsArr(opts ...*dropReplicaOptions) (res dropReplicaOptionsArr) {
 	return append(res, opts...)
 }
 
+// First gets first option
 func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 	if len(a) > 0 {
 		return a[0]

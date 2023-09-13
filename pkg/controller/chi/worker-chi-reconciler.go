@@ -111,7 +111,13 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 	return nil
 }
 
-const ReconcileShardsAndHostsOptionsCtxKey = "ReconcileShardsAndHostsOptions"
+// ReconcileShardsAndHostsOptionsCtxKeyType specifies type for ReconcileShardsAndHostsOptionsCtxKey
+// More details here on why do we need special type
+// https://stackoverflow.com/questions/40891345/fix-should-not-use-basic-type-string-as-key-in-context-withvalue-golint
+type ReconcileShardsAndHostsOptionsCtxKeyType string
+
+// ReconcileShardsAndHostsOptionsCtxKey specifies name of the key to be used for ReconcileShardsAndHostsOptions
+const ReconcileShardsAndHostsOptionsCtxKey ReconcileShardsAndHostsOptionsCtxKeyType = "ReconcileShardsAndHostsOptions"
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
@@ -302,10 +308,12 @@ func (o *reconcileHostStatefulSetOptions) ForceRecreate() bool {
 
 type reconcileHostStatefulSetOptionsArr []*reconcileHostStatefulSetOptions
 
+// NewReconcileHostStatefulSetOptionsArr creates new reconcileHostStatefulSetOptions array
 func NewReconcileHostStatefulSetOptionsArr(opts ...*reconcileHostStatefulSetOptions) (res reconcileHostStatefulSetOptionsArr) {
 	return append(res, opts...)
 }
 
+// First gets first option
 func (a reconcileHostStatefulSetOptionsArr) First() *reconcileHostStatefulSetOptions {
 	if len(a) > 0 {
 		return a[0]
@@ -420,18 +428,20 @@ func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard, opts *Re
 		// For full fan-out scenarios use all available workers.
 		// Always allow at least 1 worker.
 		return int(math.Max(availableWorkers, 1))
-	} else {
-		// For non-full fan-out scenarios respect .Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent.
-		// Always allow at least 1 worker.
-		maxAllowedWorkers := math.Max(math.Round((maxConcurrencyPercent/_100Percent)*shardsNum), 1)
-		return int(math.Min(availableWorkers, maxAllowedWorkers))
 	}
+
+	// For non-full fan-out scenarios respect .Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent.
+	// Always allow at least 1 worker.
+	maxAllowedWorkers := math.Max(math.Round((maxConcurrencyPercent/_100Percent)*shardsNum), 1)
+	return int(math.Min(availableWorkers, maxAllowedWorkers))
 }
 
+// ReconcileShardsAndHostsOptions is and options for reconciler
 type ReconcileShardsAndHostsOptions struct {
 	fullFanOut bool
 }
 
+// FullFanOut gets value
 func (o *ReconcileShardsAndHostsOptions) FullFanOut() bool {
 	if o == nil {
 		return false

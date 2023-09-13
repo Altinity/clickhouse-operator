@@ -183,7 +183,7 @@ func (s *ChiHostReconcileAttributes) String() string {
 	)
 }
 
-// ChiHostReconcileAttributes defines host reconcile status and attributes
+// ChiHostReconcileAttributesCounters defines host reconcile status and attributes counters
 type ChiHostReconcileAttributesCounters struct {
 	status map[ObjectStatus]int
 
@@ -200,6 +200,7 @@ func NewChiHostReconcileAttributesCounters() *ChiHostReconcileAttributesCounters
 	return &ChiHostReconcileAttributesCounters{}
 }
 
+// Add adds to counters provided ChiHostReconcileAttributes
 func (s *ChiHostReconcileAttributesCounters) Add(a *ChiHostReconcileAttributes) {
 	if s == nil {
 		return
@@ -227,6 +228,7 @@ func (s *ChiHostReconcileAttributesCounters) Add(a *ChiHostReconcileAttributes) 
 	}
 }
 
+// GetAdd gets added
 func (s *ChiHostReconcileAttributesCounters) GetAdd() int {
 	if s == nil {
 		return 0
@@ -234,6 +236,7 @@ func (s *ChiHostReconcileAttributesCounters) GetAdd() int {
 	return s.add
 }
 
+// GetRemove gets removed
 func (s *ChiHostReconcileAttributesCounters) GetRemove() int {
 	if s == nil {
 		return 0
@@ -241,6 +244,7 @@ func (s *ChiHostReconcileAttributesCounters) GetRemove() int {
 	return s.remove
 }
 
+// GetModify gets modified
 func (s *ChiHostReconcileAttributesCounters) GetModify() int {
 	if s == nil {
 		return 0
@@ -248,6 +252,7 @@ func (s *ChiHostReconcileAttributesCounters) GetModify() int {
 	return s.modify
 }
 
+// GetFound gets found
 func (s *ChiHostReconcileAttributesCounters) GetFound() int {
 	if s == nil {
 		return 0

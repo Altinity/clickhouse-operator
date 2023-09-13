@@ -818,10 +818,12 @@ func (o *migrateTableOptions) DropReplica() bool {
 
 type migrateTableOptionsArr []*migrateTableOptions
 
+// NewMigrateTableOptionsArr creates new migrateTableOptions array
 func NewMigrateTableOptionsArr(opts ...*migrateTableOptions) (res migrateTableOptionsArr) {
 	return append(res, opts...)
 }
 
+// First gets first option
 func (a migrateTableOptionsArr) First() *migrateTableOptions {
 	if len(a) > 0 {
 		return a[0]

@@ -28,6 +28,7 @@ var (
 	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
 )
 
+// ErrorPVC specifies errors of the PVC operations
 type ErrorPVC error
 
 var (
