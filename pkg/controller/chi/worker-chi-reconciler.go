@@ -111,6 +111,8 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 	return nil
 }
 
+const ReconcileShardsAndHostsOptionsCtxKey = "ReconcileShardsAndHostsOptions"
+
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
@@ -120,6 +122,19 @@ func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
+
+	counters := chiV1.NewChiHostReconcileAttributesCounters()
+	chi.WalkHosts(func(host *chiV1.ChiHost) error {
+		counters.Add(host.GetReconcileAttributes())
+		return nil
+	})
+
+	if counters.GetAdd() > 0 && counters.GetFound() == 0 && counters.GetModify() == 0 && counters.GetRemove() == 0 {
+		w.a.V(1).M(chi).Info("Looks like we are just adding hosts to a new CHI. Enabling full fan-out mode. CHI: %s/%s", chi.Namespace, chi.Name)
+		ctx = context.WithValue(ctx, ReconcileShardsAndHostsOptionsCtxKey, &ReconcileShardsAndHostsOptions{
+			fullFanOut: true,
+		})
+	}
 
 	return chi.WalkTillError(
 		ctx,
@@ -432,7 +447,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 	}
 
 	// Try to fetch options
-	opts, ok := ctx.Value("ReconcileShardsAndHostsOptions").(*ReconcileShardsAndHostsOptions)
+	opts, ok := ctx.Value(ReconcileShardsAndHostsOptionsCtxKey).(*ReconcileShardsAndHostsOptions)
 	if !ok {
 		opts = &ReconcileShardsAndHostsOptions{}
 	}
