@@ -1400,7 +1400,7 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) ch
 	}
 
 	//
-	// We have both set of labels, can compare both sets
+	// We have both set of labels, can compare them
 	//
 
 	if curVersion == newVersion {
