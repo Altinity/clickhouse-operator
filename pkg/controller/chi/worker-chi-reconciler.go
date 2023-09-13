@@ -52,8 +52,11 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 	defer w.a.M(new).E().P()
 
 	if new.HasAncestor() {
-		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile")
+		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile. CHI: %s/%s", new.Namespace, new.Name)
 		old = new.GetAncestor()
+	} else {
+		w.a.M(new).F().Info("has NO ancestor, use empty CHI as a base for reconcile. CHI: %s/%s", new.Namespace, new.Name)
+		old = nil
 	}
 
 	old = w.normalize(old)
@@ -458,7 +461,10 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 
 	// Try to fetch options
 	opts, ok := ctx.Value(ReconcileShardsAndHostsOptionsCtxKey).(*ReconcileShardsAndHostsOptions)
-	if !ok {
+	if ok {
+		w.a.V(1).Info("found ReconcileShardsAndHostsOptionsCtxKey")
+	} else {
+		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
 		opts = &ReconcileShardsAndHostsOptions{}
 	}
 
@@ -467,10 +473,12 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 	if opts.FullFanOut() {
 		// For full fan-out scenarios we'll start shards processing from the very beginning
 		startShard = 0
+		w.a.V(1).Info("full fan-out requested")
 	} else {
 		// For non-full fan-out scenarios, we'll process the first shard separately.
 		// This gives us some early indicator of whether the reconciliation would fail,
 		// and for large clusters it is a small price to pay before performing concurrent fan-out.
+		w.a.V(1).Info("starting first shard separately")
 		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
 			return err
 		}
@@ -482,6 +490,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
 	// Loop over shards.
 	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
+	w.a.V(1).Info("starting rest of shards shard on workers: %d", workersNum)
 	for startShardIndex := startShard; startShardIndex < len(shards); startShardIndex += workersNum {
 		endShardIndex := startShardIndex + workersNum
 		if endShardIndex > len(shards) {
