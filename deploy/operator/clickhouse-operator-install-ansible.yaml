@@ -3196,7 +3196,7 @@ data:
         # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
     
         # Max number of concurrent shard reconciles within one CHI in progress
-        reconcileShardsThreadsNumber: 1
+        reconcileShardsThreadsNumber: 10
         # Max percentage of concurrent shard reconciles within one CHI in progress
         reconcileShardsMaxConcurrencyPercent: 50
     
