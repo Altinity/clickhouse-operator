@@ -395,79 +395,110 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard) int {
-	maxAvailableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
-	maxPct := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
-	_100Pct := float64(100)
+func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard, opts *ReconcileShardsAndHostsOptions) int {
+	availableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
+	maxConcurrencyPercent := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
+	_100Percent := float64(100)
 	shardsNum := float64(len(shards))
 
-	// Always allow at least 1 worker
-	maxAllowedWorkers := math.Max(math.Round((maxPct/_100Pct)*shardsNum), 1)
-	return int(math.Min(maxAvailableWorkers, maxAllowedWorkers))
+	if opts.FullFanOut() {
+		// For full fan-out scenarios use all available workers.
+		// Always allow at least 1 worker.
+		return int(math.Max(availableWorkers, 1))
+	} else {
+		// For non-full fan-out scenarios respect .Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent.
+		// Always allow at least 1 worker.
+		maxAllowedWorkers := math.Max(math.Round((maxConcurrencyPercent/_100Percent)*shardsNum), 1)
+		return int(math.Min(availableWorkers, maxAllowedWorkers))
+	}
+}
+
+type ReconcileShardsAndHostsOptions struct {
+	fullFanOut bool
+}
+
+func (o *ReconcileShardsAndHostsOptions) FullFanOut() bool {
+	if o == nil {
+		return false
+	}
+	return o.fullFanOut
 }
 
 // reconcileShardsAndHosts reconciles shards and hosts of each shard
 func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.ChiShard) error {
+	// Sanity check - CHI has to have shard(s)
 	if len(shards) == 0 {
 		return nil
 	}
 
-	// Always process the first shard first (and all of its hosts). This gives us some early indicator of whether
-	// the reconciliation would fail, and for large clusters is small price to pay before performing concurrent fan-out.
-	firstShard := shards[0]
-	if err := w.reconcileShard(ctx, firstShard); err != nil {
-		return err
+	// Try to fetch options
+	opts, ok := ctx.Value("ReconcileShardsAndHostsOptions").(*ReconcileShardsAndHostsOptions)
+	if !ok {
+		opts = &ReconcileShardsAndHostsOptions{}
 	}
-	for _, host := range firstShard.Hosts {
-		if err := w.reconcileHost(ctx, host); err != nil {
+
+	// Which shard to start concurrent processing with
+	var startShard int
+	if opts.FullFanOut() {
+		// For full fan-out scenarios we'll start shards processing from the very beginning
+		startShard = 0
+	} else {
+		// For non-full fan-out scenarios, we'll process the first shard separately.
+		// This gives us some early indicator of whether the reconciliation would fail,
+		// and for large clusters it is a small price to pay before performing concurrent fan-out.
+		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
 			return err
 		}
+
+		// Since shard with 0 index is already done, we'll proceed with 1-st
+		startShard = 1
 	}
 
-	// If we're working on a single-shard cluster, we are done.
-	if len(shards) == 1 {
-		return nil
-	}
-
-	// Otherwise, we process the remaining n-1 shards using the configured concurrency level while maintaining
-	// the configured max concurrency percentage.
-	// The default behavior is no concurrency, but this can be adjusted in operating reconciliation runtime settings.
-	workerCount := w.getReconcileShardsWorkersNum(shards)
-	for i := 1; i < len(shards); i += workerCount {
-		endIdx := i + workerCount
-		if endIdx > len(shards) {
-			endIdx = len(shards)
+	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
+	// Loop over shards.
+	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
+	for startShardIndex := startShard; startShardIndex < len(shards); startShardIndex += workersNum {
+		endShardIndex := startShardIndex + workersNum
+		if endShardIndex > len(shards) {
+			endShardIndex = len(shards)
 		}
-		concurrentChunk := shards[i:endIdx]
+		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
+
+		// Processing error protected with mutex
+		var err error
+		var errLock sync.Mutex
 
 		wg := sync.WaitGroup{}
-		wg.Add(len(concurrentChunk))
-		var anyErr error
-		var anyErrLock sync.Mutex
-		for j := range concurrentChunk {
-			thisShard := concurrentChunk[j] // goroutine var
+		wg.Add(len(concurrentlyProcessedShards))
+		// Launch shard concurrent processing
+		for j := range concurrentlyProcessedShards {
+			shard := concurrentlyProcessedShards[j]
 			go func() {
 				defer wg.Done()
-				if err := w.reconcileShard(ctx, thisShard); err != nil {
-					anyErrLock.Lock()
-					anyErr = err
-					anyErrLock.Unlock()
+				if e := w.reconcileShardWithHosts(ctx, shard); e != nil {
+					errLock.Lock()
+					err = e
+					errLock.Unlock()
 					return
-				}
-				for replicaIndex := range thisShard.Hosts {
-					host := thisShard.Hosts[replicaIndex]
-					if err := w.reconcileHost(ctx, host); err != nil {
-						anyErrLock.Lock()
-						anyErr = err
-						anyErrLock.Unlock()
-						return
-					}
 				}
 			}()
 		}
 		wg.Wait()
-		if anyErr != nil {
-			return anyErr
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (w *worker) reconcileShardWithHosts(ctx context.Context, shard *chiV1.ChiShard) error {
+	if err := w.reconcileShard(ctx, shard); err != nil {
+		return err
+	}
+	for replicaIndex := range shard.Hosts {
+		host := shard.Hosts[replicaIndex]
+		if err := w.reconcileHost(ctx, host); err != nil {
+			return err
 		}
 	}
 	return nil
