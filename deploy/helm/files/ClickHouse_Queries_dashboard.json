@@ -44,7 +44,7 @@
       "type": "datasource",
       "id": "vertamedia-clickhouse-datasource",
       "name": "ClickHouse",
-      "version": "2.5.3"
+      "version": "2.5.4"
     }
   ],
   "annotations": {
