@@ -1221,17 +1221,17 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 
 
 @TestScenario
-@Name("test_014. Test that schema is correctly propagated on replicas")
+@Name("test_014_0. Test that schema is correctly propagated on replicas")
 @Requirements(
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper("1.0"),
     RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters("1.0"),
 )
-def test_014(self):
+def test_014_0(self):
     create_shell_namespace_clickhouse_template()
 
     util.require_keeper(keeper_type=self.context.keeper_type)
 
-    manifest = "manifests/chi/test-014-replication-1.yaml"
+    manifest = "manifests/chi/test-014-0-replication-1.yaml"
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
     shards = [0, 1]
@@ -1384,7 +1384,7 @@ def test_014(self):
     # replicas = [1]
     replicas = [1, 2]
     with When(f"Add {len(replicas)} more replicas"):
-        manifest = f"manifests/chi/test-014-replication-{1+len(replicas)}.yaml"
+        manifest = f"manifests/chi/test-014-0-replication-{1+len(replicas)}.yaml"
         chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
@@ -1405,7 +1405,7 @@ def test_014(self):
         check_schema_propagation(replicas)
 
     with When("Remove replicas"):
-        manifest = "manifests/chi/test-014-replication-1.yaml"
+        manifest = "manifests/chi/test-014-0-replication-1.yaml"
         chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
         chi = yaml_manifest.get_manifest_data(util.get_full_path(manifest))
         kubectl.create_and_check(
@@ -1454,7 +1454,7 @@ def test_014(self):
             clickhouse.query(chi_name, "INSERT INTO test_local_014 VALUES(3)")
 
     with When("Add replica one more time"):
-        manifest = "manifests/chi/test-014-replication-2.yaml"
+        manifest = "manifests/chi/test-014-0-replication-2.yaml"
         chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
@@ -1476,7 +1476,7 @@ def test_014(self):
         with Then(
             f"Tables should be deleted in {self.context.keeper_type}. We can test it re-creating the chi and checking {self.context.keeper_type} contents"
         ):
-            manifest = "manifests/chi/test-014-replication-1.yaml"
+            manifest = "manifests/chi/test-014-0-replication-1.yaml"
             kubectl.create_and_check(
                 manifest=manifest,
                 check={
@@ -1520,6 +1520,7 @@ def test_014_1(self):
         },
         timeout=600,
     )
+    kubectl.wait_chi_status("test-014-1-replication", "Completed")
 
     create_table = "CREATE TABLE test_local_014_1 ON CLUSTER '{cluster}' (a Int8, r UInt64) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/{table}', '{replica}') ORDER BY tuple()"
     table = "test_local_014_1"
@@ -1568,6 +1569,7 @@ def test_014_1(self):
                 "do_not_delete": 1,
             },
         )
+        kubectl.wait_chi_status("test-014-1-replication", "Completed")
 
         with Then("FQDN should be used as interserver_http_host"):
             for replica in replicas:
