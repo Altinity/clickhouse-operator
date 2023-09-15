@@ -8,6 +8,7 @@ spec:
   configuration:
     users:
       # default user should be security to localhost and interhost connections
+      # operator adds IP addresses of pods
       # operator creates host_regxp expression for that
       # default/networks/host_regexp: \.chi-test-011-secure-user-[^.]+-\d+-\d+\.test.svc.cluster.local$
       default/profile: default

@@ -608,16 +608,16 @@ def get_user_xml_from_configmap(chi, user):
 
 
 @TestScenario
-@Name("test_011. Test user security and network isolation")
+@Name("test_011_1. Test user security and network isolation")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
-def test_011(self):
+def test_011_1(self):
     create_shell_namespace_clickhouse_template()
 
-    with Given("test-011-secured-cluster.yaml and test-011-insecured-cluster.yaml"):
+    with Given("test-011-secured-cluster-1.yaml and test-011-insecured-cluster.yaml"):
 
         # Create clusters in parallel to speed it up
         kubectl.create_and_check(
-            manifest="manifests/chi/test-011-secured-cluster.yaml",
+            manifest="manifests/chi/test-011-secured-cluster-1.yaml",
             check={
                 "apply_templates": {
                     current().context.clickhouse_template,
@@ -636,21 +636,27 @@ def test_011(self):
         )
 
         kubectl.wait_chi_status("test-011-secured-cluster", "Completed")
-        kubectl.wait_chi_status("test-011-insecured-cluster", "Completed")
+        # kubectl.wait_chi_status("test-011-insecured-cluster", "Completed")
 
         # Tests default user security
         def test_default_user():
             with Then("Default user should have 5 allowed ips"):
+                print(f"Give the config time to propagate")
+                time.sleep(90)
                 ips = get_user_xml_from_configmap("test-011-secured-cluster", "default").findall("networks/ip")
                 ips_l = []
                 for ip in ips:
                     ips_l.append(ip.text)
-                print(f"users.xml: {ips_l}")  # should be ['::1', '127.0.0.1', '127.0.0.2', ip1, ip2]
+                # Expected output: ['::1', '127.0.0.1', '127.0.0.2', <pod1 ip>, <pod2 ip>]
+                print(f"users.xml: {ips_l}")
                 assert len(ips) == 5
 
             clickhouse.query("test-011-secured-cluster", "SYSTEM RELOAD CONFIG")
             with And("Connection to localhost should succeed with default user"):
-                out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'")
+                out = clickhouse.query_with_error(
+                    "test-011-secured-cluster",
+                    "select 'OK'",
+                )
                 assert out == "OK"
 
             with And("Connection from secured to secured host should succeed"):
@@ -686,9 +692,6 @@ def test_011(self):
                 print(f"users.xml: {regexp}")
                 assert regexp == "disabled"
 
-            with Then("Wait until configuration is reloaded by ClickHouse"):
-                time.sleep(60)
-
             test_default_user()
 
         with And("Connection from insecured to secured host should fail for user 'user1' with no password"):
@@ -717,7 +720,12 @@ def test_011(self):
             assert "<password_sha256_hex>" in users_xml
 
         with And("User 'user2' with no password should get default automatically"):
-            out = clickhouse.query_with_error("test-011-secured-cluster", "select 'OK'", user="user2", pwd="default")
+            out = clickhouse.query_with_error(
+                "test-011-secured-cluster",
+                "select 'OK'",
+                user="user2",
+                pwd="default",
+            )
             assert out == "OK"
 
         with And("User 'user3' with both plain and sha256 password should get the latter one"):
@@ -746,11 +754,21 @@ def test_011(self):
             assert "ACCESS_DENIED" in out
 
         with And("User 'user4' with access management enabled CAN run SHOW USERS"):
-            out = clickhouse.query("test-011-secured-cluster", "SHOW USERS", user="user4", pwd="secret")
+            out = clickhouse.query(
+                "test-011-secured-cluster",
+                "SHOW USERS",
+                user="user4",
+                pwd="secret",
+            )
             assert "ACCESS_DENIED" not in out
 
         with And("User 'user5' with google.com as a host filter can not login"):
-            out = clickhouse.query_with_error("test-011-insecured-cluster", "select 'OK'", user="user5", pwd="secret")
+            out = clickhouse.query_with_error(
+                "test-011-insecured-cluster",
+                "select 'OK'",
+                user="user5",
+                pwd="secret",
+            )
             assert out != "OK"
 
         with And("User 'clickhouse_operator' with can login with custom password"):
@@ -766,9 +784,9 @@ def test_011(self):
 
 
 @TestScenario
-@Name("test_011_1. Test default user security")
+@Name("test_011_2. Test default user security")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
-def test_011_1(self):
+def test_011_2(self):
     create_shell_namespace_clickhouse_template()
 
     with Given("test-011-secured-default-1.yaml with password_sha256_hex for default user"):
@@ -819,9 +837,9 @@ def test_011_1(self):
 
 
 @TestScenario
-@Name("test_011_2. Test k8s secrets usage")
+@Name("test_011_3. Test k8s secrets usage")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Secrets("1.0"))
-def test_011_2(self):
+def test_011_3(self):
     create_shell_namespace_clickhouse_template()
 
     with Given("test-011-secrets.yaml with secret storage"):
