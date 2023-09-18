@@ -636,7 +636,7 @@ def test_011_1(self):
         )
 
         kubectl.wait_chi_status("test-011-secured-cluster", "Completed")
-        # kubectl.wait_chi_status("test-011-insecured-cluster", "Completed")
+        kubectl.wait_chi_status("test-011-insecured-cluster", "Completed")
 
         # Tests default user security
         def test_default_user():
@@ -682,8 +682,6 @@ def test_011_1(self):
                 manifest="manifests/chi/test-011-secured-cluster-2.yaml",
                 check={"do_not_delete": 1},
             )
-            # Double check
-            kubectl.wait_chi_status("test-011-secured-cluster", "Completed")
 
             with Then("Make sure host_regexp is disabled"):
                 regexp = (
@@ -1254,7 +1252,6 @@ def test_014_0(self):
         },
         timeout=600,
     )
-    kubectl.wait_chi_status(chi_name, "Completed", retries=20)
 
     start_time = kubectl.get_field("pod", f"chi-{chi_name}-{cluster}-0-0-0", ".status.startTime")
 
@@ -1395,7 +1392,6 @@ def test_014_0(self):
             },
             timeout=600,
         )
-        kubectl.wait_chi_status(chi_name, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
 
@@ -1416,7 +1412,6 @@ def test_014_0(self):
                 "do_not_delete": 1,
             },
         )
-        kubectl.wait_chi_status(chi_name, "Completed", retries=20)
         with Then("Replica is removed from remote_servers.xml as well"):
             assert get_replicas_from_remote_servers(chi_name, cluster) == 1
 
@@ -1465,7 +1460,6 @@ def test_014_0(self):
             },
             timeout=600,
         )
-        kubectl.wait_chi_status(chi_name, "Completed", retries=20)
         # Give some time for replication to catch up
         time.sleep(10)
         check_schema_propagation([1])
@@ -1485,7 +1479,6 @@ def test_014_0(self):
                     "do_not_delete": 1,
                 },
             )
-            kubectl.wait_chi_status(chi_name, "Completed", retries=20)
             with Then("Tables are deleted in ZooKeeper"):
                 out = clickhouse.query_with_error(
                     chi_name,
@@ -1520,7 +1513,6 @@ def test_014_1(self):
         },
         timeout=600,
     )
-    kubectl.wait_chi_status("test-014-1-replication", "Completed")
 
     create_table = "CREATE TABLE test_local_014_1 ON CLUSTER '{cluster}' (a Int8, r UInt64) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/{table}', '{replica}') ORDER BY tuple()"
     table = "test_local_014_1"
@@ -1528,6 +1520,8 @@ def test_014_1(self):
 
     with Given("Create schema objects"):
         clickhouse.query(chi, create_table)
+        # Give some time for replication to catch up
+        time.sleep(30)
 
     def check_data_is_replicated(replicas, v):
         with When("Data is inserted on two replicas"):
@@ -1537,9 +1531,8 @@ def test_014_1(self):
                     f"INSERT INTO {table} values({v}, rand())",
                     host=f"chi-{chi}-{cluster}-0-{replica}",
                 )
-
             # Give some time for replication to catch up
-            time.sleep(10)
+            time.sleep(30)
 
             with Then("Data is replicated"):
                 for replica in replicas:
@@ -1569,7 +1562,6 @@ def test_014_1(self):
                 "do_not_delete": 1,
             },
         )
-        kubectl.wait_chi_status("test-014-1-replication", "Completed")
 
         with Then("FQDN should be used as interserver_http_host"):
             for replica in replicas:
@@ -1619,9 +1611,12 @@ def test_015(self):
                 break
             print(f"DNS_ERROR. Wait for {i * 5} seconds")
             time.sleep(i * 5)
+        print(f"out: {out}")
         assert out == "1"
 
     with And("Distributed query should work"):
+        # Sometimes it needs time to work. May be forming a cluster may take unpredictable time.
+        time.sleep(45)
         out = clickhouse.query_with_error(
             "test-015-host-network",
             host="chi-test-015-host-network-default-0-0",
@@ -1629,6 +1624,7 @@ def test_015(self):
             sql="SELECT count() FROM cluster('all-sharded', system.one) settings receive_timeout=10",
         )
         note(f"cluster out:\n{out}")
+        print(f"out: {out}")
         assert out == "2"
 
     delete_test_namespace()
