@@ -225,7 +225,8 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHos
 		return nil
 	}
 
-	log.V(1).M(host).F().Info("Migrating schema objects to host %s", host.Address.HostName)
+	log.V(1).M(host).F().S().Info("Migrating schema objects to host %s", host.Address.HostName)
+	defer log.V(1).M(host).F().E().Info("Migrating schema objects to host %s", host.Address.HostName)
 
 	replicatedObjectNames,
 		replicatedCreateSQLs,
@@ -234,14 +235,14 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHos
 
 	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
-		log.V(2).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, replicatedObjectNames)
+		log.V(1).M(host).F().Info("Creating replicated objects at %s: %v", host.Address.HostName, replicatedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", replicatedCreateSQLs)
 		err1 = s.ExecHost(ctx, host, replicatedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 	}
 
 	var err2 error
 	if len(distributedCreateSQLs) > 0 {
-		log.V(2).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, distributedObjectNames)
+		log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, distributedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", distributedCreateSQLs)
 		err2 = s.ExecHost(ctx, host, distributedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 	}
