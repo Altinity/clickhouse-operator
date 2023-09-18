@@ -286,7 +286,7 @@ func (w *worker) normalize(c *chiV1.ClickHouseInstallation) *chiV1.ClickHouseIns
 	}
 
 	ips := w.c.getPodsIPs(chi)
-	w.a.V(1).M(chi).Info("IPs of the CHI %s/%s: %v", chi.Namespace, chi.Name, ips)
+	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 	opts := chopModel.NewNormalizerOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
@@ -334,13 +334,15 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiV1.ClickHouseInsta
 func (w *worker) updateEndpoints(ctx context.Context, old, new *coreV1.Endpoints) error {
 
 	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, chopModel.NewNormalizerOptions()); err == nil {
-		w.a.V(2).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
+		w.a.V(1).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
-		w.a.V(1).M(chi).Info("IPs of the CHI-1 %v", ips)
+		w.a.V(1).M(chi).Info("IPs of the CHI-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := chopModel.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
+
+			// TODO unify with finalize reconcile
 			w.newTask(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
@@ -509,8 +511,8 @@ func (w *worker) isGenerationTheSame(old, new *chiV1.ClickHouseInstallation) boo
 
 // logCHI writes a CHI into the log
 func (w *worker) logCHI(name string, chi *chiV1.ClickHouseInstallation) {
-	w.a.V(2).M(chi).Info(
-		"%s CHI start--------------------------------------------:\n%s\n%s CHI end--------------------------------------------",
+	w.a.V(1).M(chi).Info(
+		"logCHI %s start--------------------------------------------:\n%s\nlogCHI %s end--------------------------------------------",
 		name,
 		name,
 		chi.YAML(chiV1.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}),
@@ -615,9 +617,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ch
 
 	// Update CHI object
 	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, chopModel.NewNormalizerOptions()); err == nil {
-		w.a.V(2).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
+		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
-		w.a.V(1).M(chi).Info("IPs of the CHI-2 %v", ips)
+		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := chopModel.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
@@ -625,6 +627,9 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ch
 			chi.SetAncestor(chi.GetTarget())
 			chi.SetTarget(nil)
 			chi.EnsureStatus().ReconcileComplete()
+			// TODO unify with update endpoints
+			w.newTask(chi)
+			w.reconcileCHIConfigMapUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: chiV1.CopyCHIStatusOptions{
 					WholeStatus: true,
@@ -923,23 +928,26 @@ func (w *worker) excludeHost(ctx context.Context, host *chiV1.ChiHost) error {
 		return nil
 	}
 
-	if w.shouldExcludeHost(host) {
-		w.a.V(1).
-			M(host).F().
-			Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-
-		_ = w.excludeHostFromService(ctx, host)
-		w.excludeHostFromClickHouseCluster(ctx, host)
+	if !w.shouldExcludeHost(host) {
+		return nil
 	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("Exclude from cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
+	_ = w.excludeHostFromService(ctx, host)
+	w.excludeHostFromClickHouseCluster(ctx, host)
 	return nil
 }
 
 // completeQueries wait for running queries to complete
 func (w *worker) completeQueries(ctx context.Context, host *chiV1.ChiHost) error {
-	if w.shouldWaitQueries() {
-		return w.waitHostNoActiveQueries(ctx, host)
+	if !w.shouldWaitQueries(host) {
+		return nil
 	}
-	return nil
+
+	return w.waitHostNoActiveQueries(ctx, host)
 }
 
 // shouldIncludeHost determines whether host to be included into cluster after reconciling
@@ -959,14 +967,19 @@ func (w *worker) includeHost(ctx context.Context, host *chiV1.ChiHost) error {
 		return nil
 	}
 
-	if w.shouldIncludeHost(host) {
+	if !w.shouldIncludeHost(host) {
 		w.a.V(1).
 			M(host).F().
-			Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-
-		w.includeHostIntoClickHouseCluster(ctx, host)
-		_ = w.includeHostIntoService(ctx, host)
+			Info("No need to include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return nil
 	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("Include into cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+
+	w.includeHostIntoClickHouseCluster(ctx, host)
+	_ = w.includeHostIntoService(ctx, host)
 
 	return nil
 }
@@ -990,8 +1003,8 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *chiV1.ChiHost
 		return nil
 	}
 
-	_ = w.c.appendLabelReadyPod(ctx, host)
-	_ = w.c.appendAnnotationReadyService(ctx, host)
+	_ = w.c.appendLabelReadyOnPod(ctx, host)
+	_ = w.c.appendAnnotationReadyOnService(ctx, host)
 	return nil
 }
 
@@ -1026,10 +1039,12 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 	// Add host to the cluster config
 	options := w.options()
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
-	// Wait for ClickHouse to pick-up the change
-	if w.shouldWaitIncludeHost(host) {
-		_ = w.waitHostInCluster(ctx, host)
+
+	if !w.shouldWaitIncludeHost(host) {
+		return
 	}
+	// Wait for ClickHouse to pick-up the change
+	_ = w.waitHostInCluster(ctx, host)
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
@@ -1092,8 +1107,24 @@ func (w *worker) shouldWaitExcludeHost(host *chiV1.ChiHost) bool {
 }
 
 // shouldWaitQueries determines whether reconciler should wait for the host to complete running queries
-func (w *worker) shouldWaitQueries() bool {
-	return chop.Config().Reconcile.Host.Wait.Queries.Value()
+func (w *worker) shouldWaitQueries(host *chiV1.ChiHost) bool {
+	switch {
+	case host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew:
+		w.a.V(1).
+			M(host).F().
+			Info("No need to wait for queries to complete, host is a new one host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return false
+	case chop.Config().Reconcile.Host.Wait.Queries.Value():
+		w.a.V(1).
+			M(host).F().
+			Info("Will wait for queries to complete according to CHOp config setting, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return true
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("Will NOT wait for queries to complete host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+	return false
 }
 
 // shouldWaitIncludeHost determines whether reconciler should wait for the host to be included into cluster
