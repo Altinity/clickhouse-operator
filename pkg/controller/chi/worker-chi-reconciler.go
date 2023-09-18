@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 
 	coreV1 "k8s.io/api/core/v1"
 	policyV1 "k8s.io/api/policy/v1"
@@ -59,8 +60,12 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		old = nil
 	}
 
+	w.a.M(new).F().Info("Normalize OLD CHI: %s/%s", new.Namespace, new.Name)
 	old = w.normalize(old)
+
+	w.a.M(new).F().Info("Normalize NEW CHI: %s/%s", new.Namespace, new.Name)
 	new = w.normalize(new)
+
 	new.SetAncestor(old)
 	w.logOldAndNew("normalized", old, new)
 
@@ -289,6 +294,7 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *chiV1.ChiHo
 		return "not applicable"
 	}
 
+	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s", host.GetName())
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
 	if err != nil {
 		return "failed to query"
@@ -373,8 +379,10 @@ func (w *worker) reconcileHostService(ctx context.Context, host *chiV1.ChiHost) 
 	}
 	err := w.reconcileService(ctx, host.CHI, service)
 	if err == nil {
+		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host %s.", host.GetName())
 		w.task.registryReconciled.RegisterService(service.ObjectMeta)
 	} else {
+		w.a.V(1).M(host).F().Warning("FAILED Reconcile service of the host %s.", host.GetName())
 		w.task.registryFailed.RegisterService(service.ObjectMeta)
 	}
 	return err
@@ -476,14 +484,14 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 		w.a.V(1).Info("full fan-out requested")
 	} else {
 		// For non-full fan-out scenarios, we'll process the first shard separately.
-		// This gives us some early indicator of whether the reconciliation would fail,
+		// This gives us some early indicator on whether the reconciliation would fail,
 		// and for large clusters it is a small price to pay before performing concurrent fan-out.
 		w.a.V(1).Info("starting first shard separately")
 		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
 			return err
 		}
 
-		// Since shard with 0 index is already done, we'll proceed with 1-st
+		// Since shard with 0 index is already done, we'll proceed with the 1-st
 		startShard = 1
 	}
 
@@ -620,7 +628,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	_ = w.reconcileHostService(ctx, host)
 
 	host.GetReconcileAttributes().UnsetAdd()
-
+	// Sometimes service needs some time to start after creation before being accessible for usage
+	time.Sleep(30 * time.Second)
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {
