@@ -185,7 +185,7 @@ reconcile:
   # Reconcile runtime settings
   runtime:
     # Max number of concurrent CHI reconciles in progress
-    reconcileCHIsThreadsNumber: 1
+    reconcileCHIsThreadsNumber: 10
 
     # The operator reconciles shards concurrently in each CHI with the following limitations:
     #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
@@ -196,7 +196,7 @@ reconcile:
     # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
 
     # Max number of concurrent shard reconciles within one CHI in progress
-    reconcileShardsThreadsNumber: 1
+    reconcileShardsThreadsNumber: 5
     # Max percentage of concurrent shard reconciles within one CHI in progress
     reconcileShardsMaxConcurrencyPercent: 50
 
@@ -232,13 +232,14 @@ reconcile:
 
   # Reconcile Host scenario
   host:
-    # Whether the operation during reconcile procedure should wait for a host:
-    # - to be excluded from a cluster
-    # OR
-    # - to be included into a cluster
-    # respectfully before proceeding to the host reconciliation.
+    # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+    #   - to be excluded from a ClickHouse cluster
+    #   - to complete all running queries
+    #   - to be included into a ClickHouse cluster
+    # respectfully before moving forward
     wait:
       exclude: true
+      queries: true
       include: false
 
 ################################################
