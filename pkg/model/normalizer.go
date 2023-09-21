@@ -53,7 +53,7 @@ func NewNormalizerContext(options *NormalizerOptions) *NormalizerContext {
 
 // NormalizerOptions specifies normalization options
 type NormalizerOptions struct {
-	// WithDefaultCluster specifies whether should insert default cluster if no cluster specified
+	// WithDefaultCluster specifies whether to insert default cluster in case no cluster specified
 	WithDefaultCluster bool
 	// DefaultUserAdditionalIPs specifies set of additional IPs applied to default user
 	DefaultUserAdditionalIPs   []string
@@ -102,7 +102,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 		chi = newCHI()
 		n.ctx.options.WithDefaultCluster = false
 	} else {
-		// Insert default cluster in case no clusters specified in this CHI
+		// Even in case having CHI provided, we need to insert default cluster in case no clusters specified
 		n.ctx.options.WithDefaultCluster = true
 	}
 
@@ -127,10 +127,8 @@ func (n *Normalizer) CreateTemplatedCHI(
 	return n.normalize()
 }
 
-// applyCHITemplates applies CHI templates over n.ctx.chi
-func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
-	// At this moment n.chi is either newly created 'empty' CHI or a system-wide template
-
+// prepareListOfCHITemplates prepares list of CHI templates to be used by CHI
+func (n *Normalizer) prepareListOfCHITemplates(chi *chiV1.ClickHouseInstallation) []chiV1.ChiUseTemplate {
 	// useTemplates specifies list of templates to be applied to the CHI
 	var useTemplates []chiV1.ChiUseTemplate
 
@@ -153,11 +151,21 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 		useTemplates = append(useTemplates, chi.Spec.UseTemplates...)
 	}
 
-	// UseTemplates must contain reasonable data, thus has to be normalized
+	// In case useTemplates must contain reasonable data, thus has to be normalized
 	if len(useTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found applicable templates num: %d", len(useTemplates))
 		n.normalizeUseTemplates(useTemplates)
 	}
+
+	return useTemplates
+}
+
+// applyCHITemplates applies CHI templates over n.ctx.chi
+func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
+	// At this moment n.chi is either newly created 'empty' CHI or a system-wide template
+
+	// useTemplates specifies list of templates to be applied to the CHI
+	useTemplates := n.prepareListOfCHITemplates(chi)
 
 	// Apply templates - both auto and explicitly requested
 	for i := range useTemplates {
@@ -186,32 +194,39 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 		//
 
 		log.V(1).M(chi).F().Info("Apply template: %s/%s. Selector: %v matches labels: %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
-
-		// Merge template's Spec over CHI's Spec
-		(&n.ctx.chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
-		// Merge template's Labels over CHI's Labels
-		n.ctx.chi.Labels = util.MergeStringMapsOverwrite(
-			n.ctx.chi.Labels,
-			util.CopyMapFilter(
-				template.Labels,
-				chop.Config().Label.Include,
-				chop.Config().Label.Exclude,
-			),
-		)
-		// Merge template's Annotations over CHI's Annotations
-		n.ctx.chi.Annotations = util.MergeStringMapsOverwrite(
-			n.ctx.chi.Annotations, util.CopyMapFilter(
-				template.Annotations,
-				chop.Config().Annotation.Include,
-				append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
-			),
-		)
+		n.ctx.chi = n.mergeCHIFromTemplate(n.ctx.chi, template)
 
 		// And append used template to the list of used templates
 		n.ctx.chi.EnsureStatus().PushUsedTemplate(useTemplate)
 	}
 
 	log.V(1).M(chi).F().Info("Used templates count: %d", n.ctx.chi.EnsureStatus().GetUsedTemplatesCount())
+}
+
+func (n *Normalizer) mergeCHIFromTemplate(chi, template *chiV1.ClickHouseInstallation) *chiV1.ClickHouseInstallation {
+	// Merge template's Spec over CHI's Spec
+	(&chi.Spec).MergeFrom(&template.Spec, chiV1.MergeTypeOverrideByNonEmptyValues)
+
+	// Merge template's Labels over CHI's Labels
+	chi.Labels = util.MergeStringMapsOverwrite(
+		chi.Labels,
+		util.CopyMapFilter(
+			template.Labels,
+			chop.Config().Label.Include,
+			chop.Config().Label.Exclude,
+		),
+	)
+
+	// Merge template's Annotations over CHI's Annotations
+	chi.Annotations = util.MergeStringMapsOverwrite(
+		chi.Annotations, util.CopyMapFilter(
+			template.Annotations,
+			chop.Config().Annotation.Include,
+			append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
+		),
+	)
+
+	return chi
 }
 
 // normalize normalizes whole CHI.
