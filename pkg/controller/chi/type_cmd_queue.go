@@ -222,3 +222,33 @@ func NewDropDns(initiator *metaV1.ObjectMeta) *DropDns {
 		initiator: initiator,
 	}
 }
+
+// ReconcilePod specifies pod reconcile
+type ReconcilePod struct {
+	PriorityQueueItem
+	cmd string
+	old *coreV1.Pod
+	new *coreV1.Pod
+}
+
+var _ queue.PriorityQueueItem = &ReconcileEndpoints{}
+
+// Handle returns handle of the queue item
+func (r ReconcilePod) Handle() queue.T {
+	if r.new != nil {
+		return "ReconcilePod" + ":" + r.new.Namespace + "/" + r.new.Name
+	}
+	if r.old != nil {
+		return "ReconcilePod" + ":" + r.old.Namespace + "/" + r.old.Name
+	}
+	return ""
+}
+
+// NewReconcilePod creates new reconcile endpoints queue item
+func NewReconcilePod(cmd string, old, new *coreV1.Pod) *ReconcilePod {
+	return &ReconcilePod{
+		cmd: cmd,
+		old: old,
+		new: new,
+	}
+}
