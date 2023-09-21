@@ -235,6 +235,25 @@ func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *ReconcileEn
 	return nil
 }
 
+func (w *worker) processReconcilePod(ctx context.Context, cmd *ReconcilePod) error {
+	switch cmd.cmd {
+	case reconcileAdd:
+		w.a.V(1).M(cmd.new).F().Info("Add Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
+		return nil
+	case reconcileUpdate:
+		w.a.V(1).M(cmd.new).F().Info("Update Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
+		return nil
+	case reconcileDelete:
+		w.a.V(1).M(cmd.old).F().Info("Delete Pod. %s/%s", cmd.old.Namespace, cmd.old.Name)
+		return nil
+	}
+
+	// Unknown item type, don't know what to do with it
+	// Just skip it and behave like it never existed
+	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
+	return nil
+}
+
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
@@ -264,6 +283,8 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 		return w.processReconcileChopConfig(cmd)
 	case *ReconcileEndpoints:
 		return w.processReconcileEndpoints(ctx, cmd)
+	case *ReconcilePod:
+		return w.processReconcilePod(ctx, cmd)
 	case *DropDns:
 		return w.processDropDns(ctx, cmd)
 	}
