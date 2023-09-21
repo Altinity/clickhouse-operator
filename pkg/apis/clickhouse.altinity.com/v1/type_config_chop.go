@@ -575,16 +575,16 @@ func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *Cl
 // Auto templates are sorted alphabetically by tuple: namespace, name
 func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
 	// Extract auto-templates from all templates listed
-	var auto []*ClickHouseInstallation
+	var autoTemplates []*ClickHouseInstallation
 	for _, _template := range c.Template.CHI.Runtime.Templates {
 		if _template.IsAuto() {
-			auto = append(auto, _template)
+			autoTemplates = append(autoTemplates, _template)
 		}
 	}
 
-	// Sort namespaces
+	// Prepare sorted list of namespaces
 	var namespaces []string
-	for _, _template := range auto {
+	for _, _template := range autoTemplates {
 		found := false
 		for _, namespace := range namespaces {
 			if namespace == _template.Namespace {
@@ -599,27 +599,28 @@ func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
 	}
 	sort.Strings(namespaces)
 
-	var res []*ClickHouseInstallation
+	var sortedTemplates []*ClickHouseInstallation
 	for _, namespace := range namespaces {
-		// Sort names
+		// Prepare sorted list of names within this namespace
 		var names []string
-		for _, _template := range auto {
+		for _, _template := range autoTemplates {
 			if _template.Namespace == namespace {
 				names = append(names, _template.Name)
 			}
 		}
 		sort.Strings(names)
 
+		// Walk over sorted list of names within this namespace and append to the result list of templates
 		for _, name := range names {
-			for _, _template := range auto {
+			for _, _template := range autoTemplates {
 				if (_template.Namespace == namespace) && (_template.Name == name) {
-					res = append(res, _template)
+					sortedTemplates = append(sortedTemplates, _template)
 				}
 			}
 		}
 	}
 
-	return res
+	return sortedTemplates
 }
 
 // AddCHITemplate adds CHI template
