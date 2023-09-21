@@ -414,13 +414,16 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.AddFunc")
+			c.enqueueObject(NewReconcilePod(reconcileAdd, nil, pod))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			pod := old.(*coreV1.Pod)
-			if !c.isTrackedObject(&pod.ObjectMeta) {
+			oldPod := old.(*coreV1.Pod)
+			newPod := new.(*coreV1.Pod)
+			if !c.isTrackedObject(&newPod.ObjectMeta) {
 				return
 			}
-			log.V(3).M(pod).Info("podInformer.UpdateFunc")
+			log.V(2).M(newPod).Info("podInformer.UpdateFunc")
+			c.enqueueObject(NewReconcilePod(reconcileUpdate, oldPod, newPod))
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*coreV1.Pod)
@@ -428,6 +431,7 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
+			c.enqueueObject(NewReconcilePod(reconcileDelete, nil, pod))
 		},
 	})
 }
