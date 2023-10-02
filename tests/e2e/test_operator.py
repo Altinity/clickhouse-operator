@@ -3814,6 +3814,32 @@ def test_042(self):
             res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-1-0-0", sql="select 1")
             assert res == "1"
 
+    with When("Update with another spec that crashes ClickHouse"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-042-rollback-3.yaml",
+            check={
+                "chi_status": "InProgress",
+                "do_not_delete": 1,
+            },
+        )
+
+        with Then("Operator should apply changes, and both pods should be created"):
+            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
+
+        with And("First node is in CrashLoopBackOff"):
+            kubectl.wait_field("pod", f"chi-{chi}-{cluster}-0-0-0",
+                    ".status.containerStatuses[0].state.waiting.reason",
+                    "CrashLoopBackOff")
+
+        with And("First node is down"):
+            res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-0-0-0", sql="select 1")
+            assert res != "1"
+
+        with And("Second node is up"):
+            res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-1-0-0", sql="select 1")
+            assert res == "1"
+
     with When("CHI is reverted to a good one"):
         kubectl.create_and_check(
             manifest=manifest,
