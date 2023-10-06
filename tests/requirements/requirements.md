@@ -1054,7 +1054,7 @@ of a specific host such as hostname, ports etc. as well as to define host networ
 ##### RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates
 version: 1.0
 
-[ClickHouse Operator] SHALL volume claim tamplates of the following types
+[ClickHouse Operator] SHALL volume claim templates of the following types
 
 * log volume claim using `logVolumeClaimTemplate`
 * data volume claim using `dataVolumeClaimTemplate`
@@ -2081,7 +2081,9 @@ version: 1.0
 of [string] type that SHALL specify template name from `.spec.templates.volumeClaimTemplates`
 that SHALL allow customization of each [PVC] which will mount for clickhouse log directory
 in each [Pod] during render and reconcile every `StatefulSet.spec` resource described
-in `.spec.configuration.clusters`.
+in `.spec.configuration.clusters`. If `.defaults.templates.logVolumeClaimTemplate` is 
+specified, and no container named `clickhouse-log` specified in [Pod], [ClickHouse Operator] SHALL 
+create new container for logs with name `clickhouse-log` and image `registry.access.redhat.com/ubi8/ubi-minimal:latest`.
 
 For example,
 
@@ -2235,7 +2237,7 @@ Each item of the array SHALL specify the following properties:
 For example,
 
 ```yaml
-spec
+spec:
   configuration:
     zookeeper:
       nodes:
@@ -2795,6 +2797,7 @@ spec:
           shards:
             - name: custom-shard-name
               internalReplication: 1
+```
 
 ##### Shard Settings
 
@@ -3204,7 +3207,7 @@ spec:
         layout:
           replicas:
             - name: replica0
-                settings:
+              settings: 
 ```
 
 ##### Replica Files

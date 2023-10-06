@@ -3859,6 +3859,68 @@ def test_042(self):
 
     delete_test_namespace()
 
+
+@TestCheck
+@Name("test_043. Logs container customizing")
+def test_043(self, manifest):
+    """Check that clickhouse-operator support logs container customizing."""
+
+    cluster = "cluster"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+                },
+            )
+
+    with Then("I check both containers are ready"):
+        assert kubectl.get_field(
+            kind="pod",
+            name=f"chi-{chi}-{cluster}-0-0-0",
+            field=".status.containerStatuses[0].ready"
+        ) == "true", error()
+        assert kubectl.get_field(
+            kind="pod",
+            name=f"chi-{chi}-{cluster}-0-0-0",
+            field=".status.containerStatuses[1].ready"
+        ) == "true", error()
+
+    with Then("I check clickhouse logs are in clickhouse-log container"):
+        with By("calling ls inside clickhouse-log in /var/log directory"):
+            r = kubectl.launch(f"exec chi-{chi}-{cluster}-0-0-0 -c clickhouse-log -- bash -c 'ls /var/log/clickhouse-server/'")
+
+        assert "clickhouse-server.err.log" in r
+        assert "clickhouse-server.log" in r
+
+    kubectl.delete_chi(chi)
+
+    delete_test_namespace()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_logVolumeClaimTemplate("1.0"))
+@Name("test_043_0. Logs container customizing using PodTemplate")
+def test_043_0(self):
+    """Check that clickhouse-operator support manual logs container customizing."""
+    create_shell_namespace_clickhouse_template()
+
+    test_043(manifest="manifests/chi/test-043-0-logs-container-customizing.yaml")
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_logVolumeClaimTemplate("1.0"))
+@Name("test_043_1. Default clickhouse-log container")
+def test_043_1(self):
+    """Check that clickhouse-operator sets up default logs container if it is not specified in Pod."""
+    create_shell_namespace_clickhouse_template()
+
+    test_043(manifest="manifests/chi/test-043-1-logs-container-customizing.yaml")
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"))
