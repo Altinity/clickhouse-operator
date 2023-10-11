@@ -1,0 +1,48 @@
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-044-slow-propagation
+
+spec:
+  taskID: "fix schema"
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicas:
+            - templates:
+                podTemplate: fast-replica
+            - templates:
+                podTemplate: slow-replica
+  templates:
+    podTemplates:
+      - name: fast-replica
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.8
+      - name: slow-replica
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.8
+              command:
+                - "/bin/bash"
+                - "-c"
+                - "sleep 1020 && /entrypoint.sh"
+              livenessProbe:
+                exec:
+                  command:
+                    - bash
+                    - -xc
+                    - 'echo 1'
+                initialDelaySeconds: 1100
+                timeoutSeconds: 15
+

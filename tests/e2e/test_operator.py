@@ -3893,12 +3893,14 @@ def test_043(self, manifest):
         with By("calling ls inside clickhouse-log in /var/log directory"):
             r = kubectl.launch(f"exec chi-{chi}-{cluster}-0-0-0 -c clickhouse-log -- bash -c 'ls /var/log/clickhouse-server/'")
 
-        assert "clickhouse-server.err.log" in r
-        assert "clickhouse-server.log" in r
+        assert "clickhouse-server.err.log" in r, error()
+        assert "clickhouse-server.log" in r, error()
 
-    kubectl.delete_chi(chi)
-
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -3919,6 +3921,86 @@ def test_043_1(self):
     create_shell_namespace_clickhouse_template()
 
     test_043(manifest="manifests/chi/test-043-1-logs-container-customizing.yaml")
+
+
+@TestScenario  # FIXME to add requirements
+@Name("test_044. Schema and data propagation with slow replica")
+def test_044(self):
+    """Check that schema and data can be propagated on other replica if replica start takes a lot of time."""
+    create_shell_namespace_clickhouse_template()
+    cluster = "default"
+    manifest = f"manifests/chi/test-044-0-slow-propagation.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    util.require_keeper(keeper_type=self.context.keeper_type)
+
+    with Given("CHI with 1 replica is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with And("create replicated and distributed tables"):
+        clickhouse.query(
+            chi,
+            """CREATE TABLE test_local ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple() ORDER BY a"""
+        )
+
+    with When("I create distributed table"):
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_distr ON CLUSTER 'default' AS test_local Engine = Distributed('default', default, test_local, a%2)",
+        )
+        clickhouse.query(chi, f"INSERT INTO test_distr select * from numbers(10)")
+
+    with And("I add 1 slow replica"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-044-1-slow-propagation.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+        client_pod = f"chi-{chi}-{cluster}-0-1-0"
+        kubectl.wait_field(
+            "pod",
+            client_pod,
+            ".status.containerStatuses[0].ready",
+            "true")
+
+    with Then("I check that data is not yet propagated"):
+        r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
+        assert not ("test_distr" in r), error()
+        assert not ("test_local" in r), error()
+
+    with When("I update CHI manifest to trigger reconcile"):
+        with By("adding taskID to CHI"):
+            kubectl.create_and_check(
+                manifest="manifests/chi/test-044-1-slow-propagation.yaml",
+                check={
+                    "pod_count": 2,
+                    "do_not_delete": 1,
+                },
+            )
+
+    with Then("I check data and schema is propagated"):
+        r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
+        assert "test_distr" in r, error()
+        assert "test_local" in r, error()
+        r = clickhouse.query(chi, f"SELECT count(*) FROM test_distr", host=f"chi-{chi}-{cluster}-0-1-0")
+        assert r == "10", error()
+        r = clickhouse.query(chi, f"SELECT count(*) FROM test_local", host=f"chi-{chi}-{cluster}-0-1-0")
+        assert r == "10", error()
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestModule

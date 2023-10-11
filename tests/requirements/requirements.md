@@ -794,7 +794,7 @@ version: 1.0
 [ClickHouse Operator] SHALL support being downgraded to previous version.
 
 
-#### Restaring Operator
+#### Restarting Operator
 
 ##### RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator
 version: 1.0
