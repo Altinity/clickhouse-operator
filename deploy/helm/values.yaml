@@ -8,6 +8,7 @@ operator:
     # operator.image.pullPolicy -- image pull policy
 
     pullPolicy: IfNotPresent
+  containerSecurityContext: {}
   # operator.resources -- custom resource configuration
 
   resources: {}
@@ -39,6 +40,7 @@ metrics:
     # metrics.image.pullPolicy -- image pull policy
 
     pullPolicy: IfNotPresent
+  containerSecurityContext: {}
   # metrics.resources -- custom resource configuration
 
   resources: {}
@@ -99,6 +101,7 @@ tolerations: []
 # affinity -- affinity for scheduler pod assignment
 
 affinity: {}
+podSecurityContext: {}
 serviceMonitor:
   # serviceMonitor.enabled -- ServiceMonitor CRD is created for a prometheus operator
   enabled: false

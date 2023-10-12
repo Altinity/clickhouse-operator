@@ -34,6 +34,7 @@ For upgrade please install CRDs separately:
 | dashboards.grafana_folder | string | `"clickhouse"` |  |
 | fullnameOverride | string | `""` | full name of the chart. |
 | imagePullSecrets | list | `[]` | image pull secret for private images |
+| metrics.containerSecurityContext | object | `{}` |  |
 | metrics.enabled | bool | `true` |  |
 | metrics.env | list | `[]` | additional environment variables for the deployment |
 | metrics.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
@@ -42,12 +43,14 @@ For upgrade please install CRDs separately:
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |
 | nodeSelector | object | `{}` | node for scheduler pod assignment |
+| operator.containerSecurityContext | object | `{}` |  |
 | operator.env | list | `[]` | additional environment variables for the deployment |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | operator.resources | object | `{}` | custom resource configuration |
 | podAnnotations | object | `{"prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the pod |
+| podSecurityContext | object | `{}` |  |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
 | secret.username | string | `"clickhouse_operator"` | operator credentials username |
