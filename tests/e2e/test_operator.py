@@ -3923,7 +3923,9 @@ def test_043_1(self):
     test_043(manifest="manifests/chi/test-043-1-logs-container-customizing.yaml")
 
 
-@TestScenario  # FIXME to add requirements
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_ReconcilingCycle("1.0"),
+              RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"))
 @Name("test_044. Schema and data propagation with slow replica")
 def test_044(self):
     """Check that schema and data can be propagated on other replica if replica start takes a lot of time."""
@@ -3942,7 +3944,7 @@ def test_044(self):
             },
         )
 
-    with And("create replicated and distributed tables"):
+    with When("I create replicated table on the first replica"):
         clickhouse.query(
             chi,
             """CREATE TABLE test_local ON CLUSTER 'default' (a UInt32)
@@ -3950,7 +3952,7 @@ def test_044(self):
             PARTITION BY tuple() ORDER BY a"""
         )
 
-    with When("I create distributed table"):
+    with And("I create distributed table on the first replica"):
         clickhouse.query(
             chi,
             "CREATE TABLE test_distr ON CLUSTER 'default' AS test_local Engine = Distributed('default', default, test_local, a%2)",
@@ -3973,14 +3975,15 @@ def test_044(self):
             "true")
 
     with Then("I check that data is not yet propagated"):
-        r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert not ("test_distr" in r), error()
-        assert not ("test_local" in r), error()
+        with By("checking data on the slow replica"):
+            r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert not ("test_distr" in r), error()
+            assert not ("test_local" in r), error()
 
     with When("I update CHI manifest to trigger reconcile"):
         with By("adding taskID to CHI"):
             kubectl.create_and_check(
-                manifest="manifests/chi/test-044-1-slow-propagation.yaml",
+                manifest="manifests/chi/test-044-2-slow-propagation.yaml",
                 check={
                     "pod_count": 2,
                     "do_not_delete": 1,
@@ -3988,13 +3991,14 @@ def test_044(self):
             )
 
     with Then("I check data and schema is propagated"):
-        r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert "test_distr" in r, error()
-        assert "test_local" in r, error()
-        r = clickhouse.query(chi, f"SELECT count(*) FROM test_distr", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert r == "10", error()
-        r = clickhouse.query(chi, f"SELECT count(*) FROM test_local", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert r == "10", error()
+        with By("checking data on the slow replica"):
+            r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert "test_distr" in r, error()
+            assert "test_local" in r, error()
+            r = clickhouse.query(chi, f"SELECT count(*) FROM test_distr", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert r == "10", error()
+            r = clickhouse.query(chi, f"SELECT count(*) FROM test_local", host=f"chi-{chi}-{cluster}-0-1-0")
+            assert r == "10", error()
 
     with Finally("I clean up"):
         with By("deleting chi"):

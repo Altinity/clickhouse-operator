@@ -1779,7 +1779,7 @@ steps:
 version: 1.0
 
 [ClickHouse Operator] SHALL support reconciling current and desired state of [CHI]
-using reconcicling cycle based on the custom resource specification
+using reconciling cycle based on the custom resource specification
 that result in either successful or failed [CHI] state.
 
 #### Applying ConfigMaps Before StatefulSets
