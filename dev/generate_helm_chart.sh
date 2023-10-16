@@ -189,6 +189,7 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.nodeSelector |= "{{ toYaml .Values.nodeSelector | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.affinity |= "{{ toYaml .Values.affinity | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.tolerations |= "{{ toYaml .Values.tolerations | nindent 8 }}"' "${file}"
+  yq e -i '.spec.template.spec.securityContext |= "{{ toYaml .Values.podSecurityContext | nindent 8 }}"' "${file}"
 
   for cm in $(yq e '.spec.template.spec.volumes[].configMap.name' "${file}"); do
     local prefix='{{ include \"altinity-clickhouse-operator.fullname\" . }}'
@@ -202,12 +203,14 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.containers[0].image |= "{{ .Values.operator.image.repository }}:{{ include \"altinity-clickhouse-operator.operator.tag\" . }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].imagePullPolicy |= "{{ .Values.operator.image.pullPolicy }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].resources |= "{{ toYaml .Values.operator.resources | nindent 12 }}"' "${file}"
+  yq e -i '.spec.template.spec.containers[0].securityContext |= "{{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}"' "${file}"
   yq e -i '(.spec.template.spec.containers[0].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
   yq e -i '.spec.template.spec.containers[0].env += ["{{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
 
   yq e -i '.spec.template.spec.containers[1].image |= "{{ .Values.metrics.image.repository }}:{{ include \"altinity-clickhouse-operator.metrics.tag\" . }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].imagePullPolicy |= "{{ .Values.metrics.image.pullPolicy }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].resources |= "{{ toYaml .Values.metrics.resources | nindent 12 }}"' "${file}"
+  yq e -i '.spec.template.spec.containers[1].securityContext |= "{{ toYaml .Values.metrics.containerSecurityContext | nindent 12 }}"' "${file}"
   yq e -i '(.spec.template.spec.containers[1].env[] | select(.valueFrom.resourceFieldRef.containerName == "clickhouse-operator") | .valueFrom.resourceFieldRef.containerName) = "{{ .Chart.Name }}"' "${file}"
   yq e -i '.spec.template.spec.containers[1].env += ["{{ with .Values.metrics.env }}{{ toYaml . | nindent 12 }}{{ end }}"]' "${file}"
 
