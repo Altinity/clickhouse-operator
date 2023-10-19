@@ -131,8 +131,20 @@ func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
 		return true
 	}
 
-	if host.Version.IsUnknown() {
-		w.a.V(1).M(host).F().Info("Host with unknown version should be restarted. It most likely is down. Host: %s", host.GetName())
+	podIsCrushed := false
+	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
+	if pod, err := w.c.getPod(host); err == nil {
+		if len(pod.Status.ContainerStatuses) > 0 {
+			if pod.Status.ContainerStatuses[0].State.Waiting != nil {
+				if pod.Status.ContainerStatuses[0].State.Waiting.Reason == "CrashLoopBackOff" {
+					podIsCrushed = true
+				}
+			}
+		}
+	}
+
+	if host.Version.IsUnknown() && podIsCrushed {
+		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
 		return true
 	}
 

@@ -370,20 +370,12 @@ def test_operator_restart(self, manifest, service, version=None):
         shell=shell_2
     )
 
-    # TODO fix this
-    # Fails due to IP address change after operator restart.
-    # In case IP address change, the operator starts reconcile in order to update configuration
-    # and excludes nodes one-by-one from the cluster. This breaks the test since cluster definition is changing
-    # Log:
-    # Operator IPs to process CHI: test-008-2. Previous: 172.17.0.3 Cur: 172.17.0.8
-    # Operator IPs are different. Operator was restarted on another IP since previous reconcile of the CHI: test-008-2
-    #
-    # Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
-    #     chi=chi,
-    #     shards=2,
-    #     trigger_event=trigger_event,
-    #     shell=shell_3
-    # )
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+        chi=chi,
+        shards=2,
+        trigger_event=trigger_event,
+        shell=shell_3
+    )
 
     check_operator_restart(
         chi=chi,
@@ -394,15 +386,11 @@ def test_operator_restart(self, manifest, service, version=None):
     trigger_event.set()
     join()
 
-    # TODO fix this
-    # Give ClickHouse time to catch-up
-    # time.sleep(60)
-    # This section keeps failing, comment out for now
-    # with Then("Local tables should have exactly the same number of rows"):
-    #     cnt0 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-0-0-0')
-    #     cnt1 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-1-0-0')
-    #     print(f"{cnt0} {cnt1}")
-    #     assert cnt0 == cnt1 and cnt0 != "0"
+    with Then("Local tables should have exactly the same number of rows"):
+        cnt0 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-0-0-0')
+        cnt1 = clickhouse.query(chi, "select count() from test_local", host=f'chi-{chi}-{cluster}-1-0-0')
+        print(f"{cnt0} {cnt1}")
+        assert cnt0 == cnt1 and cnt0 != "0"
 
     kubectl.delete_chi(chi)
 
