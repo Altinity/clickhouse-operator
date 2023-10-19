@@ -673,7 +673,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
 		return err
-		return err
 	}
 
 	version = w.getHostClickHouseVersion(ctx, host, false)
