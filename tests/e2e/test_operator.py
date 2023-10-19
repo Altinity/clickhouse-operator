@@ -423,19 +423,18 @@ def check_remote_servers(self, chi, shards, trigger_event, shell=None, cluster="
     if cluster == "":
         cluster = chi
 
-    ok = 0
-
+    ok_runs = 0
     while not trigger_event.is_set():
         chi_shards = get_shards_from_remote_servers(chi, cluster, shell=shell)
 
         if chi_shards != shards:
-            with Then(f"Number of shards in {cluster} cluster should be {shards}"):
+            with Then(f"Number of shards in {cluster} cluster should be {shards} got {chi_shards} instead"):
                 assert chi_shards == shards
-        ok += 1
+        ok_runs += 1
         time.sleep(1)
 
-    with By(f"remote_servers were always correct {ok} times"):
-        assert ok > 0
+    with By(f"remote_servers were always correct {ok_runs} times"):
+        assert ok_runs > 0
 
 
 @TestScenario
@@ -2897,12 +2896,11 @@ def test_030(self):
         },
     )
 
-    trigger_event = threading.Event()
-
     with When("I create new shells"):
         shell_1 = get_shell()
         shell_2 = get_shell()
 
+    trigger_event = threading.Event()
     Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
         chi=chi,
         cluster="default",
@@ -2936,6 +2934,7 @@ def test_030(self):
             new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell_2)
             assert start_time == new_start_time
 
+    # Terminate check
     trigger_event.set()
     join()
 
@@ -3772,7 +3771,7 @@ def test_042(self):
     create_shell_namespace_clickhouse_template()
 
     cluster = "default"
-    manifest = f"manifests/chi/test-042-rollback.yaml"
+    manifest = f"manifests/chi/test-042-rollback-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
     with Given("CHI is installed"):
@@ -3782,11 +3781,11 @@ def test_042(self):
                 "pod_count": 2,
                 "apply_templates": {
                     current().context.clickhouse_template,
-                    },
+                },
                 "pod_image": current().context.clickhouse_version,
                 "do_not_delete": 1,
-                },
-            )
+            },
+        )
 
     with When("Update with a spec that crashes ClickHouse"):
         kubectl.create_and_check(
@@ -3802,9 +3801,12 @@ def test_042(self):
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
         with And("First node is in CrashLoopBackOff"):
-            kubectl.wait_field("pod", f"chi-{chi}-{cluster}-0-0-0",
-                    ".status.containerStatuses[0].state.waiting.reason",
-                    "CrashLoopBackOff")
+            kubectl.wait_field(
+                "pod",
+                f"chi-{chi}-{cluster}-0-0-0",
+                ".status.containerStatuses[0].state.waiting.reason",
+                "CrashLoopBackOff"
+            )
 
         with And("First node is down"):
             res = clickhouse.query_with_error(chi, host=f"chi-{chi}-{cluster}-0-0-0", sql="select 1")

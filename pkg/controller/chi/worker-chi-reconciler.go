@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"fmt"
+	"gopkg.in/d4l3k/messagediff.v1"
 	"math"
 	"sync"
 	"time"
@@ -39,7 +40,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		return nil
 	}
 
-	w.logOldAndNew("non-normalized yet", old, new)
+	w.logOldAndNew("non-normalized yet (native)", old, new)
 
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
@@ -52,6 +53,11 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
+	metricsCHIReconcilesStarted(ctx)
+	startTime := time.Now()
+
+	w.a.M(new).F().Info("Changing OLD to Normalized COMPLETED: %s/%s", new.Namespace, new.Name)
+
 	if new.HasAncestor() {
 		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile. CHI: %s/%s", new.Namespace, new.Name)
 		old = new.GetAncestor()
@@ -60,10 +66,10 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		old = nil
 	}
 
-	w.a.M(new).F().Info("Normalize OLD CHI: %s/%s", new.Namespace, new.Name)
+	w.a.M(new).F().Info("Normalized OLD CHI: %s/%s", new.Namespace, new.Name)
 	old = w.normalize(old)
 
-	w.a.M(new).F().Info("Normalize NEW CHI: %s/%s", new.Namespace, new.Name)
+	w.a.M(new).F().Info("Normalized NEW CHI: %s/%s", new.Namespace, new.Name)
 	new = w.normalize(new)
 
 	new.SetAncestor(old)
@@ -96,8 +102,8 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
 			M(new).F().
-			Error("FAILED to update err: %v", err)
-		w.markReconcileComplete(ctx, new)
+			Error("FAILED to reconcile CHI err: %v", err)
+		w.markReconcileCompletedUnsuccessfully(ctx, new)
 	} else {
 		// Post-process added items
 		if util.IsContextDone(ctx) {
@@ -114,6 +120,9 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		w.addCHIToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
+
+		metricsCHIReconcilesCompleted(ctx)
+		metricsCHIReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
 	}
 
 	return nil
@@ -294,11 +303,14 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *chiV1.ChiHo
 		return "not applicable"
 	}
 
-	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s", host.GetName())
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
 	if err != nil {
-		return "failed to query"
+		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s", host.GetName())
+		version = "failed to query"
+		return version
 	}
+
+	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
 	host.Version = chiV1.NewCHVersion(version)
 
 	return version
@@ -337,6 +349,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		return nil
 	}
 
+	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
+	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
+
 	version := w.getHostClickHouseVersion(ctx, host, true)
 	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
@@ -360,6 +375,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 	} else {
 		w.task.registryFailed.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 		if err == errCRUDIgnore {
+			// Pretend nothing happened in case of ignore
 			err = nil
 		}
 	}
@@ -488,6 +504,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 		// and for large clusters it is a small price to pay before performing concurrent fan-out.
 		w.a.V(1).Info("starting first shard separately")
 		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
+			w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", err)
 			return err
 		}
 
@@ -498,7 +515,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
 	// Loop over shards.
 	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
-	w.a.V(1).Info("starting rest of shards shard on workers: %d", workersNum)
+	w.a.V(1).Info("Starting rest of shards on workers: %d", workersNum)
 	for startShardIndex := startShard; startShardIndex < len(shards); startShardIndex += workersNum {
 		endShardIndex := startShardIndex + workersNum
 		if endShardIndex > len(shards) {
@@ -527,6 +544,7 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.Ch
 		}
 		wg.Wait()
 		if err != nil {
+			w.a.V(1).Warning("Skipping rest of shards due to an error: %v", err)
 			return err
 		}
 	}
@@ -585,27 +603,40 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
+
+	metricsHostReconcilesStarted(ctx)
+	startTime := time.Now()
+
 	if host.IsFirst() {
 		w.reconcileCHIServicePreliminary(ctx, host.CHI)
 		defer w.reconcileCHIServiceFinal(ctx, host.CHI)
 	}
 
+	version := w.getHostClickHouseVersion(ctx, host, true)
 	w.a.V(1).
 		WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
 		WithStatusAction(host.GetCHI()).
 		M(host).F().
-		Info("Reconcile Host %s started", host.GetName())
+		Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
 
 	// Create artifacts
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if err := w.excludeHost(ctx, host); err != nil {
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
 	_ = w.completeQueries(ctx, host)
 
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
@@ -621,6 +652,10 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	}
 
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 	_ = w.reconcilePVCs(ctx, host)
@@ -633,16 +668,20 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {
-		// If host is not ready - fallback
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
+		return err
 		return err
 	}
 
-	version := w.getHostClickHouseVersion(ctx, host, false)
+	version = w.getHostClickHouseVersion(ctx, host, false)
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("Reconcile Host %s completed. ClickHouse version running: %s", host.GetName(), version)
+		Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 
 	var (
 		hostsCompleted int
@@ -659,6 +698,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		WithStatusAction(host.CHI).
 		M(host).F().
 		Info("%s: %d of %d", eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+
+	metricsHostReconcilesCompleted(ctx)
+	metricsHostReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
 
 	return nil
 }
@@ -823,6 +865,45 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost, 
 	// Check whether this object already exists in k8s
 	var err error
 	host.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
+
+	// Report diff to trace
+	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusModified {
+		w.a.V(1).M(host).F().Info("Modified StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		if diff, equal := messagediff.DeepDiff(host.CurStatefulSet.Spec, host.DesiredStatefulSet.Spec); equal {
+			w.a.V(1).M(host).Info("StatefulSet.Spec ARE EQUAL")
+		} else {
+			w.a.V(1).Info(
+				"StatefulSet.Spec ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
+				util.MessageDiffItemString("added .spec items", "", diff.Added),
+				util.MessageDiffItemString("modified .spec items", "", diff.Modified),
+				util.MessageDiffItemString("removed .spec items", "", diff.Removed),
+			)
+		}
+		if diff, equal := messagediff.DeepDiff(host.CurStatefulSet.Labels, host.DesiredStatefulSet.Labels); equal {
+			w.a.V(1).M(host).Info("StatefulSet.Labels ARE EQUAL")
+		} else {
+			if len(host.CurStatefulSet.Labels)+len(host.DesiredStatefulSet.Labels) > 0 {
+				w.a.V(1).Info(
+					"StatefulSet.Labels ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
+					util.MessageDiffItemString("added .labels items", "", diff.Added),
+					util.MessageDiffItemString("modified .labels items", "", diff.Modified),
+					util.MessageDiffItemString("removed .labels items", "", diff.Removed),
+				)
+			}
+		}
+		if diff, equal := messagediff.DeepDiff(host.CurStatefulSet.Annotations, host.DesiredStatefulSet.Annotations); equal {
+			w.a.V(1).M(host).Info("StatefulSet.Annotations ARE EQUAL")
+		} else {
+			if len(host.CurStatefulSet.Annotations)+len(host.DesiredStatefulSet.Annotations) > 0 {
+				w.a.V(1).Info(
+					"StatefulSet.Annotations ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
+					util.MessageDiffItemString("added .annotations items", "", diff.Added),
+					util.MessageDiffItemString("modified .annotations items", "", diff.Modified),
+					util.MessageDiffItemString("removed .annotations items", "", diff.Removed),
+				)
+			}
+		}
+	}
 
 	opt := NewReconcileHostStatefulSetOptionsArr(opts...).First()
 	switch {

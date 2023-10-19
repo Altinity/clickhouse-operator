@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -68,6 +70,9 @@ type Setting struct {
 	vector     []string
 	attributes map[string]string
 }
+
+// Ensure required interface implementation
+var _ yaml.Marshaler = &Setting{}
 
 // NewSettingScalar makes new scalar Setting
 func NewSettingScalar(scalar string) *Setting {
@@ -230,11 +235,21 @@ func (s *Setting) String() string {
 		return ""
 	}
 
-	if s.isScalar {
-		return s.scalar
+	attributes := ""
+	if s.HasAttributes() {
+		attributes = ":[" + s.Attributes() + "]"
 	}
 
-	return strings.Join(s.vector, ",")
+	if s.isScalar {
+		return s.scalar + attributes
+	}
+
+	return "[" + strings.Join(s.vector, ", ") + "]" + attributes
+}
+
+// MarshalYAML implements yaml.Marshaler interface
+func (s *Setting) MarshalYAML() (interface{}, error) {
+	return s.String(), nil
 }
 
 // Settings specifies settings

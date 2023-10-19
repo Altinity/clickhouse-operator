@@ -52,13 +52,16 @@ spec:
     chiSelector:
       name1: value1
       name2: value2
+    # TODO introduce one-time actions
+    # chiTaskID: "qweqwe"
+    # autoPurge: "yes"
 
   reconciling:
     # Overrides both 'reconcile.host.wait.{exclude, include}' values from the operator's config
     # Possible values:
     #  - wait
     #  - nowait
-    # DEPRECATED
+    # Syntax sugar
     policy: "nowait"
 
     # Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
