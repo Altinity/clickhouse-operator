@@ -81,7 +81,7 @@ func MessageDiffItemString(banner, defaultPath string, items map[*messagediff.Pa
 		}
 		i++
 	}
-	str += fmt.Sprintf("AP item end -------------------------")
+	str += fmt.Sprintf("AP item end -------------------------\n")
 
 	return str
 }

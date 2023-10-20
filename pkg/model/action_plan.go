@@ -221,12 +221,12 @@ func (ap *ActionPlan) String() string {
 	}
 
 	if !ap.deletionTimestampEqual {
-		str += "modified deletion timestamp\n"
+		str += "modified deletion timestamp:\n"
 		str += util.MessageDiffItemString("modified deletion timestamp", ".metadata.deletionTimestamp", ap.deletionTimestampDiff.Modified)
 	}
 
 	if !ap.finalizersEqual {
-		str += "modified finalizer\n"
+		str += "modified finalizer:\n"
 		str += util.MessageDiffItemString("modified finalizers", ".metadata.finalizers", ap.finalizersDiff.Modified)
 	}
 

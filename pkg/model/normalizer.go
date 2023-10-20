@@ -262,9 +262,6 @@ func (n *Normalizer) finalizeCHI() {
 		return nil
 	})
 	n.fillCHIAddressInfo()
-	n.ctx.chi.WalkHosts(func(host *chiV1.ChiHost) error {
-		return n.calcFingerprints(host)
-	})
 }
 
 // fillCHIAddressInfo
@@ -886,51 +883,6 @@ func (n *Normalizer) ensureClusters(clusters []*chiV1.Cluster) []*chiV1.Cluster 
 	}
 
 	return []*chiV1.Cluster{}
-}
-
-// calcFingerprints calculates fingerprints for ClickHouse configuration data
-func (n *Normalizer) calcFingerprints(host *chiV1.ChiHost) error {
-	// Zookeeper
-	zk := host.GetZookeeper()
-	host.Config.ZookeeperFingerprint = util.Fingerprint(zk)
-
-	// Settings
-	{
-		global := n.ctx.chi.Spec.Configuration.Settings.AsSortedSliceOfStrings()
-		local := host.Settings.AsSortedSliceOfStrings()
-
-		host.Config.SettingsFingerprint = util.Fingerprint(
-			fmt.Sprintf("%s%s",
-				util.Fingerprint(global),
-				util.Fingerprint(local),
-			),
-		)
-	}
-
-	//  Files
-	{
-		global := n.ctx.chi.Spec.Configuration.Files.Filter(
-			nil,
-			[]chiV1.SettingsSection{chiV1.SectionUsers},
-			true,
-		).AsSortedSliceOfStrings()
-		local := host.Files.Filter(
-			nil,
-			[]chiV1.SettingsSection{chiV1.SectionUsers},
-			true,
-		).AsSortedSliceOfStrings()
-
-		host.Config.FilesFingerprint = util.Fingerprint(
-			fmt.Sprintf("%s%s",
-				util.Fingerprint(global),
-				util.Fingerprint(local),
-			),
-		)
-	}
-
-	// Unify settings fingerprint
-	host.Config.SettingsFingerprint = util.Fingerprint(host.Config.SettingsFingerprint + host.Config.FilesFingerprint)
-	return nil
 }
 
 // normalizeConfigurationZookeeper normalizes .spec.configuration.zookeeper

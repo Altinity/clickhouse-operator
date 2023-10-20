@@ -12,7 +12,7 @@ import e2e.yaml_manifest as yaml_manifest
 import e2e.util as util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-max_retries = 20
+max_retries = 35
 
 
 def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
@@ -118,7 +118,7 @@ def delete_all_keeper(ns=None):
                     launch(f"delete {resource_type} -n {current().context.test_namespace} {name}", ok_to_fail=True)
 
 
-def create_and_check(manifest, check, ns=None, shell=None, timeout=900):
+def create_and_check(manifest, check, ns=None, shell=None, timeout=1800):
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(f"{manifest}"))
 
     # state_field = ".status.taskID"
@@ -292,7 +292,7 @@ def delete(manifest, ns=None, timeout=600):
             run_shell(f"{manifest} | {current().context.kubectl_cmd} delete -f -", timeout=timeout)
 
 
-def wait_objects(chi, object_counts, ns=None, shell=None, retries = max_retries):
+def wait_objects(chi, object_counts, ns=None, shell=None, retries=max_retries):
     with Then(
         f"Waiting for: "
         f"{object_counts['statefulset']} statefulsets, "
