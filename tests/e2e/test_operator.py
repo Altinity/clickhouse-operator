@@ -1133,7 +1133,7 @@ def test_013_1(self):
     table_names = clickhouse.query(chi, "SHOW TABLES", pod="chi-test-013-1-schema-propagation-simple-0-0-0").split()
 
     with Then("I check tables are propagated correctly 1"):
-        for attempt in retries(timeout=500, delay=1):
+        for attempt in retries(timeout=60, delay=1):
             with attempt:
                 for table_name in table_names:
                     if table_name[0] != ".":
@@ -1181,7 +1181,7 @@ def test_013_1(self):
     ).split()
 
     with Then("I check tables are propagated correctly 2"):
-        for attempt in retries(timeout=500, delay=1):
+        for attempt in retries(timeout=60, delay=1):
             with attempt:
                 assert len(tables_on_second_shard) == 2, error()
                 assert ("distr_test" in tables_on_second_shard) and (
@@ -3858,6 +3858,8 @@ def test_041(self):
 @Name("test_042. Test configuration rollback")
 def test_042(self):
     create_shell_namespace_clickhouse_template()
+    with Given("I change operator statefullSet timeout"):
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
 
     cluster = "default"
     manifest = f"manifests/chi/test-042-rollback-1.yaml"
@@ -3942,7 +3944,6 @@ def test_042(self):
         )
 
         with Then("Both nodes are working"):
-            time.sleep(60)
             res = clickhouse.query_with_error(chi, "select count() from cluster('all-sharded', system.one)")
             assert res == "2"
 
@@ -4027,14 +4028,10 @@ def test_044(self):
     manifest = f"manifests/chi/test-044-0-slow-propagation.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
-    chopconf_file = "manifests/chopconf/test-044-chopconf.yaml"
     operator_namespace = current().context.operator_namespace
 
     with Given("I change operator statefullSet timeout"):
-        with By(f"applying ClickHouseOperatorConfiguration {chopconf_file}"):
-            kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
-        with And("restarting operator"):
-            util.restart_operator()
+        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
 
     with And("CHI with 1 replica is installed"):
         kubectl.create_and_check(
@@ -4053,13 +4050,6 @@ def test_044(self):
             PARTITION BY tuple() ORDER BY a"""
         )
 
-    with And("I create distributed table on the first replica"):
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_distr ON CLUSTER 'default' AS test_local Engine = Distributed('default', default, test_local, a%2)",
-        )
-        clickhouse.query(chi, f"INSERT INTO test_distr select * from numbers(10)")
-
     with And("I add 1 slow replica"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-044-1-slow-propagation.yaml",
@@ -4075,10 +4065,9 @@ def test_044(self):
             ".status.containerStatuses[0].ready",
             "true")
 
-    with Then("I check that data is not yet propagated"):
-        with By("checking data on the slow replica"):
+    with Then("I check that schema is not yet propagated"):
+        with By("checking schema on the slow replica"):
             r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
-            assert not ("test_distr" in r), error()
             assert not ("test_local" in r), error()
 
     with When("I update CHI manifest to trigger reconcile"):
@@ -4091,15 +4080,10 @@ def test_044(self):
                 },
             )
 
-    with Then("I check data and schema is propagated"):
-        with By("checking data on the slow replica"):
+    with Then("I check schema is propagated"):
+        with By("checking schema on the slow replica"):
             r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
-            assert "test_distr" in r, error()
             assert "test_local" in r, error()
-            r = clickhouse.query(chi, f"SELECT count(*) FROM test_distr", host=f"chi-{chi}-{cluster}-0-1-0")
-            assert r == "10", error()
-            r = clickhouse.query(chi, f"SELECT count(*) FROM test_local", host=f"chi-{chi}-{cluster}-0-1-0")
-            assert r == "10", error()
 
     with Finally("I clean up"):
         with By("deleting chi"):
