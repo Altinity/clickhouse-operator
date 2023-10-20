@@ -36,13 +36,13 @@ spec:
               command:
                 - "/bin/bash"
                 - "-c"
-                - "sleep 1020 && /entrypoint.sh"
+                - "sleep 600 && /entrypoint.sh"
               livenessProbe:
                 exec:
                   command:
                     - bash
                     - -xc
                     - 'echo 1'
-                initialDelaySeconds: 1100
+                initialDelaySeconds: 700
                 timeoutSeconds: 15
 

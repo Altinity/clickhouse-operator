@@ -3177,7 +3177,9 @@ def test_032(self):
         shell = get_shell()
         self.context.shell = shell
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -3346,11 +3348,13 @@ def test_034(self):
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
-    kubectl.launch(f"delete pod {client_pod}")
-
-    kubectl.delete_chi(chi)
-
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting pod"):
+            kubectl.launch(f"delete pod {client_pod}")
+        with And("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -3454,7 +3458,9 @@ def test_036(self):
             )
             assert r == "10000", error()
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -3550,7 +3556,9 @@ def test_037(self):
         )
         assert r == "10000"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestCheck
@@ -3614,7 +3622,7 @@ def test_039(self, step=0, delete_chi=0):
                 pwd="qkrq",
             )
 
-    with Then("I delete namespace"):
+    with Finally("I delete namespace"):
         shell = get_shell()
         self.context.shell = shell
         util.delete_namespace(namespace=self.context.test_namespace, delete_chi=1)
@@ -3704,7 +3712,9 @@ def test_040(self):
         out = clickhouse.query(chi, "select uptime()")
         assert int(out) > 120
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -3764,7 +3774,9 @@ def test_041(self):
 
             assert r == "1"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 @TestScenario
 @Name("test_042. Test configuration rollback")
@@ -3855,9 +3867,11 @@ def test_042(self):
             res = clickhouse.query_with_error(chi, "select count() from cluster('all-sharded', system.one)")
             assert res == "2"
 
-    kubectl.delete_chi(chi)
-
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestCheck
@@ -3934,8 +3948,16 @@ def test_044(self):
     manifest = f"manifests/chi/test-044-0-slow-propagation.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
+    chopconf_file = "manifests/chopconf/test-044-chopconf.yaml"
+    operator_namespace = current().context.operator_namespace
 
-    with Given("CHI with 1 replica is installed"):
+    with Given("I change operator statefullSet timeout"):
+        with By(f"applying ClickHouseOperatorConfiguration {chopconf_file}"):
+            kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
+        with And("restarting operator"):
+            util.restart_operator()
+
+    with And("CHI with 1 replica is installed"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -4009,7 +4031,8 @@ def test_044(self):
 
 @TestModule
 @Name("e2e.test_operator")
-@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"))
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
+              RQ_SRS_026_ClickHouseOperator("1.0"))
 def test(self):
     with Given("set settings"):
         set_settings()
