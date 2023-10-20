@@ -3081,6 +3081,10 @@ data:
       ################################################
       configurationRestartPolicy:
         rules:
+          # IMPORTANT!
+          # Default version will also be used in case ClickHouse version is unknown.
+          # ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
+          # ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
           - version: "*"
             rules:
               - settings/*: "yes"

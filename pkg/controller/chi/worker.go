@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -34,6 +33,7 @@ import (
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -127,11 +127,28 @@ func (w *worker) shouldForceRestartHost(host *chiV1.ChiHost) bool {
 
 	// For some configuration changes we have to force restart host
 	if w.isConfigurationChangeRequiresReboot(host) {
-		w.a.V(1).M(host).F().Info("Config changes requires force restart. Host: %s", host.GetName())
+		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 	}
 
-	w.a.V(1).M(host).F().Info("Force restart is not required. Host: %s", host.GetName())
+	podIsCrushed := false
+	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
+	if pod, err := w.c.getPod(host); err == nil {
+		if len(pod.Status.ContainerStatuses) > 0 {
+			if pod.Status.ContainerStatuses[0].State.Waiting != nil {
+				if pod.Status.ContainerStatuses[0].State.Waiting.Reason == "CrashLoopBackOff" {
+					podIsCrushed = true
+				}
+			}
+		}
+	}
+
+	if host.Version.IsUnknown() && podIsCrushed {
+		w.a.V(1).M(host).F().Info("Host with unknown version and in CrashLoopBackOff should be restarted. It most likely is unable to start due to bad config. Host: %s", host.GetName())
+		return true
+	}
+
+	w.a.V(1).M(host).F().Info("Host restart is not required. Host: %s", host.GetName())
 	return false
 }
 
@@ -425,7 +442,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 		return nil
 	}
 
-	if w.isCleanRestartOnTheSameIP(new) {
+	if w.isCHIProcessedOnTheSameIP(new) {
 		// First minute after restart do not reconcile already reconciled generations
 		w.a.V(1).M(new).F().Info("Will not reconcile known generation after restart. Generation %d", new.Generation)
 		return nil
@@ -440,20 +457,20 @@ func (w *worker) updateCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 	return w.reconcileCHI(ctx, old, new)
 }
 
-// isCleanRestartOnTheSameIP checks whether it is just a restart of the operator on the same IP
-func (w *worker) isCleanRestartOnTheSameIP(chi *chiV1.ClickHouseInstallation) bool {
+// isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
+func (w *worker) isCHIProcessedOnTheSameIP(chi *chiV1.ClickHouseInstallation) bool {
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_IP)
 	operatorIpIsTheSame := ip == chi.Status.GetCHOpIP()
-	log.V(1).Info("Operator IPs. Previous: %s Cur: %s", chi.Status.GetCHOpIP(), ip)
+	log.V(1).Info("Operator IPs to process CHI: %s. Previous: %s Cur: %s", chi.Name, chi.Status.GetCHOpIP(), ip)
 
 	if !operatorIpIsTheSame {
 		// Operator has restarted on the different IP address.
 		// We may need to reconcile config files
-		log.V(1).Info("Operator IPs are different. It is NOT restart on the same IP")
+		log.V(1).Info("Operator IPs are different. Operator was restarted on another IP since previous reconcile of the CHI: %s", chi.Name)
 		return false
 	}
 
-	log.V(1).Info("Operator IPs are the same. It is restart on the same IP")
+	log.V(1).Info("Operator IPs are the same as on previous reconcile of the CHI: %s", chi.Name)
 	return w.isCleanRestart(chi)
 }
 
@@ -671,7 +688,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ch
 		Info("reconcile completed successfully, task id: %s", _chi.Spec.GetTaskID())
 }
 
-func (w *worker) markReconcileComplete(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
+func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -689,7 +706,7 @@ func (w *worker) markReconcileComplete(ctx context.Context, chi *chiV1.ClickHous
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
-		Info("reconcile completed unsuccessfully, task id: %s", chi.Spec.GetTaskID())
+		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.Spec.GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
@@ -888,13 +905,13 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost, opts ..
 		Info("Adding tables on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
 
 	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
-	host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
 	if err == nil {
 		w.a.V(1).
 			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateCompleted).
 			WithStatusAction(host.GetCHI()).
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+		host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
 	} else {
 		w.a.V(1).
 			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
@@ -949,6 +966,9 @@ func (w *worker) excludeHost(ctx context.Context, host *chiV1.ChiHost) error {
 		return nil
 	}
 
+	log.V(1).M(host).F().S().Info("exclude host start")
+	defer log.V(1).M(host).F().E().Info("exclude host end")
+
 	if !w.shouldExcludeHost(host) {
 		return nil
 	}
@@ -964,6 +984,9 @@ func (w *worker) excludeHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 // completeQueries wait for running queries to complete
 func (w *worker) completeQueries(ctx context.Context, host *chiV1.ChiHost) error {
+	log.V(1).M(host).F().S().Info("complete queries start")
+	defer log.V(1).M(host).F().E().Info("complete queries end")
+
 	if !w.shouldWaitQueries(host) {
 		return nil
 	}
@@ -1074,33 +1097,33 @@ func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 	case host.GetCHI().IsStopped():
 		w.a.V(1).
 			M(host).F().
-			Info("No need to exclude stopped host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Host is stopped, no need to exclude stopped host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case w.shouldForceRestartHost(host):
 		w.a.V(1).
 			M(host).F().
-			Info("While rolling update host would be restarted host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Host should be restarted, need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
 	case host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew:
 		w.a.V(1).
 			M(host).F().
-			Info("Nothing to exclude, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Host is new, no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusSame:
 		w.a.V(1).
 			M(host).F().
-			Info("The same host would not be updated host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Host is the same, would not be updated, no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case host.GetShard().HostsCount() == 1:
 		w.a.V(1).
 			M(host).F().
-			Info("In case shard where current host is located has only one host (means no replication), no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Host is the only host in shard (means no replication), no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	}
 
 	w.a.V(1).
 		M(host).F().
-		Info("host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		Info("Host should be excluded, host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
 	return true
 }
@@ -1450,7 +1473,10 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) ch
 	newVersion, newHasLabel := chopModel.GetObjectVersion(newMeta)
 
 	if !curHasLabel || !newHasLabel {
-		// No labels to compare, we can not say for sure what exactly is going on
+		w.a.M(newMeta).F().Warning(
+			"Not enough labels to compare objects, can not say for sure what exactly is going on. Object: %s",
+			util.NamespaceNameString(newMeta),
+		)
 		return chiV1.ObjectStatusUnknown
 	}
 
@@ -1460,21 +1486,14 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) ch
 
 	if curVersion == newVersion {
 		w.a.M(newMeta).F().Info(
-			"cur and new ARE EQUAL based on labels. No reconcile is required for: %s",
+			"cur and new objects are equal based on object version label. Update of the object is not required. Object: %s",
 			util.NamespaceNameString(newMeta),
 		)
 		return chiV1.ObjectStatusSame
 	}
 
-	//if diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, statefulSet.Spec); equal {
-	//	w.a.Info("INFO StatefulSet ARE EQUAL based on diff no reconcile is actually needed")
-	//	//					return chop.ObjectStatusSame
-	//} else {
-	//	w.a.Info("INFO StatefulSet ARE DIFFERENT based on diff reconcile is required: a:%v m:%v r:%v", diff.Added, diff.Modified, diff.Removed)
-	//	//					return chop.ObjectStatusModified
-	//}
 	w.a.M(newMeta).F().Info(
-		"cur and new ARE DIFFERENT based on labels. Reconcile is required for: %s",
+		"cur and new objects ARE DIFFERENT based on object version label: Update of the object is required. Object: %s",
 		util.NamespaceNameString(newMeta),
 	)
 
@@ -1630,10 +1649,10 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
 		return nil
 	case errCRUDAbort:
-		w.a.V(1).M(host).Info("Got abort. Abort")
+		w.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got abort. Abort", namespace, name)
 		return errCRUDAbort
 	case errCRUDIgnore:
-		w.a.V(1).M(host).Info("Got ignore. Ignore")
+		w.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
 		return nil
 	case errCRUDRecreate:
 		w.a.WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateInProgress).

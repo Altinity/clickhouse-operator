@@ -62,6 +62,17 @@ func (v *CHVersion) Matches(constraint string) bool {
 	return matches
 }
 
+// IsUnknown checls whether version is unknown
+func (v *CHVersion) IsUnknown() bool {
+	if v == nil {
+		return true
+	}
+	if len(v.Version) == 0 {
+		return true
+	}
+	return false
+}
+
 // String makes string
 func (v *CHVersion) String() string {
 	if v == nil {

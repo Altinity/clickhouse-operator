@@ -24,13 +24,13 @@ import (
 	"syscall"
 	"time"
 
-	kubeinformers "k8s.io/client-go/informers"
-
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
+	"github.com/altinity/clickhouse-operator/pkg/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/version"
+	kubeinformers "k8s.io/client-go/informers"
 )
 
 // Prometheus exporter defaults
@@ -123,33 +123,47 @@ func Run() {
 		kubeInformerFactory,
 	)
 
-	// Setup OS signals and termination context
+	// Create main context with cancel
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	stopChan := make(chan os.Signal, 2)
-	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-stopChan
-		cancelFunc()
-		<-stopChan
-		os.Exit(1)
-	}()
 
-	//
+	// Setup notification signals with cancel
+	setupNotification(cancelFunc)
+
 	// Start Informers
-	//
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
 
-	//
-	// Start Controller
-	//
+	log.V(1).F().Info("Starting operator metrics exporter")
+	metrics.StartMetricsExporter()
+
+	// Start main CHI controller
 	log.V(1).F().Info("Starting CHI controller")
+	wg := runController(ctx, chiController)
+
+	// Wait for completion
+	<-ctx.Done()
+	wg.Wait()
+}
+
+// runController runs main CHI controller
+func runController(ctx context.Context, chiController *chi.Controller) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		chiController.Run(ctx)
 	}()
-	<-ctx.Done()
-	wg.Wait()
+	return wg
+}
+
+// setupNotification sets up OS signals
+func setupNotification(cancel context.CancelFunc) {
+	stopChan := make(chan os.Signal, 2)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-stopChan
+		cancel()
+		<-stopChan
+		os.Exit(1)
+	}()
 }
