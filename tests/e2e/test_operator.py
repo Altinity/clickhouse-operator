@@ -35,8 +35,9 @@ def test_001(self):
             "pdb": ["single"],
         },
     )
-    delete_test_namespace()
-
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -64,8 +65,9 @@ def test_002(self):
             "pod_podAntiAffinity": 1,
         },
     )
-    delete_test_namespace()
-
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -90,8 +92,9 @@ def test_003(self):
             "pdb": ["cluster1", "cluster2"],
         },
     )
-    delete_test_namespace()
-
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -113,7 +116,9 @@ def test_004(self):
             },
         },
     )
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -133,7 +138,9 @@ def test_005(self):
         timeout=1200,
     )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -172,7 +179,9 @@ def test_006(self):
             },
         )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -192,7 +201,9 @@ def test_007(self):
             "pod_ports": [8124, 9001, 9010],
         },
     )
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestCheck
@@ -282,7 +293,10 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
                 f"{start_time} != {new_start_time}, pod restarted after operator upgrade"
             )
 
-    kubectl.delete_chi(chi)
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+
 
 
 def wait_operator_restart(chi, wait_objects, shell=None):
@@ -393,7 +407,10 @@ def test_operator_restart(self, manifest, service, version=None):
     #        print(f"{cnt0} {cnt1}")
     #        assert cnt0 == cnt1 and cnt0 != "0"
 
-    kubectl.delete_chi(chi)
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+
 
 
 def get_replicas_from_remote_servers(chi, cluster):
@@ -450,7 +467,9 @@ def test_008_1(self):
             service="clickhouse-test-008-1",
         )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -464,7 +483,9 @@ def test_008_2(self):
             service="service-test-008-2",
         )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -532,7 +553,9 @@ def test_008_3(self):
     trigger_event.set()
     join()
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -552,7 +575,9 @@ def test_009_1(self, version_from="0.20.1", version_to=None):
             version_to=version_to,
         )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -571,7 +596,9 @@ def test_009_2(self, version_from="0.20.1", version_to=None):
             version_to=version_to,
         )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -778,7 +805,9 @@ def test_011_1(self):
             )
             assert out != "OK"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -879,7 +908,9 @@ def test_011_3(self):
             ok_to_fail=True,
         )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -934,7 +965,9 @@ def test_012(self):
                 new_node_port == node_port
             ), f"LoadBalancer.spec.ports[0].nodePort changed from {node_port} to {new_node_port}"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -1195,7 +1228,9 @@ def test_013_1(self):
         ).split()
         assert len(tables_on_second_shard) == 0, error()
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 def get_shards_from_remote_servers(chi, cluster, shell=None):
@@ -1487,7 +1522,9 @@ def test_014_0(self):
                 note(f"Found {out} replicated tables in {self.context.keeper_type}")
                 assert "DB::Exception: No node" in out or out == "0"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -1577,7 +1614,9 @@ def test_014_1(self):
 
         check_data_is_replicated(replicas, 2)
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -1627,7 +1666,9 @@ def test_015(self):
         print(f"out: {out}")
         assert out == "2"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -1762,7 +1803,9 @@ def test_016(self):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time < new_start_time
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -1802,7 +1845,9 @@ def test_017(self):
         ver = clickhouse.query(chi, host=host, sql="select version()")
         note(f"version: {ver}, result: {out}")
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -1842,7 +1887,9 @@ def test_018(self):
                 note(macros)
                 assert "new_test" == macros
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestCheck
@@ -2019,7 +2066,9 @@ def test_019(self, step=1):
             for pvc in kubectl.get_obj_names(chi, "pvc"):
                 kubectl.launch(f"delete pvc {pvc}")
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2071,7 +2120,9 @@ def test_020(self, step=1):
             out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
             assert out == "disk2"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2274,7 +2325,9 @@ def test_021(self, step=1):
             out = clickhouse.query(chi, "select * from test_local_021")
             assert out == "1"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2322,7 +2375,9 @@ def test_022(self):
             kubectl.launch(f"delete chi {chi}", ok_to_fail=True, timeout=600)
             assert kubectl.get_count("chi", f"{chi}") == 0
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2389,7 +2444,9 @@ def test_023(self):
     with Then("Annotation from selector-2 template should NOT be populated"):
         assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.selector-test-2") == "<none>"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2468,7 +2525,9 @@ def test_024(self):
             == "test-024-0-0.example.com"
         )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2585,7 +2644,9 @@ def test_025(self):
         with And("Query to the local table via load balancer should never fail"):
             assert round(lb_error_time - start_time) == 0
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2656,7 +2717,9 @@ def test_026(self):
             )
             assert out == "['disk2']"
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2707,7 +2770,9 @@ def test_027(self):
                 },
             )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2833,7 +2898,9 @@ def test_028(self):
         with Then("Stateful sets should be there but no running pods"):
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 0, "service": 2})
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2876,7 +2943,9 @@ def test_029(self):
         topologyKey="kubernetes.io/os",
     )
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2943,7 +3012,9 @@ def test_030(self):
         shell = get_shell()
         self.context.shell = shell
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -2994,16 +3065,18 @@ def test_031(self):
                     assert "incl" in annotations, error()
                     assert "excl" not in annotations, error()
 
-    kubectl.delete_chi(chi)
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
 
-    with Finally("I restore original operator state"):
-        util.install_operator_if_not_exist(
-            reinstall=True,
-            manifest=util.get_full_path(current().context.clickhouse_operator_install_manifest, False),
-        )
-        util.restart_operator(ns=current().context.operator_namespace)
-
-    delete_test_namespace()
+        with And("restoring original operator state"):
+            util.install_operator_if_not_exist(
+                reinstall=True,
+                manifest=util.get_full_path(current().context.clickhouse_operator_install_manifest, False),
+            )
+            util.restart_operator(ns=current().context.operator_namespace)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestCheck
@@ -3042,7 +3115,9 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
                     f"*** WARNING ***: cluster was partially unavailable, {partial} queries returned incomplete results"
                 )
     finally:
-        kubectl.launch(f"delete pod {client_pod}", shell=shell)
+        with Finally("I clean up"):
+            with By("deleting pod"):
+                kubectl.launch(f"delete pod {client_pod}", shell=shell)
 
 
 @TestCheck
@@ -3067,7 +3142,9 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
         with By(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
             assert errors == 0
     finally:
-        kubectl.launch(f"delete pod {client_pod}", shell=shell)
+        with Finally("I clean up"):
+            with By("deleting pod"):
+                kubectl.launch(f"delete pod {client_pod}", shell=shell)
 
 
 @TestScenario
@@ -3777,6 +3854,7 @@ def test_041(self):
     with Finally("I clean up"):
         with By("deleting test namespace"):
             delete_test_namespace()
+
 
 @TestScenario
 @Name("test_042. Test configuration rollback")
