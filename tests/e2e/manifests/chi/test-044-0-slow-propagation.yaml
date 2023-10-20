@@ -1,0 +1,27 @@
+apiVersion: "clickhouse.altinity.com/v1"
+
+kind: "ClickHouseInstallation"
+
+metadata:
+  name: test-044-slow-propagation
+
+spec:
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicas:
+            - templates:
+                podTemplate: fast-replica
+  templates:
+    podTemplates:
+      - name: fast-replica
+        spec:
+          containers:
+            - name: clickhouse-pod
+              image: clickhouse/clickhouse-server:22.8
