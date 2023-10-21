@@ -1527,9 +1527,9 @@ and SHALL apply them immediately.
 #### RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps
 version: 1.0
 
-[ClickHouse Operator] SHALL create and manage the following [ConfigMap]s
+[ClickHouse Operator] SHALL create and manage the following [ConfigMap]'s
 which SHALL be responsible for [ClickHouse] server configuration and
-mounted to corresponding configuration folders of each [ClickHouse] pods:
+mounted to corresponding configuration folders of each [ClickHouse] pod's:
 
 * `etc-clickhouse-operator-confd-files`
 * `etc-clickhouse-operator-configd-files`
@@ -4596,7 +4596,12 @@ The default SHALL be `10`.
 ##### RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude
 version: 1.0
 
-[ClickHouse Operator] SHALL support `.spec.reconcileWaitExclude` [string] type property.
+[ClickHouse Operator] SHALL support `.spec.reconcile.wait.exclude` [string] type property.
+
+##### RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries
+version: 1.0
+
+[ClickHouse Operator] SHALL support `.spec.reconcileWaitQueries` [string] type property.
 
 #### Wait Include For Reconciliation Cycle
 

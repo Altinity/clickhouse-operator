@@ -97,6 +97,7 @@ def test_003(self):
             delete_test_namespace()
 
 
+
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 @Requirements(
@@ -4030,7 +4031,7 @@ def test_044(self):
     chopconf_file = "manifests/chopconf/test-044-chopconf.yaml"
     operator_namespace = current().context.operator_namespace
 
-    with Given("I change operator statefullSet timeout"):
+    with Given("I change operator statefulSet timeout"):
         with By(f"applying ClickHouseOperatorConfiguration {chopconf_file}"):
             kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
         with And("restarting operator"):
@@ -4108,21 +4109,13 @@ def test_044(self):
             delete_test_namespace()
 
 
-@TestScenario
-@Name("test_045. Wait queries")
-def test_045(self):
-    """todo"""
-    create_shell_namespace_clickhouse_template()
-    manifest = "manifests/chi/test-045-wait-queries.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-    chopconf_file = "manifests/chopconf/test-045-chopconf.yaml"
-    operator_namespace = current().context.operator_namespace
+@TestCheck
+@Name("test_045. Restart operator without waiting for queries to finish")
+def test_045(self, manifest):
+    """Check that operator support does not wait for the query
+     to finish before operator commences restart."""
 
-    with Given("I change operator reconcile wait queries option"):
-        with By(f"applying ClickHouseOperatorConfiguration {chopconf_file}"):
-            kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
-        with And("restarting operator"):
-            util.restart_operator()
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
 
     with Given("CHI is installed"):
         kubectl.create_and_check(
@@ -4133,18 +4126,51 @@ def test_045(self):
                 },
             )
 
-    with When("CHI is patched with a restart attribute"):
-        cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
-        kubectl.launch(cmd)
-        with Then("Operator should let the query to finish"):
-            out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
-            assert out == "30", error()
+    with When("I restart operator"):
+        with By("patching CHI with a restart attribute"):
+            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
+            kubectl.launch(cmd)
+
+    with Then("operator SHALL not wait for the query to finish"):
+        out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
+        assert out != "30", error()
 
     with Finally("I clean up"):
         with By("deleting chi"):
             kubectl.delete_chi(chi)
         with And("deleting test namespace"):
             delete_test_namespace()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy("1.0"))
+@Name("test_045_1. Reconcile wait queries property specified by CHI")
+def test_045_1(self):
+    """Check that operator supports spec.reconciling.policy property in CHI that
+    forces the operator not to wait for the queries to finish before restart."""
+
+    create_shell_namespace_clickhouse_template()
+
+    test_045(manifest=f"manifests/chi/test-045-1-wait-queries.yaml")
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy("1.0"))# FIXME RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries
+@Name("test_045_2. Reconcile wait queries property specified by clickhouse-operator config")
+def test_045_2(self):
+    """Check that operator supports spec.reconcile.host.wait.queries property in clickhouse-operator config
+    that forces the operator not to wait for the queries to finish before restart."""
+    create_shell_namespace_clickhouse_template()
+    chopconf_file = "manifests/chopconf/test-045-chopconf.yaml"
+    operator_namespace = current().context.operator_namespace
+
+    with Given("I set spec.reconcile.host.wait.queries property"):
+        with By(f"applying ClickHouseOperatorConfiguration {chopconf_file}"):
+            kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
+        with And("restarting operator"):
+            util.restart_operator()
+
+    test_045(manifest=f"manifests/chi/test-045-2-wait-queries.yaml")
 
 
 @TestModule
