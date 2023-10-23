@@ -1,9 +1,12 @@
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseOperatorConfiguration"
 metadata:
-  name: "test-044-chopconf"
+  name: "low-timeout"
 spec:
   reconcile:
+    host:
+      wait:
+        exclude: "false"
     statefulSet:
       update:
         timeout: 60

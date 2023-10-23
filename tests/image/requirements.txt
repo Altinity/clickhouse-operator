@@ -1,4 +1,4 @@
-testflows==1.9.71
+testflows==2.1.5
 requests
 PyYAML
 setuptools

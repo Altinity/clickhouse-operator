@@ -939,6 +939,10 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost, opts ...*migrateTableO
 	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated()):
 		// This host is listed as having tables created already, no need to migrate again
 		return false
+
+	case host.GetCHI().EnsureStatus().HostsCount == host.GetCHI().EnsureStatus().HostsAddedCount:
+		// CHI is new, all hosts were added
+		return false
 	}
 
 	// In all the rest cases - perform migration
