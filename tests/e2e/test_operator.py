@@ -4151,7 +4151,7 @@ def test_045_1(self):
 
     create_shell_namespace_clickhouse_template()
 
-    test_045(manifest=f"manifests/chi/test-045-1-wait-queries.yaml")
+    test_045(manifest=f"manifests/chi/test-045-1-wait-query-finish.yaml")
 
 
 @TestScenario
@@ -4161,16 +4161,11 @@ def test_045_2(self):
     """Check that operator supports spec.reconcile.host.wait.queries property in clickhouse-operator config
     that forces the operator not to wait for the queries to finish before restart."""
     create_shell_namespace_clickhouse_template()
-    chopconf_file = "manifests/chopconf/test-045-chopconf.yaml"
-    operator_namespace = current().context.operator_namespace
 
     with Given("I set spec.reconcile.host.wait.queries property"):
-        with By(f"applying ClickHouseOperatorConfiguration {chopconf_file}"):
-            kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
-        with And("restarting operator"):
-            util.restart_operator()
+        util.apply_operator_config("manifests/chopconf/test-045-chopconf.yaml")
 
-    test_045(manifest=f"manifests/chi/test-045-2-wait-queries.yaml")
+    test_045(manifest=f"manifests/chi/test-045-2-wait-query-finish.yaml")
 
 
 @TestModule
