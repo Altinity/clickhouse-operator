@@ -4155,7 +4155,7 @@ def test_045_1(self):
 
 
 @TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy("1.0"))# FIXME RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries
+@Requirements(RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries("1.0"))
 @Name("test_045_2. Reconcile wait queries property specified by clickhouse-operator config")
 def test_045_2(self):
     """Check that operator supports spec.reconcile.host.wait.queries property in clickhouse-operator config
