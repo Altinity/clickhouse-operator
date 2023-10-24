@@ -940,7 +940,8 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost, opts ...*migrateTableO
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
-	case host.GetCHI().EnsureStatus().HostsCount == host.GetCHI().EnsureStatus().HostsAddedCount:
+	case host.GetCHI().EnsureStatus().GetHostsCount() == host.GetCHI().EnsureStatus().GetHostsAddedCount():
+		// TODO there should be better way to detect newly created CHI
 		// CHI is new, all hosts were added
 		return false
 	}
