@@ -351,11 +351,24 @@ configs:
           # Timeouts used to limit connection and queries from the operator to ClickHouse instances
           # Specified in seconds.
           timeouts:
+            # Timout to setup connection from the operator to ClickHouse instances. In seconds.
             connect: 2
+            # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
             query: 5
 
+        #################################################
+        ##
+        ## Metrics collection
+        ##
+        ################################################
+
         metrics:
+          # Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
+          # Specified in seconds.
           timeouts:
+            # Timeout used to limit metrics collection request. In seconds.
+            # Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
+            # All collected metrics are returned.
             collect: 9
 
       ################################################
