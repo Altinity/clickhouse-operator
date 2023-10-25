@@ -362,6 +362,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		w.a.V(1).M(host).F().Info("Reconcile host %s. Shutting host down due to force restart", host.GetName())
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host)
+		metricsHostReconcilesRestart(ctx)
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
 	}
