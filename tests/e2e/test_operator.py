@@ -298,7 +298,6 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
             kubectl.delete_chi(chi)
 
 
-
 def wait_operator_restart(chi, wait_objects, shell=None):
     with When("Restart operator"):
         util.restart_operator(shell=shell)
@@ -409,7 +408,6 @@ def test_operator_restart(self, manifest, service, version=None):
     with Finally("I clean up"):
         with By("deleting chi"):
             kubectl.delete_chi(chi)
-
 
 
 def get_replicas_from_remote_servers(chi, cluster):
@@ -1849,7 +1847,7 @@ def test_017(self):
 
 
 @TestScenario
-@Name("test_018. Test that server settings are applied before statefulset is started")
+@Name("test_018. Test that server settings are applied before StatefulSet is started")
 # Obsolete, covered by test_016
 def test_018(self):
     create_shell_namespace_clickhouse_template()
