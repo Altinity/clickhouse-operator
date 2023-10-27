@@ -2538,25 +2538,30 @@ spec:
                               type: integer
                               minimum: 1
                               maximum: 10
-                              description: "Connect timeout. In seconds."
+                              description: "Timout to setup connection from the operator to ClickHouse instances. In seconds."
                             query:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Query timeout. In seconds."
+                              description: "Timout to perform SQL query from the operator to ClickHouse instances. In seconds."
                     metrics:
                       type: object
                       description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"
                       properties:
                         timeouts:
                           type: object
-                          description: "Timeouts used to limit connection and queries from the operator to ClickHouse instances, In seconds"
+                          description: |
+                            Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
+                            Specified in seconds.
                           properties:
                             collect:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Collect timeout. In seconds."
+                              description: |
+                                Timeout used to limit metrics collection request. In seconds.
+                                Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
+                                All collected metrics are returned.
                 template:
                   type: object
                   description: "Parameters which are used if you want to generate ClickHouseInstallationTemplate custom resources from files which are stored inside clickhouse-operator deployment"

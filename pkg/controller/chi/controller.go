@@ -431,7 +431,7 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
-			c.enqueueObject(NewReconcilePod(reconcileDelete, nil, pod))
+			c.enqueueObject(NewReconcilePod(reconcileDelete, pod, nil))
 		},
 	})
 }
@@ -589,6 +589,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		*ReconcileCHIT,
 		*ReconcileChopConfig,
 		*ReconcileEndpoints,
+		*ReconcilePod,
 		*DropDns:
 		variants := chiV1.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)

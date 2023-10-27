@@ -256,12 +256,15 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *ReconcilePod) err
 	switch cmd.cmd {
 	case reconcileAdd:
 		w.a.V(1).M(cmd.new).F().Info("Add Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
+		metricsPodAdd(ctx)
 		return nil
 	case reconcileUpdate:
 		w.a.V(1).M(cmd.new).F().Info("Update Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
+		metricsPodUpdate(ctx)
 		return nil
 	case reconcileDelete:
 		w.a.V(1).M(cmd.old).F().Info("Delete Pod. %s/%s", cmd.old.Namespace, cmd.old.Name)
+		metricsPodDelete(ctx)
 		return nil
 	}
 
@@ -940,7 +943,8 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost, opts ...*migrateTableO
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
-	case host.GetCHI().EnsureStatus().HostsCount == host.GetCHI().EnsureStatus().HostsAddedCount:
+	case host.GetCHI().EnsureStatus().GetHostsCount() == host.GetCHI().EnsureStatus().GetHostsAddedCount():
+		// TODO there should be better way to detect newly created CHI
 		// CHI is new, all hosts were added
 		return false
 	}

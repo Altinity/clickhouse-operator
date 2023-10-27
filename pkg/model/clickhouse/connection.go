@@ -116,25 +116,25 @@ func (c *Connection) ensureConnected(ctx context.Context) bool {
 }
 
 // QueryContext runs given sql query on behalf of specified context
-func (c *Connection) QueryContext(_ctx context.Context, sql string) (*QueryResult, error) {
+func (c *Connection) QueryContext(ctx context.Context, sql string) (*QueryResult, error) {
 	if len(sql) == 0 {
 		return nil, nil
 	}
 
-	if !c.ensureConnected(_ctx) {
+	if !c.ensureConnected(ctx) {
 		s := fmt.Sprintf("FAILED connect(%s) for SQL: %s", c.params.GetDSNWithHiddenCredentials(), sql)
 		c.l.V(1).F().Error(s)
 		return nil, fmt.Errorf(s)
 	}
 
-	if util.IsContextDone(_ctx) {
-		return nil, _ctx.Err()
+	if util.IsContextDone(ctx) {
+		return nil, ctx.Err()
 	}
 
 	// Query should have timeout
-	ctx, cancel := context.WithTimeout(c.ensureCtx(_ctx), c.params.GetQueryTimeout())
+	queryCtx, cancel := context.WithTimeout(c.ensureCtx(ctx), c.params.GetQueryTimeout())
 
-	rows, err := c.db.QueryContext(ctx, sql)
+	rows, err := c.db.QueryContext(queryCtx, sql)
 	if err != nil {
 		cancel()
 		s := fmt.Sprintf("FAILED Query(%s) %v for SQL: %s", c.params.GetDSNWithHiddenCredentials(), err, sql)
@@ -144,7 +144,7 @@ func (c *Connection) QueryContext(_ctx context.Context, sql string) (*QueryResul
 
 	c.l.V(2).Info("clickhouse.QueryContext():'%s'", sql)
 
-	return NewQueryResult(ctx, cancel, rows), nil
+	return NewQueryResult(queryCtx, cancel, rows), nil
 }
 
 // Query runs given sql query

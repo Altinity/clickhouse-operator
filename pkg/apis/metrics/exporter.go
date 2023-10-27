@@ -164,72 +164,72 @@ func (e *Exporter) collectFromHost(ctx context.Context, chi *WatchedCHI, host *W
 	fetcher := e.newHostFetcher(host)
 	writer := NewPrometheusWriter(c, chi.Namespace, chi.Name, host.Hostname)
 
-	log.V(2).Infof("Querying metrics for %s\n", host.Hostname)
+	log.V(2).Infof("Querying system metrics for host %s", host.Hostname)
 	if metrics, err := fetcher.getClickHouseQueryMetrics(ctx); err == nil {
-		log.V(2).Infof("Extracted %d metrics for %s\n", len(metrics), host.Hostname)
+		log.V(2).Infof("Extracted %d system metrics for host %s", len(metrics), host.Hostname)
 		writer.WriteMetrics(metrics)
 		writer.WriteOKFetch("system.metrics")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.metrics for host %s err: %s\n", host.Hostname, err)
+		log.Warningf("Error querying system.metrics for host %s err: %s", host.Hostname, err)
 		writer.WriteErrorFetch("system.metrics")
 	}
 
-	log.V(2).Infof("Querying table sizes for %s\n", host.Hostname)
+	log.V(2).Infof("Querying table sizes for host %s", host.Hostname)
 	if systemPartsData, err := fetcher.getClickHouseSystemParts(ctx); err == nil {
-		log.V(2).Infof("Extracted %d table sizes for %s\n", len(systemPartsData), host.Hostname)
+		log.V(2).Infof("Extracted %d table sizes for host %s", len(systemPartsData), host.Hostname)
 		writer.WriteTableSizes(systemPartsData)
 		writer.WriteOKFetch("table sizes")
 		writer.WriteSystemParts(systemPartsData)
 		writer.WriteOKFetch("system parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.parts for host %s err: %s\n", host.Hostname, err)
+		log.Warningf("Error querying system.parts for host %s err: %s", host.Hostname, err)
 		writer.WriteErrorFetch("table sizes")
 		writer.WriteErrorFetch("system parts")
 	}
 
-	log.V(2).Infof("Querying system replicas for %s\n", host.Hostname)
+	log.V(2).Infof("Querying system replicas for host %s", host.Hostname)
 	if systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(ctx); err == nil {
-		log.V(2).Infof("Extracted %d system replicas for %s\n", len(systemReplicas), host.Hostname)
+		log.V(2).Infof("Extracted %d system replicas for host %s", len(systemReplicas), host.Hostname)
 		writer.WriteSystemReplicas(systemReplicas)
 		writer.WriteOKFetch("system.replicas")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.replicas for host %s err: %s\n", host.Hostname, err)
+		log.Warningf("Error querying system.replicas for host %s err: %s", host.Hostname, err)
 		writer.WriteErrorFetch("system.replicas")
 	}
 
-	log.V(2).Infof("Querying mutations for %s\n", host.Hostname)
+	log.V(2).Infof("Querying mutations for host %s", host.Hostname)
 	if mutations, err := fetcher.getClickHouseQueryMutations(ctx); err == nil {
-		log.V(2).Infof("Extracted %d mutations for %s\n", len(mutations), host.Hostname)
+		log.V(2).Infof("Extracted %d mutations for %s", len(mutations), host.Hostname)
 		writer.WriteMutations(mutations)
 		writer.WriteOKFetch("system.mutations")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.mutations for host %s err: %s\n", host.Hostname, err)
+		log.Warningf("Error querying system.mutations for host %s err: %s", host.Hostname, err)
 		writer.WriteErrorFetch("system.mutations")
 	}
 
-	log.V(2).Infof("Querying disks for %s\n", host.Hostname)
+	log.V(2).Infof("Querying disks for host %s", host.Hostname)
 	if disks, err := fetcher.getClickHouseQuerySystemDisks(ctx); err == nil {
-		log.V(2).Infof("Extracted %d disks for %s\n", len(disks), host.Hostname)
+		log.V(2).Infof("Extracted %d disks for host %s", len(disks), host.Hostname)
 		writer.WriteSystemDisks(disks)
 		writer.WriteOKFetch("system.disks")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.disks for host %s err: %s\n", host.Hostname, err)
+		log.Warningf("Error querying system.disks for host %s err: %s", host.Hostname, err)
 		writer.WriteErrorFetch("system.disks")
 	}
 
-	log.V(2).Infof("Querying detached parts for %s\n", host.Hostname)
+	log.V(2).Infof("Querying detached parts for host %s", host.Hostname)
 	if detachedParts, err := fetcher.getClickHouseQueryDetachedParts(ctx); err == nil {
-		log.V(2).Infof("Extracted %d detached parts info for %s\n", len(detachedParts), host.Hostname)
+		log.V(2).Infof("Extracted %d detached parts info for host %s", len(detachedParts), host.Hostname)
 		writer.WriteDetachedParts(detachedParts)
 		writer.WriteOKFetch("system.detached_parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.detached_parts for host %s err: %s\n", host.Hostname, err)
+		log.Warningf("Error querying system.detached_parts for host %s err: %s", host.Hostname, err)
 		writer.WriteErrorFetch("system.detached_parts")
 	}
 }
@@ -291,16 +291,16 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		chi := &list.Items[i]
 
 		if chi.IsStopped() {
-			log.V(1).Infof("CHI %s/%s is stopped, skip it\n", chi.Namespace, chi.Name)
+			log.V(1).Infof("CHI %s/%s is stopped, skip it", chi.Namespace, chi.Name)
 			continue
 		}
 
 		if !chi.GetStatus().HasNormalizedCHICompleted() {
-			log.V(1).Infof("CHI %s/%s is not completed yet, skip it\n", chi.Namespace, chi.Name)
+			log.V(1).Infof("CHI %s/%s is not completed yet, skip it", chi.Namespace, chi.Name)
 			continue
 		}
 
-		log.V(1).Infof("CHI %s/%s is completed, add it\n", chi.Namespace, chi.Name)
+		log.V(1).Infof("CHI %s/%s is completed, add it", chi.Namespace, chi.Name)
 		normalizer := chopModel.NewNormalizer(kubeClient)
 		normalized, _ := normalizer.CreateTemplatedCHI(chi, chopModel.NewNormalizerOptions())
 		watchedCHI := NewWatchedCHI(normalized)
