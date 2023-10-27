@@ -316,7 +316,7 @@ def check_operator_restart(chi, wait_objects, pod, shell=None):
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell)
 
         with Then("ClickHouse pods should not be restarted during operator's restart"):
-            print(f"pod start_time old: {start_time}'")
+            print(f"pod start_time old: {start_time}")
             print(f"pod start_time new: {new_start_time}")
             assert start_time == new_start_time
 
@@ -2867,11 +2867,12 @@ def test_028(self):
                 note("Restart needs to be cleaned")
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
 
-        # with Then("Clear RollingUpdate restart policy"):
-        #    cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
-        #    kubectl.launch(cmd)
-        #    time.sleep(10)
-        #    kubectl.wait_chi_status(chi, "Completed")
+        # We need to clear RollingUpdate restart policy because of new operator's IP address emerging sometimes
+        with Then("Clear RollingUpdate restart policy"):
+            cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
+            kubectl.launch(cmd)
+            time.sleep(15)
+            kubectl.wait_chi_status(chi, "Completed")
 
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(
