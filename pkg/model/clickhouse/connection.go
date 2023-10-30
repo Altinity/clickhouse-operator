@@ -22,11 +22,15 @@ import (
 	"fmt"
 
 	// go-clickhouse is explicitly required in order to setup connection to clickhouse db
-	goch "github.com/mailru/go-clickhouse"
+	//goch "github.com/mailru/go-clickhouse"
+	goch "github.com/mailru/go-clickhouse/v2"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+//const clickHouseDriverName = "clickhouse"
+const clickHouseDriverName = "chhttp"
 
 func init() {
 	goch.RegisterTLSConfig(tlsSettings, &tls.Config{InsecureSkipVerify: true})
@@ -84,7 +88,7 @@ func (c *Connection) connect(_ctx context.Context) {
 	}
 
 	c.l.V(2).Info("Establishing connection: %s", c.params.GetDSNWithHiddenCredentials())
-	dbConnection, err := sql.Open("clickhouse", c.params.GetDSN())
+	dbConnection, err := sql.Open(clickHouseDriverName, c.params.GetDSN())
 	if err != nil {
 		c.l.V(1).F().Error("FAILED Open(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		return

@@ -3704,6 +3704,9 @@ spec:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.memory
+          ports:
+            - containerPort: 9999
+              name: metrics
         - name: metrics-exporter
           image: altinity/metrics-exporter:0.22.0
           imagePullPolicy: Always
@@ -3792,6 +3795,8 @@ metadata:
 spec:
   ports:
     - port: 8888
-      name: clickhouse-operator-metrics
+      name: clickhouse-metrics
+    - port: 9999
+      name: operator-metrics
   selector:
     app: clickhouse-operator

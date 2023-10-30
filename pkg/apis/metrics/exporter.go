@@ -18,8 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
-	kube "k8s.io/client-go/kubernetes"
 	"net/http"
 	"sync"
 	"time"
@@ -27,10 +25,12 @@ import (
 	log "github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	kube "k8s.io/client-go/kubernetes"
 
 	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopAPI "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
@@ -71,26 +71,32 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	// This method may be called concurrently and must therefore be implemented in a concurrency safe way
-	e.mutex.Lock()
-	defer e.mutex.Unlock()
+	start := time.Now()
 
-	log.V(2).Info("Starting Collect")
+	log.V(1).Info("Collect started")
+	defer func() {
+		log.V(1).Infof("Collect completed [%s]", time.Now().Sub(start))
+	}()
 
 	// Collect should have timeout
 	ctx, cancel := context.WithTimeout(context.Background(), e.collectorTimeout)
 	defer cancel()
 
+	// This method may be called concurrently and must therefore be implemented in a concurrency safe way
+	e.mutex.Lock()
+	defer e.mutex.Unlock()
+
+	log.V(1).Infof("Launching host collectors [%s]", time.Now().Sub(start))
+
 	var wg = sync.WaitGroup{}
 	e.chInstallations.walk(func(chi *WatchedCHI, _ *WatchedCluster, host *WatchedHost) {
 		wg.Add(1)
-		go func(c *WatchedCHI, h *WatchedHost, _chan chan<- prometheus.Metric) {
+		go func(ctx context.Context, chi *WatchedCHI, host *WatchedHost, ch chan<- prometheus.Metric) {
 			defer wg.Done()
-			e.collectFromHost(ctx, c, h, _chan)
-		}(chi, host, ch)
+			e.collectHostMetrics(ctx, chi, host, ch)
+		}(ctx, chi, host, ch)
 	})
 	wg.Wait()
-	log.V(2).Info("Completed Collect")
 }
 
 // Describe implements prometheus.Collector Describe method
@@ -159,77 +165,135 @@ func (e *Exporter) newHostFetcher(host *WatchedHost) *ClickHouseMetricsFetcher {
 	return NewClickHouseFetcher(clusterConnectionParams.NewEndpointConnectionParams(host.Hostname))
 }
 
-// collectFromHost collects metrics from one host and writes them into chan
-func (e *Exporter) collectFromHost(ctx context.Context, chi *WatchedCHI, host *WatchedHost, c chan<- prometheus.Metric) {
+// collectHostMetrics collects metrics from one host and writes them into chan
+func (e *Exporter) collectHostMetrics(ctx context.Context, chi *WatchedCHI, host *WatchedHost, c chan<- prometheus.Metric) {
 	fetcher := e.newHostFetcher(host)
 	writer := NewPrometheusWriter(c, chi.Namespace, chi.Name, host.Hostname)
 
-	log.V(2).Infof("Querying system metrics for host %s", host.Hostname)
-	if metrics, err := fetcher.getClickHouseQueryMetrics(ctx); err == nil {
-		log.V(2).Infof("Extracted %d system metrics for host %s", len(metrics), host.Hostname)
+	wg := sync.WaitGroup{}
+	wg.Add(6)
+	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+		e.collectHostSystemMetrics(ctx, host, fetcher, writer)
+		wg.Done()
+	}(ctx, host, fetcher, writer)
+	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+		e.collectHostSystemPartsMetrics(ctx, host, fetcher, writer)
+		wg.Done()
+	}(ctx, host, fetcher, writer)
+	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+		e.collectHostSystemReplicasMetrics(ctx, host, fetcher, writer)
+		wg.Done()
+	}(ctx, host, fetcher, writer)
+	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+		e.collectHostMutationsMetrics(ctx, host, fetcher, writer)
+		wg.Done()
+	}(ctx, host, fetcher, writer)
+	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+		e.collectHostSystemDisksMetrics(ctx, host, fetcher, writer)
+		wg.Done()
+	}(ctx, host, fetcher, writer)
+	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+		e.collectHostDetachedPartsMetrics(ctx, host, fetcher, writer)
+		wg.Done()
+	}(ctx, host, fetcher, writer)
+	wg.Wait()
+}
+
+func (e *Exporter) collectHostSystemMetrics(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+	log.V(1).Infof("Querying system metrics for host %s", host.Hostname)
+	start := time.Now()
+	metrics, err := fetcher.getClickHouseQueryMetrics(ctx)
+	elapsed := time.Now().Sub(start)
+	if err == nil {
+		log.V(1).Infof("Extracted [%s] %d system metrics for host %s", elapsed, len(metrics), host.Hostname)
 		writer.WriteMetrics(metrics)
 		writer.WriteOKFetch("system.metrics")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.metrics for host %s err: %s", host.Hostname, err)
+		log.Warningf("Error [%s] querying system.metrics for host %s err: %s", elapsed, host.Hostname, err)
 		writer.WriteErrorFetch("system.metrics")
 	}
+}
 
-	log.V(2).Infof("Querying table sizes for host %s", host.Hostname)
-	if systemPartsData, err := fetcher.getClickHouseSystemParts(ctx); err == nil {
-		log.V(2).Infof("Extracted %d table sizes for host %s", len(systemPartsData), host.Hostname)
+func (e *Exporter) collectHostSystemPartsMetrics(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+	log.V(1).Infof("Querying table sizes for host %s", host.Hostname)
+	start := time.Now()
+	systemPartsData, err := fetcher.getClickHouseSystemParts(ctx)
+	elapsed := time.Now().Sub(start)
+	if err == nil {
+		log.V(1).Infof("Extracted [%s] %d table sizes for host %s", elapsed, len(systemPartsData), host.Hostname)
 		writer.WriteTableSizes(systemPartsData)
 		writer.WriteOKFetch("table sizes")
 		writer.WriteSystemParts(systemPartsData)
 		writer.WriteOKFetch("system parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.parts for host %s err: %s", host.Hostname, err)
+		log.Warningf("Error [%s] querying system.parts for host %s err: %s", elapsed, host.Hostname, err)
 		writer.WriteErrorFetch("table sizes")
 		writer.WriteErrorFetch("system parts")
 	}
+}
 
-	log.V(2).Infof("Querying system replicas for host %s", host.Hostname)
-	if systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(ctx); err == nil {
-		log.V(2).Infof("Extracted %d system replicas for host %s", len(systemReplicas), host.Hostname)
+func (e *Exporter) collectHostSystemReplicasMetrics(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+	log.V(1).Infof("Querying system replicas for host %s", host.Hostname)
+	start := time.Now()
+	systemReplicas, err := fetcher.getClickHouseQuerySystemReplicas(ctx)
+	elapsed := time.Now().Sub(start)
+	if err == nil {
+		log.V(1).Infof("Extracted [%s] %d system replicas for host %s", elapsed, len(systemReplicas), host.Hostname)
 		writer.WriteSystemReplicas(systemReplicas)
 		writer.WriteOKFetch("system.replicas")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.replicas for host %s err: %s", host.Hostname, err)
+		log.Warningf("Error [%s] querying system.replicas for host %s err: %s", elapsed, host.Hostname, err)
 		writer.WriteErrorFetch("system.replicas")
 	}
+}
 
-	log.V(2).Infof("Querying mutations for host %s", host.Hostname)
-	if mutations, err := fetcher.getClickHouseQueryMutations(ctx); err == nil {
-		log.V(2).Infof("Extracted %d mutations for %s", len(mutations), host.Hostname)
+func (e *Exporter) collectHostMutationsMetrics(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+	log.V(1).Infof("Querying mutations for host %s", host.Hostname)
+	start := time.Now()
+	mutations, err := fetcher.getClickHouseQueryMutations(ctx)
+	elapsed := time.Now().Sub(start)
+	if err == nil {
+		log.V(1).Infof("Extracted [%s] %d mutations for %s", elapsed, len(mutations), host.Hostname)
 		writer.WriteMutations(mutations)
 		writer.WriteOKFetch("system.mutations")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.mutations for host %s err: %s", host.Hostname, err)
+		log.Warningf("Error [%s] querying system.mutations for host %s err: %s", elapsed, host.Hostname, err)
 		writer.WriteErrorFetch("system.mutations")
 	}
+}
 
-	log.V(2).Infof("Querying disks for host %s", host.Hostname)
-	if disks, err := fetcher.getClickHouseQuerySystemDisks(ctx); err == nil {
-		log.V(2).Infof("Extracted %d disks for host %s", len(disks), host.Hostname)
+func (e *Exporter) collectHostSystemDisksMetrics(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+	log.V(1).Infof("Querying disks for host %s", host.Hostname)
+	start := time.Now()
+	disks, err := fetcher.getClickHouseQuerySystemDisks(ctx)
+	elapsed := time.Now().Sub(start)
+	if err == nil {
+		log.V(1).Infof("Extracted [%s] %d disks for host %s", elapsed, len(disks), host.Hostname)
 		writer.WriteSystemDisks(disks)
 		writer.WriteOKFetch("system.disks")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.disks for host %s err: %s", host.Hostname, err)
+		log.Warningf("Error [%s] querying system.disks for host %s err: %s", elapsed, host.Hostname, err)
 		writer.WriteErrorFetch("system.disks")
 	}
+}
 
-	log.V(2).Infof("Querying detached parts for host %s", host.Hostname)
-	if detachedParts, err := fetcher.getClickHouseQueryDetachedParts(ctx); err == nil {
-		log.V(2).Infof("Extracted %d detached parts info for host %s", len(detachedParts), host.Hostname)
+func (e *Exporter) collectHostDetachedPartsMetrics(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *PrometheusWriter) {
+	log.V(1).Infof("Querying detached parts for host %s", host.Hostname)
+	start := time.Now()
+	detachedParts, err := fetcher.getClickHouseQueryDetachedParts(ctx)
+	elapsed := time.Now().Sub(start)
+	if err == nil {
+		log.V(1).Infof("Extracted [%s] %d detached parts info for host %s", elapsed, len(detachedParts), host.Hostname)
 		writer.WriteDetachedParts(detachedParts)
 		writer.WriteOKFetch("system.detached_parts")
 	} else {
 		// In case of an error fetching data from clickhouse store CHI name in e.cleanup
-		log.Warningf("Error querying system.detached_parts for host %s err: %s", host.Hostname, err)
+		log.Warningf("Error [%s] querying system.detached_parts for host %s err: %s", elapsed, host.Hostname, err)
 		writer.WriteErrorFetch("system.detached_parts")
 	}
 }
