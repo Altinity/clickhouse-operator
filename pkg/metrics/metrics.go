@@ -95,9 +95,9 @@ func Meter() otelApi.Meter {
 }
 
 func serveMetrics() {
-	fmt.Printf("serving metrics at localhost:2223/metrics")
+	fmt.Printf("serving metrics at :9999/metrics")
 	http.Handle("/metrics", promhttp.Handler())
-	err := http.ListenAndServe(":2223", nil)
+	err := http.ListenAndServe(":9999", nil)
 	if err != nil {
 		fmt.Printf("error serving http: %v", err)
 		return

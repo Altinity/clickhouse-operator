@@ -112,6 +112,9 @@ spec:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
             {{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}
+          ports:
+            - containerPort: 9999
+              name: metrics
           resources: {{ toYaml .Values.operator.resources | nindent 12 }}
           securityContext: {{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}
 {{ if .Values.metrics.enabled }}

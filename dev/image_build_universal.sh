@@ -29,6 +29,7 @@ fi
 ARCHITECTURE=$(uname -m)
 # Do nothing if architecture is arm，such as MacOS M1/M2
 
+# We may need to install qemu
 if [[ ! "${ARCHITECTURE}" =~ "arm" ]]; then
     if ! docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
         sudo apt-get install -y qemu binfmt-support qemu-user-static
@@ -40,6 +41,10 @@ if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|ina
     docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
 fi
 
+#
+# Build docker command
+#
+
 DOCKER_CMD="docker buildx build --progress plain"
 if [[ "${DOCKER_IMAGE}" =~ ":dev" || "${MINIKUBE}" == "yes" ]]; then
     DOCKER_CMD="${DOCKER_CMD} --output type=image,name=${DOCKER_IMAGE} --platform=linux/amd64"
@@ -49,14 +54,17 @@ fi
 
 DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev} --build-arg RELEASE=${RELEASE:-1}"
 
+# Append GC flags if present
 if [[ ! -z "${GCFLAGS}" ]]; then
     DOCKER_CMD="--build-arg GCFLAGS='${GCFLAGS}'"
 fi
 
+# Append repo push
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
     DOCKER_CMD="${DOCKER_CMD} --push"
 fi
 
+# Finalize docker command
 DOCKER_CMD="${DOCKER_CMD} -t ${DOCKER_IMAGE} -f ${DOCKERFILE} ${SRC_ROOT}"
 
 if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then

@@ -298,7 +298,6 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
             kubectl.delete_chi(chi)
 
 
-
 def wait_operator_restart(chi, wait_objects, shell=None):
     with When("Restart operator"):
         util.restart_operator(shell=shell)
@@ -317,7 +316,7 @@ def check_operator_restart(chi, wait_objects, pod, shell=None):
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell)
 
         with Then("ClickHouse pods should not be restarted during operator's restart"):
-            print(f"pod start_time old: {start_time}'")
+            print(f"pod start_time old: {start_time}")
             print(f"pod start_time new: {new_start_time}")
             assert start_time == new_start_time
 
@@ -409,7 +408,6 @@ def test_operator_restart(self, manifest, service, version=None):
     with Finally("I clean up"):
         with By("deleting chi"):
             kubectl.delete_chi(chi)
-
 
 
 def get_replicas_from_remote_servers(chi, cluster):
@@ -1735,6 +1733,8 @@ def test_016(self):
                 f'exec chi-{chi}-default-0-0-0 -- bash -c "grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l"',
                 "1",
             )
+        # Wait for changes to propagate
+        time.sleep(90)
 
         with Then("test_norestart user should be available"):
             version = clickhouse.query(chi, sql="select version()", user="test_norestart")
@@ -1849,7 +1849,7 @@ def test_017(self):
 
 
 @TestScenario
-@Name("test_018. Test that server settings are applied before statefulset is started")
+@Name("test_018. Test that server settings are applied before StatefulSet is started")
 # Obsolete, covered by test_016
 def test_018(self):
     create_shell_namespace_clickhouse_template()
@@ -2869,11 +2869,12 @@ def test_028(self):
                 note("Restart needs to be cleaned")
                 start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
 
-        # with Then("Clear RollingUpdate restart policy"):
-        #    cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
-        #    kubectl.launch(cmd)
-        #    time.sleep(10)
-        #    kubectl.wait_chi_status(chi, "Completed")
+        # We need to clear RollingUpdate restart policy because of new operator's IP address emerging sometimes
+        with Then("Clear RollingUpdate restart policy"):
+            cmd = f"patch chi {chi} --type='json' --patch='[{{\"op\":\"remove\",\"path\":\"/spec/restart\"}}]'"
+            kubectl.launch(cmd)
+            time.sleep(15)
+            kubectl.wait_chi_status(chi, "Completed")
 
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(
