@@ -3485,11 +3485,13 @@ def test_036(self):
         )
 
     with And("Wait for PVC to detect PV is lost"):
+        # Need to add more retries on real kubernetes
         kubectl.wait_field(
-            "pvc",
-            "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
-            ".status.phase",
-            "Lost",
+            kind="pvc",
+            name="default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+            field=".status.phase",
+            value="Lost",
+            retries=50,
         )
 
     with Then("Kick operator to start reconcile cycle to fix lost PV"):
