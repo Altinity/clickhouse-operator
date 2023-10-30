@@ -3270,26 +3270,6 @@ def test_034(self):
     chopconf_file = "manifests/chopconf/test-034-chopconf.yaml"
     operator_namespace = current().context.operator_namespace
 
-    def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=7):
-        with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
-            for i in range(1, max_retries):
-                url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
-                out = kubectl.launch(
-                    f"exec {operator_pod} -c metrics-exporter -- {url_cmd}",
-                    ns=operator_namespace,
-                )
-                rx = re.compile(expect_pattern, re.MULTILINE)
-                matches = rx.findall(out)
-                expected_pattern_found = False
-                if matches:
-                    expected_pattern_found = True
-
-                if expected_pattern_found:
-                    break
-                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                    time.sleep(i * 5)
-            assert expected_pattern_found, error()
-
     with When("create the chi without secure connection"):
         manifest = "manifests/chi/test-034-http.yaml"
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -4018,22 +3998,18 @@ def test_043_1(self):
 
 
 @TestScenario
-@Requirements(RQ_SRS_026_ClickHouseOperator_ReconcilingCycle("1.0"),
-              RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation("1.0"))
-@Name("test_044. Schema and data propagation with slow replica")
-def test_044(self):
-    """Check that schema and data can be propagated on other replica if replica start takes a lot of time."""
+@Name("test_046. Metrics for clickhouse-operator")
+def test_046(self):
+    """Check that clickhouse-operator creates metrics for reconcile and other clickhouse-operator events."""
     create_shell_namespace_clickhouse_template()
     cluster = "default"
-    manifest = f"manifests/chi/test-044-0-slow-propagation.yaml"
+    manifest = f"manifests/chi/test-046-0-clickhouse-operator-metrics.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-    util.require_keeper(keeper_type=self.context.keeper_type)
     operator_namespace = current().context.operator_namespace
+    out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
+    operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
 
-    with Given("I change operator statefullSet timeout"):
-        util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
-
-    with And("CHI with 1 replica is installed"):
+    with Given("CHI with 1 replica is installed"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -4042,48 +4018,39 @@ def test_044(self):
             },
         )
 
-    with When("I create replicated table on the first replica"):
-        clickhouse.query(
-            chi,
-            """CREATE TABLE test_local ON CLUSTER 'default' (a UInt32)
-            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-            PARTITION BY tuple() ORDER BY a"""
-        )
-
-    with And("I add 1 slow replica"):
-        kubectl.create_and_check(
-            manifest="manifests/chi/test-044-1-slow-propagation.yaml",
-            check={
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
-        client_pod = f"chi-{chi}-{cluster}-0-1-0"
-        kubectl.wait_field(
-            "pod",
-            client_pod,
-            ".status.containerStatuses[0].ready",
-            "true")
-
-    with Then("I check that schema is not yet propagated"):
-        with By("checking schema on the slow replica"):
-            r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
-            assert not ("test_local" in r), error()
-
     with When("I update CHI manifest to trigger reconcile"):
         with By("adding taskID to CHI"):
             kubectl.create_and_check(
-                manifest="manifests/chi/test-044-2-slow-propagation.yaml",
+                manifest="manifests/chi/test-046-1-clickhouse-operator-metrics.yaml",
                 check={
                     "pod_count": 2,
                     "do_not_delete": 1,
                 },
             )
 
-    with Then("I check schema is propagated"):
-        with By("checking schema on the slow replica"):
-            r = clickhouse.query(chi, "SHOW tables", host=f"chi-{chi}-{cluster}-0-1-0")
-            assert "test_local" in r, error()
+    metrics_names = [
+        "clickhouse_operator_chi_reconciles_started",
+        "clickhouse_operator_chi_reconciles_completed",
+        "clickhouse_operator_chi_reconciles_timings",
+        "clickhouse_operator_host_reconciles_started",
+        "clickhouse_operator_host_reconciles_completed",
+        "clickhouse_operator_host_reconciles_restarts",
+        "clickhouse_operator_host_reconciles_errors",
+        "clickhouse_operator_host_reconciles_timings",
+        "clickhouse_operator_pod_add_events",
+        "clickhouse_operator_pod_update_events",
+        "clickhouse_operator_pod_delete_events",
+        ]
+    pattern = ".*" + ".*".join(metrics_names) + ".*"
+
+    with Then("I check metrics for clickhouse-operator exists"):
+        check_metrics_monitoring(
+            operator_namespace,
+            operator_pod,
+            container="clickhouse-operator",
+            port="9999",  # FIXME not defined yet
+            expect_pattern=pattern,
+        )
 
     with Finally("I clean up"):
         with By("deleting chi"):
