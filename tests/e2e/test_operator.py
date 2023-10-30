@@ -1733,6 +1733,8 @@ def test_016(self):
                 f'exec chi-{chi}-default-0-0-0 -- bash -c "grep test_norestart /etc/clickhouse-server/users.d/my_users.xml | wc -l"',
                 "1",
             )
+        # Wait for changes to propagate
+        time.sleep(90)
 
         with Then("test_norestart user should be available"):
             version = clickhouse.query(chi, sql="select version()", user="test_norestart")
