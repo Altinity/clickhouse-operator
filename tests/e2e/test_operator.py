@@ -3439,19 +3439,12 @@ def test_034(self):
 @Tags("NO_PARALLEL")
 def test_036(self):
     """Check clickhouse operator recreates volumes and schema if volume is broken."""
+    create_shell_namespace_clickhouse_template()
+
     with Given("I create shells"):
         shell = get_shell()
         self.context.shell = shell
         shell_2 = get_shell()
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
 
     manifest = f"manifests/chi/test-036-volume-re-provisioning-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -3490,8 +3483,6 @@ def test_036(self):
             f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
         )
 
-        with Then("Give it some time to be deleted"):
-            time.sleep(90)
         with Then("PVC should be kept, PV should be deleted"):
             new_pvc_count = kubectl.get_count("pvc", chi=chi)
             new_pv_count = kubectl.get_count("pv")
