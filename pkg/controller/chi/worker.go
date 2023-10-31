@@ -995,11 +995,11 @@ func (w *worker) completeQueries(ctx context.Context, host *chiV1.ChiHost) error
 	log.V(1).M(host).F().S().Info("complete queries start")
 	defer log.V(1).M(host).F().E().Info("complete queries end")
 
-	if !w.shouldWaitQueries(host) {
-		return nil
+	if w.shouldWaitQueries(host) {
+		return w.waitHostNoActiveQueries(ctx, host)
 	}
 
-	return w.waitHostNoActiveQueries(ctx, host)
+	return nil
 }
 
 // shouldIncludeHost determines whether host to be included into cluster after reconciling

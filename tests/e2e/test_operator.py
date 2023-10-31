@@ -4120,14 +4120,19 @@ def test_045(self, manifest):
                 },
             )
 
-    with When("I restart operator"):
+    with When("I reconcile CHI with restart=RollingUpdate"):
         with By("patching CHI with a restart attribute"):
             cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
             kubectl.launch(cmd)
 
+    # Reconcile will exclude host from the cluster which may take up to 1 minute
+    counter = 90
     with Then("operator SHALL not wait for the query to finish"):
-        out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
-        assert out != "30", error()
+        out = clickhouse.query_with_error(
+            chi_name=chi,
+            sql=f"select count(sleepEachRow(1)) from numbers({counter})",
+            timeout=120)
+        assert out != counter, error()
 
     with Finally("I clean up"):
         with By("deleting chi"):
