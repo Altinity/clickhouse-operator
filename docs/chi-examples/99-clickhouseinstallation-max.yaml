@@ -57,11 +57,11 @@ spec:
     # autoPurge: "yes"
 
   reconciling:
-    # Overrides both 'reconcile.host.wait.{exclude, include}' values from the operator's config
-    # Possible values:
-    #  - wait
-    #  - nowait
     # Syntax sugar
+    # Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+    # Possible values:
+    #  - wait - should wait to exclude host, complete queries and include host back into the cluster
+    #  - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
     policy: "nowait"
 
     # Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
