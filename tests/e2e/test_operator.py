@@ -3506,7 +3506,6 @@ def test_036(self):
             name="default-chi-test-036-volume-re-provisioning-simple-0-0-0",
             field=".status.phase",
             value="Lost",
-            retries=50,
         )
 
     with Then("Kick operator to start reconcile cycle to fix lost PV"):
