@@ -29,7 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-//const clickHouseDriverName = "clickhouse"
+// const clickHouseDriverName = "clickhouse"
 const clickHouseDriverName = "chhttp"
 
 func init() {

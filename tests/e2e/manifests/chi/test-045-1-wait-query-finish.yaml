@@ -4,7 +4,7 @@ metadata:
   name: test-045-wait-queries
 spec:
   reconciling:
-    policy: nowaitqueries
+    policy: nowait
   useTemplates:
     - name: clickhouse-version
   configuration:
