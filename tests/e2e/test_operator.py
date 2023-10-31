@@ -97,6 +97,7 @@ def test_003(self):
             delete_test_namespace()
 
 
+
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 @Requirements(
@@ -4042,6 +4043,7 @@ def test_044(self):
     with Given("I change operator statefullSet timeout"):
         util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
 
+
     with And("CHI with 1 replica is installed"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -4099,6 +4101,65 @@ def test_044(self):
             kubectl.delete_chi(chi)
         with And("deleting test namespace"):
             delete_test_namespace()
+
+
+@TestCheck
+@Name("test_045. Restart operator without waiting for queries to finish")
+def test_045(self, manifest):
+    """Check that operator support does not wait for the query
+     to finish before operator commences restart."""
+
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+                },
+            )
+
+    with When("I restart operator"):
+        with By("patching CHI with a restart attribute"):
+            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
+            kubectl.launch(cmd)
+
+    with Then("operator SHALL not wait for the query to finish"):
+        out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
+        assert out != "30", error()
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy("1.0"))
+@Name("test_045_1. Reconcile wait queries property specified by CHI")
+def test_045_1(self):
+    """Check that operator supports spec.reconciling.policy property in CHI that
+    forces the operator not to wait for the queries to finish before restart."""
+
+    create_shell_namespace_clickhouse_template()
+
+    test_045(manifest=f"manifests/chi/test-045-1-wait-query-finish.yaml")
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries("1.0"))
+@Name("test_045_2. Reconcile wait queries property specified by clickhouse-operator config")
+def test_045_2(self):
+    """Check that operator supports spec.reconcile.host.wait.queries property in clickhouse-operator config
+    that forces the operator not to wait for the queries to finish before restart."""
+    create_shell_namespace_clickhouse_template()
+
+    with Given("I set spec.reconcile.host.wait.queries property"):
+        util.apply_operator_config("manifests/chopconf/test-045-chopconf.yaml")
+
+    test_045(manifest=f"manifests/chi/test-045-2-wait-query-finish.yaml")
 
 
 @TestModule
