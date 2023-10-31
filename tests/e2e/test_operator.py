@@ -3476,13 +3476,28 @@ def test_036(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
-    with When("I delete PV", description="delete PV on replica 0"):
-        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+    with When("Delete PV", description="delete PV on replica 0"):
+        # Prepare counters
+        pvc_count = kubectl.get_count("pvc", chi=chi)
+        pv_count = kubectl.get_count("pv")
+        print(f"pvc_count: {pvc_count}")
+        print(f"pv_count: {pv_count}")
 
+        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
         kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2)
         kubectl.launch(
             f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
         )
+
+        with Then("Give it some time to be deleted"):
+            time.sleep(90)
+        with Then("PVC should be kept, PV should be deleted"):
+            new_pvc_count = kubectl.get_count("pvc", chi=chi)
+            new_pv_count = kubectl.get_count("pv")
+            print(f"new_pvc_count: {new_pvc_count}")
+            print(f"new_pv_count: {new_pv_count}")
+            assert new_pvc_count == pvc_count
+            assert new_pv_count < pv_count
 
     with And("Wait for PVC to detect PV is lost"):
         # Need to add more retries on real kubernetes
