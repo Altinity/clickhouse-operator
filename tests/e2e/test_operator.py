@@ -3484,6 +3484,8 @@ def test_036(self):
             f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
         )
 
+        # Give it some time to be deleted
+        time.sleep(30)
         with Then("PVC should be kept, PV should be deleted"):
             new_pvc_count = kubectl.get_count("pvc", chi=chi)
             new_pv_count = kubectl.get_count("pv")
