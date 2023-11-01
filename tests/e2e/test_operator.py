@@ -3149,6 +3149,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
 
 @TestScenario
 @Name("test_032. Test rolling update logic")
+@Tags("NO_PARALLEL")
 def test_032(self):
     """Test rolling update logic."""
     create_shell_namespace_clickhouse_template()
