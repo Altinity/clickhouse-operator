@@ -3479,13 +3479,26 @@ def test_036(self):
         print(f"pv_count: {pv_count}")
 
         pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+        # retry
         kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2)
         kubectl.launch(
             f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
         )
-
         # Give it some time to be deleted
-        time.sleep(30)
+        time.sleep(10)
+        kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
+        kubectl.launch(
+            f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+            ok_to_fail = True
+        )
+        kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
+        kubectl.launch(
+            f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+            ok_to_fail=True
+        )
+        # Give it some time to be deleted
+        time.sleep(10)
+
         with Then("PVC should be kept, PV should be deleted"):
             new_pvc_count = kubectl.get_count("pvc", chi=chi)
             new_pv_count = kubectl.get_count("pv")
