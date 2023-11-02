@@ -23,6 +23,7 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
 )
@@ -245,9 +246,15 @@ func (c *Controller) getPodsOfCHI(chi *chiV1.ClickHouseInstallation) (pods []*co
 
 // getPodsIPs gets all pod IPs
 func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
+	log.V(2).M(obj).F().S().Info("looking for pods IPs")
+	defer log.V(2).M(obj).F().E().Info("looking for pods IPs")
+
 	for _, pod := range c.getPods(obj) {
-		if ip := pod.Status.PodIP; ip != "" {
+		if ip := pod.Status.PodIP; ip == "" {
+			log.V(2).M(pod).F().Warning("Pod NO IP address found. Pod: %s/%s", pod.Namespace, pod.Name)
+		} else {
 			ips = append(ips, ip)
+			log.V(2).M(pod).F().Info("Pod IP address found. Pod: %s/%s IP: %s", pod.Namespace, pod.Name, ip)
 		}
 	}
 	return ips

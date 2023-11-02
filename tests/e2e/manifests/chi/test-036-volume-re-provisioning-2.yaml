@@ -3,6 +3,7 @@ kind: "ClickHouseInstallation"
 metadata:
   name: "test-036-volume-re-provisioning"
 spec:
+  taskID: "fix lost PV"
   useTemplates:
     - name: clickhouse-version
   configuration:

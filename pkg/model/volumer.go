@@ -15,37 +15,55 @@
 package model
 
 import (
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	coreV1 "k8s.io/api/core/v1"
+
+	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func getPVCReclaimPolicy(host *v1.ChiHost, template *v1.ChiVolumeClaimTemplate) v1.PVCReclaimPolicy {
+func (c *Creator) getVolumeClaimTemplate(volumeMount *coreV1.VolumeMount) (*chop.ChiVolumeClaimTemplate, bool) {
+	volumeClaimTemplateName := volumeMount.Name
+	volumeClaimTemplate, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName)
+	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
+	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
+	return volumeClaimTemplate, ok
+}
+
+func GetVolumeClaimTemplate(host *chop.ChiHost, volumeMount *coreV1.VolumeMount) (*chop.ChiVolumeClaimTemplate, bool) {
+	volumeClaimTemplateName := volumeMount.Name
+	volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
+	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
+	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
+	return volumeClaimTemplate, ok
+}
+
+func getPVCReclaimPolicy(host *chop.ChiHost, template *chop.ChiVolumeClaimTemplate) chop.PVCReclaimPolicy {
 	// Order by priority
 
 	// VolumeClaimTemplate.PVCReclaimPolicy, in case specified
-	if template.PVCReclaimPolicy != v1.PVCReclaimPolicyUnspecified {
+	if template.PVCReclaimPolicy != chop.PVCReclaimPolicyUnspecified {
 		return template.PVCReclaimPolicy
 	}
 
-	if host.CHI.Spec.Defaults.StorageManagement.PVCReclaimPolicy != v1.PVCReclaimPolicyUnspecified {
+	if host.CHI.Spec.Defaults.StorageManagement.PVCReclaimPolicy != chop.PVCReclaimPolicyUnspecified {
 		return host.CHI.Spec.Defaults.StorageManagement.PVCReclaimPolicy
 	}
 
 	// Default value
-	return v1.PVCReclaimPolicyDelete
+	return chop.PVCReclaimPolicyDelete
 }
 
-func getPVCProvisioner(host *v1.ChiHost, template *v1.ChiVolumeClaimTemplate) v1.PVCProvisioner {
+func getPVCProvisioner(host *chop.ChiHost, template *chop.ChiVolumeClaimTemplate) chop.PVCProvisioner {
 	// Order by priority
 
 	// VolumeClaimTemplate.PVCProvisioner, in case specified
-	if template.PVCProvisioner != v1.PVCProvisionerUnspecified {
+	if template.PVCProvisioner != chop.PVCProvisionerUnspecified {
 		return template.PVCProvisioner
 	}
 
-	if host.CHI.Spec.Defaults.StorageManagement.PVCProvisioner != v1.PVCProvisionerUnspecified {
+	if host.CHI.Spec.Defaults.StorageManagement.PVCProvisioner != chop.PVCProvisionerUnspecified {
 		return host.CHI.Spec.Defaults.StorageManagement.PVCProvisioner
 	}
 
 	// Default value
-	return v1.PVCProvisionerStatefulSet
+	return chop.PVCProvisionerStatefulSet
 }

@@ -41,12 +41,13 @@ def create_test_namespace(self, force=False):
         return self.context.test_namespace
 
 
-@TestStep(Then)
+@TestStep(Finally)
 def delete_test_namespace(self):
     shell = get_shell()
     self.context.shell = shell
     util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
     shell.close()
+
 
 @TestStep(Given)
 def get_ch_version(self, test_file):

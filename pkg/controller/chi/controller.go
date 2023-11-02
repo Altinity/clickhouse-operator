@@ -105,7 +105,7 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	queuesNum := chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber+chiV1.DefaultReconcileSystemThreadsNumber
+	queuesNum := chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber + chiV1.DefaultReconcileSystemThreadsNumber
 	for i := 0; i < queuesNum; i++ {
 		c.queues = append(
 			c.queues,
@@ -414,13 +414,16 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.AddFunc")
+			c.enqueueObject(NewReconcilePod(reconcileAdd, nil, pod))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			pod := old.(*coreV1.Pod)
-			if !c.isTrackedObject(&pod.ObjectMeta) {
+			oldPod := old.(*coreV1.Pod)
+			newPod := new.(*coreV1.Pod)
+			if !c.isTrackedObject(&newPod.ObjectMeta) {
 				return
 			}
-			log.V(3).M(pod).Info("podInformer.UpdateFunc")
+			log.V(2).M(newPod).Info("podInformer.UpdateFunc")
+			c.enqueueObject(NewReconcilePod(reconcileUpdate, oldPod, newPod))
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*coreV1.Pod)
@@ -428,6 +431,7 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
+			c.enqueueObject(NewReconcilePod(reconcileDelete, pod, nil))
 		},
 	})
 }
@@ -585,6 +589,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		*ReconcileCHIT,
 		*ReconcileChopConfig,
 		*ReconcileEndpoints,
+		*ReconcilePod,
 		*DropDns:
 		variants := chiV1.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)

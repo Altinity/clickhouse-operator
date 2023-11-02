@@ -242,7 +242,7 @@ func (c *Controller) pollStatefulSet(
 
 		if time.Since(start) >= opts.Timeout {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).M(namespace, name).F().Info("%s/%s - TIMEOUT reached")
+			log.V(1).M(namespace, name).F().Info("waitStatefulSet(%s/%s) - TIMEOUT reached", namespace, name)
 			return fmt.Errorf("waitStatefulSet(%s/%s) - wait timeout", namespace, name)
 		}
 

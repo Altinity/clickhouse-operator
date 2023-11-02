@@ -27,3 +27,10 @@ var (
 	errCRUDRecreate       ErrorCRUD = errors.New("crud error - should recreate")
 	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
 )
+
+// ErrorPVC specifies errors of the PVC operations
+type ErrorPVC error
+
+var (
+	errLostPVCDeleted ErrorPVC = errors.New("pvc - lost pvc deleted")
+)

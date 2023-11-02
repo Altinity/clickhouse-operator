@@ -606,14 +606,6 @@ func (chi *ClickHouseInstallation) IsRollingUpdate() bool {
 	return chi.Spec.Restart == RestartRollingUpdate
 }
 
-// IsNoRestartSpecified checks whether CHI has no restart request
-func (chi *ClickHouseInstallation) IsNoRestartSpecified() bool {
-	if chi == nil {
-		return false
-	}
-	return chi.Spec.Restart == ""
-}
-
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
 func (chi *ClickHouseInstallation) IsTroubleshoot() bool {
 	if chi == nil {

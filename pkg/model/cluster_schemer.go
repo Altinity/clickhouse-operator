@@ -192,9 +192,9 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *chop.ChiHost)
 }
 
 // HostDropReplica calls SYSTEM DROP REPLICA
-func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRun, hostToDrop *chop.ChiHost) error {
-	log.V(1).M(hostToRun).F().Info("Drop replica: %v at %v", CreateInstanceHostname(hostToDrop), hostToRun.Address.HostName)
-	return s.ExecHost(ctx, hostToRun, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
+func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *chop.ChiHost) error {
+	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", CreateInstanceHostname(hostToDrop), hostToRunOn.Address.HostName)
+	return s.ExecHost(ctx, hostToRunOn, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
 }
 
 // createTablesSQLs makes all SQL for migrating tables
@@ -225,7 +225,8 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHos
 		return nil
 	}
 
-	log.V(1).M(host).F().Info("Migrating schema objects to host %s", host.Address.HostName)
+	log.V(1).M(host).F().S().Info("Migrating schema objects to host %s", host.Address.HostName)
+	defer log.V(1).M(host).F().E().Info("Migrating schema objects to host %s", host.Address.HostName)
 
 	replicatedObjectNames,
 		replicatedCreateSQLs,
@@ -234,14 +235,14 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHos
 
 	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
-		log.V(2).M(host).F().Info("Creating replica objects at %s: %v", host.Address.HostName, replicatedObjectNames)
+		log.V(1).M(host).F().Info("Creating replicated objects at %s: %v", host.Address.HostName, replicatedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", replicatedCreateSQLs)
 		err1 = s.ExecHost(ctx, host, replicatedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 	}
 
 	var err2 error
 	if len(distributedCreateSQLs) > 0 {
-		log.V(2).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, distributedObjectNames)
+		log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, distributedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", distributedCreateSQLs)
 		err2 = s.ExecHost(ctx, host, distributedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 	}
@@ -260,7 +261,7 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHos
 func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.getDropTablesSQLs(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
-	return s.ExecHost(ctx, host, dropTableSQLs, clickhouse.NewQueryOptions().SetRetry(true))
+	return s.ExecHost(ctx, host, dropTableSQLs, clickhouse.NewQueryOptions().SetRetry(false))
 }
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
@@ -301,8 +302,8 @@ func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *chop.Ch
 	return s.QueryHostInt(ctx, host, sql)
 }
 
-// HostVersion returns ClickHouse version on the host
-func (s *ClusterSchemer) HostVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
+// HostClickHouseVersion returns ClickHouse version on the host
+func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
 	sql := `SELECT version()`
 	return s.QueryHostString(ctx, host, sql)
 }

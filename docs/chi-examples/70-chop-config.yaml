@@ -128,8 +128,8 @@ spec:
 
     host:
       wait:
-        exclude: true
-        include: false
+        exclude: "true"
+        include: "false"
 
   ################################################
   ##

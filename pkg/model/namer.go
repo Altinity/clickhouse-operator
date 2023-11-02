@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	coreV1 "k8s.io/api/core/v1"
 
 	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -749,9 +749,25 @@ func createPodNamesOfCHI(chi *chop.ClickHouseInstallation) (names []string) {
 	return names
 }
 
-// CreatePVCName creates PVC name from components, to which PVC belongs to
-func CreatePVCName(host *chop.ChiHost, _ *v1.VolumeMount, template *chop.ChiVolumeClaimTemplate) string {
-	return template.Name + "-" + CreatePodName(host)
+// CreatePVCNameByVolumeClaimTemplate creates PVC name
+func CreatePVCNameByVolumeClaimTemplate(host *chop.ChiHost, volumeClaimTemplate *chop.ChiVolumeClaimTemplate) string {
+	return createPVCName(host, volumeClaimTemplate.Name)
+}
+
+// CreatePVCNameByVolumeMount creates PVC name
+func CreatePVCNameByVolumeMount(host *chop.ChiHost, volumeMount *coreV1.VolumeMount) (string, bool) {
+	volumeClaimTemplate, ok := GetVolumeClaimTemplate(host, volumeMount)
+	if !ok {
+		// Unable to find VolumeClaimTemplate related to this volumeMount.
+		// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
+		return "", false
+	}
+	return createPVCName(host, volumeClaimTemplate.Name), true
+}
+
+// createPVCName is an internal function
+func createPVCName(host *chop.ChiHost, volumeMountName string) string {
+	return volumeMountName + "-" + CreatePodName(host)
 }
 
 // CreateClusterAutoSecretName creates Secret name where auto-generated secret is kept

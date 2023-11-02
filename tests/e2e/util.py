@@ -5,6 +5,7 @@ import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.yaml_manifest as yaml_manifest
+import e2e.util as util
 
 from testflows.core import fail, Given, Then, But, current, message
 
@@ -302,6 +303,9 @@ def install_operator_version(version, shell=None):
         shell=shell
     )
 
+def apply_operator_config(chopconf):
+    kubectl.apply(util.get_full_path(chopconf, lookup_in_host=False), current().context.operator_namespace)
+    util.restart_operator()
 
 def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     expected_replicas = 1
