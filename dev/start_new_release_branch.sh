@@ -22,7 +22,12 @@ cat "${SRC_ROOT}/release" "${SRC_ROOT}/releases" > "${SRC_ROOT}/releases_tmp" &&
 # And write new release to release file
 echo "${NEW_RELEASE}" > "${SRC_ROOT}/release"
 
+# Commit new branch
+git add ..
+git commit -m "${NEW_RELEASE}"
+
 # Some niceness
 echo "Releases"
 cat "${SRC_ROOT}/release"
 head -n5 "${SRC_ROOT}/releases"
+
