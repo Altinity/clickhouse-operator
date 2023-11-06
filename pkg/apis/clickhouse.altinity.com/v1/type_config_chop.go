@@ -516,22 +516,33 @@ func (c *OperatorConfig) readCHITemplates() (errs []error) {
 
 // enlistCHITemplate inserts template into templates catalog
 func (c *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation) {
-	c.Template.CHI.Runtime.Templates = append(c.Template.CHI.Runtime.Templates, template)
+	if template.FoundIn(c.Template.CHI.Runtime.Templates) {
+		c.unlistCHITemplate(template)
+	}
+	if !template.FoundIn(c.Template.CHI.Runtime.Templates) {
+		c.Template.CHI.Runtime.Templates = append(c.Template.CHI.Runtime.Templates, template)
+	}
 }
 
 // unlistCHITemplate removes template from templates catalog
 func (c *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
 	// Nullify found template entry
 	for _, _template := range c.Template.CHI.Runtime.Templates {
-		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			// TODO normalize
-			//config.CHITemplates[i] = nil
+		if template.MatchFullName(_template.Namespace, _template.Name) {
 			_template.Name = ""
 			_template.Namespace = ""
 		}
 	}
-	// Compact the slice
-	// TODO compact the slice
+
+	// Compact the slice - exclude empty-named templates
+	var named []*ClickHouseInstallation
+	for _, _template := range c.Template.CHI.Runtime.Templates {
+		if !_template.MatchFullName("", "") {
+			named = append(named, _template)
+		}
+	}
+
+	c.Template.CHI.Runtime.Templates = named
 }
 
 // FindTemplate finds specified template within possibly specified namespace
