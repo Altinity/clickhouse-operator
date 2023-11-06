@@ -97,6 +97,7 @@ def test_003(self):
             delete_test_namespace()
 
 
+
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 @Requirements(
@@ -3148,6 +3149,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
 
 @TestScenario
 @Name("test_032. Test rolling update logic")
+@Tags("NO_PARALLEL")
 def test_032(self):
     """Test rolling update logic."""
     create_shell_namespace_clickhouse_template()
@@ -3436,21 +3438,15 @@ def test_034(self):
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
 @Name("test_036. Check operator volume re-provisioning")
+@Tags("NO_PARALLEL")
 def test_036(self):
     """Check clickhouse operator recreates volumes and schema if volume is broken."""
+    create_shell_namespace_clickhouse_template()
+
     with Given("I create shells"):
         shell = get_shell()
         self.context.shell = shell
         shell_2 = get_shell()
-
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
 
     manifest = f"manifests/chi/test-036-volume-re-provisioning-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -3476,20 +3472,49 @@ def test_036(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
-    with When("I delete PV", description="delete PV on replica 0"):
-        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+    with When("Delete PV", description="delete PV on replica 0"):
+        # Prepare counters
+        pvc_count = kubectl.get_count("pvc", chi=chi)
+        pv_count = kubectl.get_count("pv")
+        print(f"pvc_count: {pvc_count}")
+        print(f"pv_count: {pv_count}")
 
+        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+        # retry
         kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2)
         kubectl.launch(
             f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
         )
+        # Give it some time to be deleted
+        time.sleep(10)
+        kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
+        kubectl.launch(
+            f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+            ok_to_fail = True
+        )
+        kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
+        kubectl.launch(
+            f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+            ok_to_fail=True
+        )
+        # Give it some time to be deleted
+        time.sleep(10)
+
+        with Then("PVC should be kept, PV should be deleted"):
+            new_pvc_count = kubectl.get_count("pvc", chi=chi)
+            new_pv_count = kubectl.get_count("pv")
+            print(f"new_pvc_count: {new_pvc_count}")
+            print(f"new_pv_count: {new_pv_count}")
+            assert new_pvc_count == pvc_count
+            assert new_pv_count < pv_count
 
     with And("Wait for PVC to detect PV is lost"):
+        # Need to add more retries on real kubernetes
         kubectl.wait_field(
-            "pvc",
-            "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
-            ".status.phase",
-            "Lost",
+            kind="pvc",
+            name="default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+            field=".status.phase",
+            value="Lost",
         )
 
     with Then("Kick operator to start reconcile cycle to fix lost PV"):
@@ -4034,6 +4059,7 @@ def test_044(self):
     with Given("I change operator statefullSet timeout"):
         util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
 
+
     with And("CHI with 1 replica is installed"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -4091,6 +4117,70 @@ def test_044(self):
             kubectl.delete_chi(chi)
         with And("deleting test namespace"):
             delete_test_namespace()
+
+
+@TestCheck
+@Name("test_045. Restart operator without waiting for queries to finish")
+def test_045(self, manifest):
+    """Check that operator support does not wait for the query
+     to finish before operator commences restart."""
+
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+                },
+            )
+
+    with When("I reconcile CHI with restart=RollingUpdate"):
+        with By("patching CHI with a restart attribute"):
+            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
+            kubectl.launch(cmd)
+
+    # Reconcile will exclude host from the cluster which may take up to 1 minute
+    counter = 90
+    with Then("operator SHALL not wait for the query to finish"):
+        out = clickhouse.query_with_error(
+            chi_name=chi,
+            sql=f"select count(sleepEachRow(1)) from numbers({counter})",
+            timeout=120)
+        assert out != counter, error()
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy("1.0"))
+@Name("test_045_1. Reconcile wait queries property specified by CHI")
+def test_045_1(self):
+    """Check that operator supports spec.reconciling.policy property in CHI that
+    forces the operator not to wait for the queries to finish before restart."""
+
+    create_shell_namespace_clickhouse_template()
+
+    test_045(manifest=f"manifests/chi/test-045-1-wait-query-finish.yaml")
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries("1.0"))
+@Name("test_045_2. Reconcile wait queries property specified by clickhouse-operator config")
+def test_045_2(self):
+    """Check that operator supports spec.reconcile.host.wait.queries property in clickhouse-operator config
+    that forces the operator not to wait for the queries to finish before restart."""
+    create_shell_namespace_clickhouse_template()
+
+    with Given("I set spec.reconcile.host.wait.queries property"):
+        util.apply_operator_config("manifests/chopconf/test-045-chopconf.yaml")
+
+    test_045(manifest=f"manifests/chi/test-045-2-wait-query-finish.yaml")
 
 
 @TestModule

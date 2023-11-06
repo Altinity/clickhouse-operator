@@ -29,7 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-//const clickHouseDriverName = "clickhouse"
+// const clickHouseDriverName = "clickhouse"
 const clickHouseDriverName = "chhttp"
 
 func init() {
@@ -71,7 +71,7 @@ func (c *Connection) SetLog(l log.Announcer) *Connection {
 }
 
 // connect performs connect
-func (c *Connection) connect(_ctx context.Context) {
+func (c *Connection) connect(ctx context.Context) {
 	// Add root CA
 	if c.params.rootCA != "" {
 		rootCAs := x509.NewCertPool()
@@ -95,10 +95,10 @@ func (c *Connection) connect(_ctx context.Context) {
 	}
 
 	// Ping should have timeout
-	ctx, cancel := context.WithTimeout(c.ensureCtx(_ctx), c.params.GetConnectTimeout())
+	pingCtx, cancel := context.WithTimeout(c.ensureCtx(ctx), c.params.GetConnectTimeout())
 	defer cancel()
 
-	if err := dbConnection.PingContext(ctx); err != nil {
+	if err := dbConnection.PingContext(pingCtx); err != nil {
 		c.l.V(1).F().Error("FAILED Ping(%s). Err: %v", c.params.GetDSNWithHiddenCredentials(), err)
 		_ = dbConnection.Close()
 		return

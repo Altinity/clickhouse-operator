@@ -995,11 +995,11 @@ func (w *worker) completeQueries(ctx context.Context, host *chiV1.ChiHost) error
 	log.V(1).M(host).F().S().Info("complete queries start")
 	defer log.V(1).M(host).F().E().Info("complete queries end")
 
-	if !w.shouldWaitQueries(host) {
-		return nil
+	if w.shouldWaitQueries(host) {
+		return w.waitHostNoActiveQueries(ctx, host)
 	}
 
-	return w.waitHostNoActiveQueries(ctx, host)
+	return nil
 }
 
 // shouldIncludeHost determines whether host to be included into cluster after reconciling
@@ -1169,7 +1169,12 @@ func (w *worker) shouldWaitQueries(host *chiV1.ChiHost) bool {
 	case chop.Config().Reconcile.Host.Wait.Queries.Value():
 		w.a.V(1).
 			M(host).F().
-			Info("Will wait for queries to complete according to CHOp config setting, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Will wait for queries to complete according to CHOp config reconcile.host.wait.queries setting, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return true
+	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
+		w.a.V(1).
+			M(host).F().
+			Info("Will wait for queries to complete according to CHI reconciling.policy setting, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
 	}
 
