@@ -3,21 +3,21 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 
 metadata:
-  name: test-044-slow-propagation
+  name: test-046-operator-metrics
 
 spec:
   configuration:
     clusters:
       - name: default
         layout:
-          shardsCount: 1
-          replicas:
-            - templates:
-                podTemplate: fast-replica
+          replicasCount: 2
   templates:
     podTemplates:
-      - name: fast-replica
-        spec:
-          containers:
-            - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+    - name: clickhouse-new
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: clickhouse/clickhouse-server:22.8
+  defaults:
+    templates:
+      podTemplate: clickhouse-new

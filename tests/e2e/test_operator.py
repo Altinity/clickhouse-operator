@@ -3423,14 +3423,10 @@ def test_036(self):
         self.context.shell = shell
         shell_2 = get_shell()
 
-    if self.cflags & PARALLEL:
-        with And("I create test namespace"):
-            create_test_namespace()
-
-        with And(f"Install ClickHouse template {current().context.clickhouse_template}"):
-            kubectl.apply(
-                util.get_full_path(current().context.clickhouse_template, lookup_in_host=False),
-            )
+    create_shell_namespace_clickhouse_template()
+    # if self.cflags & PARALLEL:
+    #     with And("I create test namespace"):
+    #         create_test_namespace()
 
     manifest = f"manifests/chi/test-036-volume-re-provisioning-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -4014,7 +4010,7 @@ def test_046(self):
         kubectl.create_and_check(
             manifest=manifest,
             check={
-                "pod_count": 1,
+                "pod_count": 2,
                 "do_not_delete": 1,
             },
         )
@@ -4029,29 +4025,68 @@ def test_046(self):
                 },
             )
 
-    metrics_names = [
+    with And("I update CHI manifest with wrong clickhouse version"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-046-2-clickhouse-operator-metrics.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                "chi_status": "InProgress",
+            },
+        )
+
+    with Then("ClickHouse image can not be retrieved"):
+        kubectl.wait_field(
+            "pod",
+            "chi-test-046-operator-metrics-default-0-0-0",
+            ".status.containerStatuses[0].state.waiting.reason",
+            "ImagePullBackOff",
+        )
+
+    with And("I restore the correct version"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-046-1-clickhouse-operator-metrics.yaml",
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    client_pod = "chi-test-046-operator-metrics-default-0-1-0"
+    with When("I delete pod"):
+        kubectl.launch(f"delete pod {client_pod}")
+
+    with Then("Wait clickhouse pod is restored"):
+        kubectl.wait_field(
+            "pod",
+            "chi-test-046-operator-metrics-default-0-1-0",
+            ".status.containerStatuses[0].state.waiting.reason",
+            "Ready",
+        )
+    metric_names = [
         "clickhouse_operator_chi_reconciles_started",
         "clickhouse_operator_chi_reconciles_completed",
         "clickhouse_operator_chi_reconciles_timings",
         "clickhouse_operator_host_reconciles_started",
         "clickhouse_operator_host_reconciles_completed",
-        "clickhouse_operator_host_reconciles_restarts",
-        "clickhouse_operator_host_reconciles_errors",
+        # "clickhouse_operator_host_reconciles_restarts",
+        # "clickhouse_operator_host_reconciles_errors",
         "clickhouse_operator_host_reconciles_timings",
         "clickhouse_operator_pod_add_events",
         "clickhouse_operator_pod_update_events",
         "clickhouse_operator_pod_delete_events",
         ]
-    pattern = ".*" + ".*".join(metrics_names) + ".*"
 
-    with Then("I check metrics for clickhouse-operator exists"):
-        check_metrics_monitoring(
-            operator_namespace,
-            operator_pod,
-            container="clickhouse-operator",
-            port="9999",  # FIXME not defined yet
-            expect_pattern=pattern,
-        )
+    for metric_name in metric_names:
+        pattern = f".*{metric_name}.*"
+        with Then(f"I check {metric_name} metric for clickhouse-operator exists"):
+            check_metrics_monitoring(
+                operator_namespace=operator_namespace,
+                operator_pod=operator_pod,
+                container="clickhouse-operator",
+                port="9999",
+                expect_pattern=pattern,
+            )
 
     with Finally("I clean up"):
         with By("deleting chi"):

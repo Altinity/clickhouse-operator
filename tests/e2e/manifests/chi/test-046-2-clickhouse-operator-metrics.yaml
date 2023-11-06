@@ -6,7 +6,6 @@ metadata:
   name: test-046-operator-metrics
 
 spec:
-  taskID: "run reconcile"
   configuration:
     clusters:
       - name: default
@@ -18,7 +17,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.8
+          image: clickhouse/clickhouse-server:22.8-broken
   defaults:
     templates:
       podTemplate: clickhouse-new
