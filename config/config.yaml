@@ -156,9 +156,9 @@ clickhouse:
     # Specified in seconds.
     timeouts:
       # Timout to setup connection from the operator to ClickHouse instances. In seconds.
-      connect: 2
+      connect: 1
       # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
-      query: 5
+      query: 4
 
   #################################################
   ##
