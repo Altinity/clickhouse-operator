@@ -149,7 +149,7 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
-// GetCHISelector gets CGHI selector
+// GetCHISelector gets CHI selector
 func (t *ChiTemplating) GetCHISelector() CHISelector {
 	if t == nil {
 		return nil

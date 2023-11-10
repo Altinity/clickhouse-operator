@@ -555,12 +555,35 @@ func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate,
 	return chi.GetServiceTemplate(name)
 }
 
+// MatchNamespace matches namespace
+func (chi *ClickHouseInstallation) MatchNamespace(namespace string) bool {
+	if chi == nil {
+		return false
+	}
+	return chi.Namespace == namespace
+}
+
 // MatchFullName matches full name
 func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	if chi == nil {
 		return false
 	}
 	return (chi.Namespace == namespace) && (chi.Name == name)
+}
+
+// FoundIn checks whether CHI can be found in haystack
+func (chi *ClickHouseInstallation) FoundIn(haystack []*ClickHouseInstallation) bool {
+	if chi == nil {
+		return false
+	}
+
+	for _, candidate := range haystack {
+		if candidate.MatchFullName(chi.Namespace, chi.Name) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Possible templating policies
