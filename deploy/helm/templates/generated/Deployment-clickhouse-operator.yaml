@@ -112,7 +112,11 @@ spec:
                   containerName: {{ .Chart.Name }}
                   resource: limits.memory
             {{ with .Values.operator.env }}{{ toYaml . | nindent 12 }}{{ end }}
+          ports:
+            - containerPort: 9999
+              name: metrics
           resources: {{ toYaml .Values.operator.resources | nindent 12 }}
+          securityContext: {{ toYaml .Values.operator.containerSecurityContext | nindent 12 }}
 {{ if .Values.metrics.enabled }}
         - name: metrics-exporter
           image: {{ .Values.metrics.image.repository }}:{{ include "altinity-clickhouse-operator.metrics.tag" . }}
@@ -182,8 +186,10 @@ spec:
             - containerPort: 8888
               name: metrics
           resources: {{ toYaml .Values.metrics.resources | nindent 12 }}
+          securityContext: {{ toYaml .Values.metrics.containerSecurityContext | nindent 12 }}
 {{ end }}
       imagePullSecrets: {{ toYaml .Values.imagePullSecrets | nindent 8 }}
       nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
       affinity: {{ toYaml .Values.affinity | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      securityContext: {{ toYaml .Values.podSecurityContext | nindent 8 }}

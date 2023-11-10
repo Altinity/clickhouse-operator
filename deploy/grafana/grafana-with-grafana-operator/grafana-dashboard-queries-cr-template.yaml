@@ -13,4 +13,4 @@ spec:
       datasourceName: "$GRAFANA_PROMETHEUS_DATASOURCE_NAME"
   plugins:
     - name: "vertamedia-clickhouse-datasource"
-      version: "2.5.3"
+      version: "2.5.4"

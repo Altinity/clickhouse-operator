@@ -1,0 +1,12 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "low-timeout"
+spec:
+  reconcile:
+    host:
+      wait:
+        exclude: "false"
+    statefulSet:
+      update:
+        timeout: 60

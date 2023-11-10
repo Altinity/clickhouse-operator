@@ -17,8 +17,10 @@ package chi
 import (
 	"context"
 	"fmt"
+	"gopkg.in/d4l3k/messagediff.v1"
 	"math"
 	"sync"
+	"time"
 
 	coreV1 "k8s.io/api/core/v1"
 	policyV1 "k8s.io/api/policy/v1"
@@ -38,7 +40,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 		return nil
 	}
 
-	w.logOldAndNew("non-normalized yet", old, new)
+	w.logOldAndNew("non-normalized yet (native)", old, new)
 
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
@@ -51,13 +53,25 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
+	metricsCHIReconcilesStarted(ctx)
+	startTime := time.Now()
+
+	w.a.M(new).F().Info("Changing OLD to Normalized COMPLETED: %s/%s", new.Namespace, new.Name)
+
 	if new.HasAncestor() {
-		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile")
+		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile. CHI: %s/%s", new.Namespace, new.Name)
 		old = new.GetAncestor()
+	} else {
+		w.a.M(new).F().Info("has NO ancestor, use empty CHI as a base for reconcile. CHI: %s/%s", new.Namespace, new.Name)
+		old = nil
 	}
 
+	w.a.M(new).F().Info("Normalized OLD CHI: %s/%s", new.Namespace, new.Name)
 	old = w.normalize(old)
+
+	w.a.M(new).F().Info("Normalized NEW CHI: %s/%s", new.Namespace, new.Name)
 	new = w.normalize(new)
+
 	new.SetAncestor(old)
 	w.logOldAndNew("normalized", old, new)
 
@@ -81,15 +95,15 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 
 	w.newTask(new)
 	w.markReconcileStart(ctx, new, actionPlan)
-	w.excludeStopped(new)
+	w.excludeStoppedCHIFromMonitoring(new)
 	w.walkHosts(ctx, new, actionPlan)
 
 	if err := w.reconcile(ctx, new); err != nil {
 		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(new).
 			M(new).F().
-			Error("FAILED to update err: %v", err)
-		w.markReconcileComplete(ctx, new)
+			Error("FAILED to reconcile CHI err: %v", err)
+		w.markReconcileCompletedUnsuccessfully(ctx, new)
 	} else {
 		// Post-process added items
 		if util.IsContextDone(ctx) {
@@ -103,13 +117,24 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 			Info("remove items scheduled for deletion")
 		w.clean(ctx, new)
 		w.dropReplicas(ctx, new, actionPlan)
-		w.includeStopped(new)
+		w.addCHIToMonitoring(new)
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
+
+		metricsCHIReconcilesCompleted(ctx)
+		metricsCHIReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
 	}
 
 	return nil
 }
+
+// ReconcileShardsAndHostsOptionsCtxKeyType specifies type for ReconcileShardsAndHostsOptionsCtxKey
+// More details here on why do we need special type
+// https://stackoverflow.com/questions/40891345/fix-should-not-use-basic-type-string-as-key-in-context-withvalue-golint
+type ReconcileShardsAndHostsOptionsCtxKeyType string
+
+// ReconcileShardsAndHostsOptionsCtxKey specifies name of the key to be used for ReconcileShardsAndHostsOptions
+const ReconcileShardsAndHostsOptionsCtxKey ReconcileShardsAndHostsOptionsCtxKeyType = "ReconcileShardsAndHostsOptions"
 
 // reconcile reconciles ClickHouseInstallation
 func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
@@ -120,6 +145,19 @@ func (w *worker) reconcile(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 
 	w.a.V(2).M(chi).S().P()
 	defer w.a.V(2).M(chi).E().P()
+
+	counters := chiV1.NewChiHostReconcileAttributesCounters()
+	chi.WalkHosts(func(host *chiV1.ChiHost) error {
+		counters.Add(host.GetReconcileAttributes())
+		return nil
+	})
+
+	if counters.GetAdd() > 0 && counters.GetFound() == 0 && counters.GetModify() == 0 && counters.GetRemove() == 0 {
+		w.a.V(1).M(chi).Info("Looks like we are just adding hosts to a new CHI. Enabling full fan-out mode. CHI: %s/%s", chi.Namespace, chi.Name)
+		ctx = context.WithValue(ctx, ReconcileShardsAndHostsOptionsCtxKey, &ReconcileShardsAndHostsOptions{
+			fullFanOut: true,
+		})
+	}
 
 	return chi.WalkTillError(
 		ctx,
@@ -259,35 +297,63 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *chiV1.ChiHost
 	return nil
 }
 
-// getHostStatefulSetCurStatus gets StatefulSet current status
-func (w *worker) getHostStatefulSetCurStatus(ctx context.Context, host *chiV1.ChiHost) string {
-	version := "unknown"
-	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusNew {
-		version = "not applicable"
-	} else {
-		if ver, e := w.ensureClusterSchemer(host).HostVersion(ctx, host); e == nil {
-			version = ver
-			host.Version = chiV1.NewCHVersion(version)
-		} else {
-			version = "failed to query"
-		}
+// getHostClickHouseVersion gets host ClickHouse version
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *chiV1.ChiHost, skipNewHost bool) string {
+	if skipNewHost && (host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusNew) {
+		return "not applicable"
 	}
-	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
+
+	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
+	if err != nil {
+		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s", host.GetName())
+		version = "failed to query"
+		return version
+	}
+
+	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
+	host.Version = chiV1.NewCHVersion(version)
+
 	return version
 }
 
+type reconcileHostStatefulSetOptions struct {
+	forceRecreate bool
+}
+
+func (o *reconcileHostStatefulSetOptions) ForceRecreate() bool {
+	if o == nil {
+		return false
+	}
+	return o.forceRecreate
+}
+
+type reconcileHostStatefulSetOptionsArr []*reconcileHostStatefulSetOptions
+
+// NewReconcileHostStatefulSetOptionsArr creates new reconcileHostStatefulSetOptions array
+func NewReconcileHostStatefulSetOptionsArr(opts ...*reconcileHostStatefulSetOptions) (res reconcileHostStatefulSetOptionsArr) {
+	return append(res, opts...)
+}
+
+// First gets first option
+func (a reconcileHostStatefulSetOptionsArr) First() *reconcileHostStatefulSetOptions {
+	if len(a) > 0 {
+		return a[0]
+	}
+	return nil
+}
+
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHost, opts ...*reconcileHostStatefulSetOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	version := w.getHostStatefulSetCurStatus(ctx, host)
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
+	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
+	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
+
+	version := w.getHostClickHouseVersion(ctx, host, true)
+	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
 	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.GetName(), version)
 	// In case we have to force-restart host
@@ -296,6 +362,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 		w.a.V(1).M(host).F().Info("Reconcile host %s. Shutting host down due to force restart", host.GetName())
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host)
+		metricsHostReconcilesRestart(ctx)
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
 	}
@@ -303,12 +370,13 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *chiV1.ChiHo
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host %s. Reconcile StatefulSet", host.GetName())
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
-	err := w.reconcileStatefulSet(ctx, host)
+	err := w.reconcileStatefulSet(ctx, host, opts...)
 	if err == nil {
 		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
 		w.task.registryFailed.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 		if err == errCRUDIgnore {
+			// Pretend nothing happened in case of ignore
 			err = nil
 		}
 	}
@@ -328,8 +396,10 @@ func (w *worker) reconcileHostService(ctx context.Context, host *chiV1.ChiHost) 
 	}
 	err := w.reconcileService(ctx, host.CHI, service)
 	if err == nil {
+		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host %s.", host.GetName())
 		w.task.registryReconciled.RegisterService(service.ObjectMeta)
 	} else {
+		w.a.V(1).M(host).F().Warning("FAILED Reconcile service of the host %s.", host.GetName())
 		w.task.registryFailed.RegisterService(service.ObjectMeta)
 	}
 	return err
@@ -376,79 +446,120 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
-func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard) int {
-	maxAvailableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
-	maxPct := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
-	_100Pct := float64(100)
+func (w *worker) getReconcileShardsWorkersNum(shards []*chiV1.ChiShard, opts *ReconcileShardsAndHostsOptions) int {
+	availableWorkers := float64(chop.Config().Reconcile.Runtime.ReconcileShardsThreadsNumber)
+	maxConcurrencyPercent := float64(chop.Config().Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent)
+	_100Percent := float64(100)
 	shardsNum := float64(len(shards))
 
-	// Always allow at least 1 worker
-	maxAllowedWorkers := math.Max(math.Round((maxPct/_100Pct)*shardsNum), 1)
-	return int(math.Min(maxAvailableWorkers, maxAllowedWorkers))
+	if opts.FullFanOut() {
+		// For full fan-out scenarios use all available workers.
+		// Always allow at least 1 worker.
+		return int(math.Max(availableWorkers, 1))
+	}
+
+	// For non-full fan-out scenarios respect .Reconcile.Runtime.ReconcileShardsMaxConcurrencyPercent.
+	// Always allow at least 1 worker.
+	maxAllowedWorkers := math.Max(math.Round((maxConcurrencyPercent/_100Percent)*shardsNum), 1)
+	return int(math.Min(availableWorkers, maxAllowedWorkers))
+}
+
+// ReconcileShardsAndHostsOptions is and options for reconciler
+type ReconcileShardsAndHostsOptions struct {
+	fullFanOut bool
+}
+
+// FullFanOut gets value
+func (o *ReconcileShardsAndHostsOptions) FullFanOut() bool {
+	if o == nil {
+		return false
+	}
+	return o.fullFanOut
 }
 
 // reconcileShardsAndHosts reconciles shards and hosts of each shard
 func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*chiV1.ChiShard) error {
+	// Sanity check - CHI has to have shard(s)
 	if len(shards) == 0 {
 		return nil
 	}
 
-	// Always process the first shard first (and all of its hosts). This gives us some early indicator of whether
-	// the reconciliation would fail, and for large clusters is small price to pay before performing concurrent fan-out.
-	firstShard := shards[0]
-	if err := w.reconcileShard(ctx, firstShard); err != nil {
-		return err
+	// Try to fetch options
+	opts, ok := ctx.Value(ReconcileShardsAndHostsOptionsCtxKey).(*ReconcileShardsAndHostsOptions)
+	if ok {
+		w.a.V(1).Info("found ReconcileShardsAndHostsOptionsCtxKey")
+	} else {
+		w.a.V(1).Info("not found ReconcileShardsAndHostsOptionsCtxKey, use empty opts")
+		opts = &ReconcileShardsAndHostsOptions{}
 	}
-	for _, host := range firstShard.Hosts {
-		if err := w.reconcileHost(ctx, host); err != nil {
+
+	// Which shard to start concurrent processing with
+	var startShard int
+	if opts.FullFanOut() {
+		// For full fan-out scenarios we'll start shards processing from the very beginning
+		startShard = 0
+		w.a.V(1).Info("full fan-out requested")
+	} else {
+		// For non-full fan-out scenarios, we'll process the first shard separately.
+		// This gives us some early indicator on whether the reconciliation would fail,
+		// and for large clusters it is a small price to pay before performing concurrent fan-out.
+		w.a.V(1).Info("starting first shard separately")
+		if err := w.reconcileShardWithHosts(ctx, shards[0]); err != nil {
+			w.a.V(1).Warning("first shard failed, skipping rest of shards due to an error: %v", err)
 			return err
 		}
+
+		// Since shard with 0 index is already done, we'll proceed with the 1-st
+		startShard = 1
 	}
 
-	// If we're working on a single-shard cluster, we are done.
-	if len(shards) == 1 {
-		return nil
-	}
-
-	// Otherwise, we process the remaining n-1 shards using the configured concurrency level while maintaining
-	// the configured max concurrency percentage.
-	// The default behavior is no concurrency, but this can be adjusted in operating reconciliation runtime settings.
-	workerCount := w.getReconcileShardsWorkersNum(shards)
-	for i := 1; i < len(shards); i += workerCount {
-		endIdx := i + workerCount
-		if endIdx > len(shards) {
-			endIdx = len(shards)
+	// Process shards using specified concurrency level while maintaining specified max concurrency percentage.
+	// Loop over shards.
+	workersNum := w.getReconcileShardsWorkersNum(shards, opts)
+	w.a.V(1).Info("Starting rest of shards on workers: %d", workersNum)
+	for startShardIndex := startShard; startShardIndex < len(shards); startShardIndex += workersNum {
+		endShardIndex := startShardIndex + workersNum
+		if endShardIndex > len(shards) {
+			endShardIndex = len(shards)
 		}
-		concurrentChunk := shards[i:endIdx]
+		concurrentlyProcessedShards := shards[startShardIndex:endShardIndex]
+
+		// Processing error protected with mutex
+		var err error
+		var errLock sync.Mutex
 
 		wg := sync.WaitGroup{}
-		wg.Add(len(concurrentChunk))
-		var anyErr error
-		var anyErrLock sync.Mutex
-		for j := range concurrentChunk {
-			thisShard := concurrentChunk[j] // goroutine var
+		wg.Add(len(concurrentlyProcessedShards))
+		// Launch shard concurrent processing
+		for j := range concurrentlyProcessedShards {
+			shard := concurrentlyProcessedShards[j]
 			go func() {
 				defer wg.Done()
-				if err := w.reconcileShard(ctx, thisShard); err != nil {
-					anyErrLock.Lock()
-					anyErr = err
-					anyErrLock.Unlock()
+				if e := w.reconcileShardWithHosts(ctx, shard); e != nil {
+					errLock.Lock()
+					err = e
+					errLock.Unlock()
 					return
-				}
-				for replicaIndex := range thisShard.Hosts {
-					host := thisShard.Hosts[replicaIndex]
-					if err := w.reconcileHost(ctx, host); err != nil {
-						anyErrLock.Lock()
-						anyErr = err
-						anyErrLock.Unlock()
-						return
-					}
 				}
 			}()
 		}
 		wg.Wait()
-		if anyErr != nil {
-			return anyErr
+		if err != nil {
+			w.a.V(1).Warning("Skipping rest of shards due to an error: %v", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (w *worker) reconcileShardWithHosts(ctx context.Context, shard *chiV1.ChiShard) error {
+	if err := w.reconcileShard(ctx, shard); err != nil {
+		return err
+	}
+	for replicaIndex := range shard.Hosts {
+		host := shard.Hosts[replicaIndex]
+		if err := w.reconcileHost(ctx, host); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -481,6 +592,11 @@ func (w *worker) reconcileShard(ctx context.Context, shard *chiV1.ChiShard) erro
 
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
+	var (
+		reconcileHostStatefulSetOpts *reconcileHostStatefulSetOptions
+		migrateTableOpts             *migrateTableOptions
+	)
+
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -488,30 +604,59 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
+
+	metricsHostReconcilesStarted(ctx)
+	startTime := time.Now()
+
 	if host.IsFirst() {
 		w.reconcileCHIServicePreliminary(ctx, host.CHI)
 		defer w.reconcileCHIServiceFinal(ctx, host.CHI)
 	}
 
+	version := w.getHostClickHouseVersion(ctx, host, true)
 	w.a.V(1).
 		WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
 		WithStatusAction(host.GetCHI()).
 		M(host).F().
-		Info("Reconcile Host %s started", host.GetName())
+		Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
 
 	// Create artifacts
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if err := w.excludeHost(ctx, host); err != nil {
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
+	_ = w.completeQueries(ctx, host)
+
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
-	//w.reconcilePersistentVolumes(task, host)
-	_ = w.reconcilePVCs(ctx, host)
-	if err := w.reconcileHostStatefulSet(ctx, host); err != nil {
+
+	errPVC := w.reconcilePVCs(ctx, host)
+	if errPVC == errLostPVCDeleted {
+		reconcileHostStatefulSetOpts = &reconcileHostStatefulSetOptions{
+			forceRecreate: true,
+		}
+		migrateTableOpts = &migrateTableOptions{
+			forceMigrate: true,
+			dropReplica:  true,
+		}
+	}
+
+	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 	_ = w.reconcilePVCs(ctx, host)
@@ -519,24 +664,24 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	_ = w.reconcileHostService(ctx, host)
 
 	host.GetReconcileAttributes().UnsetAdd()
-
-	_ = w.migrateTables(ctx, host)
-
-	version, err := w.ensureClusterSchemer(host).HostVersion(ctx, host)
-	if err != nil {
-		version = "unknown"
-	}
+	// Sometimes service needs some time to start after creation before being accessible for usage
+	time.Sleep(30 * time.Second)
+	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {
-		// If host is not ready - fallback
+		metricsHostReconcilesErrors(ctx)
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
 		return err
 	}
 
+	version = w.getHostClickHouseVersion(ctx, host, false)
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("Reconcile Host %s completed. ClickHouse version running: %s", host.GetName(), version)
+		Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 
 	var (
 		hostsCompleted int
@@ -553,6 +698,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 		WithStatusAction(host.CHI).
 		M(host).F().
 		Info("%s: %d of %d", eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+
+	metricsHostReconcilesCompleted(ctx)
+	metricsHostReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
 
 	return nil
 }
@@ -697,7 +845,7 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *chiV1.ClickHouseInsta
 }
 
 // reconcileStatefulSet reconciles StatefulSet of a host
-func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
+func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost, opts ...*reconcileHostStatefulSetOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -708,7 +856,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
-	if host.GetReconcileAttributes().GetStatus() == chiV1.StatefulSetStatusSame {
+	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusSame {
 		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
 		host.CHI.EnsureStatus().HostUnchanged()
 		return nil
@@ -718,7 +866,51 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 	var err error
 	host.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
-	if host.HasCurStatefulSet() {
+	// Report diff to trace
+	if host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusModified {
+		w.a.V(1).M(host).F().Info("Modified StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		if diff, equal := messagediff.DeepDiff(host.CurStatefulSet.Spec, host.DesiredStatefulSet.Spec); equal {
+			w.a.V(1).M(host).Info("StatefulSet.Spec ARE EQUAL")
+		} else {
+			w.a.V(1).Info(
+				"StatefulSet.Spec ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
+				util.MessageDiffItemString("added .spec items", "", diff.Added),
+				util.MessageDiffItemString("modified .spec items", "", diff.Modified),
+				util.MessageDiffItemString("removed .spec items", "", diff.Removed),
+			)
+		}
+		if diff, equal := messagediff.DeepDiff(host.CurStatefulSet.Labels, host.DesiredStatefulSet.Labels); equal {
+			w.a.V(1).M(host).Info("StatefulSet.Labels ARE EQUAL")
+		} else {
+			if len(host.CurStatefulSet.Labels)+len(host.DesiredStatefulSet.Labels) > 0 {
+				w.a.V(1).Info(
+					"StatefulSet.Labels ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
+					util.MessageDiffItemString("added .labels items", "", diff.Added),
+					util.MessageDiffItemString("modified .labels items", "", diff.Modified),
+					util.MessageDiffItemString("removed .labels items", "", diff.Removed),
+				)
+			}
+		}
+		if diff, equal := messagediff.DeepDiff(host.CurStatefulSet.Annotations, host.DesiredStatefulSet.Annotations); equal {
+			w.a.V(1).M(host).Info("StatefulSet.Annotations ARE EQUAL")
+		} else {
+			if len(host.CurStatefulSet.Annotations)+len(host.DesiredStatefulSet.Annotations) > 0 {
+				w.a.V(1).Info(
+					"StatefulSet.Annotations ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
+					util.MessageDiffItemString("added .annotations items", "", diff.Added),
+					util.MessageDiffItemString("modified .annotations items", "", diff.Modified),
+					util.MessageDiffItemString("removed .annotations items", "", diff.Removed),
+				)
+			}
+		}
+	}
+
+	opt := NewReconcileHostStatefulSetOptionsArr(opts...).First()
+	switch {
+	case opt.ForceRecreate():
+		// Force recreate prevails over all other requests
+		w.recreateStatefulSet(ctx, host)
+	case host.HasCurStatefulSet():
 		// We have StatefulSet - try to update it
 		err = w.updateStatefulSet(ctx, host)
 	}
@@ -757,7 +949,7 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *chiV1.ChiHost) 
 //}
 
 // reconcilePVCs reconciles all PVCs of a host
-func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
+func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) (res ErrorPVC) {
 	if util.IsContextDone(ctx) {
 		return nil
 	}
@@ -770,46 +962,85 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *chiV1.ChiHost) error {
 		if util.IsContextDone(ctx) {
 			return
 		}
-
-		volumeClaimTemplateName := volumeMount.Name
-		volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
-		if !ok {
-			// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
-			return
-		}
-
-		pvcName := chopModel.CreatePVCName(host, volumeMount, volumeClaimTemplate)
-		w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - start", namespace, host.GetName(), volumeMount.Name, pvcName)
-		defer w.a.V(2).M(host).Info("reconcile volumeMount (%s/%s/%s/%s) - end", namespace, host.GetName(), volumeMount.Name, pvcName)
-
-		pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, newGetOptions())
-		if err != nil {
-			if apiErrors.IsNotFound(err) {
-				// This is not an error per se, means PVC is not created (yet)?
-				if w.task.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-					pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
-				} else {
-					// Not created and we are not expected to create PVC by ourselves
-					return
-				}
-			} else {
-				// Any non-NotFound API error - unable to proceed
-				w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
-				return
+		if e := w.reconcilePVCFromVolumeMount(ctx, host, volumeMount); e != nil {
+			if res == nil {
+				res = e
 			}
 		}
-
-		newPvc, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
-		if err != nil {
-			w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvcName, err)
-			w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
-			return
-		}
-
-		w.task.registryReconciled.RegisterPVC(newPvc.ObjectMeta)
 	})
 
-	return nil
+	return
+}
+
+func (w *worker) reconcilePVCFromVolumeMount(ctx context.Context, host *chiV1.ChiHost, volumeMount *coreV1.VolumeMount) (res ErrorPVC) {
+	// Which PVC are we going to reconcile
+	pvc, volumeClaimTemplate, ok := w.fetchOrCreatePVC(ctx, host, volumeMount)
+	if !ok {
+		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
+		return
+	}
+
+	namespace := host.Address.Namespace
+
+	w.a.V(2).M(host).S().Info("reconcile volumeMount (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvc.Name)
+	defer w.a.V(2).M(host).E().Info("reconcile volumeMount (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvc.Name)
+
+	if w.deleteLostPVC(ctx, pvc) {
+		res = errLostPVCDeleted
+		w.a.V(1).M(host).Info("deleted lost PVC (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvc.Name)
+		pvc, volumeClaimTemplate, ok = w.fetchOrCreatePVC(ctx, host, volumeMount)
+		if !ok {
+			// We are not expected to create this PVC, StatefulSet should do this
+			return
+		}
+	}
+
+	pvcReconciled, err := w.reconcilePVC(ctx, pvc, host, volumeClaimTemplate)
+	if err != nil {
+		w.a.M(host).F().Error("ERROR unable to reconcile PVC(%s/%s) err: %v", namespace, pvc.Name, err)
+		w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
+		return
+	}
+
+	w.task.registryReconciled.RegisterPVC(pvcReconciled.ObjectMeta)
+	return
+}
+
+func (w *worker) fetchOrCreatePVC(
+	ctx context.Context,
+	host *chiV1.ChiHost,
+	volumeMount *coreV1.VolumeMount,
+) (*coreV1.PersistentVolumeClaim, *chiV1.ChiVolumeClaimTemplate, bool) {
+	namespace := host.Address.Namespace
+	pvcName, ok := chopModel.CreatePVCNameByVolumeMount(host, volumeMount)
+	if !ok {
+		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
+		return nil, nil, false
+	}
+	volumeClaimTemplate, ok := chopModel.GetVolumeClaimTemplate(host, volumeMount)
+	if !ok {
+		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
+		return nil, nil, false
+	}
+
+	pvc, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, newGetOptions())
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			// This is not an error per se, means PVC is not created (yet)?
+			if w.task.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+				pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
+			} else {
+				// PVC is not available and we are not expected to create PVC by ourselves
+				return nil, nil, false
+			}
+		} else {
+			// In case of any non-NotFound API error - unable to proceed
+			w.a.M(host).F().Error("ERROR unable to get PVC(%s/%s) err: %v", namespace, pvcName, err)
+			return nil, nil, false
+		}
+	}
+
+	return pvc, volumeClaimTemplate, true
 }
 
 // reconcilePVC reconciles specified PVC

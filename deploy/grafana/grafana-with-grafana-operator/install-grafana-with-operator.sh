@@ -179,8 +179,8 @@ if ! command -v yq &> /dev/null; then
   echo "Install 'yq', see installation instruction in https://github.com/mikefarah/yq/#install"
   exit 1
 else
-  export OPERATOR_CH_USER=$(yq eval .clickhouse.access.username ${CUR_DIR}/../../../config/config.yaml)
-  export OPERATOR_CH_PASS=$(yq eval .clickhouse.access.password ${CUR_DIR}/../../../config/config.yaml)
+  export OPERATOR_CH_USER=$(yq 'select(.kind == "Secret") | .stringData.username' "${CUR_DIR}/../../operator/clickhouse-operator-install-bundle.yaml")
+  export OPERATOR_CH_PASS=$(yq 'select(.kind == "Secret") | .stringData.password' "${CUR_DIR}/../../operator/clickhouse-operator-install-bundle.yaml")
 fi
 
 echo "Create ClickHouse DataSource for each ClickHouseInstallation"
@@ -198,6 +198,23 @@ for LINE in $(kubectl get --all-namespaces chi -o custom-columns=NAMESPACE:.meta
         kubectl --namespace="${NAMESPACE}" exec "${POD}" -- \
             clickhouse-client --echo -mn -q 'SELECT hostName(), dummy FROM system.one SETTINGS log_queries=1; SYSTEM FLUSH LOGS'
     done
+
+    echo "Ensure clickhouse-operator will connect to any chi from grafana"
+    POD_NETWORK_CIDR=$(kubectl get cm -n kube-system kube-proxy -o yaml | grep clusterCIDR | cut -d ":" -f 2)
+    kubectl apply --validate=${VALIDATE_YAML} --namespace="${NAMESPACE}" -f <(
+      {
+        echo "apiVersion: clickhouse.altinity.com/v1"
+        echo "kind: ClickHouseInstallationTemplate"
+        echo "metadata:"
+        echo " name: clickhouse-operator-from-cluster-network"
+        echo "spec:"
+        echo "  templating:"
+        echo "    policy: auto"
+        echo "  configuration:"
+        echo "    users:"
+        echo "      ${OPERATOR_CH_USER}/networks/ip: ${POD_NETWORK_CIDR}"
+      }
+    )
 
     GRAFANA_CLICKHOUSE_DATASOURCE_NAME="k8s-${NAMESPACE}-${CHI}"
     CLICKHOUSE_URL="http://${ENDPOINT}:${PORT}"

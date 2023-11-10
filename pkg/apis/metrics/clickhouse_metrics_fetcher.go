@@ -273,6 +273,9 @@ func (f *ClickHouseMetricsFetcher) clickHouseQueryScanRows(
 	defer query.Close()
 	data := newTable()
 	for query.Rows.Next() {
+		if util.IsContextDone(ctx) {
+			return nil, ctx.Err()
+		}
 		_ = scan(query.Rows, &data)
 	}
 	return data, nil

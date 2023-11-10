@@ -1,0 +1,10 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-045-wait-queries
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
