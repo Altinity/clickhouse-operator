@@ -33,9 +33,25 @@ else
     echo "CUSTOM dir ${CODE_GENERATOR_DIR} is used to run code generator from"
 fi
 
+#bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
+#    all \
+#    github.com/altinity/clickhouse-operator/pkg/client \
+#    github.com/altinity/clickhouse-operator/pkg/apis \
+#    "clickhouse.altinity.com:v1" \
+#    -o "${SRC_ROOT}/generator"
+
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
-    all \
+    client,deepcopy,informer,lister \
     github.com/altinity/clickhouse-operator/pkg/client \
     github.com/altinity/clickhouse-operator/pkg/apis \
     "clickhouse.altinity.com:v1" \
-    -o "${SRC_ROOT}/generator"
+    -o "${SRC_ROOT}/generator" \
+    --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
+
+bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
+    deepcopy \
+    github.com/altinity/clickhouse-operator/pkg/client \
+    github.com/altinity/clickhouse-operator/pkg/apis \
+    "clickhouse.com:v1alpha1" \
+    -o "${SRC_ROOT}/generator" \
+    --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
