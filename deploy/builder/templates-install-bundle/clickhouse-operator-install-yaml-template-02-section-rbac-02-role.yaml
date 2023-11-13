@@ -149,6 +149,33 @@ rules:
     - create
     - delete
 - apiGroups:
+    - clickhouse.com
+  resources:
+    - clickhousekeepers
+  verbs:
+    - get
+    - patch
+    - update
+    - delete
+    - list
+    - watch
+- apiGroups:
+    - clickhouse.com
+  resources:
+    - clickhousekeepers/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - clickhouse.com
+  resources:
+    - clickhousekeepers/status
+  verbs:
+    - get
+    - update
+    - patch
+    - create
+    - delete
+- apiGroups:
     - ""
   resources:
     - secrets
