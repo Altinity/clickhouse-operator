@@ -24,13 +24,14 @@ import (
 	"syscall"
 	"time"
 
+	kubeinformers "k8s.io/client-go/informers"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 	"github.com/altinity/clickhouse-operator/pkg/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/version"
-	kubeinformers "k8s.io/client-go/informers"
 )
 
 // Prometheus exporter defaults
@@ -71,7 +72,6 @@ func init() {
 	flag.BoolVar(&versionRequest, "version", false, "Display clickhouse-operator version and exit")
 	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
-	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to custom kubernetes config file. Makes sense if runs outside of the cluster only.")
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
 	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
 	flag.Parse()

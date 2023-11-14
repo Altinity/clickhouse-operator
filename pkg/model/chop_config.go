@@ -98,7 +98,7 @@ func isSettingsChangeRequiresReboot(host *chiV1.ChiHost, section string, a, b *c
 
 // hostVersionMatches checks whether host's ClickHouse version matches specified constraint
 func hostVersionMatches(host *chiV1.ChiHost, versionConstraint string) bool {
-	// Special version of "*" 0- default version - has to satisfy all host versions
+	// Special version of "*" - default version - has to satisfy all host versions
 	// Default version will also be used in case ClickHouse version is unknown.
 	// ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
 	// ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.

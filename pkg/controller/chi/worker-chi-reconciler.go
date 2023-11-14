@@ -17,11 +17,11 @@ package chi
 import (
 	"context"
 	"fmt"
-	"gopkg.in/d4l3k/messagediff.v1"
 	"math"
 	"sync"
 	"time"
 
+	"gopkg.in/d4l3k/messagediff.v1"
 	coreV1 "k8s.io/api/core/v1"
 	policyV1 "k8s.io/api/policy/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
