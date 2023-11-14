@@ -319,7 +319,7 @@ func createHeadlessService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 			Port: int32(chk.Spec.GetRaftPort()),
 		},
 	}
-	return createService(headlessSvcName(chk), chk, svcPorts, false)
+	return createService(getHeadlessServiceName(chk), chk, svcPorts, false)
 }
 
 func createService(name string, chk *v1alpha1.ClickHouseKeeper, ports []corev1.ServicePort, clusterIP bool) *corev1.Service {
