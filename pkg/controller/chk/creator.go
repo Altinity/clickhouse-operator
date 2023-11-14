@@ -295,19 +295,32 @@ func mountSharedVolume(chk *v1alpha1.ClickHouseKeeper) []corev1.VolumeMount {
 // createClientService returns a client service resource for the clickhouse keeper cluster
 func createClientService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 	svcPorts := []corev1.ServicePort{
-		{Name: "client", Port: int32(chk.Spec.GetClientPort())},
+		corev1.ServicePort{
+			Name: "client",
+			Port: int32(chk.Spec.GetClientPort()),
+		},
 	}
+
 	prometheusPort := chk.Spec.GetPrometheusPort()
 	if prometheusPort != -1 {
-		svcPorts = append(svcPorts, corev1.ServicePort{Name: "prometheus", Port: int32(prometheusPort)})
+		svcPorts = append(svcPorts,
+			corev1.ServicePort{
+				Name: "prometheus",
+				Port: int32(prometheusPort),
+			},
+		)
 	}
+
 	return createService(chk.Name, chk, svcPorts, true)
 }
 
 // createHeadlessService returns an internal headless-service for the chk stateful-set
 func createHeadlessService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 	svcPorts := []corev1.ServicePort{
-		{Name: "raft", Port: int32(chk.Spec.GetRaftPort())},
+		{
+			Name: "raft",
+			Port: int32(chk.Spec.GetRaftPort()),
+		},
 	}
 	return createService(headlessSvcName(chk), chk, svcPorts, false)
 }
