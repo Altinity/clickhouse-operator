@@ -19,10 +19,8 @@ import (
 	"fmt"
 	"time"
 
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
-
 	"github.com/go-logr/logr"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -34,6 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 )
 
 // ReconcileTime is the delay between reconciliations
@@ -120,8 +121,8 @@ func (r *ChkReconciler) reconcileConfigMap(instance *v1alpha1.ClickHouseKeeper) 
 	}
 	foundCm := &corev1.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{
-		Name:      cm.Name,
 		Namespace: cm.Namespace,
+		Name:      cm.Name,
 	}, foundCm)
 	if err != nil && errors.IsNotFound(err) {
 		r.Log.Info("Creating a new Config Map")
