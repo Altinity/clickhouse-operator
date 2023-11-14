@@ -141,11 +141,13 @@ spec:
             taskIDsStarted:
               type: array
               description: "Started task ids"
+              nullable: true
               items:
                 type: string
             taskIDsCompleted:
               type: array
               description: "Completed task ids"
+              nullable: true
               items:
                 type: string
             action:
@@ -154,6 +156,7 @@ spec:
             actions:
               type: array
               description: "Actions"
+              nullable: true
               items:
                 type: string
             error:
@@ -162,6 +165,7 @@ spec:
             errors:
               type: array
               description: "Errors"
+              nullable: true
               items:
                 type: string
             hostsUpdated:
@@ -187,16 +191,19 @@ spec:
             pods:
               type: array
               description: "Pods"
+              nullable: true
               items:
                 type: string
             pod-ips:
               type: array
               description: "Pod IPs"
+              nullable: true
               items:
                 type: string
             fqdns:
               type: array
               description: "Pods FQDNs"
+              nullable: true
               items:
                 type: string
             endpoint:
@@ -217,11 +224,13 @@ spec:
             hostsWithTablesCreated:
               type: array
               description: "List of hosts with tables created by the operator"
+              nullable: true
               items:
                 type: string
             usedTemplates:
               type: array
               description: "List of templates used to build this CHI"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
               items:
                 type: object
@@ -1316,11 +1325,13 @@ spec:
             taskIDsStarted:
               type: array
               description: "Started task ids"
+              nullable: true
               items:
                 type: string
             taskIDsCompleted:
               type: array
               description: "Completed task ids"
+              nullable: true
               items:
                 type: string
             action:
@@ -1329,6 +1340,7 @@ spec:
             actions:
               type: array
               description: "Actions"
+              nullable: true
               items:
                 type: string
             error:
@@ -1337,6 +1349,7 @@ spec:
             errors:
               type: array
               description: "Errors"
+              nullable: true
               items:
                 type: string
             hostsUpdated:
@@ -1362,16 +1375,19 @@ spec:
             pods:
               type: array
               description: "Pods"
+              nullable: true
               items:
                 type: string
             pod-ips:
               type: array
               description: "Pod IPs"
+              nullable: true
               items:
                 type: string
             fqdns:
               type: array
               description: "Pods FQDNs"
+              nullable: true
               items:
                 type: string
             endpoint:
@@ -1392,11 +1408,13 @@ spec:
             hostsWithTablesCreated:
               type: array
               description: "List of hosts with tables created by the operator"
+              nullable: true
               items:
                 type: string
             usedTemplates:
               type: array
               description: "List of templates used to build this CHI"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
               items:
                 type: object
