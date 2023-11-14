@@ -26,46 +26,32 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func defaultingSettings(chk *v1alpha1.ClickHouseKeeper) map[string]string {
-	var props map[string]string
-	if chk.Spec.Settings == nil {
-		props = map[string]string{}
-	} else {
-		props = chk.Spec.Settings
-	}
+func defaultKeeperSettings(path string) map[string]string {
+	return map[string]string{
+		"logger/level":   "information",
+		"logger/console": "1",
 
-	defaultingProperty(props, "logger/level", "information")
-	defaultingProperty(props, "logger/console", "1")
+		"listen_host":     "0.0.0.0",
+		"max_connections": "4096",
 
-	defaultingProperty(props, "listen_host", "0.0.0.0")
-	defaultingProperty(props, "max_connections", "4096")
+		"keeper_server/tcp_port":                                     "9181",
+		"keeper_server/storage_path":                                 path,
+		"keeper_server/log_storage_path":                             fmt.Sprintf("%s/coordination/logs", path),
+		"keeper_server/snapshot_storage_path":                        fmt.Sprintf("%s/coordination/snapshots", path),
+		"keeper_server/coordination_settings/operation_timeout_ms":   "10000",
+		"keeper_server/coordination_settings/min_session_timeout_ms": "10000",
+		"keeper_server/coordination_settings/session_timeout_ms":     "100000",
+		"keeper_server/coordination_settings/raft_logs_level":        "information",
+		"keeper_server/hostname_checks_enabled":                      "true",
 
-	defaultingProperty(props, "keeper_server/tcp_port", "9181")
-	path := chk.Spec.GetPath()
-	defaultingProperty(props, "keeper_server/storage_path", path)
-	defaultingProperty(props, "keeper_server/log_storage_path", fmt.Sprintf("%s/coordination/logs", path))
-	defaultingProperty(props, "keeper_server/snapshot_storage_path", fmt.Sprintf("%s/coordination/snapshots", path))
-	defaultingProperty(props, "keeper_server/coordination_settings/operation_timeout_ms", "10000")
-	defaultingProperty(props, "keeper_server/coordination_settings/min_session_timeout_ms", "10000")
-	defaultingProperty(props, "keeper_server/coordination_settings/session_timeout_ms", "100000")
-	defaultingProperty(props, "keeper_server/coordination_settings/raft_logs_level", "information")
-	defaultingProperty(props, "keeper_server/hostname_checks_enabled", "true")
-
-	defaultingProperty(props, "openSSL/server/certificateFile", "/etc/clickhouse-keeper/server.crt")
-	defaultingProperty(props, "openSSL/server/privateKeyFile", "/etc/clickhouse-keeper/server.key")
-	defaultingProperty(props, "openSSL/server/dhParamsFile", "/etc/clickhouse-keeper/dhparam.pem")
-	defaultingProperty(props, "openSSL/server/verificationMode", "none")
-	defaultingProperty(props, "openSSL/server/loadDefaultCAFile", "true")
-	defaultingProperty(props, "openSSL/server/cacheSessions", "true")
-	defaultingProperty(props, "openSSL/server/disableProtocols", "sslv2,sslv3")
-	defaultingProperty(props, "openSSL/server/preferServerCiphers", "true")
-
-	return props
-}
-
-func defaultingProperty(props map[string]string, property_name, value string) {
-	if _, ok := props[property_name]; !ok {
-		props[property_name] = value
+		"openSSL/server/certificateFile":     "/etc/clickhouse-keeper/server.crt",
+		"openSSL/server/privateKeyFile":      "/etc/clickhouse-keeper/server.key",
+		"openSSL/server/dhParamsFile":        "/etc/clickhouse-keeper/dhparam.pem",
+		"openSSL/server/verificationMode":    "none",
+		"openSSL/server/loadDefaultCAFile":   "true",
+		"openSSL/server/cacheSessions":       "true",
+		"openSSL/server/disableProtocols":    "sslv2,sslv3",
+		"openSSL/server/preferServerCiphers": "true",
 	}
 }
 

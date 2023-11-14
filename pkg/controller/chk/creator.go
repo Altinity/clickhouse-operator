@@ -17,18 +17,19 @@ package chk
 import (
 	"fmt"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // createConfigMap returns a config map containing ClickHouse Keeper config XML
 func createConfigMap(chk *v1alpha1.ClickHouseKeeper) *corev1.ConfigMap {
-	chk.Spec.Settings = defaultingSettings(chk)
+	chk.Spec.Settings = util.MergeStringMapsPreserve(chk.Spec.Settings, defaultKeeperSettings(chk.Spec.GetPath()))
 
 	return &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -62,7 +63,7 @@ func createStatefulSet(chk *v1alpha1.ClickHouseKeeper) *appsv1.StatefulSet {
 			Labels:    labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			ServiceName: headlessSvcName(chk),
+			ServiceName: getHeadlessServiceName(chk),
 			Replicas:    &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
@@ -82,10 +83,6 @@ func createStatefulSet(chk *v1alpha1.ClickHouseKeeper) *appsv1.StatefulSet {
 			VolumeClaimTemplates: chk.Spec.VolumeClaimTemplates,
 		},
 	}
-}
-
-func headlessSvcName(chk *v1alpha1.ClickHouseKeeper) string {
-	return fmt.Sprintf("%s-headless", chk.GetName())
 }
 
 func createPodTemplateSpec(chk *v1alpha1.ClickHouseKeeper) corev1.PodSpec {
