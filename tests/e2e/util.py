@@ -79,15 +79,15 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
 
         if keeper_type == "zookeeper":
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml" if keeper_manifest == "" else keeper_manifest
-            keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = (
                 "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
-            keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
-            keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
 
         multi_doc = yaml_manifest.get_multidoc_manifest_data(get_full_path(keeper_manifest, lookup_in_host=True))
         keeper_nodes = 1
