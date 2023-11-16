@@ -111,27 +111,12 @@ data:
         echo "-h ${CLIENT_HOST} -p ${CLIENT_PORT}"
       fi
     }
-    function zkConnectionString() {
-      # If the client service address is not yet available, then return localhost
-      set +e
-      getent hosts "${CLIENT_HOST}" 2>/dev/null 1>/dev/null
-      if [[ $? -ne 0 ]]; then
-        set -e
-        echo "localhost:${CLIENT_PORT}"
-      else
-        set -e
-        echo "${CLIENT_HOST}:${CLIENT_PORT}"
-      fi
-    }
 
   keeperStart.sh: |
     #!/usr/bin/env bash
     set -ex
     source /conf/env.sh
     source /conf/keeperFunctions.sh
-    # TODO, replace zk-shell to clickhouse-keeper when resolve https://github.com/ClickHouse/ClickHouse/issues/54129
-    apk add py3-pip
-    pip3 install -U zk-shell
     
     HOST=`hostname -s`
     if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
@@ -187,7 +172,8 @@ data:
     fi
     
     # run clickhouse-keeper    
-    cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml 
+    cat /tmp/clickhouse-keeper/config.d/generated-keeper-settings.xml
+    rm -rfv /var/lib/clickhouse-keeper/terminated
     clickhouse-keeper --config-file=/etc/clickhouse-keeper/keeper_config.xml
 
   keeperTeardown.sh: |
@@ -199,7 +185,6 @@ data:
     source /conf/keeperFunctions.sh
     set +e
     KEEPER_URL=$(keeperConnectionString)
-    ZK_URL=$(zkConnectionString)
     set -e
     HOST=`hostname -s`
     if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
@@ -214,13 +199,15 @@ data:
     CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
     CLUSTER_SIZE=$(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E '^server\.[0-9]+=') 
     echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MY_ID"
+    # If MyId > 1, this server is being permanently removed from raft_configuration.
     if [[ "$MY_ID" -gt "1" ]]; then
       # If ClusterSize < MyId, this server is being permanently removed from raft_configuration.
-      zk-shell --run-once "reconfig remove $MY_ID" "$ZK_URL"
+      clickhouse-keeper-client -q "reconfig remove $MY_ID" ${KEEPER_URL}
+      touch /var/lib/clickhouse-keeper/terminated
     fi
 
     # Wait to remove $MY_ID from quorum
-    for (( i = 0; i < 10; i++ )); do
+    for (( i = 0; i < 6; i++ )); do
         CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
         if [[ "0" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=$HOST.+participant;[0-1]$") ]]; then
           echo "$MY_ID removed from quorum"
@@ -236,7 +223,7 @@ data:
       CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "127.0.0.1" | wc -l`
       if [[ "$CONN_COUNT" -gt 0 ]]; then
         echo "$CONN_COUNT non-local connections still connected."
-        sleep 3
+        sleep 1
       else
         echo "$CONN_COUNT non-local connections"
         break
@@ -275,6 +262,9 @@ data:
     if [[ $? -ne 0 ]]; then
       echo "no active DNS records in service, first running pod"
       exit 0
+    elif [[ -f /var/lib/clickhouse-keeper/terminated ]]; then
+      echo "termination in progress"
+      exit 0
     else
       set -e
       # An ensemble exists, check to see if this node is already a member.
@@ -298,17 +288,16 @@ data:
     
         ROLE=participant
         WEIGHT=1
-        ZK_URL=$(zkConnectionString)
+        KEEPER_URL=${keeperConnectionString}
         NEW_KEEPER_CONFIG=$(keeperConfig)
-        zk-shell --run-once "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" "$ZK_URL"
+        clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
         exit 0        
       else
         echo "clickhouse-keeper instance is available as participant with 0 weight"
         ROLE=participant
         WEIGHT=0
-        ZK_URL=$(zkConnectionString)
         NEW_KEEPER_CONFIG=$(keeperConfig)
-        zk-shell --run-once "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" "$ZK_URL"
+        clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
       fi
     fi
 
@@ -388,7 +377,7 @@ spec:
               command:
                 - /conf/keeperLive.sh
             failureThreshold: 3
-            initialDelaySeconds: 180
+            initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 10
@@ -397,7 +386,7 @@ spec:
               command:
                 - /conf/keeperReady.sh
             failureThreshold: 3
-            initialDelaySeconds: 60
+            initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 10

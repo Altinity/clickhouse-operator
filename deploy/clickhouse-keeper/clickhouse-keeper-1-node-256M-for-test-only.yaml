@@ -129,27 +129,12 @@ data:
         echo "-h ${CLIENT_HOST} -p ${CLIENT_PORT}"
       fi
     }
-    function zkConnectionString() {
-      # If the client service address is not yet available, then return localhost
-      set +e
-      getent hosts "${CLIENT_HOST}" 2>/dev/null 1>/dev/null
-      if [[ $? -ne 0 ]]; then
-        set -e
-        echo "localhost:${CLIENT_PORT}"
-      else
-        set -e
-        echo "${CLIENT_HOST}:${CLIENT_PORT}"
-      fi
-    }
 
   keeperStart.sh: |
     #!/usr/bin/env bash
     set -ex
     source /conf/env.sh
     source /conf/keeperFunctions.sh
-    # TODO, replace zk-shell to clickhouse-keeper when resolve https://github.com/ClickHouse/ClickHouse/issues/54129
-    apk add py3-pip
-    pip3 install -U zk-shell
     
     HOST=`hostname -s`
     if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
@@ -218,7 +203,6 @@ data:
     source /conf/keeperFunctions.sh
     set +e
     KEEPER_URL=$(keeperConnectionString)
-    ZK_URL=$(zkConnectionString)
     set -e
     HOST=`hostname -s`
     if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
@@ -233,9 +217,10 @@ data:
     CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
     CLUSTER_SIZE=$(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E '^server\.[0-9]+=') 
     echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MY_ID"
+    # If MyId > 1, this server is being permanently removed from raft_configuration.
     if [[ "$MY_ID" -gt "1" ]]; then
       # If ClusterSize < MyId, this server is being permanently removed from raft_configuration.
-      zk-shell --run-once "reconfig remove $MY_ID" "localhost:2181"
+      clickhouse-keeper-client -q "reconfig remove $MY_ID" ${KEEPER_URL}
       touch /var/lib/clickhouse-keeper/terminated
     fi
 
@@ -321,17 +306,16 @@ data:
     
         ROLE=participant
         WEIGHT=1
-        ZK_URL=$(zkConnectionString)
+        KEEPER_URL=${keeperConnectionString}
         NEW_KEEPER_CONFIG=$(keeperConfig)
-        zk-shell --run-once "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" "$ZK_URL"
+        clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
         exit 0        
       else
         echo "clickhouse-keeper instance is available as participant with 0 weight"
         ROLE=participant
         WEIGHT=0
-        ZK_URL=$(zkConnectionString)
         NEW_KEEPER_CONFIG=$(keeperConfig)
-        zk-shell --run-once "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" "$ZK_URL"
+        clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
       fi
     fi
 
@@ -412,7 +396,7 @@ spec:
               command:
                 - /conf/keeperLive.sh
             failureThreshold: 3
-            initialDelaySeconds: 180
+            initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 10
@@ -421,7 +405,7 @@ spec:
               command:
                 - /conf/keeperReady.sh
             failureThreshold: 3
-            initialDelaySeconds: 60
+            initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 10
