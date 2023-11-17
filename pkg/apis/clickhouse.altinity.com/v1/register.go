@@ -22,10 +22,15 @@ import (
 	clickhousealtinitycom "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 )
 
+const (
+	// APIVersion is the version of the Clickhouse Operator API.
+	APIVersion = "v1"
+)
+
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = schema.GroupVersion{
-	Group:   clickhousealtinitycom.GroupName,
-	Version: "v1",
+	Group:   clickhousealtinitycom.APIGroupName,
+	Version: APIVersion,
 }
 
 // Resource returns schema.GroupResource
