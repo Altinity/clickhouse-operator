@@ -21,9 +21,9 @@ import (
 
 	"github.com/go-logr/logr"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimachinery "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +35,7 @@ import (
 
 	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 
 // ReconcileTime is the delay between reconciliations
@@ -115,11 +116,11 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 }
 
 func (r *ChkReconciler) reconcileConfigMap(instance *v1alpha1.ClickHouseKeeper) (err error) {
-	cm := createConfigMap(instance)
+	cm := model.CreateConfigMap(instance)
 	if err = controllerutil.SetControllerReference(instance, cm, r.Scheme); err != nil {
 		return err
 	}
-	foundCm := &corev1.ConfigMap{}
+	foundCm := &core.ConfigMap{}
 	err = r.Get(context.TODO(), types.NamespacedName{
 		Namespace: cm.Namespace,
 		Name:      cm.Name,
@@ -145,11 +146,11 @@ func (r *ChkReconciler) reconcileConfigMap(instance *v1alpha1.ClickHouseKeeper) 
 }
 
 func (r *ChkReconciler) reconcileStatefulSet(instance *v1alpha1.ClickHouseKeeper) (err error) {
-	sts := createStatefulSet(instance)
+	sts := model.CreateStatefulSet(instance)
 	if err = controllerutil.SetControllerReference(instance, sts, r.Scheme); err != nil {
 		return err
 	}
-	foundSts := &appsv1.StatefulSet{}
+	foundSts := &apps.StatefulSet{}
 	err = r.Get(context.TODO(), types.NamespacedName{
 		Name:      sts.Name,
 		Namespace: sts.Namespace,
@@ -176,7 +177,7 @@ func (r *ChkReconciler) reconcileStatefulSet(instance *v1alpha1.ClickHouseKeeper
 	return nil
 }
 
-func (r *ChkReconciler) updateStatefulSet(instance *v1alpha1.ClickHouseKeeper, foundSts *appsv1.StatefulSet, sts *appsv1.StatefulSet) (err error) {
+func (r *ChkReconciler) updateStatefulSet(instance *v1alpha1.ClickHouseKeeper, foundSts *apps.StatefulSet, sts *apps.StatefulSet) (err error) {
 	r.Log.Info("Updating existing StatefulSet")
 
 	foundSts.Spec.Replicas = sts.Spec.Replicas
@@ -190,11 +191,11 @@ func (r *ChkReconciler) updateStatefulSet(instance *v1alpha1.ClickHouseKeeper, f
 }
 
 func (r *ChkReconciler) reconcileClientService(instance *v1alpha1.ClickHouseKeeper) (err error) {
-	svc := createClientService(instance)
+	svc := model.CreateClientService(instance)
 	if err = controllerutil.SetControllerReference(instance, svc, r.Scheme); err != nil {
 		return err
 	}
-	foundSvc := &corev1.Service{}
+	foundSvc := &core.Service{}
 	err = r.Get(context.TODO(), types.NamespacedName{
 		Name:      svc.Name,
 		Namespace: svc.Namespace,
@@ -222,11 +223,11 @@ func (r *ChkReconciler) reconcileClientService(instance *v1alpha1.ClickHouseKeep
 }
 
 func (r *ChkReconciler) reconcileHeadlessService(instance *v1alpha1.ClickHouseKeeper) (err error) {
-	svc := createHeadlessService(instance)
+	svc := model.CreateHeadlessService(instance)
 	if err = controllerutil.SetControllerReference(instance, svc, r.Scheme); err != nil {
 		return err
 	}
-	foundSvc := &corev1.Service{}
+	foundSvc := &core.Service{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name:      svc.Name,
 		Namespace: svc.Namespace,
@@ -254,11 +255,11 @@ func (r *ChkReconciler) reconcileHeadlessService(instance *v1alpha1.ClickHouseKe
 }
 
 func (r *ChkReconciler) reconcilePodDisruptionBudget(instance *v1alpha1.ClickHouseKeeper) (err error) {
-	pdb := createPodDisruptionBudget(instance)
+	pdb := model.CreatePodDisruptionBudget(instance)
 	if err = controllerutil.SetControllerReference(instance, pdb, r.Scheme); err != nil {
 		return err
 	}
-	foundPdb := &policyv1.PodDisruptionBudget{}
+	foundPdb := &policy.PodDisruptionBudget{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{
 		Name:      pdb.Name,
 		Namespace: pdb.Namespace,

@@ -27,8 +27,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// createConfigMap returns a config map containing ClickHouse Keeper config XML
-func createConfigMap(chk *v1alpha1.ClickHouseKeeper) *corev1.ConfigMap {
+// CreateConfigMap returns a config map containing ClickHouse Keeper config XML
+func CreateConfigMap(chk *v1alpha1.ClickHouseKeeper) *corev1.ConfigMap {
 	chk.Spec.Settings = util.MergeStringMapsPreserve(chk.Spec.Settings, defaultKeeperSettings(chk.Spec.GetPath()))
 
 	return &corev1.ConfigMap{
@@ -46,9 +46,9 @@ func createConfigMap(chk *v1alpha1.ClickHouseKeeper) *corev1.ConfigMap {
 	}
 }
 
-// createStatefulSet return a clickhouse keeper stateful set from the chk spec
-func createStatefulSet(chk *v1alpha1.ClickHouseKeeper) *appsv1.StatefulSet {
-	labels := getPodLabels(chk)
+// CreateStatefulSet return a clickhouse keeper stateful set from the chk spec
+func CreateStatefulSet(chk *v1alpha1.ClickHouseKeeper) *appsv1.StatefulSet {
+	labels := GetPodLabels(chk)
 	annotations := getPodAnnotations(chk)
 	replicas := chk.Spec.GetReplicas()
 
@@ -289,8 +289,8 @@ func mountSharedVolume(chk *v1alpha1.ClickHouseKeeper) []corev1.VolumeMount {
 	}
 }
 
-// createClientService returns a client service resource for the clickhouse keeper cluster
-func createClientService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
+// CreateClientService returns a client service resource for the clickhouse keeper cluster
+func CreateClientService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 	svcPorts := []corev1.ServicePort{
 		corev1.ServicePort{
 			Name: "client",
@@ -311,8 +311,8 @@ func createClientService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 	return createService(chk.Name, chk, svcPorts, true)
 }
 
-// createHeadlessService returns an internal headless-service for the chk stateful-set
-func createHeadlessService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
+// CreateHeadlessService returns an internal headless-service for the chk stateful-set
+func CreateHeadlessService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 	svcPorts := []corev1.ServicePort{
 		{
 			Name: "raft",
@@ -334,7 +334,7 @@ func createService(name string, chk *v1alpha1.ClickHouseKeeper, ports []corev1.S
 		},
 		Spec: corev1.ServiceSpec{
 			Ports:    ports,
-			Selector: getPodLabels(chk),
+			Selector: GetPodLabels(chk),
 		},
 	}
 	if !clusterIP {
@@ -343,8 +343,8 @@ func createService(name string, chk *v1alpha1.ClickHouseKeeper, ports []corev1.S
 	return &service
 }
 
-// createPodDisruptionBudget returns a pdb for the clickhouse keeper cluster
-func createPodDisruptionBudget(chk *v1alpha1.ClickHouseKeeper) *policyv1.PodDisruptionBudget {
+// CreatePodDisruptionBudget returns a pdb for the clickhouse keeper cluster
+func CreatePodDisruptionBudget(chk *v1alpha1.ClickHouseKeeper) *policyv1.PodDisruptionBudget {
 	pdbCount := intstr.FromInt(1)
 	return &policyv1.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{

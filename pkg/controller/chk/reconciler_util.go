@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 
 func getCheckSum(chk *v1alpha1.ClickHouseKeeper) (string, error) {
@@ -56,7 +57,7 @@ func getLastAppliedConfiguration(chk *v1alpha1.ClickHouseKeeper) *v1alpha1.Click
 
 func (r *ChkReconciler) getReadyMembers(instance *v1alpha1.ClickHouseKeeper) ([]string, error) {
 	foundPods := &corev1.PodList{}
-	labelSelector := labels.SelectorFromSet(getPodLabels(instance))
+	labelSelector := labels.SelectorFromSet(model.GetPodLabels(instance))
 	listOps := &client.ListOptions{
 		Namespace:     instance.Namespace,
 		LabelSelector: labelSelector,

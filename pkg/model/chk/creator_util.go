@@ -36,7 +36,7 @@ func getPodAnnotations(chk *v1alpha1.ClickHouseKeeper) map[string]string {
 	return annotations
 }
 
-func getPodLabels(chk *v1alpha1.ClickHouseKeeper) map[string]string {
+func GetPodLabels(chk *v1alpha1.ClickHouseKeeper) map[string]string {
 	var labels map[string]string
 	if chk.Spec.PodTemplate != nil && chk.Spec.PodTemplate.ObjectMeta.Labels != nil {
 		labels = chk.Spec.PodTemplate.ObjectMeta.Labels
