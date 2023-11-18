@@ -27,15 +27,15 @@ const (
 	APIVersion = "v1"
 )
 
-// GroupVersion is group version used to register these objects
-var GroupVersion = schema.GroupVersion{
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = schema.GroupVersion{
 	Group:   clickhousealtinitycom.APIGroupName,
 	Version: APIVersion,
 }
 
 // Resource returns schema.GroupResource
 func Resource(resource string) schema.GroupResource {
-	return GroupVersion.WithResource(resource).GroupResource()
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
 var (
@@ -54,7 +54,7 @@ func init() {
 // addKnownTypes adds list of known types to the api.Scheme object
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(
-		GroupVersion,
+		SchemeGroupVersion,
 		&ClickHouseInstallation{},
 		&ClickHouseInstallationList{},
 		&ClickHouseInstallationTemplate{},
@@ -62,6 +62,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClickHouseOperatorConfiguration{},
 		&ClickHouseOperatorConfigurationList{},
 	)
-	metav1.AddToGroupVersion(scheme, GroupVersion)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
