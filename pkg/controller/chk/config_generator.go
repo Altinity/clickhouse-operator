@@ -56,17 +56,13 @@ func defaultKeeperSettings(path string) map[string]string {
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func generateXMLConfig(m map[string]string, chk *v1alpha1.ClickHouseKeeper) string {
-	if len(m) == 0 {
+func generateXMLConfig(_settings map[string]string, chk *v1alpha1.ClickHouseKeeper) string {
+	if len(_settings) == 0 {
 		return ""
 	}
 
 	settings := v1.NewSettings()
-
-	for key, value := range m {
-		settings.Set(key, v1.NewSettingScalar(value))
-	}
-
+	settings.SetScalarsFromMap(_settings)
 	settings.Set("keeper_server/server_id", v1.NewSettingScalar("KEEPER_ID"))
 	settings.Set("keeper_server/raft_configuration/server", v1.NewSettingScalar(""))
 
