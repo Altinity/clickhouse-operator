@@ -24,7 +24,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -57,7 +57,7 @@ func (w *worker) clean(ctx context.Context, chi *chiV1.ClickHouseInstallation) {
 }
 
 // dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
-func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
+func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *model.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -78,49 +78,49 @@ func (w *worker) dropReplicas(ctx context.Context, chi *chiV1.ClickHouseInstalla
 	w.a.V(1).M(chi).F().E().Info("processed replicas: %d", cnt)
 }
 
-func shouldPurgeStatefulSet(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chopModel.Registry, m metaV1.ObjectMeta) bool {
+func shouldPurgeStatefulSet(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m metaV1.ObjectMeta) bool {
 	if reconcileFailedObjs.HasStatefulSet(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == chiV1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == chiV1.ObjectsCleanupDelete
 }
 
-func shouldPurgePVC(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chopModel.Registry, m metaV1.ObjectMeta) bool {
+func shouldPurgePVC(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m metaV1.ObjectMeta) bool {
 	if reconcileFailedObjs.HasPVC(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == chiV1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == chiV1.ObjectsCleanupDelete
 }
 
-func shouldPurgeConfigMap(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chopModel.Registry, m metaV1.ObjectMeta) bool {
+func shouldPurgeConfigMap(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m metaV1.ObjectMeta) bool {
 	if reconcileFailedObjs.HasConfigMap(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == chiV1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == chiV1.ObjectsCleanupDelete
 }
 
-func shouldPurgeService(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chopModel.Registry, m metaV1.ObjectMeta) bool {
+func shouldPurgeService(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m metaV1.ObjectMeta) bool {
 	if reconcileFailedObjs.HasService(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == chiV1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == chiV1.ObjectsCleanupDelete
 }
 
-func shouldPurgeSecret(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chopModel.Registry, m metaV1.ObjectMeta) bool {
+func shouldPurgeSecret(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m metaV1.ObjectMeta) bool {
 	if reconcileFailedObjs.HasSecret(m) {
 		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetSecret() == chiV1.ObjectsCleanupDelete
 	}
 	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == chiV1.ObjectsCleanupDelete
 }
 
-func shouldPurgePDB(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *chopModel.Registry, m metaV1.ObjectMeta) bool {
+func shouldPurgePDB(chi *chiV1.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m metaV1.ObjectMeta) bool {
 	return true
 }
 
 func (w *worker) purgeStatefulSet(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	reconcileFailedObjs *chopModel.Registry,
+	reconcileFailedObjs *model.Registry,
 	m metaV1.ObjectMeta,
 ) int {
 	if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
@@ -136,11 +136,11 @@ func (w *worker) purgeStatefulSet(
 func (w *worker) purgePVC(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	reconcileFailedObjs *chopModel.Registry,
+	reconcileFailedObjs *model.Registry,
 	m metaV1.ObjectMeta,
 ) {
 	if shouldPurgePVC(chi, reconcileFailedObjs, m) {
-		if chopModel.GetReclaimPolicy(m) == chiV1.PVCReclaimPolicyDelete {
+		if model.GetReclaimPolicy(m) == chiV1.PVCReclaimPolicyDelete {
 			w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
 			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
 				w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
@@ -152,7 +152,7 @@ func (w *worker) purgePVC(
 func (w *worker) purgeConfigMap(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	reconcileFailedObjs *chopModel.Registry,
+	reconcileFailedObjs *model.Registry,
 	m metaV1.ObjectMeta,
 ) {
 	if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
@@ -166,7 +166,7 @@ func (w *worker) purgeConfigMap(
 func (w *worker) purgeService(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	reconcileFailedObjs *chopModel.Registry,
+	reconcileFailedObjs *model.Registry,
 	m metaV1.ObjectMeta,
 ) {
 	if shouldPurgeService(chi, reconcileFailedObjs, m) {
@@ -180,7 +180,7 @@ func (w *worker) purgeService(
 func (w *worker) purgeSecret(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	reconcileFailedObjs *chopModel.Registry,
+	reconcileFailedObjs *model.Registry,
 	m metaV1.ObjectMeta,
 ) {
 	if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
@@ -194,7 +194,7 @@ func (w *worker) purgeSecret(
 func (w *worker) purgePDB(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	reconcileFailedObjs *chopModel.Registry,
+	reconcileFailedObjs *model.Registry,
 	m metaV1.ObjectMeta,
 ) {
 	if shouldPurgePDB(chi, reconcileFailedObjs, m) {
@@ -209,27 +209,27 @@ func (w *worker) purgePDB(
 func (w *worker) purge(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	reg *chopModel.Registry,
-	reconcileFailedObjs *chopModel.Registry,
+	reg *model.Registry,
+	reconcileFailedObjs *model.Registry,
 ) (cnt int) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return cnt
 	}
 
-	reg.Walk(func(entityType chopModel.EntityType, m metaV1.ObjectMeta) {
+	reg.Walk(func(entityType model.EntityType, m metaV1.ObjectMeta) {
 		switch entityType {
-		case chopModel.StatefulSet:
+		case model.StatefulSet:
 			cnt += w.purgeStatefulSet(ctx, chi, reconcileFailedObjs, m)
-		case chopModel.PVC:
+		case model.PVC:
 			w.purgePVC(ctx, chi, reconcileFailedObjs, m)
-		case chopModel.ConfigMap:
+		case model.ConfigMap:
 			w.purgeConfigMap(ctx, chi, reconcileFailedObjs, m)
-		case chopModel.Service:
+		case model.Service:
 			w.purgeService(ctx, chi, reconcileFailedObjs, m)
-		case chopModel.Secret:
+		case model.Secret:
 			w.purgeSecret(ctx, chi, reconcileFailedObjs, m)
-		case chopModel.PDB:
+		case model.PDB:
 			w.purgePDB(ctx, chi, reconcileFailedObjs, m)
 		}
 	})
@@ -265,7 +265,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *chiV1.ClickHouseIns
 	defer w.a.V(2).M(chi).E().P()
 
 	var err error
-	chi, err = w.normalizer.CreateTemplatedCHI(chi, chopModel.NewNormalizerOptions())
+	chi, err = w.normalizer.CreateTemplatedCHI(chi, model.NewNormalizerOptions())
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(chi).
@@ -339,7 +339,7 @@ func (w *worker) canDropReplica(host *chiV1.ChiHost, opts ...*dropReplicaOptions
 	w.c.walkDiscoveredPVCs(host, func(pvc *coreV1.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
-		if chopModel.GetReclaimPolicy(pvc.ObjectMeta) == chiV1.PVCReclaimPolicyRetain {
+		if model.GetReclaimPolicy(pvc.ObjectMeta) == chiV1.PVCReclaimPolicyRetain {
 			w.a.V(1).F().Info("PVC %s/%s blocks drop replica. Reclaim policy: %s", chiV1.PVCReclaimPolicyRetain.String())
 			can = false
 		}
@@ -427,7 +427,7 @@ func (w *worker) deleteTables(ctx context.Context, host *chiV1.ChiHost) error {
 		return nil
 	}
 
-	if !chopModel.HostCanDeleteAllPVCs(host) {
+	if !model.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
 	err := w.ensureClusterSchemer(host).HostDropTables(ctx, host)

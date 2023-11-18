@@ -1,6 +1,6 @@
 //go:build race
 
-package model
+package chi
 
 import (
 	"sync"

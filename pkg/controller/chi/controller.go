@@ -22,6 +22,7 @@ import (
 
 	"github.com/sanity-io/litter"
 	"gopkg.in/d4l3k/messagediff.v1"
+
 	appsV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -45,7 +46,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	chopModels "github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -453,7 +454,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(objectMeta *metaV1.ObjectMeta) bool {
-	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && chopModels.IsCHOPGeneratedObject(objectMeta)
+	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && model.IsCHOPGeneratedObject(objectMeta)
 }
 
 // Run syncs caches, starts workers
@@ -529,7 +530,7 @@ func prepareCHIAdd(command *ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *ReconcileCHI) bool {
-	actionPlan := chopModels.NewActionPlan(command.old, command.new)
+	actionPlan := model.NewActionPlan(command.old, command.new)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}

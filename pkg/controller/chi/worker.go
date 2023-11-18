@@ -21,6 +21,7 @@ import (
 
 	"github.com/juliangruber/go-intersect"
 	"gopkg.in/d4l3k/messagediff.v1"
+
 	coreV1 "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,7 +33,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -46,27 +47,27 @@ type worker struct {
 	a Announcer
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
-	normalizer *chopModel.Normalizer
-	schemer    *chopModel.ClusterSchemer
+	normalizer *model.Normalizer
+	schemer    *model.ClusterSchemer
 	start      time.Time
 	task       task
 }
 
 // task represents context of a worker. This also can be called "a reconcile task"
 type task struct {
-	creator            *chopModel.Creator
-	registryReconciled *chopModel.Registry
-	registryFailed     *chopModel.Registry
+	creator            *model.Creator
+	registryReconciled *model.Registry
+	registryFailed     *model.Registry
 	cmUpdate           time.Time
 	start              time.Time
 }
 
 // newTask creates new context
-func newTask(creator *chopModel.Creator) task {
+func newTask(creator *model.Creator) task {
 	return task{
 		creator:            creator,
-		registryReconciled: chopModel.NewRegistry(),
-		registryFailed:     chopModel.NewRegistry(),
+		registryReconciled: model.NewRegistry(),
+		registryFailed:     model.NewRegistry(),
 		cmUpdate:           time.Time{},
 		start:              time.Now(),
 	}
@@ -83,7 +84,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		c:          c,
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
-		normalizer: chopModel.NewNormalizer(c.kubeClient),
+		normalizer: model.NewNormalizer(c.kubeClient),
 		schemer:    nil, //
 		start:      start,
 	}
@@ -91,7 +92,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *chiV1.ClickHouseInstallation) {
-	w.task = newTask(chopModel.NewCreator(chi))
+	w.task = newTask(model.NewCreator(chi))
 }
 
 // timeToStart specifies time that operator does not accept changes
@@ -103,7 +104,7 @@ func (w *worker) isJustStarted() bool {
 }
 
 func (w *worker) isConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
-	return chopModel.IsConfigurationChangeRequiresReboot(host)
+	return model.IsConfigurationChangeRequiresReboot(host)
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
@@ -275,7 +276,7 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *ReconcilePod) err
 }
 
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
-	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, chopModel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, model.NewNormalizerOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
@@ -318,7 +319,7 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 // normalize
 func (w *worker) normalize(c *chiV1.ClickHouseInstallation) *chiV1.ClickHouseInstallation {
 
-	chi, err := w.normalizer.CreateTemplatedCHI(c, chopModel.NewNormalizerOptions())
+	chi, err := w.normalizer.CreateTemplatedCHI(c, model.NewNormalizerOptions())
 	if err != nil {
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -328,7 +329,7 @@ func (w *worker) normalize(c *chiV1.ClickHouseInstallation) *chiV1.ClickHouseIns
 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-	opts := chopModel.NewNormalizerOptions()
+	opts := model.NewNormalizerOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
 	chi, err = w.normalizer.CreateTemplatedCHI(c, opts)
@@ -374,11 +375,11 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *chiV1.ClickHouseInsta
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *coreV1.Endpoints) error {
 
-	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, chopModel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, model.NewNormalizerOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := chopModel.NewNormalizerOptions()
+		opts := model.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
@@ -561,7 +562,7 @@ func (w *worker) logCHI(name string, chi *chiV1.ClickHouseInstallation) {
 }
 
 // logActionPlan logs action plan
-func (w *worker) logActionPlan(ap *chopModel.ActionPlan) {
+func (w *worker) logActionPlan(ap *model.ActionPlan) {
 	w.a.Info(
 		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
 		ap,
@@ -627,7 +628,7 @@ func (w *worker) addCHIToMonitoring(chi *chiV1.ClickHouseInstallation) {
 	w.c.updateWatch(chi)
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *model.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -657,11 +658,11 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ch
 	}
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, chopModel.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, model.NewNormalizerOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := chopModel.NewNormalizerOptions()
+		opts := model.NewNormalizerOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
@@ -712,7 +713,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.Spec.GetTaskID())
 }
 
-func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *chopModel.ActionPlan) {
+func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallation, ap *model.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -725,7 +726,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 			cluster.WalkHosts(func(host *chiV1.ChiHost) error {
 
 				// Name of the StatefulSet for this host
-				name := chopModel.CreateStatefulSetName(host)
+				name := model.CreateStatefulSetName(host)
 				// Have we found this StatefulSet
 				found := false
 
@@ -806,8 +807,8 @@ func (w *worker) walkHosts(ctx context.Context, chi *chiV1.ClickHouseInstallatio
 
 // baseRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
 // which are applied on each of `remote_servers` reconfiguration during reconcile cycle
-func (w *worker) baseRemoteServersGeneratorOptions() *chopModel.RemoteServersGeneratorOptions {
-	opts := chopModel.NewRemoteServersGeneratorOptions()
+func (w *worker) baseRemoteServersGeneratorOptions() *model.RemoteServersGeneratorOptions {
+	opts := model.NewRemoteServersGeneratorOptions()
 	opts.ExcludeReconcileAttributes(
 		chiV1.NewChiHostReconcileAttributes().SetAdd(),
 	)
@@ -816,7 +817,7 @@ func (w *worker) baseRemoteServersGeneratorOptions() *chopModel.RemoteServersGen
 }
 
 // options build ClickHouseConfigFilesGeneratorOptions
-func (w *worker) options(excludeHosts ...*chiV1.ChiHost) *chopModel.ClickHouseConfigFilesGeneratorOptions {
+func (w *worker) options(excludeHosts ...*chiV1.ChiHost) *model.ClickHouseConfigFilesGeneratorOptions {
 	// Stringify
 	str := ""
 	for _, host := range excludeHosts {
@@ -825,7 +826,7 @@ func (w *worker) options(excludeHosts ...*chiV1.ChiHost) *chopModel.ClickHouseCo
 
 	opts := w.baseRemoteServersGeneratorOptions().ExcludeHosts(excludeHosts...)
 	w.a.Info("RemoteServersGeneratorOptions: %s, excluded host(s): %s", opts, str)
-	return chopModel.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
+	return model.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status
@@ -914,7 +915,7 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost, opts ..
 			WithStatusAction(host.GetCHI()).
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
-		host.GetCHI().EnsureStatus().PushHostTablesCreated(chopModel.CreateFQDN(host))
+		host.GetCHI().EnsureStatus().PushHostTablesCreated(model.CreateFQDN(host))
 	} else {
 		w.a.V(1).
 			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
@@ -939,7 +940,7 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost, opts ...*migrateTableO
 		// Force migration requested
 		return true
 
-	case util.InArray(chopModel.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated()):
+	case util.InArray(model.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated()):
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
@@ -1229,7 +1230,7 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *chiV1.ChiHos
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI bool, options *chopModel.NormalizerOptions) (*chiV1.ClickHouseInstallation, error) {
+func (w *worker) createCHIFromObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI bool, options *model.NormalizerOptions) (*chiV1.ClickHouseInstallation, error) {
 	w.a.V(3).M(objectMeta).S().P()
 	defer w.a.V(3).M(objectMeta).E().P()
 
@@ -1482,8 +1483,8 @@ func (w *worker) getStatefulSetStatus(meta metaV1.ObjectMeta) chiV1.ObjectStatus
 // getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
 func (w *worker) getObjectStatusFromMetas(curMeta, newMeta metaV1.ObjectMeta) chiV1.ObjectStatus {
 	// Try to perform label-based version comparison
-	curVersion, curHasLabel := chopModel.GetObjectVersion(curMeta)
-	newVersion, newHasLabel := chopModel.GetObjectVersion(newMeta)
+	curVersion, curHasLabel := model.GetObjectVersion(curMeta)
+	newVersion, newHasLabel := model.GetObjectVersion(newMeta)
 
 	if !curHasLabel || !newHasLabel {
 		w.a.M(newMeta).F().Warning(
@@ -1643,7 +1644,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 	}
 
 	action := errCRUDRecreate
-	if chopModel.IsStatefulSetReady(curStatefulSet) {
+	if model.IsStatefulSetReady(curStatefulSet) {
 		action = w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 	}
 
@@ -1764,7 +1765,7 @@ func (w *worker) applyResource(
 	return true
 }
 
-func (w *worker) ensureClusterSchemer(host *chiV1.ChiHost) *chopModel.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(host *chiV1.ChiHost) *model.ClusterSchemer {
 	if w == nil {
 		return nil
 	}
@@ -1786,7 +1787,7 @@ func (w *worker) ensureClusterSchemer(host *chiV1.ChiHost) *chopModel.ClusterSch
 	case chiV1.ChSchemeHTTPS:
 		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
-	w.schemer = chopModel.NewClusterSchemer(clusterConnectionParams)
+	w.schemer = model.NewClusterSchemer(clusterConnectionParams)
 
 	return w.schemer
 }

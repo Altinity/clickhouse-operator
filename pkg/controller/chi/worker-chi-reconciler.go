@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"gopkg.in/d4l3k/messagediff.v1"
+
 	coreV1 "k8s.io/api/core/v1"
 	policyV1 "k8s.io/api/policy/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -29,7 +30,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -75,7 +76,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 	new.SetAncestor(old)
 	w.logOldAndNew("normalized", old, new)
 
-	actionPlan := chopModel.NewActionPlan(old, new)
+	actionPlan := model.NewActionPlan(old, new)
 	w.logActionPlan(actionPlan)
 
 	switch {
@@ -238,7 +239,7 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *chiV1.Cli
 func (w *worker) reconcileCHIConfigMapCommon(
 	ctx context.Context,
 	chi *chiV1.ClickHouseInstallation,
-	options *chopModel.ClickHouseConfigFilesGeneratorOptions,
+	options *model.ClickHouseConfigFilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -426,7 +427,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 
 	// Add Cluster's Auto Secret
 	if cluster.Secret.Source() == chiV1.ClusterSecretSourceAuto {
-		if secret := w.task.creator.CreateClusterSecret(chopModel.CreateClusterAutoSecretName(cluster)); secret != nil {
+		if secret := w.task.creator.CreateClusterSecret(model.CreateClusterAutoSecretName(cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.CHI, secret); err == nil {
 				w.task.registryReconciled.RegisterSecret(secret.ObjectMeta)
 			} else {
@@ -1012,12 +1013,12 @@ func (w *worker) fetchOrCreatePVC(
 	volumeMount *coreV1.VolumeMount,
 ) (*coreV1.PersistentVolumeClaim, *chiV1.ChiVolumeClaimTemplate, bool) {
 	namespace := host.Address.Namespace
-	pvcName, ok := chopModel.CreatePVCNameByVolumeMount(host, volumeMount)
+	pvcName, ok := model.CreatePVCNameByVolumeMount(host, volumeMount)
 	if !ok {
 		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
 		return nil, nil, false
 	}
-	volumeClaimTemplate, ok := chopModel.GetVolumeClaimTemplate(host, volumeMount)
+	volumeClaimTemplate, ok := model.GetVolumeClaimTemplate(host, volumeMount)
 	if !ok {
 		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
 		return nil, nil, false
