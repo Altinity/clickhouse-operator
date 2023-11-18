@@ -15,9 +15,8 @@
 package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
 
 	clickhousealtinitycom "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 )
@@ -27,34 +26,24 @@ const (
 	APIVersion = "v1"
 )
 
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = schema.GroupVersion{
-	Group:   clickhousealtinitycom.APIGroupName,
-	Version: APIVersion,
-}
-
-// Resource returns schema.GroupResource
-func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
-}
-
 var (
-	// localSchemeBuilder is an instance of SchemeBuilder
-	localSchemeBuilder = new(runtime.SchemeBuilder)
+	// SchemeGroupVersion is group version used to register these objects
+	SchemeGroupVersion = schema.GroupVersion{
+		Group:   clickhousealtinitycom.APIGroupName,
+		Version: APIVersion,
+	}
 
-	// AddToScheme applies SchemeBuilder functions to the specified scheme
-	// This function is called from the generated client code
-	AddToScheme = localSchemeBuilder.AddToScheme
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	SchemeBuilder = &scheme.Builder{
+		GroupVersion: SchemeGroupVersion,
+	}
+
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
 )
 
 func init() {
-	localSchemeBuilder.Register(addKnownTypes)
-}
-
-// addKnownTypes adds list of known types to the api.Scheme object
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(
-		SchemeGroupVersion,
+	SchemeBuilder.Register(
 		&ClickHouseInstallation{},
 		&ClickHouseInstallationList{},
 		&ClickHouseInstallationTemplate{},
@@ -62,6 +51,9 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClickHouseOperatorConfiguration{},
 		&ClickHouseOperatorConfigurationList{},
 	)
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
-	return nil
+}
+
+// Resource returns schema.GroupResource
+func Resource(resource string) schema.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
