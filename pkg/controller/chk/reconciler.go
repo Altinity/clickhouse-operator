@@ -33,8 +33,8 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 
@@ -50,13 +50,13 @@ type ChkReconciler struct {
 	Scheme *apimachinery.Scheme
 }
 
-type reconcileFunc func(cluster *v1alpha1.ClickHouseKeeper) error
+type reconcileFunc func(cluster *apiChk.ClickHouseKeeper) error
 
 func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log = log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 
 	// Fetch the ClickHouseKeeper instance
-	instance := &v1alpha1.ClickHouseKeeper{}
+	instance := &apiChk.ClickHouseKeeper{}
 	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile
@@ -90,7 +90,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			}
 		}
 
-		tmp := &v1alpha1.ClickHouseKeeper{}
+		tmp := &apiChk.ClickHouseKeeper{}
 		if err := r.Get(ctx, req.NamespacedName, tmp); err != nil {
 			if errors.IsNotFound(err) {
 				// Request object not found, could have been deleted after reconcile
@@ -115,7 +115,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *ChkReconciler) reconcileConfigMap(instance *v1alpha1.ClickHouseKeeper) (err error) {
+func (r *ChkReconciler) reconcileConfigMap(instance *apiChk.ClickHouseKeeper) (err error) {
 	cm := model.CreateConfigMap(instance)
 	if err = controllerutil.SetControllerReference(instance, cm, r.Scheme); err != nil {
 		return err
@@ -145,7 +145,7 @@ func (r *ChkReconciler) reconcileConfigMap(instance *v1alpha1.ClickHouseKeeper) 
 	return nil
 }
 
-func (r *ChkReconciler) reconcileStatefulSet(instance *v1alpha1.ClickHouseKeeper) (err error) {
+func (r *ChkReconciler) reconcileStatefulSet(instance *apiChk.ClickHouseKeeper) (err error) {
 	sts := model.CreateStatefulSet(instance)
 	if err = controllerutil.SetControllerReference(instance, sts, r.Scheme); err != nil {
 		return err
@@ -177,7 +177,7 @@ func (r *ChkReconciler) reconcileStatefulSet(instance *v1alpha1.ClickHouseKeeper
 	return nil
 }
 
-func (r *ChkReconciler) updateStatefulSet(instance *v1alpha1.ClickHouseKeeper, foundSts *apps.StatefulSet, sts *apps.StatefulSet) (err error) {
+func (r *ChkReconciler) updateStatefulSet(instance *apiChk.ClickHouseKeeper, foundSts *apps.StatefulSet, sts *apps.StatefulSet) (err error) {
 	r.Log.Info("Updating existing StatefulSet")
 
 	foundSts.Spec.Replicas = sts.Spec.Replicas
@@ -190,7 +190,7 @@ func (r *ChkReconciler) updateStatefulSet(instance *v1alpha1.ClickHouseKeeper, f
 	return nil
 }
 
-func (r *ChkReconciler) reconcileClientService(instance *v1alpha1.ClickHouseKeeper) (err error) {
+func (r *ChkReconciler) reconcileClientService(instance *apiChk.ClickHouseKeeper) (err error) {
 	svc := model.CreateClientService(instance)
 	if err = controllerutil.SetControllerReference(instance, svc, r.Scheme); err != nil {
 		return err
@@ -222,7 +222,7 @@ func (r *ChkReconciler) reconcileClientService(instance *v1alpha1.ClickHouseKeep
 	return nil
 }
 
-func (r *ChkReconciler) reconcileHeadlessService(instance *v1alpha1.ClickHouseKeeper) (err error) {
+func (r *ChkReconciler) reconcileHeadlessService(instance *apiChk.ClickHouseKeeper) (err error) {
 	svc := model.CreateHeadlessService(instance)
 	if err = controllerutil.SetControllerReference(instance, svc, r.Scheme); err != nil {
 		return err
@@ -254,7 +254,7 @@ func (r *ChkReconciler) reconcileHeadlessService(instance *v1alpha1.ClickHouseKe
 	return nil
 }
 
-func (r *ChkReconciler) reconcilePodDisruptionBudget(instance *v1alpha1.ClickHouseKeeper) (err error) {
+func (r *ChkReconciler) reconcilePodDisruptionBudget(instance *apiChk.ClickHouseKeeper) (err error) {
 	pdb := model.CreatePodDisruptionBudget(instance)
 	if err = controllerutil.SetControllerReference(instance, pdb, r.Scheme); err != nil {
 		return err
@@ -275,14 +275,14 @@ func (r *ChkReconciler) reconcilePodDisruptionBudget(instance *v1alpha1.ClickHou
 	return nil
 }
 
-func (r *ChkReconciler) reconcileClusterStatus(instance *v1alpha1.ClickHouseKeeper) (err error) {
+func (r *ChkReconciler) reconcileClusterStatus(instance *apiChk.ClickHouseKeeper) (err error) {
 	readyMembers, err := r.getReadyMembers(instance)
 	if err != nil {
 		return err
 	}
 
 	// Refetch the latest ClickHouseKeeper instance
-	tmp := &v1alpha1.ClickHouseKeeper{}
+	tmp := &apiChk.ClickHouseKeeper{}
 	namespacedName := types.NamespacedName{
 		Name:      instance.Name,
 		Namespace: instance.Namespace,
@@ -294,18 +294,18 @@ func (r *ChkReconciler) reconcileClusterStatus(instance *v1alpha1.ClickHouseKeep
 		}
 
 		if tmp.Status == nil {
-			tmp.Status = &v1alpha1.ChkStatus{
+			tmp.Status = &apiChk.ChkStatus{
 				Status: "In progress",
 			}
 		}
 		tmp.Status.Replicas = instance.Spec.GetReplicas()
 
-		tmp.Status.ReadyReplicas = []v1.ChiZookeeperNode{}
+		tmp.Status.ReadyReplicas = []apiChi.ChiZookeeperNode{}
 		for _, readyOne := range readyMembers {
-			tmp.Status.ReadyReplicas = append(tmp.Status.ReadyReplicas, v1.ChiZookeeperNode{
+			tmp.Status.ReadyReplicas = append(tmp.Status.ReadyReplicas, apiChi.ChiZookeeperNode{
 				Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, instance.Namespace),
 				Port:   int32(instance.Spec.GetClientPort()),
-				Secure: v1.NewStringBool(false),
+				Secure: apiChi.NewStringBool(false),
 			})
 		}
 
