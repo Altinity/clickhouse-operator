@@ -25,12 +25,21 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
+
+func getNamespacedName(obj meta.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+}
 
 func getCheckSum(chk *api.ClickHouseKeeper) (string, error) {
 	specString, err := json.Marshal(chk.Spec)
@@ -46,7 +55,7 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func getLastAppliedConfiguration(chk *api.ClickHouseKeeper) *api.ClickHouseKeeper {
+func getLastAppliedClickHouseKeeper(chk *api.ClickHouseKeeper) *api.ClickHouseKeeper {
 	lastApplied := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
 	tmp := api.ClickHouseKeeper{}
@@ -55,36 +64,36 @@ func getLastAppliedConfiguration(chk *api.ClickHouseKeeper) *api.ClickHouseKeepe
 	return &tmp
 }
 
-func (r *ChkReconciler) getReadyMembers(instance *api.ClickHouseKeeper) ([]string, error) {
-	foundPods := &core.PodList{}
-	labelSelector := labels.SelectorFromSet(model.GetPodLabels(instance))
+func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeper) ([]string, error) {
+	podList := &core.PodList{}
+	labelSelector := labels.SelectorFromSet(model.GetPodLabels(chk))
 	listOps := &client.ListOptions{
-		Namespace:     instance.Namespace,
+		Namespace:     chk.Namespace,
 		LabelSelector: labelSelector,
 	}
-	if err := r.List(context.TODO(), foundPods, listOps); err != nil {
+	if err := r.List(context.TODO(), podList, listOps); err != nil {
 		return nil, err
 	}
 
-	var readyMembers []string
-	for _, p := range foundPods.Items {
+	var readyPods []string
+	for _, pod := range podList.Items {
 		ready := true
-		for _, c := range p.Status.ContainerStatuses {
-			r.Log.Info(fmt.Sprintf("%s: %t", c.Name, c.Ready))
-			if !c.Ready {
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			r.Log.Info(fmt.Sprintf("%s: %t", containerStatus.Name, containerStatus.Ready))
+			if !containerStatus.Ready {
 				ready = false
 			}
 		}
 		if ready {
-			readyMembers = append(readyMembers, p.Name)
+			readyPods = append(readyPods, pod.Name)
 		}
 	}
 
-	return readyMembers, nil
+	return readyPods, nil
 }
 
 func isReplicasChanged(chk *api.ClickHouseKeeper) bool {
-	lastApplied := getLastAppliedConfiguration(chk)
+	lastApplied := getLastAppliedClickHouseKeeper(chk)
 	if lastApplied.Spec.Replicas != chk.Spec.Replicas {
 		return true
 	} else {
