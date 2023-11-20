@@ -7,7 +7,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse.com/chop: ${OPERATOR_VERSION}
+    clickhouse-keeper.altinity.com/chop: ${OPERATOR_VERSION}
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced

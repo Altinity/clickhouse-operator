@@ -2809,7 +2809,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse.com/chop: 0.23.0
+    clickhouse-keeper.altinity.com/chop: 0.23.0
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
