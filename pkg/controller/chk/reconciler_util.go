@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 
@@ -41,7 +41,7 @@ func getNamespacedName(obj meta.Object) types.NamespacedName {
 	}
 }
 
-func getCheckSum(chk *api.ClickHouseKeeper) (string, error) {
+func getCheckSum(chk *api.ClickHouseKeeperInstallation) (string, error) {
 	specString, err := json.Marshal(chk.Spec)
 	if err != nil {
 		return "", err
@@ -55,16 +55,16 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func getKeeperFromAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeper) *api.ClickHouseKeeper {
+func getKeeperFromAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeperInstallation) *api.ClickHouseKeeperInstallation {
 	lastApplied := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
-	tmp := api.ClickHouseKeeper{}
+	tmp := api.ClickHouseKeeperInstallation{}
 
 	json.Unmarshal([]byte(lastApplied), &tmp)
 	return &tmp
 }
 
-func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeper) ([]string, error) {
+func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]string, error) {
 	labelSelector := labels.SelectorFromSet(model.GetPodLabels(chk))
 	listOps := &client.ListOptions{
 		Namespace:     chk.Namespace,
@@ -93,7 +93,7 @@ func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeper) ([]string, error
 	return readyPods, nil
 }
 
-func isReplicasChanged(chk *api.ClickHouseKeeper) bool {
+func isReplicasChanged(chk *api.ClickHouseKeeperInstallation) bool {
 	lastApplied := getKeeperFromAnnotationLastAppliedConfiguration(chk)
 	if lastApplied.Spec.Replicas != chk.Spec.Replicas {
 		return true
@@ -107,10 +107,10 @@ func markPodRestartedNow(sts *apps.StatefulSet) {
 	sts.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": string(v)}
 }
 
-func setAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeper) {
+func setAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeperInstallation) {
 	lastAppliedString := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
-	tmp := api.ClickHouseKeeper{}
+	tmp := api.ClickHouseKeeperInstallation{}
 	json.Unmarshal([]byte(lastAppliedString), &tmp)
 	tmp.Spec.Replicas = chk.Spec.Replicas
 

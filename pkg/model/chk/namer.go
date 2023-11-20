@@ -17,9 +17,9 @@ package chk
 import (
 	"fmt"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 )
 
-func getHeadlessServiceName(chk *api.ClickHouseKeeper) string {
+func getHeadlessServiceName(chk *api.ClickHouseKeeperInstallation) string {
 	return fmt.Sprintf("%s-headless", chk.GetName())
 }

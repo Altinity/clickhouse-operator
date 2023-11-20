@@ -15,10 +15,10 @@
 package chk
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 )
 
-func GetPodLabels(chk *api.ClickHouseKeeper) map[string]string {
+func GetPodLabels(chk *api.ClickHouseKeeperInstallation) map[string]string {
 	var labels map[string]string
 	if chk.Spec.PodTemplate != nil && chk.Spec.PodTemplate.ObjectMeta.Labels != nil {
 		labels = chk.Spec.PodTemplate.ObjectMeta.Labels

@@ -23,12 +23,12 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
-func CreateConfigMap(chk *api.ClickHouseKeeper) *core.ConfigMap {
+func CreateConfigMap(chk *api.ClickHouseKeeperInstallation) *core.ConfigMap {
 	chk.Spec.Settings = util.MergeStringMapsPreserve(chk.Spec.Settings, defaultKeeperSettings(chk.Spec.GetPath()))
 
 	return &core.ConfigMap{
@@ -47,7 +47,7 @@ func CreateConfigMap(chk *api.ClickHouseKeeper) *core.ConfigMap {
 }
 
 // CreateStatefulSet return a clickhouse keeper stateful set from the chk spec
-func CreateStatefulSet(chk *api.ClickHouseKeeper) *apps.StatefulSet {
+func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet {
 	labels := GetPodLabels(chk)
 	annotations := getPodAnnotations(chk)
 	replicas := chk.Spec.GetReplicas()
@@ -85,7 +85,7 @@ func CreateStatefulSet(chk *api.ClickHouseKeeper) *apps.StatefulSet {
 	}
 }
 
-func createPodTemplateSpec(chk *api.ClickHouseKeeper) core.PodSpec {
+func createPodTemplateSpec(chk *api.ClickHouseKeeperInstallation) core.PodSpec {
 	if chk.Spec.PodTemplate == nil {
 		chk.Spec.PodTemplate = &api.ChkPodTemplate{}
 	}
@@ -100,7 +100,7 @@ func createPodTemplateSpec(chk *api.ClickHouseKeeper) core.PodSpec {
 	return podSpec
 }
 
-func createVolumes(chk *api.ClickHouseKeeper) []core.Volume {
+func createVolumes(chk *api.ClickHouseKeeperInstallation) []core.Volume {
 	var volumes []core.Volume
 
 	switch length := len(chk.Spec.VolumeClaimTemplates); length {
@@ -165,7 +165,7 @@ func createConfigMapVolume(name string, chkName string, key string, path string)
 	}
 }
 
-func createInitContainers(chk *api.ClickHouseKeeper) []core.Container {
+func createInitContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 	var initContainers []core.Container
 
 	if len(chk.Spec.PodTemplate.Spec.InitContainers) == 0 {
@@ -202,7 +202,7 @@ func createInitContainers(chk *api.ClickHouseKeeper) []core.Container {
 	return initContainers
 }
 
-func createContainers(chk *api.ClickHouseKeeper) []core.Container {
+func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 	var containers []core.Container
 	if len(chk.Spec.PodTemplate.Spec.Containers) == 0 {
 		containers = []core.Container{{}}
@@ -279,7 +279,7 @@ func createContainers(chk *api.ClickHouseKeeper) []core.Container {
 	return containers
 }
 
-func mountVolumes(chk *api.ClickHouseKeeper) []core.VolumeMount {
+func mountVolumes(chk *api.ClickHouseKeeperInstallation) []core.VolumeMount {
 	path := chk.Spec.GetPath()
 	return []core.VolumeMount{
 		{
@@ -297,7 +297,7 @@ func mountVolumes(chk *api.ClickHouseKeeper) []core.VolumeMount {
 	}
 }
 
-func mountSharedVolume(chk *api.ClickHouseKeeper) []core.VolumeMount {
+func mountSharedVolume(chk *api.ClickHouseKeeperInstallation) []core.VolumeMount {
 	path := chk.Spec.GetPath()
 	return []core.VolumeMount{
 		{
@@ -318,7 +318,7 @@ func mountSharedVolume(chk *api.ClickHouseKeeper) []core.VolumeMount {
 }
 
 // CreateClientService returns a client service resource for the clickhouse keeper cluster
-func CreateClientService(chk *api.ClickHouseKeeper) *core.Service {
+func CreateClientService(chk *api.ClickHouseKeeperInstallation) *core.Service {
 	svcPorts := []core.ServicePort{
 		core.ServicePort{
 			Name: "client",
@@ -340,7 +340,7 @@ func CreateClientService(chk *api.ClickHouseKeeper) *core.Service {
 }
 
 // CreateHeadlessService returns an internal headless-service for the chk stateful-set
-func CreateHeadlessService(chk *api.ClickHouseKeeper) *core.Service {
+func CreateHeadlessService(chk *api.ClickHouseKeeperInstallation) *core.Service {
 	svcPorts := []core.ServicePort{
 		{
 			Name: "raft",
@@ -350,7 +350,7 @@ func CreateHeadlessService(chk *api.ClickHouseKeeper) *core.Service {
 	return createService(getHeadlessServiceName(chk), chk, svcPorts, false)
 }
 
-func createService(name string, chk *api.ClickHouseKeeper, ports []core.ServicePort, clusterIP bool) *core.Service {
+func createService(name string, chk *api.ClickHouseKeeperInstallation, ports []core.ServicePort, clusterIP bool) *core.Service {
 	service := core.Service{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "Service",
@@ -372,7 +372,7 @@ func createService(name string, chk *api.ClickHouseKeeper, ports []core.ServiceP
 }
 
 // CreatePodDisruptionBudget returns a pdb for the clickhouse keeper cluster
-func CreatePodDisruptionBudget(chk *api.ClickHouseKeeper) *policy.PodDisruptionBudget {
+func CreatePodDisruptionBudget(chk *api.ClickHouseKeeperInstallation) *policy.PodDisruptionBudget {
 	pdbCount := intstr.FromInt(1)
 	return &policy.PodDisruptionBudget{
 		TypeMeta: meta.TypeMeta{

@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strings"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/model/builder/xml"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -56,7 +56,7 @@ func defaultKeeperSettings(path string) map[string]string {
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func generateXMLConfig(_settings map[string]string, chk *apiChk.ClickHouseKeeper) string {
+func generateXMLConfig(_settings map[string]string, chk *apiChk.ClickHouseKeeperInstallation) string {
 	if len(_settings) == 0 {
 		return ""
 	}

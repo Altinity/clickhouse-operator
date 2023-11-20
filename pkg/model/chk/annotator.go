@@ -17,10 +17,10 @@ package chk
 import (
 	"fmt"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 )
 
-func getPodAnnotations(chk *api.ClickHouseKeeper) map[string]string {
+func getPodAnnotations(chk *api.ClickHouseKeeperInstallation) map[string]string {
 	var annotations map[string]string
 	if chk.Spec.PodTemplate != nil && chk.Spec.PodTemplate.ObjectMeta.Annotations != nil {
 		annotations = chk.Spec.PodTemplate.ObjectMeta.Annotations

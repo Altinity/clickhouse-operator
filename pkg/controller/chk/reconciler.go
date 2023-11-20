@@ -25,15 +25,15 @@ import (
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apimachinery "k8s.io/apimachinery/pkg/runtime"
+	apiMachinery "k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlUtil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 
@@ -46,16 +46,16 @@ var log = logf.Log.WithName("ctrl_chk")
 type ChkReconciler struct {
 	client.Client
 	Log    logr.Logger
-	Scheme *apimachinery.Scheme
+	Scheme *apiMachinery.Scheme
 }
 
-type reconcileFunc func(cluster *apiChk.ClickHouseKeeper) error
+type reconcileFunc func(cluster *apiChk.ClickHouseKeeperInstallation) error
 
 func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.Log = log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 
 	// Fetch the ClickHouseKeeper instance
-	chk := &apiChk.ClickHouseKeeper{}
+	chk := &apiChk.ClickHouseKeeperInstallation{}
 	if err := r.Get(ctx, req.NamespacedName, chk); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile
@@ -89,7 +89,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			}
 		}
 
-		tmp := &apiChk.ClickHouseKeeper{}
+		tmp := &apiChk.ClickHouseKeeperInstallation{}
 		if err := r.Get(ctx, req.NamespacedName, tmp); err != nil {
 			if errors.IsNotFound(err) {
 				// Request object not found, could have been deleted after reconcile
@@ -115,7 +115,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *ChkReconciler) reconcileConfigMap(chk *apiChk.ClickHouseKeeper) error {
+func (r *ChkReconciler) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) error {
 	return r.reconcile(
 		chk,
 		&core.ConfigMap{},
@@ -134,7 +134,7 @@ func (r *ChkReconciler) reconcileConfigMap(chk *apiChk.ClickHouseKeeper) error {
 	)
 }
 
-func (r *ChkReconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeper) error {
+func (r *ChkReconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeperInstallation) error {
 	return r.reconcile(
 		chk,
 		&apps.StatefulSet{},
@@ -160,7 +160,7 @@ func (r *ChkReconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeper) error
 	)
 }
 
-func (r *ChkReconciler) reconcileClientService(chk *apiChk.ClickHouseKeeper) error {
+func (r *ChkReconciler) reconcileClientService(chk *apiChk.ClickHouseKeeperInstallation) error {
 	return r.reconcile(
 		chk,
 		&core.Service{},
@@ -180,7 +180,7 @@ func (r *ChkReconciler) reconcileClientService(chk *apiChk.ClickHouseKeeper) err
 	)
 }
 
-func (r *ChkReconciler) reconcileHeadlessService(chk *apiChk.ClickHouseKeeper) error {
+func (r *ChkReconciler) reconcileHeadlessService(chk *apiChk.ClickHouseKeeperInstallation) error {
 	return r.reconcile(
 		chk,
 		&core.Service{},
@@ -200,7 +200,7 @@ func (r *ChkReconciler) reconcileHeadlessService(chk *apiChk.ClickHouseKeeper) e
 	)
 }
 
-func (r *ChkReconciler) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeeper) error {
+func (r *ChkReconciler) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeeperInstallation) error {
 	return r.reconcile(
 		chk,
 		&policy.PodDisruptionBudget{},
@@ -211,7 +211,7 @@ func (r *ChkReconciler) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeepe
 }
 
 func (r *ChkReconciler) reconcile(
-	chk *apiChk.ClickHouseKeeper,
+	chk *apiChk.ClickHouseKeeperInstallation,
 	cur client.Object,
 	new client.Object,
 	name string,
@@ -245,7 +245,7 @@ func (r *ChkReconciler) reconcile(
 	return nil
 }
 
-func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeper) (err error) {
+func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstallation) (err error) {
 	readyMembers, err := r.getReadyPods(chk)
 	if err != nil {
 		return err
@@ -253,7 +253,7 @@ func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeper) (er
 
 	for {
 		// Fetch the latest ClickHouseKeeper instance again
-		tmp := &apiChk.ClickHouseKeeper{}
+		tmp := &apiChk.ClickHouseKeeperInstallation{}
 		if err := r.Get(context.TODO(), getNamespacedName(chk), tmp); err != nil {
 			r.Log.Error(err, chk.Name+" not found")
 			return err

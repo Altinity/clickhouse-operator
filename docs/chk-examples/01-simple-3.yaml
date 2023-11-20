@@ -1,5 +1,5 @@
-apiVersion: "clickhouse.com/v1alpha1"
-kind: "ClickHouseKeeper"
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
 metadata:
   name: chk-simple-3
 spec:
