@@ -22,6 +22,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/version"
@@ -81,7 +82,10 @@ func Run() {
 	}()
 	go func() {
 		defer wg.Done()
-		runClickHouseMetrics(ctx)
+		// in order to run ClickHouse reconciler metrics it has to read some config data from ClickHouse
+		// Give it some time to start
+		time.Sleep(30 * time.Second)
+		runClickHouseReconcilerMetricsExporter(ctx)
 	}()
 	go func() {
 		defer wg.Done()

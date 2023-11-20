@@ -40,8 +40,8 @@ func init() {
 	flag.StringVar(&metricsPath, "metrics-path", defaultMetricsPath, "The Prometheus exporter path.")
 }
 
-// runClickHouseMetrics is an entry point of the application
-func runClickHouseMetrics(ctx context.Context) {
+// runClickHouseReconcilerMetricsExporter is an entry point of the application
+func runClickHouseReconcilerMetricsExporter(ctx context.Context) {
 	log.S().P()
 	defer log.E().P()
 
