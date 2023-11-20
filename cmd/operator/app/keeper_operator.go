@@ -3,15 +3,15 @@ package app
 import (
 	"os"
 
-	appsV1 "k8s.io/api/apps/v1"
+	apps "k8s.io/api/apps/v1"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chk"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
 )
 
 var (
@@ -20,7 +20,7 @@ var (
 
 func init() {
 	utilRuntime.Must(clientGoScheme.AddToScheme(scheme))
-	utilRuntime.Must(v1alpha1.AddToScheme(scheme))
+	utilRuntime.Must(api.AddToScheme(scheme))
 }
 
 func KeeperRun() {
@@ -38,10 +38,10 @@ func KeeperRun() {
 	}
 
 	err = ctrl.
-		NewControllerManagedBy(manager).   // Create the Controller
-		For(&v1alpha1.ClickHouseKeeper{}). // ReplicaSet is the Application API
-		Owns(&appsV1.StatefulSet{}).       // ReplicaSet owns Pods created by it
-		Complete(&chk.ChkReconciler{
+		NewControllerManagedBy(manager). // Create the Controller
+		For(&api.ClickHouseKeeper{}).    // ReplicaSet is the Application API
+		Owns(&apps.StatefulSet{}).       // ReplicaSet owns Pods created by it
+		Complete(&controller.ChkReconciler{
 			Client: manager.GetClient(),
 			Scheme: manager.GetScheme(),
 		})
