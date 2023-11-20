@@ -26,10 +26,9 @@ import (
 	policy "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	apimachinery "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	ctrlUtil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -56,8 +55,8 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	r.Log = log.WithValues("Request.Namespace", req.Namespace, "Request.Name", req.Name)
 
 	// Fetch the ClickHouseKeeper instance
-	instance := &apiChk.ClickHouseKeeper{}
-	if err := r.Get(ctx, req.NamespacedName, instance); err != nil {
+	chk := &apiChk.ClickHouseKeeper{}
+	if err := r.Get(ctx, req.NamespacedName, chk); err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile
 			// request. Owned objects are automatically garbage collected. For
@@ -68,8 +67,8 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, err
 	}
 
-	saved_chksum := instance.Annotations["saved_chksum"]
-	chksum, err := getCheckSum(instance)
+	saved_chksum := chk.Annotations["saved_chksum"]
+	chksum, err := getCheckSum(chk)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -84,7 +83,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			r.reconcileHeadlessService,
 			r.reconcilePodDisruptionBudget,
 		} {
-			if err := f(instance); err != nil {
+			if err := f(chk); err != nil {
 				r.Log.Error(err, "Wrong when reconciling "+getFunctionName(f))
 				return reconcile.Result{}, err
 			}
@@ -101,13 +100,14 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 			}
 			return ctrl.Result{}, err
 		}
+
 		r.Log.Info("chksum: " + chksum)
-		tmp.Annotations = instance.Annotations
+		tmp.Annotations = chk.Annotations
 		tmp.Annotations["saved_chksum"] = chksum
 		r.Update(ctx, tmp)
 	}
 
-	if err := r.reconcileClusterStatus(instance); err != nil {
+	if err := r.reconcileClusterStatus(chk); err != nil {
 		r.Log.Error(err, "Wrong when reconciling "+getFunctionName(r.reconcileClusterStatus))
 		return reconcile.Result{}, err
 	}
@@ -115,181 +115,147 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *ChkReconciler) reconcileConfigMap(instance *apiChk.ClickHouseKeeper) (err error) {
-	cm := model.CreateConfigMap(instance)
-	if err = controllerutil.SetControllerReference(instance, cm, r.Scheme); err != nil {
+func (r *ChkReconciler) reconcileConfigMap(chk *apiChk.ClickHouseKeeper) error {
+	return r.reconcile(
+		chk,
+		&core.ConfigMap{},
+		model.CreateConfigMap(chk),
+		"ConfigMap",
+		func(curObject, newObject client.Object) error {
+			cur, ok1 := curObject.(*core.ConfigMap)
+			new, ok2 := newObject.(*core.ConfigMap)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("unable to cast")
+			}
+			cur.Data = new.Data
+			cur.BinaryData = new.BinaryData
+			return nil
+		},
+	)
+}
+
+func (r *ChkReconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeper) error {
+	return r.reconcile(
+		chk,
+		&apps.StatefulSet{},
+		model.CreateStatefulSet(chk),
+		"StatefulSet",
+		func(curObject, newObject client.Object) error {
+			cur, ok1 := curObject.(*apps.StatefulSet)
+			new, ok2 := newObject.(*apps.StatefulSet)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("unable to cast")
+			}
+			if isReplicasChanged(chk) {
+				updateLastReplicas(chk)
+				lastApplied := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
+				r.Log.Info("kubectl.kubernetes.io/last-applied-configuration: " + lastApplied)
+			}
+			restartPods(new)
+			cur.Spec.Replicas = new.Spec.Replicas
+			cur.Spec.Template = new.Spec.Template
+			cur.Spec.UpdateStrategy = new.Spec.UpdateStrategy
+			return nil
+		},
+	)
+}
+
+func (r *ChkReconciler) reconcileClientService(chk *apiChk.ClickHouseKeeper) error {
+	return r.reconcile(
+		chk,
+		&core.Service{},
+		model.CreateClientService(chk),
+		"Client Service",
+		func(curObject, newObject client.Object) error {
+			cur, ok1 := curObject.(*core.Service)
+			new, ok2 := newObject.(*core.Service)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("unable to cast")
+			}
+			cur.Spec.Ports = new.Spec.Ports
+			cur.Spec.Type = new.Spec.Type
+			cur.SetAnnotations(new.GetAnnotations())
+			return nil
+		},
+	)
+}
+
+func (r *ChkReconciler) reconcileHeadlessService(chk *apiChk.ClickHouseKeeper) error {
+	return r.reconcile(
+		chk,
+		&core.Service{},
+		model.CreateHeadlessService(chk),
+		"Headless Service",
+		func(curObject, newObject client.Object) error {
+			cur, ok1 := curObject.(*core.Service)
+			new, ok2 := newObject.(*core.Service)
+			if !ok1 || !ok2 {
+				return fmt.Errorf("unable to cast")
+			}
+			cur.Spec.Ports = new.Spec.Ports
+			cur.Spec.Type = new.Spec.Type
+			cur.SetAnnotations(new.GetAnnotations())
+			return nil
+		},
+	)
+}
+
+func (r *ChkReconciler) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeeper) error {
+	return r.reconcile(
+		chk,
+		&policy.PodDisruptionBudget{},
+		model.CreatePodDisruptionBudget(chk),
+		"PodDisruptionBudget",
+		nil,
+	)
+}
+
+func (r *ChkReconciler) reconcile(
+	chk *apiChk.ClickHouseKeeper,
+	cur client.Object,
+	new client.Object,
+	name string,
+	updater func(cur, new client.Object) error,
+) (err error) {
+	if err = ctrlUtil.SetControllerReference(chk, new, r.Scheme); err != nil {
 		return err
 	}
-	foundCm := &core.ConfigMap{}
-	err = r.Get(context.TODO(), types.NamespacedName{
-		Namespace: cm.Namespace,
-		Name:      cm.Name,
-	}, foundCm)
+	err = r.Client.Get(context.TODO(), getNamespacedName(new), cur)
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating a new Config Map")
+		r.Log.Info("Creating new " + name)
 
-		if err = r.Create(context.TODO(), cm); err != nil {
+		if err = r.Client.Create(context.TODO(), new); err != nil {
 			return err
 		}
 	} else if err != nil {
 		return err
 	} else {
-		r.Log.Info("Updating existing config-map")
-
-		foundCm.Data = cm.Data
-		foundCm.BinaryData = cm.BinaryData
-		if err = r.Update(context.TODO(), foundCm); err != nil {
-			return err
+		if updater == nil {
+			r.Log.Info("Updater not provided")
+		} else {
+			r.Log.Info("Updating existing " + name)
+			if err = updater(cur, new); err != nil {
+				return err
+			}
+			if err = r.Client.Update(context.TODO(), cur); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-func (r *ChkReconciler) reconcileStatefulSet(instance *apiChk.ClickHouseKeeper) (err error) {
-	sts := model.CreateStatefulSet(instance)
-	if err = controllerutil.SetControllerReference(instance, sts, r.Scheme); err != nil {
-		return err
-	}
-	foundSts := &apps.StatefulSet{}
-	err = r.Get(context.TODO(), types.NamespacedName{
-		Name:      sts.Name,
-		Namespace: sts.Namespace,
-	}, foundSts)
-	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating a new StatefulSet")
-
-		if err = r.Create(context.TODO(), sts); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	} else {
-		if isReplicasChanged(instance) {
-			updateLastReplicas(instance)
-			lastApplied := instance.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
-			r.Log.Info("kubectl.kubernetes.io/last-applied-configuration: " + lastApplied)
-		}
-		restartPods(sts)
-		if err = r.updateStatefulSet(instance, foundSts, sts); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ChkReconciler) updateStatefulSet(instance *apiChk.ClickHouseKeeper, foundSts *apps.StatefulSet, sts *apps.StatefulSet) (err error) {
-	r.Log.Info("Updating existing StatefulSet")
-
-	foundSts.Spec.Replicas = sts.Spec.Replicas
-	foundSts.Spec.Template = sts.Spec.Template
-	foundSts.Spec.UpdateStrategy = sts.Spec.UpdateStrategy
-
-	if err = r.Update(context.TODO(), foundSts); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *ChkReconciler) reconcileClientService(instance *apiChk.ClickHouseKeeper) (err error) {
-	svc := model.CreateClientService(instance)
-	if err = controllerutil.SetControllerReference(instance, svc, r.Scheme); err != nil {
-		return err
-	}
-	foundSvc := &core.Service{}
-	err = r.Get(context.TODO(), types.NamespacedName{
-		Name:      svc.Name,
-		Namespace: svc.Namespace,
-	}, foundSvc)
-	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating new client service")
-
-		if err = r.Create(context.TODO(), svc); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	} else {
-		r.Log.Info("Updating existing client service")
-
-		foundSvc.Spec.Ports = svc.Spec.Ports
-		foundSvc.Spec.Type = svc.Spec.Type
-		foundSvc.SetAnnotations(svc.GetAnnotations())
-
-		if err = r.Update(context.TODO(), foundSvc); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ChkReconciler) reconcileHeadlessService(instance *apiChk.ClickHouseKeeper) (err error) {
-	svc := model.CreateHeadlessService(instance)
-	if err = controllerutil.SetControllerReference(instance, svc, r.Scheme); err != nil {
-		return err
-	}
-	foundSvc := &core.Service{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      svc.Name,
-		Namespace: svc.Namespace,
-	}, foundSvc)
-	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating new headless service")
-
-		if err = r.Client.Create(context.TODO(), svc); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	} else {
-		r.Log.Info("Updating existing headless service")
-
-		foundSvc.Spec.Ports = svc.Spec.Ports
-		foundSvc.Spec.Type = svc.Spec.Type
-		foundSvc.SetAnnotations(svc.GetAnnotations())
-
-		if err = r.Client.Update(context.TODO(), foundSvc); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *ChkReconciler) reconcilePodDisruptionBudget(instance *apiChk.ClickHouseKeeper) (err error) {
-	pdb := model.CreatePodDisruptionBudget(instance)
-	if err = controllerutil.SetControllerReference(instance, pdb, r.Scheme); err != nil {
-		return err
-	}
-	foundPdb := &policy.PodDisruptionBudget{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{
-		Name:      pdb.Name,
-		Namespace: pdb.Namespace,
-	}, foundPdb)
-	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating new pod-disruption-budget")
-		if err = r.Client.Create(context.TODO(), pdb); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *ChkReconciler) reconcileClusterStatus(instance *apiChk.ClickHouseKeeper) (err error) {
-	readyMembers, err := r.getReadyMembers(instance)
+func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeper) (err error) {
+	readyMembers, err := r.getReadyPods(chk)
 	if err != nil {
 		return err
 	}
 
-	// Refetch the latest ClickHouseKeeper instance
+	// Fetch the latest ClickHouseKeeper instance again
 	tmp := &apiChk.ClickHouseKeeper{}
-	namespacedName := types.NamespacedName{
-		Name:      instance.Name,
-		Namespace: instance.Namespace,
-	}
 	for {
-		if err := r.Get(context.TODO(), namespacedName, tmp); err != nil {
-			r.Log.Error(err, instance.Name+" not found")
+		if err := r.Get(context.TODO(), getNamespacedName(chk), tmp); err != nil {
+			r.Log.Error(err, chk.Name+" not found")
 			return err
 		}
 
@@ -298,20 +264,21 @@ func (r *ChkReconciler) reconcileClusterStatus(instance *apiChk.ClickHouseKeeper
 				Status: "In progress",
 			}
 		}
-		tmp.Status.Replicas = instance.Spec.GetReplicas()
+		tmp.Status.Replicas = chk.Spec.GetReplicas()
 
 		tmp.Status.ReadyReplicas = []apiChi.ChiZookeeperNode{}
 		for _, readyOne := range readyMembers {
-			tmp.Status.ReadyReplicas = append(tmp.Status.ReadyReplicas, apiChi.ChiZookeeperNode{
-				Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, instance.Namespace),
-				Port:   int32(instance.Spec.GetClientPort()),
-				Secure: apiChi.NewStringBool(false),
-			})
+			tmp.Status.ReadyReplicas = append(tmp.Status.ReadyReplicas,
+				apiChi.ChiZookeeperNode{
+					Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, chk.Namespace),
+					Port:   int32(chk.Spec.GetClientPort()),
+					Secure: apiChi.NewStringBool(false),
+				})
 		}
 
 		r.Log.Info("ReadyReplicas: " + fmt.Sprintf("%v", tmp.Status.ReadyReplicas))
 
-		if len(readyMembers) == int(instance.Spec.GetReplicas()) {
+		if len(readyMembers) == int(chk.Spec.GetReplicas()) {
 			tmp.Status.Status = "Completed"
 		} else {
 			tmp.Status.Status = "In progress"
