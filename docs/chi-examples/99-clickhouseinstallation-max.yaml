@@ -39,7 +39,8 @@ spec:
   # Typical use scenario - custom cluster domain in Kubernetes cluster
   namespaceDomainPattern:  "%s.svc.my.test"
 
-  # Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)
+  # Optional, applicable inside ClickHouseInstallationTemplate only.
+  # Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
   templating:
     # When defined as `auto` inside ClickhouseInstallationTemplate, this ClickhouseInstallationTemplate
     # will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
@@ -56,7 +57,9 @@ spec:
     # chiTaskID: "qweqwe"
     # autoPurge: "yes"
 
+  # Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side
   reconciling:
+    # DISCUSSED TO BE DEPRECATED
     # Syntax sugar
     # Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
     # Possible values:
@@ -68,16 +71,30 @@ spec:
     # More details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
     configMapPropagationTimeout: 90
 
+    # Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle
     cleanup:
+      # Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+      # but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+      # Default behavior is `Delete`"
       unknownObjects:
+        # Behavior policy for unknown PVC, `Delete` by default
         statefulSet: Delete
+        # Behavior policy for unknown PVC, `Delete` by default
         pvc: Delete
+        # Behavior policy for unknown ConfigMap, `Delete` by default
         configMap: Delete
+        # Behavior policy for unknown Service, `Delete` by default
         service: Delete
+      # Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+      # Default behavior is `Retain`"
       reconcileFailedObjects:
+        # Behavior policy for failed StatefulSet, `Retain` by default
         statefulSet: Retain
+        # Behavior policy for failed PVC, `Retain` by default
         pvc: Retain
+        # Behavior policy for failed ConfigMap, `Retain` by default
         configMap: Retain
+        # Behavior policy for failed Service, `Retain` by default
         service: Retain
 
   # List of templates used by a CHI
