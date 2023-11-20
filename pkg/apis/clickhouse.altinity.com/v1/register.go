@@ -18,18 +18,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/scheme"
 
-	clickhousealtinitycom "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
-)
-
-const (
-	// APIVersion is the version of the Clickhouse Operator API.
-	APIVersion = "v1"
+	clickhouse_altinity_com "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com"
 )
 
 var (
 	// SchemeGroupVersion is group version used to register these objects
 	SchemeGroupVersion = schema.GroupVersion{
-		Group:   clickhousealtinitycom.APIGroupName,
+		Group:   clickhouse_altinity_com.APIGroupName,
 		Version: APIVersion,
 	}
 

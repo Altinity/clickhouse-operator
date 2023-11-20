@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package clickhousealtinitycom
+package clickhouse_altinity_com
 
 const (
 	// APIGroupName is the group name of the ClickHouse Operator API.

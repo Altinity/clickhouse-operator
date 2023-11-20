@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +k8s:deepcopy-gen=package
-// +groupName=clickhouse-keeper.altinity.com
+package clickhouse_keeper_altinity_com
 
-// Package v1 defines version 1 of the API used with ClickHouseKeeper custom resource.
-package v1
+const (
+	// APIGroupName is the group name of the ClickHouse Operator API.
+	APIGroupName = "clickhouse-keeper.altinity.com"
+)
