@@ -22,24 +22,9 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
-
-	kubeinformers "k8s.io/client-go/informers"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	chopinformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
-	"github.com/altinity/clickhouse-operator/pkg/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/version"
-)
-
-// Prometheus exporter defaults
-const (
-	defaultMetricsEndpoint                  = ":8888"
-	metricsPath                             = "/metrics"
-	defaultInformerFactoryResyncPeriod      = 60 * time.Second
-	defaultInformerFactoryResyncDebugPeriod = 60 * time.Second
 )
 
 // CLI parameter variables
@@ -58,14 +43,6 @@ var (
 
 	// masterURL defines URL of kubernetes master to be used
 	masterURL string
-
-	// metricsEP defines metrics end-point IP address
-	metricsEP string
-
-	// Setting to 0 disables resync
-	// Informer fires Update() func to periodically verify current state
-	kubeInformerFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
-	chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncPeriod
 )
 
 func init() {
@@ -73,12 +50,12 @@ func init() {
 	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
-	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
-	flag.Parse()
 }
 
 // Run is an entry point of the application
 func Run() {
+	flag.Parse()
+
 	if versionRequest {
 		fmt.Printf("%s\n", version.Version)
 		os.Exit(0)
@@ -87,41 +64,7 @@ func Run() {
 	log.S().P()
 	defer log.E().P()
 
-	if debugRequest {
-		kubeInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
-		chopInformerFactoryResyncPeriod = defaultInformerFactoryResyncDebugPeriod
-	}
-
 	log.F().Info("Starting clickhouse-operator. Version:%s GitSHA:%s BuiltAt:%s", version.Version, version.GitSHA, version.BuiltAt)
-
-	// Initialize k8s API clients
-	kubeClient, extClient, chopClient := chop.GetClientset(kubeConfigFile, masterURL)
-
-	// Create operator instance
-	chop.New(kubeClient, chopClient, chopConfigFile)
-	log.V(1).F().Info("Log options parsed")
-	log.Info(chop.Config().String(true))
-
-	// Create Informers
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
-		kubeClient,
-		kubeInformerFactoryResyncPeriod,
-		kubeinformers.WithNamespace(chop.Config().GetInformerNamespace()),
-	)
-	chopInformerFactory := chopinformers.NewSharedInformerFactoryWithOptions(
-		chopClient,
-		chopInformerFactoryResyncPeriod,
-		chopinformers.WithNamespace(chop.Config().GetInformerNamespace()),
-	)
-
-	// Create Controller
-	chiController := chi.NewController(
-		chopClient,
-		extClient,
-		kubeClient,
-		chopInformerFactory,
-		kubeInformerFactory,
-	)
 
 	// Create main context with cancel
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -129,31 +72,25 @@ func Run() {
 	// Setup notification signals with cancel
 	setupNotification(cancelFunc)
 
-	// Start Informers
-	kubeInformerFactory.Start(ctx.Done())
-	chopInformerFactory.Start(ctx.Done())
+	var wg sync.WaitGroup
+	wg.Add(3)
 
-	log.V(1).F().Info("Starting operator metrics exporter")
-	metrics.StartMetricsExporter()
-
-	// Start main CHI controller
-	log.V(1).F().Info("Starting CHI controller")
-	wg := runController(ctx, chiController)
+	go func() {
+		defer wg.Done()
+		runClickHouse(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		runClickHouseMetrics(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		runKeeper()
+	}()
 
 	// Wait for completion
 	<-ctx.Done()
 	wg.Wait()
-}
-
-// runController runs main CHI controller
-func runController(ctx context.Context, chiController *chi.Controller) *sync.WaitGroup {
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		chiController.Run(ctx)
-	}()
-	return wg
 }
 
 // setupNotification sets up OS signals

@@ -10,20 +10,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
 )
 
-var (
-	scheme = apiMachineryRuntime.NewScheme()
-)
+var scheme = apiMachineryRuntime.NewScheme()
 
 func init() {
 	utilRuntime.Must(clientGoScheme.AddToScheme(scheme))
 	utilRuntime.Must(api.AddToScheme(scheme))
 }
 
-func KeeperRun() {
+func runKeeper() {
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	var log = ctrl.Log.WithName("keeper-runner")
@@ -38,9 +36,9 @@ func KeeperRun() {
 	}
 
 	err = ctrl.
-		NewControllerManagedBy(manager). // Create the Controller
-		For(&api.ClickHouseKeeper{}).    // ReplicaSet is the Application API
-		Owns(&apps.StatefulSet{}).       // ReplicaSet owns Pods created by it
+		NewControllerManagedBy(manager).          // Create the Controller
+		For(&api.ClickHouseKeeperInstallation{}). // ReplicaSet is the Application API
+		Owns(&apps.StatefulSet{}).                // ReplicaSet owns Pods created by it
 		Complete(&controller.ChkReconciler{
 			Client: manager.GetClient(),
 			Scheme: manager.GetScheme(),
