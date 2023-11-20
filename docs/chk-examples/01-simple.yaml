@@ -1,6 +1,6 @@
 apiVersion: "clickhouse.com/v1alpha1"
 kind: "ClickHouseKeeper"
 metadata:
-  name: chk-1-node-simplest
+  name: chk-simple
 spec:
   replicas: 1
