@@ -45,7 +45,7 @@ func newOTELResource() (*otelResource.Resource, error) {
 	)
 }
 
-func StartMetricsExporter() {
+func StartMetricsExporter(endpoint, path string) {
 	// Create resource.
 	resource, err := newOTELResource()
 	if err != nil {
@@ -82,10 +82,10 @@ func StartMetricsExporter() {
 	//otel.SetMeterProvider(meterProvider)
 	//meter := otel.Meter("chi_meter_2")
 
-	// Start the prometheus HTTP server and pass the exporter Collector to it
-	go serveMetrics()
-
 	meter = meterProvider.Meter("clickhouse-operator-meter", otelApi.WithInstrumentationVersion(version.Version))
+
+	// Start the prometheus HTTP server and pass the exporter Collector to it
+	serveMetrics(endpoint, path)
 }
 
 var meter otelApi.Meter
@@ -94,10 +94,10 @@ func Meter() otelApi.Meter {
 	return meter
 }
 
-func serveMetrics() {
-	fmt.Printf("serving metrics at :9999/metrics")
-	http.Handle("/metrics", promhttp.Handler())
-	err := http.ListenAndServe(":9999", nil)
+func serveMetrics(addr, path string) {
+	fmt.Printf("serving metrics at %s%s", addr, path)
+	http.Handle(path, promhttp.Handler())
+	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		fmt.Printf("error serving http: %v", err)
 		return
