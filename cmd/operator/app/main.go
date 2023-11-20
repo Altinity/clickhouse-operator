@@ -18,14 +18,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
-
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // CLI parameter variables
@@ -73,6 +71,10 @@ func Run() {
 	// Setup notification signals with cancel
 	setupNotification(cancelFunc)
 
+	initClickHouse(ctx)
+	initClickHouseReconcilerMetricsExporter(ctx)
+	initKeeper(ctx)
+
 	var wg sync.WaitGroup
 	wg.Add(3)
 
@@ -82,14 +84,11 @@ func Run() {
 	}()
 	go func() {
 		defer wg.Done()
-		// in order to run ClickHouse reconciler metrics it has to read some config data from ClickHouse
-		// Give it some time to start
-		time.Sleep(30 * time.Second)
 		runClickHouseReconcilerMetricsExporter(ctx)
 	}()
 	go func() {
 		defer wg.Done()
-		runKeeper()
+		runKeeper(ctx)
 	}()
 
 	// Wait for completion

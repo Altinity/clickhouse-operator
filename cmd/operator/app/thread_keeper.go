@@ -1,7 +1,10 @@
 package app
 
 import (
+	"context"
 	"os"
+
+	"github.com/go-logr/logr"
 
 	apps "k8s.io/api/apps/v1"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
@@ -21,17 +24,22 @@ func init() {
 	utilRuntime.Must(api.AddToScheme(scheme))
 }
 
-func runKeeper() {
+var (
+	manager ctrl.Manager
+	logger  logr.Logger
+)
+
+func initKeeper(ctx context.Context) {
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	var log = ctrl.Log.WithName("keeper-runner")
-	log.Info("KeeperRun() called")
+	logger = ctrl.Log.WithName("keeper-runner")
+	var err error
 
-	manager, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	manager, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
-		log.Error(err, "could not create manager")
+		logger.Error(err, "could not create manager")
 		os.Exit(1)
 	}
 
@@ -44,12 +52,14 @@ func runKeeper() {
 			Scheme: manager.GetScheme(),
 		})
 	if err != nil {
-		log.Error(err, "could not create controller")
+		logger.Error(err, "could not create controller")
 		os.Exit(1)
 	}
+}
 
-	if err := manager.Start(ctrl.SetupSignalHandler()); err != nil {
-		log.Error(err, "could not start manager")
+func runKeeper(ctx context.Context) {
+	if err := manager.Start(ctx); err != nil {
+		logger.Error(err, "could not start manager")
 		os.Exit(1)
 	}
 }

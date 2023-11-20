@@ -43,8 +43,10 @@ var (
 func init() {
 }
 
-// runClickHouse is an entry point of the application
-func runClickHouse(ctx context.Context) {
+var chiController *chi.Controller
+
+// initClickHouse is an entry point of the application
+func initClickHouse(ctx context.Context) {
 	log.S().P()
 	defer log.E().P()
 
@@ -74,7 +76,7 @@ func runClickHouse(ctx context.Context) {
 	)
 
 	// Create Controller
-	chiController := chi.NewController(
+	chiController = chi.NewController(
 		chopClient,
 		extClient,
 		kubeClient,
@@ -85,6 +87,12 @@ func runClickHouse(ctx context.Context) {
 	// Start Informers
 	kubeInformerFactory.Start(ctx.Done())
 	chopInformerFactory.Start(ctx.Done())
+}
+
+// runClickHouse is an entry point of the application
+func runClickHouse(ctx context.Context) {
+	log.S().P()
+	defer log.E().P()
 
 	// Start main CHI controller
 	log.V(1).F().Info("Starting CHI controller")
