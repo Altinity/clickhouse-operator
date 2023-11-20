@@ -3,19 +3,20 @@ package v1
 import (
 	"strconv"
 
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClickHouseKeeper defines a ClickHouse Keeper Cluster
-type ClickHouseKeeper struct {
-	metav1.TypeMeta   `json:",inline"                     yaml:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"          yaml:"metadata,omitempty"`
-	Spec              ChkSpec    `json:"spec"             yaml:"spec"`
-	Status            *ChkStatus `json:"status,omitempty" yaml:"status,omitempty"`
+// ClickHouseKeeperInstallation defines a ClickHouse Keeper Cluster
+type ClickHouseKeeperInstallation struct {
+	meta.TypeMeta   `json:",inline"                     yaml:",inline"`
+	meta.ObjectMeta `json:"metadata,omitempty"          yaml:"metadata,omitempty"`
+	Spec            ChkSpec    `json:"spec"             yaml:"spec"`
+	Status          *ChkStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ChkSpec defines spec section of ClickHouseKeeper resource
@@ -23,10 +24,10 @@ type ChkSpec struct {
 	// This is used by Chi, but ignored by Chk
 	Type string `json:"type,omitempty"`
 	// The valid range of size is from 1 to 7.
-	Replicas             int32                          `json:"replicas,omitempty"`
-	PodTemplate          *ChkPodTemplate                `json:"podTemplate,omitempty"          yaml:"podTemplate,omitempty"`
-	Settings             map[string]string              `json:"settings,omitempty"             yaml:"settings,omitempty"`
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
+	Replicas             int32                        `json:"replicas,omitempty"`
+	PodTemplate          *ChkPodTemplate              `json:"podTemplate,omitempty"          yaml:"podTemplate,omitempty"`
+	Settings             map[string]string            `json:"settings,omitempty"             yaml:"settings,omitempty"`
+	VolumeClaimTemplates []core.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
 }
 
 func (spec *ChkSpec) GetReplicas() int32 {
@@ -88,8 +89,8 @@ func (spec *ChkSpec) GetPrometheusPort() int {
 
 // ChkPodTemplate defines full Pod Template, directly used by StatefulSet
 type ChkPodTemplate struct {
-	ObjectMeta metav1.ObjectMeta `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
-	Spec       corev1.PodSpec    `json:"spec,omitempty"            yaml:"spec,omitempty"`
+	ObjectMeta meta.ObjectMeta `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
+	Spec       core.PodSpec    `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
 // ChkStatus defines status section of ClickHouseKeeper resource
@@ -100,14 +101,14 @@ type ChkStatus struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// ReadyReplicas is the number of number of ready replicas in the cluster
-	ReadyReplicas []v1.ChiZookeeperNode `json:"readyReplicas,omitempty"`
+	ReadyReplicas []apiChi.ChiZookeeperNode `json:"readyReplicas,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClickHouseKeeperList defines a list of ClickHouseKeeper resources
-type ClickHouseKeeperList struct {
-	metav1.TypeMeta `json:",inline"  yaml:",inline"`
-	metav1.ListMeta `json:"metadata" yaml:"metadata"`
-	Items           []ClickHouseKeeper `json:"items" yaml:"items"`
+type ClickHouseKeeperInstallationList struct {
+	meta.TypeMeta `json:",inline"  yaml:",inline"`
+	meta.ListMeta `json:"metadata" yaml:"metadata"`
+	Items         []ClickHouseKeeperInstallation `json:"items" yaml:"items"`
 }

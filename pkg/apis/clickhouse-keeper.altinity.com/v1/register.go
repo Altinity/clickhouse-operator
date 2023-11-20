@@ -23,7 +23,7 @@ var (
 
 func init() {
 	SchemeBuilder.Register(
-		&ClickHouseKeeper{},
-		&ClickHouseKeeperList{},
+		&ClickHouseKeeperInstallation{},
+		&ClickHouseKeeperInstallationList{},
 	)
 }
