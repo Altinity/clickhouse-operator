@@ -2846,20 +2846,20 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: clickhousekeepers.clickhouse.com
+  name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
     clickhouse.com/chop: 0.23.0
 spec:
-  group: clickhouse.com
+  group: clickhouse-keeper.altinity.com
   scope: Namespaced
   names:
-    kind: ClickHouseKeeper
-    singular: clickhousekeeper
-    plural: clickhousekeepers
+    kind: ClickHouseKeeperInstallation
+    singular: clickhousekeeperinstallation
+    plural: clickhousekeeperinstallations
     shortNames:
       - chk
   versions:
-    - name: v1alpha1
+    - name: v1
       served: true
       storage: true
       additionalPrinterColumns:
@@ -2888,19 +2888,22 @@ spec:
           properties:
             apiVersion:
               type: string
-              description: 'APIVersion defines the versioned schema of this representation
+              description: |
+                APIVersion defines the versioned schema of this representation
                 of an object. Servers should convert recognized schemas to the latest
-                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             kind:
               type: string
-              description: 'Kind is a string value representing the REST resource this
+              description: |
+                Kind is a string value representing the REST resource this
                 object represents. Servers may infer this from the endpoint the client
-                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             metadata:
               type: object
             status:
               type: object
-              description: "Current ClickHouseKeeper manifest status, contains many fields like overall status, desired replicas and ready replica list with their endpoints"
+              description: |
+                Current ClickHouseKeeperInstallation status, contains many fields like overall status, desired replicas and ready replica list with their endpoints
               properties:
                 status:
                   type: string
@@ -2917,15 +2920,15 @@ spec:
                     properties:
                       host:
                         type: string
-                        description: "dns name or ip address for Keeper node"
+                        description: dns name or ip address for Keeper node
                       port:
                         type: integer
                         minimum: 0
                         maximum: 65535
-                        description: "TCP port which used to connect to Keeper node"
+                        description: TCP port which used to connect to Keeper node
                       secure:
                         type: string
-                        description: "if a secure connection to Keeper is required"
+                        description: if a secure connection to Keeper is required
             spec:
               type: object
               description: KeeperSpec defines the desired state of a Keeper cluster
@@ -2939,8 +2942,9 @@ spec:
                 replicas:
                   type: integer
                   format: int32
-                  description: "Replicas is the expected size of the keeper cluster.
-                    The valid range of size is from 1 to 7."
+                  description: |
+                    Replicas is the expected size of the keeper cluster.
+                    The valid range of size is from 1 to 7.
                   minimum: 1
                   maximum: 7
                 settings:
@@ -2989,20 +2993,20 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: clickhousekeepers.clickhouse.com
+  name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
     clickhouse.com/chop: 0.23.0
 spec:
-  group: clickhouse.com
+  group: clickhouse-keeper.altinity.com
   scope: Namespaced
   names:
-    kind: ClickHouseKeeper
-    singular: clickhousekeeper
-    plural: clickhousekeepers
+    kind: ClickHouseKeeperInstallation
+    singular: clickhousekeeperinstallation
+    plural: clickhousekeeperinstallations
     shortNames:
       - chk
   versions:
-    - name: v1alpha1
+    - name: v1
       served: true
       storage: true
       additionalPrinterColumns:
@@ -3031,19 +3035,22 @@ spec:
           properties:
             apiVersion:
               type: string
-              description: 'APIVersion defines the versioned schema of this representation
+              description: |
+                APIVersion defines the versioned schema of this representation
                 of an object. Servers should convert recognized schemas to the latest
-                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             kind:
               type: string
-              description: 'Kind is a string value representing the REST resource this
+              description: |
+                Kind is a string value representing the REST resource this
                 object represents. Servers may infer this from the endpoint the client
-                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             metadata:
               type: object
             status:
               type: object
-              description: "Current ClickHouseKeeper manifest status, contains many fields like overall status, desired replicas and ready replica list with their endpoints"
+              description: |
+                Current ClickHouseKeeperInstallation status, contains many fields like overall status, desired replicas and ready replica list with their endpoints
               properties:
                 status:
                   type: string
@@ -3060,15 +3067,15 @@ spec:
                     properties:
                       host:
                         type: string
-                        description: "dns name or ip address for Keeper node"
+                        description: dns name or ip address for Keeper node
                       port:
                         type: integer
                         minimum: 0
                         maximum: 65535
-                        description: "TCP port which used to connect to Keeper node"
+                        description: TCP port which used to connect to Keeper node
                       secure:
                         type: string
-                        description: "if a secure connection to Keeper is required"
+                        description: if a secure connection to Keeper is required
             spec:
               type: object
               description: KeeperSpec defines the desired state of a Keeper cluster
@@ -3082,8 +3089,9 @@ spec:
                 replicas:
                   type: integer
                   format: int32
-                  description: "Replicas is the expected size of the keeper cluster.
-                    The valid range of size is from 1 to 7."
+                  description: |
+                    Replicas is the expected size of the keeper cluster.
+                    The valid range of size is from 1 to 7.
                   minimum: 1
                   maximum: 7
                 settings:
@@ -3291,9 +3299,9 @@ rules:
     - create
     - delete
 - apiGroups:
-    - clickhouse.com
+    - clickhouse-keeper.altinity.com
   resources:
-    - clickhousekeepers
+    - clickhousekeeperinstallations
   verbs:
     - get
     - patch
@@ -3302,15 +3310,15 @@ rules:
     - list
     - watch
 - apiGroups:
-    - clickhouse.com
+    - clickhouse-keeper.altinity.com
   resources:
-    - clickhousekeepers/finalizers
+    - clickhousekeeperinstallations/finalizers
   verbs:
     - update
 - apiGroups:
-    - clickhouse.com
+    - clickhouse-keeper.altinity.com
   resources:
-    - clickhousekeepers/status
+    - clickhousekeeperinstallations/status
   verbs:
     - get
     - update

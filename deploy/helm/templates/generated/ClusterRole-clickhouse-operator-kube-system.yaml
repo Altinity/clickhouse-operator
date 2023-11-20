@@ -149,9 +149,9 @@ rules:
       - create
       - delete
   - apiGroups:
-      - clickhouse.com
+      - clickhouse-keeper.altinity.com
     resources:
-      - clickhousekeepers
+      - clickhousekeeperinstallations
     verbs:
       - get
       - patch
@@ -160,15 +160,15 @@ rules:
       - list
       - watch
   - apiGroups:
-      - clickhouse.com
+      - clickhouse-keeper.altinity.com
     resources:
-      - clickhousekeepers/finalizers
+      - clickhousekeeperinstallations/finalizers
     verbs:
       - update
   - apiGroups:
-      - clickhouse.com
+      - clickhouse-keeper.altinity.com
     resources:
-      - clickhousekeepers/status
+      - clickhousekeeperinstallations/status
     verbs:
       - get
       - update
