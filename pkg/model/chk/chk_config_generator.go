@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"strings"
 
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 
 	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/model/builder/xml"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -56,15 +56,15 @@ func defaultKeeperSettings(path string) map[string]string {
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func generateXMLConfig(_settings map[string]string, chk *v1alpha1.ClickHouseKeeper) string {
+func generateXMLConfig(_settings map[string]string, chk *apiChk.ClickHouseKeeper) string {
 	if len(_settings) == 0 {
 		return ""
 	}
 
-	settings := v1.NewSettings()
+	settings := apiChi.NewSettings()
 	settings.SetScalarsFromMap(_settings)
-	settings.Set("keeper_server/server_id", v1.NewSettingScalar("KEEPER_ID"))
-	settings.Set("keeper_server/raft_configuration/server", v1.NewSettingScalar(""))
+	settings.Set("keeper_server/server_id", apiChi.NewSettingScalar("KEEPER_ID"))
+	settings.Set("keeper_server/raft_configuration/server", apiChi.NewSettingScalar(""))
 
 	b := &bytes.Buffer{}
 	// <clickhouse>

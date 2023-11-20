@@ -393,3 +393,16 @@ func CreatePodDisruptionBudget(chk *api.ClickHouseKeeper) *policy.PodDisruptionB
 		},
 	}
 }
+
+func setupPort(container *core.Container, port int, containerPort core.ContainerPort) {
+	// Check whether such a port already specified
+	for _, p := range container.Ports {
+		if p.ContainerPort == int32(port) {
+			// Yes, such a port already specified, nothing to do here
+			return
+		}
+	}
+
+	// Port is not specified, let's specify it
+	container.Ports = append(container.Ports, containerPort)
+}

@@ -15,11 +15,18 @@
 package chk
 
 import (
-	"fmt"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 )
 
-func getHeadlessServiceName(chk *api.ClickHouseKeeper) string {
-	return fmt.Sprintf("%s-headless", chk.GetName())
+func GetPodLabels(chk *api.ClickHouseKeeper) map[string]string {
+	var labels map[string]string
+	if chk.Spec.PodTemplate != nil && chk.Spec.PodTemplate.ObjectMeta.Labels != nil {
+		labels = chk.Spec.PodTemplate.ObjectMeta.Labels
+	} else {
+		labels = map[string]string{
+			"app": chk.GetName(),
+			"uid": string(chk.UID),
+		}
+	}
+	return labels
 }
