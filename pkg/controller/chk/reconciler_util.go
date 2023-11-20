@@ -55,7 +55,7 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func getLastAppliedClickHouseKeeper(chk *api.ClickHouseKeeper) *api.ClickHouseKeeper {
+func getKeeperFromAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeper) *api.ClickHouseKeeper {
 	lastApplied := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
 	tmp := api.ClickHouseKeeper{}
@@ -65,26 +65,27 @@ func getLastAppliedClickHouseKeeper(chk *api.ClickHouseKeeper) *api.ClickHouseKe
 }
 
 func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeper) ([]string, error) {
-	podList := &core.PodList{}
 	labelSelector := labels.SelectorFromSet(model.GetPodLabels(chk))
 	listOps := &client.ListOptions{
 		Namespace:     chk.Namespace,
 		LabelSelector: labelSelector,
 	}
+	podList := &core.PodList{}
 	if err := r.List(context.TODO(), podList, listOps); err != nil {
 		return nil, err
 	}
 
 	var readyPods []string
 	for _, pod := range podList.Items {
-		ready := true
+		// Pod is ready only in case all containers are ready
+		podIsReady := true
 		for _, containerStatus := range pod.Status.ContainerStatuses {
 			r.Log.Info(fmt.Sprintf("%s: %t", containerStatus.Name, containerStatus.Ready))
 			if !containerStatus.Ready {
-				ready = false
+				podIsReady = false
 			}
 		}
-		if ready {
+		if podIsReady {
 			readyPods = append(readyPods, pod.Name)
 		}
 	}
@@ -93,7 +94,7 @@ func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeper) ([]string, error
 }
 
 func isReplicasChanged(chk *api.ClickHouseKeeper) bool {
-	lastApplied := getLastAppliedClickHouseKeeper(chk)
+	lastApplied := getKeeperFromAnnotationLastAppliedConfiguration(chk)
 	if lastApplied.Spec.Replicas != chk.Spec.Replicas {
 		return true
 	} else {
@@ -101,12 +102,12 @@ func isReplicasChanged(chk *api.ClickHouseKeeper) bool {
 	}
 }
 
-func restartPods(sts *apps.StatefulSet) {
+func markPodRestartedNow(sts *apps.StatefulSet) {
 	v, _ := time.Now().UTC().MarshalText()
 	sts.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": string(v)}
 }
 
-func updateLastReplicas(chk *api.ClickHouseKeeper) {
+func setAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeper) {
 	lastAppliedString := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
 	tmp := api.ClickHouseKeeper{}

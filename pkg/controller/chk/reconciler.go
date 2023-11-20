@@ -147,11 +147,11 @@ func (r *ChkReconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeper) error
 				return fmt.Errorf("unable to cast")
 			}
 			if isReplicasChanged(chk) {
-				updateLastReplicas(chk)
+				setAnnotationLastAppliedConfiguration(chk)
 				lastApplied := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 				r.Log.Info("kubectl.kubernetes.io/last-applied-configuration: " + lastApplied)
 			}
-			restartPods(new)
+			markPodRestartedNow(new)
 			cur.Spec.Replicas = new.Spec.Replicas
 			cur.Spec.Template = new.Spec.Template
 			cur.Spec.UpdateStrategy = new.Spec.UpdateStrategy
@@ -251,9 +251,9 @@ func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeper) (er
 		return err
 	}
 
-	// Fetch the latest ClickHouseKeeper instance again
-	tmp := &apiChk.ClickHouseKeeper{}
 	for {
+		// Fetch the latest ClickHouseKeeper instance again
+		tmp := &apiChk.ClickHouseKeeper{}
 		if err := r.Get(context.TODO(), getNamespacedName(chk), tmp); err != nil {
 			r.Log.Error(err, chk.Name+" not found")
 			return err
