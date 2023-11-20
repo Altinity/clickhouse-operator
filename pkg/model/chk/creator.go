@@ -17,26 +17,26 @@ package chk
 import (
 	"fmt"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
-func CreateConfigMap(chk *v1alpha1.ClickHouseKeeper) *corev1.ConfigMap {
+func CreateConfigMap(chk *api.ClickHouseKeeper) *core.ConfigMap {
 	chk.Spec.Settings = util.MergeStringMapsPreserve(chk.Spec.Settings, defaultKeeperSettings(chk.Spec.GetPath()))
 
-	return &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
+	return &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta.ObjectMeta{
 			Name:      chk.Name,
 			Namespace: chk.Namespace,
 		},
@@ -47,33 +47,33 @@ func CreateConfigMap(chk *v1alpha1.ClickHouseKeeper) *corev1.ConfigMap {
 }
 
 // CreateStatefulSet return a clickhouse keeper stateful set from the chk spec
-func CreateStatefulSet(chk *v1alpha1.ClickHouseKeeper) *appsv1.StatefulSet {
+func CreateStatefulSet(chk *api.ClickHouseKeeper) *apps.StatefulSet {
 	labels := GetPodLabels(chk)
 	annotations := getPodAnnotations(chk)
 	replicas := chk.Spec.GetReplicas()
 
-	return &appsv1.StatefulSet{
-		TypeMeta: metav1.TypeMeta{
+	return &apps.StatefulSet{
+		TypeMeta: meta.TypeMeta{
 			Kind:       "StatefulSet",
 			APIVersion: "apps/v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta.ObjectMeta{
 			Name:      chk.GetName(),
 			Namespace: chk.Namespace,
 			Labels:    labels,
 		},
-		Spec: appsv1.StatefulSetSpec{
+		Spec: apps.StatefulSetSpec{
 			ServiceName: getHeadlessServiceName(chk),
 			Replicas:    &replicas,
-			Selector: &metav1.LabelSelector{
+			Selector: &meta.LabelSelector{
 				MatchLabels: labels,
 			},
-			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
-				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
 			},
-			PodManagementPolicy: appsv1.OrderedReadyPodManagement,
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			Template: core.PodTemplateSpec{
+				ObjectMeta: meta.ObjectMeta{
 					GenerateName: chk.GetName(),
 					Labels:       labels,
 					Annotations:  annotations,
@@ -85,9 +85,9 @@ func CreateStatefulSet(chk *v1alpha1.ClickHouseKeeper) *appsv1.StatefulSet {
 	}
 }
 
-func createPodTemplateSpec(chk *v1alpha1.ClickHouseKeeper) corev1.PodSpec {
+func createPodTemplateSpec(chk *api.ClickHouseKeeper) core.PodSpec {
 	if chk.Spec.PodTemplate == nil {
-		chk.Spec.PodTemplate = &v1alpha1.ChkPodTemplate{}
+		chk.Spec.PodTemplate = &api.ChkPodTemplate{}
 	}
 	podSpec := chk.Spec.PodTemplate.Spec
 
@@ -100,8 +100,8 @@ func createPodTemplateSpec(chk *v1alpha1.ClickHouseKeeper) corev1.PodSpec {
 	return podSpec
 }
 
-func createVolumes(chk *v1alpha1.ClickHouseKeeper) []corev1.Volume {
-	var volumes []corev1.Volume
+func createVolumes(chk *api.ClickHouseKeeper) []core.Volume {
+	var volumes []core.Volume
 
 	switch length := len(chk.Spec.VolumeClaimTemplates); length {
 	case 0:
@@ -123,50 +123,53 @@ func createVolumes(chk *v1alpha1.ClickHouseKeeper) []corev1.Volume {
 	return volumes
 }
 
-func createEphemeralVolume(name string) corev1.Volume {
-	return corev1.Volume{
+func createEphemeralVolume(name string) core.Volume {
+	return core.Volume{
 		Name: name,
-		VolumeSource: corev1.VolumeSource{
-			EmptyDir: &corev1.EmptyDirVolumeSource{
-				Medium:    corev1.StorageMediumDefault,
+		VolumeSource: core.VolumeSource{
+			EmptyDir: &core.EmptyDirVolumeSource{
+				Medium:    core.StorageMediumDefault,
 				SizeLimit: nil,
 			},
 		},
 	}
 }
 
-func createPVCVolume(name string) corev1.Volume {
-	return corev1.Volume{
+func createPVCVolume(name string) core.Volume {
+	return core.Volume{
 		Name: name,
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+		VolumeSource: core.VolumeSource{
+			PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
 				ClaimName: name,
 			},
 		},
 	}
 }
 
-func createConfigMapVolume(name string, chkName string, key string, path string) corev1.Volume {
-	return corev1.Volume{
+func createConfigMapVolume(name string, chkName string, key string, path string) core.Volume {
+	return core.Volume{
 		Name: name,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
+		VolumeSource: core.VolumeSource{
+			ConfigMap: &core.ConfigMapVolumeSource{
+				LocalObjectReference: core.LocalObjectReference{
 					Name: chkName,
 				},
-				Items: []corev1.KeyToPath{
-					{Key: key, Path: path},
+				Items: []core.KeyToPath{
+					{
+						Key:  key,
+						Path: path,
+					},
 				},
 			},
 		},
 	}
 }
 
-func createInitContainers(chk *v1alpha1.ClickHouseKeeper) []corev1.Container {
-	var initContainers []corev1.Container
+func createInitContainers(chk *api.ClickHouseKeeper) []core.Container {
+	var initContainers []core.Container
 
 	if len(chk.Spec.PodTemplate.Spec.InitContainers) == 0 {
-		initContainers = []corev1.Container{{}}
+		initContainers = []core.Container{{}}
 	} else {
 		initContainers = chk.Spec.PodTemplate.Spec.InitContainers
 	}
@@ -183,22 +186,26 @@ func createInitContainers(chk *v1alpha1.ClickHouseKeeper) []corev1.Container {
 			"export KEEPER_ID=${HOSTNAME##*-}; sed \"s/KEEPER_ID/$KEEPER_ID/g\" /tmp/clickhouse-keeper/keeper_config.xml > /etc/clickhouse-keeper/keeper_config.xml; cat /etc/clickhouse-keeper/keeper_config.xml",
 		}
 	}
-	initContainers[0].VolumeMounts = append(initContainers[0].VolumeMounts, corev1.VolumeMount{
-		Name:      "keeper-config",
-		MountPath: "/tmp/clickhouse-keeper",
-	})
-	initContainers[0].VolumeMounts = append(initContainers[0].VolumeMounts, corev1.VolumeMount{
-		Name:      "etc-clickhouse-keeper",
-		MountPath: "/etc/clickhouse-keeper",
-	})
+	initContainers[0].VolumeMounts = append(initContainers[0].VolumeMounts,
+		core.VolumeMount{
+			Name:      "keeper-config",
+			MountPath: "/tmp/clickhouse-keeper",
+		},
+	)
+	initContainers[0].VolumeMounts = append(initContainers[0].VolumeMounts,
+		core.VolumeMount{
+			Name:      "etc-clickhouse-keeper",
+			MountPath: "/etc/clickhouse-keeper",
+		},
+	)
 
 	return initContainers
 }
 
-func createContainers(chk *v1alpha1.ClickHouseKeeper) []corev1.Container {
-	var containers []corev1.Container
+func createContainers(chk *api.ClickHouseKeeper) []core.Container {
+	var containers []core.Container
 	if len(chk.Spec.PodTemplate.Spec.Containers) == 0 {
-		containers = []corev1.Container{{}}
+		containers = []core.Container{{}}
 	} else {
 		containers = chk.Spec.PodTemplate.Spec.Containers
 	}
@@ -213,13 +220,15 @@ func createContainers(chk *v1alpha1.ClickHouseKeeper) []corev1.Container {
 		probeScript := fmt.Sprintf(
 			"date && OK=$(exec 3<>/dev/tcp/127.0.0.1/%d ; printf 'ruok' >&3 ; IFS=; tee <&3; exec 3<&- ;); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi",
 			chk.Spec.GetClientPort())
-		containers[0].LivenessProbe = &corev1.Probe{
-			ProbeHandler: corev1.ProbeHandler{
-				Exec: &corev1.ExecAction{Command: []string{
-					"bash",
-					"-xc",
-					probeScript,
-				}},
+		containers[0].LivenessProbe = &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				Exec: &core.ExecAction{
+					Command: []string{
+						"bash",
+						"-xc",
+						probeScript,
+					},
+				},
 			},
 			InitialDelaySeconds: 60,
 			PeriodSeconds:       3,
@@ -227,12 +236,30 @@ func createContainers(chk *v1alpha1.ClickHouseKeeper) []corev1.Container {
 		}
 	}
 	clientPort := chk.Spec.GetClientPort()
-	setupPort(&containers[0], clientPort, corev1.ContainerPort{Name: "client", ContainerPort: int32(clientPort)})
+	setupPort(
+		&containers[0],
+		clientPort,
+		core.ContainerPort{
+			Name:          "client",
+			ContainerPort: int32(clientPort),
+		})
 	raftPort := chk.Spec.GetRaftPort()
-	setupPort(&containers[0], raftPort, corev1.ContainerPort{Name: "raft", ContainerPort: int32(raftPort)})
+	setupPort(
+		&containers[0],
+		raftPort,
+		core.ContainerPort{
+			Name:          "raft",
+			ContainerPort: int32(raftPort),
+		})
 	promethuesPort := chk.Spec.GetPrometheusPort()
 	if promethuesPort != -1 {
-		setupPort(&containers[0], promethuesPort, corev1.ContainerPort{Name: "prometheus", ContainerPort: int32(promethuesPort)})
+		setupPort(
+			&containers[0],
+			promethuesPort,
+			core.ContainerPort{
+				Name:          "prometheus",
+				ContainerPort: int32(promethuesPort),
+			})
 	}
 
 	switch length := len(chk.Spec.VolumeClaimTemplates); length {
@@ -243,17 +270,18 @@ func createContainers(chk *v1alpha1.ClickHouseKeeper) []corev1.Container {
 	case 2:
 		containers[0].VolumeMounts = append(containers[0].VolumeMounts, mountVolumes(chk)...)
 	}
-	containers[0].VolumeMounts = append(containers[0].VolumeMounts, corev1.VolumeMount{
-		Name:      "etc-clickhouse-keeper",
-		MountPath: "/etc/clickhouse-keeper",
-	})
+	containers[0].VolumeMounts = append(containers[0].VolumeMounts,
+		core.VolumeMount{
+			Name:      "etc-clickhouse-keeper",
+			MountPath: "/etc/clickhouse-keeper",
+		})
 
 	return containers
 }
 
-func mountVolumes(chk *v1alpha1.ClickHouseKeeper) []corev1.VolumeMount {
+func mountVolumes(chk *api.ClickHouseKeeper) []core.VolumeMount {
 	path := chk.Spec.GetPath()
-	return []corev1.VolumeMount{
+	return []core.VolumeMount{
 		{
 			Name:      "working-dir",
 			MountPath: path,
@@ -269,9 +297,9 @@ func mountVolumes(chk *v1alpha1.ClickHouseKeeper) []corev1.VolumeMount {
 	}
 }
 
-func mountSharedVolume(chk *v1alpha1.ClickHouseKeeper) []corev1.VolumeMount {
+func mountSharedVolume(chk *api.ClickHouseKeeper) []core.VolumeMount {
 	path := chk.Spec.GetPath()
-	return []corev1.VolumeMount{
+	return []core.VolumeMount{
 		{
 			Name:      "working-dir",
 			MountPath: path,
@@ -290,9 +318,9 @@ func mountSharedVolume(chk *v1alpha1.ClickHouseKeeper) []corev1.VolumeMount {
 }
 
 // CreateClientService returns a client service resource for the clickhouse keeper cluster
-func CreateClientService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
-	svcPorts := []corev1.ServicePort{
-		corev1.ServicePort{
+func CreateClientService(chk *api.ClickHouseKeeper) *core.Service {
+	svcPorts := []core.ServicePort{
+		core.ServicePort{
 			Name: "client",
 			Port: int32(chk.Spec.GetClientPort()),
 		},
@@ -301,7 +329,7 @@ func CreateClientService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 	prometheusPort := chk.Spec.GetPrometheusPort()
 	if prometheusPort != -1 {
 		svcPorts = append(svcPorts,
-			corev1.ServicePort{
+			core.ServicePort{
 				Name: "prometheus",
 				Port: int32(prometheusPort),
 			},
@@ -312,8 +340,8 @@ func CreateClientService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 }
 
 // CreateHeadlessService returns an internal headless-service for the chk stateful-set
-func CreateHeadlessService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
-	svcPorts := []corev1.ServicePort{
+func CreateHeadlessService(chk *api.ClickHouseKeeper) *core.Service {
+	svcPorts := []core.ServicePort{
 		{
 			Name: "raft",
 			Port: int32(chk.Spec.GetRaftPort()),
@@ -322,42 +350,42 @@ func CreateHeadlessService(chk *v1alpha1.ClickHouseKeeper) *corev1.Service {
 	return createService(getHeadlessServiceName(chk), chk, svcPorts, false)
 }
 
-func createService(name string, chk *v1alpha1.ClickHouseKeeper, ports []corev1.ServicePort, clusterIP bool) *corev1.Service {
-	service := corev1.Service{
-		TypeMeta: metav1.TypeMeta{
+func createService(name string, chk *api.ClickHouseKeeper, ports []core.ServicePort, clusterIP bool) *core.Service {
+	service := core.Service{
+		TypeMeta: meta.TypeMeta{
 			Kind:       "Service",
 			APIVersion: "v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta.ObjectMeta{
 			Name:      name,
 			Namespace: chk.Namespace,
 		},
-		Spec: corev1.ServiceSpec{
+		Spec: core.ServiceSpec{
 			Ports:    ports,
 			Selector: GetPodLabels(chk),
 		},
 	}
 	if !clusterIP {
-		service.Spec.ClusterIP = corev1.ClusterIPNone
+		service.Spec.ClusterIP = core.ClusterIPNone
 	}
 	return &service
 }
 
 // CreatePodDisruptionBudget returns a pdb for the clickhouse keeper cluster
-func CreatePodDisruptionBudget(chk *v1alpha1.ClickHouseKeeper) *policyv1.PodDisruptionBudget {
+func CreatePodDisruptionBudget(chk *api.ClickHouseKeeper) *policy.PodDisruptionBudget {
 	pdbCount := intstr.FromInt(1)
-	return &policyv1.PodDisruptionBudget{
-		TypeMeta: metav1.TypeMeta{
+	return &policy.PodDisruptionBudget{
+		TypeMeta: meta.TypeMeta{
 			Kind:       "PodDisruptionBudget",
 			APIVersion: "policy/v1",
 		},
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: meta.ObjectMeta{
 			Name:      chk.GetName(),
 			Namespace: chk.Namespace,
 		},
-		Spec: policyv1.PodDisruptionBudgetSpec{
+		Spec: policy.PodDisruptionBudgetSpec{
 			MaxUnavailable: &pdbCount,
-			Selector: &metav1.LabelSelector{
+			Selector: &meta.LabelSelector{
 				MatchLabels: map[string]string{
 					"app": chk.GetName(),
 				},
