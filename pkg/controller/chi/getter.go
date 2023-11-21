@@ -23,8 +23,9 @@ import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
@@ -56,7 +57,7 @@ func (c *Controller) getConfigMap(objMeta *metaV1.ObjectMeta, byNameOnly bool) (
 	// Try to find by labels
 
 	var selector k8slabels.Selector
-	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
+	if selector, err = model.MakeSelectorFromObjectMeta(objMeta); err != nil {
 		return nil, err
 	}
 
@@ -87,7 +88,7 @@ func (c *Controller) getService(obj interface{}) (*coreV1.Service, error) {
 		name = typedObj.Name
 		namespace = typedObj.Namespace
 	case *chiV1.ChiHost:
-		name = chopmodel.CreateStatefulSetServiceName(typedObj)
+		name = model.CreateStatefulSetServiceName(typedObj)
 		namespace = typedObj.Address.Namespace
 	}
 	return c.serviceLister.Services(namespace).Get(name)
@@ -138,7 +139,7 @@ func (c *Controller) getStatefulSetByMeta(meta *metaV1.ObjectMeta, byNameOnly bo
 	}
 
 	var selector k8slabels.Selector
-	if selector, err = chopmodel.MakeSelectorFromObjectMeta(meta); err != nil {
+	if selector, err = model.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +163,7 @@ func (c *Controller) getStatefulSetByMeta(meta *metaV1.ObjectMeta, byNameOnly bo
 // getStatefulSetByHost finds StatefulSet of a specified host
 func (c *Controller) getStatefulSetByHost(host *chiV1.ChiHost) (*appsV1.StatefulSet, error) {
 	// Namespaced name
-	name := chopmodel.CreateStatefulSetName(host)
+	name := model.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, newGetOptions())
@@ -180,10 +181,10 @@ func (c *Controller) getPod(obj interface{}) (*coreV1.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *appsV1.StatefulSet:
-		name = chopmodel.CreatePodName(obj)
+		name = model.CreatePodName(obj)
 		namespace = typedObj.Namespace
 	case *chiV1.ChiHost:
-		name = chopmodel.CreatePodName(obj)
+		name = model.CreatePodName(obj)
 		namespace = typedObj.Address.Namespace
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
@@ -245,9 +246,15 @@ func (c *Controller) getPodsOfCHI(chi *chiV1.ClickHouseInstallation) (pods []*co
 
 // getPodsIPs gets all pod IPs
 func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
+	log.V(2).M(obj).F().S().Info("looking for pods IPs")
+	defer log.V(2).M(obj).F().E().Info("looking for pods IPs")
+
 	for _, pod := range c.getPods(obj) {
-		if ip := pod.Status.PodIP; ip != "" {
+		if ip := pod.Status.PodIP; ip == "" {
+			log.V(2).M(pod).F().Warning("Pod NO IP address found. Pod: %s/%s", pod.Namespace, pod.Name)
+		} else {
 			ips = append(ips, ip)
+			log.V(2).M(pod).F().Info("Pod IP address found. Pod: %s/%s IP: %s", pod.Namespace, pod.Name, ip)
 		}
 	}
 	return ips
@@ -260,7 +267,7 @@ func (c *Controller) GetCHIByObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI boo
 	if isCHI {
 		chiName = objectMeta.Name
 	} else {
-		chiName, err = chopmodel.GetCHINameFromObjectMeta(objectMeta)
+		chiName, err = model.GetCHINameFromObjectMeta(objectMeta)
 		if err != nil {
 			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
 		}

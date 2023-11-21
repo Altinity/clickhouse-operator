@@ -1,0 +1,24 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-043-1-logs-customization
+spec:
+  templates:
+    podTemplates:
+    - name: pod-template
+      spec:
+        containers:
+          - name: clickhouse
+            image: clickhouse/clickhouse-server:22.3
+    volumeClaimTemplates:
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Mi
+  defaults:
+    templates:
+      podTemplate: pod-template
+      logVolumeClaimTemplate: log-volume-template

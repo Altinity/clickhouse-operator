@@ -47,9 +47,14 @@ const (
 	defaultChConfigUserDefaultNetworkIP = "::/0"
 	defaultChConfigUserDefaultPassword  = "default"
 
-	ChSchemeHTTP  = "http"
+	// Possible values for ClickHouse scheme
+
+	// ChSchemeHTTP specifies HTTP access scheme
+	ChSchemeHTTP = "http"
+	// ChSchemeHTTPS specifies HTTPS access scheme
 	ChSchemeHTTPS = "https"
-	ChSchemeAuto  = "auto"
+	// ChSchemeAuto specifies that operator has to decide itself should https or http be used
+	ChSchemeAuto = "auto"
 
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
@@ -239,8 +244,35 @@ type OperatorConfigTemplate struct {
 	CHI OperatorConfigCHI `json:"chi" yaml:"chi"`
 }
 
+// OperatorConfigCHIPolicy specifies string value of .template.chi.policy
+type OperatorConfigCHIPolicy string
+
+// String is a stringifier
+func (p OperatorConfigCHIPolicy) String() string {
+	return string(p)
+}
+
+// ToLower provides the same functionality as strings.ToLower()
+func (p OperatorConfigCHIPolicy) ToLower() string {
+	return strings.ToLower(p.String())
+}
+
+// Equals checks whether OperatorConfigCHIPolicy is equal to another one
+func (p OperatorConfigCHIPolicy) Equals(another OperatorConfigCHIPolicy) bool {
+	return p.ToLower() == another.ToLower()
+}
+
+// Possible values for OperatorConfigCHIPolicy
+const (
+	OperatorConfigCHIPolicyReadOnStart          OperatorConfigCHIPolicy = "ReadOnStart"
+	OperatorConfigCHIPolicyApplyOnNextReconcile OperatorConfigCHIPolicy = "ApplyOnNextReconcile"
+	defaultOperatorConfigCHIPolicy              OperatorConfigCHIPolicy = OperatorConfigCHIPolicyApplyOnNextReconcile
+)
+
 // OperatorConfigCHI specifies template CHI section
 type OperatorConfigCHI struct {
+	// Policy specifies how to handle CHITs
+	Policy OperatorConfigCHIPolicy `json:"policy" yaml:"policy"`
 	// Path where to look for ClickHouseInstallation templates .yaml files
 	Path string `json:"path" yaml:"path"`
 
@@ -291,6 +323,7 @@ type OperatorConfigReconcileHost struct {
 // OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
 	Exclude *StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+	Queries *StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
 	Include *StringBool `json:"include,omitempty" yaml:"include,omitempty"`
 }
 
@@ -472,8 +505,9 @@ func (c *OperatorConfig) readCHITemplates() (errs []error) {
 		if err := yaml.Unmarshal([]byte(c.Template.CHI.Runtime.TemplateFiles[filename]), template); err != nil {
 			// Unable to unmarshal - skip incorrect template
 			errs = append(errs, fmt.Errorf("FAIL readCHITemplates() unable to unmarshal file %s Error: %q", filename, err))
-			continue
+			continue // skip to the next template
 		}
+		// Template read successfully, let's append it to the list
 		c.enlistCHITemplate(template)
 	}
 
@@ -482,33 +516,37 @@ func (c *OperatorConfig) readCHITemplates() (errs []error) {
 
 // enlistCHITemplate inserts template into templates catalog
 func (c *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation) {
-	if c.Template.CHI.Runtime.Templates == nil {
-		c.Template.CHI.Runtime.Templates = make([]*ClickHouseInstallation, 0)
+	if template.FoundIn(c.Template.CHI.Runtime.Templates) {
+		c.unlistCHITemplate(template)
 	}
-	c.Template.CHI.Runtime.Templates = append(c.Template.CHI.Runtime.Templates, template)
+	if !template.FoundIn(c.Template.CHI.Runtime.Templates) {
+		c.Template.CHI.Runtime.Templates = append(c.Template.CHI.Runtime.Templates, template)
+	}
 }
 
 // unlistCHITemplate removes template from templates catalog
 func (c *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
-	if c.Template.CHI.Runtime.Templates == nil {
-		return
-	}
-
 	// Nullify found template entry
 	for _, _template := range c.Template.CHI.Runtime.Templates {
-		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			// TODO normalize
-			//config.CHITemplates[i] = nil
+		if template.MatchFullName(_template.Namespace, _template.Name) {
 			_template.Name = ""
 			_template.Namespace = ""
 		}
 	}
-	// Compact the slice
-	// TODO compact the slice
+
+	// Compact the slice - exclude empty-named templates
+	var named []*ClickHouseInstallation
+	for _, _template := range c.Template.CHI.Runtime.Templates {
+		if !_template.MatchFullName("", "") {
+			named = append(named, _template)
+		}
+	}
+
+	c.Template.CHI.Runtime.Templates = named
 }
 
-// FindTemplate finds specified template
-func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
+// FindTemplate finds specified template within possibly specified namespace
+func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, fallbackNamespace string) *ClickHouseInstallation {
 	// Try to find direct match
 	for _, _template := range c.Template.CHI.Runtime.Templates {
 		if _template.MatchFullName(use.Namespace, use.Name) {
@@ -518,17 +556,18 @@ func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *Cl
 	}
 
 	// Direct match is not possible.
+	// Let's try to find by name only
 
 	if use.Namespace != "" {
-		// With fully-specified use template direct (full name) only match is applicable, and it is not possible
+		// With fully-specified template namespace+name pair direct (full name) only match is applicable
 		// This is strange situation, however
 		return nil
 	}
 
-	// Improvise with use.Namespace
+	// Look for templates with specified name in explicitly specified namespace
 
 	for _, _template := range c.Template.CHI.Runtime.Templates {
-		if _template.MatchFullName(namespace, use.Name) {
+		if _template.MatchFullName(fallbackNamespace, use.Name) {
 			// Found template with searched name in specified namespace
 			return _template
 		}
@@ -541,111 +580,63 @@ func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *Cl
 // Auto templates are sorted alphabetically by tuple: namespace, name
 func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
 	// Extract auto-templates from all templates listed
-	var auto []*ClickHouseInstallation
+	var autoTemplates []*ClickHouseInstallation
 	for _, _template := range c.Template.CHI.Runtime.Templates {
 		if _template.IsAuto() {
-			auto = append(auto, _template)
+			autoTemplates = append(autoTemplates, _template)
 		}
 	}
 
-	// Sort namespaces
+	// Prepare sorted unique list of namespaces
 	var namespaces []string
-	for _, _template := range auto {
-		found := false
-		for _, namespace := range namespaces {
-			if namespace == _template.Namespace {
-				// Already has it
-				found = true
-				break
-			}
-		}
-		if !found {
+	for _, _template := range autoTemplates {
+		// Append template's namespace to the list of namespaces
+		if !util.StringSliceContains(namespaces, _template.Namespace) {
 			namespaces = append(namespaces, _template.Namespace)
 		}
 	}
 	sort.Strings(namespaces)
 
-	var res []*ClickHouseInstallation
+	// Prepare sorted list of templates
+	var sortedTemplates []*ClickHouseInstallation
+	// Walk over sorted unique namespaces
 	for _, namespace := range namespaces {
-		// Sort names
+		// Prepare sorted unique list of names within this namespace
 		var names []string
-		for _, _template := range auto {
-			if _template.Namespace == namespace {
+		for _, _template := range autoTemplates {
+			if _template.MatchNamespace(namespace) && !util.StringSliceContains(names, _template.Name) {
 				names = append(names, _template.Name)
 			}
 		}
 		sort.Strings(names)
 
+		// Walk over sorted unique list of names within this namespace
+		// and append first unseen before template to the result list of templates
 		for _, name := range names {
-			for _, _template := range auto {
-				if (_template.Namespace == namespace) && (_template.Name == name) {
-					res = append(res, _template)
+			for _, _template := range autoTemplates {
+				if _template.MatchFullName(namespace, name) && !_template.FoundIn(sortedTemplates) {
+					sortedTemplates = append(sortedTemplates, _template)
 				}
 			}
 		}
 	}
 
-	return res
-}
-
-// buildUnifiedCHITemplate builds combined CHI Template from templates catalog
-func (c *OperatorConfig) buildUnifiedCHITemplate() {
-
-	return
-	/*
-		// Build unified template in case there are templates to build from only
-		if len(config.CHITemplates) == 0 {
-			return
-		}
-
-		// Sort CHI templates by their names and in order to apply orderly
-		// Extract file names into slice and sort it
-		// Then we'll loop over templates in sorted order (by filenames) and apply them one-by-one
-		var sortedTemplateNames []string
-		for name := range config.CHITemplates {
-			// Convenience wrapper
-			template := config.CHITemplates[name]
-			sortedTemplateNames = append(sortedTemplateNames, template.Name)
-		}
-		sort.Strings(sortedTemplateNames)
-
-		// Create final combined template
-		config.CHITemplate = new(ClickHouseInstallation)
-
-		// Extract templates in sorted order - according to sorted template names
-		for _, name := range sortedTemplateNames {
-			// Convenience wrapper
-			template := config.CHITemplates[name]
-			// Merge into accumulated target template from current template
-			config.CHITemplate.MergeFrom(template)
-		}
-
-		// Log final CHI template obtained
-		// Marshaling is done just to print nice yaml
-		if bytes, err := yaml.Marshal(config.CHITemplate); err == nil {
-			log.V(1).Infof("Unified CHITemplate:\n%s\n", string(bytes))
-		} else {
-			log.V(1).Infof("FAIL unable to Marshal Unified CHITemplate")
-		}
-	*/
+	return sortedTemplates
 }
 
 // AddCHITemplate adds CHI template
 func (c *OperatorConfig) AddCHITemplate(template *ClickHouseInstallation) {
 	c.enlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // UpdateCHITemplate updates CHI template
 func (c *OperatorConfig) UpdateCHITemplate(template *ClickHouseInstallation) {
 	c.enlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // DeleteCHITemplate deletes CHI template
 func (c *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
 	c.unlistCHITemplate(template)
-	c.buildUnifiedCHITemplate()
 }
 
 // Postprocess runs all postprocessors
@@ -653,23 +644,35 @@ func (c *OperatorConfig) Postprocess() {
 	c.normalize()
 	c.readClickHouseCustomConfigFiles()
 	c.readCHITemplates()
-	c.buildUnifiedCHITemplate()
 	c.applyEnvVarParams()
 	c.applyDefaultWatchNamespace()
 }
 
-func (c *OperatorConfig) normalizeConfigurationFilesSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
 
+}
+
+func (c *OperatorConfig) normalizeSectionTemplate() {
+	p := c.Template.CHI.Policy
+	switch {
+	case p.Equals(OperatorConfigCHIPolicyReadOnStart):
+		c.Template.CHI.Policy = OperatorConfigCHIPolicyReadOnStart
+	case p.Equals(OperatorConfigCHIPolicyApplyOnNextReconcile):
+		c.Template.CHI.Policy = OperatorConfigCHIPolicyApplyOnNextReconcile
+	default:
+		c.Template.CHI.Policy = defaultOperatorConfigCHIPolicy
+	}
+
 	// Process ClickHouseInstallation templates section
 	util.PreparePath(&c.Template.CHI.Path, c.Runtime.ConfigFolderPath, TemplatesDir)
 }
 
-func (c *OperatorConfig) normalizeUpdateSection() {
+func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
 	// Process Create/Update section
 
 	// Timeouts
@@ -696,7 +699,7 @@ func (c *OperatorConfig) normalizeUpdateSection() {
 	}
 }
 
-func (c *OperatorConfig) normalizeSettingsSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseConfigurationUserDefault() {
 	// Default values for ClickHouse user configuration
 	// 1. user/profile
 	// 2. user/quota
@@ -718,7 +721,7 @@ func (c *OperatorConfig) normalizeSettingsSection() {
 	// chConfigNetworksHostRegexpTemplate
 }
 
-func (c *OperatorConfig) normalizeAccessSection() {
+func (c *OperatorConfig) normalizeSectionClickHouseAccess() {
 	// Username and Password to be used by operator to connect to ClickHouse instances for
 	// 1. Metrics requests
 	// 2. Schema maintenance
@@ -769,15 +772,17 @@ func (c *OperatorConfig) normalizeAccessSection() {
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Access.Timeouts.Query = c.ClickHouse.Access.Timeouts.Query * time.Second
 
+}
+
+func (c *OperatorConfig) normalizeSectionClickHouseMetrics() {
 	if c.ClickHouse.Metrics.Timeouts.Collect == 0 {
 		c.ClickHouse.Metrics.Timeouts.Collect = defaultTimeoutCollect
 	}
 	// Adjust seconds to time.Duration
 	c.ClickHouse.Metrics.Timeouts.Collect = c.ClickHouse.Metrics.Timeouts.Collect * time.Second
-
 }
 
-func (c *OperatorConfig) normalizeLogSection() {
+func (c *OperatorConfig) normalizeSectionLogger() {
 	// Logtostderr      string `json:"logtostderr"      yaml:"logtostderr"`
 	// Alsologtostderr  string `json:"alsologtostderr"  yaml:"alsologtostderr"`
 	// V                string `json:"v"                yaml:"v"`
@@ -786,7 +791,7 @@ func (c *OperatorConfig) normalizeLogSection() {
 	// Log_backtrace_at string `json:"log_backtrace_at" yaml:"log_backtrace_at"`
 }
 
-func (c *OperatorConfig) normalizeRuntimeSection() {
+func (c *OperatorConfig) normalizeSectionReconcileRuntime() {
 	if c.Reconcile.Runtime.ThreadsNumber == 0 {
 		c.Reconcile.Runtime.ThreadsNumber = defaultReconcileCHIsThreadsNumber
 	}
@@ -804,7 +809,7 @@ func (c *OperatorConfig) normalizeRuntimeSection() {
 	//reconcileWaitInclude: false
 }
 
-func (c *OperatorConfig) normalizeLabelsSection() {
+func (c *OperatorConfig) normalizeSectionLabel() {
 	//config.IncludeIntoPropagationAnnotations
 	//config.ExcludeFromPropagationAnnotations
 	//config.IncludeIntoPropagationLabels
@@ -813,12 +818,15 @@ func (c *OperatorConfig) normalizeLabelsSection() {
 	c.Label.Runtime.AppendScope = c.Label.AppendScopeString.Value()
 }
 
-func (c *OperatorConfig) normalizePodManagementSection() {
-	if c.Pod.TerminationGracePeriod == 0 {
-		c.Pod.TerminationGracePeriod = defaultTerminationGracePeriod
-	}
+func (c *OperatorConfig) normalizeSectionStatefulSet() {
 	if c.StatefulSet.RevisionHistoryLimit == 0 {
 		c.StatefulSet.RevisionHistoryLimit = defaultRevisionHistoryLimit
+	}
+}
+
+func (c *OperatorConfig) normalizeSectionPod() {
+	if c.Pod.TerminationGracePeriod == 0 {
+		c.Pod.TerminationGracePeriod = defaultTerminationGracePeriod
 	}
 }
 
@@ -827,14 +835,17 @@ func (c *OperatorConfig) normalize() {
 	c.move()
 	c.Runtime.Namespace = os.Getenv(OPERATOR_POD_NAMESPACE)
 
-	c.normalizeConfigurationFilesSection()
-	c.normalizeUpdateSection()
-	c.normalizeSettingsSection()
-	c.normalizeAccessSection()
-	c.normalizeLogSection()
-	c.normalizeRuntimeSection()
-	c.normalizeLabelsSection()
-	c.normalizePodManagementSection()
+	c.normalizeSectionClickHouseConfigurationFile()
+	c.normalizeSectionClickHouseConfigurationUserDefault()
+	c.normalizeSectionClickHouseAccess()
+	c.normalizeSectionClickHouseMetrics()
+	c.normalizeSectionTemplate()
+	c.normalizeSectionReconcileStatefulSet()
+	c.normalizeSectionReconcileRuntime()
+	c.normalizeSectionLogger()
+	c.normalizeSectionLabel()
+	c.normalizeSectionStatefulSet()
+	c.normalizeSectionPod()
 }
 
 // applyEnvVarParams applies ENV VARS over config

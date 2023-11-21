@@ -22,6 +22,7 @@ import (
 
 	"github.com/sanity-io/litter"
 	"gopkg.in/d4l3k/messagediff.v1"
+
 	appsV1 "k8s.io/api/apps/v1"
 	coreV1 "k8s.io/api/core/v1"
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -45,7 +46,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	chopModels "github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -105,7 +106,8 @@ func NewController(
 
 // initQueues
 func (c *Controller) initQueues() {
-	for i := 0; i < chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber+chiV1.DefaultReconcileSystemThreadsNumber; i++ {
+	queuesNum := chop.Config().Reconcile.Runtime.ReconcileCHIsThreadsNumber + chiV1.DefaultReconcileSystemThreadsNumber
+	for i := 0; i < queuesNum; i++ {
 		c.queues = append(
 			c.queues,
 			queue.New(),
@@ -413,13 +415,16 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.AddFunc")
+			c.enqueueObject(NewReconcilePod(reconcileAdd, nil, pod))
 		},
 		UpdateFunc: func(old, new interface{}) {
-			pod := old.(*coreV1.Pod)
-			if !c.isTrackedObject(&pod.ObjectMeta) {
+			oldPod := old.(*coreV1.Pod)
+			newPod := new.(*coreV1.Pod)
+			if !c.isTrackedObject(&newPod.ObjectMeta) {
 				return
 			}
-			log.V(3).M(pod).Info("podInformer.UpdateFunc")
+			log.V(2).M(newPod).Info("podInformer.UpdateFunc")
+			c.enqueueObject(NewReconcilePod(reconcileUpdate, oldPod, newPod))
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*coreV1.Pod)
@@ -427,6 +432,7 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
+			c.enqueueObject(NewReconcilePod(reconcileDelete, pod, nil))
 		},
 	})
 }
@@ -448,7 +454,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(objectMeta *metaV1.ObjectMeta) bool {
-	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && chopModels.IsCHOPGeneratedObject(objectMeta)
+	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && model.IsCHOPGeneratedObject(objectMeta)
 }
 
 // Run syncs caches, starts workers
@@ -524,7 +530,7 @@ func prepareCHIAdd(command *ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *ReconcileCHI) bool {
-	actionPlan := chopModels.NewActionPlan(command.old, command.new)
+	actionPlan := model.NewActionPlan(command.old, command.new)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}
@@ -584,6 +590,7 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 		*ReconcileCHIT,
 		*ReconcileChopConfig,
 		*ReconcileEndpoints,
+		*ReconcilePod,
 		*DropDns:
 		variants := chiV1.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
@@ -623,33 +630,6 @@ func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCHI) {
 	} else {
 		log.V(1).Info("OK delete watch (%s/%s)", chi.Namespace, chi.Name)
 	}
-}
-
-// addChit sync new CHIT - creates all its resources
-func (c *Controller) addChit(chit *chiV1.ClickHouseInstallationTemplate) error {
-	log.V(1).M(chit).F().P()
-	chop.Config().AddCHITemplate((*chiV1.ClickHouseInstallation)(chit))
-	return nil
-}
-
-// updateChit sync CHIT which was already created earlier
-func (c *Controller) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) error {
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
-		// No need to react
-		return nil
-	}
-
-	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
-	chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
-	return nil
-}
-
-// deleteChit deletes CHIT
-func (c *Controller) deleteChit(chit *chiV1.ClickHouseInstallationTemplate) error {
-	log.V(2).M(chit).F().P()
-	chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
-	return nil
 }
 
 // addChopConfig

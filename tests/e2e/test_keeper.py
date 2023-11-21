@@ -165,11 +165,11 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
     if keeper_replica_count > 1:
         keeper_manifest = keeper_manifest_3_node
     if keeper_type == "zookeeper":
-        keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+        keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
     if keeper_type == "clickhouse-keeper":
-        keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+        keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
     if keeper_type == "zookeeper-operator":
-        keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+        keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
 
     zk_manifest = yaml_manifest.get_multidoc_manifest_data(util.get_full_path(keeper_manifest, lookup_in_host=True))
     for doc in zk_manifest:

@@ -1,0 +1,32 @@
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: test-043-0-logs-customization
+spec:
+  templates:
+    podTemplates:
+    - name: pod-template
+      spec:
+        containers:
+          - name: clickhouse
+            image: clickhouse/clickhouse-server:22.3
+          - name: clickhouse-log
+            image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+            command:
+              - "/bin/sh"
+              - "-c"
+              - "--"
+            args:
+              - "while true; do sleep 30; done;"
+    volumeClaimTemplates:
+      - name: log-volume-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Mi
+  defaults:
+    templates:
+      podTemplate: pod-template
+      logVolumeClaimTemplate: log-volume-template

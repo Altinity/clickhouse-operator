@@ -15,7 +15,6 @@
 package v1
 
 import (
-	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
@@ -96,7 +95,37 @@ type ChiUseTemplate struct {
 
 // ChiTemplating defines templating policy struct
 type ChiTemplating struct {
-	Policy string `json:"policy,omitempty" yaml:"policy,omitempty"`
+	Policy      string      `json:"policy,omitempty"      yaml:"policy,omitempty"`
+	CHISelector CHISelector `json:"chiSelector,omitempty" yaml:"chiSelector,omitempty"`
+}
+
+// CHISelector specifies CHI label selector
+type CHISelector map[string]string
+
+// Matches checks whether CHISelector matches provided set of labels
+func (s CHISelector) Matches(labels map[string]string) bool {
+	if s == nil {
+		// Empty selector matches all labels
+		return true
+	}
+
+	// Walk over selector keys
+	for key, selectorValue := range s {
+		if labelValue, ok := labels[key]; !ok {
+			// Labels have no key specified in selector.
+			// Selector does not match the labels
+			return false
+		} else if selectorValue != labelValue {
+			// Labels have the key specified in selector, but selector value is not the same as labels value
+			// Selector does not match the labels
+			return false
+		}
+	}
+
+	// All keys are in place with the same values
+	// Selector matches the labels
+
+	return true
 }
 
 // NewChiTemplating creates new templating
@@ -120,6 +149,14 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
+// GetCHISelector gets CHI selector
+func (t *ChiTemplating) GetCHISelector() CHISelector {
+	if t == nil {
+		return nil
+	}
+	return t.CHISelector
+}
+
 // MergeFrom merges from specified templating
 func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemplating {
 	if from == nil {
@@ -135,10 +172,17 @@ func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemp
 		if t.Policy == "" {
 			t.Policy = from.Policy
 		}
+		if t.CHISelector == nil {
+			t.CHISelector = from.CHISelector
+		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.Policy != "" {
 			// Override by non-empty values only
 			t.Policy = from.Policy
+		}
+		if from.CHISelector != nil {
+			// Override by non-empty values only
+			t.CHISelector = from.CHISelector
 		}
 	}
 
@@ -599,168 +643,6 @@ type ChiHostConfig struct {
 	ZookeeperFingerprint string `json:"zookeeperfingerprint" yaml:"zookeeperfingerprint"`
 	SettingsFingerprint  string `json:"settingsfingerprint"  yaml:"settingsfingerprint"`
 	FilesFingerprint     string `json:"filesfingerprint"     yaml:"filesfingerprint"`
-}
-
-// StatefulSetStatus specifies StatefulSet status
-type StatefulSetStatus string
-
-// Possible values for StatefulSet status
-const (
-	StatefulSetStatusModified StatefulSetStatus = "modified"
-	StatefulSetStatusNew      StatefulSetStatus = "new"
-	StatefulSetStatusSame     StatefulSetStatus = "same"
-	StatefulSetStatusUnknown  StatefulSetStatus = "unknown"
-)
-
-// ChiHostReconcileAttributes defines host reconcile status
-type ChiHostReconcileAttributes struct {
-	status StatefulSetStatus
-	add    bool
-	remove bool
-	modify bool
-	found  bool
-}
-
-// NewChiHostReconcileAttributes creates new reconcile attributes
-func NewChiHostReconcileAttributes() *ChiHostReconcileAttributes {
-	return &ChiHostReconcileAttributes{}
-}
-
-// Equal checks whether reconcile attributes are equal
-func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
-	if s == nil {
-		return false
-	}
-	return true &&
-		(s.add == to.add) &&
-		(s.remove == to.remove) &&
-		(s.modify == to.modify) &&
-		(s.found == to.found)
-}
-
-// Any checks whether any of the attributes is set
-func (s *ChiHostReconcileAttributes) Any(of *ChiHostReconcileAttributes) bool {
-	if s == nil {
-		return false
-	}
-	if of == nil {
-		return false
-	}
-	return false ||
-		(s.add && of.add) ||
-		(s.remove && of.remove) ||
-		(s.modify && of.modify) ||
-		(s.found && of.found)
-}
-
-// SetStatus sets status
-func (s *ChiHostReconcileAttributes) SetStatus(status StatefulSetStatus) *ChiHostReconcileAttributes {
-	if s == nil {
-		return s
-	}
-	s.status = status
-	return s
-}
-
-// GetStatus gets status
-func (s *ChiHostReconcileAttributes) GetStatus() StatefulSetStatus {
-	if s == nil {
-		return StatefulSetStatus("")
-	}
-	return s.status
-}
-
-// SetAdd sets 'add' attribute
-func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
-	if s == nil {
-		return s
-	}
-	s.add = true
-	return s
-}
-
-// UnsetAdd unsets 'add' attribute
-func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
-	if s == nil {
-		return s
-	}
-	s.add = false
-	return s
-}
-
-// SetRemove sets 'remove' attribute
-func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
-	if s == nil {
-		return s
-	}
-	s.remove = true
-	return s
-}
-
-// SetModify sets 'modify' attribute
-func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
-	if s == nil {
-		return s
-	}
-	s.modify = true
-	return s
-}
-
-// SetFound sets 'found' attribute
-func (s *ChiHostReconcileAttributes) SetFound() *ChiHostReconcileAttributes {
-	if s == nil {
-		return s
-	}
-	s.found = true
-	return s
-}
-
-// IsAdd checks whether 'add' attribute is set
-func (s *ChiHostReconcileAttributes) IsAdd() bool {
-	if s == nil {
-		return false
-	}
-	return s.add
-}
-
-// IsRemove checks whether 'remove' attribute is set
-func (s *ChiHostReconcileAttributes) IsRemove() bool {
-	if s == nil {
-		return false
-	}
-	return s.remove
-}
-
-// IsModify checks whether 'modify' attribute is set
-func (s *ChiHostReconcileAttributes) IsModify() bool {
-	if s == nil {
-		return false
-	}
-	return s.modify
-}
-
-// IsFound checks whether 'found' attribute is set
-func (s *ChiHostReconcileAttributes) IsFound() bool {
-	if s == nil {
-		return false
-	}
-	return s.found
-}
-
-// String returns string form
-func (s *ChiHostReconcileAttributes) String() string {
-	if s == nil {
-		return "(nil)"
-	}
-
-	return fmt.Sprintf(
-		"status: %s, add: %t, remove: %t, modify: %t, found: %t",
-		s.status,
-		s.add,
-		s.remove,
-		s.modify,
-		s.found,
-	)
 }
 
 // ChiTemplates defines templates section of .spec

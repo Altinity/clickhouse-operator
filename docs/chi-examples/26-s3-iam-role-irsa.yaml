@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/<role-name>
+  name: irsa-iam
+---
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: s3-irsa
+spec:
+  defaults:
+    templates:
+      podTemplate: pod-template-with-svc-account
+  templates:
+    podTemplates:
+      - name: pod-template-with-svc-account
+        spec:
+          serviceAccountName: irsa-iam
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:latest
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+          replicasCount: 1

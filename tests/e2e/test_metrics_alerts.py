@@ -10,6 +10,8 @@ import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.util as util
 import e2e.alerts as alerts
+import e2e.steps as steps
+
 
 
 @TestScenario
@@ -1213,6 +1215,11 @@ def test_keeper_alerts_outline(self, keeper_type):
 @TestFeature
 @Name("e2e.test_metrics_alerts")
 def test(self):
+    with Given("I setup settings"):
+        steps.set_settings()
+    with Given("I create shell"):
+        shell = steps.get_shell()
+        self.context.shell = shell
     util.clean_namespace(delete_chi=True)
     util.install_operator_if_not_exist()
 

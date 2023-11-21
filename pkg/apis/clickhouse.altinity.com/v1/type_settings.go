@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -68,6 +70,9 @@ type Setting struct {
 	vector     []string
 	attributes map[string]string
 }
+
+// Ensure required interface implementation
+var _ yaml.Marshaler = &Setting{}
 
 // NewSettingScalar makes new scalar Setting
 func NewSettingScalar(scalar string) *Setting {
@@ -230,11 +235,21 @@ func (s *Setting) String() string {
 		return ""
 	}
 
-	if s.isScalar {
-		return s.scalar
+	attributes := ""
+	if s.HasAttributes() {
+		attributes = ":[" + s.Attributes() + "]"
 	}
 
-	return strings.Join(s.vector, ",")
+	if s.isScalar {
+		return s.scalar + attributes
+	}
+
+	return "[" + strings.Join(s.vector, ", ") + "]" + attributes
+}
+
+// MarshalYAML implements yaml.Marshaler interface
+func (s *Setting) MarshalYAML() (interface{}, error) {
+	return s.String(), nil
 }
 
 // Settings specifies settings
@@ -321,6 +336,13 @@ func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
 	}
 	if !settings.Has(name) {
 		settings.Set(name, setting)
+	}
+}
+
+// SetScalarsFromMap sets multiple scalars from map
+func (settings *Settings) SetScalarsFromMap(m map[string]string) {
+	for key, value := range m {
+		settings.Set(key, NewSettingScalar(value))
 	}
 }
 
@@ -414,6 +436,8 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 	case // scalar
 		float32:
 		floatVal := untyped.(float32)
+		// What is the fractional part of the float value?
+		// If it is too small, we can consider the value to be an int value
 		_, frac := math.Modf(float64(floatVal))
 		if frac > ignoreThreshold {
 			// Consider it float
@@ -427,6 +451,8 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 	case // scalar
 		float64:
 		floatVal := untyped.(float64)
+		// What is the fractional part of the float value?
+		// If it is too small, we can consider the value to be an int value
 		_, frac := math.Modf(floatVal)
 		if frac > ignoreThreshold {
 			// Consider it float

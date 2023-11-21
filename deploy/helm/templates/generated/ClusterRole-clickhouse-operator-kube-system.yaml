@@ -48,6 +48,15 @@ rules:
       - ""
     resources:
       - persistentvolumes
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
       - pods
     verbs:
       - get
@@ -55,6 +64,7 @@ rules:
       - patch
       - update
       - watch
+      - delete
   - apiGroups:
       - apps
     resources:
@@ -132,6 +142,33 @@ rules:
       - clickhouseinstallations/status
       - clickhouseinstallationtemplates/status
       - clickhouseoperatorconfigurations/status
+    verbs:
+      - get
+      - update
+      - patch
+      - create
+      - delete
+  - apiGroups:
+      - clickhouse-keeper.altinity.com
+    resources:
+      - clickhousekeeperinstallations
+    verbs:
+      - get
+      - patch
+      - update
+      - delete
+      - list
+      - watch
+  - apiGroups:
+      - clickhouse-keeper.altinity.com
+    resources:
+      - clickhousekeeperinstallations/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - clickhouse-keeper.altinity.com
+    resources:
+      - clickhousekeeperinstallations/status
     verbs:
       - get
       - update

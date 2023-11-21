@@ -555,12 +555,35 @@ func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate,
 	return chi.GetServiceTemplate(name)
 }
 
+// MatchNamespace matches namespace
+func (chi *ClickHouseInstallation) MatchNamespace(namespace string) bool {
+	if chi == nil {
+		return false
+	}
+	return chi.Namespace == namespace
+}
+
 // MatchFullName matches full name
 func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	if chi == nil {
 		return false
 	}
 	return (chi.Namespace == namespace) && (chi.Name == name)
+}
+
+// FoundIn checks whether CHI can be found in haystack
+func (chi *ClickHouseInstallation) FoundIn(haystack []*ClickHouseInstallation) bool {
+	if chi == nil {
+		return false
+	}
+
+	for _, candidate := range haystack {
+		if candidate.MatchFullName(chi.Namespace, chi.Name) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Possible templating policies
@@ -604,14 +627,6 @@ func (chi *ClickHouseInstallation) IsRollingUpdate() bool {
 		return false
 	}
 	return chi.Spec.Restart == RestartRollingUpdate
-}
-
-// IsNoRestartSpecified checks whether CHI has no restart request
-func (chi *ClickHouseInstallation) IsNoRestartSpecified() bool {
-	if chi == nil {
-		return false
-	}
-	return chi.Spec.Restart == ""
 }
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
@@ -707,8 +722,17 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	// Otherwise, we need to acquire a lock to initialize the field.
 	chi.statusMu.Lock()
 	defer chi.statusMu.Unlock()
-	if chi.Status == nil { // Note that we have to check this property again to avoid a TOCTOU bug.
+	// Note that we have to check this property again to avoid a TOCTOU bug.
+	if chi.Status == nil {
 		chi.Status = &ChiStatus{}
+	}
+	return chi.Status
+}
+
+// GetStatus gets Status
+func (chi *ClickHouseInstallation) GetStatus() *ChiStatus {
+	if chi == nil {
+		return nil
 	}
 	return chi.Status
 }
@@ -769,6 +793,7 @@ func (chi *ClickHouseInstallation) SetTarget(a *ClickHouseInstallation) {
 	chi.EnsureStatus().NormalizedCHI = a
 }
 
+// FirstHost returns first host of the CHI
 func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
 	var result *ChiHost
 	chi.WalkHosts(func(host *ChiHost) error {

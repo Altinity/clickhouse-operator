@@ -122,9 +122,18 @@ stringData:
 
 ```
 
-> **Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration.
-> The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed.
-> This approach requires recreating the ClickHouse podTemplates when adding new users.
+**Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration.
+The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed.
+This approach requires recreating the ClickHouse podTemplates when adding new users. It can be configured as follows:
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/k8s_secret_env_password: clickhouse-secret/pwduser1
+      user2/k8s_secret_env_password_sha256_hex: clickhouse-secret/pwduser2
+      user3/k8s_secret_env_password_double_sha1_hex: clickhouse-secret/pwduser3
+```
 
 ### Securing the 'default' user
 
@@ -337,8 +346,8 @@ spec:
                     <name>AcceptCertificateHandler</name>
                 </invalidCertificateHandler>
             </client>
+          </openSSL>
         </clickhouse>
-      </openSSL>
 ```
 
 **Note:** To secure connections for external users only, but keep inter-cluster communications insecure, instead of using the '**secure**' flag, specify the **podTemplate** explicitly and open the proper ports:
@@ -348,20 +357,20 @@ spec:
   templates:
     podTemplates:
     - name: default
-        containers:
-        - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.8
-          ports:
-          - name: http
-            containerPort: 8123
-          - name: https
-            containerPort: 8443
-          - name: client
-            containerPort: 9000
-          - name: secureclient
-            containerPort: 9440
-          - name: interserver
-            containerPort: 9009
+      containers:
+      - name: clickhouse-pod
+        image: clickhouse/clickhouse-server:22.8
+        ports:
+        - name: http
+          containerPort: 8123
+        - name: https
+          containerPort: 8443
+        - name: client
+          containerPort: 9000
+        - name: secureclient
+          containerPort: 9440
+        - name: interserver
+          containerPort: 9009
 ```
 
 ### Forcing HTTPS for operator connections

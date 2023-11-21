@@ -8,6 +8,7 @@ operator:
     # operator.image.pullPolicy -- image pull policy
 
     pullPolicy: IfNotPresent
+  containerSecurityContext: {}
   # operator.resources -- custom resource configuration
 
   resources: {}
@@ -39,6 +40,7 @@ metrics:
     # metrics.image.pullPolicy -- image pull policy
 
     pullPolicy: IfNotPresent
+  containerSecurityContext: {}
   # metrics.resources -- custom resource configuration
 
   resources: {}
@@ -99,6 +101,7 @@ tolerations: []
 # affinity -- affinity for scheduler pod assignment
 
 affinity: {}
+podSecurityContext: {}
 serviceMonitor:
   # serviceMonitor.enabled -- ServiceMonitor CRD is created for a prometheus operator
   enabled: false
@@ -207,7 +210,7 @@ configs:
 
       ################################################
       ##
-      ## Watch Section
+      ## Watch section
       ##
       ################################################
       watch:
@@ -222,7 +225,7 @@ configs:
         configuration:
           ################################################
           ##
-          ## Configuration Files Section
+          ## Configuration files section
           ##
           ################################################
           file:
@@ -236,7 +239,7 @@ configs:
               user: users.d
           ################################################
           ##
-          ## Configuration Users Section
+          ## Configuration users section
           ##
           ################################################
           user:
@@ -249,8 +252,8 @@ configs:
             # 2. CHOP user account DOES NOT use:
             #    - profile setting. It uses predefined profile called 'clickhouse_operator'
             #    - quota setting. It uses empty quota name.
-            #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
-            #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
+            #    - networks IP setting. Operator specifies 'networks/ip' user setting to match operators' pod IP only.
+            #    - password setting. Password for CHOP account is used from 'clickhouse.access.*' section
             default:
               # Default values for ClickHouse user account(s) created by the operator
               #   1. user/profile - string
@@ -266,7 +269,7 @@ configs:
               password: "default"
           ################################################
           ##
-          ## Configuration Network Section
+          ## Configuration network section
           ##
           ################################################
           network:
@@ -275,12 +278,17 @@ configs:
 
         ################################################
         ##
-        ## Configuration Restart Policy Section
+        ## Configuration restart policy section
         ## Configuration restart policy describes what configuration changes require ClickHouse restart
         ##
         ################################################
         configurationRestartPolicy:
           rules:
+            # IMPORTANT!
+            # Special version of "*" - default version - has to satisfy all ClickHouse versions.
+            # Default version will also be used in case ClickHouse version is unknown.
+            # ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
+            # ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
             - version: "*"
               rules:
                 - settings/*: "yes"
@@ -344,48 +352,82 @@ configs:
           # Timeouts used to limit connection and queries from the operator to ClickHouse instances
           # Specified in seconds.
           timeouts:
-            connect: 2
-            query: 5
+            # Timout to setup connection from the operator to ClickHouse instances. In seconds.
+            connect: 1
+            # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
+            query: 4
+
+        #################################################
+        ##
+        ## Metrics collection
+        ##
+        ################################################
 
         metrics:
+          # Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
+          # Specified in seconds.
           timeouts:
+            # Timeout used to limit metrics collection request. In seconds.
+            # Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
+            # All collected metrics are returned.
             collect: 9
 
       ################################################
       ##
-      ## Templates Section
+      ## Template(s) management section
       ##
       ################################################
       template:
         chi:
-          # Path to the folder where ClickHouseInstallation .yaml manifests are located.
-          # Manifests are applied in sorted alpha-numeric order.
+          # CHI template updates handling policy
+          # Possible policy values:
+          #   - ReadOnStart. Accept CHIT updates on the operators start only.
+          #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+          policy: ApplyOnNextReconcile
+
+          # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+          # Templates are added to the list of all templates and used when CHI is reconciled.
+          # Templates are applied in sorted alpha-numeric order.
           path: templates.d
 
       ################################################
       ##
-      ## Reconcile Section
+      ## Reconcile section
       ##
       ################################################
       reconcile:
+        # Reconcile runtime settings
         runtime:
           # Max number of concurrent CHI reconciles in progress
           reconcileCHIsThreadsNumber: 10
-          # Max number of concurrent shard reconciles in progress
-          reconcileShardsThreadsNumber: 1
-          # The maximum percentage of cluster shards that may be reconciled in parallel
+
+          # The operator reconciles shards concurrently in each CHI with the following limitations:
+          #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
+          #      can not be greater than 'reconcileShardsThreadsNumber'.
+          #   2. Percentage of shards being reconciled (and thus having hosts down) in each CHI concurrently
+          #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
+          #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
+          # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
+
+          # Max number of concurrent shard reconciles within one CHI in progress
+          reconcileShardsThreadsNumber: 5
+          # Max percentage of concurrent shard reconciles within one CHI in progress
           reconcileShardsMaxConcurrencyPercent: 50
 
+        # Reconcile StatefulSet scenario
         statefulSet:
+          # Create StatefulSet scenario
           create:
             # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
             # Possible options:
-            # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-            #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+            # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+            #    do not try to fix or delete or update it, just abort reconcile cycle.
+            #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
             # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
-            # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+            # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
             onFailure: ignore
 
+          # Update StatefulSet scenario
           update:
             # How many seconds to wait for created/updated StatefulSet to be 'Ready'
             timeout: 300
@@ -393,27 +435,30 @@ configs:
             pollInterval: 5
             # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
             # Possible options:
-            # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-            #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+            # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+            #    do not try to fix or delete or update it, just abort reconcile cycle.
+            #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
             # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
             #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
-            #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
-            # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+            #    Follow 'abort' path afterwards.
+            # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
             onFailure: abort
 
+        # Reconcile Host scenario
         host:
-          # Whether reconciler should wait for a host:
-          # - to be excluded from a cluster
-          # OR
-          # - to be included into a cluster
-          # respectfully before proceeding to the host reconciliation.
+          # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+          #   - to be excluded from a ClickHouse cluster
+          #   - to complete all running queries
+          #   - to be included into a ClickHouse cluster
+          # respectfully before moving forward
           wait:
             exclude: true
+            queries: true
             include: false
 
       ################################################
       ##
-      ## Annotations management
+      ## Annotations management section
       ##
       ################################################
       annotation:
@@ -428,7 +473,7 @@ configs:
 
       ################################################
       ##
-      ## Labels management
+      ## Labels management section
       ##
       ################################################
       label:
@@ -457,7 +502,7 @@ configs:
 
       ################################################
       ##
-      ## StatefulSet management
+      ## StatefulSet management section
       ##
       ################################################
       statefulSet:
@@ -465,7 +510,7 @@ configs:
 
       ################################################
       ##
-      ## Pod management
+      ## Pod management section
       ##
       ################################################
       pod:
@@ -477,7 +522,7 @@ configs:
 
       ################################################
       ##
-      ## Log parameters
+      ## Log parameters section
       ##
       ################################################
       logger:

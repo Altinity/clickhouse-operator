@@ -26,7 +26,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -242,7 +242,7 @@ func (c *Controller) pollStatefulSet(
 
 		if time.Since(start) >= opts.Timeout {
 			// Timeout reached, no good result available, time to quit
-			log.V(1).M(namespace, name).F().Info("%s/%s - TIMEOUT reached")
+			log.V(1).M(namespace, name).F().Info("waitStatefulSet(%s/%s) - TIMEOUT reached", namespace, name)
 			return fmt.Errorf("waitStatefulSet(%s/%s) - wait timeout", namespace, name)
 		}
 

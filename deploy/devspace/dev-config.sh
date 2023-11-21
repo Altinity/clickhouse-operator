@@ -23,8 +23,8 @@ case "${DEPLOY_OPERATOR}" in
         ;;
     "dev")
         # This would be dev operator
-        OPERATOR_IMAGE="${OPERATOR_IMAGE:-"sunsingerus/clickhouse-operator:dev"}"
-        METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"sunsingerus/metrics-exporter:dev"}"
+        OPERATOR_IMAGE="${OPERATOR_IMAGE:-"altinity/clickhouse-operator:dev"}"
+        METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:dev"}"
         ;;
     *)
         echo "No Operator would be installed"

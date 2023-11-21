@@ -9,6 +9,8 @@ source "${CUR_DIR}/dev-config.sh"
 echo "Create ${OPERATOR_NAMESPACE} namespace"
 kubectl create namespace "${OPERATOR_NAMESPACE}"
 
+export MINIKUBE="${MINIKUBE:-"yes"}"
+
 echo "Install operator requirements"
 echo "OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE}"
 echo "OPERATOR_VERSION=${OPERATOR_VERSION}"
@@ -20,11 +22,7 @@ echo "METRICS_EXPORTER_IMAGE_PULL_POLICY=${METRICS_EXPORTER_IMAGE_PULL_POLICY}"
 echo "DEPLOY_OPERATOR=${DEPLOY_OPERATOR}"
 echo "MINIKUBE=${MINIKUBE}"
 
-export MINIKUBE=${MINIKUBE:-yes}
-
-#
-# Deploy prerequisites - CRDs, RBACs, etc
-#
+echo "Deploy prerequisites - CRDs, RBACs, etc"
 kubectl -n "${OPERATOR_NAMESPACE}" apply -f <(                         \
     OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}"                         \
     OPERATOR_VERSION="${OPERATOR_VERSION}"                             \
@@ -35,9 +33,21 @@ kubectl -n "${OPERATOR_NAMESPACE}" apply -f <(                         \
     "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh" \
 )
 
-#
-# Deploy operator's deployment
-#
+if [[ "${MINIKUBE}" == "yes" ]]; then
+    case "${DEPLOY_OPERATOR}" in
+        "dev")
+            echo "Build" && \
+            ${PROJECT_ROOT}/dev/image_build_all_dev.sh && \
+            echo "Load images" && \
+            minikube image load "${OPERATOR_IMAGE}" && \
+            minikube image load "${METRICS_EXPORTER_IMAGE}" && \
+            echo "Images prepared"
+            ;;
+    esac
+fi
+
+
+echo "Deploy operator's deployment"
 case "${DEPLOY_OPERATOR}" in
     "yes" | "release" | "prod" | "latest" | "dev")
         echo "Install operator from Docker Registry (dockerhub or whatever)"

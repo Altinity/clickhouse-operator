@@ -5,6 +5,7 @@ import e2e.clickhouse as clickhouse
 import e2e.kubectl as kubectl
 import e2e.settings as settings
 import e2e.yaml_manifest as yaml_manifest
+import e2e.util as util
 
 from testflows.core import fail, Given, Then, But, current, message
 
@@ -78,15 +79,15 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
 
         if keeper_type == "zookeeper":
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml" if keeper_manifest == "" else keeper_manifest
-            keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = (
                 "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
-            keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
-            keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
 
         multi_doc = yaml_manifest.get_multidoc_manifest_data(get_full_path(keeper_manifest, lookup_in_host=True))
         keeper_nodes = 1
@@ -302,6 +303,9 @@ def install_operator_version(version, shell=None):
         shell=shell
     )
 
+def apply_operator_config(chopconf):
+    kubectl.apply(util.get_full_path(chopconf, lookup_in_host=False), current().context.operator_namespace)
+    util.restart_operator()
 
 def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     expected_replicas = 1

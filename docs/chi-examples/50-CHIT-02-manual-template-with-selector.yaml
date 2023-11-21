@@ -1,0 +1,14 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+metadata:
+  name: chit-02
+  annotations:
+    chit-02-annotation: chit-02-annotation-value
+spec:
+  templating:
+    policy: "manual"
+    # chiSelector works exactly as nodeSelector
+    # https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+    # Specify labels of the target CHIs to apply this CHIT
+    chiSelector:
+      target-chi-label-manual: target-chi-label-manual-value

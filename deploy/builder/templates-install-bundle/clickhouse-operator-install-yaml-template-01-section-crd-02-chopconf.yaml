@@ -164,25 +164,30 @@ spec:
                               type: integer
                               minimum: 1
                               maximum: 10
-                              description: "Connect timeout. In seconds."
+                              description: "Timout to setup connection from the operator to ClickHouse instances. In seconds."
                             query:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Query timeout. In seconds."
+                              description: "Timout to perform SQL query from the operator to ClickHouse instances. In seconds."
                     metrics:
                       type: object
                       description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"
                       properties:
                         timeouts:
                           type: object
-                          description: "Timeouts used to limit connection and queries from the operator to ClickHouse instances, In seconds"
+                          description: |
+                            Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
+                            Specified in seconds.
                           properties:
                             collect:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Collect timeout. In seconds."
+                              description: |
+                                Timeout used to limit metrics collection request. In seconds.
+                                Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
+                                All collected metrics are returned.
                 template:
                   type: object
                   description: "Parameters which are used if you want to generate ClickHouseInstallationTemplate custom resources from files which are stored inside clickhouse-operator deployment"
@@ -190,6 +195,16 @@ spec:
                     chi:
                       type: object
                       properties:
+                        policy:
+                          type: string
+                          description: |
+                            CHI template updates handling policy
+                            Possible policy values:
+                              - ReadOnStart. Accept CHIT updates on the operators start only.
+                              - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+                          enum:
+                            - "ReadOnStart"
+                            - "ApplyOnNextReconcile"
                         path:
                           type: string
                           description: "Path to folder where ClickHouseInstallationTemplate .yaml manifests are located."
@@ -252,14 +267,20 @@ spec:
                                 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet.
                     host:
                       type: object
-                      description: "allow define how to wait host include to system.cluster behavior during scale up and scale down cluster operations"
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+
                       properties:
                         wait:
                           type: object
                           properties:
                             exclude:  &TypeStringBool
                               type: string
-                              description: "wait when a pod will be removed from the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
                               enum:
                                 # List StringBoolXXX constants from model
                                 - ""
@@ -285,9 +306,12 @@ spec:
                                 - "disabled"
                                 - "Enabled"
                                 - "enabled"
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
                             include:
                               <<: *TypeStringBool
-                              description: "wait when a pod will be added to the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
