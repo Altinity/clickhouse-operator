@@ -22,8 +22,8 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
-	xmlbuilder "github.com/altinity/clickhouse-operator/pkg/model/builder/xml"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
 
 func defaultKeeperSettings(path string) map[string]string {
@@ -71,7 +71,7 @@ func generateXMLConfig(_settings map[string]string, chk *apiChk.ClickHouseKeeper
 	// XML code
 	// </clickhouse>
 	util.Iline(b, 0, "<clickhouse>")
-	xmlbuilder.GenerateXML(b, settings, "")
+	xml.GenerateFromSettings(b, settings, "")
 	util.Iline(b, 0, "</clickhouse>")
 
 	raft := &bytes.Buffer{}

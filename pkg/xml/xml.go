@@ -21,13 +21,13 @@ import (
 	"sort"
 	"strings"
 
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 type xmlNode struct {
 	children []*xmlNode
 	tag      string
-	value    *chiv1.Setting
+	value    *api.Setting
 }
 
 const (
@@ -35,8 +35,8 @@ const (
 	noEol = ""
 )
 
-// GenerateXML creates XML representation from the provided input
-func GenerateXML(w io.Writer, settings *chiv1.Settings, prefix string) {
+// GenerateFromSettings creates XML representation from the provided settings
+func GenerateFromSettings(w io.Writer, settings *api.Settings, prefix string) {
 	if settings.Len() == 0 {
 		return
 	}
@@ -49,7 +49,7 @@ func GenerateXML(w io.Writer, settings *chiv1.Settings, prefix string) {
 	// 2. all map keys listed in 'excludes' are excluded
 	data := make(map[string]string)
 	// Skip excluded paths
-	settings.Walk(func(name string, setting *chiv1.Setting) {
+	settings.Walk(func(name string, setting *api.Setting) {
 		// 'name' may be non-normalized, and may have starting or trailing '/'
 		// 'path' is normalized path without starting and trailing '/', ex.: 'test/quotas'
 		path := normalizePath(prefix, name)
@@ -96,7 +96,7 @@ func normalizePath(prefix, path string) string {
 }
 
 // addBranch ensures branch exists and assign value to the last tagged node
-func (n *xmlNode) addBranch(tags []string, setting *chiv1.Setting) {
+func (n *xmlNode) addBranch(tags []string, setting *api.Setting) {
 	node := n
 	for _, tag := range tags {
 		node = node.addChild(tag)
