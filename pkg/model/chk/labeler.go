@@ -19,14 +19,15 @@ import (
 )
 
 func GetPodLabels(chk *api.ClickHouseKeeperInstallation) map[string]string {
-	var labels map[string]string
+	// In case Pod template has labels explicitly specified - use them
 	if chk.Spec.PodTemplate != nil && chk.Spec.PodTemplate.ObjectMeta.Labels != nil {
-		labels = chk.Spec.PodTemplate.ObjectMeta.Labels
-	} else {
-		labels = map[string]string{
-			"app": chk.GetName(),
-			"uid": string(chk.UID),
-		}
+		return chk.Spec.PodTemplate.ObjectMeta.Labels
 	}
-	return labels
+
+	// Either no pod template or labels specified.
+	// Construct default labels
+	return map[string]string{
+		"app": chk.GetName(),
+		"uid": string(chk.UID),
+	}
 }

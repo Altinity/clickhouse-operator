@@ -29,6 +29,7 @@ import (
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
 func CreateConfigMap(chk *api.ClickHouseKeeperInstallation) *core.ConfigMap {
+	// Normalize settings
 	chk.Spec.Settings = util.MergeStringMapsPreserve(chk.Spec.Settings, defaultKeeperSettings(chk.Spec.GetPath()))
 
 	return &core.ConfigMap{
@@ -86,9 +87,11 @@ func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet 
 }
 
 func createPodTemplateSpec(chk *api.ClickHouseKeeperInstallation) core.PodSpec {
+	// Ensure PodTemplate
 	if chk.Spec.PodTemplate == nil {
 		chk.Spec.PodTemplate = &api.ChkPodTemplate{}
 	}
+
 	podSpec := chk.Spec.PodTemplate.Spec
 
 	if len(podSpec.Volumes) == 0 {
@@ -146,13 +149,13 @@ func createPVCVolume(name string) core.Volume {
 	}
 }
 
-func createConfigMapVolume(name string, chkName string, key string, path string) core.Volume {
+func createConfigMapVolume(volumeName string, configMapName string, key string, path string) core.Volume {
 	return core.Volume{
-		Name: name,
+		Name: volumeName,
 		VolumeSource: core.VolumeSource{
 			ConfigMap: &core.ConfigMapVolumeSource{
 				LocalObjectReference: core.LocalObjectReference{
-					Name: chkName,
+					Name: configMapName,
 				},
 				Items: []core.KeyToPath{
 					{
@@ -173,6 +176,8 @@ func createInitContainers(chk *api.ClickHouseKeeperInstallation) []core.Containe
 	} else {
 		initContainers = chk.Spec.PodTemplate.Spec.InitContainers
 	}
+
+	// Build server id injector container
 	if initContainers[0].Name == "" {
 		initContainers[0].Name = "server-id-injector"
 	}
@@ -210,6 +215,7 @@ func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 		containers = chk.Spec.PodTemplate.Spec.Containers
 	}
 
+	// Build ClickHouse keeper container
 	if containers[0].Name == "" {
 		containers[0].Name = "clickhouse-keeper"
 	}
@@ -251,14 +257,14 @@ func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 			Name:          "raft",
 			ContainerPort: int32(raftPort),
 		})
-	promethuesPort := chk.Spec.GetPrometheusPort()
-	if promethuesPort != -1 {
+	prometheusPort := chk.Spec.GetPrometheusPort()
+	if prometheusPort != -1 {
 		setupPort(
 			&containers[0],
-			promethuesPort,
+			prometheusPort,
 			core.ContainerPort{
 				Name:          "prometheus",
-				ContainerPort: int32(promethuesPort),
+				ContainerPort: int32(prometheusPort),
 			})
 	}
 
@@ -319,6 +325,7 @@ func mountSharedVolume(chk *api.ClickHouseKeeperInstallation) []core.VolumeMount
 
 // CreateClientService returns a client service resource for the clickhouse keeper cluster
 func CreateClientService(chk *api.ClickHouseKeeperInstallation) *core.Service {
+	// Client port is mandatory
 	svcPorts := []core.ServicePort{
 		core.ServicePort{
 			Name: "client",
@@ -326,6 +333,7 @@ func CreateClientService(chk *api.ClickHouseKeeperInstallation) *core.Service {
 		},
 	}
 
+	// Prometheus port is optional
 	prometheusPort := chk.Spec.GetPrometheusPort()
 	if prometheusPort != -1 {
 		svcPorts = append(svcPorts,

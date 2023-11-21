@@ -22,15 +22,23 @@ import (
 
 func getPodAnnotations(chk *api.ClickHouseKeeperInstallation) map[string]string {
 	var annotations map[string]string
+
+	// Fetch annotations from Pod template (if any)
 	if chk.Spec.PodTemplate != nil && chk.Spec.PodTemplate.ObjectMeta.Annotations != nil {
 		annotations = chk.Spec.PodTemplate.ObjectMeta.Annotations
 	}
-	if port := chk.Spec.GetPrometheusPort(); port != -1 {
-		if annotations == nil {
-			annotations = map[string]string{}
-		}
-		annotations["prometheus.io/port"] = fmt.Sprintf("%d", port)
-		annotations["prometheus.io/scrape"] = "true"
+
+	// In case no Prometheus port specified - nothing to add to annotations
+	port := chk.Spec.GetPrometheusPort()
+	if port == -1 {
+		return annotations
 	}
+
+	// Prometheus port specified, append it to annotations
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	annotations["prometheus.io/port"] = fmt.Sprintf("%d", port)
+	annotations["prometheus.io/scrape"] = "true"
 	return annotations
 }
