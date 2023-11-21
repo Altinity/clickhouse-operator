@@ -1,0 +1,1 @@
+../../../../generator/github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1/zz_generated.deepcopy.go

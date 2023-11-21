@@ -309,7 +309,9 @@ spec:
                 templating:
                   type: object
                   # nullable: true
-                  description: "Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)"
+                  description: |
+                    Optional, applicable inside ClickHouseInstallationTemplate only.
+                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
@@ -327,12 +329,21 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
-                  description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
                       type: string
-                      description: DEPRECATED
+                      description: |
+                        DISCUSSED TO BE DEPRECATED
+                        Syntax sugar
+                        Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+                        Possible values:
+                         - wait - should wait to exclude host, complete queries and include host back into the cluster
+                         - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                      enum:
+                        - "wait"
+                        - "nowait"
                     configMapPropagationTimeout:
                       type: integer
                       description: |
@@ -342,17 +353,20 @@ spec:
                       maximum: 3600
                     cleanup:
                       type: object
-                      description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
+                      description: "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle"
                       # nullable: true
                       properties:
                         unknownObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
+                          description: |
+                            Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+                            but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+                            Default behavior is `Delete`"
                           # nullable: true
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "behavior policy for unknown StatefulSet, Delete by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
                                 - "Retain"
@@ -360,30 +374,32 @@ spec:
                             pvc:
                               type: string
                               !!merge <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown PVC, Delete by default"
+                              description: "Behavior policy for unknown PVC, `Delete` by default"
                             configMap:
                               !!merge <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown ConfigMap, Delete by default"
+                              description: "Behavior policy for unknown ConfigMap, `Delete` by default"
                             service:
                               !!merge <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown Service, Delete by default"
+                              description: "Behavior policy for unknown Service, `Delete` by default"
                         reconcileFailedObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
+                          description: |
+                            Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+                            Default behavior is `Retain`"
                           # nullable: true
                           properties:
                             statefulSet:
                               !!merge <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed StatefulSet reconciling, Retain by default"
+                              description: "Behavior policy for failed StatefulSet, `Retain` by default"
                             pvc:
                               !!merge <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed PVC reconciling, Retain by default"
+                              description: "Behavior policy for failed PVC, `Retain` by default"
                             configMap:
                               !!merge <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed ConfigMap reconciling, Retain by default"
+                              description: "Behavior policy for failed ConfigMap, `Retain` by default"
                             service:
                               !!merge <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed Service reconciling, Retain by default"
+                              description: "Behavior policy for failed Service, `Retain` by default"
                 defaults:
                   type: object
                   description: |

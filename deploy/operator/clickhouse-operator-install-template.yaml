@@ -313,7 +313,9 @@ spec:
                 templating:
                   type: object
                   # nullable: true
-                  description: "Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)"
+                  description: |
+                    Optional, applicable inside ClickHouseInstallationTemplate only.
+                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
@@ -331,12 +333,21 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
-                  description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
                       type: string
-                      description: DEPRECATED
+                      description: |
+                        DISCUSSED TO BE DEPRECATED
+                        Syntax sugar
+                        Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+                        Possible values:
+                         - wait - should wait to exclude host, complete queries and include host back into the cluster
+                         - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                      enum:
+                        - "wait"
+                        - "nowait"
                     configMapPropagationTimeout:
                       type: integer
                       description: |
@@ -346,17 +357,20 @@ spec:
                       maximum: 3600
                     cleanup:
                       type: object
-                      description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
+                      description: "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle"
                       # nullable: true
                       properties:
                         unknownObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
+                          description: |
+                            Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+                            but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+                            Default behavior is `Delete`"
                           # nullable: true
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "behavior policy for unknown StatefulSet, Delete by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
                                 - "Retain"
@@ -364,30 +378,32 @@ spec:
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown PVC, Delete by default"
+                              description: "Behavior policy for unknown PVC, `Delete` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown ConfigMap, Delete by default"
+                              description: "Behavior policy for unknown ConfigMap, `Delete` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown Service, Delete by default"
+                              description: "Behavior policy for unknown Service, `Delete` by default"
                         reconcileFailedObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
+                          description: |
+                            Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+                            Default behavior is `Retain`"
                           # nullable: true
                           properties:
                             statefulSet:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed StatefulSet reconciling, Retain by default"
+                              description: "Behavior policy for failed StatefulSet, `Retain` by default"
                             pvc:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed PVC reconciling, Retain by default"
+                              description: "Behavior policy for failed PVC, `Retain` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed ConfigMap reconciling, Retain by default"
+                              description: "Behavior policy for failed ConfigMap, `Retain` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed Service reconciling, Retain by default"
+                              description: "Behavior policy for failed Service, `Retain` by default"
                 defaults:
                   type: object
                   description: |
@@ -1509,7 +1525,9 @@ spec:
                 templating:
                   type: object
                   # nullable: true
-                  description: "Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)"
+                  description: |
+                    Optional, applicable inside ClickHouseInstallationTemplate only.
+                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
@@ -1527,12 +1545,21 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
-                  description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
                       type: string
-                      description: DEPRECATED
+                      description: |
+                        DISCUSSED TO BE DEPRECATED
+                        Syntax sugar
+                        Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+                        Possible values:
+                         - wait - should wait to exclude host, complete queries and include host back into the cluster
+                         - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                      enum:
+                        - "wait"
+                        - "nowait"
                     configMapPropagationTimeout:
                       type: integer
                       description: |
@@ -1542,17 +1569,20 @@ spec:
                       maximum: 3600
                     cleanup:
                       type: object
-                      description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
+                      description: "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle"
                       # nullable: true
                       properties:
                         unknownObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
+                          description: |
+                            Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+                            but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+                            Default behavior is `Delete`"
                           # nullable: true
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "behavior policy for unknown StatefulSet, Delete by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
                                 - "Retain"
@@ -1560,30 +1590,32 @@ spec:
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown PVC, Delete by default"
+                              description: "Behavior policy for unknown PVC, `Delete` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown ConfigMap, Delete by default"
+                              description: "Behavior policy for unknown ConfigMap, `Delete` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown Service, Delete by default"
+                              description: "Behavior policy for unknown Service, `Delete` by default"
                         reconcileFailedObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
+                          description: |
+                            Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+                            Default behavior is `Retain`"
                           # nullable: true
                           properties:
                             statefulSet:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed StatefulSet reconciling, Retain by default"
+                              description: "Behavior policy for failed StatefulSet, `Retain` by default"
                             pvc:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed PVC reconciling, Retain by default"
+                              description: "Behavior policy for failed PVC, `Retain` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed ConfigMap reconciling, Retain by default"
+                              description: "Behavior policy for failed ConfigMap, `Retain` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed Service reconciling, Retain by default"
+                              description: "Behavior policy for failed Service, `Retain` by default"
                 defaults:
                   type: object
                   description: |
@@ -2807,20 +2839,20 @@ spec:
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: clickhousekeepers.clickhouse.com
+  name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse.com/chop: 0.23.0
+    clickhouse-keeper.altinity.com/chop: 0.23.0
 spec:
-  group: clickhouse.com
+  group: clickhouse-keeper.altinity.com
   scope: Namespaced
   names:
-    kind: ClickHouseKeeper
-    singular: clickhousekeeper
-    plural: clickhousekeepers
+    kind: ClickHouseKeeperInstallation
+    singular: clickhousekeeperinstallation
+    plural: clickhousekeeperinstallations
     shortNames:
       - chk
   versions:
-    - name: v1alpha1
+    - name: v1
       served: true
       storage: true
       additionalPrinterColumns:
@@ -2849,19 +2881,22 @@ spec:
           properties:
             apiVersion:
               type: string
-              description: 'APIVersion defines the versioned schema of this representation
+              description: |
+                APIVersion defines the versioned schema of this representation
                 of an object. Servers should convert recognized schemas to the latest
-                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             kind:
               type: string
-              description: 'Kind is a string value representing the REST resource this
+              description: |
+                Kind is a string value representing the REST resource this
                 object represents. Servers may infer this from the endpoint the client
-                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             metadata:
               type: object
             status:
               type: object
-              description: "Current ClickHouseKeeper manifest status, contains many fields like overall status, desired replicas and ready replica list with their endpoints"
+              description: |
+                Current ClickHouseKeeperInstallation status, contains many fields like overall status, desired replicas and ready replica list with their endpoints
               properties:
                 status:
                   type: string
@@ -2878,15 +2913,15 @@ spec:
                     properties:
                       host:
                         type: string
-                        description: "dns name or ip address for Keeper node"
+                        description: dns name or ip address for Keeper node
                       port:
                         type: integer
                         minimum: 0
                         maximum: 65535
-                        description: "TCP port which used to connect to Keeper node"
+                        description: TCP port which used to connect to Keeper node
                       secure:
                         type: string
-                        description: "if a secure connection to Keeper is required"
+                        description: if a secure connection to Keeper is required
             spec:
               type: object
               description: KeeperSpec defines the desired state of a Keeper cluster
@@ -2900,151 +2935,9 @@ spec:
                 replicas:
                   type: integer
                   format: int32
-                  description: "Replicas is the expected size of the keeper cluster.
-                    The valid range of size is from 1 to 7."
-                  minimum: 1
-                  maximum: 7
-                settings:
-                  type: object
-                  description: "allows configure multiple aspects and behavior for `clickhouse-keeper` instance"
-                  x-kubernetes-preserve-unknown-fields: true
-                podTemplate:
-                  type: object
                   description: |
-                    podTemplate will use during render `Pod` inside `StatefulSet.spec` and allows define rendered `Pod.spec`, pod scheduling distribution and pod zone
-                  properties:
-                    metadata:
-                      type: object
-                      description: |
-                        allows passing standard object's metadata from template to Pod
-                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-                      x-kubernetes-preserve-unknown-fields: true
-                    spec:
-                      # TODO specify PodSpec
-                      type: object
-                      description: "allows defining whole Pod.spec inside StatefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
-                      x-kubernetes-preserve-unknown-fields: true
-                volumeClaimTemplates:
-                  type: array
-                  description: "allows defining template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mounting clickhouse `data`, clickhouse `logs` or something else"
-                  items:
-                    type: object
-                    properties:
-                      metadata:
-                        type: object
-                        description: |
-                          allows to pass standard object's metadata from template to PVC
-                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-                        x-kubernetes-preserve-unknown-fields: true
-                      spec:
-                        type: object
-                        description: |
-                          allows define all aspects of `PVC` resource
-                          More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
-                        x-kubernetes-preserve-unknown-fields: true
----
-# Template Parameters:
-#
-# OPERATOR_VERSION=0.23.0
-#
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: clickhousekeepers.clickhouse.com
-  labels:
-    clickhouse.com/chop: 0.23.0
-spec:
-  group: clickhouse.com
-  scope: Namespaced
-  names:
-    kind: ClickHouseKeeper
-    singular: clickhousekeeper
-    plural: clickhousekeepers
-    shortNames:
-      - chk
-  versions:
-    - name: v1alpha1
-      served: true
-      storage: true
-      additionalPrinterColumns:
-        - name: status
-          type: string
-          description: CHK status
-          jsonPath: .status.status
-        - name: replicas
-          type: integer
-          description: Replica count
-          priority: 1 # show in wide view
-          jsonPath: .status.replicas
-        - name: age
-          type: date
-          description: Age of the resource
-          # Displayed in all priorities
-          jsonPath: .metadata.creationTimestamp
-      subresources:
-        status: {}
-      schema:
-        openAPIV3Schema:
-          type: object
-          required:
-            - spec
-          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one ClickHouse Keeper cluster"
-          properties:
-            apiVersion:
-              type: string
-              description: 'APIVersion defines the versioned schema of this representation
-                of an object. Servers should convert recognized schemas to the latest
-                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-            kind:
-              type: string
-              description: 'Kind is a string value representing the REST resource this
-                object represents. Servers may infer this from the endpoint the client
-                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-            metadata:
-              type: object
-            status:
-              type: object
-              description: "Current ClickHouseKeeper manifest status, contains many fields like overall status, desired replicas and ready replica list with their endpoints"
-              properties:
-                status:
-                  type: string
-                  description: "Status"
-                replicas:
-                  type: integer
-                  format: int32
-                  description: Replicas is the number of number of desired replicas in the cluster
-                readyReplicas:
-                  type: array
-                  description: ReadyReplicas is the array of endpoints of those ready replicas in the cluster
-                  items:
-                    type: object
-                    properties:
-                      host:
-                        type: string
-                        description: "dns name or ip address for Keeper node"
-                      port:
-                        type: integer
-                        minimum: 0
-                        maximum: 65535
-                        description: "TCP port which used to connect to Keeper node"
-                      secure:
-                        type: string
-                        description: "if a secure connection to Keeper is required"
-            spec:
-              type: object
-              description: KeeperSpec defines the desired state of a Keeper cluster
-              properties:
-                type:
-                  type: string
-                  description: This is used by chi reconciliation.
-                  enum:
-                    - "Container"
-                    - "Embedded"
-                replicas:
-                  type: integer
-                  format: int32
-                  description: "Replicas is the expected size of the keeper cluster.
-                    The valid range of size is from 1 to 7."
+                    Replicas is the expected size of the keeper cluster.
+                    The valid range of size is from 1 to 7.
                   minimum: 1
                   maximum: 7
                 settings:
@@ -3252,9 +3145,9 @@ rules:
     - create
     - delete
 - apiGroups:
-    - clickhouse.com
+    - clickhouse-keeper.altinity.com
   resources:
-    - clickhousekeepers
+    - clickhousekeeperinstallations
   verbs:
     - get
     - patch
@@ -3263,15 +3156,15 @@ rules:
     - list
     - watch
 - apiGroups:
-    - clickhouse.com
+    - clickhouse-keeper.altinity.com
   resources:
-    - clickhousekeepers/finalizers
+    - clickhousekeeperinstallations/finalizers
   verbs:
     - update
 - apiGroups:
-    - clickhouse.com
+    - clickhouse-keeper.altinity.com
   resources:
-    - clickhousekeepers/status
+    - clickhousekeeperinstallations/status
   verbs:
     - get
     - update

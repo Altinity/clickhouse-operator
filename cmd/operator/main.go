@@ -15,25 +15,9 @@
 package main
 
 import (
-	"sync"
-
 	"github.com/altinity/clickhouse-operator/cmd/operator/app"
 )
 
 func main() {
-	var wg sync.WaitGroup
-
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		// Application entry point for chi, chit and chopconf
-		app.Run()
-	}()
-	go func() {
-		defer wg.Done()
-		// Application entry point for chk
-		app.KeeperRun()
-	}()
-
-	wg.Wait()
+	app.Run()
 }

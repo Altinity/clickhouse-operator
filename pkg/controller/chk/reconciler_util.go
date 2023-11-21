@@ -23,15 +23,25 @@ import (
 	"runtime"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.com/v1alpha1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 
-func getCheckSum(chk *v1alpha1.ClickHouseKeeper) (string, error) {
+func getNamespacedName(obj meta.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+}
+
+func getCheckSum(chk *api.ClickHouseKeeperInstallation) (string, error) {
 	specString, err := json.Marshal(chk.Spec)
 	if err != nil {
 		return "", err
@@ -45,45 +55,46 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func getLastAppliedConfiguration(chk *v1alpha1.ClickHouseKeeper) *v1alpha1.ClickHouseKeeper {
+func getKeeperFromAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeperInstallation) *api.ClickHouseKeeperInstallation {
 	lastApplied := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
-	tmp := v1alpha1.ClickHouseKeeper{}
+	tmp := api.ClickHouseKeeperInstallation{}
 
 	json.Unmarshal([]byte(lastApplied), &tmp)
 	return &tmp
 }
 
-func (r *ChkReconciler) getReadyMembers(instance *v1alpha1.ClickHouseKeeper) ([]string, error) {
-	foundPods := &corev1.PodList{}
-	labelSelector := labels.SelectorFromSet(getPodLabels(instance))
+func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]string, error) {
+	labelSelector := labels.SelectorFromSet(model.GetPodLabels(chk))
 	listOps := &client.ListOptions{
-		Namespace:     instance.Namespace,
+		Namespace:     chk.Namespace,
 		LabelSelector: labelSelector,
 	}
-	if err := r.List(context.TODO(), foundPods, listOps); err != nil {
+	podList := &core.PodList{}
+	if err := r.List(context.TODO(), podList, listOps); err != nil {
 		return nil, err
 	}
 
-	var readyMembers []string
-	for _, p := range foundPods.Items {
-		ready := true
-		for _, c := range p.Status.ContainerStatuses {
-			r.Log.Info(fmt.Sprintf("%s: %t", c.Name, c.Ready))
-			if !c.Ready {
-				ready = false
+	var readyPods []string
+	for _, pod := range podList.Items {
+		// Pod is ready only in case all containers are ready
+		podIsReady := true
+		for _, containerStatus := range pod.Status.ContainerStatuses {
+			r.Log.Info(fmt.Sprintf("%s: %t", containerStatus.Name, containerStatus.Ready))
+			if !containerStatus.Ready {
+				podIsReady = false
 			}
 		}
-		if ready {
-			readyMembers = append(readyMembers, p.Name)
+		if podIsReady {
+			readyPods = append(readyPods, pod.Name)
 		}
 	}
 
-	return readyMembers, nil
+	return readyPods, nil
 }
 
-func isReplicasChanged(chk *v1alpha1.ClickHouseKeeper) bool {
-	lastApplied := getLastAppliedConfiguration(chk)
+func isReplicasChanged(chk *api.ClickHouseKeeperInstallation) bool {
+	lastApplied := getKeeperFromAnnotationLastAppliedConfiguration(chk)
 	if lastApplied.Spec.Replicas != chk.Spec.Replicas {
 		return true
 	} else {
@@ -91,15 +102,15 @@ func isReplicasChanged(chk *v1alpha1.ClickHouseKeeper) bool {
 	}
 }
 
-func restartPods(sts *appsv1.StatefulSet) {
+func markPodRestartedNow(sts *apps.StatefulSet) {
 	v, _ := time.Now().UTC().MarshalText()
 	sts.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": string(v)}
 }
 
-func updateLastReplicas(chk *v1alpha1.ClickHouseKeeper) {
+func setAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeperInstallation) {
 	lastAppliedString := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 
-	tmp := v1alpha1.ClickHouseKeeper{}
+	tmp := api.ClickHouseKeeperInstallation{}
 	json.Unmarshal([]byte(lastAppliedString), &tmp)
 	tmp.Spec.Replicas = chk.Spec.Replicas
 

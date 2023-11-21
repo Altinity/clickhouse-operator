@@ -40,6 +40,8 @@ fi
 #    "clickhouse.altinity.com:v1" \
 #    -o "${SRC_ROOT}/generator"
 
+echo ""
+echo "Generate code for clickhouse.altinity.com:v1"
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     client,deepcopy,informer,lister \
     github.com/altinity/clickhouse-operator/pkg/client \
@@ -48,10 +50,12 @@ bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     -o "${SRC_ROOT}/generator" \
     --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
 
+echo ""
+echo "Generate code for clickhouse-keeper.altinity.com:v1"
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     deepcopy \
     github.com/altinity/clickhouse-operator/pkg/client \
     github.com/altinity/clickhouse-operator/pkg/apis \
-    "clickhouse.com:v1alpha1" \
+    "clickhouse-keeper.altinity.com:v1" \
     -o "${SRC_ROOT}/generator" \
     --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt

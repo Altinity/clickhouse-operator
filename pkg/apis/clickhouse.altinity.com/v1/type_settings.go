@@ -339,6 +339,13 @@ func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
 	}
 }
 
+// SetScalarsFromMap sets multiple scalars from map
+func (settings *Settings) SetScalarsFromMap(m map[string]string) {
+	for key, value := range m {
+		settings.Set(key, NewSettingScalar(value))
+	}
+}
+
 // Names gets names of the settings
 func (settings *Settings) Names() (names []string) {
 	settings.Walk(func(name string, setting *Setting) {
@@ -429,6 +436,8 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 	case // scalar
 		float32:
 		floatVal := untyped.(float32)
+		// What is the fractional part of the float value?
+		// If it is too small, we can consider the value to be an int value
 		_, frac := math.Modf(float64(floatVal))
 		if frac > ignoreThreshold {
 			// Consider it float
@@ -442,6 +451,8 @@ func unmarshalScalar(untyped interface{}) (string, bool) {
 	case // scalar
 		float64:
 		floatVal := untyped.(float64)
+		// What is the fractional part of the float value?
+		// If it is too small, we can consider the value to be an int value
 		_, frac := math.Modf(floatVal)
 		if frac > ignoreThreshold {
 			// Consider it float
