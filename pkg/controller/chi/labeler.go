@@ -27,7 +27,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -246,8 +246,8 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 	)
 }
 
-// appendLabelReadyPod appends Label "Ready" to the pod of the specified host
-func (c *Controller) appendLabelReadyPod(ctx context.Context, host *chiV1.ChiHost) error {
+// appendLabelReadyOnPod appends Label "Ready" to the pod of the specified host
+func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -302,8 +302,8 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiV1.ChiHos
 	return nil
 }
 
-// appendAnnotationReadyService appends Annotation "Ready" to the service of the specified host
-func (c *Controller) appendAnnotationReadyService(ctx context.Context, host *chiV1.ChiHost) error {
+// appendAnnotationReadyOnService appends Annotation "Ready" to the service of the specified host
+func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *chiV1.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

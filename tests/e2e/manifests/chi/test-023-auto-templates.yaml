@@ -2,6 +2,8 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
 metadata:
   name: test-023
+  labels:
+    clickhouse.altinity.com/chi: test-023
 spec:
   configuration:
     clusters:

@@ -241,13 +241,13 @@ func writeSingleMetricToPrometheus(
 		labelValues...,
 	)
 	if err != nil {
-		log.Infof("Error creating metric %s: %s", name, err)
+		log.Warningf("Error creating metric %s: %s", name, err)
 		return
 	}
 	select {
 	case out <- m:
 	case <-time.After(writeMetricWaitTimeout):
-		log.Infof("Error sending metric to the channel %s", name)
+		log.Warningf("Error sending metric to the channel %s", name)
 	}
 }
 

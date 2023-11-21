@@ -1,0 +1,32 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "test-036-volume-re-provisioning"
+spec:
+
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+    - name: simple
+      layout:
+        shardsCount: 1
+        replicasCount: 2
+  defaults:
+    storageManagement:
+      provisioner: Operator
+    templates:
+      volumeClaimTemplate: default
+  templates:
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi

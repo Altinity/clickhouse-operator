@@ -1,0 +1,16 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-042
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+    settings:
+      out_of_the_blue: "2"
+    profiles:
+      default/out_of_the_blue: "2"

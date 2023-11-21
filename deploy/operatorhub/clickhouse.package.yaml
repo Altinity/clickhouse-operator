@@ -1,5 +1,0 @@
-channels:
-- currentCSV: clickhouse-operator.v0.21.1
-  name: latest
-defaultChannel: latest
-packageName: clickhouse

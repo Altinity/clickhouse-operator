@@ -24,7 +24,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopModel "github.com/altinity/clickhouse-operator/pkg/model"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -58,8 +58,8 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chiV1.ClickHo
 
 	var err error
 
-	configMapCommon := chopModel.CreateConfigMapCommonName(chi)
-	configMapCommonUsersName := chopModel.CreateConfigMapCommonUsersName(chi)
+	configMapCommon := model.CreateConfigMapCommonName(chi)
+	configMapCommonUsersName := model.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommon, newDeleteOptions())
@@ -93,7 +93,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 		return nil
 	}
 
-	name := chopModel.CreatePodName(statefulSet)
+	name := model.CreatePodName(statefulSet)
 	log.V(1).M(host).Info("Delete Pod %s/%s", statefulSet.Namespace, name)
 	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(ctx, name, newDeleteOptions())
 	if err == nil {
@@ -121,7 +121,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 	// it is possible to scale the StatefulSet down to 0 prior to deletion.
 
 	// Namespaced name
-	name := chopModel.CreateStatefulSetName(host)
+	name := model.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -199,7 +199,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chiV1.ChiHost) error {
 		}
 
 		// Check whether PVC can be deleted
-		if chopModel.HostCanDeletePVC(host, pvc.Name) {
+		if model.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).M(host).Info("PVC %s/%s would be deleted", namespace, pvc.Name)
 		} else {
 			log.V(1).M(host).Info("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
@@ -227,7 +227,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chiV1.ChiHost) e
 		return nil
 	}
 
-	name := chopModel.CreateConfigMapHostName(host)
+	name := model.CreateConfigMapHostName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -261,7 +261,7 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *chiV1.ChiHost)
 		return nil
 	}
 
-	serviceName := chopModel.CreateStatefulSetServiceName(host)
+	serviceName := model.CreateStatefulSetServiceName(host)
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -274,7 +274,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *chiV1.ChiSha
 		return nil
 	}
 
-	serviceName := chopModel.CreateShardServiceName(shard)
+	serviceName := model.CreateShardServiceName(shard)
 	namespace := shard.Address.Namespace
 	log.V(1).M(shard).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -287,7 +287,7 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chiV1.Cl
 		return nil
 	}
 
-	serviceName := chopModel.CreateClusterServiceName(cluster)
+	serviceName := model.CreateClusterServiceName(cluster)
 	namespace := cluster.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -300,7 +300,7 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chiV1.ClickHouse
 		return nil
 	}
 
-	serviceName := chopModel.CreateCHIServiceName(chi)
+	serviceName := model.CreateCHIServiceName(chi)
 	namespace := chi.Namespace
 	log.V(1).M(chi).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -339,7 +339,7 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chiV1.Clu
 		return nil
 	}
 
-	secretName := chopModel.CreateClusterAutoSecretName(cluster)
+	secretName := model.CreateClusterAutoSecretName(cluster)
 	namespace := cluster.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, secretName)
 	return c.deleteSecretIfExists(ctx, namespace, secretName)

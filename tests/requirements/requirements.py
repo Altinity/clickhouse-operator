@@ -1,6 +1,6 @@
 # These requirements were auto generated
 # from software requirements specification (SRS)
-# document by TestFlows v1.9.221228.1171522.
+# document by TestFlows v2.0.230917.1131314.
 # Do not edit by hand but re-generate instead
 # using 'tfs requirements generate' command.
 from testflows.core import Specification
@@ -9,4950 +9,5003 @@ from testflows.core import Requirement
 Heading = Specification.Heading
 
 RQ_SRS_026_ClickHouseOperator = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating, configuring and managing [ClickHouse] clusters running on [Kubernetes].\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support creating, configuring and managing [ClickHouse] clusters running on [Kubernetes].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.1.0.1",
+    num='4.1.0.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Installation = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Installation",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Installation',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support being installed as a [Deployment] or via CoreOS OLM.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support being installed as a [Deployment] or via CoreOS OLM.\n'
+        '\n'
+    ),
     link=None,
     level=3,
-    num="4.2.1",
+    num='4.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Installation_MonitoringSupport = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Installation.MonitoringSupport",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Installation.MonitoringSupport',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL come with additional metrics-exporter container that SHALL be used for monitoring\n"
-        "when [operator] is installed as a [Deployment].\n"
-        "\n"
+        '[ClickHouse Operator] SHALL come with additional metrics-exporter container that SHALL be used for monitoring\n'
+        'when [operator] is installed as a [Deployment].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.2.2.1",
+    num='4.2.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Namespaces_KubeSystem = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Namespaces.KubeSystem",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Namespaces.KubeSystem',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support being installed in `kube-system` [Namespace].\n"
-        "This SHALL be the default.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support being installed in `kube-system` [Namespace].\n'
+        'This SHALL be the default.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.3.1.1",
+    num='4.3.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Namespaces_UserDefined = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Namespaces.UserDefined",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Namespaces.UserDefined',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support being installed user defined [Namespace].\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support being installed user defined [Namespace].\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.3.2.1",
+    num='4.3.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Namespaces_ClusterManagement = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Namespaces.ClusterManagement",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Namespaces.ClusterManagement',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support managing [ClickHouse] clusters inside [Kubernetes] defined by\n"
-        "[CHI] custom resource in all [Namespace]s by default or list of user defined [Namespace]s.\n"
-        "\n"
-        "If [Namespace] is not configured, [operator] SHALL manage [CHI] in the [Namespace] where [operator] is installed.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support managing [ClickHouse] clusters inside [Kubernetes] defined by\n'
+        '[CHI] custom resource in all [Namespace]s by default or list of user defined [Namespace]s.\n'
+        '\n'
+        'If [Namespace] is not configured, [operator] SHALL manage [CHI] in the [Namespace] where [operator] is installed.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.3.3.1",
+    num='4.3.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ACM = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ACM",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ACM',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL be able to create a [ClickHouse] cluster based on manifest generated by [Altinity Cloud Manager](https://altinity.com/cloud-database/)\n"
-        "\n"
+        '[ClickHouse Operator] SHALL be able to create a [ClickHouse] cluster based on manifest generated by [Altinity Cloud Manager](https://altinity.com/cloud-database/)\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.4.3.1",
+    num='4.4.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Create = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Create",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Create',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating [ClickHouse] clusters based on [custom resource definition].\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support creating [ClickHouse] clusters based on [custom resource definition].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.5.3.1",
+    num='4.5.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_DeleteBroken = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.DeleteBroken",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.DeleteBroken',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support be able to delete a [ClickHouse] cluster with broken image.\n" "\n"
+        '[ClickHouse Operator] SHALL support be able to delete a [ClickHouse] cluster with broken image.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.5.3.2",
+    num='4.5.3.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_AutoGeneratedClickHouseClusters = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.AutoGeneratedClickHouseClusters",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.AutoGeneratedClickHouseClusters',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL auto-generate the following [ClickHouse] cluster\n"
-        "definitions inside [ClickHouse] `<remote_servers>` configuration:\n"
-        "\n"
-        "* `all-sharded` that SHALL include all nodes from all [ClickHouse] clusters inside a [CHI] where each node is its own shard\n"
-        "* `all-replicated` that SHALL include all nodes from all [ClickHouse] clusters inside a [CHI] all replicas are inside the same shard\n"
-        "\n"
+        '[ClickHouse Operator] SHALL auto-generate the following [ClickHouse] cluster\n'
+        'definitions inside [ClickHouse] `<remote_servers>` configuration:\n'
+        '\n'
+        '* `all-sharded` that SHALL include all nodes from all [ClickHouse] clusters inside a [CHI] where each node is its own shard\n'
+        '* `all-replicated` that SHALL include all nodes from all [ClickHouse] clusters inside a [CHI] all replicas are inside the same shard\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.6.1",
+    num='4.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.UpgradingOperator",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.UpgradingOperator',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support being updated without restarting any [Pod]s.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support being updated without restarting any [Pod]s.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.7.1.1",
+    num='4.7.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_DowngradingOperator = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.DowngradingOperator",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.DowngradingOperator',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support being downgraded to previous version.\n" "\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support being downgraded to previous version.\n'
+        '\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.7.2.1",
+    num='4.7.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support being restarted without any effect on the operation\n"
-        "of managed [ClickHouse] clusters.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support being restarted without any effect on the operation\n'
+        'of managed [ClickHouse] clusters.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.7.3.1",
+    num='4.7.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_DefaultAccessControl = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.DefaultAccessControl",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.DefaultAccessControl',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support by default restriction of access for specific\n"
-        "users to [ClickHouse] cluster to specific IPs.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support by default restriction of access for specific\n'
+        'users to [ClickHouse] cluster to specific IPs.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.8.1.1",
+    num='4.8.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_DefaultUsers = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.DefaultUsers",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.DefaultUsers',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL by default support secure default user for inter-cluster communication\n"
-        "only and SHALL require a separte user for external access.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL by default support secure default user for inter-cluster communication\n'
+        'only and SHALL require a separte user for external access.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.8.2.1",
+    num='4.8.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Secrets = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Secrets",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Secrets',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support using secrets for sensitive information\n"
-        "such as ClickHouse password by using [Kubernetes] secrets. ClickHouse password can be stored as secret in different forms: as plaintext, as `sha256` sum or as `double sha1` sum.\n"
-        "\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "---\n"
-        "apiVersion: v1\n"
-        "kind: Secret\n"
-        "metadata:\n"
-        "  name: secret-passwords\n"
-        "stringData:\n"
-        "    pwduser1: pwduser1\n"
-        "    pwduser2: e106728c3541ec3694822a29d4b8b5f1f473508adc148fcb58a60c42bcf3234c\n"
-        "    pwduser3: cbe205a7351dd15397bf423957559512bd4be395\n"
-        "\n"
-        "---\n"
-        "apiVersion: clickhouse.altinity.com/v1\n"
-        "kind: ClickHouseInstallation\n"
-        "metadata:\n"
-        "  name: chi-with-password-secrets\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    users:\n"
-        "      default/password: default\n"
-        "      # reference to namespace/name/field in the secret containing passwords\n"
-        "      user1/k8s_secret_password: test/test-011-secret/pwduser1\n"
-        "      user2/k8s_secret_password_sha256_hex: test/test-011-secret/pwduser2\n"
-        "      user3/k8s_secret_password_double_sha1_hex: test/test-011-secret/pwduser3\n"
-        "    clusters:\n"
-        "    - name: default\n"
-        "      layout:\n"
-        "        shardsCount: 1\n"
-        "        replicasCount: 1\n"
-        "```\n"
-        "\n"
-        "or\n"
-        "\n"
-        "```yaml\n"
-        "templates:\n"
-        "  podTemplates:\n"
-        "    - name: pod-with-mounted-secret\n"
-        "      spec:\n"
-        "        containers:\n"
-        "          - name: clickhouse\n"
-        "            env:\n"
-        "              - name: PASSWORD1\n"
-        "                valueFrom:\n"
-        "                  secretKeyRef:\n"
-        "                    name: secret-passwords\n"
-        "                    key: pwduser1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support using secrets for sensitive information\n'
+        'such as ClickHouse password by using [Kubernetes] secrets. ClickHouse password can be stored as secret in different forms: as plaintext, as `sha256` sum or as `double sha1` sum.\n'
+        '\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        '---\n'
+        'apiVersion: v1\n'
+        'kind: Secret\n'
+        'metadata:\n'
+        '  name: secret-passwords\n'
+        'stringData:\n'
+        '    pwduser1: pwduser1\n'
+        '    pwduser2: e106728c3541ec3694822a29d4b8b5f1f473508adc148fcb58a60c42bcf3234c\n'
+        '    pwduser3: cbe205a7351dd15397bf423957559512bd4be395\n'
+        '\n'
+        '---\n'
+        'apiVersion: clickhouse.altinity.com/v1\n'
+        'kind: ClickHouseInstallation\n'
+        'metadata:\n'
+        '  name: chi-with-password-secrets\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    users:\n'
+        '      default/password: default\n'
+        '      # reference to namespace/name/field in the secret containing passwords\n'
+        '      user1/k8s_secret_password: test/test-011-secret/pwduser1\n'
+        '      user2/k8s_secret_password_sha256_hex: test/test-011-secret/pwduser2\n'
+        '      user3/k8s_secret_password_double_sha1_hex: test/test-011-secret/pwduser3\n'
+        '    clusters:\n'
+        '    - name: default\n'
+        '      layout:\n'
+        '        shardsCount: 1\n'
+        '        replicasCount: 1\n'
+        '```\n'
+        '\n'
+        'or\n'
+        '\n'
+        '```yaml\n'
+        'templates:\n'
+        '  podTemplates:\n'
+        '    - name: pod-with-mounted-secret\n'
+        '      spec:\n'
+        '        containers:\n'
+        '          - name: clickhouse\n'
+        '            env:\n'
+        '              - name: PASSWORD1\n'
+        '                valueFrom:\n'
+        '                  secretKeyRef:\n'
+        '                    name: secret-passwords\n'
+        '                    key: pwduser1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.8.3.1",
+    num='4.8.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_EnableHttps = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.EnableHttps",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.EnableHttps',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support secure `HTTPS` connection with [ClickHouse] server by changing the configuration. Configurations can be updated at run time using a `chopconf` file.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "---\n"
+        '[ClickHouse Operator] SHALL support secure `HTTPS` connection with [ClickHouse] server by changing the configuration. Configurations can be updated at run time using a `chopconf` file.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        '---\n'
         'apiVersion: "clickhouse.altinity.com/v1"\n'
         'kind: "ClickHouseOperatorConfiguration"\n'
-        "metadata:\n"
+        'metadata:\n'
         '  name: "test-xxx-chopconf"\n'
-        "spec:\n"
-        "  clickhouse:\n"
-        "    access:\n"
-        "      scheme: https\n"
-        "      port: 8443\n"
-        "```\n"
-        "\n"
+        'spec:\n'
+        '  clickhouse:\n'
+        '    access:\n'
+        '      scheme: https\n'
+        '      port: 8443\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.8.4.1",
+    num='4.8.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_SecureInterClusterCommunication = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support secure inter-cluster communications with secrets.\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
+        '[ClickHouse Operator] SHALL support secure inter-cluster communications with secrets.\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
         'apiVersion: "clickhouse.altinity.com/v1"\n'
         'kind: "ClickHouseInstallation"\n'
-        "metadata:\n"
+        'metadata:\n'
         '  name: "name"\n'
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
         '      - name: "secret-ref"\n'
         '        secure: "yes"\n'
-        "        secret:\n"
+        '        secret:\n'
         '          auto: "true"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.8.4.2",
+    num='4.8.4.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_InterClusterCommunicationWithSecret = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support inter-cluster communications with secret.\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
+        '[ClickHouse Operator] SHALL support inter-cluster communications with secret.\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
         'apiVersion: "clickhouse.altinity.com/v1"\n'
         'kind: "ClickHouseInstallation"\n'
-        "metadata:\n"
+        'metadata:\n'
         '  name: "name"\n'
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
         '      - name: "secret-ref"\n'
-        "        secret:\n"
+        '        secret:\n'
         '          auto: "true"\n'
-        "```\n"
-        "\n"
-        "\n"
+        '```\n'
+        '\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.8.4.3",
+    num='4.8.4.3'
 )
 
 RQ_SRS_026_ClickHouseOperator_CHI_ConnectWithHttps = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse] server deployed by [ClickHouse Operator] SHALL support secure `HTTPS` connection from local [ClickHouse] client.\n"
-        "\n"
+        '[ClickHouse] server deployed by [ClickHouse Operator] SHALL support secure `HTTPS` connection from local [ClickHouse] client.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.8.4.4",
+    num='4.8.4.4'
 )
 
 RQ_SRS_026_ClickHouseOperator_DefaultTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.DefaultTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL use its own base default templates\n"
-        "for rendering [Kubernetes] resources like [StatefulSet], [ConfigMap], [Service]\n"
-        "and [PVC] which SHALL be overridable by the user using custom resource definition manifests\n"
-        "when not explicitly specified in any way inside a manifest that SHALL result in a workable\n"
-        "cluster that MAY be stateless.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL use its own base default templates\n'
+        'for rendering [Kubernetes] resources like [StatefulSet], [ConfigMap], [Service]\n'
+        'and [PVC] which SHALL be overridable by the user using custom resource definition manifests\n'
+        'when not explicitly specified in any way inside a manifest that SHALL result in a workable\n'
+        'cluster that MAY be stateless.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.9.1",
+    num='4.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_DefaultTemplates_MergingWithUserDefinedTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support merging default templates with user defined ones.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support merging default templates with user defined ones.\n'
+        '\n'
+    ),
     link=None,
     level=3,
-    num="4.9.2",
+    num='4.9.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_AnnotationsInTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.AnnotationsInTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.AnnotationsInTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support annotations in the following templates:\n"
-        "\n"
-        "* hostTemplate\n"
-        "* podTemplate\n"
-        "* dataVolumeClaimTemplate\n"
-        "* logVolumeClaimTemplate\n"
-        "* serviceTemplate\n"
-        "* clusterServiceTemplate\n"
-        "* shardServiceTemplate\n"
-        "* replicaServiceTemplate\n"
-        "\n"
-        "Annotations for [CHI] SHALL be propagated to `podTemplates`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support annotations in the following templates:\n'
+        '\n'
+        '* hostTemplate\n'
+        '* podTemplate\n'
+        '* dataVolumeClaimTemplate\n'
+        '* logVolumeClaimTemplate\n'
+        '* serviceTemplate\n'
+        '* clusterServiceTemplate\n'
+        '* shardServiceTemplate\n'
+        '* replicaServiceTemplate\n'
+        '\n'
+        'Annotations for [CHI] SHALL be propagated to `podTemplates`.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.10.1",
+    num='4.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_PodTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.PodTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.PodTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support customized [Pod] templates for cluster, shard, replica and [CHI] level.\n"
-        "[Pod] templates SHALL correspond to [Kubernetes] `PodTemplate` standard specification with\n"
-        "two additional properties `distribution` and `zones` to simplify affinity and anti-affinity rules.\n"
-        "\n"
-        "Pod templates SHALL support defining the following:\n"
-        "\n"
-        "* image reference for particular [ClickHouse] version\n"
-        "* CPU/memory requests\n"
-        "* affinity and anti-affinity rules that are also available as separate shortcuts:\n"
-        "  * `distribution`’ property streamlines OnePerHost semantics\n"
-        "  * `zones` property streamlines multi-AZ deployment (tested with AWS)\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support customized [Pod] templates for cluster, shard, replica and [CHI] level.\n'
+        '[Pod] templates SHALL correspond to [Kubernetes] `PodTemplate` standard specification with\n'
+        'two additional properties `distribution` and `zones` to simplify affinity and anti-affinity rules.\n'
+        '\n'
+        'Pod templates SHALL support defining the following:\n'
+        '\n'
+        '* image reference for particular [ClickHouse] version\n'
+        '* CPU/memory requests\n'
+        '* affinity and anti-affinity rules that are also available as separate shortcuts:\n'
+        '  * `distribution`’ property streamlines OnePerHost semantics\n'
+        '  * `zones` property streamlines multi-AZ deployment (tested with AWS)\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.11.1.1",
+    num='4.11.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ServiceTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support customized service templates for providing\n"
-        "networking endpoints with the following scopes:\n"
-        "\n"
-        "* Global ([CHI] level) using `serviceTemplate`\n"
-        "* Cluster using `clusterServiceTemplate`\n"
-        "* Shard using `shardServiceTemplate`\n"
-        "* Replica using `replicaServiceTemplate`\n"
-        "* Host (implicit)\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support customized service templates for providing\n'
+        'networking endpoints with the following scopes:\n'
+        '\n'
+        '* Global ([CHI] level) using `serviceTemplate`\n'
+        '* Cluster using `clusterServiceTemplate`\n'
+        '* Shard using `shardServiceTemplate`\n'
+        '* Replica using `replicaServiceTemplate`\n'
+        '* Host (implicit)\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.12.1",
+    num='4.12.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ServiceTemplates_LoadBalancer = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.LoadBalancer",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.LoadBalancer',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL provide a load balancer for each [Service] entry point.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL provide a load balancer for each [Service] entry point.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.12.2.1",
+    num='4.12.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ServiceTemplates_ServiceSpecificationStandard = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.ServiceSpecificationStandard",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.ServiceSpecificationStandard',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support [Service] templates that SHALL correspond\n"
-        "to standard [Kubernetes] [Service] specification.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support [Service] templates that SHALL correspond\n'
+        'to standard [Kubernetes] [Service] specification.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.12.3.1",
+    num='4.12.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ServiceTemplates_Annotations = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.Annotations",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.Annotations',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support annotations that SHALL allow use of external load balancers.\n" "\n"
+        '[ClickHouse Operator] SHALL support annotations that SHALL allow use of external load balancers.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.12.4.1",
+    num='4.12.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ServiceTemplates_NameGeneration = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.NameGeneration",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.NameGeneration',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow to generate service names based\n"
-        "on [CHI], cluster, shard or replica names or indices.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow to generate service names based\n'
+        'on [CHI], cluster, shard or replica names or indices.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.12.5.1",
+    num='4.12.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_HostTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.HostTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.HostTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support customized host templates for specifying specific parameters\n"
-        "of a specific host such as hostname, ports etc. as well as to define host networking.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support customized host templates for specifying specific parameters\n'
+        'of a specific host such as hostname, ports etc. as well as to define host networking.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.13.5.1",
+    num='4.13.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_VolumeClaimTamplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL volume claim tamplates of the following types\n"
-        "\n"
-        "* log volume claim using `logVolumeClaimTemplate`\n"
-        "* data volume claim using `dataVolumeClaimTemplate`\n"
-        "\n"
-        "that SHALL be used for [ClickHouse] data directory and logs respectively.\n"
-        "\n"
-        "[CHI] MAY have one or many volume claim templates.\n"
-        "If volume claim template is not defined, default SHALL be used\n"
-        "defined via the default `ClickHouseInstallationTemplate` resource.\n"
-        "\n"
-        "Volume claim templates SHALL correspond to [Kubernetes] `PersistentVolumeClaim`\n"
-        "standard specification.\n"
-        "\n"
-        "It SHALL be possible to configure one template for entire [CHI],\n"
-        "or template per shard, per replica, or per host.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL volume claim templates of the following types\n'
+        '\n'
+        '* log volume claim using `logVolumeClaimTemplate`\n'
+        '* data volume claim using `dataVolumeClaimTemplate`\n'
+        '\n'
+        'that SHALL be used for [ClickHouse] data directory and logs respectively.\n'
+        '\n'
+        '[CHI] MAY have one or many volume claim templates.\n'
+        'If volume claim template is not defined, default SHALL be used\n'
+        'defined via the default `ClickHouseInstallationTemplate` resource.\n'
+        '\n'
+        'Volume claim templates SHALL correspond to [Kubernetes] `PersistentVolumeClaim`\n'
+        'standard specification.\n'
+        '\n'
+        'It SHALL be possible to configure one template for entire [CHI],\n'
+        'or template per shard, per replica, or per host.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.14.5.1",
+    num='4.14.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_StorageProvisioning = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.StorageProvisioning",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.StorageProvisioning',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support customized storage provisioning using `VolumeClaim` templates.\n"
-        "\n"
-        "* Mount data\n"
-        "* Mount logs\n"
-        "* Mount multi-volumes which uses ClickHouse storage policy\n"
-        "* Retain policy\n"
-        "* Support different storage classes (Kubernetes concept)\n"
-        "* Support increase disk size\n"
-        "* Support adding new disks\n"
-        "\n"
-        "If [Kubernetes] cluster provides encrypted storage the operator SHALL support using it.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support customized storage provisioning using `VolumeClaim` templates.\n'
+        '\n'
+        '* Mount data\n'
+        '* Mount logs\n'
+        '* Mount multi-volumes which uses ClickHouse storage policy\n'
+        '* Retain policy\n'
+        '* Support different storage classes (Kubernetes concept)\n'
+        '* Support increase disk size\n'
+        '* Support adding new disks\n'
+        '\n'
+        'If [Kubernetes] cluster provides encrypted storage the operator SHALL support using it.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.15.5.1",
+    num='4.15.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_SingleNodeInstances = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.SingleNodeInstances",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.SingleNodeInstances',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating and managing single node instance\n" "deployments.\n" "\n"
+        '[ClickHouse Operator] SHALL support creating and managing single node instance\n'
+        'deployments.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.1.1",
+    num='4.16.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_MultipleShards = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShards",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShards',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating and managing deployments\n"
-        "where [ClickHouse] cluster contains multiple shards.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support creating and managing deployments\n'
+        'where [ClickHouse] cluster contains multiple shards.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.2.1",
+    num='4.16.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_MultipleReplicas = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleReplicas",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleReplicas',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating and managing deployments\n"
-        "where [ClickHouse] cluster contains multiple replicas for non-sharded tables\n"
-        "when external [ZooKeeper] installation is available.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support creating and managing deployments\n'
+        'where [ClickHouse] cluster contains multiple replicas for non-sharded tables\n'
+        'when external [ZooKeeper] installation is available.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.3.1",
+    num='4.16.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_MultipleShardsAndReplicas = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShardsAndReplicas",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShardsAndReplicas',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating and managing deployments\n"
-        "where [ClickHouse] cluster contains multiple shards and replicas\n"
-        "when external [ZooKeeper] installation is available.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support creating and managing deployments\n'
+        'where [ClickHouse] cluster contains multiple shards and replicas\n'
+        'when external [ZooKeeper] installation is available.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.4.1",
+    num='4.16.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_MultipleClusters = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleClusters",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleClusters',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support creating and managing multiple\n"
-        "cluster deployments using a single [CHI].\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support creating and managing multiple\n'
+        'cluster deployments using a single [CHI].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.5.1",
+    num='4.16.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_CircularReplication = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.CircularReplication",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.CircularReplication',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support setting up [ClickHouse] clusters\n"
-        "that use circular replication where any given node can server as both\n"
-        "a shard and a replica for another shard.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support setting up [ClickHouse] clusters\n'
+        'that use circular replication where any given node can server as both\n'
+        'a shard and a replica for another shard.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.6.1",
+    num='4.16.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_DifferentClickHouseVersionsOnReplicasAndShards = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.DifferentClickHouseVersionsOnReplicasAndShards",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.DifferentClickHouseVersionsOnReplicasAndShards',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support deploying different [ClickHouse] server\n"
-        "versions on replicas and shards.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support deploying different [ClickHouse] server\n'
+        'versions on replicas and shards.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.7.1",
+    num='4.16.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_MultipleStorageVolumes = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleStorageVolumes",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleStorageVolumes',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support deployments that use multiple storage volumes\n"
-        "for [ClickHouse] server by defining storage policy definitions in [ClickHouse]\n"
-        "configuration files.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support deployments that use multiple storage volumes\n'
+        'for [ClickHouse] server by defining storage policy definitions in [ClickHouse]\n'
+        'configuration files.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.16.8.1",
+    num='4.16.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Deployments_PluggingExternalVolumes = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Deployments.PluggingExternalVolumes",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Deployments.PluggingExternalVolumes',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support plugging of externally created volumes to [CHI].\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support plugging of externally created volumes to [CHI].\n'
+        '\n'
+    ),
     link=None,
     level=3,
-    num="4.17.1",
+    num='4.17.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ConfigurationFileControl_ConfigXML = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.ConfigXML",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.ConfigXML',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying contents of [ClickHouse] `config.xml`\n"
-        "using YAML syntax.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying contents of [ClickHouse] `config.xml`\n'
+        'using YAML syntax.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.18.1.1",
+    num='4.18.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ConfigurationFileControl_UsersXML = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.UsersXML",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.UsersXML',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying contents of [ClickHouse] `users.xml`\n"
-        "using YAML syntax.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying contents of [ClickHouse] `users.xml`\n'
+        'using YAML syntax.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.18.2.1",
+    num='4.18.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ConfigurationFileControl_EmbeddedXML = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.EmbeddedXML",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.EmbeddedXML',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support embedding XML files in YAML configuration.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support embedding XML files in YAML configuration.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.18.3.1",
+    num='4.18.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ConfigurationFileControl_MacrosXML = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.MacrosXML",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.MacrosXML',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support auto-generating [ClickHouse] `macros.xml`\n"
-        "with standard macros that can be used for replicated tables.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support auto-generating [ClickHouse] `macros.xml`\n'
+        'with standard macros that can be used for replicated tables.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.18.4.1",
+    num='4.18.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_RetainingVolumeClaimTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.RetainingVolumeClaimTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.RetainingVolumeClaimTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support rataining of volume claim templates\n"
-        "after deletion of [CHI] resource which SHALL work on [CHI], shard and replica levels.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support rataining of volume claim templates\n'
+        'after deletion of [CHI] resource which SHALL work on [CHI], shard and replica levels.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.19.1",
+    num='4.19.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ReconnectingExistingPersistentVolumes = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ReconnectingExistingPersistentVolumes",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ReconnectingExistingPersistentVolumes',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support reconnecting existing persistent volumes ([PV]s).\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support reconnecting existing persistent volumes ([PV]s).\n'
+        '\n'
+    ),
     link=None,
     level=3,
-    num="4.20.1",
+    num='4.20.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_MaintainingClusterUpTimeDuringChanges = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.MaintainingClusterUpTimeDuringChanges",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.MaintainingClusterUpTimeDuringChanges',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL maintain [ClickHouse] clusters operational\n"
-        "during application of changes to [CHI] resource.\n"
-        "\n"
-        "Specific cases:\n"
-        "\n"
-        "* inserts and selects to and from Distributed tables SHALL not be interrupted\n"
-        "\n"
+        '[ClickHouse Operator] SHALL maintain [ClickHouse] clusters operational\n'
+        'during application of changes to [CHI] resource.\n'
+        '\n'
+        'Specific cases:\n'
+        '\n'
+        '* inserts and selects to and from Distributed tables SHALL not be interrupted\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.21.1",
+    num='4.21.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_AddingNewPersistentVolumesToPods = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.AddingNewPersistentVolumesToPods",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.AddingNewPersistentVolumesToPods',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support adding new persistent volumes ([PV]s)\n" "to managed [Pod]s.\n" "\n"
+        '[ClickHouse Operator] SHALL support adding new persistent volumes ([PV]s)\n'
+        'to managed [Pod]s.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.22.1",
+    num='4.22.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_InterruptingApplicationOfClickHouseClusterChanges = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.InterruptingApplicationOfClickHouseClusterChanges",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.InterruptingApplicationOfClickHouseClusterChanges',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support interrupting application of changes to [ClickHouse]\n"
-        "clusters.\n"
-        "\n"
-        "For example when [CHI] manifest contains a user mistake that specifies\n"
-        "creation of a large number of replicas.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support interrupting application of changes to [ClickHouse]\n'
+        'clusters.\n'
+        '\n'
+        'For example when [CHI] manifest contains a user mistake that specifies\n'
+        'creation of a large number of replicas.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.23.1",
+    num='4.23.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_TLS = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.TLS",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.TLS',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support configuring (TLS) secure access to [ClickHouse]\n"
-        "cluster nodes and inter-cluster communication.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support configuring (TLS) secure access to [ClickHouse]\n'
+        'cluster nodes and inter-cluster communication.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.1.1",
+    num='4.24.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_RestartingZooKeeper = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.RestartingZooKeeper",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.RestartingZooKeeper',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support read-only access to [ClickHouse] clusters\n"
-        "while [ZooKeeper] cluster is being restarted. Once [ZooKeeper] is back up\n"
-        "then all [ClickHouse] clusters that use that [ZooKeeper] SHALL return to\n"
-        "read/write mode.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support read-only access to [ClickHouse] clusters\n'
+        'while [ZooKeeper] cluster is being restarted. Once [ZooKeeper] is back up\n'
+        'then all [ClickHouse] clusters that use that [ZooKeeper] SHALL return to\n'
+        'read/write mode.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.2.1",
+    num='4.24.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_Changes = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.Changes",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.Changes',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL apply all changes in a sequential order host-by-host in scope of [CHI].\n" "\n"
+        '[ClickHouse Operator] SHALL apply all changes in a sequential order host-by-host in scope of [CHI].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.3.1",
+    num='4.24.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_RollbackOnError = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.RollbackOnError",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.RollbackOnError',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support roll-back in case of error to make sure [ClickHouse] is operational.\n"
-        "This MAY result in inconsistent state where actual state is different from [CHI].\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support roll-back in case of error to make sure [ClickHouse] is operational.\n'
+        'This MAY result in inconsistent state where actual state is different from [CHI].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.4.1",
+    num='4.24.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ChangesRequiringRestart = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ChangesRequiringRestart",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ChangesRequiringRestart',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support changes that MAY require a restart of [ClickHouse],\n"
-        "in particular:\n"
-        "\n"
-        "* changes to [ZooKeeper] configuration\n"
-        "* changes to [ClickHouse] server settings (as opposed to users/profiles that do not require a restart)\n"
-        "* changes to [Pod] templates, e.g. version change\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support changes that MAY require a restart of [ClickHouse],\n'
+        'in particular:\n'
+        '\n'
+        '* changes to [ZooKeeper] configuration\n'
+        '* changes to [ClickHouse] server settings (as opposed to users/profiles that do not require a restart)\n'
+        '* changes to [Pod] templates, e.g. version change\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.5.1",
+    num='4.24.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ConfigurationAndSettings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ConfigurationAndSettings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ConfigurationAndSettings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support managing [ClickHouse] server configuration\n"
-        "or users/profiles configuration and settings including [ZooKeeper] integration.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support managing [ClickHouse] server configuration\n'
+        'or users/profiles configuration and settings including [ZooKeeper] integration.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.6.1",
+    num='4.24.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingShards = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingShards",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingShards',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support adding shards to [CHI] with schema propagation.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support adding shards to [CHI] with schema propagation.\n'
+        '\n'
+    ),
     link=None,
     level=5,
-    num="4.24.7.1.1",
+    num='4.24.7.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicas = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicas",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicas',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support adding additional replicas to [CHI] with schema propagation. ClickHouse shall remain available during this operation.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support adding additional replicas to [CHI] with schema propagation. ClickHouse shall remain available during this operation.\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.24.7.2.1",
+    num='4.24.7.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_AddingReplicationToExistingNonReplicatedCluster = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicationToExistingNonReplicatedCluster",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicationToExistingNonReplicatedCluster',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support adding replication to existing non-replicated cluster\n"
-        "only if ReplicatedMergeTree tables are being used.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support adding replication to existing non-replicated cluster\n'
+        'only if ReplicatedMergeTree tables are being used.\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.24.7.3.1",
+    num='4.24.7.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_SchemaPropagation = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.SchemaPropagation",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.SchemaPropagation',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support automatic schema propagation for\n"
-        "when adding new shards or replicas\n"
-        "\n"
-        "* Distributed tables\n"
-        "* tables used by Distributed tables (underlying tables)\n"
-        "\n"
-        "All schema objects SHALL be migrated to new cluster nodes. Schema objects include but not limited to\n"
-        "\n"
-        "* database engines\n"
-        "* tables engines\n"
-        "* views\n"
-        "* dictionaries\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support automatic schema propagation for\n'
+        'when adding new shards or replicas\n'
+        '\n'
+        '* Distributed tables\n'
+        '* tables used by Distributed tables (underlying tables)\n'
+        '\n'
+        'All schema objects SHALL be migrated to new cluster nodes. Schema objects include but not limited to\n'
+        '\n'
+        '* database engines\n'
+        '* tables engines\n'
+        '* views\n'
+        '* dictionaries\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.24.7.4.1",
+    num='4.24.7.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ClusterScaling_Down = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.Down",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.Down',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support [ClickHouse] cluster scaling down shards and replicas.\n"
-        "\n"
-        "Scaling down shards MAY result in loss of data.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support [ClickHouse] cluster scaling down shards and replicas.\n'
+        '\n'
+        'Scaling down shards MAY result in loss of data.\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.24.7.5.1",
+    num='4.24.7.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support [ClickHouse] server version upgrades\n"
-        "on one shard, one replica or entire cluster.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support [ClickHouse] server version upgrades\n'
+        'on one shard, one replica or entire cluster.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.8.1",
+    num='4.24.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades_IndividualOrAll = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades.IndividualOrAll",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades.IndividualOrAll',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support upgrading [ClickHouse] version for each\n"
-        "pod individually or all pods at the same time.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support upgrading [ClickHouse] version for each\n'
+        'pod individually or all pods at the same time.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.8.2",
+    num='4.24.8.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningPodsUsingDifferentTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support re-provisioning [Pod]s using a different template.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support re-provisioning [Pod]s using a different template.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.24.9.1",
+    num='4.24.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support re-provisioning Volume by deleting [PVC], recreating [PVC] and recreating [StatefullSet].\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support re-provisioning Volume by deleting [PVC], recreating [PVC] and recreating [StatefullSet].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.10.1",
+    num='4.24.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_StorageManagementSwitch = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support switching storageManagement from default to Operator.\n"
-        "\n"
-        "```\n"
-        "defaults:\n"
-        "  storageManagement:\n"
-        "  # provisioner: StatefulSet # this is default\n"
-        "    provisioner: Operator\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support switching storageManagement from default to Operator.\n'
+        '\n'
+        '```\n'
+        'defaults:\n'
+        '  storageManagement:\n'
+        '  # provisioner: StatefulSet # this is default\n'
+        '    provisioner: Operator\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.11.1",
+    num='4.24.11.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_StoppingAndStarting = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support stopping and starting [CHI] entirely.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support stopping and starting [CHI] entirely.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.24.12.1",
+    num='4.24.12.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_StoppingSpecificClickHousePods = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support stopping specific [ClickHouse] [Pod]s completely.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support stopping specific [ClickHouse] [Pod]s completely.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.24.13.1",
+    num='4.24.13.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_StoppingSpecificClickHouseHosts = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support stopping specific [ClickHouse] hosts\n"
-        "for a maintenance on a running [Pod] that SHALL require providing custom [Pod] template\n"
-        "with an entry point.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support stopping specific [ClickHouse] hosts\n'
+        'for a maintenance on a running [Pod] that SHALL require providing custom [Pod] template\n'
+        'with an entry point.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.14.1",
+    num='4.24.14.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_ExportingMetrics = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support exporting [ClickHouse] metrics to [Prometheus]\n"
-        "including after restart of operator.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support exporting [ClickHouse] metrics to [Prometheus]\n'
+        'including after restart of operator.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.15.1",
+    num='4.24.15.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_Monitoring = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.Monitoring",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.Monitoring',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support updating the status and recording\n"
-        "relevant events for [CHI] resource that can be observed and monitored separately.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support updating the status and recording\n'
+        'relevant events for [CHI] resource that can be observed and monitored separately.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.16.1",
+    num='4.24.16.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Managing_RollingUpdate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support rolling update of an existing cluster where\n"
-        "each [Pod] of the [ClickHouse] cluster is updated one at a time with only one [Pod]\n"
-        "being offline during rolling update.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support rolling update of an existing cluster where\n'
+        'each [Pod] of the [ClickHouse] cluster is updated one at a time with only one [Pod]\n'
+        'being offline during rolling update.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.24.17.1",
+    num='4.24.17.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Logging = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Logging",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Logging',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support writing logs for each [Pod] that SHALL be\n"
-        "accessible using `kubectl logs` or, if present, [Kubernetes] cluster monitoring.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support writing logs for each [Pod] that SHALL be\n'
+        'accessible using `kubectl logs` or, if present, [Kubernetes] cluster monitoring.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.25.17.1",
+    num='4.25.17.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Logging_HighLevelStatus = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support writing high level status in [CHI] object and\n"
-        "SHALL log warnings and errors as events. Both SHALL be accessible with `kubectl describe`.\n"
-        "\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support writing high level status in [CHI] object and\n'
+        'SHALL log warnings and errors as events. Both SHALL be accessible with `kubectl describe`.\n'
+        '\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.25.17.2.1",
+    num='4.25.17.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ValidInstallation = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ValidInstallation",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ValidInstallation',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "After installing [ClickHouse Operator] the following commands SHALL work\n"
-        "\n"
-        "* `kubectl get deployment clickhouse-operator -n kube-system` that SHALL return one deployment, for example\n"
-        "\n"
-        "``` bash\n"
-        "NAME                  READY   UP-TO-DATE   AVAILABLE   AGE\n"
-        "clickhouse-operator   1/1     1            1           21d\n"
-        "```\n"
-        "\n"
-        "* `kubectl get configmap --all-namespaces | grep clickhouse-operator` that SHALL return five config maps, for example\n"
-        "\n"
-        "```bash\n"
-        "kube-system          etc-clickhouse-operator-files                      1      21d\n"
-        "kube-system          etc-clickhouse-operator-confd-files                0      21d\n"
-        "kube-system          etc-clickhouse-operator-configd-files              4      21d\n"
-        "kube-system          etc-clickhouse-operator-templatesd-files           4      21d\n"
-        "kube-system          etc-clickhouse-operator-usersd-files      \n"
-        "```\n"
-        "\n"
-        "* `kubectl get crd | grep clickhouse` that SHALL return three resource definitions\n"
-        "\n"
+        'After installing [ClickHouse Operator] the following commands SHALL work\n'
+        '\n'
+        '* `kubectl get deployment clickhouse-operator -n kube-system` that SHALL return one deployment, for example\n'
+        '\n'
+        '``` bash\n'
+        'NAME                  READY   UP-TO-DATE   AVAILABLE   AGE\n'
+        'clickhouse-operator   1/1     1            1           21d\n'
+        '```\n'
+        '\n'
+        '* `kubectl get configmap --all-namespaces | grep clickhouse-operator` that SHALL return five config maps, for example\n'
+        '\n'
+        '```bash\n'
+        'kube-system          etc-clickhouse-operator-files                      1      21d\n'
+        'kube-system          etc-clickhouse-operator-confd-files                0      21d\n'
+        'kube-system          etc-clickhouse-operator-configd-files              4      21d\n'
+        'kube-system          etc-clickhouse-operator-templatesd-files           4      21d\n'
+        'kube-system          etc-clickhouse-operator-usersd-files      \n'
+        '```\n'
+        '\n'
+        '* `kubectl get crd | grep clickhouse` that SHALL return three resource definitions\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.26.1",
+    num='4.26.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Settings_ConfigYaml = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Settings.ConfigYaml",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Settings.ConfigYaml',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support configuration using\n" "`/etc/clickhouse-operator/config.yaml`.\n" "\n"
+        '[ClickHouse Operator] SHALL support configuration using\n'
+        '`/etc/clickhouse-operator/config.yaml`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.27.1.1",
+    num='4.27.1.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Settings_ConfigMap = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support configuration using\n"
-        "`etc-clickhouse-operator-files` [ConfigMap].\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support configuration using\n'
+        '`etc-clickhouse-operator-files` [ConfigMap].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.27.2.1",
+    num='4.27.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Settings_ConfigMap_Changes = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap.Changes",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap.Changes',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] MAY not monitor changes to `etc-clickhouse-operator-files` [ConfigMap]\n"
-        "but changes SHALL be picked up if operator is restarted.\n"
-        "\n"
+        '[ClickHouse Operator] MAY not monitor changes to `etc-clickhouse-operator-files` [ConfigMap]\n'
+        'but changes SHALL be picked up if operator is restarted.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.27.2.2",
+    num='4.27.2.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_Settings_ClickHouseOperatorConfiguration = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support configuration using\n"
-        "`etc-clickhouse-operator-files` [ConfigMap] defined using `ClickHouseOperatorConfiguration`\n"
-        "resource.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support configuration using\n'
+        '`etc-clickhouse-operator-files` [ConfigMap] defined using `ClickHouseOperatorConfiguration`\n'
+        'resource.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.27.3.1",
+    num='4.27.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Settings_ClickHouseOperatorConfiguration_Changes = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration.Changes",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration.Changes',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL monitor changes to `ClickHouseOperatorConfiguration` resource\n"
-        "and SHALL apply them immediately.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL monitor changes to `ClickHouseOperatorConfiguration` resource\n'
+        'and SHALL apply them immediately.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.27.3.2",
+    num='4.27.3.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_ClickHouse_ConfigMaps = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL create and manage the following [ConfigMap]s\n"
-        "which SHALL be responsible for [ClickHouse] server configuration and\n"
-        "mounted to corresponding configuration folders of each [ClickHouse] pods:\n"
-        "\n"
-        "* `etc-clickhouse-operator-confd-files`\n"
-        "* `etc-clickhouse-operator-configd-files`\n"
-        "* `etc-clickhouse-operator-usersd-files`\n"
-        "\n"
+        "[ClickHouse Operator] SHALL create and manage the following [ConfigMap]'s\n"
+        'which SHALL be responsible for [ClickHouse] server configuration and\n'
+        "mounted to corresponding configuration folders of each [ClickHouse] pod's:\n"
+        '\n'
+        '* `etc-clickhouse-operator-confd-files`\n'
+        '* `etc-clickhouse-operator-configd-files`\n'
+        '* `etc-clickhouse-operator-usersd-files`\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.28.1",
+    num='4.28.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ClickHouse_ConfigMaps_Defaults = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps.Defaults",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps.Defaults',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL specify the defaults for [ClickHouse] [ConfigMaps]\n"
-        "in `manifests/operator/clickhouse-operator-install.yaml`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL specify the defaults for [ClickHouse] [ConfigMaps]\n'
+        'in `manifests/operator/clickhouse-operator-install.yaml`.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.29.1",
+    num='4.29.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_CustomResourceDefinition = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.CustomResourceDefinition",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.CustomResourceDefinition',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL provide [custom resource definition] file\n"
-        "`clickhouse-operator-install-bundle.yaml` that\n"
-        "SHALL provide support for defining [ClickHouse] custom resource installations.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL provide [custom resource definition] file\n'
+        '`clickhouse-operator-install-bundle.yaml` that\n'
+        'SHALL provide support for defining [ClickHouse] custom resource installations.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.30.1",
+    num='4.30.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining custom resource definition\n"
-        "using the following API versions\n"
-        "\n"
-        "* `clickhouse.altinity.com/v1`\n"
-        "\n"
-        "```yaml\n"
+        '[ClickHouse Operator] SHALL support defining custom resource definition\n'
+        'using the following API versions\n'
+        '\n'
+        '* `clickhouse.altinity.com/v1`\n'
+        '\n'
+        '```yaml\n'
         'apiVersion: "clickhouse.altinity.com/v1"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.31.1",
+    num='4.31.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallation = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL provide support to define custom resources\n"
-        "of the `ClickHouseInstallation` kind specified using `.kind` property.\n"
-        "\n"
-        "`ClickHouseInstallation` resources SHALL be accessible using `chi` short name.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
+        '[ClickHouse Operator] SHALL provide support to define custom resources\n'
+        'of the `ClickHouseInstallation` kind specified using `.kind` property.\n'
+        '\n'
+        '`ClickHouseInstallation` resources SHALL be accessible using `chi` short name.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
         'kind: "ClickHouseInstallation"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.32.1",
+    num='4.32.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallationTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL provide support to define custom resources\n"
-        "of the `ClickHouseInstallationTemplate` kind specified using `.kind` property\n"
-        "and SHALL define in whole or in part `ClickHouseIntallation` resource.\n"
-        "\n"
-        "`ClickHouseInstallationTemplate` resources SHALL be accessible using `chit`\n"
-        "short name.\n"
-        "\n"
-        "`ClickHouseInstallationTemplate` reouces SHALL support the same spec\n"
-        "as the `ClickHouseInstallation` resource kind.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
+        '[ClickHouse Operator] SHALL provide support to define custom resources\n'
+        'of the `ClickHouseInstallationTemplate` kind specified using `.kind` property\n'
+        'and SHALL define in whole or in part `ClickHouseIntallation` resource.\n'
+        '\n'
+        '`ClickHouseInstallationTemplate` resources SHALL be accessible using `chit`\n'
+        'short name.\n'
+        '\n'
+        '`ClickHouseInstallationTemplate` reouces SHALL support the same spec\n'
+        'as the `ClickHouseInstallation` resource kind.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
         'kind: "ClickHouseInstallationTemplate"\n'
-        "```\n"
+        '```\n'
     ),
     link=None,
     level=3,
-    num="4.32.2",
+    num='4.32.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseOperatorConfiguration = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL provide support to define custom resources\n"
-        "of the `ClickHouseOperatorConfiguration` kind specified using `.kind` property\n"
-        "that SHALL support configuring operator behavior.\n"
-        "\n"
-        "`ClickHouseOperatorConfiguration` resources SHALL be accessible using `chopconf`\n"
-        "short name.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
+        '[ClickHouse Operator] SHALL provide support to define custom resources\n'
+        'of the `ClickHouseOperatorConfiguration` kind specified using `.kind` property\n'
+        'that SHALL support configuring operator behavior.\n'
+        '\n'
+        '`ClickHouseOperatorConfiguration` resources SHALL be accessible using `chopconf`\n'
+        'short name.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
         'kind: "ClickHouseOperatorConfiguration"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.32.3",
+    num='4.32.3'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Metadata = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL provide support to define metadata for the custom resource\n"
-        "manifest using `.metadata` object that SHALL provide custom resource identification.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "metadata:\n"
+        '[ClickHouse Operator] SHALL provide support to define metadata for the custom resource\n'
+        'manifest using `.metadata` object that SHALL provide custom resource identification.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'metadata:\n'
         '  name: "clickhouse-installation-max"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.33.1",
+    num='4.33.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL provide support to define specification of the desired\n"
-        "behavior of one or more ClickHouse clusters using `.spec` object inside the custom\n"
-        "resource manifest.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL provide support to define specification of the desired\n'
+        'behavior of one or more ClickHouse clusters using `.spec` object inside the custom\n'
+        'resource manifest.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.34.1",
+    num='4.34.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_TaskID = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow defining custom _taskID_ for named update\n"
+        '[ClickHouse Operator] SHALL allow defining custom _taskID_ for named update\n'
         "and watching status of this update execution in `.status.taskID`'s field\n"
-        "using `spec.taskID` property that SHALL be of [string] type.\n"
-        "\n"
-        "By default, every update of the custom resource manifest SHALL generate random _taskID_.\n"
-        "\n"
+        'using `spec.taskID` property that SHALL be of [string] type.\n'
+        '\n'
+        'By default, every update of the custom resource manifest SHALL generate random _taskID_.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.35.1",
+    num='4.35.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Stop = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow stopping all ClickHouse clusters described in current\n"
-        "custom resource manifest using `.spec.stop` property that SHALL use [bool enum] type.\n"
-        "where stop mechanism SHALL work as follows:\n"
-        "\n"
-        "* if `stop` is `1` then setup `Replicas: 0` in each\n"
-        "  [StatefulSet] resource, all [Pod]s and [Service] resources will be destroyed,\n"
-        "  but [PVC]s SHALL still live\n"
-        "\n"
-        "* if `stop` is `0` then [Pod]s will be created again and will attach retained\n"
-        "  [PVC]s and [Service] also will be created again\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
+        '[ClickHouse Operator] SHALL allow stopping all ClickHouse clusters described in current\n'
+        'custom resource manifest using `.spec.stop` property that SHALL use [bool enum] type.\n'
+        'where stop mechanism SHALL work as follows:\n'
+        '\n'
+        '* if `stop` is `1` then setup `Replicas: 0` in each\n'
+        '  [StatefulSet] resource, all [Pod]s and [Service] resources will be destroyed,\n'
+        '  but [PVC]s SHALL still live\n'
+        '\n'
+        '* if `stop` is `0` then [Pod]s will be created again and will attach retained\n'
+        '  [PVC]s and [Service] also will be created again\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
         '  stop: "no"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.36.1",
+    num='4.36.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Restart = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow specifying restart policy for [StatefulSets]\n"
-        "using `.spec.restart` property that SHALL support rolling restart.\n"
-        "\n"
-        "The only supported value is `RollingUpdate` that SHALL allow graceful restart\n"
-        "of each [Pod] one by one instead of restarting all [Pod]s simultaneously.\n"
-        "\n"
-        "The `RollingUpdate` SHALL be the default value if not specified.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
+        '[ClickHouse Operator] SHALL allow specifying restart policy for [StatefulSets]\n'
+        'using `.spec.restart` property that SHALL support rolling restart.\n'
+        '\n'
+        'The only supported value is `RollingUpdate` that SHALL allow graceful restart\n'
+        'of each [Pod] one by one instead of restarting all [Pod]s simultaneously.\n'
+        '\n'
+        'The `RollingUpdate` SHALL be the default value if not specified.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
         '  restart: "RollingUpdate"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.37.1",
+    num='4.37.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Troubleshoot = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow troubleshooting [Pods] during _CrashLoopBack_ state\n"
-        "when user applies wrong configuration by specifying `.spec.troubleshoot`\n"
-        "property of [bool enum] type. For example, the `clickhouse-server` does not start.\n"
-        "\n"
-        "If value is set to `yes` then the `kubectl exec -n <namespace-name> <pod-name> bash` SHALL provide access to the [Pod] shell.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
+        '[ClickHouse Operator] SHALL allow troubleshooting [Pods] during _CrashLoopBack_ state\n'
+        'when user applies wrong configuration by specifying `.spec.troubleshoot`\n'
+        'property of [bool enum] type. For example, the `clickhouse-server` does not start.\n'
+        '\n'
+        'If value is set to `yes` then the `kubectl exec -n <namespace-name> <pod-name> bash` SHALL provide access to the [Pod] shell.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
         '  troubleshoot: "no"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.38.1",
+    num='4.38.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_NamespaceDomainPattern = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom domain suffix\n"
-        "for [Service] or [Pod] names when custom cluster domain is used in [Kubernetes] cluster\n"
-        "by specifying `.spec.namespaceDomainPattern` property of [string] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
+        '[ClickHouse Operator] SHALL support specifying custom domain suffix\n'
+        'for [Service] or [Pod] names when custom cluster domain is used in [Kubernetes] cluster\n'
+        'by specifying `.spec.namespaceDomainPattern` property of [string] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
         '  namespaceDomainPattern:  "%s.svc.my.test"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.39.1",
+    num='4.39.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying policy for\n"
-        "auto applying _ClickHouseInstallationTemplate_ inside [CHI]\n"
-        "by specifying `.spec.templating.policy` property inside the `.spec.templating` object.\n"
-        "\n"
-        "* if `auto` it SHALL auto add ClickHouseInstallationTemplate into all [CHI]s\n"
-        "* if `manual` it SHALL not auto add ClickHouseInstallationTemplate into all [CHI]s (default)\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templating:\n"
+        '[ClickHouse Operator] SHALL support specifying policy for\n'
+        'auto applying _ClickHouseInstallationTemplate_ inside [CHI]\n'
+        'by specifying `.spec.templating.policy` property inside the `.spec.templating` object.\n'
+        '\n'
+        '* if `auto` it SHALL auto add ClickHouseInstallationTemplate into all [CHI]s\n'
+        '* if `manual` it SHALL not auto add ClickHouseInstallationTemplate into all [CHI]s (default)\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templating:\n'
         '    policy: "manual"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.40.1",
+    num='4.40.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ReconcilingCycle = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ReconcilingCycle",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support reconciling current and desired state of [CHI]\n"
-        "using reconcicling cycle based on the custom resource specification\n"
-        "that result in either successful or failed [CHI] state.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support reconciling current and desired state of [CHI]\n'
+        'using reconciling cycle based on the custom resource specification\n'
+        'that result in either successful or failed [CHI] state.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.41.1",
+    num='4.41.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ReconcilingCycle_ApplyingConfigMapsBeforeStatefulSets = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL create or update [ConfigMap]s before any changes to [StatefulSet]s.\n" "\n"
+        '[ClickHouse Operator] SHALL create or update [ConfigMap]s before any changes to [StatefulSet]s.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.41.2.1",
+    num='4.41.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support tuning reconciling cycle for [CHI]\n"
-        "from ClickHouse operator side using `.spec.reconciling` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  reconciling:\n"
-        "```\n"
+        '[ClickHouse Operator] SHALL support tuning reconciling cycle for [CHI]\n'
+        'from ClickHouse operator side using `.spec.reconciling` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  reconciling:\n'
+        '```\n'
     ),
     link=None,
     level=4,
-    num="4.41.3.1",
+    num='4.41.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying a name for the reconciliation cycle policy\n"
-        "using `.spec.reconciling.policy` property of [string] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  reconciling:\n"
+        '[ClickHouse Operator] SHALL support specifying a name for the reconciliation cycle policy\n'
+        'using `.spec.reconciling.policy` property of [string] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  reconciling:\n'
         '    policy: "nowait"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.41.4.1",
+    num='4.41.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_ConfigMapPropagationTimeout = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying timeout in seconds\n"
-        "using `.spec.reconciling.configMapPropagationTimeout` property with [integer] type\n"
-        "that operator SHALL wait when applying [ConfigMap] during reconciliation of the [CHI].\n"
-        "\n"
-        "[Pods] SHALL be updated from cache as specified in\n"
-        "https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  reconciling:\n"
-        "    configMapPropagationTimeout: 90\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying timeout in seconds\n'
+        'using `.spec.reconciling.configMapPropagationTimeout` property with [integer] type\n'
+        'that operator SHALL wait when applying [ConfigMap] during reconciliation of the [CHI].\n'
+        '\n'
+        '[Pods] SHALL be updated from cache as specified in\n'
+        'https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  reconciling:\n'
+        '    configMapPropagationTimeout: 90\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.41.5.1",
+    num='4.41.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining behavior for cleaning up [Kubernetes]\n"
-        "resources during reconcile cycle using `.spec.reconciling.cleanup` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  reconciling:\n"
-        "    cleanup:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining behavior for cleaning up [Kubernetes]\n'
+        'resources during reconcile cycle using `.spec.reconciling.cleanup` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  reconciling:\n'
+        '    cleanup:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.41.6.1",
+    num='4.41.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup_UnknownObjects = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying what operator SHALL do when it finds\n"
-        "[Kubernetes] resources which should be managed by the operator, but do not have\n"
-        "`ownerReference` for any currently managed [CHI] resource using\n"
-        "`.spec.reconciling.cleanup.unknownObjects` object.\n"
-        "\n"
-        "The following properties SHALL be supported having [string] type containing\n"
-        "either `Retain` or `Delete` values that SHALL specify the cleanup behavior\n"
-        "for the respective [Kubernetes] resources.\n"
-        "\n"
-        "* [StatefulSet]\n"
-        "  using `.spec.reconciling.cleanup.unknownObjects.statefulSet` property\n"
-        "* [PVC]\n"
-        "  using `.spec.reconciling.cleanup.unknownObjects.pvc` property\n"
-        "* [ConfigMap]\n"
-        "  using `.spec.reconciling.cleanup.unknownObjects.configMap` property\n"
-        "* [Service]\n"
-        "  using `.spec.reconciling.cleanup.unknownObjects.service` property\n"
-        "\n"
-        "The default behavior SHALL be `Delete` for each.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  reconciling:\n"
-        "    cleanup:\n"
-        "      unknownObjects:\n"
-        "        statefulSet: Delete\n"
-        "        pvc: Delete\n"
-        "        configMap: Delete\n"
-        "        service: Delete\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying what operator SHALL do when it finds\n'
+        '[Kubernetes] resources which should be managed by the operator, but do not have\n'
+        '`ownerReference` for any currently managed [CHI] resource using\n'
+        '`.spec.reconciling.cleanup.unknownObjects` object.\n'
+        '\n'
+        'The following properties SHALL be supported having [string] type containing\n'
+        'either `Retain` or `Delete` values that SHALL specify the cleanup behavior\n'
+        'for the respective [Kubernetes] resources.\n'
+        '\n'
+        '* [StatefulSet]\n'
+        '  using `.spec.reconciling.cleanup.unknownObjects.statefulSet` property\n'
+        '* [PVC]\n'
+        '  using `.spec.reconciling.cleanup.unknownObjects.pvc` property\n'
+        '* [ConfigMap]\n'
+        '  using `.spec.reconciling.cleanup.unknownObjects.configMap` property\n'
+        '* [Service]\n'
+        '  using `.spec.reconciling.cleanup.unknownObjects.service` property\n'
+        '\n'
+        'The default behavior SHALL be `Delete` for each.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  reconciling:\n'
+        '    cleanup:\n'
+        '      unknownObjects:\n'
+        '        statefulSet: Delete\n'
+        '        pvc: Delete\n'
+        '        configMap: Delete\n'
+        '        service: Delete\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.41.7.1",
+    num='4.41.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup_ReconcileFailedObjects = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying what operator shall do when\n"
-        "reconciling [Kubernetes] resources that are failed using\n"
-        "`.spec.reconciling.cleanup.reconcileFailedObjects` object.\n"
-        "\n"
-        "The following properties SHALL be supported having [string] type containing\n"
-        "either `Retain` or `Delete` values that SHALL specify the behavior\n"
-        "for the respective failed [Kubernetes] resources.\n"
-        "\n"
-        "* [StatefulSet]\n"
-        "  using `.spec.reconciling.cleanup.reconcileFailedObjects.statefulSet` property\n"
-        "* [PVC]\n"
-        "  using `.spec.reconciling.cleanup.reconcileFailedObjects.pvc` property\n"
-        "* [ConfigMap]\n"
-        "  using `.spec.reconciling.cleanup.reconcileFailedObjects.configMap` property\n"
-        "* [Service]\n"
-        "  using `.spec.reconciling.cleanup.reconcileFailedObjects.service` property\n"
-        "\n"
-        "The default behavior is SHALL be `Retain` for each property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying what operator shall do when\n'
+        'reconciling [Kubernetes] resources that are failed using\n'
+        '`.spec.reconciling.cleanup.reconcileFailedObjects` object.\n'
+        '\n'
+        'The following properties SHALL be supported having [string] type containing\n'
+        'either `Retain` or `Delete` values that SHALL specify the behavior\n'
+        'for the respective failed [Kubernetes] resources.\n'
+        '\n'
+        '* [StatefulSet]\n'
+        '  using `.spec.reconciling.cleanup.reconcileFailedObjects.statefulSet` property\n'
+        '* [PVC]\n'
+        '  using `.spec.reconciling.cleanup.reconcileFailedObjects.pvc` property\n'
+        '* [ConfigMap]\n'
+        '  using `.spec.reconciling.cleanup.reconcileFailedObjects.configMap` property\n'
+        '* [Service]\n'
+        '  using `.spec.reconciling.cleanup.reconcileFailedObjects.service` property\n'
+        '\n'
+        'The default behavior is SHALL be `Retain` for each property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.41.8.1",
+    num='4.41.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining the default behavior for whole\n"
-        "[CHI] with the ability to re-define some behavior on cluster, shard and or replica level\n"
-        "using `.spec.defaults` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining the default behavior for whole\n'
+        '[CHI] with the ability to re-define some behavior on cluster, shard and or replica level\n'
+        'using `.spec.defaults` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.42.8.1",
+    num='4.42.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_StorageManagementProvisioner = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.storageManagement` property\n"
-        "with string enum type that SHALL define storage management provisioner.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.storageManagement` property\n'
+        'with string enum type that SHALL define storage management provisioner.\n'
+        '\n'
         'This value can be either `"StatefulSet"` or `"Operator""`.\n'
-        "\n"
+        '\n'
         'The default value SHALL be `"StatefulSet"`.\n'
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    storageManagement:\n"
-        "      provisioner: Operator\n"
-        "```\n"
-        "\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    storageManagement:\n'
+        '      provisioner: Operator\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.42.9.1",
+    num='4.42.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_ReplicasUseFQDN = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.replicasUseFQDN` property\n"
-        "with [bool enum] type that SHALL define if replicas SHALL be specified by FQDN in `<host></host>`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.replicasUseFQDN` property\n'
+        'with [bool enum] type that SHALL define if replicas SHALL be specified by FQDN in `<host></host>`.\n'
+        '\n'
         'If the value is `"no"` then it SHALL use short hostname and `clickhouse-server`\n'
-        "SHALL use [Kubernetes] default suffixes for proper DNS lookup.\n"
-        "\n"
+        'SHALL use [Kubernetes] default suffixes for proper DNS lookup.\n'
+        '\n'
         'The default value SHALL be `"yes"`.\n'
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
         '    replicasUseFQDN: "no"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.42.10.1",
+    num='4.42.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_DistributedDDL = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.distributedDDL` object\n"
-        "that SHALL allow to specify `<yandex><distributed_ddl></distributed_ddl></yandex>`\n"
-        "[ClickHouse] server settings\n"
-        "(https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-distributed_ddl).\n"
-        "\n"
-        "Each property of the object SHALL map to the corresponding setting name and value.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        " defaults:\n"
-        "    distributedDDL:\n"
-        "      profile: default\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.distributedDDL` object\n'
+        'that SHALL allow to specify `<yandex><distributed_ddl></distributed_ddl></yandex>`\n'
+        '[ClickHouse] server settings\n'
+        '(https://clickhouse.tech/docs/en/operations/server-configuration-parameters/settings/#server-settings-distributed_ddl).\n'
+        '\n'
+        'Each property of the object SHALL map to the corresponding setting name and value.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        ' defaults:\n'
+        '    distributedDDL:\n'
+        '      profile: default\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.42.11.1",
+    num='4.42.11.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates` object\n"
-        "that SHALL support specifying templates names which operator will use\n"
-        "to generate [Kubernetes] resources according to one or more [ClickHouse]\n"
-        "clusters described in current [CHI] resource.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    templates:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates` object\n'
+        'that SHALL support specifying templates names which operator will use\n'
+        'to generate [Kubernetes] resources according to one or more [ClickHouse]\n'
+        'clusters described in current [CHI] resource.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    templates:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.42.12.1",
+    num='4.42.12.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_HostTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates.hostTemplate` property of\n"
-        "[string] type that SHALL specify template name from `.spec.templates.hostTemplates`\n"
-        "which SHALL be applied to configure every `clickhouse-server` instance during rendering of\n"
-        "[ConfigMap] resources that will mount into [Pod].\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    templates:\n"
-        "      hostTemplate: host-template-custom-ports\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates.hostTemplate` property of\n'
+        '[string] type that SHALL specify template name from `.spec.templates.hostTemplates`\n'
+        'which SHALL be applied to configure every `clickhouse-server` instance during rendering of\n'
+        '[ConfigMap] resources that will mount into [Pod].\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    templates:\n'
+        '      hostTemplate: host-template-custom-ports\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.2.1",
+    num='4.42.12.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_PodTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates.podTemplate` property\n"
-        "of [string] type that SHALL specify template name from `.spec.templates.podTemplates`\n"
-        "that SHALL allow customization of each `Pod` resource during rendering and reconciliation\n"
-        "of each `StatefulSet.spec` resource described in `.spec.configuration.clusters`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    templates:\n"
-        "      podTemplate: clickhouse-v20.6\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates.podTemplate` property\n'
+        'of [string] type that SHALL specify template name from `.spec.templates.podTemplates`\n'
+        'that SHALL allow customization of each `Pod` resource during rendering and reconciliation\n'
+        'of each `StatefulSet.spec` resource described in `.spec.configuration.clusters`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    templates:\n'
+        '      podTemplate: clickhouse-v20.6\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.3.1",
+    num='4.42.12.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_dataVolumeClaimTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates.dataVolumeClaimTemplate` property\n"
-        "of [string] type that SHALL specify template name from `.spec.templates.dataVolumeClaimTemplates`\n"
-        "that SHALL allow customization of each [PVC] which will mount for clickhouse data directory\n"
-        "in each [Pod] during render and reconcile every `StatefulSet.spec` resource described\n"
-        "in `.spec.configuration.clusters`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        " defaults:\n"
-        "    templates:\n"
-        "      dataVolumeClaimTemplate: default-volume-claim\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates.dataVolumeClaimTemplate` property\n'
+        'of [string] type that SHALL specify template name from `.spec.templates.dataVolumeClaimTemplates`\n'
+        'that SHALL allow customization of each [PVC] which will mount for clickhouse data directory\n'
+        'in each [Pod] during render and reconcile every `StatefulSet.spec` resource described\n'
+        'in `.spec.configuration.clusters`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        ' defaults:\n'
+        '    templates:\n'
+        '      dataVolumeClaimTemplate: default-volume-claim\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.4.1",
+    num='4.42.12.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_logVolumeClaimTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.defaults.templates.logVolumeClaimTemplate` property\n"
-        "of [string] type that SHALL specify template name from `.spec.templates.volumeClaimTemplates`\n"
-        "that SHALL allow customization of each [PVC] which will mount for clickhouse log directory\n"
-        "in each [Pod] during render and reconcile every `StatefulSet.spec` resource described\n"
-        "in `.spec.configuration.clusters`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        " defaults:\n"
-        "    templates:\n"
-        "      logVolumeClaimTemplate: default-volume-claim\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.defaults.templates.logVolumeClaimTemplate` property\n'
+        'of [string] type that SHALL specify template name from `.spec.templates.volumeClaimTemplates`\n'
+        'that SHALL allow customization of each [PVC] which will mount for clickhouse log directory\n'
+        'in each [Pod] during render and reconcile every `StatefulSet.spec` resource described\n'
+        'in `.spec.configuration.clusters`. If `.defaults.templates.logVolumeClaimTemplate` is \n'
+        'specified, and no container named `clickhouse-log` specified in [Pod], [ClickHouse Operator] SHALL \n'
+        'create new container for logs with name `clickhouse-log` and image `registry.access.redhat.com/ubi8/ubi-minimal:latest`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        ' defaults:\n'
+        '    templates:\n'
+        '      logVolumeClaimTemplate: default-volume-claim\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.5.1",
+    num='4.42.12.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ServiceTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates.serviceTemplate` property\n"
-        "of [string] type that SHALL specify template name from `.spec.templates.serviceTemplates`\n"
-        "that SHALL allow customization for one [Service] resource which will created by operator\n"
-        "for all clusters in whole [CHI] resource.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    templates:\n"
-        "      serviceTemplate: chi-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates.serviceTemplate` property\n'
+        'of [string] type that SHALL specify template name from `.spec.templates.serviceTemplates`\n'
+        'that SHALL allow customization for one [Service] resource which will created by operator\n'
+        'for all clusters in whole [CHI] resource.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    templates:\n'
+        '      serviceTemplate: chi-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.6.1",
+    num='4.42.12.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ClusterServiceTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates.clusterServiceTemplate` property\n"
-        "of [string] type that SHALL specify template name from `.spec.templates.serviceTemplates`\n"
-        "that SHALL allow customization for each [Service] resource\n"
-        "which will created by operator for each clickhouse cluster described in\n"
-        "`.spec.configuration.clusters`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    templates:\n"
-        "      clusterServiceTemplate: cluster-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates.clusterServiceTemplate` property\n'
+        'of [string] type that SHALL specify template name from `.spec.templates.serviceTemplates`\n'
+        'that SHALL allow customization for each [Service] resource\n'
+        'which will created by operator for each clickhouse cluster described in\n'
+        '`.spec.configuration.clusters`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    templates:\n'
+        '      clusterServiceTemplate: cluster-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.7.1",
+    num='4.42.12.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ShardServiceTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates.shardServiceTemplate` property\n"
-        "of [string] type that SHALL specify template name from `.spec.templates.serviceTemplates`\n"
-        "that SHALL allow customization for each [Service] resource which will created by\n"
-        "operator for each shard inside clickhouse cluster described in `.spec.configuration.clusters`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    templates:\n"
-        "      shardServiceTemplate: shard-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates.shardServiceTemplate` property\n'
+        'of [string] type that SHALL specify template name from `.spec.templates.serviceTemplates`\n'
+        'that SHALL allow customization for each [Service] resource which will created by\n'
+        'operator for each shard inside clickhouse cluster described in `.spec.configuration.clusters`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    templates:\n'
+        '      shardServiceTemplate: shard-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.8.1",
+    num='4.42.12.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ReplicaServiceTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `.spec.defaults.templates.replicaServiceTemplate` property\n"
-        "of [string] type that SHALL specify template name from `chi.spec.templates.serviceTemplates`\n"
-        "that SHALL allow customization for each [Service] resource which will created by\n"
-        "operator for each replica inside each shard inside each clickhouse cluster\n"
-        "described in `.spec.configuration.clusters`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  defaults:\n"
-        "    templates:\n"
-        "      replicaServiceTemplate: replica-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.defaults.templates.replicaServiceTemplate` property\n'
+        'of [string] type that SHALL specify template name from `chi.spec.templates.serviceTemplates`\n'
+        'that SHALL allow customization for each [Service] resource which will created by\n'
+        'operator for each replica inside each shard inside each clickhouse cluster\n'
+        'described in `.spec.configuration.clusters`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  defaults:\n'
+        '    templates:\n'
+        '      replicaServiceTemplate: replica-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.9.1",
+    num='4.42.12.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_VolumeClaimTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL treat `.spec.defaults.templates.volumeClaimTemplate`\n"
-        "of [string] type as _deprecated_ in favor of `dataVolumeClaimTemplate`\n"
-        "and `logVolumeClaimTemplate` properties.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL treat `.spec.defaults.templates.volumeClaimTemplate`\n'
+        'of [string] type as _deprecated_ in favor of `dataVolumeClaimTemplate`\n'
+        'and `logVolumeClaimTemplate` properties.\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.42.12.10.1",
+    num='4.42.12.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow configuration of multiple aspects and\n"
-        "behavior of `clickhouse-server` instances while also allowing\n"
-        "description of multiple `clickhouse-server` clusters inside one [CHI] resource\n"
-        "using `.spec.configuration` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow configuration of multiple aspects and\n'
+        'behavior of `clickhouse-server` instances while also allowing\n'
+        'description of multiple `clickhouse-server` clusters inside one [CHI] resource\n'
+        'using `.spec.configuration` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.43.1",
+    num='4.43.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow configuration of settings in\n"
-        "`<yandex><zookeeper></zookeeper></yandex>` section in each [Pod] when generating [ConfigMap]\n"
-        "which SHALL be mounted in `/etc/clickhouse-server/config.d/` using\n"
-        "`.spec.configuration.zookeeper` object.\n"
-        "\n"
-        "The operator itself SHALL not manage [ZooKeeper] which and user SHALL install\n"
-        "[ZooKeeper] separately.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    zookeeper:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow configuration of settings in\n'
+        '`<yandex><zookeeper></zookeeper></yandex>` section in each [Pod] when generating [ConfigMap]\n'
+        'which SHALL be mounted in `/etc/clickhouse-server/config.d/` using\n'
+        '`.spec.configuration.zookeeper` object.\n'
+        '\n'
+        'The operator itself SHALL not manage [ZooKeeper] which and user SHALL install\n'
+        '[ZooKeeper] separately.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    zookeeper:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.43.2.1",
+    num='4.43.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Nodes = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support description of every available [ZooKeeper]\n"
-        "cluster node for interaction using `.spec.configuration.zookeer.nodes`\n"
-        "of the [array] type.\n"
-        "\n"
-        "Each item of the array SHALL specify the following properties:\n"
-        "\n"
-        "* `host` property of [string] type that SHALL contain DNS name or IP address for [ZooKeeper] node\n"
-        "* `port` property of [integer] type with minimum of `0` and maximum of `65535`\n"
-        "  that SHALL specify the TCP port which SHALL be used to connect to [ZooKeeper] node\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec\n"
-        "  configuration:\n"
-        "    zookeeper:\n"
-        "      nodes:\n"
-        "        - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local\n"
-        "          port: 2181\n"
-        "        - host: zookeeper-1.zookeepers.zoo3ns.svc.cluster.local\n"
-        "          port: 2181\n"
-        "        - host: zookeeper-2.zookeepers.zoo3ns.svc.cluster.local\n"
-        "          port: 2181\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support description of every available [ZooKeeper]\n'
+        'cluster node for interaction using `.spec.configuration.zookeer.nodes`\n'
+        'of the [array] type.\n'
+        '\n'
+        'Each item of the array SHALL specify the following properties:\n'
+        '\n'
+        '* `host` property of [string] type that SHALL contain DNS name or IP address for [ZooKeeper] node\n'
+        '* `port` property of [integer] type with minimum of `0` and maximum of `65535`\n'
+        '  that SHALL specify the TCP port which SHALL be used to connect to [ZooKeeper] node\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    zookeeper:\n'
+        '      nodes:\n'
+        '        - host: zookeeper-0.zookeepers.zoo3ns.svc.cluster.local\n'
+        '          port: 2181\n'
+        '        - host: zookeeper-1.zookeepers.zoo3ns.svc.cluster.local\n'
+        '          port: 2181\n'
+        '        - host: zookeeper-2.zookeepers.zoo3ns.svc.cluster.local\n'
+        '          port: 2181\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.43.2.2.1",
+    num='4.43.2.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_SessionTimeoutMs = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying session timeout in `ms` during connection to\n"
-        "[ZooKeeper] using `.spec.configuration.zookeeper.session_timeout_ms` property\n"
-        "of [integer] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    zookeeper:\n"
-        "      session_timeout_ms: 30000\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying session timeout in `ms` during connection to\n'
+        '[ZooKeeper] using `.spec.configuration.zookeeper.session_timeout_ms` property\n'
+        'of [integer] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    zookeeper:\n'
+        '      session_timeout_ms: 30000\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.43.2.3.1",
+    num='4.43.2.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_OperationTimeoutMs = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying operation timeout in `ms` during  \n"
-        "[ZooKeeper] transactions using `.spec.configuration.zookeeper.operation_timeout_ms` property\n"
-        "of [integer] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    zookeeper:\n"
-        "      operation_timeout_ms: 10000\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying operation timeout in `ms` during  \n'
+        '[ZooKeeper] transactions using `.spec.configuration.zookeeper.operation_timeout_ms` property\n'
+        'of [integer] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    zookeeper:\n'
+        '      operation_timeout_ms: 10000\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.43.2.4.1",
+    num='4.43.2.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Root = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying root znode path usded inside [ZooKeeper]\n"
-        "to store [ClickHouse] related data, such as replication queue or distributed DDL,\n"
-        "using `.spec.configuration.zookeeper.root` property of [string] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    zookeeper:\n"
+        '[ClickHouse Operator] SHALL support specifying root znode path usded inside [ZooKeeper]\n'
+        'to store [ClickHouse] related data, such as replication queue or distributed DDL,\n'
+        'using `.spec.configuration.zookeeper.root` property of [string] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    zookeeper:\n'
         '      root: "/path/to/zookeeper/root/node"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.43.2.5.1",
+    num='4.43.2.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Identify = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying access credentials string in the\n"
-        "`user:password` format that SHALL be used for digest authorization with [ZooKeeper]\n"
-        "using `.spec.configuration.zookeeper.identity` property of [string] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    zookeeper:\n"
+        '[ClickHouse Operator] SHALL support specifying access credentials string in the\n'
+        '`user:password` format that SHALL be used for digest authorization with [ZooKeeper]\n'
+        'using `.spec.configuration.zookeeper.identity` property of [string] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    zookeeper:\n'
         '      identity: "user:password"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.43.2.6.1",
+    num='4.43.2.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Users = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying settings\n"
-        "in `<yandex><users>..</users></yandex>` section of each [Pod] during generation of [ConfigMap]\n"
-        "mounted in `/etc/clickhouse-server/users.d/` using `.spec.configuration.users` object.\n"
-        "\n"
-        "This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/settings/settings-users/.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    users:\n"
-        "      readonly/profile: readonly\n"
-        "      #     <users>\n"
-        "      #        <readonly>\n"
-        "      #          <profile>readonly</profile>\n"
-        "      #        </readonly>\n"
-        "      #     </users>\n"
-        "      test/networks/ip:\n"
+        '[ClickHouse Operator] SHALL support specifying settings\n'
+        'in `<yandex><users>..</users></yandex>` section of each [Pod] during generation of [ConfigMap]\n'
+        'mounted in `/etc/clickhouse-server/users.d/` using `.spec.configuration.users` object.\n'
+        '\n'
+        'This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/settings/settings-users/.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    users:\n'
+        '      readonly/profile: readonly\n'
+        '      #     <users>\n'
+        '      #        <readonly>\n'
+        '      #          <profile>readonly</profile>\n'
+        '      #        </readonly>\n'
+        '      #     </users>\n'
+        '      test/networks/ip:\n'
         '        - "127.0.0.1"\n'
         '        - "::/0"\n'
-        "      #     <users>\n"
-        "      #        <test>\n"
-        "      #          <networks>\n"
-        "      #            <ip>127.0.0.1</ip>\n"
-        "      #            <ip>::/0</ip>\n"
-        "      #          </networks>\n"
-        "      #        </test>\n"
-        "      #     </users>\n"
-        "      test/profile: default\n"
-        "      test/quotas: default\n"
-        "```\n"
-        "\n"
+        '      #     <users>\n'
+        '      #        <test>\n'
+        '      #          <networks>\n'
+        '      #            <ip>127.0.0.1</ip>\n'
+        '      #            <ip>::/0</ip>\n'
+        '      #          </networks>\n'
+        '      #        </test>\n'
+        '      #     </users>\n'
+        '      test/profile: default\n'
+        '      test/quotas: default\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.43.3.1",
+    num='4.43.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Profiles = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying settings\n"
-        "in `<yandex><profiles>..</profiles></yandex>` section of each [Pod] during generation of [ConfigMap]\n"
-        "mounted in `/etc/clickhouse-server/users.d/` using `.spec.configuration.profiles` object.\n"
-        "\n"
-        "This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/settings/settings-profiles/.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    profiles:\n"
+        '[ClickHouse Operator] SHALL support specifying settings\n'
+        'in `<yandex><profiles>..</profiles></yandex>` section of each [Pod] during generation of [ConfigMap]\n'
+        'mounted in `/etc/clickhouse-server/users.d/` using `.spec.configuration.profiles` object.\n'
+        '\n'
+        'This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/settings/settings-profiles/.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    profiles:\n'
         '      readonly/readonly: "1"\n'
-        "      #      <profiles>\n"
-        "      #        <readonly>\n"
-        "      #          <readonly>1</readonly>\n"
-        "      #        </readonly>\n"
-        "      #      </profiles>\n"
+        '      #      <profiles>\n'
+        '      #        <readonly>\n'
+        '      #          <readonly>1</readonly>\n'
+        '      #        </readonly>\n'
+        '      #      </profiles>\n'
         '      default/max_memory_usage: "1000000000"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.43.4.1",
+    num='4.43.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Quotas = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying settings\n"
-        "in `<yandex><quotas>..</quotas></yandex>` of each [Pod] during generation of [ConfigMap]\n"
-        "mounted in `/etc/clickhouse-server/users.d/` using `.spec.configuration.quotas` object.  \n"
-        "\n"
-        "This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/quotas/.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    quotas:\n"
+        '[ClickHouse Operator] SHALL support specifying settings\n'
+        'in `<yandex><quotas>..</quotas></yandex>` of each [Pod] during generation of [ConfigMap]\n'
+        'mounted in `/etc/clickhouse-server/users.d/` using `.spec.configuration.quotas` object.  \n'
+        '\n'
+        'This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/quotas/.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    quotas:\n'
         '      default/interval/duration: "3600"\n'
-        "      #     <quotas>\n"
-        "      #       <default>\n"
-        "      #         <interval>\n"
-        "      #           <duration>3600</duration>\n"
-        "      #         </interval>\n"
-        "      #       </default>\n"
-        "      #     </quotas>\n"
-        "```\n"
+        '      #     <quotas>\n'
+        '      #       <default>\n'
+        '      #         <interval>\n'
+        '      #           <duration>3600</duration>\n'
+        '      #         </interval>\n'
+        '      #       </default>\n'
+        '      #     </quotas>\n'
+        '```\n'
     ),
     link=None,
     level=4,
-    num="4.43.5.1",
+    num='4.43.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Settings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying settings\n"
-        "in `<yandex>..</yandex>` section of each [Pod] during generation of [ConfigMap]\n"
-        "mounted in `/etc/clickhouse-server/config.d/` using `.spec.configuration.settings` object.  \n"
-        "\n"
-        "This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/settings/settings/.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    settings:\n"
-        "      compression/case/method: zstd\n"
-        "      #      <compression>\n"
-        "      #        <case>\n"
-        "      #          <method>zstd</method>\n"
-        "      #        </case>\n"
-        "      #      </compression>\n"
-        "      disable_internal_dns_cache: 1\n"
-        "      #      <disable_internal_dns_cache>1</disable_internal_dns_cache>\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying settings\n'
+        'in `<yandex>..</yandex>` section of each [Pod] during generation of [ConfigMap]\n'
+        'mounted in `/etc/clickhouse-server/config.d/` using `.spec.configuration.settings` object.  \n'
+        '\n'
+        'This object SHALL support specifying any setting defined in https://clickhouse.tech/docs/en/operations/settings/settings/.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    settings:\n'
+        '      compression/case/method: zstd\n'
+        '      #      <compression>\n'
+        '      #        <case>\n'
+        '      #          <method>zstd</method>\n'
+        '      #        </case>\n'
+        '      #      </compression>\n'
+        '      disable_internal_dns_cache: 1\n'
+        '      #      <disable_internal_dns_cache>1</disable_internal_dns_cache>\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.43.6.1",
+    num='4.43.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Files = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying content of any setting file inside each [Pod]\n"
-        "during generation of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`.\n"
-        "\n"
-        "Every key in this object SHALL specify the file name.\n"
-        "Every value in this object SHALL specify the file content.\n"
-        "\n"
-        "Using `!!binary |` and base64 for binary files SHALL be supported as specified in\n"
-        "https://yaml.org/type/binary.html.\n"
-        "\n"
-        "Each key SHALL support having one of the following prefixes\n"
-        "\n"
-        "* `USERS`\n"
-        "* `COMMON`\n"
-        "* `HOST`\n"
-        "* `config.d`\n"
-        "* `users.d`\n"
-        "* `cond.d`\n"
-        "\n"
-        "Wrong prefixes and sub-folders SHALL be ignored.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    files:\n"
-        "      dict1.xml: |\n"
-        "        <yandex>\n"
-        "            <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->\n"
-        "        </yandex>\n"
-        "      source1.csv: |\n"
-        "        a1,b1,c1,d1\n"
-        "        a2,b2,c2,d2\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying content of any setting file inside each [Pod]\n'
+        'during generation of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`.\n'
+        '\n'
+        'Every key in this object SHALL specify the file name.\n'
+        'Every value in this object SHALL specify the file content.\n'
+        '\n'
+        'Using `!!binary |` and base64 for binary files SHALL be supported as specified in\n'
+        'https://yaml.org/type/binary.html.\n'
+        '\n'
+        'Each key SHALL support having one of the following prefixes\n'
+        '\n'
+        '* `USERS`\n'
+        '* `COMMON`\n'
+        '* `HOST`\n'
+        '* `config.d`\n'
+        '* `users.d`\n'
+        '* `cond.d`\n'
+        '\n'
+        'Wrong prefixes and sub-folders SHALL be ignored.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    files:\n'
+        '      dict1.xml: |\n'
+        '        <yandex>\n'
+        '            <!-- ref to file /etc/clickhouse-data/config.d/source1.csv -->\n'
+        '        </yandex>\n'
+        '      source1.csv: |\n'
+        '        a1,b1,c1,d1\n'
+        '        a2,b2,c2,d2\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.43.7.1",
+    num='4.43.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support description of ClickHouse clusters layout and SHALL\n"
-        "allow changing settings on cluster, shard and replica levels using\n"
-        "`.spec.configuration.cluster` object of [array] type.\n"
-        "\n"
-        "Every cluster SHALL be a set of [StatefulSet].\n"
-        "One [StatefulSet] SHALL contain only one [Pod] with `clickhouse-server`.\n"
-        "All [Pods] SHALL render `<remote_server>` part of [ClickHouse] configs\n"
-        "mounted from ConfigMap as `/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`.\n"
-        "\n"
-        "Clusters SHALL be configured to use Distributed table engine (https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/).\n"
-        "\n"
-        "A `cluster` MAY contain [ZooKeeper] settings that SHALL support inheriting from top [CHI] level.\n"
-        "A `cluster` SHALL support creating ReplicatedMergeTree tables\n"
-        "that interact with [ZooKeeper] nodes specified in `.spec.configuration.zookeer.nodes`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support description of ClickHouse clusters layout and SHALL\n'
+        'allow changing settings on cluster, shard and replica levels using\n'
+        '`.spec.configuration.cluster` object of [array] type.\n'
+        '\n'
+        'Every cluster SHALL be a set of [StatefulSet].\n'
+        'One [StatefulSet] SHALL contain only one [Pod] with `clickhouse-server`.\n'
+        'All [Pods] SHALL render `<remote_server>` part of [ClickHouse] configs\n'
+        'mounted from ConfigMap as `/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`.\n'
+        '\n'
+        'Clusters SHALL be configured to use Distributed table engine (https://clickhouse.tech/docs/en/engines/table-engines/special/distributed/).\n'
+        '\n'
+        'A `cluster` MAY contain [ZooKeeper] settings that SHALL support inheriting from top [CHI] level.\n'
+        'A `cluster` SHALL support creating ReplicatedMergeTree tables\n'
+        'that interact with [ZooKeeper] nodes specified in `.spec.configuration.zookeer.nodes`.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.44.1",
+    num='4.44.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying cluster name, used to identify a set of [ClickHouse]\n"
-        "servers and used during generating names of related [Kubernetes] resources using\n"
-        "`.spec.configuration.clusters[].name` array item property of type [string] having\n"
-        "minimum length of `1` and maximum length of `15` matching\n"
+        '[ClickHouse Operator] SHALL support specifying cluster name, used to identify a set of [ClickHouse]\n'
+        'servers and used during generating names of related [Kubernetes] resources using\n'
+        '`.spec.configuration.clusters[].name` array item property of type [string] having\n'
+        'minimum length of `1` and maximum length of `15` matching\n'
         '`"^[a-zA-Z0-9-]{0,15}$"` pattern.\n'
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: all-counts\n"
-        "```\n"
-        "\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: all-counts\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.44.2.1",
+    num='4.44.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `<yandex><zookeeper>..</zookeeper></yandex>`\n"
-        "section setting in each [Pod] only in current [ClickHouse] cluster used during generation\n"
-        "of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/` using\n"
-        "`.spec.configuration.clusters[].zookeeper` array item object that SHALL\n"
-        "support the same properties as for the top-level `.spec.configuration.zookeeper` object.\n"
-        "\n"
-        "Any specified settings SHALL override top-level `.spec.configuration.zookeeper` settings.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        zookeeper:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `<yandex><zookeeper>..</zookeeper></yandex>`\n'
+        'section setting in each [Pod] only in current [ClickHouse] cluster used during generation\n'
+        'of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/` using\n'
+        '`.spec.configuration.clusters[].zookeeper` array item object that SHALL\n'
+        'support the same properties as for the top-level `.spec.configuration.zookeeper` object.\n'
+        '\n'
+        'Any specified settings SHALL override top-level `.spec.configuration.zookeeper` settings.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        zookeeper:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.44.3.1",
+    num='4.44.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Settings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n"
-        "section settings in each [Pod] for one shard that SHALL be used during generation\n"
-        "of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "using `.spec.configuration.clusters[].settings` array item object that SHALL\n"
-        "support the same properties as for the top-level `.spec.configuration.settings` object.\n"
-        "\n"
-        "Any specified settings SHALL override top-level `.spec.configuration.settings` and\n"
-        "cluster level `.spec.configuration.clusters.settings` settings.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        settings:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n'
+        'section settings in each [Pod] for one shard that SHALL be used during generation\n'
+        'of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'using `.spec.configuration.clusters[].settings` array item object that SHALL\n'
+        'support the same properties as for the top-level `.spec.configuration.settings` object.\n'
+        '\n'
+        'Any specified settings SHALL override top-level `.spec.configuration.settings` and\n'
+        'cluster level `.spec.configuration.clusters.settings` settings.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        settings:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.44.4.1",
+    num='4.44.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Files = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n"
-        "only for one shard that SHALL be used during generation of [ConfigMap] mounted in\n"
-        "`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n"
-        "`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].files` array\n"
-        "item object that SHALL support the same properties as for\n"
-        "the top level `.spec.configuration.files` object.\n"
-        "\n"
-        "Any specified files SHALL override top level `.spec.configuration.files` and\n"
-        "cluster level `.spec.configuration.clusters.files` if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        files:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n'
+        'only for one shard that SHALL be used during generation of [ConfigMap] mounted in\n'
+        '`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n'
+        '`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].files` array\n'
+        'item object that SHALL support the same properties as for\n'
+        'the top level `.spec.configuration.files` object.\n'
+        '\n'
+        'Any specified files SHALL override top level `.spec.configuration.files` and\n'
+        'cluster level `.spec.configuration.clusters.files` if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        files:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.44.5.1",
+    num='4.44.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining templates names which will used for\n"
-        "generation of [Kubernetes] resources according to selected shard using\n"
-        "`.spec.configuration.clusters[].templates` array item object that SHALL support\n"
-        "the same properties as the top level `.spec.defaults.templates` object.\n"
-        "\n"
-        "The `serviceTemplate` SHALL be ignored for cluster-level.\n"
-        "\n"
-        "Any specified templates SHALL override top level `.spec.default.templates`\n"
-        "and cluster level `.spec.configuration.clusters.templates` properties if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        templates:\n"
-        "          podTemplate: clickhouse-v20.6\n"
-        "          dataVolumeClaimTemplate: default-volume-claim\n"
-        "          logVolumeClaimTemplate: default-volume-claim\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining templates names which will used for\n'
+        'generation of [Kubernetes] resources according to selected shard using\n'
+        '`.spec.configuration.clusters[].templates` array item object that SHALL support\n'
+        'the same properties as the top level `.spec.defaults.templates` object.\n'
+        '\n'
+        'The `serviceTemplate` SHALL be ignored for cluster-level.\n'
+        '\n'
+        'Any specified templates SHALL override top level `.spec.default.templates`\n'
+        'and cluster level `.spec.configuration.clusters.templates` properties if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        templates:\n'
+        '          podTemplate: clickhouse-v20.6\n'
+        '          dataVolumeClaimTemplate: default-volume-claim\n'
+        '          logVolumeClaimTemplate: default-volume-claim\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.44.6.1",
+    num='4.44.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying current cluster layout such as\n"
-        "how many shards SHALL be in cluster, how many replicas in each shard\n"
-        "and SHALL allow to override settings on each shard and replica separately.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: all-counts\n"
-        "        layout:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying current cluster layout such as\n'
+        'how many shards SHALL be in cluster, how many replicas in each shard\n'
+        'and SHALL allow to override settings on each shard and replica separately.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: all-counts\n'
+        '        layout:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.45.1",
+    num='4.45.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Type = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL treat `.spec.configuration.clusters[].layout.type`\n"
-        "property as _deprecated_.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL treat `.spec.configuration.clusters[].layout.type`\n'
+        'property as _deprecated_.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.45.2.1",
+    num='4.45.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_ShardsCount = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying how many shards for current [ClickHouse] cluster\n"
-        "will be created in [Kubernetes] using `.spec.configuration.clusters[].layout.shardsCount`\n"
-        "property of [integer] type. Each shard SHALL contain shared-nothing part of\n"
-        "data that MAY contain a set of replicas.\n"
-        "\n"
-        "Cluster SHALL contain only one shard by default.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: my-cluster\n"
-        "        layout:\n"
-        "          shardsCount: 1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying how many shards for current [ClickHouse] cluster\n'
+        'will be created in [Kubernetes] using `.spec.configuration.clusters[].layout.shardsCount`\n'
+        'property of [integer] type. Each shard SHALL contain shared-nothing part of\n'
+        'data that MAY contain a set of replicas.\n'
+        '\n'
+        'Cluster SHALL contain only one shard by default.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: my-cluster\n'
+        '        layout:\n'
+        '          shardsCount: 1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.45.3.1",
+    num='4.45.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_ReplicasCount = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying number of replicas for each shards\n"
-        "of the current [ClickHouse] cluster that will be created in [Kubernetes]\n"
-        "using `.spec.configuration.clusters[].layout.replicasCount` of [integer] type.\n"
-        "\n"
-        "Each replica SHALL be a separate [StatefulSet] that SHALL contain only one [Pod]\n"
-        "with `clickhouse-server` instance.\n"
-        "\n"
-        "Every shard SHALL contain only one replica by default.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: my-cluster\n"
-        "        layout:\n"
-        "          replicasCount: 1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying number of replicas for each shards\n'
+        'of the current [ClickHouse] cluster that will be created in [Kubernetes]\n'
+        'using `.spec.configuration.clusters[].layout.replicasCount` of [integer] type.\n'
+        '\n'
+        'Each replica SHALL be a separate [StatefulSet] that SHALL contain only one [Pod]\n'
+        'with `clickhouse-server` instance.\n'
+        '\n'
+        'Every shard SHALL contain only one replica by default.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: my-cluster\n'
+        '        layout:\n'
+        '          replicasCount: 1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.45.4.1",
+    num='4.45.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support overriding top level `.spec.configuration` and\n"
-        "cluster level `.spec.configuration.clusters` settings for each shard separately\n"
-        "using `.spec.configuration.clusters[].layout.shards` array type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: my-cluster\n"
-        "        layout:\n"
-        "          shards:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support overriding top level `.spec.configuration` and\n'
+        'cluster level `.spec.configuration.clusters` settings for each shard separately\n'
+        'using `.spec.configuration.clusters[].layout.shards` array type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: my-cluster\n'
+        '        layout:\n'
+        '          shards:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.45.5.1",
+    num='4.45.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom shard name using\n"
-        "`.spec.configuration.clusters[].layout.shards[].name` array item property of [string] type\n"
+        '[ClickHouse Operator] SHALL support specifying custom shard name using\n'
+        '`.spec.configuration.clusters[].layout.shards[].name` array item property of [string] type\n'
         'with min length of `1` and max length of `15` that matches `"^[a-zA-Z0-9-]{0,15}$"` pattern.\n'
-        "\n"
-        "If not specified shard name SHALL be auto generated.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: my-cluster\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: custom-shard-name\n"
-        "```\n"
-        "\n"
+        '\n'
+        'If not specified shard name SHALL be auto generated.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: my-cluster\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: custom-shard-name\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.2.1",
+    num='4.45.5.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_DefinitionType = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL treat `.spec.configuration.clusters[].layout.shards[].definitionType`\n"
-        "property as _deprecated_.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL treat `.spec.configuration.clusters[].layout.shards[].definitionType`\n'
+        'property as _deprecated_.\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.3.1",
+    num='4.45.5.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Weight = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying shard `<weight>` setting which will be used\n"
-        "during insert into tables using `Distributed` engine.\n"
-        "This value SHALL be be applied in `<remote_servers>` inside [ConfigMap] mounted in\n"
-        "`/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: my-cluster\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: custom-shard-name\n"
-        "              weight: 1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying shard `<weight>` setting which will be used\n'
+        'during insert into tables using `Distributed` engine.\n'
+        'This value SHALL be be applied in `<remote_servers>` inside [ConfigMap] mounted in\n'
+        '`/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: my-cluster\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: custom-shard-name\n'
+        '              weight: 1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.4.1",
+    num='4.45.5.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_InternalReplication = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying  `<internal_replication>` setting which\n"
-        "SHALL be used during insert into tables with `Distributed` engine using\n"
-        "`.spec.configuration.clusters[].layout.shards[].internalReplication` property of\n"
-        "[bool enum] type.\n"
-        "\n"
-        "It SHALL support enabling insert only into one live replica while\n"
-        "other replicas SHALL download inserted data during replication.\n"
-        "\n"
-        "The value SHALL be applied in `<remote_servers>` inside [ConfigMap] mounted in\n"
-        "`/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`\n"
-        "\n"
-        "The default value SHALL be `true` when `.spec.configuration.clusters[].layout.replicaCount` > `1` and `0` otherwise.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: my-cluster\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: custom-shard-name\n"
-        "              internalReplication: 1\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying  `<internal_replication>` setting which\n'
+        'SHALL be used during insert into tables with `Distributed` engine using\n'
+        '`.spec.configuration.clusters[].layout.shards[].internalReplication` property of\n'
+        '[bool enum] type.\n'
+        '\n'
+        'It SHALL support enabling insert only into one live replica while\n'
+        'other replicas SHALL download inserted data during replication.\n'
+        '\n'
+        'The value SHALL be applied in `<remote_servers>` inside [ConfigMap] mounted in\n'
+        '`/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`\n'
+        '\n'
+        'The default value SHALL be `true` when `.spec.configuration.clusters[].layout.replicaCount` > `1` and `0` otherwise.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: my-cluster\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: custom-shard-name\n'
+        '              internalReplication: 1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.5.1",
+    num='4.45.5.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Settings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n"
-        "section settings in each [Pod] for one shard that SHALL be used during generation\n"
-        "of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "using `.spec.configuration.clusters[].layout.shards[].settings` array item object that SHALL\n"
-        "support the same properties as for the top-level `.spec.configuration.settings` object.\n"
-        "\n"
-        "Any specified settings SHALL override top-level `.spec.configuration.settings` and\n"
-        "cluster level `.spec.configuration.clusters.settings` settings.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: shard-name\n"
-        "              settings:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n'
+        'section settings in each [Pod] for one shard that SHALL be used during generation\n'
+        'of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'using `.spec.configuration.clusters[].layout.shards[].settings` array item object that SHALL\n'
+        'support the same properties as for the top-level `.spec.configuration.settings` object.\n'
+        '\n'
+        'Any specified settings SHALL override top-level `.spec.configuration.settings` and\n'
+        'cluster level `.spec.configuration.clusters.settings` settings.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: shard-name\n'
+        '              settings:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.6.1",
+    num='4.45.5.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Files = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n"
-        "only for one shard that SHALL be used during generation of [ConfigMap] mounted in\n"
-        "`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n"
-        "`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.shards[].files` array\n"
-        "item object that SHALL support the same properties as for\n"
-        "the top level `.spec.configuration.files` object.\n"
-        "\n"
-        "Any specified files SHALL override top level `.spec.configuration.files` and\n"
-        "cluster level `.spec.configuration.clusters.files` if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: shard-name\n"
-        "              files:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n'
+        'only for one shard that SHALL be used during generation of [ConfigMap] mounted in\n'
+        '`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n'
+        '`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.shards[].files` array\n'
+        'item object that SHALL support the same properties as for\n'
+        'the top level `.spec.configuration.files` object.\n'
+        '\n'
+        'Any specified files SHALL override top level `.spec.configuration.files` and\n'
+        'cluster level `.spec.configuration.clusters.files` if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: shard-name\n'
+        '              files:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.7.1",
+    num='4.45.5.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining templates names which will used for\n"
-        "generation of [Kubernetes] resources for the shard using\n"
-        "`.spec.configuration.clusters[].layout.shards[].templates` array item object that SHALL support\n"
-        "the same properties as the top level `.spec.defaults.templates` object.\n"
-        "\n"
-        "* `serviceTemplate` SHALL be ignored for shard level.\n"
-        "* `clusterServiceTemplate` SHALL be ignored for shard level.\n"
-        "\n"
-        "Any specified templates SHALL override top level `.spec.default.templates`\n"
-        "and cluster level `.spec.configuration.clusters.templates` properties if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: my-shard\n"
-        "              templates:\n"
-        "                podTemplate: clickhouse-v20.6\n"
-        "                dataVolumeClaimTemplate: default-volume-claim\n"
-        "                logVolumeClaimTemplate: default-volume-claim\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining templates names which will used for\n'
+        'generation of [Kubernetes] resources for the shard using\n'
+        '`.spec.configuration.clusters[].layout.shards[].templates` array item object that SHALL support\n'
+        'the same properties as the top level `.spec.defaults.templates` object.\n'
+        '\n'
+        '* `serviceTemplate` SHALL be ignored for shard level.\n'
+        '* `clusterServiceTemplate` SHALL be ignored for shard level.\n'
+        '\n'
+        'Any specified templates SHALL override top level `.spec.default.templates`\n'
+        'and cluster level `.spec.configuration.clusters.templates` properties if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: my-shard\n'
+        '              templates:\n'
+        '                podTemplate: clickhouse-v20.6\n'
+        '                dataVolumeClaimTemplate: default-volume-claim\n'
+        '                logVolumeClaimTemplate: default-volume-claim\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.8.1",
+    num='4.45.5.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_ReplicasCount = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining how many replicas SHALL be present in the\n"
-        "selected shard of the selected [ClickHouse] cluster that SHALL run in [Kubernetes]\n"
-        "using `.spec.configuration.clusters[].layout.shards[].replicasCount` array item property\n"
-        "of [integer] type with minimum value of `1`.\n"
-        "\n"
-        "Each replica SHALL be a separate [StatefulSet] that SHALL contain only one [Pod]\n"
-        "with `clickhouse-server` instance and shard SHALL contain only one replica by default.\n"
-        "\n"
-        "This property SHALL override cluster level `.spec.configuration.clusters.layout.replicasCount`\n"
-        "property if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        shards:\n"
-        "          - name: shard0\n"
-        "            replicasCount: 1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining how many replicas SHALL be present in the\n'
+        'selected shard of the selected [ClickHouse] cluster that SHALL run in [Kubernetes]\n'
+        'using `.spec.configuration.clusters[].layout.shards[].replicasCount` array item property\n'
+        'of [integer] type with minimum value of `1`.\n'
+        '\n'
+        'Each replica SHALL be a separate [StatefulSet] that SHALL contain only one [Pod]\n'
+        'with `clickhouse-server` instance and shard SHALL contain only one replica by default.\n'
+        '\n'
+        'This property SHALL override cluster level `.spec.configuration.clusters.layout.replicasCount`\n'
+        'property if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        shards:\n'
+        '          - name: shard0\n'
+        '            replicasCount: 1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.5.9.1",
+    num='4.45.5.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support overriding properties for selected replicas\n"
-        "from cluster level `.spec.configuration.clusters` and shard level\n"
-        "`.spec.configuration.clusters[].layout.shards` using\n"
-        "`.spec.configuration.clusters[].layout.shards[].replicas` array type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        shards:\n"
-        "          - name: shard0\n"
-        "            replicas:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support overriding properties for selected replicas\n'
+        'from cluster level `.spec.configuration.clusters` and shard level\n'
+        '`.spec.configuration.clusters[].layout.shards` using\n'
+        '`.spec.configuration.clusters[].layout.shards[].replicas` array type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        shards:\n'
+        '          - name: shard0\n'
+        '            replicas:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.45.6.1",
+    num='4.45.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom replica name\n"
-        "for a shard inside a cluster using `.spec.configuration.clusters[].layout.shards[].replicas[].name`\n"
-        "[string] type property with min length of `1` and max length of `15`\n"
+        '[ClickHouse Operator] SHALL support specifying custom replica name\n'
+        'for a shard inside a cluster using `.spec.configuration.clusters[].layout.shards[].replicas[].name`\n'
+        '[string] type property with min length of `1` and max length of `15`\n'
         'matching `"^[a-zA-Z0-9-]{0,15}$"` pattern.\n'
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        shards:\n"
-        "          - name: shard0\n"
-        "            replicas:\n"
-        "              - name: shard0-replica0\n"
-        "```\n"
-        "\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        shards:\n'
+        '          - name: shard0\n'
+        '            replicas:\n'
+        '              - name: shard0-replica0\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.6.2.1",
+    num='4.45.6.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_TcpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n"
-        "with name `tcp` for select replica and overriding `.spec.templates.hostTemplates.spec.tcpPort`\n"
-        "that SHALL allow connecting to `clickhouse-server` via TCP Native protocol using\n"
-        "[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.shards[].replicas[].tcpPort`\n"
-        "[integer] type property with the minimum value of `1` and maximum value of `65535`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: shard0\n"
-        "              replicas:\n"
-        "                - name: shard0-replica0\n"
-        "                  tcpPort: 9000\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n'
+        'with name `tcp` for select replica and overriding `.spec.templates.hostTemplates.spec.tcpPort`\n'
+        'that SHALL allow connecting to `clickhouse-server` via TCP Native protocol using\n'
+        '[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.shards[].replicas[].tcpPort`\n'
+        '[integer] type property with the minimum value of `1` and maximum value of `65535`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: shard0\n'
+        '              replicas:\n'
+        '                - name: shard0-replica0\n'
+        '                  tcpPort: 9000\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.6.3.1",
+    num='4.45.6.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_HttpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n"
-        "with name `http` for the select replica and overriding `.spec.templates.hostTemplates.spec.httpPort`\n"
-        "that SHALL allow connecting to `clickhouse-server` via HTTP protocol using\n"
-        "[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.shards[].replicas[].httpPort`\n"
-        "[integer] type property with the minimum value of `1` and maximum value of `65535`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: shard0\n"
-        "              replicas:\n"
-        "                - name: shard0-replica0\n"
-        "                  httpPort: 8123\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n'
+        'with name `http` for the select replica and overriding `.spec.templates.hostTemplates.spec.httpPort`\n'
+        'that SHALL allow connecting to `clickhouse-server` via HTTP protocol using\n'
+        '[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.shards[].replicas[].httpPort`\n'
+        '[integer] type property with the minimum value of `1` and maximum value of `65535`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: shard0\n'
+        '              replicas:\n'
+        '                - name: shard0-replica0\n'
+        '                  httpPort: 8123\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.6.4.1",
+    num='4.45.6.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_InterServerHttpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n"
-        "with name `interserver` for the select replica and overriding `.spec.templates.hostTemplates.spec.interserverHTTPPort`\n"
-        "that SHALL allow connection between replicas inside the same shard during fetching replicated data parts via HTTP protocol\n"
-        "by using `.spec.configuration.clusters[].layout.shards[].replicas[].interserverHTTPPort`\n"
-        "[integer] type property with the minimum value of `1` and maximum value of `65535`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: shard0\n"
-        "              replicas:\n"
-        "                - name: shard0-replica0\n"
-        "                  interserverHTTPPort: 9009\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n'
+        'with name `interserver` for the select replica and overriding `.spec.templates.hostTemplates.spec.interserverHTTPPort`\n'
+        'that SHALL allow connection between replicas inside the same shard during fetching replicated data parts via HTTP protocol\n'
+        'by using `.spec.configuration.clusters[].layout.shards[].replicas[].interserverHTTPPort`\n'
+        '[integer] type property with the minimum value of `1` and maximum value of `65535`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: shard0\n'
+        '              replicas:\n'
+        '                - name: shard0-replica0\n'
+        '                  interserverHTTPPort: 9009\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.6.5.1",
+    num='4.45.6.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Settings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n"
-        "section settings in each [Pod] for one shard replica that SHALL be used during generation\n"
-        "of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "using `.spec.configuration.clusters[].layout.shards[].replicas[].settings` array item object that SHALL\n"
-        "support the same properties as for the `.spec.configuration.settings` object.\n"
-        "\n"
-        "Any specified settings SHALL override top level `.spec.configuration.settings` and\n"
-        "cluster level `.spec.configuration.clusters.settings` and\n"
-        "shard level `.spec.configuration.clusters[].layout.shards[].settings` settings.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: shard-name\n"
-        "              replicas:\n"
-        "                - name: shard0-replica0\n"
-        "                  settings:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n'
+        'section settings in each [Pod] for one shard replica that SHALL be used during generation\n'
+        'of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'using `.spec.configuration.clusters[].layout.shards[].replicas[].settings` array item object that SHALL\n'
+        'support the same properties as for the `.spec.configuration.settings` object.\n'
+        '\n'
+        'Any specified settings SHALL override top level `.spec.configuration.settings` and\n'
+        'cluster level `.spec.configuration.clusters.settings` and\n'
+        'shard level `.spec.configuration.clusters[].layout.shards[].settings` settings.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: shard-name\n'
+        '              replicas:\n'
+        '                - name: shard0-replica0\n'
+        '                  settings:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.6.6.1",
+    num='4.45.6.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Files = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n"
-        "only for one shard replica that SHALL be used during generation of [ConfigMap] mounted in\n"
-        "`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n"
-        "`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.shards[].files` array\n"
-        "item object that SHALL support the same properties as for\n"
-        "the `.spec.configuration.files` object.\n"
-        "\n"
-        "Any specified files SHALL override top level `.spec.configuration.files` and\n"
-        "cluster level `.spec.configuration.clusters.files` and shard level\n"
-        "`.spec.configuration.clusters[].layout.shards[].files` settings if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: shard-name\n"
-        "              replicas:\n"
-        "                - name: shard0-replica0\n"
-        "                  files:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n'
+        'only for one shard replica that SHALL be used during generation of [ConfigMap] mounted in\n'
+        '`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n'
+        '`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.shards[].files` array\n'
+        'item object that SHALL support the same properties as for\n'
+        'the `.spec.configuration.files` object.\n'
+        '\n'
+        'Any specified files SHALL override top level `.spec.configuration.files` and\n'
+        'cluster level `.spec.configuration.clusters.files` and shard level\n'
+        '`.spec.configuration.clusters[].layout.shards[].files` settings if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: shard-name\n'
+        '              replicas:\n'
+        '                - name: shard0-replica0\n'
+        '                  files:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.6.7.1",
+    num='4.45.6.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining templates names which will used for\n"
-        "generation of [Kubernetes] resources for the shard replica using\n"
-        "`.spec.configuration.clusters[].layout.shards[].replicas[].templates` array item object that SHALL support\n"
-        "the same properties as the top level `.spec.defaults.templates` object.\n"
-        "\n"
-        "* `serviceTemplate` SHALL be ignored for replica level.\n"
-        "* `clusterServiceTemplate` SHALL be ignored for replica level.\n"
-        "* `shardServiceTemplate` SHALL be ignored for replica level.\n"
-        "* `shardServiceTemplate` SHALL be ignored for replica level.\n"
-        "\n"
-        "Any specified templates SHALL override top level `.spec.default.templates`\n"
-        "and cluster level `.spec.configuration.clusters.templates` and\n"
-        "shard level `.spec.configuration.clusters[].layout.shards[].templates`\n"
-        "properties if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          shards:\n"
-        "            - name: my-shard\n"
-        "              replicas:\n"
-        "                - name: shard0-name0\n"
-        "                  templates:\n"
-        "                    podTemplate: clickhouse-v20.7\n"
-        "                    dataVolumeClaimTemplate: default-volume-claim\n"
-        "                    logVolumeClaimTemplate: default-volume-claim\n"
-        "                    replicaServiceTemplate: replica-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining templates names which will used for\n'
+        'generation of [Kubernetes] resources for the shard replica using\n'
+        '`.spec.configuration.clusters[].layout.shards[].replicas[].templates` array item object that SHALL support\n'
+        'the same properties as the top level `.spec.defaults.templates` object.\n'
+        '\n'
+        '* `serviceTemplate` SHALL be ignored for replica level.\n'
+        '* `clusterServiceTemplate` SHALL be ignored for replica level.\n'
+        '* `shardServiceTemplate` SHALL be ignored for replica level.\n'
+        '* `shardServiceTemplate` SHALL be ignored for replica level.\n'
+        '\n'
+        'Any specified templates SHALL override top level `.spec.default.templates`\n'
+        'and cluster level `.spec.configuration.clusters.templates` and\n'
+        'shard level `.spec.configuration.clusters[].layout.shards[].templates`\n'
+        'properties if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          shards:\n'
+        '            - name: my-shard\n'
+        '              replicas:\n'
+        '                - name: shard0-name0\n'
+        '                  templates:\n'
+        '                    podTemplate: clickhouse-v20.7\n'
+        '                    dataVolumeClaimTemplate: default-volume-claim\n'
+        '                    logVolumeClaimTemplate: default-volume-claim\n'
+        '                    replicaServiceTemplate: replica-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.6.8.1",
+    num='4.45.6.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support overriding top level `.spec.configuration` and\n"
-        "cluster level `.spec.configuration.clusters` configuration for each replica\n"
-        "and each shard that is related to selected replica using\n"
-        "`.spec.configuration.clusters[].layout.replicas` array type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support overriding top level `.spec.configuration` and\n'
+        'cluster level `.spec.configuration.clusters` configuration for each replica\n'
+        'and each shard that is related to selected replica using\n'
+        '`.spec.configuration.clusters[].layout.replicas` array type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.45.7.1",
+    num='4.45.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom replica name\n"
-        "for each replica and each shard for selected replica inside a cluster\n"
-        "using `.spec.configuration.clusters[].layout.replicas[].name`\n"
-        "[string] type property with min length of `1` and max length of `15`\n"
+        '[ClickHouse Operator] SHALL support specifying custom replica name\n'
+        'for each replica and each shard for selected replica inside a cluster\n'
+        'using `.spec.configuration.clusters[].layout.replicas[].name`\n'
+        '[string] type property with min length of `1` and max length of `15`\n'
         'matching `"^[a-zA-Z0-9-]{0,15}$"` pattern.\n'
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "```\n"
-        "\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.7.2.1",
+    num='4.45.7.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Settings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n"
-        "section settings in each [Pod] for only one replica that SHALL be used during generation\n"
-        "of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "using `.spec.configuration.clusters[].layout.replicas[].settings` array item object that SHALL\n"
-        "support the same properties as for the `.spec.configuration.settings` object.\n"
-        "\n"
-        "Any specified settings SHALL override top level `.spec.configuration.settings` and\n"
-        "cluster level `.spec.configuration.clusters.settings` but\n"
-        "will be ignored if shard level `.spec.configuration.clusters[].layout.shards`\n"
-        "settings is are present.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "                settings:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n'
+        'section settings in each [Pod] for only one replica that SHALL be used during generation\n'
+        'of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'using `.spec.configuration.clusters[].layout.replicas[].settings` array item object that SHALL\n'
+        'support the same properties as for the `.spec.configuration.settings` object.\n'
+        '\n'
+        'Any specified settings SHALL override top level `.spec.configuration.settings` and\n'
+        'cluster level `.spec.configuration.clusters.settings` but\n'
+        'will be ignored if shard level `.spec.configuration.clusters[].layout.shards`\n'
+        'settings is are present.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              settings: \n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.7.3.1",
+    num='4.45.7.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Files = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n"
-        "only for only one replica that SHALL be used during generation of [ConfigMap] mounted in\n"
-        "`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n"
-        "`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.replicas[].files` array\n"
-        "item object that SHALL support the same properties as for\n"
-        "the `.spec.configuration.files` object.\n"
-        "\n"
-        "Any specified files SHALL override top level `.spec.configuration.files` and\n"
-        "cluster level `.spec.configuration.clusters.files` but will be ignored if shard level\n"
-        "`.spec.configuration.clusters[].layout.shards` settings are present.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              files:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n'
+        'only for only one replica that SHALL be used during generation of [ConfigMap] mounted in\n'
+        '`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n'
+        '`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.replicas[].files` array\n'
+        'item object that SHALL support the same properties as for\n'
+        'the `.spec.configuration.files` object.\n'
+        '\n'
+        'Any specified files SHALL override top level `.spec.configuration.files` and\n'
+        'cluster level `.spec.configuration.clusters.files` but will be ignored if shard level\n'
+        '`.spec.configuration.clusters[].layout.shards` settings are present.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              files:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.7.4.1",
+    num='4.45.7.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining templates names which will used for\n"
-        "generation of [Kubernetes] resources for the selected replica using\n"
-        "`.spec.configuration.clusters[].layout.replicas[].templates` array item object that SHALL support\n"
-        "the same properties as the top level `.spec.defaults.templates` object.\n"
-        "\n"
-        "* `serviceTemplate` SHALL be ignored for replica level.\n"
-        "* `clusterServiceTemplate` SHALL be ignored for replica level.\n"
-        "* `shardServiceTemplate` SHALL be ignored for replica level.\n"
-        "\n"
-        "Any specified templates SHALL override top level `.spec.default.templates`\n"
-        "and cluster level `.spec.configuration.clusters.templates` properties if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              templates:\n"
-        "                podTemplate: clickhouse-v20.7\n"
-        "                dataVolumeClaimTemplate: default-volume-claim\n"
-        "                logVolumeClaimTemplate: default-volume-claim\n"
-        "                replicaServiceTemplate: replica-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining templates names which will used for\n'
+        'generation of [Kubernetes] resources for the selected replica using\n'
+        '`.spec.configuration.clusters[].layout.replicas[].templates` array item object that SHALL support\n'
+        'the same properties as the top level `.spec.defaults.templates` object.\n'
+        '\n'
+        '* `serviceTemplate` SHALL be ignored for replica level.\n'
+        '* `clusterServiceTemplate` SHALL be ignored for replica level.\n'
+        '* `shardServiceTemplate` SHALL be ignored for replica level.\n'
+        '\n'
+        'Any specified templates SHALL override top level `.spec.default.templates`\n'
+        'and cluster level `.spec.configuration.clusters.templates` properties if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              templates:\n'
+        '                podTemplate: clickhouse-v20.7\n'
+        '                dataVolumeClaimTemplate: default-volume-claim\n'
+        '                logVolumeClaimTemplate: default-volume-claim\n'
+        '                replicaServiceTemplate: replica-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.7.5.1",
+    num='4.45.7.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_ShardsCount = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying the number of shards related to\n"
-        "the current replica using `.spec.configuration.clusters[].layout.replicas[].shardsCount`\n"
-        "property of [integer] type with minimum number of `1`.\n"
-        "\n"
-        "If specified it SHALL override each shard behavior specified in\n"
-        "`.spec.configuration.clusters[].layout.replicas[].shards`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shardsCount: 1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying the number of shards related to\n'
+        'the current replica using `.spec.configuration.clusters[].layout.replicas[].shardsCount`\n'
+        'property of [integer] type with minimum number of `1`.\n'
+        '\n'
+        'If specified it SHALL override each shard behavior specified in\n'
+        '`.spec.configuration.clusters[].layout.replicas[].shards`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shardsCount: 1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.7.6.1",
+    num='4.45.7.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying a list of shards related to the current replica\n"
-        "using `.spec.configuration.clusters[].layout.replicas[].shards` array type object.\n"
-        "\n"
-        "This property SHALL be ignored if `.spec.configuration.clusters.layout.shards` is present.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying a list of shards related to the current replica\n'
+        'using `.spec.configuration.clusters[].layout.replicas[].shards` array type object.\n'
+        '\n'
+        'This property SHALL be ignored if `.spec.configuration.clusters.layout.shards` is present.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.45.8.1",
+    num='4.45.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom shard name\n"
-        "for each shard for selected replica inside a cluster\n"
-        "using `.spec.configuration.clusters[].layout.replicas[].shards[].name`\n"
-        "[string] type property with min length of `1` and max length of `15`\n"
+        '[ClickHouse Operator] SHALL support specifying custom shard name\n'
+        'for each shard for selected replica inside a cluster\n'
+        'using `.spec.configuration.clusters[].layout.replicas[].shards[].name`\n'
+        '[string] type property with min length of `1` and max length of `15`\n'
         'matching `"^[a-zA-Z0-9-]{0,15}$"` pattern.\n'
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "                - name: shard0-replica0\n"
-        "```\n"
-        "\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '                - name: shard0-replica0\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.8.2.1",
+    num='4.45.8.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_TcpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n"
-        "with name `tcp` for selected shard and overriding `.spec.templates.hostTemplates.spec.tcpPort`\n"
-        "that SHALL allow connecting to `clickhouse-server` via TCP Native protocol using\n"
-        "[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.replicas[].shards[].tcpPort`\n"
-        "[integer] type property with the minimum value of `1` and maximum value of `65535`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "                - name: shard0-replica0\n"
-        "                  tcpPort: 9000\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n'
+        'with name `tcp` for selected shard and overriding `.spec.templates.hostTemplates.spec.tcpPort`\n'
+        'that SHALL allow connecting to `clickhouse-server` via TCP Native protocol using\n'
+        '[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.replicas[].shards[].tcpPort`\n'
+        '[integer] type property with the minimum value of `1` and maximum value of `65535`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '                - name: shard0-replica0\n'
+        '                  tcpPort: 9000\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.8.3.1",
+    num='4.45.8.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_HttpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n"
-        "with name `http` for the selected shard and overriding `.spec.templates.hostTemplates.spec.httpPort`\n"
-        "that SHALL allow connecting to `clickhouse-server` via HTTP protocol using\n"
-        "[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.replicas[].shards[].httpPort`\n"
-        "[integer] type property with the minimum value of `1` and maximum value of `65535`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "                - name: shard0-replica0\n"
-        "                  httpPort: 8123\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n'
+        'with name `http` for the selected shard and overriding `.spec.templates.hostTemplates.spec.httpPort`\n'
+        'that SHALL allow connecting to `clickhouse-server` via HTTP protocol using\n'
+        '[Kubernetes] [Service] by using `.spec.configuration.clusters[].layout.replicas[].shards[].httpPort`\n'
+        '[integer] type property with the minimum value of `1` and maximum value of `65535`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '                - name: shard0-replica0\n'
+        '                  httpPort: 8123\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.8.4.1",
+    num='4.45.8.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_InterServerHttpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n"
-        "with name `interserver` for the selected shard and overriding `.spec.templates.hostTemplates.spec.interserverHTTPPort`\n"
-        "that SHALL allow connection between replicas inside the same shard during fetching replicated data parts via HTTP protocol\n"
-        "by using `.spec.configuration.clusters[].layout.replicas[].shards[].interserverHTTPPort`\n"
-        "[integer] type property with the minimum value of `1` and maximum value of `65535`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "                - name: shard0-replica0\n"
-        "                  interserverHTTPPort: 9009\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `Pod.spec.containers.ports`\n'
+        'with name `interserver` for the selected shard and overriding `.spec.templates.hostTemplates.spec.interserverHTTPPort`\n'
+        'that SHALL allow connection between replicas inside the same shard during fetching replicated data parts via HTTP protocol\n'
+        'by using `.spec.configuration.clusters[].layout.replicas[].shards[].interserverHTTPPort`\n'
+        '[integer] type property with the minimum value of `1` and maximum value of `65535`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '                - name: shard0-replica0\n'
+        '                  interserverHTTPPort: 9009\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.8.5.1",
+    num='4.45.8.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Settings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n"
-        "section settings in each [Pod] for only one shard of the current replica that SHALL be used during generation\n"
-        "of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "using `.spec.configuration.clusters[].layout.replicas[].shards[].settings` array item object that SHALL\n"
-        "support the same properties as for the `.spec.configuration.settings` object.\n"
-        "\n"
-        "Any specified settings SHALL override top level `.spec.configuration.settings`,\n"
-        "cluster level `.spec.configuration.clusters.settings`\n"
-        "and replica level `.spec.configuration.clusters[].layout.replicas.settings`\n"
-        "settings if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "                - name: shard0-replica0\n"
-        "                  settings:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n'
+        'section settings in each [Pod] for only one shard of the current replica that SHALL be used during generation\n'
+        'of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'using `.spec.configuration.clusters[].layout.replicas[].shards[].settings` array item object that SHALL\n'
+        'support the same properties as for the `.spec.configuration.settings` object.\n'
+        '\n'
+        'Any specified settings SHALL override top level `.spec.configuration.settings`,\n'
+        'cluster level `.spec.configuration.clusters.settings`\n'
+        'and replica level `.spec.configuration.clusters[].layout.replicas.settings`\n'
+        'settings if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '                - name: shard0-replica0\n'
+        '                  settings:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.8.6.1",
+    num='4.45.8.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Files = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n"
-        "only for only one shard of the current replica that SHALL be used during generation of [ConfigMap] mounted in\n"
-        "`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n"
-        "`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.replicas[].shards[].files` array\n"
-        "item object that SHALL support the same properties as for\n"
-        "the `.spec.configuration.files` object.\n"
-        "\n"
-        "Any specified settings SHALL override top level `.spec.configuration.files` and\n"
-        "cluster level `.spec.configuration.clusters.files` but SHALL be ignored\n"
-        "if `.spec.configuration.clusters[].layout.shards` settings are present.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "                - name: shard0-replica0\n"
-        "                  files:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining content of any settings file inside each [Pod]\n'
+        'only for only one shard of the current replica that SHALL be used during generation of [ConfigMap] mounted in\n'
+        '`/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or\n'
+        '`/etc/clickhouse-server/users.d/` using `.spec.configuration.clusters[].layout.replicas[].shards[].files` array\n'
+        'item object that SHALL support the same properties as for\n'
+        'the `.spec.configuration.files` object.\n'
+        '\n'
+        'Any specified settings SHALL override top level `.spec.configuration.files` and\n'
+        'cluster level `.spec.configuration.clusters.files` but SHALL be ignored\n'
+        'if `.spec.configuration.clusters[].layout.shards` settings are present.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '                - name: shard0-replica0\n'
+        '                  files:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.8.7.1",
+    num='4.45.8.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining templates names which will used for\n"
-        "generation of [Kubernetes] resources for the selected shard replica using\n"
-        "`.spec.configuration.clusters[].layout.replicas[].shards[].templates` array item object that SHALL support\n"
-        "the same properties as the top level `.spec.defaults.templates` object.\n"
-        "\n"
-        "* `serviceTemplate` SHALL be ignored for shard level\n"
-        "* `clusterServiceTemplate` SHALL be ignored for shard level\n"
-        "\n"
-        "Any specified settings SHALL override top level `.spec.defaults.templates`,\n"
-        "cluster level `.spec.configuration.clusters.templates` and replica level\n"
-        "`.spec.configuration.clusters[].layout.replicas[].templates` settings if any.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  configuration:\n"
-        "    clusters:\n"
-        "      - name: cluster-name\n"
-        "        layout:\n"
-        "          replicas:\n"
-        "            - name: replica0\n"
-        "              shards:\n"
-        "                - name: shard0-replica0\n"
-        "                  templates:\n"
-        "                    podTemplate: clickhouse-v20.7\n"
-        "                    dataVolumeClaimTemplate: default-volume-claim\n"
-        "                    logVolumeClaimTemplate: default-volume-claim\n"
-        "                    replicaServiceTemplate: replica-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining templates names which will used for\n'
+        'generation of [Kubernetes] resources for the selected shard replica using\n'
+        '`.spec.configuration.clusters[].layout.replicas[].shards[].templates` array item object that SHALL support\n'
+        'the same properties as the top level `.spec.defaults.templates` object.\n'
+        '\n'
+        '* `serviceTemplate` SHALL be ignored for shard level\n'
+        '* `clusterServiceTemplate` SHALL be ignored for shard level\n'
+        '\n'
+        'Any specified settings SHALL override top level `.spec.defaults.templates`,\n'
+        'cluster level `.spec.configuration.clusters.templates` and replica level\n'
+        '`.spec.configuration.clusters[].layout.replicas[].templates` settings if any.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '    clusters:\n'
+        '      - name: cluster-name\n'
+        '        layout:\n'
+        '          replicas:\n'
+        '            - name: replica0\n'
+        '              shards:\n'
+        '                - name: shard0-replica0\n'
+        '                  templates:\n'
+        '                    podTemplate: clickhouse-v20.7\n'
+        '                    dataVolumeClaimTemplate: default-volume-claim\n'
+        '                    logVolumeClaimTemplate: default-volume-claim\n'
+        '                    replicaServiceTemplate: replica-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.45.8.8.1",
+    num='4.45.8.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying templates which SHALL be used\n"
-        "for rendering [Kubernetes] resources like [StatefulSet], [ConfigMap], [Service]\n"
-        "and [PVC] by default using `.spec.templates` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying templates which SHALL be used\n'
+        'for rendering [Kubernetes] resources like [StatefulSet], [ConfigMap], [Service]\n'
+        'and [PVC] by default using `.spec.templates` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.46.1",
+    num='4.46.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying host templates\n"
-        "that SHALL be used to generate `clickhose-server` config files using\n"
-        "`.spec.templates.hostTemplates` array type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying host templates\n'
+        'that SHALL be used to generate `clickhose-server` config files using\n'
+        '`.spec.templates.hostTemplates` array type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.47.1",
+    num='4.47.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying host template name that MAY be used\n"
-        "as a value in the following properties to provide default property values\n"
-        "for the selected resources:\n"
-        "\n"
-        "* top level `.spec.defaults.templates.hostTemplate`\n"
-        "* cluster level `.spec.configuration.clusters.templates.hostTemplate`\n"
-        "* shard level `.spec.configuration.clusters.layout.shards.temlates.hostTemplate`\n"
-        "* replica level `.spec.configuration.clusters.layout.replicas.templates.hostTemplate`\n"
-        "\n"
-        "using `.spec.templates.hostTemplates[].name` [string] type property.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying host template name that MAY be used\n'
+        'as a value in the following properties to provide default property values\n'
+        'for the selected resources:\n'
+        '\n'
+        '* top level `.spec.defaults.templates.hostTemplate`\n'
+        '* cluster level `.spec.configuration.clusters.templates.hostTemplate`\n'
+        '* shard level `.spec.configuration.clusters.layout.shards.temlates.hostTemplate`\n'
+        '* replica level `.spec.configuration.clusters.layout.replicas.templates.hostTemplate`\n'
+        '\n'
+        'using `.spec.templates.hostTemplates[].name` [string] type property.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.47.2.1",
+    num='4.47.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_PortDistribution = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying how to distribute numeric values of\n"
-        "named ports in `Pod.spec.containers.ports` and `clickhouse-server` configs\n"
-        "using `.spec.templates.hostTemplates[].portDistribution` array type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "        portDistribution:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying how to distribute numeric values of\n'
+        'named ports in `Pod.spec.containers.ports` and `clickhouse-server` configs\n'
+        'using `.spec.templates.hostTemplates[].portDistribution` array type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '        portDistribution:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.47.3.1",
+    num='4.47.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_PortDistribution_Type = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying the type of port distribution\n"
-        "using `.spec.templates.hostTemplates[].portDistribution[].type` property of\n"
-        "[string] type having one of the following values:\n"
-        "\n"
-        "* if empty it SHALL use the default value\n"
-        "\n"
-        "* if `Unspecified` then all listen ports on clickhouse-server\n"
-        "  configuration in all Pods SHALL have the same value. This value SHALL be the default.\n"
-        "\n"
-        "* if `ClusterScopeIndex` then ports will increment to offset from base value depending\n"
-        "  on shard and replica index inside the cluster. With the combination of\n"
-        "  `.spec.templates.podTemlates.spec.HostNetwork` it SHALL allow setup [ClickHouse]\n"
-        "  cluster inside [Kubernetes] and provide access via external network bypassing [Kubernetes]\n"
-        "  internal network\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "        portDistribution:\n"
+        '[ClickHouse Operator] SHALL support specifying the type of port distribution\n'
+        'using `.spec.templates.hostTemplates[].portDistribution[].type` property of\n'
+        '[string] type having one of the following values:\n'
+        '\n'
+        '* if empty it SHALL use the default value\n'
+        '\n'
+        '* if `Unspecified` then all listen ports on clickhouse-server\n'
+        '  configuration in all Pods SHALL have the same value. This value SHALL be the default.\n'
+        '\n'
+        '* if `ClusterScopeIndex` then ports will increment to offset from base value depending\n'
+        '  on shard and replica index inside the cluster. With the combination of\n'
+        '  `.spec.templates.podTemlates.spec.HostNetwork` it SHALL allow setup [ClickHouse]\n'
+        '  cluster inside [Kubernetes] and provide access via external network bypassing [Kubernetes]\n'
+        '  internal network\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '        portDistribution:\n'
         '          - type: "ClusterScopeIndex"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.3.2.1",
+    num='4.47.3.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying host template\n"
-        "properties `.spec.templates.hostTemplates[].spec` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "        spec:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying host template\n'
+        'properties `.spec.templates.hostTemplates[].spec` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '        spec:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.47.4.1",
+    num='4.47.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom host name for each `clickhuse-server`\n"
-        "using `.spec.templates.hostTemplates[].spec.name` [string] type property\n"
-        "with the minimum length of `1` and maximum length of `15` matching\n"
+        '[ClickHouse Operator] SHALL support specifying custom host name for each `clickhuse-server`\n'
+        'using `.spec.templates.hostTemplates[].spec.name` [string] type property\n'
+        'with the minimum length of `1` and maximum length of `15` matching\n'
         '`"^[a-zA-Z0-9-]{0,15}$"` pattern.\n'
-        "\n"
-        "By default, host name SHALL be auto generated.     \n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "        spec:\n"
-        "          name: custom-host-name\n"
-        "```\n"
-        "\n"
+        '\n'
+        'By default, host name SHALL be auto generated.     \n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '        spec:\n'
+        '          name: custom-host-name\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.4.2.1",
+    num='4.47.4.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_TcpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom `tcp_port` inside\n"
-        "`clickhouse-server` settings for each [Pod] where current template will be applied\n"
-        "using `.spec.templates.hostTemplates[].spec.tcpPort` [integer] type property\n"
-        "ranging from `1` to `65535`.\n"
-        "\n"
-        "If specified, SHALL have equal value to `.spec.templates.podTemplates.spec.containers.ports[name=tcp]`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "        spec:\n"
-        "          tcpPort: 9000\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying custom `tcp_port` inside\n'
+        '`clickhouse-server` settings for each [Pod] where current template will be applied\n'
+        'using `.spec.templates.hostTemplates[].spec.tcpPort` [integer] type property\n'
+        'ranging from `1` to `65535`.\n'
+        '\n'
+        'If specified, SHALL have equal value to `.spec.templates.podTemplates.spec.containers.ports[name=tcp]`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '        spec:\n'
+        '          tcpPort: 9000\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.4.3.1",
+    num='4.47.4.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_HttpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom `http_port`\n"
-        "inside `clickhouse-server` settings for each [Pod] where current template will be applied\n"
-        "using `.spec.templates.hostTemplates[].spec.httpPort` [integer] type property\n"
-        "ranging from `1` to `65535`.\n"
-        "\n"
-        "If specified, SHALL have equal value to `.spec.templates.podTemplates.spec.containers.ports[name=http]`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "        spec:\n"
-        "          httpPort: 8123\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying custom `http_port`\n'
+        'inside `clickhouse-server` settings for each [Pod] where current template will be applied\n'
+        'using `.spec.templates.hostTemplates[].spec.httpPort` [integer] type property\n'
+        'ranging from `1` to `65535`.\n'
+        '\n'
+        'If specified, SHALL have equal value to `.spec.templates.podTemplates.spec.containers.ports[name=http]`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '        spec:\n'
+        '          httpPort: 8123\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.4.4.1",
+    num='4.47.4.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_InterServerHttpPort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying custom `interserver_http_port`\n"
-        "inside `clickhouse-server` settings for each [Pod] where current template will be applied\n"
-        "using `.spec.templates.hostTemplates[].spec.interserverHTTPPort` [integer] type property\n"
-        "ranging from `1` to `65535`.\n"
-        "\n"
-        "If specified, SHALL have value equal to `.spec.templates.podTemplates.spec.containers.ports[name=interserver]`.\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: host-template-custom-ports\n"
-        "        spec:\n"
-        "          interserverHTTPPort: 7002\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying custom `interserver_http_port`\n'
+        'inside `clickhouse-server` settings for each [Pod] where current template will be applied\n'
+        'using `.spec.templates.hostTemplates[].spec.interserverHTTPPort` [integer] type property\n'
+        'ranging from `1` to `65535`.\n'
+        '\n'
+        'If specified, SHALL have value equal to `.spec.templates.podTemplates.spec.containers.ports[name=interserver]`.\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: host-template-custom-ports\n'
+        '        spec:\n'
+        '          interserverHTTPPort: 7002\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.4.5.1",
+    num='4.47.4.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Settings = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n"
-        "section settings in each [Pod] where this template will be applied\n"
-        "that SHALL be used during generation of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "using `.spec.templates.hostTemplates[].spec.settings` array item object that SHALL\n"
-        "support the same properties as for the `.spec.configuration.settings` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: custom-host-template\n"
-        "        spec:\n"
-        "          settings:\n"
-        "```\n"
-        "\n"
-        " optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap`\n"
-        " which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `<yandex>..</yandex>`\n'
+        'section settings in each [Pod] where this template will be applied\n'
+        'that SHALL be used during generation of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'using `.spec.templates.hostTemplates[].spec.settings` array item object that SHALL\n'
+        'support the same properties as for the `.spec.configuration.settings` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: custom-host-template\n'
+        '        spec:\n'
+        '          settings:\n'
+        '```\n'
+        '\n'
+        ' optional, allows define content of any setting file inside each `Pod` where this template will apply during generate `ConfigMap`\n'
+        ' which will mount in `/etc/clickhouse-server/config.d/` or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.4.6.1",
+    num='4.47.4.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Files = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining content of any settings file\n"
-        "inside each [Pod] where this template will be applied\n"
-        "that SHALL be used during generation of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n"
-        "or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\n"
-        "using `.spec.templates.hostTemplates[].spec.files` object and SHALL\n"
-        "support the same properties as the `.spec.configuration.files` object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    hostTemplates:\n"
-        "      - name: custom-host-template\n"
-        "        spec:\n"
-        "          files:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining content of any settings file\n'
+        'inside each [Pod] where this template will be applied\n'
+        'that SHALL be used during generation of [ConfigMap] mounted in `/etc/clickhouse-server/config.d/`\n'
+        'or `/etc/clickhouse-server/conf.d/` or `/etc/clickhouse-server/users.d/`\n'
+        'using `.spec.templates.hostTemplates[].spec.files` object and SHALL\n'
+        'support the same properties as the `.spec.configuration.files` object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    hostTemplates:\n'
+        '      - name: custom-host-template\n'
+        '        spec:\n'
+        '          files:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.4.7.1",
+    num='4.47.4.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Templates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support overriding template inside a template\n"
-        "for each [Pod] where this template will be applied using\n"
-        "`.spec.templates.hostTemplates[].spec.templates` object that SHALL support the following\n"
-        "properties of [string] type that SHALL contain the name of the template\n"
-        "of the corresponding type from `spec.templates`\n"
-        "\n"
-        "* `hostTemplate`\n"
-        "* `podTemplate`\n"
-        "* `dataVolumeClaimTemplate`\n"
-        "* `logVolumeClaimTemplate`\n"
-        "* `serviceTemplate`\n"
-        "* `clusterServiceTemplate`\n"
-        "* `shardServiceTemplate`\n"
-        "* `replicaServiceTemplate`\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support overriding template inside a template\n'
+        'for each [Pod] where this template will be applied using\n'
+        '`.spec.templates.hostTemplates[].spec.templates` object that SHALL support the following\n'
+        'properties of [string] type that SHALL contain the name of the template\n'
+        'of the corresponding type from `spec.templates`\n'
+        '\n'
+        '* `hostTemplate`\n'
+        '* `podTemplate`\n'
+        '* `dataVolumeClaimTemplate`\n'
+        '* `logVolumeClaimTemplate`\n'
+        '* `serviceTemplate`\n'
+        '* `clusterServiceTemplate`\n'
+        '* `shardServiceTemplate`\n'
+        '* `replicaServiceTemplate`\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.47.4.8.1",
+    num='4.47.4.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying [Pod] templates\n"
-        "that SHALL allow to render a `Pod` inside `StatefulSet.spec` and define\n"
-        "`Pod.spec`, [Pod] scheduling distribution and [Pod] zone using\n"
-        "`.spec.templates.podTemplates` array type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    podTemplates:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying [Pod] templates\n'
+        'that SHALL allow to render a `Pod` inside `StatefulSet.spec` and define\n'
+        '`Pod.spec`, [Pod] scheduling distribution and [Pod] zone using\n'
+        '`.spec.templates.podTemplates` array type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.48.1",
+    num='4.48.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying [Pod] template name that MAY be used\n"
-        "as a value in the following properties to provide default property values\n"
-        "for the selected resources:\n"
-        "\n"
-        "* top level `.spec.defaults.templates.podTemplate`\n"
-        "* cluster level `.spec.configuration.clusters.templates.podTemplate`\n"
-        "* shard level `.spec.configuration.clusters.layout.shards.temlates.podTemplate`\n"
-        "* replica level `.spec.configuration.clusters.layout.replicas.templates.podTemplate`\n"
-        "\n"
-        "using `.spec.templates.podTemplates[].name` [string] type property.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    podTemplates:\n"
-        "      - name: pod-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying [Pod] template name that MAY be used\n'
+        'as a value in the following properties to provide default property values\n'
+        'for the selected resources:\n'
+        '\n'
+        '* top level `.spec.defaults.templates.podTemplate`\n'
+        '* cluster level `.spec.configuration.clusters.templates.podTemplate`\n'
+        '* shard level `.spec.configuration.clusters.layout.shards.temlates.podTemplate`\n'
+        '* replica level `.spec.configuration.clusters.layout.replicas.templates.podTemplate`\n'
+        '\n'
+        'using `.spec.templates.podTemplates[].name` [string] type property.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '      - name: pod-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.48.2.1",
+    num='4.48.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_GenerateName = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying how to auto generate [Pod] template name\n"
-        "using `.spec.templates.podTemplates[].generateName` [string] type property that SHALL\n"
-        "specify the format.\n"
-        "\n"
-        "The `generateName` property SHALL support the following macros\n"
-        "depending on the level of the object, for which [Service] is being created:\n"
-        "\n"
-        "**For [CHI] level [Service]**\n"
-        "  * `{chi}` - ClickHouseInstallation name\n"
-        "  * `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "\n"
-        "**For cluster level [Service]**\n"
-        "  * `{chi}` - ClickHouseInstallation name\n"
-        "  * `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "  * `{cluster}` - cluster name\n"
-        "  * `{clusterID}` - short hashed cluster name\n"
-        "  * `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n"
-        "\n"
-        "**For shard level [Service]**\n"
-        "  * `{chi}` - ClickHouseInstallation name\n"
-        "  * `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "  * `{cluster}` - cluster name\n"
-        "  * `{clusterID}` - short hashed cluster name\n"
-        "  * `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n"
-        "  * `{shard}` - shard name\n"
-        "  * `{shardID}` - short hashed shard name\n"
-        "  * `{shardIndex}` - 0-based index of the shard in the cluster\n"
-        "\n"
-        "**For replica level [Service]**\n"
-        "  * `{chi}` - ClickHouseInstallation name\n"
-        "  * `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "  * `{cluster}` - cluster name\n"
-        "  * `{clusterID}` - short hashed cluster name\n"
-        "  * `{clusterIndex}` - 0-based index of the cluster in the CHI\n"
-        "  * `{shard}` - shard name\n"
-        "  * `{shardID}` - short hashed shard name\n"
-        "  * `{shardIndex}` - 0-based index of the shard in the cluster\n"
-        "  * `{replica}` - replica name\n"
-        "  * `{replicaID}` - short hashed replica name\n"
-        "  * `{replicaIndex}` - 0-based index of the replica in the shard\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    podTemplates:\n"
-        "      - name: pod-template\n"
+        '[ClickHouse Operator] SHALL support specifying how to auto generate [Pod] template name\n'
+        'using `.spec.templates.podTemplates[].generateName` [string] type property that SHALL\n'
+        'specify the format.\n'
+        '\n'
+        'The `generateName` property SHALL support the following macros\n'
+        'depending on the level of the object, for which [Service] is being created:\n'
+        '\n'
+        '**For [CHI] level [Service]**\n'
+        '  * `{chi}` - ClickHouseInstallation name\n'
+        '  * `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '\n'
+        '**For cluster level [Service]**\n'
+        '  * `{chi}` - ClickHouseInstallation name\n'
+        '  * `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '  * `{cluster}` - cluster name\n'
+        '  * `{clusterID}` - short hashed cluster name\n'
+        '  * `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n'
+        '\n'
+        '**For shard level [Service]**\n'
+        '  * `{chi}` - ClickHouseInstallation name\n'
+        '  * `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '  * `{cluster}` - cluster name\n'
+        '  * `{clusterID}` - short hashed cluster name\n'
+        '  * `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n'
+        '  * `{shard}` - shard name\n'
+        '  * `{shardID}` - short hashed shard name\n'
+        '  * `{shardIndex}` - 0-based index of the shard in the cluster\n'
+        '\n'
+        '**For replica level [Service]**\n'
+        '  * `{chi}` - ClickHouseInstallation name\n'
+        '  * `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '  * `{cluster}` - cluster name\n'
+        '  * `{clusterID}` - short hashed cluster name\n'
+        '  * `{clusterIndex}` - 0-based index of the cluster in the CHI\n'
+        '  * `{shard}` - shard name\n'
+        '  * `{shardID}` - short hashed shard name\n'
+        '  * `{shardIndex}` - 0-based index of the shard in the cluster\n'
+        '  * `{replica}` - replica name\n'
+        '  * `{replicaID}` - short hashed replica name\n'
+        '  * `{replicaIndex}` - 0-based index of the replica in the shard\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '      - name: pod-template\n'
         '        generateName: "service-{chi}"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.48.3.1",
+    num='4.48.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow defining custom zone name to separate\n"
-        "[ClickHouse] [Pods] between nodes using `.spec.templates.podTemplates[].zone`\n"
-        "object.\n"
-        "\n"
-        "This property SHALL serve as a shortcut for `.spec.templates.podTemplates[].spec.affinity.podAntiAffinity`.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    podTemplates:\n"
-        "      - name: pod-template\n"
-        "        zone:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow defining custom zone name to separate\n'
+        '[ClickHouse] [Pods] between nodes using `.spec.templates.podTemplates[].zone`\n'
+        'object.\n'
+        '\n'
+        'This property SHALL serve as a shortcut for `.spec.templates.podTemplates[].spec.affinity.podAntiAffinity`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '      - name: pod-template\n'
+        '        zone:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.48.4.1",
+    num='4.48.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone_Key = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow to select [Kubernetes] nodes by label\n"
-        "with `name` equal `key` specified using `.spec.templates.podTemplates[].zone.key` [string] type\n"
-        "property.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    podTemplates:\n"
-        "      - name: pod-template\n"
-        "        zone:\n"
+        '[ClickHouse Operator] SHALL allow to select [Kubernetes] nodes by label\n'
+        'with `name` equal `key` specified using `.spec.templates.podTemplates[].zone.key` [string] type\n'
+        'property.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '      - name: pod-template\n'
+        '        zone:\n'
         '          key: "clickhouse"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.48.4.2.1",
+    num='4.48.4.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone_Values = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow to select [Kubernetes] nodes by label with `value`\n"
-        "in `values` specified using `.spec.templates.podTemplates[].zone.values` [array] type\n"
-        "object where each item in the array SHALL be of [string] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    podTemplates:\n"
-        "      - name: pod-template\n"
-        "        zone:\n"
+        '[ClickHouse Operator] SHALL allow to select [Kubernetes] nodes by label with `value`\n'
+        'in `values` specified using `.spec.templates.podTemplates[].zone.values` [array] type\n'
+        'object where each item in the array SHALL be of [string] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '      - name: pod-template\n'
+        '        zone:\n'
         '          key: "clickhouse"\n'
-        "          values:\n"
+        '          values:\n'
         '            - "allow"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.48.4.3.1",
+    num='4.48.4.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining [ClickHouse] [Pod] distribution policy\n"
-        "between [Kubernetes] nodes inside shard, replica, [Namespace], [CHI],\n"
-        "or another [ClickHouse] cluster using  `.spec.templates.podTemplates[].podDistribution`\n"
-        "[array] type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    podTemplates:\n"
-        "      - name: pod-template\n"
-        "        podDistribution:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining [ClickHouse] [Pod] distribution policy\n'
+        'between [Kubernetes] nodes inside shard, replica, [Namespace], [CHI],\n'
+        'or another [ClickHouse] cluster using  `.spec.templates.podTemplates[].podDistribution`\n'
+        '[array] type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '      - name: pod-template\n'
+        '        podDistribution:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.48.5.1",
+    num='4.48.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Type = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining multiple affinity policy types using\n"
-        "`.spec.templates.podTemplates[].podDistribution[].type` [string] type property\n"
-        "which SHALL support the following values:\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining multiple affinity policy types using\n'
+        '`.spec.templates.podTemplates[].podDistribution[].type` [string] type property\n'
+        'which SHALL support the following values:\n'
+        '\n'
         '* `""`\n'
         '* `"Unspecified"`\n'
         '* `"ClickHouseAntiAffinity"`\n'
@@ -4969,25 +5022,25 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDist
         '* `"ReplicaAffinity"`\n'
         '* `"PreviousTailAffinity"`\n'
         '* `"CircularReplication"`\n'
-        "\n"
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.48.5.2.1",
+    num='4.48.5.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Scope = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining scope for applying each `podDistribution`\n"
-        "using `.spec.templates.podTemplates[].podDistribution[].scope` [string] type property\n"
-        "which SHALL support the following values:\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining scope for applying each `podDistribution`\n'
+        'using `.spec.templates.podTemplates[].podDistribution[].scope` [string] type property\n'
+        'which SHALL support the following values:\n'
+        '\n'
         '* `""`\n'
         '* `"Unspecified"`\n'
         '* `"Shard"`\n'
@@ -4995,1010 +5048,1038 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDist
         '* `"Cluster"`\n'
         '* `"ClickHouseInstallation"`\n'
         '* `"Namespace"`\n'
-        "\n"
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.48.5.3.1",
+    num='4.48.5.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Number = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining how many [ClickHouse] [Pods] could exist\n"
-        "inside the selected scope with the selected distribution type using\n"
-        "`.spec.templates.podTemplates[].podDistribution[].number` [integer] type property\n"
-        "having the minimum value of `0` and maximum value of `65535`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining how many [ClickHouse] [Pods] could exist\n'
+        'inside the selected scope with the selected distribution type using\n'
+        '`.spec.templates.podTemplates[].podDistribution[].number` [integer] type property\n'
+        'having the minimum value of `0` and maximum value of `65535`.\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.48.5.4.1",
+    num='4.48.5.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_TopologyKey = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining topology key used for inter-pod affinity\n"
-        "using `.spec.templates.podTemplates[].podDistribution[].topologyKey` [string] type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining topology key used for inter-pod affinity\n'
+        'using `.spec.templates.podTemplates[].podDistribution[].topologyKey` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.48.5.5.1",
+    num='4.48.5.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Spec = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow defining whole `Pod.spec` inside `StaefulSet.spec`\n"
-        "using `.spec.templates.podTemplates[].spec` object as\n"
-        "specified in https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow defining whole `Pod.spec` inside `StaefulSet.spec`\n'
+        'using `.spec.templates.podTemplates[].spec` object as\n'
+        'specified in https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.48.6.1",
+    num='4.48.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Metadata = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
         "[ClickHouse Operator] SHALL allow passing standard object's metadata from template to [Pod]\n"
-        "using `.spec.templates.podTemplates[].metadata` object as\n"
-        "specified in https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.\n"
-        "\n"
+        'using `.spec.templates.podTemplates[].metadata` object as\n'
+        'specified in https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.48.7.1",
+    num='4.48.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow defining templates for rendering [PVC]\n"
-        "resources which would be used inside [Pod]s for mounting [ClickHouse]\n"
-        "`data`, `logs` or other folders using `.spec.templates.volumeClaimTemplates`\n"
-        "[array] type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    volumeClaimTemplates:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow defining templates for rendering [PVC]\n'
+        'resources which would be used inside [Pod]s for mounting [ClickHouse]\n'
+        '`data`, `logs` or other folders using `.spec.templates.volumeClaimTemplates`\n'
+        '[array] type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    volumeClaimTemplates:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.49.1",
+    num='4.49.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `VolumeClaimTemplate` name that MAY be used\n"
-        "as a value in the following properties to provide default property values\n"
-        "for the selected resources:\n"
-        "\n"
-        "* top level `.spec.defaults.templates.dataVolumeClaimTemplate` or `.spec.defaults.templates.logVolumeClaimTemplate`\n"
-        "* cluster level `.spec.configuration.clusters.templates.dataVolumeClaimTemplate` or `.spec.configuration.clusters.templates.logVolumeClaimTemplate`\n"
-        "* shard level `.spec.configuration.clusters.layout.shards.temlates.dataVolumeClaimTemplate` or `.spec.configuration.clusters.layout.shards.temlates.logVolumeClaimTemplate`\n"
-        "* replica level `.spec.configuration.clusters.layout.replicas.templates.dataVolumeClaimTemplate` or `.spec.configuration.clusters.layout.replicas.templates.logVolumeClaimTemplate`\n"
-        "\n"
-        "using `.spec.templates.volumeClaimTemplates[].name` [string] type property.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    volumeClaimTemplates:\n"
-        "      - name: default-volume-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `VolumeClaimTemplate` name that MAY be used\n'
+        'as a value in the following properties to provide default property values\n'
+        'for the selected resources:\n'
+        '\n'
+        '* top level `.spec.defaults.templates.dataVolumeClaimTemplate` or `.spec.defaults.templates.logVolumeClaimTemplate`\n'
+        '* cluster level `.spec.configuration.clusters.templates.dataVolumeClaimTemplate` or `.spec.configuration.clusters.templates.logVolumeClaimTemplate`\n'
+        '* shard level `.spec.configuration.clusters.layout.shards.temlates.dataVolumeClaimTemplate` or `.spec.configuration.clusters.layout.shards.temlates.logVolumeClaimTemplate`\n'
+        '* replica level `.spec.configuration.clusters.layout.replicas.templates.dataVolumeClaimTemplate` or `.spec.configuration.clusters.layout.replicas.templates.logVolumeClaimTemplate`\n'
+        '\n'
+        'using `.spec.templates.volumeClaimTemplates[].name` [string] type property.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    volumeClaimTemplates:\n'
+        '      - name: default-volume-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.49.2.1",
+    num='4.49.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_ReclaimPolicy = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining the behavior of [PVC] deletion policy\n"
-        "when [Pod] to which [PVC] was assinged is being deleted using\n"
-        "`.spec.templates.volumeClaimTemplates[].reclaimPolicy` [string] type property.\n"
-        "\n"
-        "* `Delete` SHALL be the default value\n"
-        "* `Retain` SHALL cause the [PVC] to alive even if [Pod] is deleted\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining the behavior of [PVC] deletion policy\n'
+        'when [Pod] to which [PVC] was assinged is being deleted using\n'
+        '`.spec.templates.volumeClaimTemplates[].reclaimPolicy` [string] type property.\n'
+        '\n'
+        '* `Delete` SHALL be the default value\n'
+        '* `Retain` SHALL cause the [PVC] to alive even if [Pod] is deleted\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.49.3.1",
+    num='4.49.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Metadata = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
         "[ClickHouse Operator] SHALL allow passing standard object's metadata from template to [PVC]\n"
-        "as specified in https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata\n"
-        "using `.spec.templates.volumeClaimTemplates[].metadata` object.\n"
-        "\n"
+        'as specified in https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata\n'
+        'using `.spec.templates.volumeClaimTemplates[].metadata` object.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.49.4.1",
+    num='4.49.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Spec = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow defining all aspects of [PVC] resource\n"
-        "as specified in https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims\n"
-        "using `.spec.templates.volumeClaimTemplates[].spec` object.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow defining all aspects of [PVC] resource\n'
+        'as specified in https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims\n'
+        'using `.spec.templates.volumeClaimTemplates[].spec` object.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.49.5.1",
+    num='4.49.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow defining templates for rendering [Service]s\n"
-        "which would get endpoint from [Pod]s having either [CHI] wide, cluster wide, shard wide,\n"
-        "or replica wide scope level using `.spec.templates.serviceTemplates` [array] type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    serviceTemplates:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow defining templates for rendering [Service]s\n'
+        'which would get endpoint from [Pod]s having either [CHI] wide, cluster wide, shard wide,\n'
+        'or replica wide scope level using `.spec.templates.serviceTemplates` [array] type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    serviceTemplates:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.50.1",
+    num='4.50.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying `ServiceTemplate` name that MAY be used\n"
-        "as a value in the following properties to provide default property values\n"
-        "for the selected resources:\n"
-        "\n"
-        "* top level `.spec.defaults.templates.serviceTemplate`\n"
-        "* cluster level `.spec.configuration.clusters.templates.clusterServiceTemplate`\n"
-        "* shard level `.spec.configuration.clusters.layout.shards.temlates.shardServiceTemplate`\n"
-        "* replica level `.spec.configuration.clusters.layout.replicas.templates.replicaServiceTemplate`\n"
-        "  or `.spec.configuration.clusters.layout.shards.replicas.replicaServiceTemplate`\n"
-        "\n"
-        "using `.spec.templates.serviceTemplates[].name` [string] type property.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  templates:\n"
-        "    serviceTemplates:\n"
-        "      - name: default-service-template\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying `ServiceTemplate` name that MAY be used\n'
+        'as a value in the following properties to provide default property values\n'
+        'for the selected resources:\n'
+        '\n'
+        '* top level `.spec.defaults.templates.serviceTemplate`\n'
+        '* cluster level `.spec.configuration.clusters.templates.clusterServiceTemplate`\n'
+        '* shard level `.spec.configuration.clusters.layout.shards.temlates.shardServiceTemplate`\n'
+        '* replica level `.spec.configuration.clusters.layout.replicas.templates.replicaServiceTemplate`\n'
+        '  or `.spec.configuration.clusters.layout.shards.replicas.replicaServiceTemplate`\n'
+        '\n'
+        'using `.spec.templates.serviceTemplates[].name` [string] type property.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    serviceTemplates:\n'
+        '      - name: default-service-template\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.50.2.1",
+    num='4.50.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_GenerateName = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining format for generated [Service] name\n"
-        "using `.spec.templates.serviceTemplates[].generateName` [string] type property\n"
-        "that support the following macros depending on the level of the object\n"
-        "for which the [Service] is being created:\n"
-        "\n"
-        "**For [CHI] level [Service]**\n"
-        "\n"
-        "* `{chi}` - ClickHouseInstallation name\n"
-        "* `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "\n"
-        "**For cluster level [Service]**\n"
-        "\n"
-        "* `{chi}` - ClickHouseInstallation name\n"
-        "* `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "* `{cluster}` - cluster name\n"
-        "* `{clusterID}` - short hashed cluster name\n"
-        "* `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n"
-        "\n"
-        "**For shard level [Service]**\n"
-        "\n"
-        "* `{chi}` - ClickHouseInstallation name\n"
-        "* `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "* `{cluster}` - cluster name\n"
-        "* `{clusterID}` - short hashed cluster name\n"
-        "* `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n"
-        "* `{shard}` - shard name\n"
-        "* `{shardID}` - short hashed shard name\n"
-        "* `{shardIndex}` - 0-based index of the shard in the cluster\n"
-        "\n"
-        "**For replica level [Service]**\n"
-        "\n"
-        "* `{chi}` - ClickHouseInstallation name\n"
-        "* `{chiID}` - short hashed ClickHouseInstallation name\n"
-        "* `{cluster}` - cluster name\n"
-        "* `{clusterID}` - short hashed cluster name\n"
-        "* `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n"
-        "* `{shard}` - shard name\n"
-        "* `{shardID}` - short hashed shard name\n"
-        "* `{shardIndex}` - 0-based index of the shard in the cluster\n"
-        "* `{replica}` - replica name\n"
-        "* `{replicaID}` - short hashed replica name\n"
-        "* `{replicaIndex}` - 0-based index of the replica in the shard\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining format for generated [Service] name\n'
+        'using `.spec.templates.serviceTemplates[].generateName` [string] type property\n'
+        'that support the following macros depending on the level of the object\n'
+        'for which the [Service] is being created:\n'
+        '\n'
+        '**For [CHI] level [Service]**\n'
+        '\n'
+        '* `{chi}` - ClickHouseInstallation name\n'
+        '* `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '\n'
+        '**For cluster level [Service]**\n'
+        '\n'
+        '* `{chi}` - ClickHouseInstallation name\n'
+        '* `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '* `{cluster}` - cluster name\n'
+        '* `{clusterID}` - short hashed cluster name\n'
+        '* `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n'
+        '\n'
+        '**For shard level [Service]**\n'
+        '\n'
+        '* `{chi}` - ClickHouseInstallation name\n'
+        '* `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '* `{cluster}` - cluster name\n'
+        '* `{clusterID}` - short hashed cluster name\n'
+        '* `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n'
+        '* `{shard}` - shard name\n'
+        '* `{shardID}` - short hashed shard name\n'
+        '* `{shardIndex}` - 0-based index of the shard in the cluster\n'
+        '\n'
+        '**For replica level [Service]**\n'
+        '\n'
+        '* `{chi}` - ClickHouseInstallation name\n'
+        '* `{chiID}` - short hashed ClickHouseInstallation name\n'
+        '* `{cluster}` - cluster name\n'
+        '* `{clusterID}` - short hashed cluster name\n'
+        '* `{clusterIndex}` - 0-based index of the cluster in the [CHI]\n'
+        '* `{shard}` - shard name\n'
+        '* `{shardID}` - short hashed shard name\n'
+        '* `{shardIndex}` - 0-based index of the shard in the cluster\n'
+        '* `{replica}` - replica name\n'
+        '* `{replicaID}` - short hashed replica name\n'
+        '* `{replicaIndex}` - 0-based index of the replica in the shard\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.50.3.1",
+    num='4.50.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Metadata = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
         "[ClickHouse Operator] SHALL allow passing standard object's metadata from template to [Service]\n"
-        "using  `.spec.templates.serviceTemplates[].metadata` object.\n"
-        "\n"
-        "This MAY be used for defining cloud provider specific metadata that may impact the\n"
-        "behavior of [Service].\n"
-        "\n"
+        'using  `.spec.templates.serviceTemplates[].metadata` object.\n'
+        '\n'
+        'This MAY be used for defining cloud provider specific metadata that may impact the\n'
+        'behavior of [Service].\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.50.4.1",
+    num='4.50.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Spec = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL allow describing the behavior of generated [Service]\n"
-        "as specified in https://kubernetes.io/docs/concepts/services-networking/service/\n"
-        "using `.spec.templates.serviceTemplates[].spec` object.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL allow describing the behavior of generated [Service]\n'
+        'as specified in https://kubernetes.io/docs/concepts/services-networking/service/\n'
+        'using `.spec.templates.serviceTemplates[].spec` object.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.50.5.1",
+    num='4.50.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining a list of `ClickHouseInstallationTemplate`\n"
-        "resource names which will merge with current [CHI] manifest during rendering\n"
-        "of [Kubernetes] resources to create [ClickHouse] clusters using\n"
-        "`.spec.useTemplates` [array] type object.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  # List of templates used by a CHI\n"
-        "  useTemplates:\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining a list of `ClickHouseInstallationTemplate`\n'
+        'resource names which will merge with current [CHI] manifest during rendering\n'
+        'of [Kubernetes] resources to create [ClickHouse] clusters using\n'
+        '`.spec.useTemplates` [array] type object.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  # List of templates used by a CHI\n'
+        '  useTemplates:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.51.5.1",
+    num='4.51.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Name = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining the name of `ClickHouseInstallationTemplate`\n"
-        "to be used using the `.spec.useTemplates.name` [string] type property.\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  useTemplates:\n"
-        "    - name: template1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining the name of `ClickHouseInstallationTemplate`\n'
+        'to be used using the `.spec.useTemplates.name` [string] type property.\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  useTemplates:\n'
+        '    - name: template1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.51.6.1",
+    num='4.51.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Namespace = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support specifying [Kubernetes] [Namespace] where\n"
-        "operator needs to search for `ClickHouseInstallationTemplate` resources using\n"
-        "`.spec.useTemplates.namespace` [string] type property.\n"
-        "\n"
-        "The available namespaces SHALL depend on the `watchNamespaces` setting in the operator.\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  useTemplates:\n"
-        "    - name: template1\n"
-        "      namespace: ns1\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support specifying [Kubernetes] [Namespace] where\n'
+        'operator needs to search for `ClickHouseInstallationTemplate` resources using\n'
+        '`.spec.useTemplates.namespace` [string] type property.\n'
+        '\n'
+        'The available namespaces SHALL depend on the `watchNamespaces` setting in the operator.\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  useTemplates:\n'
+        '    - name: template1\n'
+        '      namespace: ns1\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.51.7.1",
+    num='4.51.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_UseType = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining merge strategy for templates\n"
-        "using the `.spec.useTemplates.useType` [string] type property.\n"
-        "\n"
-        "Only the `merge` value SHALL be currently supported and current [CHI] settings\n"
-        "SHALL have higher priority than the merged `ClickHouseInstallationTemplate`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining merge strategy for templates\n'
+        'using the `.spec.useTemplates.useType` [string] type property.\n'
+        '\n'
+        'Only the `merge` value SHALL be currently supported and current [CHI] settings\n'
+        'SHALL have higher priority than the merged `ClickHouseInstallationTemplate`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.51.8.1",
+    num='4.51.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support `spec` object in the\n"
-        "`ClickHouseOperatorConfiguration` resource that SHALL allow to define\n"
-        "settings for the operator itself.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
+        '[ClickHouse Operator] SHALL support `spec` object in the\n'
+        '`ClickHouseOperatorConfiguration` resource that SHALL allow to define\n'
+        'settings for the operator itself.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
         'apiVersion: "clickhouse.altinity.com/v1"\n'
         'kind: "ClickHouseOperatorConfiguration"\n'
-        "metadata:\n"
+        'metadata:\n'
         '  name: "chop-config-01"\n'
-        "spec:\n"
-        "```\n"
-        "\n"
+        'spec:\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.52.1",
+    num='4.52.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_WatchNamespaces = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining a list of namespaces where the operator watches\n"
-        "for events using `.spec.watchNamespaces` [array] type object where each element of the array\n"
-        "SHALL specify a namespace using a [string] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  # List of namespaces where clickhouse-operator watches for events.\n"
-        "  # Concurrently running operators should watch on different namespaces\n"
-        "  watchNamespaces:\n"
-        "   - dev\n"
-        "   - info\n"
-        "   - onemore\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining a list of namespaces where the operator watches\n'
+        'for events using `.spec.watchNamespaces` [array] type object where each element of the array\n'
+        'SHALL specify a namespace using a [string] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  # List of namespaces where clickhouse-operator watches for events.\n'
+        '  # Concurrently running operators should watch on different namespaces\n'
+        '  watchNamespaces:\n'
+        '   - dev\n'
+        '   - info\n'
+        '   - onemore\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.2.1",
+    num='4.52.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCommonConfigsPath = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining path to folder where [ClickHouse]\n"
-        "configuration files common for all instances within [CHI] are located using\n"
-        "`.spec.chCommonConfigsPath` [string] type property.\n"
-        "\n"
-        "The default value SHALL be `config.d`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining path to folder where [ClickHouse]\n'
+        'configuration files common for all instances within [CHI] are located using\n'
+        '`.spec.chCommonConfigsPath` [string] type property.\n'
+        '\n'
+        'The default value SHALL be `config.d`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.3.1",
+    num='4.52.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseHostConfigsPath = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining path to folder where [ClickHouse]\n"
-        "configuration files unique for each instance (host) within [CHI] are located\n"
-        "`.spec.chHostConfigsPath` [string] type property.\n"
-        "\n"
-        "The default value SHALL be `conf.d`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining path to folder where [ClickHouse]\n'
+        'configuration files unique for each instance (host) within [CHI] are located\n'
+        '`.spec.chHostConfigsPath` [string] type property.\n'
+        '\n'
+        'The default value SHALL be `conf.d`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.4.1",
+    num='4.52.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseUsersConfigsPath = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining path to folder where [ClickHouse]\n"
+        '[ClickHouse Operator] SHALL support defining path to folder where [ClickHouse]\n'
         "configuration files with user's settings for all instances within [CHI] are located using\n"
-        "`.spec.chUsersConfigsPath` [string] type property.\n"
-        "\n"
-        "The default value SHALL be `users.d`.\n"
-        "\n"
+        '`.spec.chUsersConfigsPath` [string] type property.\n'
+        '\n'
+        'The default value SHALL be `users.d`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.5.1",
+    num='4.52.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_TemplatesPath = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining path to folder where `ClickHouseInstallation`\n"
-        "`.yaml` manifests are located using `.spec.chiTemplatesPath` [string] type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining path to folder where `ClickHouseInstallation`\n'
+        '`.yaml` manifests are located using `.spec.chiTemplatesPath` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.6.1",
+    num='4.52.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdateTimeout = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining how many seconds to wait for\n"
-        "created or updated StatefulSet to be ready using `.spec.statefulSetUpdateTimeout`\n"
-        "integer type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining how many seconds to wait for\n'
+        'created or updated StatefulSet to be ready using `.spec.statefulSetUpdateTimeout`\n'
+        'integer type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.7.1",
+    num='4.52.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdatePollPeriod = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining how many seconds to wait between\n"
-        "checks for created or updated [StatefulSet] status using\n"
-        "`spec.statefulSetUpdatePollPeriod` integer type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining how many seconds to wait between\n'
+        'checks for created or updated [StatefulSet] status using\n'
+        '`spec.statefulSetUpdatePollPeriod` integer type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.8.1",
+    num='4.52.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetCreateFailureAction = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining what to do in case created [StatefulSet]\n"
-        "is not in ready after `statefulSetUpdateTimeout` seconds have elapsed using\n"
-        "`.spec.onStatefulSetCreateFailureAction` [string] type property.\n"
-        "\n"
-        "The following values SHALL be supported:\n"
-        "\n"
-        "* `abort` - SHALL do nothing, just break the process and wait for admin.\n"
-        "* `delete` - SHALL delete newly created problematic [StatefulSet]\n"
-        "* `ignore` - SHALL be the default and SHALL ignore error,\n"
-        "  pretend nothing happened and move on to the next [StatefulSet]\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining what to do in case created [StatefulSet]\n'
+        'is not in ready after `statefulSetUpdateTimeout` seconds have elapsed using\n'
+        '`.spec.onStatefulSetCreateFailureAction` [string] type property.\n'
+        '\n'
+        'The following values SHALL be supported:\n'
+        '\n'
+        '* `abort` - SHALL do nothing, just break the process and wait for admin.\n'
+        '* `delete` - SHALL delete newly created problematic [StatefulSet]\n'
+        '* `ignore` - SHALL be the default and SHALL ignore error,\n'
+        '  pretend nothing happened and move on to the next [StatefulSet]\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.9.1",
+    num='4.52.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdateFailureAction = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining what to do in case updated [StatefulSet]\n"
-        "is not in ready after `statefulSetUpdateTimeout` seconds have elapsed using\n"
-        "`.spec.onStatefulSetUpdateFailureAction` [string] type property.\n"
-        "\n"
-        "The following values SHALL be supported:\n"
-        "\n"
-        "* `abort` - SHALL do nothing, just break the process and wait for admin\n"
-        "* `rollback`- SHALL be the default and SHALL delete Pod and rollback [StatefulSet] to previous\n"
-        "  generation. [Pod] SHALL be recreated by [StatefulSet] based on rollback-ed configuration\n"
-        "* `ignore` - SHALL ignore error, pretend nothing happened and move on to the next [StatefulSet]\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining what to do in case updated [StatefulSet]\n'
+        'is not in ready after `statefulSetUpdateTimeout` seconds have elapsed using\n'
+        '`.spec.onStatefulSetUpdateFailureAction` [string] type property.\n'
+        '\n'
+        'The following values SHALL be supported:\n'
+        '\n'
+        '* `abort` - SHALL do nothing, just break the process and wait for admin\n'
+        '* `rollback`- SHALL be the default and SHALL delete Pod and rollback [StatefulSet] to previous\n'
+        '  generation. [Pod] SHALL be recreated by [StatefulSet] based on rollback-ed configuration\n'
+        '* `ignore` - SHALL ignore error, pretend nothing happened and move on to the next [StatefulSet]\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.10.1",
+    num='4.52.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultProfile = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n"
-        "`<profile>...</profile>` section for any `<user>` using\n"
-        "`.spec.chConfigUserDefaultProfile` [string] type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n'
+        '`<profile>...</profile>` section for any `<user>` using\n'
+        '`.spec.chConfigUserDefaultProfile` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.11.1",
+    num='4.52.11.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultQuota = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n"
-        "`<quota>...</quota>` section for any `<user>` using `.spec.chConfigUserDefaultQuota` [string]\n"
-        "type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n'
+        '`<quota>...</quota>` section for any `<user>` using `.spec.chConfigUserDefaultQuota` [string]\n'
+        'type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.12.1",
+    num='4.52.12.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultNetworksIP = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n"
-        "`<networks><ip>...</ip></networks>` section for any `<user>` using\n"
-        "`.spec.chConfigUserDefaultNetworksIP` [array] type object with each item having\n"
-        "[string] type.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
-        "  chConfigUserDefaultNetworksIP:\n"
+        '[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n'
+        '`<networks><ip>...</ip></networks>` section for any `<user>` using\n'
+        '`.spec.chConfigUserDefaultNetworksIP` [array] type object with each item having\n'
+        '[string] type.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  chConfigUserDefaultNetworksIP:\n'
         '    - "::/0"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.13.1",
+    num='4.52.13.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultPassword = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n"
-        "`<password>...</password>` section for any `<user>` using\n"
-        "`.spec.chConfigUserDefaultPassword` [string] type property.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yaml\n"
-        "spec:\n"
+        '[ClickHouse Operator] SHALL support defining default [ClickHouse] server configuration\n'
+        '`<password>...</password>` section for any `<user>` using\n'
+        '`.spec.chConfigUserDefaultPassword` [string] type property.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
         '  chConfigUserDefaultPassword: "default"\n'
-        "```\n"
-        "\n"
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.14.1",
+    num='4.52.14.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigNetworksHostRegexpTemplate = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining [ClickHouse] server configuration\n"
-        "`<host_regexp>...</host_regexp>` section for any `<user>` using\n"
-        "`.spec.chConfigNetworksHostRegexpTemplate` [string] type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining [ClickHouse] server configuration\n'
+        '`<host_regexp>...</host_regexp>` section for any `<user>` using\n'
+        '`.spec.chConfigNetworksHostRegexpTemplate` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.15.1",
+    num='4.52.15.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCredentialsSecretNamespace = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining [Namespace] for [Kubernetes] secret with\n"
-        "username and password to be used by operator to connect to [ClickHouse] instances\n"
-        "using `.spec.chCredentialsSecretNamespace` [string] type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining [Namespace] for [Kubernetes] secret with\n'
+        'username and password to be used by operator to connect to [ClickHouse] instances\n'
+        'using `.spec.chCredentialsSecretNamespace` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.16.1",
+    num='4.52.16.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCredentialsSecretName = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining name of [Kubernetes] secret with username\n"
-        "and password to be used by operator to connect to [ClickHouse] instances\n"
-        "using `.spec.chCredentialsSecretName` [string] type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining name of [Kubernetes] secret with username\n'
+        'and password to be used by operator to connect to [ClickHouse] instances\n'
+        'using `.spec.chCredentialsSecretName` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.17.1",
+    num='4.52.17.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHousePort = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining [ClickHouse] port to be used by operator\n"
-        "to connect to [ClickHouse] instances using `.spec.chPort` [integer] type property\n"
-        "in the range from `1` to `65535`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining [ClickHouse] port to be used by operator\n'
+        'to connect to [ClickHouse] instances using `.spec.chPort` [integer] type property\n'
+        'in the range from `1` to `65535`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.18.1",
+    num='4.52.18.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogToStderr = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support allowing writing logs to `stderr` using\n"
-        "`.spec.logtostderr` [string] type property that SHALL have a boolean value.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support allowing writing logs to `stderr` using\n'
+        '`.spec.logtostderr` [string] type property that SHALL have a boolean value.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.19.1",
+    num='4.52.19.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AlsoLogToStderr = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support allowing to write logs to stderr and files at the same\n"
-        "time using `.spec.alsologtostderr` [string] type property that SHALL have a boolean value.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support allowing to write logs to stderr and files at the same\n'
+        'time using `.spec.alsologtostderr` [string] type property that SHALL have a boolean value.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.20.1",
+    num='4.52.20.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_VerbosityLevel = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support allowing verbosity level of the operator logging\n"
-        "using `.spec.v` [string] type property.\n"
-        "\n"
-        "The default SHALL be `1` and max level SHALL be `9`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support allowing verbosity level of the operator logging\n'
+        'using `.spec.v` [string] type property.\n'
+        '\n'
+        'The default SHALL be `1` and max level SHALL be `9`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.21.1",
+    num='4.52.21.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StderrThreshold = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining threshold for writing log to\n"
-        "`stderr` using `.spec.stderrthreshold` [string] type property.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining threshold for writing log to\n'
+        '`stderr` using `.spec.stderrthreshold` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.22.1",
+    num='4.52.22.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_VModule = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support `.spec.vmodule` [string] type property.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support `.spec.vmodule` [string] type property.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.52.23.1",
+    num='4.52.23.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogBacktrace = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
-    description=("[ClickHouse Operator] SHALL support `.spec.log_backtrace_at` [string] type property.\n" "\n"),
+    description=(
+        '[ClickHouse Operator] SHALL support `.spec.log_backtrace_at` [string] type property.\n'
+        '\n'
+    ),
     link=None,
     level=4,
-    num="4.52.24.1",
+    num='4.52.24.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileThreadsNumber = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining how many goroutines SHALL be used\n"
-        "for reconciliation cycle in parallel using `.spec.reconcileThreadsNumber` [integer]\n"
-        "type property in range from `1` to `65535`.\n"
-        "\n"
-        "The default SHALL be `10`.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support defining how many goroutines SHALL be used\n'
+        'for reconciliation cycle in parallel using `.spec.reconcileThreadsNumber` [integer]\n'
+        'type property in range from `1` to `65535`.\n'
+        '\n'
+        'The default SHALL be `10`.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.25.1",
+    num='4.52.25.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitExclude = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude",
-    version="1.0",
-    priority=None,
-    group=None,
-    type=None,
-    uid=None,
-    description=("[ClickHouse Operator] SHALL support `.spec.reconcileWaitExclude` [string] type property.\n" "\n"),
-    link=None,
-    level=4,
-    num="4.52.26.1",
-)
-
-RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitInclude = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude",
-    version="1.0",
-    priority=None,
-    group=None,
-    type=None,
-    uid=None,
-    description=("[ClickHouse Operator] SHALL support `.spec.reconcileWaitInclude` [string] type property.\n" "\n"),
-    link=None,
-    level=4,
-    num="4.52.27.1",
-)
-
-RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ExcludeFromPropagationLabels = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining which labels SHALL be excluded when\n"
-        "propagating labels from the [CHI]'s `metadata.labels` section to child objects' `metadata.labels`\n"
-        "using `.spec.excludeFromPropagationLabels` [array]\n"
-        "type object where each item is of [string] type and specifies the label to exclude.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.reconcile.wait.exclude` [string] type property.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.28.1",
+    num='4.52.26.1'
 )
 
-RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AppendScopeLabels = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels",
-    version="1.0",
+RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support defining whether to append `scope` labels to\n"
-        "[StatefulSet] and [Pod] using `.spec.appendScopeLabels` [string] type property\n"
-        "that SHALL either be set to [bool enum] value or one of the following values:\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support `.spec.reconcileWaitQueries` [string] type property.\n'
+        '\n'
+    ),
+    link=None,
+    level=4,
+    num='4.52.26.2'
+)
+
+RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitInclude = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support `.spec.reconcileWaitInclude` [string] type property.\n'
+        '\n'
+    ),
+    link=None,
+    level=4,
+    num='4.52.27.1'
+)
+
+RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ExcludeFromPropagationLabels = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support defining which labels SHALL be excluded when\n'
+        "propagating labels from the [CHI]'s `metadata.labels` section to child objects' `metadata.labels`\n"
+        'using `.spec.excludeFromPropagationLabels` [array]\n'
+        'type object where each item is of [string] type and specifies the label to exclude.\n'
+        '\n'
+    ),
+    link=None,
+    level=4,
+    num='4.52.28.1'
+)
+
+RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AppendScopeLabels = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support defining whether to append `scope` labels to\n'
+        '[StatefulSet] and [Pod] using `.spec.appendScopeLabels` [string] type property\n'
+        'that SHALL either be set to [bool enum] value or one of the following values:\n'
+        '\n'
         '* `"LabelShardScopeIndex"`\n'
         '* `"LabelReplicaScopeIndex"`\n'
         '* `"LabelCHIScopeIndex"`\n'
@@ -6009,280 +6090,286 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AppendScopeLabels = Requirement
         '* `"LabelClusterScopeCycleSize"`\n'
         '* `"LabelClusterScopeCycleIndex"`\n'
         '* `"LabelClusterScopeCycleOffset"`\n'
-        "\n"
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.52.29.1",
+    num='4.52.29.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_StatefulSets = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.StatefulSets",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.StatefulSets',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL use [StatefulSets] to manage pods that are based\n"
-        "on an identical container spec.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL use [StatefulSets] to manage pods that are based\n'
+        'on an identical container spec.\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.53.1",
+    num='4.53.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_StatefulSets_PodsStickyIdentity = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL use [StatefulSets] that maintain a sticky identity\n"
-        "for each of their pods.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL use [StatefulSets] that maintain a sticky identity\n'
+        'for each of their pods.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.53.2.1",
+    num='4.53.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_StatefulSets_PodsCreatedFromTheSameSpec = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL create pods that are created from the same spec but are\n"
-        "not interchangeable. This means that each pod SHALL have a persistent identifier\n"
-        "that it SHALL maintain across any rescheduling.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL create pods that are created from the same spec but are\n'
+        'not interchangeable. This means that each pod SHALL have a persistent identifier\n'
+        'that it SHALL maintain across any rescheduling.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.53.3.1",
+    num='4.53.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support handling cases when [StatefulSet] would\n"
-        "not reach `Ready` status.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "* invalid [ClickHouse] server image\n"
-        "* invalid [ClickHouse] server `users.xml` or `config.xml` configuration files\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support handling cases when [StatefulSet] would\n'
+        'not reach `Ready` status.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '* invalid [ClickHouse] server image\n'
+        '* invalid [ClickHouse] server `users.xml` or `config.xml` configuration files\n'
+        '\n'
     ),
     link=None,
     level=3,
-    num="4.54.1",
+    num='4.54.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_HealthMonitoring = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support health monitoring of updated or created\n"
-        "[StatefulSets] when performing rolling update or create procedures.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support health monitoring of updated or created\n'
+        '[StatefulSets] when performing rolling update or create procedures.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.54.2.1",
+    num='4.54.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_PollingForReady = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support polling [StatefulSet] status and wait\n"
-        "for some configurable time for [StatefulSet] to report `Ready` status to be reached.\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support polling [StatefulSet] status and wait\n'
+        'for some configurable time for [StatefulSet] to report `Ready` status to be reached.\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.54.3.1",
+    num='4.54.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_MoveOnReady = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support moving on to the next [StatefulSet]\n"
-        "when operation on the current [StatefulSet] successfully reports `Ready` status\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support moving on to the next [StatefulSet]\n'
+        'when operation on the current [StatefulSet] successfully reports `Ready` status\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.54.4.1",
+    num='4.54.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_Create = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support the following options in the case\n"
-        "of [StatefulSet] create failure after `statefulSetUpdateTimeout` seconds\n"
-        "has passed\n"
-        "\n"
-        "* `abort` - SHALL do nothing and SHALL just break the process and wait for admin\n"
-        "* `delete` - SHALL delete newly created problematic StatefulSet\n"
-        "\n"
-        "If not specified, `abort` SHALL be the default behavior.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yml\n"
-        "onStatefulSetCreateFailureAction: delete\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support the following options in the case\n'
+        'of [StatefulSet] create failure after `statefulSetUpdateTimeout` seconds\n'
+        'has passed\n'
+        '\n'
+        '* `abort` - SHALL do nothing and SHALL just break the process and wait for admin\n'
+        '* `delete` - SHALL delete newly created problematic StatefulSet\n'
+        '\n'
+        'If not specified, `abort` SHALL be the default behavior.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yml\n'
+        'onStatefulSetCreateFailureAction: delete\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.54.5.1",
+    num='4.54.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_Update = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL support the following options in the case\n"
-        "of [StatefulSet] update failure after `statefulSetUpdateTimeout` seconds\n"
-        "has passed\n"
-        "\n"
-        "* `abort` - SHALL do nothing and SHALL just break the process and wait for admin\n"
-        "* `rollback` - SHALL delete Pod and rollback [StatefulSet] to previous generation.\n"
-        "\n"
-        "If not specified, `abort` SHALL be the default behavior.\n"
-        "\n"
-        "For example,\n"
-        "\n"
-        "```yml\n"
-        "onStatefulSetUpdateFailureAction: rollback\n"
-        "```\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support the following options in the case\n'
+        'of [StatefulSet] update failure after `statefulSetUpdateTimeout` seconds\n'
+        'has passed\n'
+        '\n'
+        '* `abort` - SHALL do nothing and SHALL just break the process and wait for admin\n'
+        '* `rollback` - SHALL delete Pod and rollback [StatefulSet] to previous generation.\n'
+        '\n'
+        'If not specified, `abort` SHALL be the default behavior.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yml\n'
+        'onStatefulSetUpdateFailureAction: rollback\n'
+        '```\n'
+        '\n'
     ),
     link=None,
     level=4,
-    num="4.54.6.1",
+    num='4.54.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Create = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create",
-    version="1.0",
-    priority=None,
-    group=None,
-    type=None,
-    uid=None,
-    description=("[ClickHouse Operator] SHALL support reverting back after [StatefulSet] create failure.\n" "\n"),
-    link=None,
-    level=4,
-    num="4.54.7.1",
-)
-
-RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Update = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update",
-    version="1.0",
-    priority=None,
-    group=None,
-    type=None,
-    uid=None,
-    description=("[ClickHouse Operator] SHALL support reverting back after [StatefulSet] update failure.\n" "\n"),
-    link=None,
-    level=4,
-    num="4.54.7.2",
-)
-
-RQ_SRS_026_ClickHouseOperator_ErrorHandling_SuccessfulUpdateBeforeFailed_DoNothing = Requirement(
-    name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing",
-    version="1.0",
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create',
+    version='1.0',
     priority=None,
     group=None,
     type=None,
     uid=None,
     description=(
-        "[ClickHouse Operator] SHALL do nothing if [StatefulSets] were already successfully\n"
-        "updated on the same run before failed [StatefulSet] met.\n"
-        "\n"
-        "[Operator]: #operator\n"
-        "[operator]: #operator\n"
-        "[ReplicaSet]: #replicaset\n"
-        "[Namespace]: #namespace\n"
-        "[OLM]: #olm\n"
-        "[Deployment]: #deployment\n"
-        "[SRS]: #srs\n"
-        "[CHI]: #chi\n"
-        "[PVC]: #pvc\n"
-        "[Pod]: #pod\n"
-        "[Pods]: #pod\n"
-        "[Service]: #service\n"
-        "[bool enum]: #bool-enum-type\n"
-        "[string]: #string-type\n"
-        "[integer]: #integer-type\n"
-        "[array]: #array-type\n"
-        "[ConfigMap]: #configmap\n"
-        "[ConfigMaps]: #configmap\n"
-        "[StatefulSet]: #statefulset\n"
-        "[StatefulSets]: #statefulset\n"
-        "[custom resource definition]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/\n"
-        "[Altinity]: https://altinity.com\n"
-        "[ZooKeeper]: https://zookeeper.apache.org/\n"
-        "[Prometheus]: https://prometheus.io/\n"
-        "[Kubernetes]: https://kubernetes.io/\n"
-        "[Clickhouse Operator]: https://github.com/Altinity/clickhouse-operator\n"
-        "[ClickHouse]: https://clickhouse.tech\n"
-        "[Gitlab repository]: https://gitlab.com/altinity-qa/documents/qa-srs026-clickhouse-operator/blob/main/QA_SRS026_ClickHouse_Operator.md\n"
-        "[Revision history]: https://gitlab.com/altinity-qa/documents/qa-srs026-clickhouse-operator/commits/main/QA_SRS026_ClickHouse_Operator.md\n"
-        "[Git]: https://git-scm.com/\n"
-        "[GitLab]: https://gitlab.com\n"
-        "\n"
+        '[ClickHouse Operator] SHALL support reverting back after [StatefulSet] create failure.\n'
+        '\n'
+    ),
+    link=None,
+    level=4,
+    num='4.54.7.1'
+)
+
+RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Update = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support reverting back after [StatefulSet] update failure.\n'
+        '\n'
+    ),
+    link=None,
+    level=4,
+    num='4.54.7.2'
+)
+
+RQ_SRS_026_ClickHouseOperator_ErrorHandling_SuccessfulUpdateBeforeFailed_DoNothing = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL do nothing if [StatefulSets] were already successfully\n'
+        'updated on the same run before failed [StatefulSet] met.\n'
+        '\n'
+        '[Operator]: #operator\n'
+        '[operator]: #operator\n'
+        '[ReplicaSet]: #replicaset\n'
+        '[Namespace]: #namespace\n'
+        '[OLM]: #olm\n'
+        '[Deployment]: #deployment\n'
+        '[SRS]: #srs\n'
+        '[CHI]: #chi\n'
+        '[PVC]: #pvc\n'
+        '[Pod]: #pod\n'
+        '[Pods]: #pod\n'
+        '[Service]: #service\n'
+        '[bool enum]: #bool-enum-type\n'
+        '[string]: #string-type\n'
+        '[integer]: #integer-type\n'
+        '[array]: #array-type\n'
+        '[ConfigMap]: #configmap\n'
+        '[ConfigMaps]: #configmap\n'
+        '[StatefulSet]: #statefulset\n'
+        '[StatefulSets]: #statefulset\n'
+        '[custom resource definition]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/\n'
+        '[Altinity]: https://altinity.com\n'
+        '[ZooKeeper]: https://zookeeper.apache.org/\n'
+        '[Prometheus]: https://prometheus.io/\n'
+        '[Kubernetes]: https://kubernetes.io/\n'
+        '[Clickhouse Operator]: https://github.com/Altinity/clickhouse-operator\n'
+        '[ClickHouse]: https://clickhouse.tech\n'
+        '[Gitlab repository]: https://gitlab.com/altinity-qa/documents/qa-srs026-clickhouse-operator/blob/main/QA_SRS026_ClickHouse_Operator.md\n'
+        '[Revision history]: https://gitlab.com/altinity-qa/documents/qa-srs026-clickhouse-operator/commits/main/QA_SRS026_ClickHouse_Operator.md\n'
+        '[Git]: https://git-scm.com/\n'
+        '[GitLab]: https://gitlab.com\n'
+        '\n'
     ),
     link=None,
     level=5,
-    num="4.54.8.2.1",
+    num='4.54.8.2.1'
 )
 
 QA_SRS026_ClickHouse_Operator = Specification(
-    name="QA-SRS026 ClickHouse Operator",
+    name='QA-SRS026 ClickHouse Operator',
     description=None,
-    author="vzakaznikov",
-    date="October 8, 2021",
-    status="-",
-    approved_by="-",
-    approved_date="-",
-    approved_version="-",
+    author='vzakaznikov',
+    date='October 8, 2021',
+    status='-',
+    approved_by='-',
+    approved_date='-',
+    approved_version='-',
     version=None,
     group=None,
     type=None,
@@ -6291,1481 +6378,530 @@ QA_SRS026_ClickHouse_Operator = Specification(
     parent=None,
     children=None,
     headings=(
-        Heading(name="Revision History", level=1, num="1"),
-        Heading(name="Introduction", level=1, num="2"),
-        Heading(name="Definitions", level=1, num="3"),
-        Heading(name="PV", level=2, num="3.1"),
-        Heading(name="CSI", level=2, num="3.2"),
-        Heading(name="Operator", level=2, num="3.3"),
-        Heading(name="Deployment", level=2, num="3.4"),
-        Heading(name="Namespace", level=2, num="3.5"),
-        Heading(name="OLM", level=2, num="3.6"),
-        Heading(name="Pod", level=2, num="3.7"),
-        Heading(name="ReplicaSet", level=2, num="3.8"),
-        Heading(name="Service", level=2, num="3.9"),
-        Heading(name="PVC", level=2, num="3.10"),
-        Heading(name="CHI", level=2, num="3.11"),
-        Heading(name="Shard", level=2, num="3.12"),
-        Heading(name="Replica", level=2, num="3.13"),
-        Heading(name="ConfigMap", level=2, num="3.14"),
-        Heading(name="StatefulSet", level=2, num="3.15"),
-        Heading(name="`bool enum` Type", level=2, num="3.16"),
-        Heading(name="`string` Type", level=2, num="3.17"),
-        Heading(name="`integer` Type", level=2, num="3.18"),
-        Heading(name="`array` Type", level=2, num="3.19"),
-        Heading(name="Requirements", level=1, num="4"),
-        Heading(name="General", level=2, num="4.1"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator", level=4, num="4.1.0.1"),
-        Heading(name="Installation", level=2, num="4.2"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.Installation", level=3, num="4.2.1"),
-        Heading(name="Monitoring Support", level=3, num="4.2.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Installation.MonitoringSupport",
-            level=4,
-            num="4.2.2.1",
+        Heading(name='Revision History', level=1, num='1'),
+        Heading(name='Introduction', level=1, num='2'),
+        Heading(name='Definitions', level=1, num='3'),
+        Heading(name='PV', level=2, num='3.1'),
+        Heading(name='CSI', level=2, num='3.2'),
+        Heading(name='Operator', level=2, num='3.3'),
+        Heading(name='Deployment', level=2, num='3.4'),
+        Heading(name='Namespace', level=2, num='3.5'),
+        Heading(name='OLM', level=2, num='3.6'),
+        Heading(name='Pod', level=2, num='3.7'),
+        Heading(name='ReplicaSet', level=2, num='3.8'),
+        Heading(name='Service', level=2, num='3.9'),
+        Heading(name='PVC', level=2, num='3.10'),
+        Heading(name='CHI', level=2, num='3.11'),
+        Heading(name='Shard', level=2, num='3.12'),
+        Heading(name='Replica', level=2, num='3.13'),
+        Heading(name='ConfigMap', level=2, num='3.14'),
+        Heading(name='StatefulSet', level=2, num='3.15'),
+        Heading(name='`bool enum` Type', level=2, num='3.16'),
+        Heading(name='`string` Type', level=2, num='3.17'),
+        Heading(name='`integer` Type', level=2, num='3.18'),
+        Heading(name='`array` Type', level=2, num='3.19'),
+        Heading(name='Requirements', level=1, num='4'),
+        Heading(name='General', level=2, num='4.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator', level=4, num='4.1.0.1'),
+        Heading(name='Installation', level=2, num='4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Installation', level=3, num='4.2.1'),
+        Heading(name='Monitoring Support', level=3, num='4.2.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Installation.MonitoringSupport', level=4, num='4.2.2.1'),
+        Heading(name='Namespaces', level=2, num='4.3'),
+        Heading(name='Kube System', level=3, num='4.3.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Namespaces.KubeSystem', level=4, num='4.3.1.1'),
+        Heading(name='User Defined', level=3, num='4.3.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Namespaces.UserDefined', level=4, num='4.3.2.1'),
+        Heading(name='Cluster Management', level=3, num='4.3.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Namespaces.ClusterManagement', level=4, num='4.3.3.1'),
+        Heading(name='ACM Compatibility', level=2, num='4.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ACM', level=4, num='4.4.3.1'),
+        Heading(name='Creating Clusters', level=2, num='4.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Create', level=4, num='4.5.3.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.DeleteBroken', level=4, num='4.5.3.2'),
+        Heading(name='Auto-generated ClickHouse Clusters Definitions', level=2, num='4.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.AutoGeneratedClickHouseClusters', level=3, num='4.6.1'),
+        Heading(name='Managing Operator', level=2, num='4.7'),
+        Heading(name='Upgrading Operator', level=3, num='4.7.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.UpgradingOperator', level=4, num='4.7.1.1'),
+        Heading(name='Downgrading Operator', level=3, num='4.7.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.DowngradingOperator', level=4, num='4.7.2.1'),
+        Heading(name='Restarting Operator', level=3, num='4.7.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator', level=4, num='4.7.3.1'),
+        Heading(name='Security', level=2, num='4.8'),
+        Heading(name='Default Access Control', level=3, num='4.8.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultAccessControl', level=4, num='4.8.1.1'),
+        Heading(name='Default Users', level=3, num='4.8.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultUsers', level=4, num='4.8.2.1'),
+        Heading(name='Secrets', level=3, num='4.8.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Secrets', level=4, num='4.8.3.1'),
+        Heading(name='Secure Connection', level=3, num='4.8.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.EnableHttps', level=4, num='4.8.4.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication', level=4, num='4.8.4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret', level=4, num='4.8.4.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps', level=4, num='4.8.4.4'),
+        Heading(name='Default Templates', level=2, num='4.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates', level=3, num='4.9.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates', level=3, num='4.9.2'),
+        Heading(name='Annotations In Templates', level=2, num='4.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.AnnotationsInTemplates', level=3, num='4.10.1'),
+        Heading(name='Custom Pod Templates', level=2, num='4.11'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.PodTemplates', level=4, num='4.11.1.1'),
+        Heading(name='Custom Service Templates', level=2, num='4.12'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates', level=3, num='4.12.1'),
+        Heading(name='Load Balancer', level=3, num='4.12.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.LoadBalancer', level=4, num='4.12.2.1'),
+        Heading(name='Standard Kubernetes Service Specification', level=3, num='4.12.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.ServiceSpecificationStandard', level=4, num='4.12.3.1'),
+        Heading(name='Annotations', level=3, num='4.12.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.Annotations', level=4, num='4.12.4.1'),
+        Heading(name='Name Generation', level=3, num='4.12.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ServiceTemplates.NameGeneration', level=4, num='4.12.5.1'),
+        Heading(name='Custom Host Template', level=2, num='4.13'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.HostTemplates', level=4, num='4.13.5.1'),
+        Heading(name='Custom Volume Claim Templates', level=2, num='4.14'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates', level=4, num='4.14.5.1'),
+        Heading(name='Storage Provisioning', level=2, num='4.15'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.StorageProvisioning', level=4, num='4.15.5.1'),
+        Heading(name='Deployments', level=2, num='4.16'),
+        Heading(name='Single Node Instances', level=3, num='4.16.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.SingleNodeInstances', level=4, num='4.16.1.1'),
+        Heading(name='Multiple Shards', level=3, num='4.16.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShards', level=4, num='4.16.2.1'),
+        Heading(name='Multiple Replicas', level=3, num='4.16.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleReplicas', level=4, num='4.16.3.1'),
+        Heading(name='Multiple Shards And Replicas', level=3, num='4.16.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShardsAndReplicas', level=4, num='4.16.4.1'),
+        Heading(name='Multiple Clusters', level=3, num='4.16.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleClusters', level=4, num='4.16.5.1'),
+        Heading(name='Circular Replication', level=3, num='4.16.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.CircularReplication', level=4, num='4.16.6.1'),
+        Heading(name='Different ClickHouse Versions On Replicas And Shards', level=3, num='4.16.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.DifferentClickHouseVersionsOnReplicasAndShards', level=4, num='4.16.7.1'),
+        Heading(name='Multiple Storage Volumes', level=3, num='4.16.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.MultipleStorageVolumes', level=4, num='4.16.8.1'),
+        Heading(name='Plugging External Volumes', level=2, num='4.17'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Deployments.PluggingExternalVolumes', level=3, num='4.17.1'),
+        Heading(name='Configuration File Control', level=2, num='4.18'),
+        Heading(name='YAML Syntax For `config.xml`', level=3, num='4.18.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.ConfigXML', level=4, num='4.18.1.1'),
+        Heading(name='YAML Syntax For `users.xml`', level=3, num='4.18.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.UsersXML', level=4, num='4.18.2.1'),
+        Heading(name='Embedded XML Files', level=3, num='4.18.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.EmbeddedXML', level=4, num='4.18.3.1'),
+        Heading(name='Macros XML', level=3, num='4.18.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.MacrosXML', level=4, num='4.18.4.1'),
+        Heading(name='Retaining Volume Claim Templates', level=2, num='4.19'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.RetainingVolumeClaimTemplates', level=3, num='4.19.1'),
+        Heading(name='Reconnecting Existing Persistent Volumes', level=2, num='4.20'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ReconnectingExistingPersistentVolumes', level=3, num='4.20.1'),
+        Heading(name='Maintaining Cluster Uptime During Changes', level=2, num='4.21'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.MaintainingClusterUpTimeDuringChanges', level=3, num='4.21.1'),
+        Heading(name='Adding New Persistent Volumes To Pods', level=2, num='4.22'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.AddingNewPersistentVolumesToPods', level=3, num='4.22.1'),
+        Heading(name='Interrupting Application of ClickHouse Cluster Changes', level=2, num='4.23'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.InterruptingApplicationOfClickHouseClusterChanges', level=3, num='4.23.1'),
+        Heading(name='Managing ClickHouse', level=2, num='4.24'),
+        Heading(name='Configuring TLS', level=3, num='4.24.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.TLS', level=4, num='4.24.1.1'),
+        Heading(name='Restarting ZooKeeper Cluster', level=3, num='4.24.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.RestartingZooKeeper', level=4, num='4.24.2.1'),
+        Heading(name='Application of Changes', level=3, num='4.24.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.Changes', level=4, num='4.24.3.1'),
+        Heading(name='Rollback On Error', level=3, num='4.24.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.RollbackOnError', level=4, num='4.24.4.1'),
+        Heading(name='Changes Requiring Restart', level=3, num='4.24.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ChangesRequiringRestart', level=4, num='4.24.5.1'),
+        Heading(name='Configuration And Settings', level=3, num='4.24.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ConfigurationAndSettings', level=4, num='4.24.6.1'),
+        Heading(name='Cluster Scaling', level=3, num='4.24.7'),
+        Heading(name='Adding Shards', level=4, num='4.24.7.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingShards', level=5, num='4.24.7.1.1'),
+        Heading(name='Adding Replicas', level=4, num='4.24.7.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicas', level=5, num='4.24.7.2.1'),
+        Heading(name='Adding Replication To Existing Non-replicated Cluster', level=4, num='4.24.7.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicationToExistingNonReplicatedCluster', level=5, num='4.24.7.3.1'),
+        Heading(name='Schema Propagation', level=4, num='4.24.7.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.SchemaPropagation', level=5, num='4.24.7.4.1'),
+        Heading(name='Scaling Down', level=4, num='4.24.7.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.Down', level=5, num='4.24.7.5.1'),
+        Heading(name='ClickHouse Version Upgrades', level=3, num='4.24.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades', level=4, num='4.24.8.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades.IndividualOrAll', level=4, num='4.24.8.2'),
+        Heading(name='Re-provisioning Pods Using Different Template', level=3, num='4.24.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate', level=4, num='4.24.9.1'),
+        Heading(name='Re-provisioning Volume', level=3, num='4.24.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume', level=4, num='4.24.10.1'),
+        Heading(name='StorageManagement switch', level=3, num='4.24.11'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch', level=4, num='4.24.11.1'),
+        Heading(name='Stopping And Starting', level=3, num='4.24.12'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting', level=4, num='4.24.12.1'),
+        Heading(name='Stopping Specific ClickHouse Pods', level=3, num='4.24.13'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods', level=4, num='4.24.13.1'),
+        Heading(name='Stopping Specific ClickHouse Hosts', level=3, num='4.24.14'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts', level=4, num='4.24.14.1'),
+        Heading(name='Exporting Metrics', level=3, num='4.24.15'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics', level=4, num='4.24.15.1'),
+        Heading(name='Monitoring', level=3, num='4.24.16'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.Monitoring', level=4, num='4.24.16.1'),
+        Heading(name='Rolling Update', level=3, num='4.24.17'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate', level=4, num='4.24.17.1'),
+        Heading(name='Logging', level=2, num='4.25'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Logging', level=4, num='4.25.17.1'),
+        Heading(name='High Level Status', level=4, num='4.25.17.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus', level=5, num='4.25.17.2.1'),
+        Heading(name='Valid Installation', level=2, num='4.26'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ValidInstallation', level=3, num='4.26.1'),
+        Heading(name='Operator Settings', level=2, num='4.27'),
+        Heading(name='config.yaml', level=3, num='4.27.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Settings.ConfigYaml', level=4, num='4.27.1.1'),
+        Heading(name='Config Map', level=3, num='4.27.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap', level=4, num='4.27.2.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap.Changes', level=4, num='4.27.2.2'),
+        Heading(name='`ClickHouseOperatorConfiguration` Resource', level=3, num='4.27.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration', level=4, num='4.27.3.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration.Changes', level=4, num='4.27.3.2'),
+        Heading(name='ClickHouse Config Maps', level=2, num='4.28'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps', level=3, num='4.28.1'),
+        Heading(name='ClickHouse Config Maps Defaults', level=2, num='4.29'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps.Defaults', level=3, num='4.29.1'),
+        Heading(name='Custom Resource Definition', level=2, num='4.30'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.CustomResourceDefinition', level=3, num='4.30.1'),
+        Heading(name='API Version', level=2, num='4.31'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion', level=3, num='4.31.1'),
+        Heading(name='Resource Kind', level=2, num='4.32'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation', level=3, num='4.32.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate', level=3, num='4.32.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration', level=3, num='4.32.3'),
+        Heading(name='Metadata', level=2, num='4.33'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata', level=3, num='4.33.1'),
+        Heading(name='Cluster Specification', level=2, num='4.34'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec', level=3, num='4.34.1'),
+        Heading(name='Task Identifier', level=2, num='4.35'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID', level=3, num='4.35.1'),
+        Heading(name='Stopping ClickHouse Clusters', level=2, num='4.36'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop', level=3, num='4.36.1'),
+        Heading(name='Restart Policy For StatefulSets', level=2, num='4.37'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart', level=3, num='4.37.1'),
+        Heading(name='Troubleshooting Pods', level=2, num='4.38'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot', level=3, num='4.38.1'),
+        Heading(name='Custom Domain Suffix', level=2, num='4.39'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern', level=3, num='4.39.1'),
+        Heading(name='Policy For Auto Applying Templates', level=2, num='4.40'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating', level=3, num='4.40.1'),
+        Heading(name='Reconciling Cycle', level=2, num='4.41'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle', level=3, num='4.41.1'),
+        Heading(name='Applying ConfigMaps Before StatefulSets', level=3, num='4.41.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets', level=4, num='4.41.2.1'),
+        Heading(name='Configuring Reconciling Cycle', level=3, num='4.41.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling', level=4, num='4.41.3.1'),
+        Heading(name='Reconciliation Policy Name', level=3, num='4.41.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy', level=4, num='4.41.4.1'),
+        Heading(name='ConfigMap Propagation Timeout', level=3, num='4.41.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout', level=4, num='4.41.5.1'),
+        Heading(name='Cleaning Objects', level=3, num='4.41.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup', level=4, num='4.41.6.1'),
+        Heading(name='Cleaning Up Unknown Objects', level=3, num='4.41.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects', level=4, num='4.41.7.1'),
+        Heading(name='Reconciling Failed Objects', level=3, num='4.41.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects', level=4, num='4.41.8.1'),
+        Heading(name='Defaults', level=2, num='4.42'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults', level=4, num='4.42.8.1'),
+        Heading(name='Specifying Storage Management Provisioner', level=3, num='4.42.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner', level=4, num='4.42.9.1'),
+        Heading(name='Specifying Replicas By FQDN', level=3, num='4.42.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN', level=4, num='4.42.10.1'),
+        Heading(name='Changing Distributed_DDL Settings', level=3, num='4.42.11'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL', level=4, num='4.42.11.1'),
+        Heading(name='Templates', level=3, num='4.42.12'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates', level=4, num='4.42.12.1'),
+        Heading(name='Host Template', level=4, num='4.42.12.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate', level=5, num='4.42.12.2.1'),
+        Heading(name='Pod Template', level=4, num='4.42.12.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate', level=5, num='4.42.12.3.1'),
+        Heading(name='Data Volume Claim Template', level=4, num='4.42.12.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate', level=5, num='4.42.12.4.1'),
+        Heading(name='Log Volume Claim Template', level=4, num='4.42.12.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate', level=5, num='4.42.12.5.1'),
+        Heading(name='Service Template', level=4, num='4.42.12.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate', level=5, num='4.42.12.6.1'),
+        Heading(name='Cluster Service Template', level=4, num='4.42.12.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate', level=5, num='4.42.12.7.1'),
+        Heading(name='Shard Service Template', level=4, num='4.42.12.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate', level=5, num='4.42.12.8.1'),
+        Heading(name='Replica Service Template', level=4, num='4.42.12.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate', level=5, num='4.42.12.9.1'),
+        Heading(name='Volume Claim Template', level=4, num='4.42.12.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate', level=5, num='4.42.12.10.1'),
+        Heading(name='ClickHouse Server Configuration', level=2, num='4.43'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration', level=3, num='4.43.1'),
+        Heading(name='ZooKeeper', level=3, num='4.43.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper', level=4, num='4.43.2.1'),
+        Heading(name='ZooKeeper Nodes', level=4, num='4.43.2.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes', level=5, num='4.43.2.2.1'),
+        Heading(name='Session Timeout', level=4, num='4.43.2.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs', level=5, num='4.43.2.3.1'),
+        Heading(name='Operation Timeout', level=4, num='4.43.2.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs', level=5, num='4.43.2.4.1'),
+        Heading(name='Root Path', level=4, num='4.43.2.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root', level=5, num='4.43.2.5.1'),
+        Heading(name='Login Credentials', level=4, num='4.43.2.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify', level=5, num='4.43.2.6.1'),
+        Heading(name='Users', level=3, num='4.43.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users', level=4, num='4.43.3.1'),
+        Heading(name='Profiles', level=3, num='4.43.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles', level=4, num='4.43.4.1'),
+        Heading(name='Quotas', level=3, num='4.43.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas', level=4, num='4.43.5.1'),
+        Heading(name='Settings', level=3, num='4.43.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings', level=4, num='4.43.6.1'),
+        Heading(name='Files', level=3, num='4.43.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files', level=4, num='4.43.7.1'),
+        Heading(name='ClickHouse Clusters Configuration', level=2, num='4.44'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters', level=3, num='4.44.1'),
+        Heading(name='Cluster Name', level=3, num='4.44.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name', level=4, num='4.44.2.1'),
+        Heading(name='Cluster ZooKeeper', level=3, num='4.44.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper', level=4, num='4.44.3.1'),
+        Heading(name='Cluster Settings', level=3, num='4.44.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings', level=4, num='4.44.4.1'),
+        Heading(name='Cluster Files', level=3, num='4.44.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files', level=4, num='4.44.5.1'),
+        Heading(name='Cluster Templates', level=3, num='4.44.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates', level=4, num='4.44.6.1'),
+        Heading(name='ClickHouse Cluster Layout', level=2, num='4.45'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout', level=3, num='4.45.1'),
+        Heading(name='Layout Type (Deprecated)', level=3, num='4.45.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type', level=4, num='4.45.2.1'),
+        Heading(name='Layout Shards Count', level=3, num='4.45.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount', level=4, num='4.45.3.1'),
+        Heading(name='Layout Replicas Count', level=3, num='4.45.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount', level=4, num='4.45.4.1'),
+        Heading(name='Layout Shards', level=3, num='4.45.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards', level=4, num='4.45.5.1'),
+        Heading(name='Shard Name', level=4, num='4.45.5.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name', level=5, num='4.45.5.2.1'),
+        Heading(name='Shard Definition Type (Deprecated)', level=4, num='4.45.5.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType', level=5, num='4.45.5.3.1'),
+        Heading(name='Shard Weight', level=4, num='4.45.5.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight', level=5, num='4.45.5.4.1'),
+        Heading(name='Shard Internnal Replication', level=4, num='4.45.5.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication', level=5, num='4.45.5.5.1'),
+        Heading(name='Shard Settings', level=4, num='4.45.5.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings', level=5, num='4.45.5.6.1'),
+        Heading(name='Shard Files', level=4, num='4.45.5.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files', level=5, num='4.45.5.7.1'),
+        Heading(name='Shard Templates', level=4, num='4.45.5.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates', level=5, num='4.45.5.8.1'),
+        Heading(name='Shard Replicas Count', level=4, num='4.45.5.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount', level=5, num='4.45.5.9.1'),
+        Heading(name='Layout Shards Replicas', level=3, num='4.45.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas', level=4, num='4.45.6.1'),
+        Heading(name='Shard Replica Name', level=4, num='4.45.6.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name', level=5, num='4.45.6.2.1'),
+        Heading(name='Shard Replica TCP Port', level=4, num='4.45.6.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort', level=5, num='4.45.6.3.1'),
+        Heading(name='Shard Replica HTTP Port', level=4, num='4.45.6.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort', level=5, num='4.45.6.4.1'),
+        Heading(name='Shard Replica Inter-server HTTP Port', level=4, num='4.45.6.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort', level=5, num='4.45.6.5.1'),
+        Heading(name='Shard Replica Settings', level=4, num='4.45.6.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings', level=5, num='4.45.6.6.1'),
+        Heading(name='Shard Replica Files', level=4, num='4.45.6.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files', level=5, num='4.45.6.7.1'),
+        Heading(name='Shard Replica Templates', level=4, num='4.45.6.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates', level=5, num='4.45.6.8.1'),
+        Heading(name='Layout Replicas', level=3, num='4.45.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas', level=4, num='4.45.7.1'),
+        Heading(name='Replica Name', level=4, num='4.45.7.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name', level=5, num='4.45.7.2.1'),
+        Heading(name='Replica Settings', level=4, num='4.45.7.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings', level=5, num='4.45.7.3.1'),
+        Heading(name='Replica Files', level=4, num='4.45.7.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files', level=5, num='4.45.7.4.1'),
+        Heading(name='Replica Templates', level=4, num='4.45.7.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates', level=5, num='4.45.7.5.1'),
+        Heading(name='Replica Shards Count', level=4, num='4.45.7.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount', level=5, num='4.45.7.6.1'),
+        Heading(name='Layout Replicas Shards', level=3, num='4.45.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards', level=4, num='4.45.8.1'),
+        Heading(name='Replica Shard Name', level=4, num='4.45.8.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name', level=5, num='4.45.8.2.1'),
+        Heading(name='Replica Shard TCP Port', level=4, num='4.45.8.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort', level=5, num='4.45.8.3.1'),
+        Heading(name='Replica Shard HTTP Port', level=4, num='4.45.8.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort', level=5, num='4.45.8.4.1'),
+        Heading(name='Replica Shard Inter-server HTTP Port', level=4, num='4.45.8.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort', level=5, num='4.45.8.5.1'),
+        Heading(name='Replica Shard Settings', level=4, num='4.45.8.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings', level=5, num='4.45.8.6.1'),
+        Heading(name='Replica Shard Files', level=4, num='4.45.8.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files', level=5, num='4.45.8.7.1'),
+        Heading(name='Replica Shard Templates', level=4, num='4.45.8.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates', level=5, num='4.45.8.8.1'),
+        Heading(name='User Defined Templates', level=2, num='4.46'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates', level=3, num='4.46.1'),
+        Heading(name='Host Templates', level=2, num='4.47'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates', level=3, num='4.47.1'),
+        Heading(name='Host Template Name', level=3, num='4.47.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name', level=4, num='4.47.2.1'),
+        Heading(name='Host Template Port Distribution', level=3, num='4.47.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution', level=4, num='4.47.3.1'),
+        Heading(name='Port Distribution Type', level=4, num='4.47.3.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type', level=5, num='4.47.3.2.1'),
+        Heading(name='Host Template Specification', level=3, num='4.47.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec', level=4, num='4.47.4.1'),
+        Heading(name='Host Name', level=4, num='4.47.4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name', level=5, num='4.47.4.2.1'),
+        Heading(name='Host TCP Port', level=4, num='4.47.4.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort', level=5, num='4.47.4.3.1'),
+        Heading(name='Host HTTP Port', level=4, num='4.47.4.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort', level=5, num='4.47.4.4.1'),
+        Heading(name='Host Inter-server HTTP Port', level=4, num='4.47.4.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort', level=5, num='4.47.4.5.1'),
+        Heading(name='Host Settings', level=4, num='4.47.4.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings', level=5, num='4.47.4.6.1'),
+        Heading(name='Host Files', level=4, num='4.47.4.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files', level=5, num='4.47.4.7.1'),
+        Heading(name='Host Overriding Templates', level=4, num='4.47.4.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates', level=5, num='4.47.4.8.1'),
+        Heading(name='Pod Templates', level=2, num='4.48'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates', level=3, num='4.48.1'),
+        Heading(name='Pod Name', level=3, num='4.48.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name', level=4, num='4.48.2.1'),
+        Heading(name='Pod Generate Name', level=3, num='4.48.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName', level=4, num='4.48.3.1'),
+        Heading(name='Pod Zone', level=3, num='4.48.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone', level=4, num='4.48.4.1'),
+        Heading(name='Pod Zone Key', level=4, num='4.48.4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key', level=5, num='4.48.4.2.1'),
+        Heading(name='Pod Zone Values', level=4, num='4.48.4.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values', level=5, num='4.48.4.3.1'),
+        Heading(name='Pod Distribution', level=3, num='4.48.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution', level=4, num='4.48.5.1'),
+        Heading(name='Pod Distribution Type', level=4, num='4.48.5.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type', level=5, num='4.48.5.2.1'),
+        Heading(name='Pod Distribution Scope', level=4, num='4.48.5.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope', level=5, num='4.48.5.3.1'),
+        Heading(name='Pod Distribution Number', level=4, num='4.48.5.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number', level=5, num='4.48.5.4.1'),
+        Heading(name='Pod Distribution Topology Key', level=4, num='4.48.5.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey', level=5, num='4.48.5.5.1'),
+        Heading(name='Pod Spec', level=3, num='4.48.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec', level=4, num='4.48.6.1'),
+        Heading(name='Pod Metadata', level=3, num='4.48.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata', level=4, num='4.48.7.1'),
+        Heading(name='Volume Claim Templates', level=2, num='4.49'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates', level=3, num='4.49.1'),
+        Heading(name='Volume Claim Name', level=3, num='4.49.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name', level=4, num='4.49.2.1'),
+        Heading(name='Volume Claim Reclaim Policy', level=3, num='4.49.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy', level=4, num='4.49.3.1'),
+        Heading(name='Volume Claim Metadata', level=3, num='4.49.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata', level=4, num='4.49.4.1'),
+        Heading(name='Volume Claim Spec', level=3, num='4.49.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec', level=4, num='4.49.5.1'),
+        Heading(name='Service Templates', level=2, num='4.50'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates', level=3, num='4.50.1'),
+        Heading(name='Service Name', level=3, num='4.50.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name', level=4, num='4.50.2.1'),
+        Heading(name='Service Generate Name', level=3, num='4.50.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName', level=4, num='4.50.3.1'),
+        Heading(name='Service Generate Metadata', level=3, num='4.50.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata', level=4, num='4.50.4.1'),
+        Heading(name='Service Spec', level=3, num='4.50.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec', level=4, num='4.50.5.1'),
+        Heading(name='Use Templates', level=2, num='4.51'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates', level=4, num='4.51.5.1'),
+        Heading(name='Use Template Name', level=3, num='4.51.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name', level=4, num='4.51.6.1'),
+        Heading(name='Use Template Namespace', level=3, num='4.51.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace', level=4, num='4.51.7.1'),
+        Heading(name='Use Template Use Type', level=3, num='4.51.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType', level=4, num='4.51.8.1'),
+        Heading(name='ClickHouse Operator Configuration', level=2, num='4.52'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec', level=3, num='4.52.1'),
+        Heading(name='Watched Namespaces', level=3, num='4.52.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces', level=4, num='4.52.2.1'),
+        Heading(name='ClickHouse Common Configs Path', level=3, num='4.52.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath', level=4, num='4.52.3.1'),
+        Heading(name='ClickHouse Host Configs Path', level=3, num='4.52.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath', level=4, num='4.52.4.1'),
+        Heading(name='ClickHouse Users Configs Path', level=3, num='4.52.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath', level=4, num='4.52.5.1'),
+        Heading(name='Templates Path', level=3, num='4.52.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath', level=4, num='4.52.6.1'),
+        Heading(name='StatefulSet Update Timeout', level=3, num='4.52.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout', level=4, num='4.52.7.1'),
+        Heading(name='StatefulSet Update Poll Period', level=3, num='4.52.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod', level=4, num='4.52.8.1'),
+        Heading(name='StatefulSet Create Failure Action', level=3, num='4.52.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction', level=4, num='4.52.9.1'),
+        Heading(name='StatefulSet Update Failure Action', level=3, num='4.52.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction', level=4, num='4.52.10.1'),
+        Heading(name='ClickHouse Config User Default Profile', level=3, num='4.52.11'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile', level=4, num='4.52.11.1'),
+        Heading(name='ClickHouse Config User Default Quota', level=3, num='4.52.12'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota', level=4, num='4.52.12.1'),
+        Heading(name='ClickHouse Config User Default Networks IP', level=3, num='4.52.13'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP', level=4, num='4.52.13.1'),
+        Heading(name='ClickHouse Config User Default Password', level=3, num='4.52.14'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword', level=4, num='4.52.14.1'),
+        Heading(name='ClickHouse Config Networks Host Regexp Template', level=3, num='4.52.15'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate', level=4, num='4.52.15.1'),
+        Heading(name='ClickHouse Credentials Secret Namespace', level=3, num='4.52.16'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace', level=4, num='4.52.16.1'),
+        Heading(name='ClickHouse Credentials Secret Name', level=3, num='4.52.17'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName', level=4, num='4.52.17.1'),
+        Heading(name='ClickHouse Port', level=3, num='4.52.18'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort', level=4, num='4.52.18.1'),
+        Heading(name='Log To `stderr`', level=3, num='4.52.19'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr', level=4, num='4.52.19.1'),
+        Heading(name='Log To `stderr` And Files', level=3, num='4.52.20'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr', level=4, num='4.52.20.1'),
+        Heading(name='Verbosity Level', level=3, num='4.52.21'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel', level=4, num='4.52.21.1'),
+        Heading(name='Threshold For `stderr`', level=3, num='4.52.22'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold', level=4, num='4.52.22.1'),
+        Heading(name='V Module', level=3, num='4.52.23'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule', level=4, num='4.52.23.1'),
+        Heading(name='Logging Backtrace', level=3, num='4.52.24'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace', level=4, num='4.52.24.1'),
+        Heading(name='Number Of Threads For Reconciliation Cycle', level=3, num='4.52.25'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber', level=4, num='4.52.25.1'),
+        Heading(name='Wait Exclude For Reconciliation Cycle', level=3, num='4.52.26'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude', level=4, num='4.52.26.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries', level=4, num='4.52.26.2'),
+        Heading(name='Wait Include For Reconciliation Cycle', level=3, num='4.52.27'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude', level=4, num='4.52.27.1'),
+        Heading(name='Excluding From Propagation Labels', level=3, num='4.52.28'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels', level=4, num='4.52.28.1'),
+        Heading(name='Appending Scope Labels', level=3, num='4.52.29'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels', level=4, num='4.52.29.1'),
+        Heading(name='Stateful Sets', level=2, num='4.53'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets', level=3, num='4.53.1'),
+        Heading(name='Sticky Identity', level=3, num='4.53.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity', level=4, num='4.53.2.1'),
+        Heading(name='Pods Created From The Same Spec', level=3, num='4.53.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec', level=4, num='4.53.3.1'),
+        Heading(name='Error Handling', level=2, num='4.54'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling', level=3, num='4.54.1'),
+        Heading(name='Health Monitoring', level=3, num='4.54.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring', level=4, num='4.54.2.1'),
+        Heading(name='Polling For Ready', level=3, num='4.54.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady', level=4, num='4.54.3.1'),
+        Heading(name='Move On Ready', level=3, num='4.54.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady', level=4, num='4.54.4.1'),
+        Heading(name='Create Failure', level=3, num='4.54.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create', level=4, num='4.54.5.1'),
+        Heading(name='Update Failure', level=3, num='4.54.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update', level=4, num='4.54.6.1'),
+        Heading(name='Reverting Back', level=3, num='4.54.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create', level=4, num='4.54.7.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update', level=4, num='4.54.7.2'),
+        Heading(name='Successful Update Before Failed', level=3, num='4.54.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing', level=5, num='4.54.8.2.1'),
         ),
-        Heading(name="Namespaces", level=2, num="4.3"),
-        Heading(name="Kube System", level=3, num="4.3.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Namespaces.KubeSystem",
-            level=4,
-            num="4.3.1.1",
-        ),
-        Heading(name="User Defined", level=3, num="4.3.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Namespaces.UserDefined",
-            level=4,
-            num="4.3.2.1",
-        ),
-        Heading(name="Cluster Management", level=3, num="4.3.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Namespaces.ClusterManagement",
-            level=4,
-            num="4.3.3.1",
-        ),
-        Heading(name="ACM Compatibility", level=2, num="4.4"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.ACM", level=4, num="4.4.3.1"),
-        Heading(name="Creating Clusters", level=2, num="4.5"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.Create", level=4, num="4.5.3.1"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.DeleteBroken", level=4, num="4.5.3.2"),
-        Heading(name="Auto-generated ClickHouse Clusters Definitions", level=2, num="4.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.AutoGeneratedClickHouseClusters",
-            level=3,
-            num="4.6.1",
-        ),
-        Heading(name="Managing Operator", level=2, num="4.7"),
-        Heading(name="Upgrading Operator", level=3, num="4.7.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.UpgradingOperator",
-            level=4,
-            num="4.7.1.1",
-        ),
-        Heading(name="Downgrading Operator", level=3, num="4.7.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.DowngradingOperator",
-            level=4,
-            num="4.7.2.1",
-        ),
-        Heading(name="Restaring Operator", level=3, num="4.7.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator",
-            level=4,
-            num="4.7.3.1",
-        ),
-        Heading(name="Security", level=2, num="4.8"),
-        Heading(name="Default Access Control", level=3, num="4.8.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.DefaultAccessControl",
-            level=4,
-            num="4.8.1.1",
-        ),
-        Heading(name="Default Users", level=3, num="4.8.2"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.DefaultUsers", level=4, num="4.8.2.1"),
-        Heading(name="Secrets", level=3, num="4.8.3"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.Secrets", level=4, num="4.8.3.1"),
-        Heading(name="Secure Connection", level=3, num="4.8.4"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.EnableHttps", level=4, num="4.8.4.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication",
-            level=4,
-            num="4.8.4.2",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret",
-            level=4,
-            num="4.8.4.3",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps",
-            level=4,
-            num="4.8.4.4",
-        ),
-        Heading(name="Default Templates", level=2, num="4.9"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.DefaultTemplates", level=3, num="4.9.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates",
-            level=3,
-            num="4.9.2",
-        ),
-        Heading(name="Annotations In Templates", level=2, num="4.10"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.AnnotationsInTemplates",
-            level=3,
-            num="4.10.1",
-        ),
-        Heading(name="Custom Pod Templates", level=2, num="4.11"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.PodTemplates", level=4, num="4.11.1.1"),
-        Heading(name="Custom Service Templates", level=2, num="4.12"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates", level=3, num="4.12.1"),
-        Heading(name="Load Balancer", level=3, num="4.12.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.LoadBalancer",
-            level=4,
-            num="4.12.2.1",
-        ),
-        Heading(name="Standard Kubernetes Service Specification", level=3, num="4.12.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.ServiceSpecificationStandard",
-            level=4,
-            num="4.12.3.1",
-        ),
-        Heading(name="Annotations", level=3, num="4.12.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.Annotations",
-            level=4,
-            num="4.12.4.1",
-        ),
-        Heading(name="Name Generation", level=3, num="4.12.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ServiceTemplates.NameGeneration",
-            level=4,
-            num="4.12.5.1",
-        ),
-        Heading(name="Custom Host Template", level=2, num="4.13"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.HostTemplates", level=4, num="4.13.5.1"),
-        Heading(name="Custom Volume Claim Templates", level=2, num="4.14"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates",
-            level=4,
-            num="4.14.5.1",
-        ),
-        Heading(name="Storage Provisioning", level=2, num="4.15"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.StorageProvisioning",
-            level=4,
-            num="4.15.5.1",
-        ),
-        Heading(name="Deployments", level=2, num="4.16"),
-        Heading(name="Single Node Instances", level=3, num="4.16.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.SingleNodeInstances",
-            level=4,
-            num="4.16.1.1",
-        ),
-        Heading(name="Multiple Shards", level=3, num="4.16.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShards",
-            level=4,
-            num="4.16.2.1",
-        ),
-        Heading(name="Multiple Replicas", level=3, num="4.16.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleReplicas",
-            level=4,
-            num="4.16.3.1",
-        ),
-        Heading(name="Multiple Shards And Replicas", level=3, num="4.16.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShardsAndReplicas",
-            level=4,
-            num="4.16.4.1",
-        ),
-        Heading(name="Multiple Clusters", level=3, num="4.16.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleClusters",
-            level=4,
-            num="4.16.5.1",
-        ),
-        Heading(name="Circular Replication", level=3, num="4.16.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.CircularReplication",
-            level=4,
-            num="4.16.6.1",
-        ),
-        Heading(
-            name="Different ClickHouse Versions On Replicas And Shards",
-            level=3,
-            num="4.16.7",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.DifferentClickHouseVersionsOnReplicasAndShards",
-            level=4,
-            num="4.16.7.1",
-        ),
-        Heading(name="Multiple Storage Volumes", level=3, num="4.16.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.MultipleStorageVolumes",
-            level=4,
-            num="4.16.8.1",
-        ),
-        Heading(name="Plugging External Volumes", level=2, num="4.17"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Deployments.PluggingExternalVolumes",
-            level=3,
-            num="4.17.1",
-        ),
-        Heading(name="Configuration File Control", level=2, num="4.18"),
-        Heading(name="YAML Syntax For `config.xml`", level=3, num="4.18.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.ConfigXML",
-            level=4,
-            num="4.18.1.1",
-        ),
-        Heading(name="YAML Syntax For `users.xml`", level=3, num="4.18.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.UsersXML",
-            level=4,
-            num="4.18.2.1",
-        ),
-        Heading(name="Embedded XML Files", level=3, num="4.18.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.EmbeddedXML",
-            level=4,
-            num="4.18.3.1",
-        ),
-        Heading(name="Macros XML", level=3, num="4.18.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.MacrosXML",
-            level=4,
-            num="4.18.4.1",
-        ),
-        Heading(name="Retaining Volume Claim Templates", level=2, num="4.19"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.RetainingVolumeClaimTemplates",
-            level=3,
-            num="4.19.1",
-        ),
-        Heading(name="Reconnecting Existing Persistent Volumes", level=2, num="4.20"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ReconnectingExistingPersistentVolumes",
-            level=3,
-            num="4.20.1",
-        ),
-        Heading(name="Maintaining Cluster Uptime During Changes", level=2, num="4.21"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.MaintainingClusterUpTimeDuringChanges",
-            level=3,
-            num="4.21.1",
-        ),
-        Heading(name="Adding New Persistent Volumes To Pods", level=2, num="4.22"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.AddingNewPersistentVolumesToPods",
-            level=3,
-            num="4.22.1",
-        ),
-        Heading(
-            name="Interrupting Application of ClickHouse Cluster Changes",
-            level=2,
-            num="4.23",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.InterruptingApplicationOfClickHouseClusterChanges",
-            level=3,
-            num="4.23.1",
-        ),
-        Heading(name="Managing ClickHouse", level=2, num="4.24"),
-        Heading(name="Configuring TLS", level=3, num="4.24.1"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.Managing.TLS", level=4, num="4.24.1.1"),
-        Heading(name="Restarting ZooKeeper Cluster", level=3, num="4.24.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.RestartingZooKeeper",
-            level=4,
-            num="4.24.2.1",
-        ),
-        Heading(name="Application of Changes", level=3, num="4.24.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.Changes",
-            level=4,
-            num="4.24.3.1",
-        ),
-        Heading(name="Rollback On Error", level=3, num="4.24.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.RollbackOnError",
-            level=4,
-            num="4.24.4.1",
-        ),
-        Heading(name="Changes Requiring Restart", level=3, num="4.24.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ChangesRequiringRestart",
-            level=4,
-            num="4.24.5.1",
-        ),
-        Heading(name="Configuration And Settings", level=3, num="4.24.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ConfigurationAndSettings",
-            level=4,
-            num="4.24.6.1",
-        ),
-        Heading(name="Cluster Scaling", level=3, num="4.24.7"),
-        Heading(name="Adding Shards", level=4, num="4.24.7.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingShards",
-            level=5,
-            num="4.24.7.1.1",
-        ),
-        Heading(name="Adding Replicas", level=4, num="4.24.7.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicas",
-            level=5,
-            num="4.24.7.2.1",
-        ),
-        Heading(
-            name="Adding Replication To Existing Non-replicated Cluster",
-            level=4,
-            num="4.24.7.3",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicationToExistingNonReplicatedCluster",
-            level=5,
-            num="4.24.7.3.1",
-        ),
-        Heading(name="Schema Propagation", level=4, num="4.24.7.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.SchemaPropagation",
-            level=5,
-            num="4.24.7.4.1",
-        ),
-        Heading(name="Scaling Down", level=4, num="4.24.7.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.Down",
-            level=5,
-            num="4.24.7.5.1",
-        ),
-        Heading(name="ClickHouse Version Upgrades", level=3, num="4.24.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades",
-            level=4,
-            num="4.24.8.1",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades.IndividualOrAll",
-            level=4,
-            num="4.24.8.2",
-        ),
-        Heading(name="Re-provisioning Pods Using Different Template", level=3, num="4.24.9"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate",
-            level=4,
-            num="4.24.9.1",
-        ),
-        Heading(name="Re-provisioning Volume", level=3, num="4.24.10"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume",
-            level=4,
-            num="4.24.10.1",
-        ),
-        Heading(name="StorageManagement switch", level=3, num="4.24.11"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch",
-            level=4,
-            num="4.24.11.1",
-        ),
-        Heading(name="Stopping And Starting", level=3, num="4.24.12"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting",
-            level=4,
-            num="4.24.12.1",
-        ),
-        Heading(name="Stopping Specific ClickHouse Pods", level=3, num="4.24.13"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods",
-            level=4,
-            num="4.24.13.1",
-        ),
-        Heading(name="Stopping Specific ClickHouse Hosts", level=3, num="4.24.14"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts",
-            level=4,
-            num="4.24.14.1",
-        ),
-        Heading(name="Exporting Metrics", level=3, num="4.24.15"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics",
-            level=4,
-            num="4.24.15.1",
-        ),
-        Heading(name="Monitoring", level=3, num="4.24.16"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.Monitoring",
-            level=4,
-            num="4.24.16.1",
-        ),
-        Heading(name="Rolling Update", level=3, num="4.24.17"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate",
-            level=4,
-            num="4.24.17.1",
-        ),
-        Heading(name="Logging", level=2, num="4.25"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.Logging", level=4, num="4.25.17.1"),
-        Heading(name="High Level Status", level=4, num="4.25.17.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus",
-            level=5,
-            num="4.25.17.2.1",
-        ),
-        Heading(name="Valid Installation", level=2, num="4.26"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ValidInstallation",
-            level=3,
-            num="4.26.1",
-        ),
-        Heading(name="Operator Settings", level=2, num="4.27"),
-        Heading(name="config.yaml", level=3, num="4.27.1"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Settings.ConfigYaml",
-            level=4,
-            num="4.27.1.1",
-        ),
-        Heading(name="Config Map", level=3, num="4.27.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap",
-            level=4,
-            num="4.27.2.1",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap.Changes",
-            level=4,
-            num="4.27.2.2",
-        ),
-        Heading(name="`ClickHouseOperatorConfiguration` Resource", level=3, num="4.27.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration",
-            level=4,
-            num="4.27.3.1",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration.Changes",
-            level=4,
-            num="4.27.3.2",
-        ),
-        Heading(name="ClickHouse Config Maps", level=2, num="4.28"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps",
-            level=3,
-            num="4.28.1",
-        ),
-        Heading(name="ClickHouse Config Maps Defaults", level=2, num="4.29"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps.Defaults",
-            level=3,
-            num="4.29.1",
-        ),
-        Heading(name="Custom Resource Definition", level=2, num="4.30"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.CustomResourceDefinition",
-            level=3,
-            num="4.30.1",
-        ),
-        Heading(name="API Version", level=2, num="4.31"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion",
-            level=3,
-            num="4.31.1",
-        ),
-        Heading(name="Resource Kind", level=2, num="4.32"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation",
-            level=3,
-            num="4.32.1",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate",
-            level=3,
-            num="4.32.2",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration",
-            level=3,
-            num="4.32.3",
-        ),
-        Heading(name="Metadata", level=2, num="4.33"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata",
-            level=3,
-            num="4.33.1",
-        ),
-        Heading(name="Cluster Specification", level=2, num="4.34"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec",
-            level=3,
-            num="4.34.1",
-        ),
-        Heading(name="Task Identifier", level=2, num="4.35"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID",
-            level=3,
-            num="4.35.1",
-        ),
-        Heading(name="Stopping ClickHouse Clusters", level=2, num="4.36"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop",
-            level=3,
-            num="4.36.1",
-        ),
-        Heading(name="Restart Policy For StatefulSets", level=2, num="4.37"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart",
-            level=3,
-            num="4.37.1",
-        ),
-        Heading(name="Troubleshooting Pods", level=2, num="4.38"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot",
-            level=3,
-            num="4.38.1",
-        ),
-        Heading(name="Custom Domain Suffix", level=2, num="4.39"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern",
-            level=3,
-            num="4.39.1",
-        ),
-        Heading(name="Policy For Auto Applying Templates", level=2, num="4.40"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating",
-            level=3,
-            num="4.40.1",
-        ),
-        Heading(name="Reconciling Cycle", level=2, num="4.41"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.ReconcilingCycle", level=3, num="4.41.1"),
-        Heading(name="Applying ConfigMaps Before StatefulSets", level=3, num="4.41.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets",
-            level=4,
-            num="4.41.2.1",
-        ),
-        Heading(name="Configuring Reconciling Cycle", level=3, num="4.41.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling",
-            level=4,
-            num="4.41.3.1",
-        ),
-        Heading(name="Reconciliation Policy Name", level=3, num="4.41.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy",
-            level=4,
-            num="4.41.4.1",
-        ),
-        Heading(name="ConfigMap Propagation Timeout", level=3, num="4.41.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout",
-            level=4,
-            num="4.41.5.1",
-        ),
-        Heading(name="Cleaning Objects", level=3, num="4.41.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup",
-            level=4,
-            num="4.41.6.1",
-        ),
-        Heading(name="Cleaning Up Unknown Objects", level=3, num="4.41.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects",
-            level=4,
-            num="4.41.7.1",
-        ),
-        Heading(name="Reconciling Failed Objects", level=3, num="4.41.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects",
-            level=4,
-            num="4.41.8.1",
-        ),
-        Heading(name="Defaults", level=2, num="4.42"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults",
-            level=4,
-            num="4.42.8.1",
-        ),
-        Heading(name="Specifying Storage Management Provisioner", level=3, num="4.42.9"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner",
-            level=4,
-            num="4.42.9.1",
-        ),
-        Heading(name="Specifying Replicas By FQDN", level=3, num="4.42.10"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN",
-            level=4,
-            num="4.42.10.1",
-        ),
-        Heading(name="Changing Distributed_DDL Settings", level=3, num="4.42.11"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL",
-            level=4,
-            num="4.42.11.1",
-        ),
-        Heading(name="Templates", level=3, num="4.42.12"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates",
-            level=4,
-            num="4.42.12.1",
-        ),
-        Heading(name="Host Template", level=4, num="4.42.12.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate",
-            level=5,
-            num="4.42.12.2.1",
-        ),
-        Heading(name="Pod Template", level=4, num="4.42.12.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate",
-            level=5,
-            num="4.42.12.3.1",
-        ),
-        Heading(name="Data Volume Claim Template", level=4, num="4.42.12.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate",
-            level=5,
-            num="4.42.12.4.1",
-        ),
-        Heading(name="Log Volume Claim Template", level=4, num="4.42.12.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate",
-            level=5,
-            num="4.42.12.5.1",
-        ),
-        Heading(name="Service Template", level=4, num="4.42.12.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate",
-            level=5,
-            num="4.42.12.6.1",
-        ),
-        Heading(name="Cluster Service Template", level=4, num="4.42.12.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate",
-            level=5,
-            num="4.42.12.7.1",
-        ),
-        Heading(name="Shard Service Template", level=4, num="4.42.12.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate",
-            level=5,
-            num="4.42.12.8.1",
-        ),
-        Heading(name="Replica Service Template", level=4, num="4.42.12.9"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate",
-            level=5,
-            num="4.42.12.9.1",
-        ),
-        Heading(name="Volume Claim Template", level=4, num="4.42.12.10"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate",
-            level=5,
-            num="4.42.12.10.1",
-        ),
-        Heading(name="ClickHouse Server Configuration", level=2, num="4.43"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration",
-            level=3,
-            num="4.43.1",
-        ),
-        Heading(name="ZooKeeper", level=3, num="4.43.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper",
-            level=4,
-            num="4.43.2.1",
-        ),
-        Heading(name="ZooKeeper Nodes", level=4, num="4.43.2.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes",
-            level=5,
-            num="4.43.2.2.1",
-        ),
-        Heading(name="Session Timeout", level=4, num="4.43.2.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs",
-            level=5,
-            num="4.43.2.3.1",
-        ),
-        Heading(name="Operation Timeout", level=4, num="4.43.2.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs",
-            level=5,
-            num="4.43.2.4.1",
-        ),
-        Heading(name="Root Path", level=4, num="4.43.2.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root",
-            level=5,
-            num="4.43.2.5.1",
-        ),
-        Heading(name="Login Credentials", level=4, num="4.43.2.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify",
-            level=5,
-            num="4.43.2.6.1",
-        ),
-        Heading(name="Users", level=3, num="4.43.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users",
-            level=4,
-            num="4.43.3.1",
-        ),
-        Heading(name="Profiles", level=3, num="4.43.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles",
-            level=4,
-            num="4.43.4.1",
-        ),
-        Heading(name="Quotas", level=3, num="4.43.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas",
-            level=4,
-            num="4.43.5.1",
-        ),
-        Heading(name="Settings", level=3, num="4.43.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings",
-            level=4,
-            num="4.43.6.1",
-        ),
-        Heading(name="Files", level=3, num="4.43.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files",
-            level=4,
-            num="4.43.7.1",
-        ),
-        Heading(name="ClickHouse Clusters Configuration", level=2, num="4.44"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters",
-            level=3,
-            num="4.44.1",
-        ),
-        Heading(name="Cluster Name", level=3, num="4.44.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name",
-            level=4,
-            num="4.44.2.1",
-        ),
-        Heading(name="Cluster ZooKeeper", level=3, num="4.44.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper",
-            level=4,
-            num="4.44.3.1",
-        ),
-        Heading(name="Cluster Settings", level=3, num="4.44.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings",
-            level=4,
-            num="4.44.4.1",
-        ),
-        Heading(name="Cluster Files", level=3, num="4.44.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files",
-            level=4,
-            num="4.44.5.1",
-        ),
-        Heading(name="Cluster Templates", level=3, num="4.44.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates",
-            level=4,
-            num="4.44.6.1",
-        ),
-        Heading(name="ClickHouse Cluster Layout", level=2, num="4.45"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout",
-            level=3,
-            num="4.45.1",
-        ),
-        Heading(name="Layout Type (Deprecated)", level=3, num="4.45.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type",
-            level=4,
-            num="4.45.2.1",
-        ),
-        Heading(name="Layout Shards Count", level=3, num="4.45.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount",
-            level=4,
-            num="4.45.3.1",
-        ),
-        Heading(name="Layout Replicas Count", level=3, num="4.45.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount",
-            level=4,
-            num="4.45.4.1",
-        ),
-        Heading(name="Layout Shards", level=3, num="4.45.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards",
-            level=4,
-            num="4.45.5.1",
-        ),
-        Heading(name="Shard Name", level=4, num="4.45.5.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name",
-            level=5,
-            num="4.45.5.2.1",
-        ),
-        Heading(name="Shard Definition Type (Deprecated)", level=4, num="4.45.5.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType",
-            level=5,
-            num="4.45.5.3.1",
-        ),
-        Heading(name="Shard Weight", level=4, num="4.45.5.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight",
-            level=5,
-            num="4.45.5.4.1",
-        ),
-        Heading(name="Shard Internnal Replication", level=4, num="4.45.5.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication",
-            level=5,
-            num="4.45.5.5.1",
-        ),
-        Heading(name="Shard Settings", level=4, num="4.45.5.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings",
-            level=5,
-            num="4.45.5.6.1",
-        ),
-        Heading(name="Shard Files", level=4, num="4.45.5.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files",
-            level=5,
-            num="4.45.5.7.1",
-        ),
-        Heading(name="Shard Templates", level=4, num="4.45.5.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates",
-            level=5,
-            num="4.45.5.8.1",
-        ),
-        Heading(name="Shard Replicas Count", level=4, num="4.45.5.9"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount",
-            level=5,
-            num="4.45.5.9.1",
-        ),
-        Heading(name="Layout Shards Replicas", level=3, num="4.45.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas",
-            level=4,
-            num="4.45.6.1",
-        ),
-        Heading(name="Shard Replica Name", level=4, num="4.45.6.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name",
-            level=5,
-            num="4.45.6.2.1",
-        ),
-        Heading(name="Shard Replica TCP Port", level=4, num="4.45.6.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort",
-            level=5,
-            num="4.45.6.3.1",
-        ),
-        Heading(name="Shard Replica HTTP Port", level=4, num="4.45.6.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort",
-            level=5,
-            num="4.45.6.4.1",
-        ),
-        Heading(name="Shard Replica Inter-server HTTP Port", level=4, num="4.45.6.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort",
-            level=5,
-            num="4.45.6.5.1",
-        ),
-        Heading(name="Shard Replica Settings", level=4, num="4.45.6.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings",
-            level=5,
-            num="4.45.6.6.1",
-        ),
-        Heading(name="Shard Replica Files", level=4, num="4.45.6.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files",
-            level=5,
-            num="4.45.6.7.1",
-        ),
-        Heading(name="Shard Replica Templates", level=4, num="4.45.6.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates",
-            level=5,
-            num="4.45.6.8.1",
-        ),
-        Heading(name="Layout Replicas", level=3, num="4.45.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas",
-            level=4,
-            num="4.45.7.1",
-        ),
-        Heading(name="Replica Name", level=4, num="4.45.7.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name",
-            level=5,
-            num="4.45.7.2.1",
-        ),
-        Heading(name="Replica Settings", level=4, num="4.45.7.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings",
-            level=5,
-            num="4.45.7.3.1",
-        ),
-        Heading(name="Replica Files", level=4, num="4.45.7.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files",
-            level=5,
-            num="4.45.7.4.1",
-        ),
-        Heading(name="Replica Templates", level=4, num="4.45.7.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates",
-            level=5,
-            num="4.45.7.5.1",
-        ),
-        Heading(name="Replica Shards Count", level=4, num="4.45.7.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount",
-            level=5,
-            num="4.45.7.6.1",
-        ),
-        Heading(name="Layout Replicas Shards", level=3, num="4.45.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards",
-            level=4,
-            num="4.45.8.1",
-        ),
-        Heading(name="Replica Shard Name", level=4, num="4.45.8.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name",
-            level=5,
-            num="4.45.8.2.1",
-        ),
-        Heading(name="Replica Shard TCP Port", level=4, num="4.45.8.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort",
-            level=5,
-            num="4.45.8.3.1",
-        ),
-        Heading(name="Replica Shard HTTP Port", level=4, num="4.45.8.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort",
-            level=5,
-            num="4.45.8.4.1",
-        ),
-        Heading(name="Replica Shard Inter-server HTTP Port", level=4, num="4.45.8.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort",
-            level=5,
-            num="4.45.8.5.1",
-        ),
-        Heading(name="Replica Shard Settings", level=4, num="4.45.8.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings",
-            level=5,
-            num="4.45.8.6.1",
-        ),
-        Heading(name="Replica Shard Files", level=4, num="4.45.8.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files",
-            level=5,
-            num="4.45.8.7.1",
-        ),
-        Heading(name="Replica Shard Templates", level=4, num="4.45.8.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates",
-            level=5,
-            num="4.45.8.8.1",
-        ),
-        Heading(name="User Defined Templates", level=2, num="4.46"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates",
-            level=3,
-            num="4.46.1",
-        ),
-        Heading(name="Host Templates", level=2, num="4.47"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates",
-            level=3,
-            num="4.47.1",
-        ),
-        Heading(name="Host Template Name", level=3, num="4.47.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name",
-            level=4,
-            num="4.47.2.1",
-        ),
-        Heading(name="Host Template Port Distribution", level=3, num="4.47.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution",
-            level=4,
-            num="4.47.3.1",
-        ),
-        Heading(name="Port Distribution Type", level=4, num="4.47.3.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type",
-            level=5,
-            num="4.47.3.2.1",
-        ),
-        Heading(name="Host Template Specification", level=3, num="4.47.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec",
-            level=4,
-            num="4.47.4.1",
-        ),
-        Heading(name="Host Name", level=4, num="4.47.4.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name",
-            level=5,
-            num="4.47.4.2.1",
-        ),
-        Heading(name="Host TCP Port", level=4, num="4.47.4.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort",
-            level=5,
-            num="4.47.4.3.1",
-        ),
-        Heading(name="Host HTTP Port", level=4, num="4.47.4.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort",
-            level=5,
-            num="4.47.4.4.1",
-        ),
-        Heading(name="Host Inter-server HTTP Port", level=4, num="4.47.4.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort",
-            level=5,
-            num="4.47.4.5.1",
-        ),
-        Heading(name="Host Settings", level=4, num="4.47.4.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings",
-            level=5,
-            num="4.47.4.6.1",
-        ),
-        Heading(name="Host Files", level=4, num="4.47.4.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files",
-            level=5,
-            num="4.47.4.7.1",
-        ),
-        Heading(name="Host Overriding Templates", level=4, num="4.47.4.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates",
-            level=5,
-            num="4.47.4.8.1",
-        ),
-        Heading(name="Pod Templates", level=2, num="4.48"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates",
-            level=3,
-            num="4.48.1",
-        ),
-        Heading(name="Pod Name", level=3, num="4.48.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name",
-            level=4,
-            num="4.48.2.1",
-        ),
-        Heading(name="Pod Generate Name", level=3, num="4.48.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName",
-            level=4,
-            num="4.48.3.1",
-        ),
-        Heading(name="Pod Zone", level=3, num="4.48.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone",
-            level=4,
-            num="4.48.4.1",
-        ),
-        Heading(name="Pod Zone Key", level=4, num="4.48.4.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key",
-            level=5,
-            num="4.48.4.2.1",
-        ),
-        Heading(name="Pod Zone Values", level=4, num="4.48.4.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values",
-            level=5,
-            num="4.48.4.3.1",
-        ),
-        Heading(name="Pod Distribution", level=3, num="4.48.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution",
-            level=4,
-            num="4.48.5.1",
-        ),
-        Heading(name="Pod Distribution Type", level=4, num="4.48.5.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type",
-            level=5,
-            num="4.48.5.2.1",
-        ),
-        Heading(name="Pod Distribution Scope", level=4, num="4.48.5.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope",
-            level=5,
-            num="4.48.5.3.1",
-        ),
-        Heading(name="Pod Distribution Number", level=4, num="4.48.5.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number",
-            level=5,
-            num="4.48.5.4.1",
-        ),
-        Heading(name="Pod Distribution Topology Key", level=4, num="4.48.5.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey",
-            level=5,
-            num="4.48.5.5.1",
-        ),
-        Heading(name="Pod Spec", level=3, num="4.48.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec",
-            level=4,
-            num="4.48.6.1",
-        ),
-        Heading(name="Pod Metadata", level=3, num="4.48.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata",
-            level=4,
-            num="4.48.7.1",
-        ),
-        Heading(name="Volume Claim Templates", level=2, num="4.49"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates",
-            level=3,
-            num="4.49.1",
-        ),
-        Heading(name="Volume Claim Name", level=3, num="4.49.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name",
-            level=4,
-            num="4.49.2.1",
-        ),
-        Heading(name="Volume Claim Reclaim Policy", level=3, num="4.49.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy",
-            level=4,
-            num="4.49.3.1",
-        ),
-        Heading(name="Volume Claim Metadata", level=3, num="4.49.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata",
-            level=4,
-            num="4.49.4.1",
-        ),
-        Heading(name="Volume Claim Spec", level=3, num="4.49.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec",
-            level=4,
-            num="4.49.5.1",
-        ),
-        Heading(name="Service Templates", level=2, num="4.50"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates",
-            level=3,
-            num="4.50.1",
-        ),
-        Heading(name="Service Name", level=3, num="4.50.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name",
-            level=4,
-            num="4.50.2.1",
-        ),
-        Heading(name="Service Generate Name", level=3, num="4.50.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName",
-            level=4,
-            num="4.50.3.1",
-        ),
-        Heading(name="Service Generate Metadata", level=3, num="4.50.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata",
-            level=4,
-            num="4.50.4.1",
-        ),
-        Heading(name="Service Spec", level=3, num="4.50.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec",
-            level=4,
-            num="4.50.5.1",
-        ),
-        Heading(name="Use Templates", level=2, num="4.51"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates",
-            level=4,
-            num="4.51.5.1",
-        ),
-        Heading(name="Use Template Name", level=3, num="4.51.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name",
-            level=4,
-            num="4.51.6.1",
-        ),
-        Heading(name="Use Template Namespace", level=3, num="4.51.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace",
-            level=4,
-            num="4.51.7.1",
-        ),
-        Heading(name="Use Template Use Type", level=3, num="4.51.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType",
-            level=4,
-            num="4.51.8.1",
-        ),
-        Heading(name="ClickHouse Operator Configuration", level=2, num="4.52"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec",
-            level=3,
-            num="4.52.1",
-        ),
-        Heading(name="Watched Namespaces", level=3, num="4.52.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces",
-            level=4,
-            num="4.52.2.1",
-        ),
-        Heading(name="ClickHouse Common Configs Path", level=3, num="4.52.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath",
-            level=4,
-            num="4.52.3.1",
-        ),
-        Heading(name="ClickHouse Host Configs Path", level=3, num="4.52.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath",
-            level=4,
-            num="4.52.4.1",
-        ),
-        Heading(name="ClickHouse Users Configs Path", level=3, num="4.52.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath",
-            level=4,
-            num="4.52.5.1",
-        ),
-        Heading(name="Templates Path", level=3, num="4.52.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath",
-            level=4,
-            num="4.52.6.1",
-        ),
-        Heading(name="StatefulSet Update Timeout", level=3, num="4.52.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout",
-            level=4,
-            num="4.52.7.1",
-        ),
-        Heading(name="StatefulSet Update Poll Period", level=3, num="4.52.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod",
-            level=4,
-            num="4.52.8.1",
-        ),
-        Heading(name="StatefulSet Create Failure Action", level=3, num="4.52.9"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction",
-            level=4,
-            num="4.52.9.1",
-        ),
-        Heading(name="StatefulSet Update Failure Action", level=3, num="4.52.10"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction",
-            level=4,
-            num="4.52.10.1",
-        ),
-        Heading(name="ClickHouse Config User Default Profile", level=3, num="4.52.11"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile",
-            level=4,
-            num="4.52.11.1",
-        ),
-        Heading(name="ClickHouse Config User Default Quota", level=3, num="4.52.12"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota",
-            level=4,
-            num="4.52.12.1",
-        ),
-        Heading(name="ClickHouse Config User Default Networks IP", level=3, num="4.52.13"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP",
-            level=4,
-            num="4.52.13.1",
-        ),
-        Heading(name="ClickHouse Config User Default Password", level=3, num="4.52.14"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword",
-            level=4,
-            num="4.52.14.1",
-        ),
-        Heading(
-            name="ClickHouse Config Networks Host Regexp Template",
-            level=3,
-            num="4.52.15",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate",
-            level=4,
-            num="4.52.15.1",
-        ),
-        Heading(name="ClickHouse Credentials Secret Namespace", level=3, num="4.52.16"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace",
-            level=4,
-            num="4.52.16.1",
-        ),
-        Heading(name="ClickHouse Credentials Secret Name", level=3, num="4.52.17"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName",
-            level=4,
-            num="4.52.17.1",
-        ),
-        Heading(name="ClickHouse Port", level=3, num="4.52.18"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort",
-            level=4,
-            num="4.52.18.1",
-        ),
-        Heading(name="Log To `stderr`", level=3, num="4.52.19"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr",
-            level=4,
-            num="4.52.19.1",
-        ),
-        Heading(name="Log To `stderr` And Files", level=3, num="4.52.20"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr",
-            level=4,
-            num="4.52.20.1",
-        ),
-        Heading(name="Verbosity Level", level=3, num="4.52.21"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel",
-            level=4,
-            num="4.52.21.1",
-        ),
-        Heading(name="Threshold For `stderr`", level=3, num="4.52.22"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold",
-            level=4,
-            num="4.52.22.1",
-        ),
-        Heading(name="V Module", level=3, num="4.52.23"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule",
-            level=4,
-            num="4.52.23.1",
-        ),
-        Heading(name="Logging Backtrace", level=3, num="4.52.24"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace",
-            level=4,
-            num="4.52.24.1",
-        ),
-        Heading(name="Number Of Threads For Reconciliation Cycle", level=3, num="4.52.25"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber",
-            level=4,
-            num="4.52.25.1",
-        ),
-        Heading(name="Wait Exclude For Reconciliation Cycle", level=3, num="4.52.26"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude",
-            level=4,
-            num="4.52.26.1",
-        ),
-        Heading(name="Wait Include For Reconciliation Cycle", level=3, num="4.52.27"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude",
-            level=4,
-            num="4.52.27.1",
-        ),
-        Heading(name="Excluding From Propagation Labels", level=3, num="4.52.28"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels",
-            level=4,
-            num="4.52.28.1",
-        ),
-        Heading(name="Appending Scope Labels", level=3, num="4.52.29"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels",
-            level=4,
-            num="4.52.29.1",
-        ),
-        Heading(name="Stateful Sets", level=2, num="4.53"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.StatefulSets", level=3, num="4.53.1"),
-        Heading(name="Sticky Identity", level=3, num="4.53.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity",
-            level=4,
-            num="4.53.2.1",
-        ),
-        Heading(name="Pods Created From The Same Spec", level=3, num="4.53.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec",
-            level=4,
-            num="4.53.3.1",
-        ),
-        Heading(name="Error Handling", level=2, num="4.54"),
-        Heading(name="RQ.SRS-026.ClickHouseOperator.ErrorHandling", level=3, num="4.54.1"),
-        Heading(name="Health Monitoring", level=3, num="4.54.2"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring",
-            level=4,
-            num="4.54.2.1",
-        ),
-        Heading(name="Polling For Ready", level=3, num="4.54.3"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady",
-            level=4,
-            num="4.54.3.1",
-        ),
-        Heading(name="Move On Ready", level=3, num="4.54.4"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady",
-            level=4,
-            num="4.54.4.1",
-        ),
-        Heading(name="Create Failure", level=3, num="4.54.5"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create",
-            level=4,
-            num="4.54.5.1",
-        ),
-        Heading(name="Update Failure", level=3, num="4.54.6"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update",
-            level=4,
-            num="4.54.6.1",
-        ),
-        Heading(name="Reverting Back", level=3, num="4.54.7"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create",
-            level=4,
-            num="4.54.7.1",
-        ),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update",
-            level=4,
-            num="4.54.7.2",
-        ),
-        Heading(name="Successful Update Before Failed", level=3, num="4.54.8"),
-        Heading(
-            name="RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing",
-            level=5,
-            num="4.54.8.2.1",
-        ),
-    ),
     requirements=(
         RQ_SRS_026_ClickHouseOperator,
         RQ_SRS_026_ClickHouseOperator_Installation,
@@ -8003,6 +7139,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
         RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogBacktrace,
         RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileThreadsNumber,
         RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitExclude,
+        RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries,
         RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitInclude,
         RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ExcludeFromPropagationLabels,
         RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AppendScopeLabels,
@@ -8018,8 +7155,8 @@ QA_SRS026_ClickHouse_Operator = Specification(
         RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Create,
         RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Update,
         RQ_SRS_026_ClickHouseOperator_ErrorHandling_SuccessfulUpdateBeforeFailed_DoNothing,
-    ),
-    content="""
+        ),
+    content='''
 # QA-SRS026 ClickHouse Operator
 # Software Requirements Specification
 
@@ -8046,525 +7183,526 @@ QA_SRS026_ClickHouse_Operator = Specification(
 * 1 [Revision History](#revision-history)
 * 2 [Introduction](#introduction)
 * 3 [Definitions](#definitions)
-  * 3.1 [PV](#pv)
-  * 3.2 [CSI](#csi)
-  * 3.3 [Operator](#operator)
-  * 3.4 [Deployment](#deployment)
-  * 3.5 [Namespace](#namespace)
-  * 3.6 [OLM](#olm)
-  * 3.7 [Pod](#pod)
-  * 3.8 [ReplicaSet](#replicaset)
-  * 3.9 [Service](#service)
-  * 3.10 [PVC](#pvc)
-  * 3.11 [CHI](#chi)
-  * 3.12 [Shard](#shard)
-  * 3.13 [Replica](#replica)
-  * 3.14 [ConfigMap](#configmap)
-  * 3.15 [StatefulSet](#statefulset)
-  * 3.16 [`bool enum` Type](#bool-enum-type)
-  * 3.17 [`string` Type](#string-type)
-  * 3.18 [`integer` Type](#integer-type)
-  * 3.19 [`array` Type](#array-type)
+    * 3.1 [PV](#pv)
+    * 3.2 [CSI](#csi)
+    * 3.3 [Operator](#operator)
+    * 3.4 [Deployment](#deployment)
+    * 3.5 [Namespace](#namespace)
+    * 3.6 [OLM](#olm)
+    * 3.7 [Pod](#pod)
+    * 3.8 [ReplicaSet](#replicaset)
+    * 3.9 [Service](#service)
+    * 3.10 [PVC](#pvc)
+    * 3.11 [CHI](#chi)
+    * 3.12 [Shard](#shard)
+    * 3.13 [Replica](#replica)
+    * 3.14 [ConfigMap](#configmap)
+    * 3.15 [StatefulSet](#statefulset)
+    * 3.16 [`bool enum` Type](#bool-enum-type)
+    * 3.17 [`string` Type](#string-type)
+    * 3.18 [`integer` Type](#integer-type)
+    * 3.19 [`array` Type](#array-type)
 * 4 [Requirements](#requirements)
-  * 4.1 [General](#general)
-      * 4.1.0.1 [RQ.SRS-026.ClickHouseOperator](#rqsrs-026clickhouseoperator)
-  * 4.2 [Installation](#installation)
-    * 4.2.1 [RQ.SRS-026.ClickHouseOperator.Installation](#rqsrs-026clickhouseoperatorinstallation)
-    * 4.2.2 [Monitoring Support](#monitoring-support)
-      * 4.2.2.1 [RQ.SRS-026.ClickHouseOperator.Installation.MonitoringSupport](#rqsrs-026clickhouseoperatorinstallationmonitoringsupport)
-  * 4.3 [Namespaces](#namespaces)
-    * 4.3.1 [Kube System](#kube-system)
-      * 4.3.1.1 [RQ.SRS-026.ClickHouseOperator.Namespaces.KubeSystem](#rqsrs-026clickhouseoperatornamespaceskubesystem)
-    * 4.3.2 [User Defined](#user-defined)
-      * 4.3.2.1 [RQ.SRS-026.ClickHouseOperator.Namespaces.UserDefined](#rqsrs-026clickhouseoperatornamespacesuserdefined)
-    * 4.3.3 [Cluster Management](#cluster-management)
-      * 4.3.3.1 [RQ.SRS-026.ClickHouseOperator.Namespaces.ClusterManagement](#rqsrs-026clickhouseoperatornamespacesclustermanagement)
-  * 4.4 [ACM Compatibility](#acm-compatibility)
-      * 4.4.3.1 [RQ.SRS-026.ClickHouseOperator.ACM](#rqsrs-026clickhouseoperatoracm)
-  * 4.5 [Creating Clusters](#creating-clusters)
-      * 4.5.3.1 [RQ.SRS-026.ClickHouseOperator.Create](#rqsrs-026clickhouseoperatorcreate)
-      * 4.5.3.2 [RQ.SRS-026.ClickHouseOperator.DeleteBroken](#rqsrs-026clickhouseoperatordeletebroken)
-  * 4.6 [Auto-generated ClickHouse Clusters Definitions](#auto-generated-clickhouse-clusters-definitions)
-    * 4.6.1 [RQ.SRS-026.ClickHouseOperator.AutoGeneratedClickHouseClusters](#rqsrs-026clickhouseoperatorautogeneratedclickhouseclusters)
-  * 4.7 [Managing Operator](#managing-operator)
-    * 4.7.1 [Upgrading Operator](#upgrading-operator)
-      * 4.7.1.1 [RQ.SRS-026.ClickHouseOperator.Managing.UpgradingOperator](#rqsrs-026clickhouseoperatormanagingupgradingoperator)
-    * 4.7.2 [Downgrading Operator](#downgrading-operator)
-      * 4.7.2.1 [RQ.SRS-026.ClickHouseOperator.Managing.DowngradingOperator](#rqsrs-026clickhouseoperatormanagingdowngradingoperator)
-    * 4.7.3 [Restaring Operator](#restaring-operator)
-      * 4.7.3.1 [RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator](#rqsrs-026clickhouseoperatormanagingrestartingoperator)
-  * 4.8 [Security](#security)
-    * 4.8.1 [Default Access Control](#default-access-control)
-      * 4.8.1.1 [RQ.SRS-026.ClickHouseOperator.DefaultAccessControl](#rqsrs-026clickhouseoperatordefaultaccesscontrol)
-    * 4.8.2 [Default Users](#default-users)
-      * 4.8.2.1 [RQ.SRS-026.ClickHouseOperator.DefaultUsers](#rqsrs-026clickhouseoperatordefaultusers)
-    * 4.8.3 [Secrets](#secrets)
-      * 4.8.3.1 [RQ.SRS-026.ClickHouseOperator.Secrets](#rqsrs-026clickhouseoperatorsecrets)
-    * 4.8.4 [Secure Connection](#secure-connection)
-      * 4.8.4.1 [RQ.SRS-026.ClickHouseOperator.EnableHttps](#rqsrs-026clickhouseoperatorenablehttps)
-      * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication](#rqsrs-026clickhouseoperatorsecureinterclustercommunication)
-      * 4.8.4.3 [RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret](#rqsrs-026clickhouseoperatorinterclustercommunicationwithsecret)
-      * 4.8.4.4 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
-  * 4.9 [Default Templates](#default-templates)
-    * 4.9.1 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates](#rqsrs-026clickhouseoperatordefaulttemplates)
-    * 4.9.2 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates](#rqsrs-026clickhouseoperatordefaulttemplatesmergingwithuserdefinedtemplates)
-  * 4.10 [Annotations In Templates](#annotations-in-templates)
-    * 4.10.1 [RQ.SRS-026.ClickHouseOperator.AnnotationsInTemplates](#rqsrs-026clickhouseoperatorannotationsintemplates)
-  * 4.11 [Custom Pod Templates](#custom-pod-templates)
-      * 4.11.1.1 [RQ.SRS-026.ClickHouseOperator.PodTemplates](#rqsrs-026clickhouseoperatorpodtemplates)
-  * 4.12 [Custom Service Templates](#custom-service-templates)
-    * 4.12.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates](#rqsrs-026clickhouseoperatorservicetemplates)
-    * 4.12.2 [Load Balancer](#load-balancer)
-      * 4.12.2.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.LoadBalancer](#rqsrs-026clickhouseoperatorservicetemplatesloadbalancer)
-    * 4.12.3 [Standard Kubernetes Service Specification](#standard-kubernetes-service-specification)
-      * 4.12.3.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.ServiceSpecificationStandard](#rqsrs-026clickhouseoperatorservicetemplatesservicespecificationstandard)
-    * 4.12.4 [Annotations](#annotations)
-      * 4.12.4.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.Annotations](#rqsrs-026clickhouseoperatorservicetemplatesannotations)
-    * 4.12.5 [Name Generation](#name-generation)
-      * 4.12.5.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.NameGeneration](#rqsrs-026clickhouseoperatorservicetemplatesnamegeneration)
-  * 4.13 [Custom Host Template](#custom-host-template)
-      * 4.13.5.1 [RQ.SRS-026.ClickHouseOperator.HostTemplates](#rqsrs-026clickhouseoperatorhosttemplates)
-  * 4.14 [Custom Volume Claim Templates](#custom-volume-claim-templates)
-      * 4.14.5.1 [RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates](#rqsrs-026clickhouseoperatorvolumeclaimtamplates)
-  * 4.15 [Storage Provisioning](#storage-provisioning)
-      * 4.15.5.1 [RQ.SRS-026.ClickHouseOperator.StorageProvisioning](#rqsrs-026clickhouseoperatorstorageprovisioning)
-  * 4.16 [Deployments](#deployments)
-    * 4.16.1 [Single Node Instances](#single-node-instances)
-      * 4.16.1.1 [RQ.SRS-026.ClickHouseOperator.Deployments.SingleNodeInstances](#rqsrs-026clickhouseoperatordeploymentssinglenodeinstances)
-    * 4.16.2 [Multiple Shards](#multiple-shards)
-      * 4.16.2.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShards](#rqsrs-026clickhouseoperatordeploymentsmultipleshards)
-    * 4.16.3 [Multiple Replicas](#multiple-replicas)
-      * 4.16.3.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleReplicas](#rqsrs-026clickhouseoperatordeploymentsmultiplereplicas)
-    * 4.16.4 [Multiple Shards And Replicas](#multiple-shards-and-replicas)
-      * 4.16.4.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShardsAndReplicas](#rqsrs-026clickhouseoperatordeploymentsmultipleshardsandreplicas)
-    * 4.16.5 [Multiple Clusters](#multiple-clusters)
-      * 4.16.5.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleClusters](#rqsrs-026clickhouseoperatordeploymentsmultipleclusters)
-    * 4.16.6 [Circular Replication](#circular-replication)
-      * 4.16.6.1 [RQ.SRS-026.ClickHouseOperator.Deployments.CircularReplication](#rqsrs-026clickhouseoperatordeploymentscircularreplication)
-    * 4.16.7 [Different ClickHouse Versions On Replicas And Shards](#different-clickhouse-versions-on-replicas-and-shards)
-      * 4.16.7.1 [RQ.SRS-026.ClickHouseOperator.Deployments.DifferentClickHouseVersionsOnReplicasAndShards](#rqsrs-026clickhouseoperatordeploymentsdifferentclickhouseversionsonreplicasandshards)
-    * 4.16.8 [Multiple Storage Volumes](#multiple-storage-volumes)
-      * 4.16.8.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleStorageVolumes](#rqsrs-026clickhouseoperatordeploymentsmultiplestoragevolumes)
-  * 4.17 [Plugging External Volumes](#plugging-external-volumes)
-    * 4.17.1 [RQ.SRS-026.ClickHouseOperator.Deployments.PluggingExternalVolumes](#rqsrs-026clickhouseoperatordeploymentspluggingexternalvolumes)
-  * 4.18 [Configuration File Control](#configuration-file-control)
-    * 4.18.1 [YAML Syntax For `config.xml`](#yaml-syntax-for-configxml)
-      * 4.18.1.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.ConfigXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolconfigxml)
-    * 4.18.2 [YAML Syntax For `users.xml`](#yaml-syntax-for-usersxml)
-      * 4.18.2.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.UsersXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolusersxml)
-    * 4.18.3 [Embedded XML Files](#embedded-xml-files)
-      * 4.18.3.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.EmbeddedXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolembeddedxml)
-    * 4.18.4 [Macros XML](#macros-xml)
-      * 4.18.4.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.MacrosXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolmacrosxml)
-  * 4.19 [Retaining Volume Claim Templates](#retaining-volume-claim-templates)
-    * 4.19.1 [RQ.SRS-026.ClickHouseOperator.RetainingVolumeClaimTemplates](#rqsrs-026clickhouseoperatorretainingvolumeclaimtemplates)
-  * 4.20 [Reconnecting Existing Persistent Volumes](#reconnecting-existing-persistent-volumes)
-    * 4.20.1 [RQ.SRS-026.ClickHouseOperator.ReconnectingExistingPersistentVolumes](#rqsrs-026clickhouseoperatorreconnectingexistingpersistentvolumes)
-  * 4.21 [Maintaining Cluster Uptime During Changes](#maintaining-cluster-uptime-during-changes)
-    * 4.21.1 [RQ.SRS-026.ClickHouseOperator.MaintainingClusterUpTimeDuringChanges](#rqsrs-026clickhouseoperatormaintainingclusteruptimeduringchanges)
-  * 4.22 [Adding New Persistent Volumes To Pods](#adding-new-persistent-volumes-to-pods)
-    * 4.22.1 [RQ.SRS-026.ClickHouseOperator.AddingNewPersistentVolumesToPods](#rqsrs-026clickhouseoperatoraddingnewpersistentvolumestopods)
-  * 4.23 [Interrupting Application of ClickHouse Cluster Changes](#interrupting-application-of-clickhouse-cluster-changes)
-    * 4.23.1 [RQ.SRS-026.ClickHouseOperator.InterruptingApplicationOfClickHouseClusterChanges](#rqsrs-026clickhouseoperatorinterruptingapplicationofclickhouseclusterchanges)
-  * 4.24 [Managing ClickHouse](#managing-clickhouse)
-    * 4.24.1 [Configuring TLS](#configuring-tls)
-      * 4.24.1.1 [RQ.SRS-026.ClickHouseOperator.Managing.TLS](#rqsrs-026clickhouseoperatormanagingtls)
-    * 4.24.2 [Restarting ZooKeeper Cluster](#restarting-zookeeper-cluster)
-      * 4.24.2.1 [RQ.SRS-026.ClickHouseOperator.Managing.RestartingZooKeeper](#rqsrs-026clickhouseoperatormanagingrestartingzookeeper)
-    * 4.24.3 [Application of Changes](#application-of-changes)
-      * 4.24.3.1 [RQ.SRS-026.ClickHouseOperator.Managing.Changes](#rqsrs-026clickhouseoperatormanagingchanges)
-    * 4.24.4 [Rollback On Error](#rollback-on-error)
-      * 4.24.4.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollbackOnError](#rqsrs-026clickhouseoperatormanagingrollbackonerror)
-    * 4.24.5 [Changes Requiring Restart](#changes-requiring-restart)
-      * 4.24.5.1 [RQ.SRS-026.ClickHouseOperator.Managing.ChangesRequiringRestart](#rqsrs-026clickhouseoperatormanagingchangesrequiringrestart)
-    * 4.24.6 [Configuration And Settings](#configuration-and-settings)
-      * 4.24.6.1 [RQ.SRS-026.ClickHouseOperator.Managing.ConfigurationAndSettings](#rqsrs-026clickhouseoperatormanagingconfigurationandsettings)
-    * 4.24.7 [Cluster Scaling](#cluster-scaling)
-      * 4.24.7.1 [Adding Shards](#adding-shards)
-        * 4.24.7.1.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingShards](#rqsrs-026clickhouseoperatormanagingclusterscalingaddingshards)
-      * 4.24.7.2 [Adding Replicas](#adding-replicas)
-        * 4.24.7.2.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicas](#rqsrs-026clickhouseoperatormanagingclusterscalingaddingreplicas)
-      * 4.24.7.3 [Adding Replication To Existing Non-replicated Cluster](#adding-replication-to-existing-non-replicated-cluster)
-        * 4.24.7.3.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicationToExistingNonReplicatedCluster](#rqsrs-026clickhouseoperatormanagingclusterscalingaddingreplicationtoexistingnonreplicatedcluster)
-      * 4.24.7.4 [Schema Propagation](#schema-propagation)
-        * 4.24.7.4.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.SchemaPropagation](#rqsrs-026clickhouseoperatormanagingclusterscalingschemapropagation)
-      * 4.24.7.5 [Scaling Down](#scaling-down)
-        * 4.24.7.5.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.Down](#rqsrs-026clickhouseoperatormanagingclusterscalingdown)
-    * 4.24.8 [ClickHouse Version Upgrades](#clickhouse-version-upgrades)
-      * 4.24.8.1 [RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades](#rqsrs-026clickhouseoperatormanagingversionupgrades)
-      * 4.24.8.2 [RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades.IndividualOrAll](#rqsrs-026clickhouseoperatormanagingversionupgradesindividualorall)
-    * 4.24.9 [Re-provisioning Pods Using Different Template](#re-provisioning-pods-using-different-template)
-      * 4.24.9.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate](#rqsrs-026clickhouseoperatormanagingreprovisioningpodsusingdifferenttemplate)
-    * 4.24.10 [Re-provisioning Volume](#re-provisioning-volume)
-      * 4.24.10.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume](#rqsrs-026clickhouseoperatormanagingreprovisioningvolume)
-    * 4.24.11 [StorageManagement switch](#storagemanagement-switch)
-      * 4.24.11.1 [RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch](#rqsrs-026clickhouseoperatormanagingstoragemanagementswitch)
-    * 4.24.12 [Stopping And Starting](#stopping-and-starting)
-      * 4.24.12.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting](#rqsrs-026clickhouseoperatormanagingstoppingandstarting)
-    * 4.24.13 [Stopping Specific ClickHouse Pods](#stopping-specific-clickhouse-pods)
-      * 4.24.13.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousepods)
-    * 4.24.14 [Stopping Specific ClickHouse Hosts](#stopping-specific-clickhouse-hosts)
-      * 4.24.14.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousehosts)
-    * 4.24.15 [Exporting Metrics](#exporting-metrics)
-      * 4.24.15.1 [RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics](#rqsrs-026clickhouseoperatormanagingexportingmetrics)
-    * 4.24.16 [Monitoring](#monitoring)
-      * 4.24.16.1 [RQ.SRS-026.ClickHouseOperator.Managing.Monitoring](#rqsrs-026clickhouseoperatormanagingmonitoring)
-    * 4.24.17 [Rolling Update](#rolling-update)
-      * 4.24.17.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate](#rqsrs-026clickhouseoperatormanagingrollingupdate)
-  * 4.25 [Logging](#logging)
-      * 4.25.17.1 [RQ.SRS-026.ClickHouseOperator.Logging](#rqsrs-026clickhouseoperatorlogging)
-      * 4.25.17.2 [High Level Status](#high-level-status)
-        * 4.25.17.2.1 [RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus](#rqsrs-026clickhouseoperatorlogginghighlevelstatus)
-  * 4.26 [Valid Installation](#valid-installation)
-    * 4.26.1 [RQ.SRS-026.ClickHouseOperator.ValidInstallation](#rqsrs-026clickhouseoperatorvalidinstallation)
-  * 4.27 [Operator Settings](#operator-settings)
-    * 4.27.1 [config.yaml](#configyaml)
-      * 4.27.1.1 [RQ.SRS-026.ClickHouseOperator.Settings.ConfigYaml](#rqsrs-026clickhouseoperatorsettingsconfigyaml)
-    * 4.27.2 [Config Map](#config-map)
-      * 4.27.2.1 [RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap](#rqsrs-026clickhouseoperatorsettingsconfigmap)
-      * 4.27.2.2 [RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap.Changes](#rqsrs-026clickhouseoperatorsettingsconfigmapchanges)
-    * 4.27.3 [`ClickHouseOperatorConfiguration` Resource](#clickhouseoperatorconfiguration-resource)
-      * 4.27.3.1 [RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration](#rqsrs-026clickhouseoperatorsettingsclickhouseoperatorconfiguration)
-      * 4.27.3.2 [RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration.Changes](#rqsrs-026clickhouseoperatorsettingsclickhouseoperatorconfigurationchanges)
-  * 4.28 [ClickHouse Config Maps](#clickhouse-config-maps)
-    * 4.28.1 [RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps](#rqsrs-026clickhouseoperatorclickhouseconfigmaps)
-  * 4.29 [ClickHouse Config Maps Defaults](#clickhouse-config-maps-defaults)
-    * 4.29.1 [RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps.Defaults](#rqsrs-026clickhouseoperatorclickhouseconfigmapsdefaults)
-  * 4.30 [Custom Resource Definition](#custom-resource-definition)
-    * 4.30.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.CustomResourceDefinition](#rqsrs-026clickhouseoperatorcustomresourcecustomresourcedefinition)
-  * 4.31 [API Version](#api-version)
-    * 4.31.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion](#rqsrs-026clickhouseoperatorcustomresourceapiversion)
-  * 4.32 [Resource Kind](#resource-kind)
-    * 4.32.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseinstallation)
-    * 4.32.2 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseinstallationtemplate)
-    * 4.32.3 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseoperatorconfiguration)
-  * 4.33 [Metadata](#metadata)
-    * 4.33.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata](#rqsrs-026clickhouseoperatorcustomresourcemetadata)
-  * 4.34 [Cluster Specification](#cluster-specification)
-    * 4.34.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec](#rqsrs-026clickhouseoperatorcustomresourcespec)
-  * 4.35 [Task Identifier](#task-identifier)
-    * 4.35.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID](#rqsrs-026clickhouseoperatorcustomresourcespectaskid)
-  * 4.36 [Stopping ClickHouse Clusters](#stopping-clickhouse-clusters)
-    * 4.36.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop](#rqsrs-026clickhouseoperatorcustomresourcespecstop)
-  * 4.37 [Restart Policy For StatefulSets](#restart-policy-for-statefulsets)
-    * 4.37.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart](#rqsrs-026clickhouseoperatorcustomresourcespecrestart)
-  * 4.38 [Troubleshooting Pods](#troubleshooting-pods)
-    * 4.38.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot](#rqsrs-026clickhouseoperatorcustomresourcespectroubleshoot)
-  * 4.39 [Custom Domain Suffix](#custom-domain-suffix)
-    * 4.39.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern](#rqsrs-026clickhouseoperatorcustomresourcespecnamespacedomainpattern)
-  * 4.40 [Policy For Auto Applying Templates](#policy-for-auto-applying-templates)
-    * 4.40.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating](#rqsrs-026clickhouseoperatorcustomresourcespectemplating)
-  * 4.41 [Reconciling Cycle](#reconciling-cycle)
-    * 4.41.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle](#rqsrs-026clickhouseoperatorreconcilingcycle)
-    * 4.41.2 [Applying ConfigMaps Before StatefulSets](#applying-configmaps-before-statefulsets)
-      * 4.41.2.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets](#rqsrs-026clickhouseoperatorreconcilingcycleapplyingconfigmapsbeforestatefulsets)
-    * 4.41.3 [Configuring Reconciling Cycle](#configuring-reconciling-cycle)
-      * 4.41.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling](#rqsrs-026clickhouseoperatorcustomresourcespecreconciling)
-    * 4.41.4 [Reconciliation Policy Name](#reconciliation-policy-name)
-      * 4.41.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingpolicy)
-    * 4.41.5 [ConfigMap Propagation Timeout](#configmap-propagation-timeout)
-      * 4.41.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingconfigmappropagationtimeout)
-    * 4.41.6 [Cleaning Objects](#cleaning-objects)
-      * 4.41.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanup)
-    * 4.41.7 [Cleaning Up Unknown Objects](#cleaning-up-unknown-objects)
-      * 4.41.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupunknownobjects)
-    * 4.41.8 [Reconciling Failed Objects](#reconciling-failed-objects)
-      * 4.41.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupreconcilefailedobjects)
-  * 4.42 [Defaults](#defaults)
-      * 4.42.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults](#rqsrs-026clickhouseoperatorcustomresourcespecdefaults)
-    * 4.42.9 [Specifying Storage Management Provisioner](#specifying-storage-management-provisioner)
-      * 4.42.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsstoragemanagementprovisioner)
-    * 4.42.10 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
-      * 4.42.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
-    * 4.42.11 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
-      * 4.42.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
-    * 4.42.12 [Templates](#templates)
-      * 4.42.12.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
-      * 4.42.12.2 [Host Template](#host-template)
-        * 4.42.12.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
-      * 4.42.12.3 [Pod Template](#pod-template)
-        * 4.42.12.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
-      * 4.42.12.4 [Data Volume Claim Template](#data-volume-claim-template)
-        * 4.42.12.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
-      * 4.42.12.5 [Log Volume Claim Template](#log-volume-claim-template)
-        * 4.42.12.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
-      * 4.42.12.6 [Service Template](#service-template)
-        * 4.42.12.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
-      * 4.42.12.7 [Cluster Service Template](#cluster-service-template)
-        * 4.42.12.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
-      * 4.42.12.8 [Shard Service Template](#shard-service-template)
-        * 4.42.12.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
-      * 4.42.12.9 [Replica Service Template](#replica-service-template)
-        * 4.42.12.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
-      * 4.42.12.10 [Volume Claim Template](#volume-claim-template)
-        * 4.42.12.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
-  * 4.43 [ClickHouse Server Configuration](#clickhouse-server-configuration)
-    * 4.43.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration](#rqsrs-026clickhouseoperatorcustomresourcespecconfiguration)
-    * 4.43.2 [ZooKeeper](#zookeeper)
-      * 4.43.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeper)
-      * 4.43.2.2 [ZooKeeper Nodes](#zookeeper-nodes)
-        * 4.43.2.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepernodes)
-      * 4.43.2.3 [Session Timeout](#session-timeout)
-        * 4.43.2.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepersessiontimeoutms)
-      * 4.43.2.4 [Operation Timeout](#operation-timeout)
-        * 4.43.2.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperoperationtimeoutms)
-      * 4.43.2.5 [Root Path](#root-path)
-        * 4.43.2.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperroot)
-      * 4.43.2.6 [Login Credentials](#login-credentials)
-        * 4.43.2.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperidentify)
-    * 4.43.3 [Users](#users)
-      * 4.43.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationusers)
-    * 4.43.4 [Profiles](#profiles)
-      * 4.43.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationprofiles)
-    * 4.43.5 [Quotas](#quotas)
-      * 4.43.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationquotas)
-    * 4.43.6 [Settings](#settings)
-      * 4.43.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationsettings)
-    * 4.43.7 [Files](#files)
-      * 4.43.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationfiles)
-  * 4.44 [ClickHouse Clusters Configuration](#clickhouse-clusters-configuration)
-    * 4.44.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclusters)
-    * 4.44.2 [Cluster Name](#cluster-name)
-      * 4.44.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustername)
-    * 4.44.3 [Cluster ZooKeeper](#cluster-zookeeper)
-      * 4.44.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterzookeeper)
-    * 4.44.4 [Cluster Settings](#cluster-settings)
-      * 4.44.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustersettings)
-    * 4.44.5 [Cluster Files](#cluster-files)
-      * 4.44.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterfiles)
-    * 4.44.6 [Cluster Templates](#cluster-templates)
-      * 4.44.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustertemplates)
-  * 4.45 [ClickHouse Cluster Layout](#clickhouse-cluster-layout)
-    * 4.45.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayout)
-    * 4.45.2 [Layout Type (Deprecated)](#layout-type-deprecated)
-      * 4.45.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayouttype)
-    * 4.45.3 [Layout Shards Count](#layout-shards-count)
-      * 4.45.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardscount)
-    * 4.45.4 [Layout Replicas Count](#layout-replicas-count)
-      * 4.45.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicascount)
-    * 4.45.5 [Layout Shards](#layout-shards)
-      * 4.45.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshards)
-      * 4.45.5.2 [Shard Name](#shard-name)
-        * 4.45.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsname)
-      * 4.45.5.3 [Shard Definition Type (Deprecated)](#shard-definition-type-deprecated)
-        * 4.45.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsdefinitiontype)
-      * 4.45.5.4 [Shard Weight](#shard-weight)
-        * 4.45.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsweight)
-      * 4.45.5.5 [Shard Internnal Replication](#shard-internnal-replication)
-        * 4.45.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsinternalreplication)
-      * 4.45.5.6 [Shard Settings](#shard-settings)
-        * 4.45.5.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardssettings)
-      * 4.45.5.7 [Shard Files](#shard-files)
-        * 4.45.5.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsfiles)
-      * 4.45.5.8 [Shard Templates](#shard-templates)
-        * 4.45.5.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardstemplates)
-      * 4.45.5.9 [Shard Replicas Count](#shard-replicas-count)
-        * 4.45.5.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicascount)
-    * 4.45.6 [Layout Shards Replicas](#layout-shards-replicas)
-      * 4.45.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicas)
-      * 4.45.6.2 [Shard Replica Name](#shard-replica-name)
-        * 4.45.6.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasname)
-      * 4.45.6.3 [Shard Replica TCP Port](#shard-replica-tcp-port)
-        * 4.45.6.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastcpport)
-      * 4.45.6.4 [Shard Replica HTTP Port](#shard-replica-http-port)
-        * 4.45.6.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicashttpport)
-      * 4.45.6.5 [Shard Replica Inter-server HTTP Port](#shard-replica-inter-server-http-port)
-        * 4.45.6.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasinterserverhttpport)
-      * 4.45.6.6 [Shard Replica Settings](#shard-replica-settings)
-        * 4.45.6.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicassettings)
-      * 4.45.6.7 [Shard Replica Files](#shard-replica-files)
-        * 4.45.6.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasfiles)
-      * 4.45.6.8 [Shard Replica Templates](#shard-replica-templates)
-        * 4.45.6.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastemplates)
-    * 4.45.7 [Layout Replicas](#layout-replicas)
-      * 4.45.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicas)
-      * 4.45.7.2 [Replica Name](#replica-name)
-        * 4.45.7.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasname)
-      * 4.45.7.3 [Replica Settings](#replica-settings)
-        * 4.45.7.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicassettings)
-      * 4.45.7.4 [Replica Files](#replica-files)
-        * 4.45.7.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasfiles)
-      * 4.45.7.5 [Replica Templates](#replica-templates)
-        * 4.45.7.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicastemplates)
-      * 4.45.7.6 [Replica Shards Count](#replica-shards-count)
-        * 4.45.7.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardscount)
-    * 4.45.8 [Layout Replicas Shards](#layout-replicas-shards)
-      * 4.45.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshards)
-      * 4.45.8.2 [Replica Shard Name](#replica-shard-name)
-        * 4.45.8.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsname)
-      * 4.45.8.3 [Replica Shard TCP Port](#replica-shard-tcp-port)
-        * 4.45.8.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstcpport)
-      * 4.45.8.4 [Replica Shard HTTP Port](#replica-shard-http-port)
-        * 4.45.8.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardshttpport)
-      * 4.45.8.5 [Replica Shard Inter-server HTTP Port](#replica-shard-inter-server-http-port)
-        * 4.45.8.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsinterserverhttpport)
-      * 4.45.8.6 [Replica Shard Settings](#replica-shard-settings)
-        * 4.45.8.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardssettings)
-      * 4.45.8.7 [Replica Shard Files](#replica-shard-files)
-        * 4.45.8.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsfiles)
-      * 4.45.8.8 [Replica Shard Templates](#replica-shard-templates)
-        * 4.45.8.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstemplates)
-  * 4.46 [User Defined Templates](#user-defined-templates)
-    * 4.46.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplates)
-  * 4.47 [Host Templates](#host-templates)
-    * 4.47.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplates)
-    * 4.47.2 [Host Template Name](#host-template-name)
-      * 4.47.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesname)
-    * 4.47.3 [Host Template Port Distribution](#host-template-port-distribution)
-      * 4.47.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistribution)
-      * 4.47.3.2 [Port Distribution Type](#port-distribution-type)
-        * 4.47.3.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistributiontype)
-    * 4.47.4 [Host Template Specification](#host-template-specification)
-      * 4.47.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspec)
-      * 4.47.4.2 [Host Name](#host-name)
-        * 4.47.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecname)
-      * 4.47.4.3 [Host TCP Port](#host-tcp-port)
-        * 4.47.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectcpport)
-      * 4.47.4.4 [Host HTTP Port](#host-http-port)
-        * 4.47.4.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspechttpport)
-      * 4.47.4.5 [Host Inter-server HTTP Port](#host-inter-server-http-port)
-        * 4.47.4.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecinterserverhttpport)
-      * 4.47.4.6 [Host Settings](#host-settings)
-        * 4.47.4.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecsettings)
-      * 4.47.4.7 [Host Files](#host-files)
-        * 4.47.4.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecfiles)
-      * 4.47.4.8 [Host Overriding Templates](#host-overriding-templates)
-        * 4.47.4.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectemplates)
-  * 4.48 [Pod Templates](#pod-templates)
-    * 4.48.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplates)
-    * 4.48.2 [Pod Name](#pod-name)
-      * 4.48.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesname)
-    * 4.48.3 [Pod Generate Name](#pod-generate-name)
-      * 4.48.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesgeneratename)
-    * 4.48.4 [Pod Zone](#pod-zone)
-      * 4.48.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszone)
-      * 4.48.4.2 [Pod Zone Key](#pod-zone-key)
-        * 4.48.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonekey)
-      * 4.48.4.3 [Pod Zone Values](#pod-zone-values)
-        * 4.48.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonevalues)
-    * 4.48.5 [Pod Distribution](#pod-distribution)
-      * 4.48.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistribution)
-      * 4.48.5.2 [Pod Distribution Type](#pod-distribution-type)
-        * 4.48.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontype)
-      * 4.48.5.3 [Pod Distribution Scope](#pod-distribution-scope)
-        * 4.48.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionscope)
-      * 4.48.5.4 [Pod Distribution Number](#pod-distribution-number)
-        * 4.48.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionnumber)
-      * 4.48.5.5 [Pod Distribution Topology Key](#pod-distribution-topology-key)
-        * 4.48.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontopologykey)
-    * 4.48.6 [Pod Spec](#pod-spec)
-      * 4.48.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesspec)
-    * 4.48.7 [Pod Metadata](#pod-metadata)
-      * 4.48.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesmetadata)
-  * 4.49 [Volume Claim Templates](#volume-claim-templates)
-    * 4.49.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplates)
-    * 4.49.2 [Volume Claim Name](#volume-claim-name)
-      * 4.49.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesname)
-    * 4.49.3 [Volume Claim Reclaim Policy](#volume-claim-reclaim-policy)
-      * 4.49.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesreclaimpolicy)
-    * 4.49.4 [Volume Claim Metadata](#volume-claim-metadata)
-      * 4.49.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesmetadata)
-    * 4.49.5 [Volume Claim Spec](#volume-claim-spec)
-      * 4.49.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesspec)
-  * 4.50 [Service Templates](#service-templates)
-    * 4.50.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplates)
-    * 4.50.2 [Service Name](#service-name)
-      * 4.50.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesname)
-    * 4.50.3 [Service Generate Name](#service-generate-name)
-      * 4.50.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesgeneratename)
-    * 4.50.4 [Service Generate Metadata](#service-generate-metadata)
-      * 4.50.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesmetadata)
-    * 4.50.5 [Service Spec](#service-spec)
-      * 4.50.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesspec)
-  * 4.51 [Use Templates](#use-templates)
-      * 4.51.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplates)
-    * 4.51.6 [Use Template Name](#use-template-name)
-      * 4.51.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesname)
-    * 4.51.7 [Use Template Namespace](#use-template-namespace)
-      * 4.51.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesnamespace)
-    * 4.51.8 [Use Template Use Type](#use-template-use-type)
-      * 4.51.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesusetype)
-  * 4.52 [ClickHouse Operator Configuration](#clickhouse-operator-configuration)
-    * 4.52.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec](#rqsrs-026clickhouseoperatorconfigurationspec)
-    * 4.52.2 [Watched Namespaces](#watched-namespaces)
-      * 4.52.2.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces](#rqsrs-026clickhouseoperatorconfigurationspecwatchnamespaces)
-    * 4.52.3 [ClickHouse Common Configs Path](#clickhouse-common-configs-path)
-      * 4.52.3.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecommonconfigspath)
-    * 4.52.4 [ClickHouse Host Configs Path](#clickhouse-host-configs-path)
-      * 4.52.4.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousehostconfigspath)
-    * 4.52.5 [ClickHouse Users Configs Path](#clickhouse-users-configs-path)
-      * 4.52.5.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseusersconfigspath)
-    * 4.52.6 [Templates Path](#templates-path)
-      * 4.52.6.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath](#rqsrs-026clickhouseoperatorconfigurationspectemplatespath)
-    * 4.52.7 [StatefulSet Update Timeout](#statefulset-update-timeout)
-      * 4.52.7.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatetimeout)
-    * 4.52.8 [StatefulSet Update Poll Period](#statefulset-update-poll-period)
-      * 4.52.8.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatepollperiod)
-    * 4.52.9 [StatefulSet Create Failure Action](#statefulset-create-failure-action)
-      * 4.52.9.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetcreatefailureaction)
-    * 4.52.10 [StatefulSet Update Failure Action](#statefulset-update-failure-action)
-      * 4.52.10.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatefailureaction)
-    * 4.52.11 [ClickHouse Config User Default Profile](#clickhouse-config-user-default-profile)
-      * 4.52.11.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultprofile)
-    * 4.52.12 [ClickHouse Config User Default Quota](#clickhouse-config-user-default-quota)
-      * 4.52.12.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultquota)
-    * 4.52.13 [ClickHouse Config User Default Networks IP](#clickhouse-config-user-default-networks-ip)
-      * 4.52.13.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultnetworksip)
-    * 4.52.14 [ClickHouse Config User Default Password](#clickhouse-config-user-default-password)
-      * 4.52.14.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultpassword)
-    * 4.52.15 [ClickHouse Config Networks Host Regexp Template](#clickhouse-config-networks-host-regexp-template)
-      * 4.52.15.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfignetworkshostregexptemplate)
-    * 4.52.16 [ClickHouse Credentials Secret Namespace](#clickhouse-credentials-secret-namespace)
-      * 4.52.16.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretnamespace)
-    * 4.52.17 [ClickHouse Credentials Secret Name](#clickhouse-credentials-secret-name)
-      * 4.52.17.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretname)
-    * 4.52.18 [ClickHouse Port](#clickhouse-port)
-      * 4.52.18.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseport)
-    * 4.52.19 [Log To `stderr`](#log-to-stderr)
-      * 4.52.19.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr](#rqsrs-026clickhouseoperatorconfigurationspeclogtostderr)
-    * 4.52.20 [Log To `stderr` And Files](#log-to-stderr-and-files)
-      * 4.52.20.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr](#rqsrs-026clickhouseoperatorconfigurationspecalsologtostderr)
-    * 4.52.21 [Verbosity Level](#verbosity-level)
-      * 4.52.21.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel](#rqsrs-026clickhouseoperatorconfigurationspecverbositylevel)
-    * 4.52.22 [Threshold For `stderr`](#threshold-for-stderr)
-      * 4.52.22.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold](#rqsrs-026clickhouseoperatorconfigurationspecstderrthreshold)
-    * 4.52.23 [V Module](#v-module)
-      * 4.52.23.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule](#rqsrs-026clickhouseoperatorconfigurationspecvmodule)
-    * 4.52.24 [Logging Backtrace](#logging-backtrace)
-      * 4.52.24.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace](#rqsrs-026clickhouseoperatorconfigurationspeclogbacktrace)
-    * 4.52.25 [Number Of Threads For Reconciliation Cycle](#number-of-threads-for-reconciliation-cycle)
-      * 4.52.25.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber](#rqsrs-026clickhouseoperatorconfigurationspecreconcilethreadsnumber)
-    * 4.52.26 [Wait Exclude For Reconciliation Cycle](#wait-exclude-for-reconciliation-cycle)
-      * 4.52.26.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitexclude)
-    * 4.52.27 [Wait Include For Reconciliation Cycle](#wait-include-for-reconciliation-cycle)
-      * 4.52.27.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitinclude)
-    * 4.52.28 [Excluding From Propagation Labels](#excluding-from-propagation-labels)
-      * 4.52.28.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels](#rqsrs-026clickhouseoperatorconfigurationspecexcludefrompropagationlabels)
-    * 4.52.29 [Appending Scope Labels](#appending-scope-labels)
-      * 4.52.29.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels](#rqsrs-026clickhouseoperatorconfigurationspecappendscopelabels)
-  * 4.53 [Stateful Sets](#stateful-sets)
-    * 4.53.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets](#rqsrs-026clickhouseoperatorstatefulsets)
-    * 4.53.2 [Sticky Identity](#sticky-identity)
-      * 4.53.2.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity](#rqsrs-026clickhouseoperatorstatefulsetspodsstickyidentity)
-    * 4.53.3 [Pods Created From The Same Spec](#pods-created-from-the-same-spec)
-      * 4.53.3.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec](#rqsrs-026clickhouseoperatorstatefulsetspodscreatedfromthesamespec)
-  * 4.54 [Error Handling](#error-handling)
-    * 4.54.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling](#rqsrs-026clickhouseoperatorerrorhandling)
-    * 4.54.2 [Health Monitoring](#health-monitoring)
-      * 4.54.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring](#rqsrs-026clickhouseoperatorerrorhandlinghealthmonitoring)
-    * 4.54.3 [Polling For Ready](#polling-for-ready)
-      * 4.54.3.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady](#rqsrs-026clickhouseoperatorerrorhandlingpollingforready)
-    * 4.54.4 [Move On Ready](#move-on-ready)
-      * 4.54.4.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady](#rqsrs-026clickhouseoperatorerrorhandlingmoveonready)
-    * 4.54.5 [Create Failure](#create-failure)
-      * 4.54.5.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create](#rqsrs-026clickhouseoperatorerrorhandlingcreate)
-    * 4.54.6 [Update Failure](#update-failure)
-      * 4.54.6.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update](#rqsrs-026clickhouseoperatorerrorhandlingupdate)
-    * 4.54.7 [Reverting Back](#reverting-back)
-      * 4.54.7.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackcreate)
-      * 4.54.7.2 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackupdate)
-    * 4.54.8 [Successful Update Before Failed](#successful-update-before-failed)
-        * 4.54.8.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing](#rqsrs-026clickhouseoperatorerrorhandlingsuccessfulupdatebeforefaileddonothing)
+    * 4.1 [General](#general)
+            * 4.1.0.1 [RQ.SRS-026.ClickHouseOperator](#rqsrs-026clickhouseoperator)
+    * 4.2 [Installation](#installation)
+        * 4.2.1 [RQ.SRS-026.ClickHouseOperator.Installation](#rqsrs-026clickhouseoperatorinstallation)
+        * 4.2.2 [Monitoring Support](#monitoring-support)
+            * 4.2.2.1 [RQ.SRS-026.ClickHouseOperator.Installation.MonitoringSupport](#rqsrs-026clickhouseoperatorinstallationmonitoringsupport)
+    * 4.3 [Namespaces](#namespaces)
+        * 4.3.1 [Kube System](#kube-system)
+            * 4.3.1.1 [RQ.SRS-026.ClickHouseOperator.Namespaces.KubeSystem](#rqsrs-026clickhouseoperatornamespaceskubesystem)
+        * 4.3.2 [User Defined](#user-defined)
+            * 4.3.2.1 [RQ.SRS-026.ClickHouseOperator.Namespaces.UserDefined](#rqsrs-026clickhouseoperatornamespacesuserdefined)
+        * 4.3.3 [Cluster Management](#cluster-management)
+            * 4.3.3.1 [RQ.SRS-026.ClickHouseOperator.Namespaces.ClusterManagement](#rqsrs-026clickhouseoperatornamespacesclustermanagement)
+    * 4.4 [ACM Compatibility](#acm-compatibility)
+            * 4.4.3.1 [RQ.SRS-026.ClickHouseOperator.ACM](#rqsrs-026clickhouseoperatoracm)
+    * 4.5 [Creating Clusters](#creating-clusters)
+            * 4.5.3.1 [RQ.SRS-026.ClickHouseOperator.Create](#rqsrs-026clickhouseoperatorcreate)
+            * 4.5.3.2 [RQ.SRS-026.ClickHouseOperator.DeleteBroken](#rqsrs-026clickhouseoperatordeletebroken)
+    * 4.6 [Auto-generated ClickHouse Clusters Definitions](#auto-generated-clickhouse-clusters-definitions)
+        * 4.6.1 [RQ.SRS-026.ClickHouseOperator.AutoGeneratedClickHouseClusters](#rqsrs-026clickhouseoperatorautogeneratedclickhouseclusters)
+    * 4.7 [Managing Operator](#managing-operator)
+        * 4.7.1 [Upgrading Operator](#upgrading-operator)
+            * 4.7.1.1 [RQ.SRS-026.ClickHouseOperator.Managing.UpgradingOperator](#rqsrs-026clickhouseoperatormanagingupgradingoperator)
+        * 4.7.2 [Downgrading Operator](#downgrading-operator)
+            * 4.7.2.1 [RQ.SRS-026.ClickHouseOperator.Managing.DowngradingOperator](#rqsrs-026clickhouseoperatormanagingdowngradingoperator)
+        * 4.7.3 [Restarting Operator](#restarting-operator)
+            * 4.7.3.1 [RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator](#rqsrs-026clickhouseoperatormanagingrestartingoperator)
+    * 4.8 [Security](#security)
+        * 4.8.1 [Default Access Control](#default-access-control)
+            * 4.8.1.1 [RQ.SRS-026.ClickHouseOperator.DefaultAccessControl](#rqsrs-026clickhouseoperatordefaultaccesscontrol)
+        * 4.8.2 [Default Users](#default-users)
+            * 4.8.2.1 [RQ.SRS-026.ClickHouseOperator.DefaultUsers](#rqsrs-026clickhouseoperatordefaultusers)
+        * 4.8.3 [Secrets](#secrets)
+            * 4.8.3.1 [RQ.SRS-026.ClickHouseOperator.Secrets](#rqsrs-026clickhouseoperatorsecrets)
+        * 4.8.4 [Secure Connection](#secure-connection)
+            * 4.8.4.1 [RQ.SRS-026.ClickHouseOperator.EnableHttps](#rqsrs-026clickhouseoperatorenablehttps)
+            * 4.8.4.2 [RQ.SRS-026.ClickHouseOperator.SecureInterClusterCommunication](#rqsrs-026clickhouseoperatorsecureinterclustercommunication)
+            * 4.8.4.3 [RQ.SRS-026.ClickHouseOperator.InterClusterCommunicationWithSecret](#rqsrs-026clickhouseoperatorinterclustercommunicationwithsecret)
+            * 4.8.4.4 [RQ.SRS-026.ClickHouseOperator.CHI.ConnectWithHttps](#rqsrs-026clickhouseoperatorchiconnectwithhttps)
+    * 4.9 [Default Templates](#default-templates)
+        * 4.9.1 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates](#rqsrs-026clickhouseoperatordefaulttemplates)
+        * 4.9.2 [RQ.SRS-026.ClickHouseOperator.DefaultTemplates.MergingWithUserDefinedTemplates](#rqsrs-026clickhouseoperatordefaulttemplatesmergingwithuserdefinedtemplates)
+    * 4.10 [Annotations In Templates](#annotations-in-templates)
+        * 4.10.1 [RQ.SRS-026.ClickHouseOperator.AnnotationsInTemplates](#rqsrs-026clickhouseoperatorannotationsintemplates)
+    * 4.11 [Custom Pod Templates](#custom-pod-templates)
+            * 4.11.1.1 [RQ.SRS-026.ClickHouseOperator.PodTemplates](#rqsrs-026clickhouseoperatorpodtemplates)
+    * 4.12 [Custom Service Templates](#custom-service-templates)
+        * 4.12.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates](#rqsrs-026clickhouseoperatorservicetemplates)
+        * 4.12.2 [Load Balancer](#load-balancer)
+            * 4.12.2.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.LoadBalancer](#rqsrs-026clickhouseoperatorservicetemplatesloadbalancer)
+        * 4.12.3 [Standard Kubernetes Service Specification](#standard-kubernetes-service-specification)
+            * 4.12.3.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.ServiceSpecificationStandard](#rqsrs-026clickhouseoperatorservicetemplatesservicespecificationstandard)
+        * 4.12.4 [Annotations](#annotations)
+            * 4.12.4.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.Annotations](#rqsrs-026clickhouseoperatorservicetemplatesannotations)
+        * 4.12.5 [Name Generation](#name-generation)
+            * 4.12.5.1 [RQ.SRS-026.ClickHouseOperator.ServiceTemplates.NameGeneration](#rqsrs-026clickhouseoperatorservicetemplatesnamegeneration)
+    * 4.13 [Custom Host Template](#custom-host-template)
+            * 4.13.5.1 [RQ.SRS-026.ClickHouseOperator.HostTemplates](#rqsrs-026clickhouseoperatorhosttemplates)
+    * 4.14 [Custom Volume Claim Templates](#custom-volume-claim-templates)
+            * 4.14.5.1 [RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates](#rqsrs-026clickhouseoperatorvolumeclaimtamplates)
+    * 4.15 [Storage Provisioning](#storage-provisioning)
+            * 4.15.5.1 [RQ.SRS-026.ClickHouseOperator.StorageProvisioning](#rqsrs-026clickhouseoperatorstorageprovisioning)
+    * 4.16 [Deployments](#deployments)
+        * 4.16.1 [Single Node Instances](#single-node-instances)
+            * 4.16.1.1 [RQ.SRS-026.ClickHouseOperator.Deployments.SingleNodeInstances](#rqsrs-026clickhouseoperatordeploymentssinglenodeinstances)
+        * 4.16.2 [Multiple Shards](#multiple-shards)
+            * 4.16.2.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShards](#rqsrs-026clickhouseoperatordeploymentsmultipleshards)
+        * 4.16.3 [Multiple Replicas](#multiple-replicas)
+            * 4.16.3.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleReplicas](#rqsrs-026clickhouseoperatordeploymentsmultiplereplicas)
+        * 4.16.4 [Multiple Shards And Replicas](#multiple-shards-and-replicas)
+            * 4.16.4.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleShardsAndReplicas](#rqsrs-026clickhouseoperatordeploymentsmultipleshardsandreplicas)
+        * 4.16.5 [Multiple Clusters](#multiple-clusters)
+            * 4.16.5.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleClusters](#rqsrs-026clickhouseoperatordeploymentsmultipleclusters)
+        * 4.16.6 [Circular Replication](#circular-replication)
+            * 4.16.6.1 [RQ.SRS-026.ClickHouseOperator.Deployments.CircularReplication](#rqsrs-026clickhouseoperatordeploymentscircularreplication)
+        * 4.16.7 [Different ClickHouse Versions On Replicas And Shards](#different-clickhouse-versions-on-replicas-and-shards)
+            * 4.16.7.1 [RQ.SRS-026.ClickHouseOperator.Deployments.DifferentClickHouseVersionsOnReplicasAndShards](#rqsrs-026clickhouseoperatordeploymentsdifferentclickhouseversionsonreplicasandshards)
+        * 4.16.8 [Multiple Storage Volumes](#multiple-storage-volumes)
+            * 4.16.8.1 [RQ.SRS-026.ClickHouseOperator.Deployments.MultipleStorageVolumes](#rqsrs-026clickhouseoperatordeploymentsmultiplestoragevolumes)
+    * 4.17 [Plugging External Volumes](#plugging-external-volumes)
+        * 4.17.1 [RQ.SRS-026.ClickHouseOperator.Deployments.PluggingExternalVolumes](#rqsrs-026clickhouseoperatordeploymentspluggingexternalvolumes)
+    * 4.18 [Configuration File Control](#configuration-file-control)
+        * 4.18.1 [YAML Syntax For `config.xml`](#yaml-syntax-for-configxml)
+            * 4.18.1.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.ConfigXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolconfigxml)
+        * 4.18.2 [YAML Syntax For `users.xml`](#yaml-syntax-for-usersxml)
+            * 4.18.2.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.UsersXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolusersxml)
+        * 4.18.3 [Embedded XML Files](#embedded-xml-files)
+            * 4.18.3.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.EmbeddedXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolembeddedxml)
+        * 4.18.4 [Macros XML](#macros-xml)
+            * 4.18.4.1 [RQ.SRS-026.ClickHouseOperator.ConfigurationFileControl.MacrosXML](#rqsrs-026clickhouseoperatorconfigurationfilecontrolmacrosxml)
+    * 4.19 [Retaining Volume Claim Templates](#retaining-volume-claim-templates)
+        * 4.19.1 [RQ.SRS-026.ClickHouseOperator.RetainingVolumeClaimTemplates](#rqsrs-026clickhouseoperatorretainingvolumeclaimtemplates)
+    * 4.20 [Reconnecting Existing Persistent Volumes](#reconnecting-existing-persistent-volumes)
+        * 4.20.1 [RQ.SRS-026.ClickHouseOperator.ReconnectingExistingPersistentVolumes](#rqsrs-026clickhouseoperatorreconnectingexistingpersistentvolumes)
+    * 4.21 [Maintaining Cluster Uptime During Changes](#maintaining-cluster-uptime-during-changes)
+        * 4.21.1 [RQ.SRS-026.ClickHouseOperator.MaintainingClusterUpTimeDuringChanges](#rqsrs-026clickhouseoperatormaintainingclusteruptimeduringchanges)
+    * 4.22 [Adding New Persistent Volumes To Pods](#adding-new-persistent-volumes-to-pods)
+        * 4.22.1 [RQ.SRS-026.ClickHouseOperator.AddingNewPersistentVolumesToPods](#rqsrs-026clickhouseoperatoraddingnewpersistentvolumestopods)
+    * 4.23 [Interrupting Application of ClickHouse Cluster Changes](#interrupting-application-of-clickhouse-cluster-changes)
+        * 4.23.1 [RQ.SRS-026.ClickHouseOperator.InterruptingApplicationOfClickHouseClusterChanges](#rqsrs-026clickhouseoperatorinterruptingapplicationofclickhouseclusterchanges)
+    * 4.24 [Managing ClickHouse](#managing-clickhouse)
+        * 4.24.1 [Configuring TLS](#configuring-tls)
+            * 4.24.1.1 [RQ.SRS-026.ClickHouseOperator.Managing.TLS](#rqsrs-026clickhouseoperatormanagingtls)
+        * 4.24.2 [Restarting ZooKeeper Cluster](#restarting-zookeeper-cluster)
+            * 4.24.2.1 [RQ.SRS-026.ClickHouseOperator.Managing.RestartingZooKeeper](#rqsrs-026clickhouseoperatormanagingrestartingzookeeper)
+        * 4.24.3 [Application of Changes](#application-of-changes)
+            * 4.24.3.1 [RQ.SRS-026.ClickHouseOperator.Managing.Changes](#rqsrs-026clickhouseoperatormanagingchanges)
+        * 4.24.4 [Rollback On Error](#rollback-on-error)
+            * 4.24.4.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollbackOnError](#rqsrs-026clickhouseoperatormanagingrollbackonerror)
+        * 4.24.5 [Changes Requiring Restart](#changes-requiring-restart)
+            * 4.24.5.1 [RQ.SRS-026.ClickHouseOperator.Managing.ChangesRequiringRestart](#rqsrs-026clickhouseoperatormanagingchangesrequiringrestart)
+        * 4.24.6 [Configuration And Settings](#configuration-and-settings)
+            * 4.24.6.1 [RQ.SRS-026.ClickHouseOperator.Managing.ConfigurationAndSettings](#rqsrs-026clickhouseoperatormanagingconfigurationandsettings)
+        * 4.24.7 [Cluster Scaling](#cluster-scaling)
+            * 4.24.7.1 [Adding Shards](#adding-shards)
+                * 4.24.7.1.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingShards](#rqsrs-026clickhouseoperatormanagingclusterscalingaddingshards)
+            * 4.24.7.2 [Adding Replicas](#adding-replicas)
+                * 4.24.7.2.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicas](#rqsrs-026clickhouseoperatormanagingclusterscalingaddingreplicas)
+            * 4.24.7.3 [Adding Replication To Existing Non-replicated Cluster](#adding-replication-to-existing-non-replicated-cluster)
+                * 4.24.7.3.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.AddingReplicationToExistingNonReplicatedCluster](#rqsrs-026clickhouseoperatormanagingclusterscalingaddingreplicationtoexistingnonreplicatedcluster)
+            * 4.24.7.4 [Schema Propagation](#schema-propagation)
+                * 4.24.7.4.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.SchemaPropagation](#rqsrs-026clickhouseoperatormanagingclusterscalingschemapropagation)
+            * 4.24.7.5 [Scaling Down](#scaling-down)
+                * 4.24.7.5.1 [RQ.SRS-026.ClickHouseOperator.Managing.ClusterScaling.Down](#rqsrs-026clickhouseoperatormanagingclusterscalingdown)
+        * 4.24.8 [ClickHouse Version Upgrades](#clickhouse-version-upgrades)
+            * 4.24.8.1 [RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades](#rqsrs-026clickhouseoperatormanagingversionupgrades)
+            * 4.24.8.2 [RQ.SRS-026.ClickHouseOperator.Managing.VersionUpgrades.IndividualOrAll](#rqsrs-026clickhouseoperatormanagingversionupgradesindividualorall)
+        * 4.24.9 [Re-provisioning Pods Using Different Template](#re-provisioning-pods-using-different-template)
+            * 4.24.9.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningPodsUsingDifferentTemplate](#rqsrs-026clickhouseoperatormanagingreprovisioningpodsusingdifferenttemplate)
+        * 4.24.10 [Re-provisioning Volume](#re-provisioning-volume)
+            * 4.24.10.1 [RQ.SRS-026.ClickHouseOperator.Managing.ReprovisioningVolume](#rqsrs-026clickhouseoperatormanagingreprovisioningvolume)
+        * 4.24.11 [StorageManagement switch](#storagemanagement-switch)
+            * 4.24.11.1 [RQ.SRS-026.ClickHouseOperator.Managing.StorageManagementSwitch](#rqsrs-026clickhouseoperatormanagingstoragemanagementswitch)
+        * 4.24.12 [Stopping And Starting](#stopping-and-starting)
+            * 4.24.12.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingAndStarting](#rqsrs-026clickhouseoperatormanagingstoppingandstarting)
+        * 4.24.13 [Stopping Specific ClickHouse Pods](#stopping-specific-clickhouse-pods)
+            * 4.24.13.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHousePods](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousepods)
+        * 4.24.14 [Stopping Specific ClickHouse Hosts](#stopping-specific-clickhouse-hosts)
+            * 4.24.14.1 [RQ.SRS-026.ClickHouseOperator.Managing.StoppingSpecificClickHouseHosts](#rqsrs-026clickhouseoperatormanagingstoppingspecificclickhousehosts)
+        * 4.24.15 [Exporting Metrics](#exporting-metrics)
+            * 4.24.15.1 [RQ.SRS-026.ClickHouseOperator.Managing.ExportingMetrics](#rqsrs-026clickhouseoperatormanagingexportingmetrics)
+        * 4.24.16 [Monitoring](#monitoring)
+            * 4.24.16.1 [RQ.SRS-026.ClickHouseOperator.Managing.Monitoring](#rqsrs-026clickhouseoperatormanagingmonitoring)
+        * 4.24.17 [Rolling Update](#rolling-update)
+            * 4.24.17.1 [RQ.SRS-026.ClickHouseOperator.Managing.RollingUpdate](#rqsrs-026clickhouseoperatormanagingrollingupdate)
+    * 4.25 [Logging](#logging)
+            * 4.25.17.1 [RQ.SRS-026.ClickHouseOperator.Logging](#rqsrs-026clickhouseoperatorlogging)
+            * 4.25.17.2 [High Level Status](#high-level-status)
+                * 4.25.17.2.1 [RQ.SRS-026.ClickHouseOperator.Logging.HighLevelStatus](#rqsrs-026clickhouseoperatorlogginghighlevelstatus)
+    * 4.26 [Valid Installation](#valid-installation)
+        * 4.26.1 [RQ.SRS-026.ClickHouseOperator.ValidInstallation](#rqsrs-026clickhouseoperatorvalidinstallation)
+    * 4.27 [Operator Settings](#operator-settings)
+        * 4.27.1 [config.yaml](#configyaml)
+            * 4.27.1.1 [RQ.SRS-026.ClickHouseOperator.Settings.ConfigYaml](#rqsrs-026clickhouseoperatorsettingsconfigyaml)
+        * 4.27.2 [Config Map](#config-map)
+            * 4.27.2.1 [RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap](#rqsrs-026clickhouseoperatorsettingsconfigmap)
+            * 4.27.2.2 [RQ.SRS-026.ClickHouseOperator.Settings.ConfigMap.Changes](#rqsrs-026clickhouseoperatorsettingsconfigmapchanges)
+        * 4.27.3 [`ClickHouseOperatorConfiguration` Resource](#clickhouseoperatorconfiguration-resource)
+            * 4.27.3.1 [RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration](#rqsrs-026clickhouseoperatorsettingsclickhouseoperatorconfiguration)
+            * 4.27.3.2 [RQ.SRS-026.ClickHouseOperator.Settings.ClickHouseOperatorConfiguration.Changes](#rqsrs-026clickhouseoperatorsettingsclickhouseoperatorconfigurationchanges)
+    * 4.28 [ClickHouse Config Maps](#clickhouse-config-maps)
+        * 4.28.1 [RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps](#rqsrs-026clickhouseoperatorclickhouseconfigmaps)
+    * 4.29 [ClickHouse Config Maps Defaults](#clickhouse-config-maps-defaults)
+        * 4.29.1 [RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps.Defaults](#rqsrs-026clickhouseoperatorclickhouseconfigmapsdefaults)
+    * 4.30 [Custom Resource Definition](#custom-resource-definition)
+        * 4.30.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.CustomResourceDefinition](#rqsrs-026clickhouseoperatorcustomresourcecustomresourcedefinition)
+    * 4.31 [API Version](#api-version)
+        * 4.31.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion](#rqsrs-026clickhouseoperatorcustomresourceapiversion)
+    * 4.32 [Resource Kind](#resource-kind)
+        * 4.32.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseinstallation)
+        * 4.32.2 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseinstallationtemplate)
+        * 4.32.3 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseoperatorconfiguration)
+    * 4.33 [Metadata](#metadata)
+        * 4.33.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata](#rqsrs-026clickhouseoperatorcustomresourcemetadata)
+    * 4.34 [Cluster Specification](#cluster-specification)
+        * 4.34.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec](#rqsrs-026clickhouseoperatorcustomresourcespec)
+    * 4.35 [Task Identifier](#task-identifier)
+        * 4.35.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID](#rqsrs-026clickhouseoperatorcustomresourcespectaskid)
+    * 4.36 [Stopping ClickHouse Clusters](#stopping-clickhouse-clusters)
+        * 4.36.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop](#rqsrs-026clickhouseoperatorcustomresourcespecstop)
+    * 4.37 [Restart Policy For StatefulSets](#restart-policy-for-statefulsets)
+        * 4.37.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart](#rqsrs-026clickhouseoperatorcustomresourcespecrestart)
+    * 4.38 [Troubleshooting Pods](#troubleshooting-pods)
+        * 4.38.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot](#rqsrs-026clickhouseoperatorcustomresourcespectroubleshoot)
+    * 4.39 [Custom Domain Suffix](#custom-domain-suffix)
+        * 4.39.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern](#rqsrs-026clickhouseoperatorcustomresourcespecnamespacedomainpattern)
+    * 4.40 [Policy For Auto Applying Templates](#policy-for-auto-applying-templates)
+        * 4.40.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating](#rqsrs-026clickhouseoperatorcustomresourcespectemplating)
+    * 4.41 [Reconciling Cycle](#reconciling-cycle)
+        * 4.41.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle](#rqsrs-026clickhouseoperatorreconcilingcycle)
+        * 4.41.2 [Applying ConfigMaps Before StatefulSets](#applying-configmaps-before-statefulsets)
+            * 4.41.2.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets](#rqsrs-026clickhouseoperatorreconcilingcycleapplyingconfigmapsbeforestatefulsets)
+        * 4.41.3 [Configuring Reconciling Cycle](#configuring-reconciling-cycle)
+            * 4.41.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling](#rqsrs-026clickhouseoperatorcustomresourcespecreconciling)
+        * 4.41.4 [Reconciliation Policy Name](#reconciliation-policy-name)
+            * 4.41.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingpolicy)
+        * 4.41.5 [ConfigMap Propagation Timeout](#configmap-propagation-timeout)
+            * 4.41.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingconfigmappropagationtimeout)
+        * 4.41.6 [Cleaning Objects](#cleaning-objects)
+            * 4.41.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanup)
+        * 4.41.7 [Cleaning Up Unknown Objects](#cleaning-up-unknown-objects)
+            * 4.41.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupunknownobjects)
+        * 4.41.8 [Reconciling Failed Objects](#reconciling-failed-objects)
+            * 4.41.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupreconcilefailedobjects)
+    * 4.42 [Defaults](#defaults)
+            * 4.42.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults](#rqsrs-026clickhouseoperatorcustomresourcespecdefaults)
+        * 4.42.9 [Specifying Storage Management Provisioner](#specifying-storage-management-provisioner)
+            * 4.42.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsstoragemanagementprovisioner)
+        * 4.42.10 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
+            * 4.42.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
+        * 4.42.11 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
+            * 4.42.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
+        * 4.42.12 [Templates](#templates)
+            * 4.42.12.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
+            * 4.42.12.2 [Host Template](#host-template)
+                * 4.42.12.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
+            * 4.42.12.3 [Pod Template](#pod-template)
+                * 4.42.12.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
+            * 4.42.12.4 [Data Volume Claim Template](#data-volume-claim-template)
+                * 4.42.12.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
+            * 4.42.12.5 [Log Volume Claim Template](#log-volume-claim-template)
+                * 4.42.12.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
+            * 4.42.12.6 [Service Template](#service-template)
+                * 4.42.12.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
+            * 4.42.12.7 [Cluster Service Template](#cluster-service-template)
+                * 4.42.12.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
+            * 4.42.12.8 [Shard Service Template](#shard-service-template)
+                * 4.42.12.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
+            * 4.42.12.9 [Replica Service Template](#replica-service-template)
+                * 4.42.12.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
+            * 4.42.12.10 [Volume Claim Template](#volume-claim-template)
+                * 4.42.12.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
+    * 4.43 [ClickHouse Server Configuration](#clickhouse-server-configuration)
+        * 4.43.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration](#rqsrs-026clickhouseoperatorcustomresourcespecconfiguration)
+        * 4.43.2 [ZooKeeper](#zookeeper)
+            * 4.43.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeper)
+            * 4.43.2.2 [ZooKeeper Nodes](#zookeeper-nodes)
+                * 4.43.2.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepernodes)
+            * 4.43.2.3 [Session Timeout](#session-timeout)
+                * 4.43.2.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepersessiontimeoutms)
+            * 4.43.2.4 [Operation Timeout](#operation-timeout)
+                * 4.43.2.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperoperationtimeoutms)
+            * 4.43.2.5 [Root Path](#root-path)
+                * 4.43.2.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperroot)
+            * 4.43.2.6 [Login Credentials](#login-credentials)
+                * 4.43.2.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperidentify)
+        * 4.43.3 [Users](#users)
+            * 4.43.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationusers)
+        * 4.43.4 [Profiles](#profiles)
+            * 4.43.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationprofiles)
+        * 4.43.5 [Quotas](#quotas)
+            * 4.43.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationquotas)
+        * 4.43.6 [Settings](#settings)
+            * 4.43.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationsettings)
+        * 4.43.7 [Files](#files)
+            * 4.43.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationfiles)
+    * 4.44 [ClickHouse Clusters Configuration](#clickhouse-clusters-configuration)
+        * 4.44.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclusters)
+        * 4.44.2 [Cluster Name](#cluster-name)
+            * 4.44.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustername)
+        * 4.44.3 [Cluster ZooKeeper](#cluster-zookeeper)
+            * 4.44.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterzookeeper)
+        * 4.44.4 [Cluster Settings](#cluster-settings)
+            * 4.44.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustersettings)
+        * 4.44.5 [Cluster Files](#cluster-files)
+            * 4.44.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterfiles)
+        * 4.44.6 [Cluster Templates](#cluster-templates)
+            * 4.44.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustertemplates)
+    * 4.45 [ClickHouse Cluster Layout](#clickhouse-cluster-layout)
+        * 4.45.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayout)
+        * 4.45.2 [Layout Type (Deprecated)](#layout-type-deprecated)
+            * 4.45.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayouttype)
+        * 4.45.3 [Layout Shards Count](#layout-shards-count)
+            * 4.45.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardscount)
+        * 4.45.4 [Layout Replicas Count](#layout-replicas-count)
+            * 4.45.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicascount)
+        * 4.45.5 [Layout Shards](#layout-shards)
+            * 4.45.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshards)
+            * 4.45.5.2 [Shard Name](#shard-name)
+                * 4.45.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsname)
+            * 4.45.5.3 [Shard Definition Type (Deprecated)](#shard-definition-type-deprecated)
+                * 4.45.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsdefinitiontype)
+            * 4.45.5.4 [Shard Weight](#shard-weight)
+                * 4.45.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsweight)
+            * 4.45.5.5 [Shard Internnal Replication](#shard-internnal-replication)
+                * 4.45.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsinternalreplication)
+            * 4.45.5.6 [Shard Settings](#shard-settings)
+                * 4.45.5.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardssettings)
+            * 4.45.5.7 [Shard Files](#shard-files)
+                * 4.45.5.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsfiles)
+            * 4.45.5.8 [Shard Templates](#shard-templates)
+                * 4.45.5.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardstemplates)
+            * 4.45.5.9 [Shard Replicas Count](#shard-replicas-count)
+                * 4.45.5.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicascount)
+        * 4.45.6 [Layout Shards Replicas](#layout-shards-replicas)
+            * 4.45.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicas)
+            * 4.45.6.2 [Shard Replica Name](#shard-replica-name)
+                * 4.45.6.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasname)
+            * 4.45.6.3 [Shard Replica TCP Port](#shard-replica-tcp-port)
+                * 4.45.6.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastcpport)
+            * 4.45.6.4 [Shard Replica HTTP Port](#shard-replica-http-port)
+                * 4.45.6.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicashttpport)
+            * 4.45.6.5 [Shard Replica Inter-server HTTP Port](#shard-replica-inter-server-http-port)
+                * 4.45.6.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasinterserverhttpport)
+            * 4.45.6.6 [Shard Replica Settings](#shard-replica-settings)
+                * 4.45.6.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicassettings)
+            * 4.45.6.7 [Shard Replica Files](#shard-replica-files)
+                * 4.45.6.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasfiles)
+            * 4.45.6.8 [Shard Replica Templates](#shard-replica-templates)
+                * 4.45.6.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastemplates)
+        * 4.45.7 [Layout Replicas](#layout-replicas)
+            * 4.45.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicas)
+            * 4.45.7.2 [Replica Name](#replica-name)
+                * 4.45.7.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasname)
+            * 4.45.7.3 [Replica Settings](#replica-settings)
+                * 4.45.7.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicassettings)
+            * 4.45.7.4 [Replica Files](#replica-files)
+                * 4.45.7.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasfiles)
+            * 4.45.7.5 [Replica Templates](#replica-templates)
+                * 4.45.7.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicastemplates)
+            * 4.45.7.6 [Replica Shards Count](#replica-shards-count)
+                * 4.45.7.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardscount)
+        * 4.45.8 [Layout Replicas Shards](#layout-replicas-shards)
+            * 4.45.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshards)
+            * 4.45.8.2 [Replica Shard Name](#replica-shard-name)
+                * 4.45.8.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsname)
+            * 4.45.8.3 [Replica Shard TCP Port](#replica-shard-tcp-port)
+                * 4.45.8.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstcpport)
+            * 4.45.8.4 [Replica Shard HTTP Port](#replica-shard-http-port)
+                * 4.45.8.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardshttpport)
+            * 4.45.8.5 [Replica Shard Inter-server HTTP Port](#replica-shard-inter-server-http-port)
+                * 4.45.8.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsinterserverhttpport)
+            * 4.45.8.6 [Replica Shard Settings](#replica-shard-settings)
+                * 4.45.8.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardssettings)
+            * 4.45.8.7 [Replica Shard Files](#replica-shard-files)
+                * 4.45.8.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsfiles)
+            * 4.45.8.8 [Replica Shard Templates](#replica-shard-templates)
+                * 4.45.8.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstemplates)
+    * 4.46 [User Defined Templates](#user-defined-templates)
+        * 4.46.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplates)
+    * 4.47 [Host Templates](#host-templates)
+        * 4.47.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplates)
+        * 4.47.2 [Host Template Name](#host-template-name)
+            * 4.47.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesname)
+        * 4.47.3 [Host Template Port Distribution](#host-template-port-distribution)
+            * 4.47.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistribution)
+            * 4.47.3.2 [Port Distribution Type](#port-distribution-type)
+                * 4.47.3.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistributiontype)
+        * 4.47.4 [Host Template Specification](#host-template-specification)
+            * 4.47.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspec)
+            * 4.47.4.2 [Host Name](#host-name)
+                * 4.47.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecname)
+            * 4.47.4.3 [Host TCP Port](#host-tcp-port)
+                * 4.47.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectcpport)
+            * 4.47.4.4 [Host HTTP Port](#host-http-port)
+                * 4.47.4.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspechttpport)
+            * 4.47.4.5 [Host Inter-server HTTP Port](#host-inter-server-http-port)
+                * 4.47.4.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecinterserverhttpport)
+            * 4.47.4.6 [Host Settings](#host-settings)
+                * 4.47.4.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecsettings)
+            * 4.47.4.7 [Host Files](#host-files)
+                * 4.47.4.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecfiles)
+            * 4.47.4.8 [Host Overriding Templates](#host-overriding-templates)
+                * 4.47.4.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectemplates)
+    * 4.48 [Pod Templates](#pod-templates)
+        * 4.48.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplates)
+        * 4.48.2 [Pod Name](#pod-name)
+            * 4.48.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesname)
+        * 4.48.3 [Pod Generate Name](#pod-generate-name)
+            * 4.48.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesgeneratename)
+        * 4.48.4 [Pod Zone](#pod-zone)
+            * 4.48.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszone)
+            * 4.48.4.2 [Pod Zone Key](#pod-zone-key)
+                * 4.48.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonekey)
+            * 4.48.4.3 [Pod Zone Values](#pod-zone-values)
+                * 4.48.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonevalues)
+        * 4.48.5 [Pod Distribution](#pod-distribution)
+            * 4.48.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistribution)
+            * 4.48.5.2 [Pod Distribution Type](#pod-distribution-type)
+                * 4.48.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontype)
+            * 4.48.5.3 [Pod Distribution Scope](#pod-distribution-scope)
+                * 4.48.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionscope)
+            * 4.48.5.4 [Pod Distribution Number](#pod-distribution-number)
+                * 4.48.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionnumber)
+            * 4.48.5.5 [Pod Distribution Topology Key](#pod-distribution-topology-key)
+                * 4.48.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontopologykey)
+        * 4.48.6 [Pod Spec](#pod-spec)
+            * 4.48.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesspec)
+        * 4.48.7 [Pod Metadata](#pod-metadata)
+            * 4.48.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesmetadata)
+    * 4.49 [Volume Claim Templates](#volume-claim-templates)
+        * 4.49.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplates)
+        * 4.49.2 [Volume Claim Name](#volume-claim-name)
+            * 4.49.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesname)
+        * 4.49.3 [Volume Claim Reclaim Policy](#volume-claim-reclaim-policy)
+            * 4.49.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesreclaimpolicy)
+        * 4.49.4 [Volume Claim Metadata](#volume-claim-metadata)
+            * 4.49.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesmetadata)
+        * 4.49.5 [Volume Claim Spec](#volume-claim-spec)
+            * 4.49.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesspec)
+    * 4.50 [Service Templates](#service-templates)
+        * 4.50.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplates)
+        * 4.50.2 [Service Name](#service-name)
+            * 4.50.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesname)
+        * 4.50.3 [Service Generate Name](#service-generate-name)
+            * 4.50.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesgeneratename)
+        * 4.50.4 [Service Generate Metadata](#service-generate-metadata)
+            * 4.50.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesmetadata)
+        * 4.50.5 [Service Spec](#service-spec)
+            * 4.50.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesspec)
+    * 4.51 [Use Templates](#use-templates)
+            * 4.51.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplates)
+        * 4.51.6 [Use Template Name](#use-template-name)
+            * 4.51.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesname)
+        * 4.51.7 [Use Template Namespace](#use-template-namespace)
+            * 4.51.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesnamespace)
+        * 4.51.8 [Use Template Use Type](#use-template-use-type)
+            * 4.51.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesusetype)
+    * 4.52 [ClickHouse Operator Configuration](#clickhouse-operator-configuration)
+        * 4.52.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec](#rqsrs-026clickhouseoperatorconfigurationspec)
+        * 4.52.2 [Watched Namespaces](#watched-namespaces)
+            * 4.52.2.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces](#rqsrs-026clickhouseoperatorconfigurationspecwatchnamespaces)
+        * 4.52.3 [ClickHouse Common Configs Path](#clickhouse-common-configs-path)
+            * 4.52.3.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecommonconfigspath)
+        * 4.52.4 [ClickHouse Host Configs Path](#clickhouse-host-configs-path)
+            * 4.52.4.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousehostconfigspath)
+        * 4.52.5 [ClickHouse Users Configs Path](#clickhouse-users-configs-path)
+            * 4.52.5.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseusersconfigspath)
+        * 4.52.6 [Templates Path](#templates-path)
+            * 4.52.6.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath](#rqsrs-026clickhouseoperatorconfigurationspectemplatespath)
+        * 4.52.7 [StatefulSet Update Timeout](#statefulset-update-timeout)
+            * 4.52.7.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatetimeout)
+        * 4.52.8 [StatefulSet Update Poll Period](#statefulset-update-poll-period)
+            * 4.52.8.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatepollperiod)
+        * 4.52.9 [StatefulSet Create Failure Action](#statefulset-create-failure-action)
+            * 4.52.9.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetcreatefailureaction)
+        * 4.52.10 [StatefulSet Update Failure Action](#statefulset-update-failure-action)
+            * 4.52.10.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatefailureaction)
+        * 4.52.11 [ClickHouse Config User Default Profile](#clickhouse-config-user-default-profile)
+            * 4.52.11.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultprofile)
+        * 4.52.12 [ClickHouse Config User Default Quota](#clickhouse-config-user-default-quota)
+            * 4.52.12.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultquota)
+        * 4.52.13 [ClickHouse Config User Default Networks IP](#clickhouse-config-user-default-networks-ip)
+            * 4.52.13.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultnetworksip)
+        * 4.52.14 [ClickHouse Config User Default Password](#clickhouse-config-user-default-password)
+            * 4.52.14.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultpassword)
+        * 4.52.15 [ClickHouse Config Networks Host Regexp Template](#clickhouse-config-networks-host-regexp-template)
+            * 4.52.15.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfignetworkshostregexptemplate)
+        * 4.52.16 [ClickHouse Credentials Secret Namespace](#clickhouse-credentials-secret-namespace)
+            * 4.52.16.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretnamespace)
+        * 4.52.17 [ClickHouse Credentials Secret Name](#clickhouse-credentials-secret-name)
+            * 4.52.17.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretname)
+        * 4.52.18 [ClickHouse Port](#clickhouse-port)
+            * 4.52.18.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseport)
+        * 4.52.19 [Log To `stderr`](#log-to-stderr)
+            * 4.52.19.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr](#rqsrs-026clickhouseoperatorconfigurationspeclogtostderr)
+        * 4.52.20 [Log To `stderr` And Files](#log-to-stderr-and-files)
+            * 4.52.20.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr](#rqsrs-026clickhouseoperatorconfigurationspecalsologtostderr)
+        * 4.52.21 [Verbosity Level](#verbosity-level)
+            * 4.52.21.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel](#rqsrs-026clickhouseoperatorconfigurationspecverbositylevel)
+        * 4.52.22 [Threshold For `stderr`](#threshold-for-stderr)
+            * 4.52.22.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold](#rqsrs-026clickhouseoperatorconfigurationspecstderrthreshold)
+        * 4.52.23 [V Module](#v-module)
+            * 4.52.23.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule](#rqsrs-026clickhouseoperatorconfigurationspecvmodule)
+        * 4.52.24 [Logging Backtrace](#logging-backtrace)
+            * 4.52.24.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace](#rqsrs-026clickhouseoperatorconfigurationspeclogbacktrace)
+        * 4.52.25 [Number Of Threads For Reconciliation Cycle](#number-of-threads-for-reconciliation-cycle)
+            * 4.52.25.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber](#rqsrs-026clickhouseoperatorconfigurationspecreconcilethreadsnumber)
+        * 4.52.26 [Wait Exclude For Reconciliation Cycle](#wait-exclude-for-reconciliation-cycle)
+            * 4.52.26.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitexclude)
+            * 4.52.26.2 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitqueries)
+        * 4.52.27 [Wait Include For Reconciliation Cycle](#wait-include-for-reconciliation-cycle)
+            * 4.52.27.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitinclude)
+        * 4.52.28 [Excluding From Propagation Labels](#excluding-from-propagation-labels)
+            * 4.52.28.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels](#rqsrs-026clickhouseoperatorconfigurationspecexcludefrompropagationlabels)
+        * 4.52.29 [Appending Scope Labels](#appending-scope-labels)
+            * 4.52.29.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels](#rqsrs-026clickhouseoperatorconfigurationspecappendscopelabels)
+    * 4.53 [Stateful Sets](#stateful-sets)
+        * 4.53.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets](#rqsrs-026clickhouseoperatorstatefulsets)
+        * 4.53.2 [Sticky Identity](#sticky-identity)
+            * 4.53.2.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity](#rqsrs-026clickhouseoperatorstatefulsetspodsstickyidentity)
+        * 4.53.3 [Pods Created From The Same Spec](#pods-created-from-the-same-spec)
+            * 4.53.3.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec](#rqsrs-026clickhouseoperatorstatefulsetspodscreatedfromthesamespec)
+    * 4.54 [Error Handling](#error-handling)
+        * 4.54.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling](#rqsrs-026clickhouseoperatorerrorhandling)
+        * 4.54.2 [Health Monitoring](#health-monitoring)
+            * 4.54.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring](#rqsrs-026clickhouseoperatorerrorhandlinghealthmonitoring)
+        * 4.54.3 [Polling For Ready](#polling-for-ready)
+            * 4.54.3.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady](#rqsrs-026clickhouseoperatorerrorhandlingpollingforready)
+        * 4.54.4 [Move On Ready](#move-on-ready)
+            * 4.54.4.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady](#rqsrs-026clickhouseoperatorerrorhandlingmoveonready)
+        * 4.54.5 [Create Failure](#create-failure)
+            * 4.54.5.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create](#rqsrs-026clickhouseoperatorerrorhandlingcreate)
+        * 4.54.6 [Update Failure](#update-failure)
+            * 4.54.6.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update](#rqsrs-026clickhouseoperatorerrorhandlingupdate)
+        * 4.54.7 [Reverting Back](#reverting-back)
+            * 4.54.7.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackcreate)
+            * 4.54.7.2 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackupdate)
+        * 4.54.8 [Successful Update Before Failed](#successful-update-before-failed)
+                * 4.54.8.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing](#rqsrs-026clickhouseoperatorerrorhandlingsuccessfulupdatebeforefaileddonothing)
 
 ## Revision History
 
@@ -8816,7 +7954,7 @@ version: 1.0
 [ClickHouse Operator] SHALL support being downgraded to previous version.
 
 
-#### Restaring Operator
+#### Restarting Operator
 
 ##### RQ.SRS-026.ClickHouseOperator.Managing.RestartingOperator
 version: 1.0
@@ -9076,7 +8214,7 @@ of a specific host such as hostname, ports etc. as well as to define host networ
 ##### RQ.SRS-026.ClickHouseOperator.VolumeClaimTamplates
 version: 1.0
 
-[ClickHouse Operator] SHALL volume claim tamplates of the following types
+[ClickHouse Operator] SHALL volume claim templates of the following types
 
 * log volume claim using `logVolumeClaimTemplate`
 * data volume claim using `dataVolumeClaimTemplate`
@@ -9549,9 +8687,9 @@ and SHALL apply them immediately.
 #### RQ.SRS-026.ClickHouseOperator.ClickHouse.ConfigMaps
 version: 1.0
 
-[ClickHouse Operator] SHALL create and manage the following [ConfigMap]s
+[ClickHouse Operator] SHALL create and manage the following [ConfigMap]'s
 which SHALL be responsible for [ClickHouse] server configuration and
-mounted to corresponding configuration folders of each [ClickHouse] pods:
+mounted to corresponding configuration folders of each [ClickHouse] pod's:
 
 * `etc-clickhouse-operator-confd-files`
 * `etc-clickhouse-operator-configd-files`
@@ -9801,7 +8939,7 @@ steps:
 version: 1.0
 
 [ClickHouse Operator] SHALL support reconciling current and desired state of [CHI]
-using reconcicling cycle based on the custom resource specification
+using reconciling cycle based on the custom resource specification
 that result in either successful or failed [CHI] state.
 
 #### Applying ConfigMaps Before StatefulSets
@@ -10103,7 +9241,9 @@ version: 1.0
 of [string] type that SHALL specify template name from `.spec.templates.volumeClaimTemplates`
 that SHALL allow customization of each [PVC] which will mount for clickhouse log directory
 in each [Pod] during render and reconcile every `StatefulSet.spec` resource described
-in `.spec.configuration.clusters`.
+in `.spec.configuration.clusters`. If `.defaults.templates.logVolumeClaimTemplate` is 
+specified, and no container named `clickhouse-log` specified in [Pod], [ClickHouse Operator] SHALL 
+create new container for logs with name `clickhouse-log` and image `registry.access.redhat.com/ubi8/ubi-minimal:latest`.
 
 For example,
 
@@ -10257,7 +9397,7 @@ Each item of the array SHALL specify the following properties:
 For example,
 
 ```yaml
-spec
+spec:
   configuration:
     zookeeper:
       nodes:
@@ -10817,6 +9957,7 @@ spec:
           shards:
             - name: custom-shard-name
               internalReplication: 1
+```
 
 ##### Shard Settings
 
@@ -11226,7 +10367,7 @@ spec:
         layout:
           replicas:
             - name: replica0
-                settings:
+              settings: 
 ```
 
 ##### Replica Files
@@ -12615,7 +11756,12 @@ The default SHALL be `10`.
 ##### RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude
 version: 1.0
 
-[ClickHouse Operator] SHALL support `.spec.reconcileWaitExclude` [string] type property.
+[ClickHouse Operator] SHALL support `.spec.reconcile.wait.exclude` [string] type property.
+
+##### RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries
+version: 1.0
+
+[ClickHouse Operator] SHALL support `.spec.reconcileWaitQueries` [string] type property.
 
 #### Wait Include For Reconciliation Cycle
 
@@ -12807,5 +11953,5 @@ updated on the same run before failed [StatefulSet] met.
 [Revision history]: https://gitlab.com/altinity-qa/documents/qa-srs026-clickhouse-operator/commits/main/QA_SRS026_ClickHouse_Operator.md
 [Git]: https://git-scm.com/
 [GitLab]: https://gitlab.com
-""",
+'''
 )

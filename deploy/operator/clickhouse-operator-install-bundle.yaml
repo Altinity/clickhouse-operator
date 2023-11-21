@@ -4,13 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
+# OPERATOR_VERSION=0.23.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -148,11 +149,13 @@ spec:
                 taskIDsStarted:
                   type: array
                   description: "Started task ids"
+                  nullable: true
                   items:
                     type: string
                 taskIDsCompleted:
                   type: array
                   description: "Completed task ids"
+                  nullable: true
                   items:
                     type: string
                 action:
@@ -161,6 +164,7 @@ spec:
                 actions:
                   type: array
                   description: "Actions"
+                  nullable: true
                   items:
                     type: string
                 error:
@@ -169,6 +173,7 @@ spec:
                 errors:
                   type: array
                   description: "Errors"
+                  nullable: true
                   items:
                     type: string
                 hostsUpdated:
@@ -194,16 +199,19 @@ spec:
                 pods:
                   type: array
                   description: "Pods"
+                  nullable: true
                   items:
                     type: string
                 pod-ips:
                   type: array
                   description: "Pod IPs"
+                  nullable: true
                   items:
                     type: string
                 fqdns:
                   type: array
                   description: "Pods FQDNs"
+                  nullable: true
                   items:
                     type: string
                 endpoint:
@@ -224,8 +232,17 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
                   items:
                     type: string
+                usedTemplates:
+                  type: array
+                  description: "List of templates used to build this CHI"
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -236,15 +253,16 @@ spec:
                 taskID:
                   type: string
                   description: |
-                    Allows to define custom taskID for named update operation and watch status of this update execution in .status.taskIDs field.
-                    By default every update of chi manifest will generate random taskID
+                    Allows to define custom taskID for CHI update and watch status of this update execution.
+                    Displayed in all .status.taskID* fields.
+                    By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
                   type: string
                   description: |
-                    Allow stop all ClickHouse clusters described in current chi.
-                    Stop mechanism works as follows:
-                     - When `stop` is `1` then setup `Replicas: 0` in each related to current `chi` StatefulSet resource, all `Pods` and `Service` resources will desctroy, but PVCs still live
-                     - When `stop` is `0` then `Pods` will created again and will attach retained PVCs and `Service` also will created again
+                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Works as the following:
+                     - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
+                     - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
@@ -272,55 +290,87 @@ spec:
                     - "enabled"
                 restart:
                   type: string
-                  description: "This is a 'soft restart' button. When set to 'RollingUpdate' operator will restart ClickHouse pods in a graceful way. Remove it after the use in order to avoid unneeded restarts"
+                  description: |
+                    In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
+                    This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
                   enum:
                     - ""
                     - "RollingUpdate"
                 troubleshoot:
                   <<: *TypeStringBool
-                  description: "allows troubleshoot Pods during CrashLoopBack state, when you apply wrong configuration, `clickhouse-server` wouldn't startup"
+                  description: |
+                    Allows to troubleshoot Pods during CrashLoopBack state.
+                    This may happen when wrong configuration applied, in this case `clickhouse-server` wouldn't start.
+                    Command within ClickHouse container is modified with `sleep` in order to avoid quick restarts
+                    and give time to troubleshoot via CLI.
+                    Liveness and Readiness probes are disabled as well.
                 namespaceDomainPattern:
                   type: string
-                  description: "custom domain suffix which will add to end of `Service` or `Pod` name, use it when you use custom cluster domain in your Kubernetes cluster"
+                  description: |
+                    Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+                    Typical use scenario - custom cluster domain in Kubernetes cluster
+                    Example: %s.svc.my.test
                 templating:
                   type: object
                   # nullable: true
-                  description: "optional, define policy for auto applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                  description: |
+                    Optional, applicable inside ClickHouseInstallationTemplate only.
+                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
-                      description: "when defined as `auto` inside ClickhouseInstallationTemplate, it will auto add into all ClickHouseInstallation, manual value is default"
+                      description: |
+                        When defined as `auto` inside ClickhouseInstallationTemplate, this ClickhouseInstallationTemplate
+                        will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
+                        Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
                         - "auto"
                         - "manual"
+                    chiSelector:
+                      type: object
+                      description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
+                      # nullable: true
+                      x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
-                  description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
                       type: string
-                      description: DEPRECATED
+                      description: |
+                        DISCUSSED TO BE DEPRECATED
+                        Syntax sugar
+                        Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+                        Possible values:
+                         - wait - should wait to exclude host, complete queries and include host back into the cluster
+                         - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                      enum:
+                        - "wait"
+                        - "nowait"
                     configMapPropagationTimeout:
                       type: integer
                       description: |
-                        timeout in seconds when `clickhouse-operator` will wait when applied `ConfigMap` during reconcile `ClickhouseInstallation` pods will updated from cache
-                        see details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
+                        Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
+                        More details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
                       minimum: 0
                       maximum: 3600
                     cleanup:
                       type: object
-                      description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
+                      description: "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle"
                       # nullable: true
                       properties:
                         unknownObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
+                          description: |
+                            Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+                            but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+                            Default behavior is `Delete`"
                           # nullable: true
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "behavior policy for unknown StatefulSet, Delete by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
                                 - "Retain"
@@ -328,30 +378,32 @@ spec:
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown PVC, Delete by default"
+                              description: "Behavior policy for unknown PVC, `Delete` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown ConfigMap, Delete by default"
+                              description: "Behavior policy for unknown ConfigMap, `Delete` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown Service, Delete by default"
+                              description: "Behavior policy for unknown Service, `Delete` by default"
                         reconcileFailedObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
+                          description: |
+                            Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+                            Default behavior is `Retain`"
                           # nullable: true
                           properties:
                             statefulSet:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed StatefulSet reconciling, Retain by default"
+                              description: "Behavior policy for failed StatefulSet, `Retain` by default"
                             pvc:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed PVC reconciling, Retain by default"
+                              description: "Behavior policy for failed PVC, `Retain` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed ConfigMap reconciling, Retain by default"
+                              description: "Behavior policy for failed ConfigMap, `Retain` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed Service reconciling, Retain by default"
+                              description: "Behavior policy for failed Service, `Retain` by default"
                 defaults:
                   type: object
                   description: |
@@ -1164,13 +1216,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
+# OPERATOR_VERSION=0.23.0
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1308,11 +1361,13 @@ spec:
                 taskIDsStarted:
                   type: array
                   description: "Started task ids"
+                  nullable: true
                   items:
                     type: string
                 taskIDsCompleted:
                   type: array
                   description: "Completed task ids"
+                  nullable: true
                   items:
                     type: string
                 action:
@@ -1321,6 +1376,7 @@ spec:
                 actions:
                   type: array
                   description: "Actions"
+                  nullable: true
                   items:
                     type: string
                 error:
@@ -1329,6 +1385,7 @@ spec:
                 errors:
                   type: array
                   description: "Errors"
+                  nullable: true
                   items:
                     type: string
                 hostsUpdated:
@@ -1354,16 +1411,19 @@ spec:
                 pods:
                   type: array
                   description: "Pods"
+                  nullable: true
                   items:
                     type: string
                 pod-ips:
                   type: array
                   description: "Pod IPs"
+                  nullable: true
                   items:
                     type: string
                 fqdns:
                   type: array
                   description: "Pods FQDNs"
+                  nullable: true
                   items:
                     type: string
                 endpoint:
@@ -1384,8 +1444,17 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
                   items:
                     type: string
+                usedTemplates:
+                  type: array
+                  description: "List of templates used to build this CHI"
+                  nullable: true
+                  x-kubernetes-preserve-unknown-fields: true
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
             spec:
               type: object
               # x-kubernetes-preserve-unknown-fields: true
@@ -1396,15 +1465,16 @@ spec:
                 taskID:
                   type: string
                   description: |
-                    Allows to define custom taskID for named update operation and watch status of this update execution in .status.taskIDs field.
-                    By default every update of chi manifest will generate random taskID
+                    Allows to define custom taskID for CHI update and watch status of this update execution.
+                    Displayed in all .status.taskID* fields.
+                    By default (if not filled) every update of CHI manifest will generate random taskID
                 stop: &TypeStringBool
                   type: string
                   description: |
-                    Allow stop all ClickHouse clusters described in current chi.
-                    Stop mechanism works as follows:
-                     - When `stop` is `1` then setup `Replicas: 0` in each related to current `chi` StatefulSet resource, all `Pods` and `Service` resources will desctroy, but PVCs still live
-                     - When `stop` is `0` then `Pods` will created again and will attach retained PVCs and `Service` also will created again
+                    Allows to stop all ClickHouse clusters defined in a CHI.
+                    Works as the following:
+                     - When `stop` is `1` operator sets `Replicas: 0` in each StatefulSet. Thie leads to having all `Pods` and `Service` deleted. All PVCs are kept intact.
+                     - When `stop` is `0` operator sets `Replicas: 1` and `Pod`s and `Service`s will created again and all retained PVCs will be attached to `Pod`s.
                   enum:
                     # List StringBoolXXX constants from model
                     - ""
@@ -1432,55 +1502,87 @@ spec:
                     - "enabled"
                 restart:
                   type: string
-                  description: "This is a 'soft restart' button. When set to 'RollingUpdate' operator will restart ClickHouse pods in a graceful way. Remove it after the use in order to avoid unneeded restarts"
+                  description: |
+                    In case 'RollingUpdate' specified, the operator will always restart ClickHouse pods during reconcile.
+                    This options is used in rare cases when force restart is required and is typically removed after the use in order to avoid unneeded restarts.
                   enum:
                     - ""
                     - "RollingUpdate"
                 troubleshoot:
                   <<: *TypeStringBool
-                  description: "allows troubleshoot Pods during CrashLoopBack state, when you apply wrong configuration, `clickhouse-server` wouldn't startup"
+                  description: |
+                    Allows to troubleshoot Pods during CrashLoopBack state.
+                    This may happen when wrong configuration applied, in this case `clickhouse-server` wouldn't start.
+                    Command within ClickHouse container is modified with `sleep` in order to avoid quick restarts
+                    and give time to troubleshoot via CLI.
+                    Liveness and Readiness probes are disabled as well.
                 namespaceDomainPattern:
                   type: string
-                  description: "custom domain suffix which will add to end of `Service` or `Pod` name, use it when you use custom cluster domain in your Kubernetes cluster"
+                  description: |
+                    Custom domain pattern which will be used for DNS names of `Service` or `Pod`.
+                    Typical use scenario - custom cluster domain in Kubernetes cluster
+                    Example: %s.svc.my.test
                 templating:
                   type: object
                   # nullable: true
-                  description: "optional, define policy for auto applying ClickHouseInstallationTemplate inside ClickHouseInstallation"
+                  description: |
+                    Optional, applicable inside ClickHouseInstallationTemplate only.
+                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
-                      description: "when defined as `auto` inside ClickhouseInstallationTemplate, it will auto add into all ClickHouseInstallation, manual value is default"
+                      description: |
+                        When defined as `auto` inside ClickhouseInstallationTemplate, this ClickhouseInstallationTemplate
+                        will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
+                        Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
                         - "auto"
                         - "manual"
+                    chiSelector:
+                      type: object
+                      description: "Optional, defines selector for ClickHouseInstallation(s) to be templated with ClickhouseInstallationTemplate"
+                      # nullable: true
+                      x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
-                  description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
                       type: string
-                      description: DEPRECATED
+                      description: |
+                        DISCUSSED TO BE DEPRECATED
+                        Syntax sugar
+                        Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+                        Possible values:
+                         - wait - should wait to exclude host, complete queries and include host back into the cluster
+                         - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                      enum:
+                        - "wait"
+                        - "nowait"
                     configMapPropagationTimeout:
                       type: integer
                       description: |
-                        timeout in seconds when `clickhouse-operator` will wait when applied `ConfigMap` during reconcile `ClickhouseInstallation` pods will updated from cache
-                        see details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
+                        Timeout in seconds for `clickhouse-operator` to wait for modified `ConfigMap` to propagate into the `Pod`
+                        More details: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
                       minimum: 0
                       maximum: 3600
                     cleanup:
                       type: object
-                      description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
+                      description: "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle"
                       # nullable: true
                       properties:
                         unknownObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
+                          description: |
+                            Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+                            but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+                            Default behavior is `Delete`"
                           # nullable: true
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "behavior policy for unknown StatefulSet, Delete by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
                                 - "Retain"
@@ -1488,30 +1590,32 @@ spec:
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown PVC, Delete by default"
+                              description: "Behavior policy for unknown PVC, `Delete` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown ConfigMap, Delete by default"
+                              description: "Behavior policy for unknown ConfigMap, `Delete` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown Service, Delete by default"
+                              description: "Behavior policy for unknown Service, `Delete` by default"
                         reconcileFailedObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
+                          description: |
+                            Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+                            Default behavior is `Retain`"
                           # nullable: true
                           properties:
                             statefulSet:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed StatefulSet reconciling, Retain by default"
+                              description: "Behavior policy for failed StatefulSet, `Retain` by default"
                             pvc:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed PVC reconciling, Retain by default"
+                              description: "Behavior policy for failed PVC, `Retain` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed ConfigMap reconciling, Retain by default"
+                              description: "Behavior policy for failed ConfigMap, `Retain` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed Service reconciling, Retain by default"
+                              description: "Behavior policy for failed Service, `Retain` by default"
                 defaults:
                   type: object
                   description: |
@@ -2327,7 +2431,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2484,25 +2588,30 @@ spec:
                               type: integer
                               minimum: 1
                               maximum: 10
-                              description: "Connect timeout. In seconds."
+                              description: "Timout to setup connection from the operator to ClickHouse instances. In seconds."
                             query:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Query timeout. In seconds."
+                              description: "Timout to perform SQL query from the operator to ClickHouse instances. In seconds."
                     metrics:
                       type: object
                       description: "parameters which use for connect to fetch metrics from clickhouse by clickhouse-operator"
                       properties:
                         timeouts:
                           type: object
-                          description: "Timeouts used to limit connection and queries from the operator to ClickHouse instances, In seconds"
+                          description: |
+                            Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
+                            Specified in seconds.
                           properties:
                             collect:
                               type: integer
                               minimum: 1
                               maximum: 600
-                              description: "Collect timeout. In seconds."
+                              description: |
+                                Timeout used to limit metrics collection request. In seconds.
+                                Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
+                                All collected metrics are returned.
                 template:
                   type: object
                   description: "Parameters which are used if you want to generate ClickHouseInstallationTemplate custom resources from files which are stored inside clickhouse-operator deployment"
@@ -2510,6 +2619,16 @@ spec:
                     chi:
                       type: object
                       properties:
+                        policy:
+                          type: string
+                          description: |
+                            CHI template updates handling policy
+                            Possible policy values:
+                              - ReadOnStart. Accept CHIT updates on the operators start only.
+                              - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+                          enum:
+                            - "ReadOnStart"
+                            - "ApplyOnNextReconcile"
                         path:
                           type: string
                           description: "Path to folder where ClickHouseInstallationTemplate .yaml manifests are located."
@@ -2572,14 +2691,20 @@ spec:
                                 3. ignore - ignore error, pretend nothing happened and move on to the next StatefulSet.
                     host:
                       type: object
-                      description: "allow define how to wait host include to system.cluster behavior during scale up and scale down cluster operations"
+                      description: |
+                        Whether the operator during reconcile procedure should wait for a ClickHouse host:
+                          - to be excluded from a ClickHouse cluster
+                          - to complete all running queries
+                          - to be included into a ClickHouse cluster
+                        respectfully before moving forward
+
                       properties:
                         wait:
                           type: object
                           properties:
                             exclude:  &TypeStringBool
                               type: string
-                              description: "wait when a pod will be removed from the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be excluded from a ClickHouse cluster"
                               enum:
                                 # List StringBoolXXX constants from model
                                 - ""
@@ -2605,9 +2730,12 @@ spec:
                                 - "disabled"
                                 - "Enabled"
                                 - "enabled"
+                            queries:
+                              <<: *TypeStringBool
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to complete all running queries"
                             include:
                               <<: *TypeStringBool
-                              description: "wait when a pod will be added to the cluster"
+                              description: "Whether the operator during reconcile procedure should wait for a ClickHouse host to be included into a ClickHouse cluster"
                 annotation:
                   type: object
                   description: "defines which metadata.annotations items will include or exclude during render StatefulSet, Pod, PVC resources"
@@ -2706,6 +2834,153 @@ spec:
 ---
 # Template Parameters:
 #
+# OPERATOR_VERSION=0.23.0
+#
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
+  labels:
+    clickhouse-keeper.altinity.com/chop: 0.23.0
+spec:
+  group: clickhouse-keeper.altinity.com
+  scope: Namespaced
+  names:
+    kind: ClickHouseKeeperInstallation
+    singular: clickhousekeeperinstallation
+    plural: clickhousekeeperinstallations
+    shortNames:
+      - chk
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - name: status
+          type: string
+          description: CHK status
+          jsonPath: .status.status
+        - name: replicas
+          type: integer
+          description: Replica count
+          priority: 1 # show in wide view
+          jsonPath: .status.replicas
+        - name: age
+          type: date
+          description: Age of the resource
+          # Displayed in all priorities
+          jsonPath: .metadata.creationTimestamp
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          description: "define a set of Kubernetes resources (StatefulSet, PVC, Service, ConfigMap) which describe behavior one ClickHouse Keeper cluster"
+          properties:
+            apiVersion:
+              type: string
+              description: |
+                APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            kind:
+              type: string
+              description: |
+                Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            metadata:
+              type: object
+            status:
+              type: object
+              description: |
+                Current ClickHouseKeeperInstallation status, contains many fields like overall status, desired replicas and ready replica list with their endpoints
+              properties:
+                status:
+                  type: string
+                  description: "Status"
+                replicas:
+                  type: integer
+                  format: int32
+                  description: Replicas is the number of number of desired replicas in the cluster
+                readyReplicas:
+                  type: array
+                  description: ReadyReplicas is the array of endpoints of those ready replicas in the cluster
+                  items:
+                    type: object
+                    properties:
+                      host:
+                        type: string
+                        description: dns name or ip address for Keeper node
+                      port:
+                        type: integer
+                        minimum: 0
+                        maximum: 65535
+                        description: TCP port which used to connect to Keeper node
+                      secure:
+                        type: string
+                        description: if a secure connection to Keeper is required
+            spec:
+              type: object
+              description: KeeperSpec defines the desired state of a Keeper cluster
+              properties:
+                type:
+                  type: string
+                  description: This is used by chi reconciliation.
+                  enum:
+                    - "Container"
+                    - "Embedded"
+                replicas:
+                  type: integer
+                  format: int32
+                  description: |
+                    Replicas is the expected size of the keeper cluster.
+                    The valid range of size is from 1 to 7.
+                  minimum: 1
+                  maximum: 7
+                settings:
+                  type: object
+                  description: "allows configure multiple aspects and behavior for `clickhouse-keeper` instance"
+                  x-kubernetes-preserve-unknown-fields: true
+                podTemplate:
+                  type: object
+                  description: |
+                    podTemplate will use during render `Pod` inside `StatefulSet.spec` and allows define rendered `Pod.spec`, pod scheduling distribution and pod zone
+                  properties:
+                    metadata:
+                      type: object
+                      description: |
+                        allows passing standard object's metadata from template to Pod
+                        More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                      x-kubernetes-preserve-unknown-fields: true
+                    spec:
+                      # TODO specify PodSpec
+                      type: object
+                      description: "allows defining whole Pod.spec inside StatefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
+                      x-kubernetes-preserve-unknown-fields: true
+                volumeClaimTemplates:
+                  type: array
+                  description: "allows defining template for rendering `PVC` kubernetes resource, which would use inside `Pod` for mounting clickhouse `data`, clickhouse `logs` or something else"
+                  items:
+                    type: object
+                    properties:
+                      metadata:
+                        type: object
+                        description: |
+                          allows to pass standard object's metadata from template to PVC
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                        x-kubernetes-preserve-unknown-fields: true
+                      spec:
+                        type: object
+                        description: |
+                          allows define all aspects of `PVC` resource
+                          More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims
+                        x-kubernetes-preserve-unknown-fields: true
+---
+# Template Parameters:
+#
 # COMMENT=
 # NAMESPACE=kube-system
 # NAME=clickhouse-operator
@@ -2717,7 +2992,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
 ---
 # Template Parameters:
 #
@@ -2734,7 +3009,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
 rules:
 - apiGroups:
     - ""
@@ -2769,6 +3044,15 @@ rules:
     - ""
   resources:
     - persistentvolumes
+  verbs:
+    - get
+    - list
+    - patch
+    - update
+    - watch
+- apiGroups:
+    - ""
+  resources:
     - pods
   verbs:
     - get
@@ -2776,6 +3060,7 @@ rules:
     - patch
     - update
     - watch
+    - delete
 - apiGroups:
     - apps
   resources:
@@ -2860,6 +3145,33 @@ rules:
     - create
     - delete
 - apiGroups:
+    - clickhouse-keeper.altinity.com
+  resources:
+    - clickhousekeeperinstallations
+  verbs:
+    - get
+    - patch
+    - update
+    - delete
+    - list
+    - watch
+- apiGroups:
+    - clickhouse-keeper.altinity.com
+  resources:
+    - clickhousekeeperinstallations/finalizers
+  verbs:
+    - update
+- apiGroups:
+    - clickhouse-keeper.altinity.com
+  resources:
+    - clickhousekeeperinstallations/status
+  verbs:
+    - get
+    - update
+    - patch
+    - create
+    - delete
+- apiGroups:
     - ""
   resources:
     - secrets
@@ -2882,7 +3194,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -2904,7 +3216,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -2924,7 +3236,7 @@ data:
     
     ################################################
     ##
-    ## Watch Section
+    ## Watch section
     ##
     ################################################
     watch:
@@ -2939,7 +3251,7 @@ data:
       configuration:
         ################################################
         ##
-        ## Configuration Files Section
+        ## Configuration files section
         ##
         ################################################
         file:
@@ -2953,7 +3265,7 @@ data:
             user: users.d
         ################################################
         ##
-        ## Configuration Users Section
+        ## Configuration users section
         ##
         ################################################
         user:
@@ -2966,8 +3278,8 @@ data:
           # 2. CHOP user account DOES NOT use:
           #    - profile setting. It uses predefined profile called 'clickhouse_operator'
           #    - quota setting. It uses empty quota name.
-          #    - network IPs setting. Operator specifies networks/ip to match operators' pod IP only.
-          #    - password setting. Password for CHOP account is used from 'clickhouse.access.password' section
+          #    - networks IP setting. Operator specifies 'networks/ip' user setting to match operators' pod IP only.
+          #    - password setting. Password for CHOP account is used from 'clickhouse.access.*' section
           default:
             # Default values for ClickHouse user account(s) created by the operator
             #   1. user/profile - string
@@ -2983,7 +3295,7 @@ data:
             password: "default"
         ################################################
         ##
-        ## Configuration Network Section
+        ## Configuration network section
         ##
         ################################################
         network:
@@ -2992,12 +3304,17 @@ data:
     
       ################################################
       ##
-      ## Configuration Restart Policy Section
+      ## Configuration restart policy section
       ## Configuration restart policy describes what configuration changes require ClickHouse restart
       ##
       ################################################
       configurationRestartPolicy:
         rules:
+          # IMPORTANT!
+          # Special version of "*" - default version - has to satisfy all ClickHouse versions.
+          # Default version will also be used in case ClickHouse version is unknown.
+          # ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
+          # ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
           - version: "*"
             rules:
               - settings/*: "yes"
@@ -3061,48 +3378,82 @@ data:
         # Timeouts used to limit connection and queries from the operator to ClickHouse instances
         # Specified in seconds.
         timeouts:
-          connect: 2
-          query: 5
+          # Timout to setup connection from the operator to ClickHouse instances. In seconds.
+          connect: 1
+          # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
+          query: 4
+    
+      #################################################
+      ##
+      ## Metrics collection
+      ##
+      ################################################
     
       metrics:
+        # Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
+        # Specified in seconds.
         timeouts:
+          # Timeout used to limit metrics collection request. In seconds.
+          # Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
+          # All collected metrics are returned.
           collect: 9
     
     ################################################
     ##
-    ## Templates Section
+    ## Template(s) management section
     ##
     ################################################
     template:
       chi:
-        # Path to the folder where ClickHouseInstallation .yaml manifests are located.
-        # Manifests are applied in sorted alpha-numeric order.
+        # CHI template updates handling policy
+        # Possible policy values:
+        #   - ReadOnStart. Accept CHIT updates on the operators start only.
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        policy: ApplyOnNextReconcile
+    
+        # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+        # Templates are added to the list of all templates and used when CHI is reconciled.
+        # Templates are applied in sorted alpha-numeric order.
         path: templates.d
     
     ################################################
     ##
-    ## Reconcile Section
+    ## Reconcile section
     ##
     ################################################
     reconcile:
+      # Reconcile runtime settings
       runtime:
         # Max number of concurrent CHI reconciles in progress
         reconcileCHIsThreadsNumber: 10
-        # Max number of concurrent shard reconciles in progress
-        reconcileShardsThreadsNumber: 1
-        # The maximum percentage of cluster shards that may be reconciled in parallel
+    
+        # The operator reconciles shards concurrently in each CHI with the following limitations:
+        #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
+        #      can not be greater than 'reconcileShardsThreadsNumber'.
+        #   2. Percentage of shards being reconciled (and thus having hosts down) in each CHI concurrently
+        #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
+        #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
+        # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
+    
+        # Max number of concurrent shard reconciles within one CHI in progress
+        reconcileShardsThreadsNumber: 5
+        # Max percentage of concurrent shard reconciles within one CHI in progress
         reconcileShardsMaxConcurrencyPercent: 50
     
+      # Reconcile StatefulSet scenario
       statefulSet:
+        # Create StatefulSet scenario
         create:
           # What to do in case created StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
           # Possible options:
-          # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-          #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+          # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+          #    do not try to fix or delete or update it, just abort reconcile cycle.
+          #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
           # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
-          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+          # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: ignore
     
+        # Update StatefulSet scenario
         update:
           # How many seconds to wait for created/updated StatefulSet to be 'Ready'
           timeout: 300
@@ -3110,27 +3461,30 @@ data:
           pollInterval: 5
           # What to do in case updated StatefulSet is not in 'Ready' after `reconcile.statefulSet.update.timeout` seconds
           # Possible options:
-          # 1. abort - abort the process, do not do anything, do not try to fix ror delete or update problematic StatefulSet,
-          #    just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
+          # 1. abort - abort the process, do nothing with the problematic StatefulSet, leave it as it is,
+          #    do not try to fix or delete or update it, just abort reconcile cycle.
+          #    Do not proceed to the next StatefulSet(s) and wait for an admin to assist.
           # 2. rollback - delete Pod and rollback StatefulSet to previous Generation.
           #    Pod would be recreated by StatefulSet based on rollback-ed StatefulSet configuration.
-          #    Then just abort reconcile cycle without processing next StatefulSet(s) and wait for an admin to assist.
-          # 3. ignore - ignore an error, pretend nothing happened and move on to the next StatefulSet.
+          #    Follow 'abort' path afterwards.
+          # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: abort
     
+      # Reconcile Host scenario
       host:
-        # Whether reconciler should wait for a host:
-        # - to be excluded from a cluster
-        # OR
-        # - to be included into a cluster
-        # respectfully before proceeding to the host reconciliation.
+        # Whether the operator during reconcile procedure should wait for a ClickHouse host:
+        #   - to be excluded from a ClickHouse cluster
+        #   - to complete all running queries
+        #   - to be included into a ClickHouse cluster
+        # respectfully before moving forward
         wait:
           exclude: true
+          queries: true
           include: false
     
     ################################################
     ##
-    ## Annotations management
+    ## Annotations management section
     ##
     ################################################
     annotation:
@@ -3145,7 +3499,7 @@ data:
     
     ################################################
     ##
-    ## Labels management
+    ## Labels management section
     ##
     ################################################
     label:
@@ -3174,7 +3528,7 @@ data:
     
     ################################################
     ##
-    ## StatefulSet management
+    ## StatefulSet management section
     ##
     ################################################
     statefulSet:
@@ -3182,7 +3536,7 @@ data:
     
     ################################################
     ##
-    ## Pod management
+    ## Pod management section
     ##
     ################################################
     pod:
@@ -3194,7 +3548,7 @@ data:
     
     ################################################
     ##
-    ## Log parameters
+    ## Log parameters section
     ##
     ################################################
     logger:
@@ -3218,7 +3572,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 data:
 ---
@@ -3234,7 +3588,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3333,7 +3687,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3433,7 +3787,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -3486,7 +3840,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.21.2
+#   OPERATOR_VERSION=0.23.0
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -3496,7 +3850,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -3507,9 +3861,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.21.2
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.23.0
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.21.2
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.23.0
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -3520,7 +3874,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3554,7 +3908,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.21.2
+          image: altinity/clickhouse-operator:0.23.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3617,9 +3971,12 @@ spec:
                 resourceFieldRef:
                   containerName: clickhouse-operator
                   resource: limits.memory
+          ports:
+            - containerPort: 9999
+              name: metrics
 
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.21.2
+          image: altinity/metrics-exporter:0.23.0
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3702,11 +4059,13 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.21.2
+    clickhouse.altinity.com/chop: 0.23.0
     app: clickhouse-operator
 spec:
   ports:
     - port: 8888
-      name: clickhouse-operator-metrics
+      name: clickhouse-metrics
+    - port: 9999
+      name: operator-metrics
   selector:
     app: clickhouse-operator

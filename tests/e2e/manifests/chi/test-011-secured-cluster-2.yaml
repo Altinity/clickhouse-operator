@@ -9,6 +9,7 @@ spec:
     users:
       # default user should be security to localhost and interhost connections
       # operator adds IP addresses of pods
+      # operator will not create host_regxp expression for that - disabled
       default/networks/host_regexp: "disabled"
       default/profile: default
       default/quota: default

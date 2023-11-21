@@ -20,18 +20,22 @@ const (
 	PortMayBeAssignedLaterOrLeftUnused = int32(0)
 )
 
+// PortUnassigned returns value for unassigned port
 func PortUnassigned() int32 {
 	return PortMayBeAssignedLaterOrLeftUnused
 }
 
+// IsPortAssigned checks whether port is assigned
 func IsPortAssigned(port int32) bool {
-	return port != PortMayBeAssignedLaterOrLeftUnused
+	return port != PortUnassigned()
 }
 
+// IsPortUnassigned checks whether port is unassigned
 func IsPortUnassigned(port int32) bool {
-	return port == PortMayBeAssignedLaterOrLeftUnused
+	return port == PortUnassigned()
 }
 
+// IsPortInvalid checks whether port is invalid
 func IsPortInvalid(port int32) bool {
 	return (port <= 0) || (port >= 65535)
 }

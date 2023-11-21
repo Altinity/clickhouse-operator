@@ -65,6 +65,19 @@ Copyright (c) 2019-2023, Altinity Inc and/or its affiliates. All rights reserved
 Altinity Kubernetes Operator for ClickHouse is licensed under the Apache License 2.0.
 
 See [LICENSE](./LICENSE) for more details.
+
+## Commercial Support
+
+Altinity is the primary maintainer of the operator. It is the basis of Altinity.Cloud and
+is also used in self-managed installations. Altinity offers a range of 
+services related to ClickHouse and analytic applications on Kubernetes. 
+
+- [Official website](https://altinity.com/) - Get a high level overview of Altinity and our offerings.
+- [Altinity.Cloud](https://altinity.com/cloud-database/) - Run ClickHouse in our cloud or yours.
+- [Altinity Support](https://altinity.com/support/) - Get Enterprise-class support for ClickHouse.
+- [Slack](https://altinitydbworkspace.slack.com/join/shared_invite/zt-1togw9b4g-N0ZOXQyEyPCBh_7IEHUjdw#/shared-invite/email) - Talk directly with ClickHouse users and Altinity devs.
+- [Contact us](https://hubs.la/Q020sH3Z0) - Contact Altinity with your questions or issues.
+- [Free consultation](https://hubs.la/Q020sHkv0) - Get a free consultation with a ClickHouse expert today.
  
 [chi_max_yaml]: ./docs/chi-examples/99-clickhouseinstallation-max.yaml
 [intro]: ./docs/introduction.md

@@ -1,6 +1,4 @@
-testflows==1.9.50
+testflows==2.1.5
 requests
-PyYAML<6
-docker-compose>=1.29.1
-docker>=5.0.0
+PyYAML
 setuptools

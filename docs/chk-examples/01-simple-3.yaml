@@ -1,0 +1,6 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: chk-simple-3
+spec:
+  replicas: 3

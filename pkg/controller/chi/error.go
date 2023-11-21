@@ -18,6 +18,7 @@ import (
 	"errors"
 )
 
+// ErrorCRUD specifies errors of the CRUD operations
 type ErrorCRUD error
 
 var (
@@ -25,4 +26,11 @@ var (
 	errCRUDIgnore         ErrorCRUD = errors.New("crud error - should ignore")
 	errCRUDRecreate       ErrorCRUD = errors.New("crud error - should recreate")
 	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
+)
+
+// ErrorPVC specifies errors of the PVC operations
+type ErrorPVC error
+
+var (
+	errLostPVCDeleted ErrorPVC = errors.New("pvc - lost pvc deleted")
 )
