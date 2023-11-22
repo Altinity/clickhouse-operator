@@ -259,8 +259,9 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *ReconcilePod) err
 		metricsPodAdd(ctx)
 		return nil
 	case reconcileUpdate:
-		w.a.V(1).M(cmd.new).F().Info("Update Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
-		metricsPodUpdate(ctx)
+		//ignore
+		//w.a.V(1).M(cmd.new).F().Info("Update Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
+		//metricsPodUpdate(ctx)
 		return nil
 	case reconcileDelete:
 		w.a.V(1).M(cmd.old).F().Info("Delete Pod. %s/%s", cmd.old.Namespace, cmd.old.Name)
