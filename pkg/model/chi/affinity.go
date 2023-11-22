@@ -23,8 +23,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// newAffinity creates new Affinity struct
-func newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
+// NewAffinity creates new Affinity struct
+func NewAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
 	// Pod node affinity scheduling rules.
 	nodeAffinity := newNodeAffinity(template)
 	// Pod affinity scheduling rules. Ex.: co-locate this pod in the same node, zone, etc
@@ -45,8 +45,8 @@ func newAffinity(template *chiV1.ChiPodTemplate) *v1.Affinity {
 	}
 }
 
-// mergeAffinity merges from src into dst and returns dst
-func mergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
+// MergeAffinity merges from src into dst and returns dst
+func MergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
 	if src == nil {
 		// Nothing to merge from
 		return dst

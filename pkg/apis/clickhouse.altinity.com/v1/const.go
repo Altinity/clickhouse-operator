@@ -25,13 +25,6 @@ const (
 	StatusTerminating = "Terminating"
 )
 
-// Possible kinds of CRDs
-const (
-	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
-	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
-	ClickHouseOperatorCRDResourceKind             = "ClickHouseOperator"
-)
-
 // used in type OperatorConfig struct
 const (
 	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile

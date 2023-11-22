@@ -15,11 +15,12 @@
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strings"
 	"sync"
 	"time"
+
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // MergeType specifies merge types type
@@ -36,20 +37,20 @@ const (
 
 // ClickHouseInstallation defines the Installation of a ClickHouse Database Cluster
 type ClickHouseInstallation struct {
-	metav1.TypeMeta   `json:",inline"            yaml:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec              ChiSpec    `json:"spec"               yaml:"spec"`
-	Status            *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
+	meta.TypeMeta   `json:",inline"            yaml:",inline"`
+	meta.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	Spec            ChiSpec    `json:"spec"               yaml:"spec"`
+	Status          *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
 	Attributes ComparableAttributes `json:"-" yaml:"-"`
 
-	statusMu sync.Mutex
+	statusCreatorMutex sync.Mutex
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable
 type ComparableAttributes struct {
-	ExchangeEnv  []corev1.EnvVar `json:"-" yaml:"-"`
-	SkipOwnerRef bool            `json:"-" yaml:"-"`
+	ExchangeEnv  []core.EnvVar `json:"-" yaml:"-"`
+	SkipOwnerRef bool          `json:"-" yaml:"-"`
 }
 
 // +genclient
@@ -65,10 +66,10 @@ type ClickHouseInstallationTemplate ClickHouseInstallation
 
 // ClickHouseOperatorConfiguration defines CHOp config
 type ClickHouseOperatorConfiguration struct {
-	metav1.TypeMeta   `json:",inline"               yaml:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"    yaml:"metadata,omitempty"`
-	Spec              OperatorConfig `json:"spec"   yaml:"spec"`
-	Status            string         `json:"status" yaml:"status"`
+	meta.TypeMeta   `json:",inline"               yaml:",inline"`
+	meta.ObjectMeta `json:"metadata,omitempty"    yaml:"metadata,omitempty"`
+	Spec            OperatorConfig `json:"spec"   yaml:"spec"`
+	Status          string         `json:"status" yaml:"status"`
 }
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
@@ -666,8 +667,8 @@ type ChiPodTemplate struct {
 	GenerateName    string               `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
 	Zone            ChiPodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
-	ObjectMeta      metav1.ObjectMeta    `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
-	Spec            corev1.PodSpec       `json:"spec,omitempty"            yaml:"spec,omitempty"`
+	ObjectMeta      meta.ObjectMeta      `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
+	Spec            core.PodSpec         `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
 // ChiPodTemplateZone defines pod template zone
@@ -686,10 +687,10 @@ type ChiPodDistribution struct {
 
 // ChiServiceTemplate defines CHI service template
 type ChiServiceTemplate struct {
-	Name         string             `json:"name"                   yaml:"name"`
-	GenerateName string             `json:"generateName,omitempty" yaml:"generateName,omitempty"`
-	ObjectMeta   metav1.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`
-	Spec         corev1.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
+	Name         string           `json:"name"                   yaml:"name"`
+	GenerateName string           `json:"generateName,omitempty" yaml:"generateName,omitempty"`
+	ObjectMeta   meta.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`
+	Spec         core.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
 }
 
 // ChiDistributedDDL defines distributedDDL section of .spec.defaults
@@ -701,27 +702,27 @@ type ChiDistributedDDL struct {
 
 // ClickHouseInstallationList defines a list of ClickHouseInstallation resources
 type ClickHouseInstallationList struct {
-	metav1.TypeMeta `json:",inline"  yaml:",inline"`
-	metav1.ListMeta `json:"metadata" yaml:"metadata"`
-	Items           []ClickHouseInstallation `json:"items" yaml:"items"`
+	meta.TypeMeta `json:",inline"  yaml:",inline"`
+	meta.ListMeta `json:"metadata" yaml:"metadata"`
+	Items         []ClickHouseInstallation `json:"items" yaml:"items"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClickHouseInstallationTemplateList defines CHI template list
 type ClickHouseInstallationTemplateList struct {
-	metav1.TypeMeta `json:",inline"  yaml:",inline"`
-	metav1.ListMeta `json:"metadata" yaml:"metadata"`
-	Items           []ClickHouseInstallationTemplate `json:"items" yaml:"items"`
+	meta.TypeMeta `json:",inline"  yaml:",inline"`
+	meta.ListMeta `json:"metadata" yaml:"metadata"`
+	Items         []ClickHouseInstallationTemplate `json:"items" yaml:"items"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClickHouseOperatorConfigurationList defines CHI operator config list
 type ClickHouseOperatorConfigurationList struct {
-	metav1.TypeMeta `json:",inline"  yaml:",inline"`
-	metav1.ListMeta `json:"metadata" yaml:"metadata"`
-	Items           []ClickHouseOperatorConfiguration `json:"items" yaml:"items"`
+	meta.TypeMeta `json:",inline"  yaml:",inline"`
+	meta.ListMeta `json:"metadata" yaml:"metadata"`
+	Items         []ClickHouseOperatorConfiguration `json:"items" yaml:"items"`
 }
 
 // Secured interface for nodes and hosts

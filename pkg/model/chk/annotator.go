@@ -21,12 +21,8 @@ import (
 )
 
 func getPodAnnotations(chk *api.ClickHouseKeeperInstallation) map[string]string {
-	var annotations map[string]string
-
 	// Fetch annotations from Pod template (if any)
-	if chk.Spec.PodTemplate != nil && chk.Spec.PodTemplate.ObjectMeta.Annotations != nil {
-		annotations = chk.Spec.PodTemplate.ObjectMeta.Annotations
-	}
+	annotations := getPodTemplateAnnotations(chk)
 
 	// In case no Prometheus port specified - nothing to add to annotations
 	port := chk.Spec.GetPrometheusPort()

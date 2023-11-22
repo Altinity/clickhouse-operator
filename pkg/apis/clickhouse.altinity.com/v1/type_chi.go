@@ -720,8 +720,8 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	}
 
 	// Otherwise, we need to acquire a lock to initialize the field.
-	chi.statusMu.Lock()
-	defer chi.statusMu.Unlock()
+	chi.statusCreatorMutex.Lock()
+	defer chi.statusCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
 	if chi.Status == nil {
 		chi.Status = &ChiStatus{}

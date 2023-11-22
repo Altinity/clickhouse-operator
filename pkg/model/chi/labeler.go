@@ -238,7 +238,7 @@ func (l *Labeler) getHostScope(host *chiv1.ChiHost, applySupplementaryServiceLab
 	if applySupplementaryServiceLabels {
 		// Optional labels
 		// TODO
-		// When we'll have Cluster Discovery functionality we can refactor this properly
+		// When we'll have ChkCluster Discovery functionality we can refactor this properly
 		labels = appendConfigLabels(host, labels)
 	}
 	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))

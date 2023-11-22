@@ -1037,7 +1037,7 @@ func (in *ClickHouseInstallation) DeepCopyInto(out *ClickHouseInstallation) {
 		(*in).DeepCopyInto(*out)
 	}
 	in.Attributes.DeepCopyInto(&out.Attributes)
-	out.statusMu = in.statusMu
+	out.statusCreatorMutex = in.statusCreatorMutex
 	return
 }
 
@@ -1104,7 +1104,7 @@ func (in *ClickHouseInstallationTemplate) DeepCopyInto(out *ClickHouseInstallati
 		(*in).DeepCopyInto(*out)
 	}
 	in.Attributes.DeepCopyInto(&out.Attributes)
-	out.statusMu = in.statusMu
+	out.statusCreatorMutex = in.statusCreatorMutex
 	return
 }
 

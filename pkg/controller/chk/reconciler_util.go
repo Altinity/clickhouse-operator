@@ -80,7 +80,6 @@ func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]s
 		// Pod is ready only in case all containers are ready
 		podIsReady := true
 		for _, containerStatus := range pod.Status.ContainerStatuses {
-			r.Log.Info(fmt.Sprintf("%s: %t", containerStatus.Name, containerStatus.Ready))
 			if !containerStatus.Ready {
 				podIsReady = false
 			}
@@ -94,12 +93,13 @@ func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]s
 }
 
 func isReplicasChanged(chk *api.ClickHouseKeeperInstallation) bool {
-	lastApplied := getKeeperFromAnnotationLastAppliedConfiguration(chk)
-	if lastApplied.Spec.Replicas != chk.Spec.Replicas {
-		return true
-	} else {
-		return false
-	}
+	//lastApplied := getKeeperFromAnnotationLastAppliedConfiguration(chk)
+	//if lastApplied.Spec.Replicas != chk.Spec.Replicas {
+	//	return true
+	//} else {
+	//	return false
+	//}
+	return false
 }
 
 func markPodRestartedNow(sts *apps.StatefulSet) {
@@ -108,12 +108,12 @@ func markPodRestartedNow(sts *apps.StatefulSet) {
 }
 
 func setAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeperInstallation) {
-	lastAppliedString := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
-
-	tmp := api.ClickHouseKeeperInstallation{}
-	json.Unmarshal([]byte(lastAppliedString), &tmp)
-	tmp.Spec.Replicas = chk.Spec.Replicas
-
-	updatedLastApplied, _ := json.Marshal(tmp)
-	chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(updatedLastApplied)
+	//lastAppliedString := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
+	//
+	//tmp := api.ClickHouseKeeperInstallation{}
+	//json.Unmarshal([]byte(lastAppliedString), &tmp)
+	//tmp.Spec.Replicas = chk.Spec.Replicas
+	//
+	//updatedLastApplied, _ := json.Marshal(tmp)
+	//chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(updatedLastApplied)
 }

@@ -562,12 +562,12 @@ func (w *worker) deleteCluster(ctx context.Context, chi *chiV1.ClickHouseInstall
 		M(cluster).F().
 		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
 
-	// Delete Cluster Service
+	// Delete ChkCluster Service
 	_ = w.c.deleteServiceCluster(ctx, cluster)
 
-	// Delete Cluster's Auto Secret
+	// Delete ChkCluster's Auto Secret
 	if cluster.Secret.Source() == chiV1.ClusterSecretSourceAuto {
-		// Delete Cluster Secret
+		// Delete ChkCluster Secret
 		_ = w.c.deleteSecretCluster(ctx, cluster)
 	}
 

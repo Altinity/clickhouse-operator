@@ -458,7 +458,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 	// <CLUSTER_NAME-shard>0-based shard index within cluster</CLUSTER_NAME-shard>
 	// util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", replica.Address.ClusterName, replica.Address.ShardIndex)
 
-	// All Shards One Replica Cluster
+	// All Shards One Replica ChkCluster
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster</CLUSTER_NAME-shard>
 	util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, host.Address.CHIScopeIndex)
 

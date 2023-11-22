@@ -406,7 +406,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *chiV1.ChiHost) 
 	return err
 }
 
-// reconcileCluster reconciles Cluster, excluding nested shards
+// reconcileCluster reconciles ChkCluster, excluding nested shards
 func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -416,7 +416,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 	w.a.V(2).M(cluster).S().P()
 	defer w.a.V(2).M(cluster).E().P()
 
-	// Add Cluster's Service
+	// Add ChkCluster's Service
 	if service := w.task.creator.CreateServiceCluster(cluster); service != nil {
 		if err := w.reconcileService(ctx, cluster.CHI, service); err == nil {
 			w.task.registryReconciled.RegisterService(service.ObjectMeta)
@@ -425,7 +425,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *chiV1.Cluster) e
 		}
 	}
 
-	// Add Cluster's Auto Secret
+	// Add ChkCluster's Auto Secret
 	if cluster.Secret.Source() == chiV1.ClusterSecretSourceAuto {
 		if secret := w.task.creator.CreateClusterSecret(model.CreateClusterAutoSecretName(cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.CHI, secret); err == nil {

@@ -435,7 +435,7 @@ spec:
         # 2. Delete
         reclaimPolicy: Retain
 
-        # type ObjectMeta struct from k8s.io/core/v1
+        # type ObjectMeta struct {} from k8s.io/meta/v1
         metadata:
           labels:
             a: "b"
@@ -465,7 +465,7 @@ spec:
         # 2. Delete
         reclaimPolicy: Retain
 
-        # type ObjectMeta struct from k8s.io/core/v1
+        # type ObjectMeta struct {} from k8s.io/meta/v1
         metadata:
           labels:
             a: "b"
@@ -561,6 +561,10 @@ spec:
             # Apply podDistribution on per-zone basis
             #topologyKey: "kubernetes.io/zone"
 
+        # type ObjectMeta struct {} from k8s.io/meta/v1
+        metadata:
+          labels:
+            a: "b"
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:
@@ -587,6 +591,10 @@ spec:
 
       # pod template for ClickHouse v22.2
       - name: clickhouse-v22.2
+        # type ObjectMeta struct {} from k8s.io/meta/v1
+        metadata:
+          labels:
+            a: "b"
         # type PodSpec struct {} from k8s.io/core/v1
         spec:
           containers:

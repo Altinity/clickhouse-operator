@@ -136,14 +136,14 @@ func (n *xmlNode) buildXML(w io.Writer, indent, tabsize uint8) {
 	}
 
 	if n.value.IsScalar() {
-		// Scalar node
-		n.writeTagWithValue(w, n.value.Scalar(), n.value.Attributes(), indent, tabsize)
+		// ScalarString node
+		n.writeTagWithValue(w, n.value.ScalarString(), n.value.Attributes(), indent, tabsize)
 		return
 	}
 
-	// Vector node
+	// VectorString node
 
-	for _, value := range n.value.Vector() {
+	for _, value := range n.value.VectorString() {
 		n.writeTagWithValue(w, value, n.value.Attributes(), indent, tabsize)
 	}
 }

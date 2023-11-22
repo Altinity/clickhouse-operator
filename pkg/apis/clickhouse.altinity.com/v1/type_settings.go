@@ -106,24 +106,36 @@ func (s *Setting) IsVector() bool {
 	return !s.isScalar
 }
 
-// Scalar gets scalar value of a setting
-func (s *Setting) Scalar() string {
+// ScalarString gets string scalar value of a setting
+func (s *Setting) ScalarString() string {
 	if s == nil {
 		return ""
 	}
 	return s.scalar
 }
 
-// Vector gets vector values of a setting
-func (s *Setting) Vector() []string {
+// ScalarInt gets int scalar value of a setting
+func (s *Setting) ScalarInt() int {
+	if s == nil {
+		return 0
+	}
+	if value, err := strconv.Atoi(s.scalar); err == nil {
+		return value
+	}
+
+	return 0
+}
+
+// VectorString gets vector values of a setting
+func (s *Setting) VectorString() []string {
 	if s == nil {
 		return nil
 	}
 	return s.vector
 }
 
-// AsVector gets value of a setting as vector. Scalar value is casted to vector
-func (s *Setting) AsVector() []string {
+// AsVectorString gets value of a setting as vector. ScalarString value is casted to vector
+func (s *Setting) AsVectorString() []string {
 	if s == nil {
 		return nil
 	}
@@ -135,13 +147,13 @@ func (s *Setting) AsVector() []string {
 	return s.vector
 }
 
-// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to Vector
+// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to VectorString
 func (s *Setting) CastToVector() *Setting {
 	if s == nil {
 		return nil
 	}
 	if s.isScalar {
-		return NewSettingVector(s.AsVector())
+		return NewSettingVector(s.AsVectorString())
 	}
 	return s
 }
@@ -218,9 +230,9 @@ func (s *Setting) MergeFrom(from *Setting) *Setting {
 
 	// In case recipient does not exist just copy values from source
 	if s == nil {
-		news := NewSettingVector(from.Vector())
-		news.attributes = util.MergeStringMapsPreserve(news.attributes, from.attributes)
-		return news
+		new := NewSettingVector(from.VectorString())
+		new.attributes = util.MergeStringMapsPreserve(new.attributes, from.attributes)
+		return new
 	}
 
 	s.vector = util.MergeStringArrays(s.vector, from.vector)
@@ -499,20 +511,20 @@ func unmarshalVector(untyped interface{}) ([]string, bool) {
 	return nil, false
 }
 
-// getValueAsScalar
-func (settings *Settings) getValueAsScalar(name string) (string, bool) {
+// getValueAsScalarString
+func (settings *Settings) getValueAsScalarString(name string) (string, bool) {
 	if !settings.Has(name) {
 		return "", false
 	}
 	setting := settings.Get(name)
 	if setting.IsScalar() {
-		return setting.Scalar(), true
+		return setting.ScalarString(), true
 	}
 	return "", false
 }
 
-// getValueAsVector
-func (settings *Settings) getValueAsVector(name string) ([]string, bool) {
+// getValueAsVectorString
+func (settings *Settings) getValueAsVectorString(name string) ([]string, bool) {
 	if !settings.Has(name) {
 		return nil, false
 	}
@@ -520,27 +532,12 @@ func (settings *Settings) getValueAsVector(name string) ([]string, bool) {
 	if setting.IsScalar() {
 		return nil, false
 	}
-	return setting.Vector(), true
-}
-
-// getValueAsInt
-func (settings *Settings) getValueAsInt(name string) int {
-	value, ok := settings.getValueAsScalar(name)
-	if !ok {
-		return 0
-	}
-
-	i, err := strconv.Atoi(value)
-	if err != nil {
-		return 0
-	}
-
-	return i
+	return setting.VectorString(), true
 }
 
 // fetchPort
 func (settings *Settings) fetchPort(name string) int32 {
-	return int32(settings.getValueAsInt(name))
+	return int32(settings.Get(name).ScalarInt())
 }
 
 // GetTCPPort gets TCP port from settings
@@ -634,7 +631,7 @@ func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUn
 			return
 		}
 
-		if scalar, ok := settings.getValueAsScalar(path); ok {
+		if scalar, ok := settings.getValueAsScalarString(path); ok {
 			if m == nil {
 				// Lazy load
 				m = make(map[string]string)

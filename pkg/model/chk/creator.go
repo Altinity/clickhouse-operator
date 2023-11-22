@@ -24,13 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
 func CreateConfigMap(chk *api.ClickHouseKeeperInstallation) *core.ConfigMap {
 	// Normalize settings
-	chk.Spec.Settings = util.MergeStringMapsPreserve(chk.Spec.Settings, defaultKeeperSettings(chk.Spec.GetPath()))
+	chk.Spec.EnsureConfiguration().Settings = chk.Spec.EnsureConfiguration().Settings.MergeFrom(defaultKeeperSettings(chk.Spec.GetPath()))
 
 	return &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
@@ -42,7 +41,7 @@ func CreateConfigMap(chk *api.ClickHouseKeeperInstallation) *core.ConfigMap {
 			Namespace: chk.Namespace,
 		},
 		Data: map[string]string{
-			"keeper_config.xml": generateXMLConfig(chk.Spec.Settings, chk),
+			"keeper_config.xml": generateXMLConfig(chk.Spec.GetConfiguration().GetSettings(), chk),
 		},
 	}
 }
@@ -51,7 +50,7 @@ func CreateConfigMap(chk *api.ClickHouseKeeperInstallation) *core.ConfigMap {
 func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet {
 	labels := GetPodLabels(chk)
 	annotations := getPodAnnotations(chk)
-	replicas := chk.Spec.GetReplicas()
+	replicas := int32(0)//chk.Spec.GetReplicas()
 
 	return &apps.StatefulSet{
 		TypeMeta: meta.TypeMeta{
@@ -81,18 +80,13 @@ func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet 
 				},
 				Spec: createPodTemplateSpec(chk),
 			},
-			VolumeClaimTemplates: chk.Spec.VolumeClaimTemplates,
+			VolumeClaimTemplates: getVolumeClaimTemplates(chk),
 		},
 	}
 }
 
 func createPodTemplateSpec(chk *api.ClickHouseKeeperInstallation) core.PodSpec {
-	// Ensure PodTemplate
-	if chk.Spec.PodTemplate == nil {
-		chk.Spec.PodTemplate = &api.ChkPodTemplate{}
-	}
-
-	podSpec := chk.Spec.PodTemplate.Spec
+	podSpec := getPodTemplate(chk).Spec
 
 	if len(podSpec.Volumes) == 0 {
 		podSpec.Volumes = createVolumes(chk)
@@ -106,7 +100,7 @@ func createPodTemplateSpec(chk *api.ClickHouseKeeperInstallation) core.PodSpec {
 func createVolumes(chk *api.ClickHouseKeeperInstallation) []core.Volume {
 	var volumes []core.Volume
 
-	switch length := len(chk.Spec.VolumeClaimTemplates); length {
+	switch length := len(getVolumeClaimTemplates(chk)); length {
 	case 0:
 		volumes = append(volumes, createEphemeralVolume("log-storage-path"))
 		volumes = append(volumes, createEphemeralVolume("snapshot-storage-path"))
@@ -171,10 +165,10 @@ func createConfigMapVolume(volumeName string, configMapName string, key string, 
 func createInitContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 	var initContainers []core.Container
 
-	if len(chk.Spec.PodTemplate.Spec.InitContainers) == 0 {
+	if len(getPodTemplate(chk).Spec.InitContainers) == 0 {
 		initContainers = []core.Container{{}}
 	} else {
-		initContainers = chk.Spec.PodTemplate.Spec.InitContainers
+		initContainers = getPodTemplate(chk).Spec.InitContainers
 	}
 
 	// Build server id injector container
@@ -209,10 +203,10 @@ func createInitContainers(chk *api.ClickHouseKeeperInstallation) []core.Containe
 
 func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 	var containers []core.Container
-	if len(chk.Spec.PodTemplate.Spec.Containers) == 0 {
+	if len(getPodTemplate(chk).Spec.Containers) == 0 {
 		containers = []core.Container{{}}
 	} else {
-		containers = chk.Spec.PodTemplate.Spec.Containers
+		containers = getPodTemplate(chk).Spec.Containers
 	}
 
 	// Build ClickHouse keeper container
@@ -268,7 +262,7 @@ func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 			})
 	}
 
-	switch length := len(chk.Spec.VolumeClaimTemplates); length {
+	switch length := len(getVolumeClaimTemplates(chk)); length {
 	case 0:
 		containers[0].VolumeMounts = append(containers[0].VolumeMounts, mountVolumes(chk)...)
 	case 1:

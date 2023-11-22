@@ -247,7 +247,6 @@ func (host *ChiHost) IsStopped() bool {
 	return host.GetCHI().IsStopped()
 }
 
-
 // WhichStatefulSet specifies which StatefulSet we are going to process in host functions
 type WhichStatefulSet string
 

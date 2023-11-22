@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chk
+// +k8s:deepcopy-gen=package,register
+// +groupName=clickhouse.altinity.com
 
-import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+// Package v1 defines version 1 of the API used with ClickHouse Installation Custom Resources.
+package v1
+
+// Possible kinds of CRDs
+const (
+	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
+	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
+	ClickHouseOperatorCRDResourceKind             = "ClickHouseOperator"
 )
-
-func GetPodLabels(chk *api.ClickHouseKeeperInstallation) map[string]string {
-	// In case Pod template has labels explicitly specified - use them
-	labels := getPodTemplateLabels(chk)
-	if labels != nil {
-		return labels
-	}
-
-	// Either no pod template or labels specified.
-	// Construct default labels
-	return map[string]string{
-		"app": chk.GetName(),
-		"uid": string(chk.UID),
-	}
-}
