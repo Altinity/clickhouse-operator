@@ -932,7 +932,7 @@ func (w *worker) shouldMigrateTables(host *chiV1.ChiHost, opts ...*migrateTableO
 
 	// Deal with special cases
 	switch {
-	case host.GetCHI().IsStopped():
+	case host.IsStopped():
 		// Stopped host is not able to receive any data, migration is inapplicable
 		return false
 
@@ -1006,7 +1006,7 @@ func (w *worker) completeQueries(ctx context.Context, host *chiV1.ChiHost) error
 // shouldIncludeHost determines whether host to be included into cluster after reconciling
 func (w *worker) shouldIncludeHost(host *chiV1.ChiHost) bool {
 	switch {
-	case host.GetCHI().IsStopped():
+	case host.IsStopped():
 		// No need to include stopped host
 		return false
 	}
@@ -1103,7 +1103,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *chi
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
 func (w *worker) shouldExcludeHost(host *chiV1.ChiHost) bool {
 	switch {
-	case host.GetCHI().IsStopped():
+	case host.IsStopped():
 		w.a.V(1).
 			M(host).F().
 			Info("Host is stopped, no need to exclude stopped host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
@@ -1577,7 +1577,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) err
 // waitConfigMapPropagation
 func (w *worker) waitConfigMapPropagation(ctx context.Context, host *chiV1.ChiHost) bool {
 	// No need to wait for ConfigMap propagation on stopped host
-	if host.GetCHI().IsStopped() {
+	if host.IsStopped() {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
 		return false
 	}
