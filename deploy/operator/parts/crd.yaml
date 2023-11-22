@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.22.0
+# OPERATOR_VERSION=0.22.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1191,14 +1191,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.22.0
+# OPERATOR_VERSION=0.22.1
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2381,7 +2381,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
