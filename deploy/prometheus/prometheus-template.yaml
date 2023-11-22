@@ -122,6 +122,58 @@ stringData:
       - action: labeldrop
         regex: 'container_id|image_id|controller_revision_hash|pod_template_generation|pod_template_hash'
 
+    - job_name: 'kubernetes-clickhouse-operator-pods'
+      kubernetes_sd_configs:
+      - role: pod
+      # only for e2e test, should 5m for production
+      scrape_interval: 10s
+      scrape_timeout: 10s
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        insecure_skip_verify: false
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+
+      relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_clickhouse_operator_metrics_scrape]
+        regex: true
+        action: keep
+
+      - source_labels: [__meta_kubernetes_pod_annotation_clickhouse_operator_metrics_scrape]
+        regex: false
+        action: drop
+
+      - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_clickhouse_operator_metrics_port]
+        regex: (.+);(.+)
+        replacement: $1:$2
+        target_label: __address__
+
+      - source_labels: [__meta_kubernetes_pod_annotation_clickhouse_operator_metrics_path]
+        action: replace
+        regex: ()
+        replacement: /metrics
+        target_label: __meta_kubernetes_pod_annotation_clickhouse_operator_metrics_path
+
+      - source_labels: [__meta_kubernetes_pod_annotation_clickhouse_operator_metrics_path]
+        action: replace
+        target_label: __metrics_path__
+
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod_name
+
+      - source_labels: [__meta_kubernetes_pod_container_name]
+        action: replace
+        target_label: container_name
+
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+
+      - action: labeldrop
+        regex: 'container_id|image_id|controller_revision_hash|pod_template_generation|pod_template_hash'
 ---
 # Setup Prometheus
 # Prometheus would be created in kubectl-specified namespace

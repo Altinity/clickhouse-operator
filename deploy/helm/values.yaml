@@ -49,6 +49,8 @@ imagePullSecrets: []
 podAnnotations:
   prometheus.io/port: '8888'
   prometheus.io/scrape: 'true'
+  clickhouse-operator-metrics/port: '9999'
+  clickhouse-operator-metrics/scrape: 'true'
 # nameOverride -- override name of the chart
 nameOverride: ""
 # fullnameOverride -- full name of the chart.
