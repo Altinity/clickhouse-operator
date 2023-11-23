@@ -320,7 +320,7 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     for i in range(retries):
         readonly_replicas = clickhouse.query(
             chi["metadata"]["name"],
-            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
+            "SYSTEM DROP DNS CACHE; SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
         )
         if readonly_replicas == expected_replicas:
             message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")

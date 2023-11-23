@@ -71,16 +71,11 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
                 pod_prefix = "zookeeper"
             else:
                 expected_outs = (
-                    "[keeper, clickhouse]",
-                    "[clickhouse, keeper]",
-                    "[keeper]",
+                    "keeper clickhouse",
+                    "clickhouse keeper",
+                    "keeper",
                 )
-                keeper_cmd = "if [[ ! $(command -v zkcli) ]]; then "
-                keeper_cmd += "wget -q -O /tmp/zkcli.tar.gz https://github.com/let-us-go/zkcli/releases/download/v0.4.0/zkcli-0.4.0-linux-amd64.tar.gz; "
-                keeper_cmd += "cd /tmp; tar -xf zkcli.tar.gz; "
-                keeper_cmd += "mv -fv ./zkcli-0.4.0-linux-amd64/zkcli /bin/zkcli; "
-                keeper_cmd += "fi; "
-                keeper_cmd += "zkcli -s 127.0.0.1:2181 ls /"
+                keeper_cmd = "clickhouse-keeper client -h 127.0.0.1 -p 2181 -q 'ls /'"
                 pod_prefix = "clickhouse-keeper"
 
             out = kubectl.launch(
@@ -233,7 +228,7 @@ def test_keeper_rescale_outline(
             insert_tables=["test_repl1"],
         )
 
-    total_iterations = 1
+    total_iterations = 3
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):

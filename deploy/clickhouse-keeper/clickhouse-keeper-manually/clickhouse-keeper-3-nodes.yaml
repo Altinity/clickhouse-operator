@@ -288,7 +288,7 @@ data:
     
         ROLE=participant
         WEIGHT=1
-        KEEPER_URL=${keeperConnectionString}
+        KEEPER_URL=$(keeperConnectionString)
         NEW_KEEPER_CONFIG=$(keeperConfig)
         clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
         exit 0        
@@ -296,6 +296,7 @@ data:
         echo "clickhouse-keeper instance is available as participant with 0 weight"
         ROLE=participant
         WEIGHT=0
+        KEEPER_URL=$(keeperConnectionString)
         NEW_KEEPER_CONFIG=$(keeperConfig)
         clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
       fi
