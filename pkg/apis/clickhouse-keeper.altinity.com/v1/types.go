@@ -200,6 +200,25 @@ func (c *ChkConfiguration) GetSettings() *apiChi.Settings {
 	return c.Settings
 }
 
+func (c *ChkConfiguration) GetClusters() []*ChkCluster {
+	if c == nil {
+		return nil
+	}
+
+	return c.Clusters
+}
+
+func (c *ChkConfiguration) GetCluster(i int) *ChkCluster {
+	clusters := c.GetClusters()
+	if clusters == nil {
+		return nil
+	}
+	if i >= len(clusters) {
+		return nil
+	}
+	return clusters[i]
+}
+
 // MergeFrom merges from specified source
 func (configuration *ChkConfiguration) MergeFrom(from *ChkConfiguration, _type apiChi.MergeType) *ChkConfiguration {
 	if from == nil {
@@ -212,6 +231,10 @@ func (configuration *ChkConfiguration) MergeFrom(from *ChkConfiguration, _type a
 
 	configuration.Settings = configuration.Settings.MergeFrom(from.Settings)
 
+	// TODO merge clusters
+	// Copy Clusters for now
+	configuration.Clusters = from.Clusters
+
 	return configuration
 }
 
@@ -219,6 +242,13 @@ func (configuration *ChkConfiguration) MergeFrom(from *ChkConfiguration, _type a
 type ChkCluster struct {
 	Name   string            `json:"name,omitempty"         yaml:"name,omitempty"`
 	Layout *ChkClusterLayout `json:"layout,omitempty"       yaml:"layout,omitempty"`
+}
+
+func (c *ChkCluster) GetLayout() *ChkClusterLayout {
+	if c == nil {
+		return nil
+	}
+	return c.Layout
 }
 
 // ChkClusterLayout defines layout section of .spec.configuration.clusters
@@ -230,6 +260,13 @@ type ChkClusterLayout struct {
 // NewChkClusterLayout creates new cluster layout
 func NewChkClusterLayout() *ChkClusterLayout {
 	return new(ChkClusterLayout)
+}
+
+func (c *ChkClusterLayout) GetReplicasCount() int {
+	if c == nil {
+		return 0
+	}
+	return c.ReplicasCount
 }
 
 // ChkTemplates defines templates section of .spec

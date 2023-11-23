@@ -134,6 +134,7 @@ func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern stri
 
 // normalizeConfiguration normalizes .spec.configuration
 func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiChk.ChkConfiguration {
+	// Ensure configuration
 	if conf == nil {
 		conf = apiChk.NewConfiguration()
 	}
@@ -372,19 +373,21 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
 func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *apiChi.Settings {
 	if settings == nil {
-		//settings = apiChi.NewSettings()
-		return nil
+		settings = apiChi.NewSettings()
 	}
+	settings = settings.MergeFrom(defaultKeeperSettings(n.ctx.chk.Spec.GetPath()))
 	settings.Normalize()
 	return settings
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkCluster {
+	// Ensure cluster
 	if cluster == nil {
 		cluster = n.newDefaultCluster()
 	}
 
+	// Ensure layout
 	if cluster.Layout == nil {
 		cluster.Layout = apiChk.NewChkClusterLayout()
 	}
@@ -395,6 +398,7 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
 func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *apiChk.ChkClusterLayout) *apiChk.ChkClusterLayout {
+	// Ensure layout
 	if layout == nil {
 		layout = apiChk.NewChkClusterLayout()
 	}

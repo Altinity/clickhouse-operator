@@ -17,6 +17,7 @@ package chk
 import (
 	"context"
 	"fmt"
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -31,7 +32,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-//	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	//	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -79,9 +80,8 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	log.V(1).M(new).F().Info("Normalized OLD CHK: %s/%s", new.Namespace, new.Name)
 	old = r.normalize(old)
 
-	log.V(1).M(new).F().Info("Normalized NEW CHIK %s/%s", new.Namespace, new.Name)
+	log.V(1).M(new).F().Info("Normalized NEW CHK %s/%s", new.Namespace, new.Name)
 	new = r.normalize(new)
-
 	new.SetAncestor(old)
 
 	if util.IsContextDone(ctx) {
@@ -89,15 +89,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	saved_chksum := new.Annotations["saved_chksum"]
-	chksum, err := getCheckSum(new)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if saved_chksum != chksum {
-		log.V(1).Info("task is done")
-
+	if old.GetGeneration() != new.GetGeneration() {
 		for _, f := range []reconcileFunc{
 			r.reconcileConfigMap,
 			r.reconcileStatefulSet,
@@ -110,22 +102,19 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 				return reconcile.Result{}, err
 			}
 		}
+	}
 
-		tmp := &apiChk.ClickHouseKeeperInstallation{}
-		if err := r.Get(ctx, req.NamespacedName, tmp); err != nil {
-			if errors.IsNotFound(err) {
-				// Request object not found, could have been deleted after reconcile
-				// request. Owned objects are automatically garbage collected. For
-				// additional cleanup logic use finalizers.
-				// Return and don't requeue
-				return ctrl.Result{}, nil
-			}
-			return ctrl.Result{}, err
+	// Fetch the ClickHouseKeeper instance
+	dummy := &apiChk.ClickHouseKeeperInstallation{}
+	if err := r.Get(ctx, req.NamespacedName, dummy); err != nil {
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile
+			// request. Owned objects are automatically garbage collected. For
+			// additional cleanup logic use finalizers.
+			// Return and don't requeue
+			return ctrl.Result{}, nil
 		}
-
-		tmp.Annotations = new.Annotations
-		tmp.Annotations["saved_chksum"] = chksum
-		r.Update(ctx, tmp)
+		return ctrl.Result{}, err
 	}
 
 	if err := r.reconcileClusterStatus(new); err != nil {
@@ -166,10 +155,6 @@ func (r *ChkReconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeperInstall
 			new, ok2 := newObject.(*apps.StatefulSet)
 			if !ok1 || !ok2 {
 				return fmt.Errorf("unable to cast")
-			}
-			if isReplicasChanged(chk) {
-				setAnnotationLastAppliedConfiguration(chk)
-				_ = chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
 			}
 			markPodRestartedNow(new)
 			cur.Spec.Replicas = new.Spec.Replicas
@@ -266,50 +251,54 @@ func (r *ChkReconciler) reconcile(
 }
 
 func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstallation) (err error) {
-	//readyMembers, err := r.getReadyPods(chk)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//for {
-	//	// Fetch the latest ClickHouseKeeper instance again
-	//	tmp := &apiChk.ClickHouseKeeperInstallation{}
-	//	if err := r.Get(context.TODO(), getNamespacedName(chk), tmp); err != nil {
-	//		log.V(1).Error("Error: not found %s err: %s", chk.Name, err)
-	//		return err
-	//	}
-	//
-	//	if tmp.Status == nil {
-	//		tmp.Status = &apiChk.ChkStatus{
-	//			Status: "In progress",
-	//		}
-	//	}
-	//	tmp.Status.Replicas = chk.Spec.GetReplicas()
-	//
-	//	tmp.Status.ReadyReplicas = []apiChi.ChiZookeeperNode{}
-	//	for _, readyOne := range readyMembers {
-	//		tmp.Status.ReadyReplicas = append(tmp.Status.ReadyReplicas,
-	//			apiChi.ChiZookeeperNode{
-	//				Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, chk.Namespace),
-	//				Port:   int32(chk.Spec.GetClientPort()),
-	//				Secure: apiChi.NewStringBool(false),
-	//			})
-	//	}
-	//
-	//	log.V(1).Info("ReadyReplicas: " + fmt.Sprintf("%v", tmp.Status.ReadyReplicas))
-	//
-	//	if len(readyMembers) == int(chk.Spec.GetReplicas()) {
-	//		tmp.Status.Status = "Completed"
-	//	} else {
-	//		tmp.Status.Status = "In progress"
-	//	}
-	//	if err := r.Status().Update(context.TODO(), tmp); err != nil {
-	//		log.V(1).Error("err: %s", err.Error())
-	//	} else {
-	//		return nil
-	//	}
-	//}
-	return nil
+	readyMembers, err := r.getReadyPods(chk)
+	if err != nil {
+		return err
+	}
+
+	for {
+		// Fetch the latest ClickHouseKeeper instance again
+		cur := &apiChk.ClickHouseKeeperInstallation{}
+		if err := r.Get(context.TODO(), getNamespacedName(chk), cur); err != nil {
+			log.V(1).Error("Error: not found %s err: %s", chk.Name, err)
+			return err
+		}
+
+		if cur.GetStatus() == nil {
+			cur.Status = cur.EnsureStatus()
+		}
+		cur.Status.Replicas = int32(model.GetReplicasCount(chk))
+
+		cur.Status.ReadyReplicas = []apiChi.ChiZookeeperNode{}
+		for _, readyOne := range readyMembers {
+			cur.Status.ReadyReplicas = append(cur.Status.ReadyReplicas,
+				apiChi.ChiZookeeperNode{
+					Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, chk.Namespace),
+					Port:   int32(chk.Spec.GetClientPort()),
+					Secure: apiChi.NewStringBool(false),
+				})
+		}
+
+		log.V(1).Info("ReadyReplicas: " + fmt.Sprintf("%v", cur.Status.ReadyReplicas))
+
+		if len(readyMembers) == model.GetReplicasCount(chk) {
+			cur.Status.Status = "Completed"
+		} else {
+			cur.Status.Status = "In progress"
+		}
+
+		cur.Status.NormalizedCHK = nil
+		cur.Status.NormalizedCHKCompleted = chk.DeepCopy()
+		cur.Status.NormalizedCHKCompleted.ObjectMeta.ManagedFields = nil
+		cur.Status.NormalizedCHKCompleted.Status = nil
+
+
+		if err := r.Status().Update(context.TODO(), cur); err != nil {
+			log.V(1).Error("err: %s", err.Error())
+		} else {
+			return nil
+		}
+	}
 }
 
 // normalize

@@ -15,9 +15,13 @@
 package chk
 
 import (
+	"bytes"
 	"fmt"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/xml"
+	"strings"
 )
 
 func defaultKeeperSettings(path string) *apiChi.Settings {
@@ -55,35 +59,42 @@ func defaultKeeperSettings(path string) *apiChi.Settings {
 
 // generateXMLConfig creates XML using map[string]string definitions
 func generateXMLConfig(settings *apiChi.Settings, chk *apiChk.ClickHouseKeeperInstallation) string {
-	//if settings.Len() == 0 {
-	//	return ""
-	//}
-	//
-	//settings.Set("keeper_server/server_id", apiChi.NewSettingScalar("KEEPER_ID"))
-	//settings.Set("keeper_server/raft_configuration/server", apiChi.NewSettingScalar(""))
-	//
-	//b := &bytes.Buffer{}
-	//// <clickhouse>
-	//// XML code
-	//// </clickhouse>
-	//util.Iline(b, 0, "<clickhouse>")
-	//xml.GenerateFromSettings(b, settings, "")
-	//util.Iline(b, 0, "</clickhouse>")
-	//
-	//raft := &bytes.Buffer{}
-	//raftPort := chk.Spec.GetRaftPort()
-	//for i := 0; i < int(chk.Spec.GetReplicas()); i++ {
-	//	util.Iline(raft, 12, "<server>")
-	//	util.Iline(raft, 12, "    <id>%d</id>", i)
-	//	util.Iline(raft, 12, "    <hostname>%s-%d.%s-headless.%s.svc.cluster.local</hostname>", chk.Name, i, chk.Name, chk.Namespace)
-	//	util.Iline(raft, 12, "    <port>%s</port>", fmt.Sprintf("%d", raftPort))
-	//	util.Iline(raft, 12, "</server>")
-	//}
-	//
-	//tmp := b.String()
-	//
-	//// tmp = strings.Replace(tmp, "<server_id></server_id>", "<server_id from_env=\"KEEPER_ID\" />", 1)
-	//
-	//return strings.Replace(tmp, "            <server></server>\n", raft.String(), 1)
-	return ""
+	if settings.Len() == 0 {
+		return ""
+	}
+
+	settings.Set("keeper_server/server_id", apiChi.NewSettingScalar("KEEPER_ID"))
+	// Produces
+	// <raft_configuration>
+	//     <server></server>
+	// </raft_configuration>
+	settings.Set("keeper_server/raft_configuration/server", apiChi.NewSettingScalar(""))
+
+	b := &bytes.Buffer{}
+	// <clickhouse>
+	// XML code
+	// </clickhouse>
+	util.Iline(b, 0, "<clickhouse>")
+	xml.GenerateFromSettings(b, settings, "")
+	util.Iline(b, 0, "</clickhouse>")
+
+	raft := &bytes.Buffer{}
+	raftPort := chk.Spec.GetRaftPort()
+	for i := 0; i < int(getCluster(chk).GetLayout().GetReplicasCount()); i++ {
+		util.Iline(raft, 12, "<server>")
+		util.Iline(raft, 12, "    <id>%d</id>", i)
+		util.Iline(raft, 12, "    <hostname>%s-%d.%s-headless.%s.svc.cluster.local</hostname>", chk.Name, i, chk.Name, chk.Namespace)
+		util.Iline(raft, 12, "    <port>%s</port>", fmt.Sprintf("%d", raftPort))
+		util.Iline(raft, 12, "</server>")
+	}
+
+	tmp := b.String()
+
+	// tmp = strings.Replace(tmp, "<server_id></server_id>", "<server_id from_env=\"KEEPER_ID\" />", 1)
+
+	// Replace server in
+	// <raft_configuration>
+	//     <server></server>
+	// </raft_configuration>
+	return strings.Replace(tmp, "            <server></server>\n", raft.String(), 1)
 }

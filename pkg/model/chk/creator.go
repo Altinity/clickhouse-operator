@@ -28,9 +28,6 @@ import (
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
 func CreateConfigMap(chk *api.ClickHouseKeeperInstallation) *core.ConfigMap {
-	// Normalize settings
-	chk.Spec.EnsureConfiguration().Settings = chk.Spec.EnsureConfiguration().Settings.MergeFrom(defaultKeeperSettings(chk.Spec.GetPath()))
-
 	return &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
@@ -50,7 +47,7 @@ func CreateConfigMap(chk *api.ClickHouseKeeperInstallation) *core.ConfigMap {
 func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet {
 	labels := GetPodLabels(chk)
 	annotations := getPodAnnotations(chk)
-	replicas := int32(0)//chk.Spec.GetReplicas()
+	replicas := int32(GetReplicasCount(chk))
 
 	return &apps.StatefulSet{
 		TypeMeta: meta.TypeMeta{

@@ -16,9 +16,7 @@ package chk
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"runtime"
 	"time"
@@ -39,16 +37,6 @@ func getNamespacedName(obj meta.Object) types.NamespacedName {
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}
-}
-
-func getCheckSum(chk *api.ClickHouseKeeperInstallation) (string, error) {
-	specString, err := json.Marshal(chk.Spec)
-	if err != nil {
-		return "", err
-	}
-	h := sha256.New()
-	h.Write([]byte(specString))
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
 func getFunctionName(i interface{}) string {
@@ -92,28 +80,7 @@ func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]s
 	return readyPods, nil
 }
 
-func isReplicasChanged(chk *api.ClickHouseKeeperInstallation) bool {
-	//lastApplied := getKeeperFromAnnotationLastAppliedConfiguration(chk)
-	//if lastApplied.Spec.Replicas != chk.Spec.Replicas {
-	//	return true
-	//} else {
-	//	return false
-	//}
-	return false
-}
-
 func markPodRestartedNow(sts *apps.StatefulSet) {
 	v, _ := time.Now().UTC().MarshalText()
 	sts.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": string(v)}
-}
-
-func setAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeperInstallation) {
-	//lastAppliedString := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
-	//
-	//tmp := api.ClickHouseKeeperInstallation{}
-	//json.Unmarshal([]byte(lastAppliedString), &tmp)
-	//tmp.Spec.Replicas = chk.Spec.Replicas
-	//
-	//updatedLastApplied, _ := json.Marshal(tmp)
-	//chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"] = string(updatedLastApplied)
 }

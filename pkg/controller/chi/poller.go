@@ -37,7 +37,15 @@ const (
 
 // waitHostNotReady polls host's StatefulSet for not exists or not ready
 func (c *Controller) waitHostNotReady(ctx context.Context, host *chiV1.ChiHost) error {
-	err := c.pollStatefulSet(ctx, host, NewStatefulSetPollOptions().FromConfig(chop.Config()).SetCreateTimeout(0), model.IsStatefulSetNotReady, nil)
+	err := c.pollStatefulSet(
+		ctx,
+		host,
+		NewStatefulSetPollOptions().
+			FromConfig(chop.Config()).
+			SetCreateTimeout(0),
+		model.IsStatefulSetNotReady,
+		nil,
+	)
 	if apiErrors.IsNotFound(err) {
 		err = nil
 	}
