@@ -1100,17 +1100,17 @@ spec:
                                 topologyKey:
                                   type: string
                                   description: "use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`, More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
-                          spec:
-                            # TODO specify PodSpec
-                            type: object
-                            description: "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           metadata:
                             type: object
                             description: |
                               allows pass standard object's metadata from template to Pod
                               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                          spec:
+                            # TODO specify PodSpec
+                            type: object
+                            description: "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
 
