@@ -2,16 +2,13 @@ package app
 
 import (
 	"context"
-	"os"
-
-	"github.com/go-logr/logr"
-
 	apps "k8s.io/api/apps/v1"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"os"
+	ctrlRuntime "sigs.k8s.io/controller-runtime"
+	//	ctrl "sigs.k8s.io/controller-runtime/pkg/controller"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
@@ -25,41 +22,36 @@ func init() {
 }
 
 var (
-	manager ctrl.Manager
-	logger  logr.Logger
+	manager ctrlRuntime.Manager
 )
 
 func initKeeper(ctx context.Context) {
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-
-	logger = ctrl.Log.WithName("keeper-runner")
 	var err error
 
-	manager, err = ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	manager, err = ctrlRuntime.NewManager(ctrlRuntime.GetConfigOrDie(), ctrlRuntime.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
-		logger.Error(err, "could not create manager")
 		os.Exit(1)
 	}
 
-	err = ctrl.
-		NewControllerManagedBy(manager).          // Create the Controller
-		For(&api.ClickHouseKeeperInstallation{}). // ReplicaSet is the Application API
-		Owns(&apps.StatefulSet{}).                // ReplicaSet owns Pods created by it
-		Complete(&controller.ChkReconciler{
+	err = ctrlRuntime.
+		NewControllerManagedBy(manager).
+		For(&api.ClickHouseKeeperInstallation{}).
+		Owns(&apps.StatefulSet{}).Complete(&controller.ChkReconciler{
+		//WithOptions(ctrl.Options{
+		//	CacheSyncTimeout: 1*time.Second,
+		//}).Complete(&controller.ChkReconciler{
 			Client: manager.GetClient(),
 			Scheme: manager.GetScheme(),
 		})
 	if err != nil {
-		logger.Error(err, "could not create controller")
 		os.Exit(1)
 	}
 }
 
 func runKeeper(ctx context.Context) {
 	if err := manager.Start(ctx); err != nil {
-		logger.Error(err, "could not start manager")
 		os.Exit(1)
 	}
 }
