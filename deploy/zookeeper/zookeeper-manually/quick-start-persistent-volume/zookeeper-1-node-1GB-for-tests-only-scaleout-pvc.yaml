@@ -366,8 +366,8 @@ data:
 
     # Wait for client connections to drain. Kubernetes will wait until the configured
     # "terminationGracePeriodSeconds" before forcibly killing the container
-    CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "/127.0.0.1:" | wc -l`
     for (( i = 0; i < 6; i++ )); do
+      CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "/127.0.0.1:" | wc -l`
       if [[ "$CONN_COUNT" -gt 0 ]]; then
         echo "$CONN_COUNT non-local connections still connected."
         sleep 5
@@ -385,7 +385,7 @@ data:
     CLUSTER_SIZE=$(zkCli.sh -server ${ZKURL} config | grep -c -E '^server\.[0-9]+=') 
     echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MYID"
     if [[ "$MYID" -gt "1" ]]; then
-      # If ClusterSize < MyId, this server is being permanantly removed.
+      # If ClusterSize < MyId, this server is being permanently removed.
       zkCli.sh  -server ${ZKURL} reconfig -remove $MYID | grep -E '^server\.[0-9]+='  > $DYNCONFIG 
       echo $?
     fi
