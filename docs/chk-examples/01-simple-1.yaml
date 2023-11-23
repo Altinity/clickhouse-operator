@@ -3,4 +3,6 @@ kind: "ClickHouseKeeperInstallation"
 metadata:
   name: chk-simple-1
 spec:
-  replicas: 1
+  configuration:
+    clusters:
+      - name: "simple-1"
