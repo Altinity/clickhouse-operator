@@ -355,6 +355,7 @@ def test_operator_restart(self, manifest, service, version=None):
                 "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)",
                 host=h,
             )
+    wait_for_cluster(2, chi, cluster)
 
     trigger_event = threading.Event()
 
@@ -454,6 +455,7 @@ def check_remote_servers(self, chi, shards, trigger_event, shell=None, cluster="
 
 @TestScenario
 @Name("test_008_1. Test operator restart")
+@Tags("NO_PARALLEL")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
 def test_008_1(self):
     create_shell_namespace_clickhouse_template()
@@ -471,6 +473,7 @@ def test_008_1(self):
 
 @TestScenario
 @Name("test_008_2. Test operator restart")
+@Tags("NO_PARALLEL")
 def test_008_2(self):
     create_shell_namespace_clickhouse_template()
 
@@ -487,6 +490,7 @@ def test_008_2(self):
 
 @TestScenario
 @Name("test_008_3. Test operator restart in the middle of reconcile")
+@Tags("NO_PARALLEL")
 def test_008_3(self):
     create_shell_namespace_clickhouse_template()
 
@@ -558,7 +562,8 @@ def test_008_3(self):
 @TestScenario
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
-def test_009_1(self, version_from="0.20.1", version_to=None):
+@Tags("NO_PARALLEL")
+def test_009_1(self, version_from="0.21.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -579,7 +584,8 @@ def test_009_1(self, version_from="0.20.1", version_to=None):
 
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
-def test_009_2(self, version_from="0.20.1", version_to=None):
+@Tags("NO_PARALLEL")
+def test_009_2(self, version_from="0.21.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -1249,6 +1255,27 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 
     return chi_shards
 
+def wait_for_cluster(n_shards, chi, cluster):
+    with Given(f"Cluster {cluster} is properly configured"):
+        with By(f"remote_servers have {n_shards} shards"):
+            assert n_shards == get_shards_from_remote_servers(chi, cluster)
+        with By(f"ClickHouse recognizes {n_shards} shards in the cluster"):
+            cnt = ""
+            for i in range(1, 10):
+                cnt = clickhouse.query(
+                    chi,
+                    f"select count() from system.clusters where cluster ='{cluster}'",
+                    host=f"chi-{chi}-{cluster}-0-0",
+                )
+                if cnt == str(n_shards):
+                    break
+                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                    time.sleep(i * 5)
+            assert str(n_shards) == clickhouse.query(
+                chi,
+                f"select count() from system.clusters where cluster ='{cluster}'",
+                host=f"chi-{chi}-{cluster}-0-0",
+            )
 
 @TestScenario
 @Name("test_014_0. Test that schema is correctly propagated on replicas")
@@ -1320,30 +1347,11 @@ def test_014_0(self):
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)"
     ]
-    with Given(f"Cluster {cluster} is properly configured"):
-        with By(f"remote_servers have {n_shards} shards"):
-            assert n_shards == get_shards_from_remote_servers(chi_name, cluster)
-        with By(f"ClickHouse recognizes {n_shards} shards in the cluster"):
-            cnt = ""
-            for i in range(1, 10):
-                cnt = clickhouse.query(
-                    chi_name,
-                    f"select count() from system.clusters where cluster ='{cluster}'",
-                    host=f"chi-{chi_name}-{cluster}-0-0",
-                )
-                if cnt == str(n_shards):
-                    break
-                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                    time.sleep(i * 5)
-            assert str(n_shards) == clickhouse.query(
-                chi_name,
-                f"select count() from system.clusters where cluster ='{cluster}'",
-                host=f"chi-{chi_name}-{cluster}-0-0",
-            )
+    wait_for_cluster(nshards, chi_name, cluster)
 
-        with Then("Create schema objects"):
-            for q in create_ddls:
-                clickhouse.query(chi_name, q, host=f"chi-{chi_name}-{cluster}-0-0")
+    with Then("Create schema objects"):
+        for q in create_ddls:
+            clickhouse.query(chi_name, q, host=f"chi-{chi_name}-{cluster}-0-0")
 
     with Given("Replicated table is created on a first replica and data is inserted"):
         for table in replicated_tables:
@@ -1548,14 +1556,13 @@ def test_014_1(self):
         timeout=600,
     )
 
-    create_table = "CREATE TABLE test_local_014_1 ON CLUSTER '{cluster}' (a Int8, r UInt64) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/{table}', '{replica}') ORDER BY tuple()"
+    create_table = "CREATE TABLE test_local_014_1 (a Int8, r UInt64) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/{table}', '{replica}') ORDER BY tuple()"
     table = "test_local_014_1"
     replicas = [0, 1]
 
     with Given("Create schema objects"):
-        clickhouse.query(chi, create_table)
-        # Give some time for replication to catch up
-        time.sleep(30)
+        for replica in replicas:
+            clickhouse.query(chi, create_table, host=f"chi-{chi}-{cluster}-0-{replica}")
 
     def check_data_is_replicated(replicas, v):
         with When("Data is inserted on two replicas"):
