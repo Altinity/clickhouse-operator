@@ -1347,7 +1347,7 @@ def test_014_0(self):
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)"
     ]
-    wait_for_cluster(nshards, chi_name, cluster)
+    wait_for_cluster(n_shards, chi_name, cluster)
 
     with Then("Create schema objects"):
         for q in create_ddls:
