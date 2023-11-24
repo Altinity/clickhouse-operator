@@ -1255,7 +1255,7 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 
     return chi_shards
 
-def wait_for_cluster(chi, cluster, num_shards, num_replicas=0):
+def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
     with Given(f"Cluster {cluster} is properly configured"):
         with By(f"remote_servers have {num_shards} shards"):
             assert num_shards == get_shards_from_remote_servers(chi, cluster)
@@ -1266,11 +1266,13 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0):
                     chi,
                     f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
                     host=f"chi-{chi}-{cluster}-0-0",
+                    pwd=pwd,
                 )
                 replicas = clickhouse.query(
                     chi,
                     f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
                     host=f"chi-{chi}-{cluster}-0-0",
+                    pwd=pwd,
                 )
                 if shards == str(num_shards) and (num_replicas==0 or replicas == str(num_replicas)):
                     break
@@ -1280,11 +1282,13 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0):
                 chi,
                 f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
                 host=f"chi-{chi}-{cluster}-0-0",
+                pwd=pwd,
             )
             assert num_replicas==0 or str(num_replicas) == clickhouse.query(
                 chi,
                 f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
                 host=f"chi-{chi}-{cluster}-0-0",
+                pwd=pwd,
             )
 
 @TestScenario
@@ -3707,7 +3711,7 @@ def test_039(self, step=0, delete_chi=0):
             },
         )
 
-    wait_for_cluster(chi, cluster, 2)
+    wait_for_cluster(chi, cluster, 2, pwd="qkrq")
 
     with When("I create distributed table that use secure port and insert data into it"):
         clickhouse.query(
