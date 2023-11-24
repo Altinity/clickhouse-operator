@@ -355,7 +355,7 @@ def test_operator_restart(self, manifest, service, version=None):
                 "CREATE TABLE IF NOT EXISTS test_dist as test_local Engine = Distributed('{cluster}', default, test_local, a)",
                 host=h,
             )
-    wait_for_cluster(2, chi, cluster)
+    wait_for_cluster(chi, cluster, 2)
 
     trigger_event = threading.Event()
 
@@ -1255,25 +1255,35 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 
     return chi_shards
 
-def wait_for_cluster(n_shards, chi, cluster):
+def wait_for_cluster(chi, cluster, num_shards, num_replicas=0):
     with Given(f"Cluster {cluster} is properly configured"):
-        with By(f"remote_servers have {n_shards} shards"):
-            assert n_shards == get_shards_from_remote_servers(chi, cluster)
-        with By(f"ClickHouse recognizes {n_shards} shards in the cluster"):
+        with By(f"remote_servers have {num_shards} shards"):
+            assert num_shards == get_shards_from_remote_servers(chi, cluster)
+        with By(f"ClickHouse recognizes {num_shards} shards in the cluster"):
             cnt = ""
             for i in range(1, 10):
-                cnt = clickhouse.query(
+                shards = clickhouse.query(
                     chi,
-                    f"select count() from system.clusters where cluster ='{cluster}'",
+                    f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
                     host=f"chi-{chi}-{cluster}-0-0",
                 )
-                if cnt == str(n_shards):
+                replicas = clickhouse.query(
+                    chi,
+                    f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
+                    host=f"chi-{chi}-{cluster}-0-0",
+                )
+                if shards == str(num_shards) and (num_replicas==0 or replicas == str(num_replicas)):
                     break
                 with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                     time.sleep(i * 5)
-            assert str(n_shards) == clickhouse.query(
+            assert str(num_shards) == clickhouse.query(
                 chi,
-                f"select count() from system.clusters where cluster ='{cluster}'",
+                f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
+                host=f"chi-{chi}-{cluster}-0-0",
+            )
+            assert num_replicas==0 or str(num_replicas) == clickhouse.query(
+                chi,
+                f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
                 host=f"chi-{chi}-{cluster}-0-0",
             )
 
@@ -1347,7 +1357,7 @@ def test_014_0(self):
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)"
     ]
-    wait_for_cluster(n_shards, chi_name, cluster)
+    wait_for_cluster(chi_name, cluster, n_shards)
 
     with Then("Create schema objects"):
         for q in create_ddls:
@@ -2674,6 +2684,8 @@ def test_026(self):
     )
 
     with When("Cluster is ready"):
+        wait_for_cluster(chi, 'default', 1, 2)
+
         with Then("Check that first replica has one disk"):
             out = clickhouse.query(
                 chi,
@@ -3196,6 +3208,8 @@ def test_032(self):
 
     numbers = 100
 
+    wait_for_cluster(chi, 'default', 2, 2)
+
     with Given("Create replicated and distributed tables"):
         clickhouse.query(chi, create_table)
         clickhouse.query(
@@ -3469,6 +3483,8 @@ def test_036(self):
             },
         )
 
+    wait_for_cluster(chi, cluster, 1, 2)
+
     with And("I create replicated table with some data"):
         create_table = """
             CREATE TABLE test_local_036 ON CLUSTER '{cluster}' (a UInt32)
@@ -3691,6 +3707,8 @@ def test_039(self, step=0, delete_chi=0):
             },
         )
 
+    wait_for_cluster(chi, cluster, 2)
+
     with When("I create distributed table that use secure port and insert data into it"):
         clickhouse.query(
             chi,
@@ -3846,7 +3864,9 @@ def test_041(self):
             },
         )
 
-    with When("I create distributed table and insert data into it"):
+    wait_for_cluster(chi, cluster, 1, 2)
+
+    with When("I create replicated table and insert data into it"):
         clickhouse.query(
             chi,
             "CREATE TABLE secure_repl on cluster '{cluster}' (a UInt32) "
@@ -3855,24 +3875,18 @@ def test_041(self):
         )
         clickhouse.query(
             chi,
-            "CREATE TABLE secure on cluster '{cluster}' (a UInt32) "
-            "ENGINE = MergeTree() PARTITION BY tuple() ORDER BY a"
-        )
-        clickhouse.query(
-            chi,
-            "CREATE TABLE secure_dist on cluster '{cluster}' as secure "
-            "ENGINE = Distributed('{cluster}', default, secure, a%2)"
-        )
-        clickhouse.query(
-            chi,
-            "INSERT INTO secure_dist select number as a from numbers(10)"
+            "INSERT INTO secure_repl select number as a from numbers(10)",
+            host = f"chi-{chi}-{cluster}-0-0-0"
         )
 
     with Then("I check clickhouse can successfully connect to zookeeper"):
         clickhouse.query(chi, "SELECT * FROM system.zookeeper WHERE path = '/'")
 
-    with And("I check data is distributed"):
-        r = clickhouse.query(chi, "SELECT count(*) FROM secure_dist")
+    with And("I check data is replicated"):
+        r = clickhouse.query(
+            chi,
+            "SELECT count(*) FROM secure_repl",
+            host = f"chi-{chi}-{cluster}-0-1-0")
         assert r == "10"
 
     with And("I check connection is secured"):
@@ -4079,7 +4093,7 @@ def test_044(self):
     with When("I create replicated table on the first replica"):
         clickhouse.query(
             chi,
-            """CREATE TABLE test_local ON CLUSTER 'default' (a UInt32)
+            """CREATE TABLE test_local (a UInt32)
             Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
             PARTITION BY tuple() ORDER BY a"""
         )
