@@ -133,13 +133,12 @@ def create_and_check(manifest, check, ns=None, shell=None, timeout=1800):
 
     apply_chi(util.get_full_path(manifest, False), ns=ns, timeout=timeout, shell=shell)
 
-    # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
-    # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
-    wait_chi_status(chi_name, "InProgress", ns=ns, retries=3, throw_error=False, shell=shell)
-
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns, shell=shell)
     else:
+        # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
+        # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
+        wait_chi_status(chi_name, "InProgress", ns=ns, retries=3, throw_error=False, shell=shell)
         wait_chi_status(chi_name, "Completed", ns=ns, shell=shell)
 
     if "object_counts" in check:

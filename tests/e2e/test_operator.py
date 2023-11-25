@@ -146,7 +146,6 @@ def test_005(self):
 
 @TestScenario
 @Name("test_006. Test clickhouse version upgrade from one version to another using podTemplate change")
-@Tags("NO_PARALLEL")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_VersionUpgrades("1.0"))
 def test_006(self):
     create_shell_namespace_clickhouse_template()
@@ -1260,36 +1259,28 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
         with By(f"remote_servers have {num_shards} shards"):
             assert num_shards == get_shards_from_remote_servers(chi, cluster)
         with By(f"ClickHouse recognizes {num_shards} shards in the cluster"):
-            cnt = ""
-            for i in range(1, 10):
-                shards = clickhouse.query(
-                    chi,
-                    f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
-                    host=f"chi-{chi}-{cluster}-0-0",
-                    pwd=pwd,
-                )
-                replicas = clickhouse.query(
-                    chi,
-                    f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
-                    host=f"chi-{chi}-{cluster}-0-0",
-                    pwd=pwd,
-                )
-                if shards == str(num_shards) and (num_replicas==0 or replicas == str(num_replicas)):
-                    break
-                with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                    time.sleep(i * 5)
-            assert str(num_shards) == clickhouse.query(
-                chi,
-                f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
-                host=f"chi-{chi}-{cluster}-0-0",
-                pwd=pwd,
-            )
-            assert num_replicas==0 or str(num_replicas) == clickhouse.query(
-                chi,
-                f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
-                host=f"chi-{chi}-{cluster}-0-0",
-                pwd=pwd,
-            )
+            for shard in range(1, num_shards):
+                shards = ""
+                replicas = ""
+                for i in range(1, 10):
+                    shards = clickhouse.query(
+                        chi,
+                        f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
+                        host=f"chi-{chi}-{cluster}-{shard}-0",
+                        pwd=pwd,
+                    )
+                    replicas = clickhouse.query(
+                        chi,
+                        f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
+                        host=f"chi-{chi}-{cluster}-{shard}-0",
+                        pwd=pwd,
+                    )
+                    if shards == str(num_shards) and (num_replicas==0 or replicas == str(num_replicas)):
+                        break
+                    with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                        time.sleep(i * 5)
+                assert str(num_shards) == shards
+                assert num_replicas==0 or str(num_replicas) == replicas
 
 @TestScenario
 @Name("test_014_0. Test that schema is correctly propagated on replicas")
