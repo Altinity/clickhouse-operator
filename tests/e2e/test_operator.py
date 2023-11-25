@@ -1261,7 +1261,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
         with By(f"ClickHouse recognizes {num_shards} shards in the cluster"):
             for shard in range(1, num_shards):
                 shards = ""
-                replicas = ""
+                nodes = ""
                 for i in range(1, 10):
                     shards = clickhouse.query(
                         chi,
@@ -1269,18 +1269,20 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
                         host=f"chi-{chi}-{cluster}-{shard}-0",
                         pwd=pwd,
                     )
-                    replicas = clickhouse.query(
+                    nodes = clickhouse.query(
                         chi,
-                        f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
+                        "SELECT count() FROM cluster('all-sharded', cluster('all-sharded', system.one))",
                         host=f"chi-{chi}-{cluster}-{shard}-0",
                         pwd=pwd,
-                    )
-                    if shards == str(num_shards) and (num_replicas==0 or replicas == str(num_replicas)):
+                        )
+                    if shards == str(num_shards):
+                        break
+                    if num_replicas==0 or nodes == str(num_replicas*num_shards):
                         break
                     with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                         time.sleep(i * 5)
                 assert str(num_shards) == shards
-                assert num_replicas==0 or str(num_replicas) == replicas
+                assert nodes == str(num_replicas*num_shards)
 
 @TestScenario
 @Name("test_014_0. Test that schema is correctly propagated on replicas")
@@ -3868,12 +3870,14 @@ def test_041(self):
     wait_for_cluster(chi, cluster, 1, 2)
 
     with When("I create replicated table and insert data into it"):
-        clickhouse.query(
-            chi,
-            "CREATE TABLE secure_repl on cluster '{cluster}' (a UInt32) "
-            "ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{uuid}', '{replica}')  "
-            "PARTITION BY tuple() ORDER BY a"
-        )
+        for r in [0,1]:
+            clickhouse.query(
+                chi,
+                host = f"chi-{chi}-{cluster}-0-{r}-0",
+                sql = "CREATE TABLE secure_repl (a UInt32) "
+                "ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{table}', '{replica}')  "
+                "PARTITION BY tuple() ORDER BY a"
+                )
         clickhouse.query(
             chi,
             "INSERT INTO secure_repl select number as a from numbers(10)",
