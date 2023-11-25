@@ -2700,7 +2700,13 @@ def test_026(self):
     with When("Create a table and generate several inserts"):
         clickhouse.query(
             chi,
-            sql="DROP TABLE IF EXISTS test_disks ON CLUSTER '{cluster}' SYNC; CREATE TABLE test_disks ON CLUSTER '{cluster}' (a Int64) Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}') PARTITION BY (a%10) ORDER BY a",
+            host="chi-test-026-mixed-replicas-default-0-0",
+            sql="CREATE TABLE test_disks (a Int64) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') PARTITION BY (a%10) ORDER BY a",
+        )
+        clickhouse.query(
+            chi,
+            host="chi-test-026-mixed-replicas-default-0-1",
+            sql="CREATE TABLE test_disks (a Int64) Engine = ReplicatedMergeTree('/clickhouse/tables/{database}/{table}', '{replica}') PARTITION BY (a%10) ORDER BY a",
         )
         clickhouse.query(
             chi,
