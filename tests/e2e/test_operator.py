@@ -1276,13 +1276,12 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
                         pwd=pwd,
                         )
                     if shards == str(num_shards):
-                        break
-                    if num_replicas==0 or nodes == str(num_replicas*num_shards):
-                        break
+                        if num_replicas==0 or nodes == str(num_replicas*num_shards):
+                            break
                     with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                         time.sleep(i * 5)
                 assert str(num_shards) == shards
-                assert nodes == str(num_replicas*num_shards)
+                assert num_replicas==0 or nodes == str(num_replicas*num_shards)
 
 @TestScenario
 @Name("test_014_0. Test that schema is correctly propagated on replicas")
