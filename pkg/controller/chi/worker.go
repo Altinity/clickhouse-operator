@@ -33,6 +33,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -1254,7 +1255,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *chiV1.ClickHouseInsta
 		return nil
 	}
 
-	updatedConfigMap, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, newUpdateOptions())
+	updatedConfigMap, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, controller.NewUpdateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
@@ -1282,7 +1283,7 @@ func (w *worker) createConfigMap(ctx context.Context, chi *chiV1.ClickHouseInsta
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(ctx, configMap, newCreateOptions())
+	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(ctx, configMap, controller.NewCreateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
@@ -1392,7 +1393,7 @@ func (w *worker) updateService(
 		log.V(2).Info("task is done")
 		return nil
 	}
-	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(ctx, newService, newUpdateOptions())
+	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(ctx, newService, controller.NewUpdateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
@@ -1417,7 +1418,7 @@ func (w *worker) createService(ctx context.Context, chi *chiV1.ClickHouseInstall
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(ctx, service, newCreateOptions())
+	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(ctx, service, controller.NewCreateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
@@ -1442,7 +1443,7 @@ func (w *worker) createSecret(ctx context.Context, chi *chiV1.ClickHouseInstalla
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, newCreateOptions())
+	_, err := w.c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, controller.NewCreateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).

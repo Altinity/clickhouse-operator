@@ -27,6 +27,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -111,7 +112,7 @@ func (c *Controller) labelMyObjectsTree(ctx context.Context) error {
 }
 
 func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*coreV1.Pod, error) {
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, newGetOptions())
+	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(ctx, name, controller.NewGetOptions())
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR get Pod %s/%s %v", namespace, name, err)
 		return nil, err
@@ -124,7 +125,7 @@ func (c *Controller) labelPod(ctx context.Context, namespace, name string) (*cor
 
 	// Put label on the Pod
 	pod.Labels = c.addLabels(pod.Labels)
-	pod, err = c.kubeClient.CoreV1().Pods(namespace).Update(ctx, pod, newUpdateOptions())
+	pod, err = c.kubeClient.CoreV1().Pods(namespace).Update(ctx, pod, controller.NewUpdateOptions())
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
 		return nil, err
@@ -158,7 +159,7 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *coreV1.Pod) (*app
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
-	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Get(ctx, replicaSetName, newGetOptions())
+	replicaSet, err := c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Get(ctx, replicaSetName, controller.NewGetOptions())
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
@@ -171,7 +172,7 @@ func (c *Controller) labelReplicaSet(ctx context.Context, pod *coreV1.Pod) (*app
 
 	// Put label on the ReplicaSet
 	replicaSet.Labels = c.addLabels(replicaSet.Labels)
-	replicaSet, err = c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Update(ctx, replicaSet, newUpdateOptions())
+	replicaSet, err = c.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Update(ctx, replicaSet, controller.NewUpdateOptions())
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
@@ -205,7 +206,7 @@ func (c *Controller) labelDeployment(ctx context.Context, rs *appsV1.ReplicaSet)
 	}
 
 	// Deployment namespaced name found, fetch the Deployment
-	deployment, err := c.kubeClient.AppsV1().Deployments(rs.Namespace).Get(ctx, deploymentName, newGetOptions())
+	deployment, err := c.kubeClient.AppsV1().Deployments(rs.Namespace).Get(ctx, deploymentName, controller.NewGetOptions())
 	if err != nil {
 		log.V(1).M(rs.Namespace, deploymentName).F().Error("ERROR get Deployment %s/%s", rs.Namespace, deploymentName)
 		return err
@@ -218,7 +219,7 @@ func (c *Controller) labelDeployment(ctx context.Context, rs *appsV1.ReplicaSet)
 
 	// Put label on the Deployment
 	deployment.Labels = c.addLabels(deployment.Labels)
-	deployment, err = c.kubeClient.AppsV1().Deployments(rs.Namespace).Update(ctx, deployment, newUpdateOptions())
+	deployment, err = c.kubeClient.AppsV1().Deployments(rs.Namespace).Update(ctx, deployment, controller.NewUpdateOptions())
 	if err != nil {
 		log.V(1).M(rs.Namespace, deploymentName).F().Error("ERROR put label on Deployment %s/%s %v", rs.Namespace, deploymentName, err)
 		return err
@@ -261,7 +262,7 @@ func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *chiV1.ChiH
 
 	if model.AppendLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, controller.NewUpdateOptions())
 		if err != nil {
 			log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
 			return err
@@ -295,7 +296,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *chiV1.ChiHos
 
 	if model.DeleteLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, newUpdateOptions())
+		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, controller.NewUpdateOptions())
 		return err
 	}
 
@@ -317,7 +318,7 @@ func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *c
 
 	if model.AppendAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
+		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 		if err != nil {
 			log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Address.NamespaceNameString(), err)
 			return err
@@ -351,7 +352,7 @@ func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *chi
 
 	if model.DeleteAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, newUpdateOptions())
+		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 		return err
 	}
 

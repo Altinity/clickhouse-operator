@@ -26,6 +26,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -41,7 +42,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 	statefulSet := host.DesiredStatefulSet
 
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
-	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, newCreateOptions()); err != nil {
+	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions()); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
 		return errCRUDRecreate
 	}
@@ -71,7 +72,7 @@ func (c *Controller) updateStatefulSet(
 	}
 
 	// Apply newStatefulSet and wait for Generation to change
-	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(ctx, newStatefulSet, newUpdateOptions())
+	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(ctx, newStatefulSet, controller.NewUpdateOptions())
 	if err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update failed. err: %v", err)
 		diff, equal := messagediff.DeepDiff(oldStatefulSet.Spec, newStatefulSet.Spec)
@@ -151,11 +152,11 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 		return nil, fmt.Errorf("task is done")
 	}
 
-	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
+	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, controller.NewGetOptions())
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
 			// This is not an error per se, means PVC is not created (yet)?
-			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, newCreateOptions())
+			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, controller.NewCreateOptions())
 			if err != nil {
 				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)
 			}
@@ -166,7 +167,7 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 		return nil, err
 	}
 
-	pvcUpdated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
+	pvcUpdated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, controller.NewUpdateOptions())
 	if err != nil {
 		// Update failed
 		//if strings.Contains(err.Error(), "field can not be less than previous value") {
@@ -246,7 +247,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
 		// This will rollback Pod to previous .spec
 		statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
-		statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, newUpdateOptions())
+		statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, controller.NewUpdateOptions())
 		_ = c.statefulSetDeletePod(ctx, statefulSet, host)
 
 		return c.shouldContinueOnUpdateFailed()
@@ -301,7 +302,7 @@ func (c *Controller) createSecret(ctx context.Context, secret *coreV1.Secret) er
 	}
 
 	log.V(1).Info("Create Secret %s/%s", secret.Namespace, secret.Name)
-	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, newCreateOptions()); err != nil {
+	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, controller.NewCreateOptions()); err != nil {
 		// Unable to create StatefulSet at all
 		log.V(1).Error("Create Secret %s/%s failed err:%v", secret.Namespace, secret.Name, err)
 		return err

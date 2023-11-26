@@ -12,43 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package controller
 
 import (
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// newListOptions returns filled metav1.ListOptions
-func newListOptions(labelsMap map[string]string) metaV1.ListOptions {
+// NewListOptions returns filled metav1.ListOptions
+func NewListOptions(labelsMap map[string]string) metaV1.ListOptions {
 	labelSelector := labels.SelectorFromSet(labelsMap)
 	return metaV1.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
 }
 
-// newGetOptions returns filled metav1.GetOptions
-func newGetOptions() metaV1.GetOptions {
+// NewGetOptions returns filled metav1.GetOptions
+func NewGetOptions() metaV1.GetOptions {
 	return metaV1.GetOptions{}
 }
 
-// newCreateOptions returns filled metav1.CreateOptions
-func newCreateOptions() metaV1.CreateOptions {
+// NewCreateOptions returns filled metav1.CreateOptions
+func NewCreateOptions() metaV1.CreateOptions {
 	return metaV1.CreateOptions{}
 }
 
-// newUpdateOptions returns filled metav1.UpdateOptions
-func newUpdateOptions() metaV1.UpdateOptions {
+// NewUpdateOptions returns filled metav1.UpdateOptions
+func NewUpdateOptions() metaV1.UpdateOptions {
 	return metaV1.UpdateOptions{}
 }
 
-// newPatchOptions returns filled metav1.PatchOptions
-func newPatchOptions() metaV1.PatchOptions {
+// NewPatchOptions returns filled metav1.PatchOptions
+func NewPatchOptions() metaV1.PatchOptions {
 	return metaV1.PatchOptions{}
 }
 
-// newDeleteOptions returns filled *metav1.DeleteOptions
-func newDeleteOptions() metaV1.DeleteOptions {
+// NewDeleteOptions returns filled *metav1.DeleteOptions
+func NewDeleteOptions() metaV1.DeleteOptions {
 	gracePeriodSeconds := int64(0)
 	propagationPolicy := metaV1.DeletePropagationForeground
 	return metaV1.DeleteOptions{

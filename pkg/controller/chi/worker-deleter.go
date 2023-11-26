@@ -24,6 +24,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -125,7 +126,7 @@ func (w *worker) purgeStatefulSet(
 ) int {
 	if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
-		if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+		if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 		return 1
@@ -142,7 +143,7 @@ func (w *worker) purgePVC(
 	if shouldPurgePVC(chi, reconcileFailedObjs, m) {
 		if model.GetReclaimPolicy(m) == chiV1.PVCReclaimPolicyDelete {
 			w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
-			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
 				w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
 			}
 		}
@@ -157,7 +158,7 @@ func (w *worker) purgeConfigMap(
 ) {
 	if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
-		if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+		if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
@@ -171,7 +172,7 @@ func (w *worker) purgeService(
 ) {
 	if shouldPurgeService(chi, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
-		if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+		if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
@@ -185,7 +186,7 @@ func (w *worker) purgeSecret(
 ) {
 	if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
-		if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+		if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
@@ -199,7 +200,7 @@ func (w *worker) purgePDB(
 ) {
 	if shouldPurgePDB(chi, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
-		if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, newDeleteOptions()); err != nil {
+		if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
@@ -608,7 +609,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 	// so in this case we should agree to delete CHI itself, but has to keep all CHI's child resources.
 
 	var clear bool
-	crd, err := w.c.extClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, "clickhouseinstallations.clickhouse.altinity.com", newGetOptions())
+	crd, err := w.c.extClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, "clickhouseinstallations.clickhouse.altinity.com", controller.NewGetOptions())
 	if err == nil {
 		if crd.ObjectMeta.DeletionTimestamp.IsZero() {
 			// CRD is not being deleted and operator can delete all child resources.
@@ -626,7 +627,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *chiV1.ClickHouseInstal
 	}
 
 	if clear {
-		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(ctx, new.Name, newGetOptions())
+		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(ctx, new.Name, controller.NewGetOptions())
 		if cur == nil {
 			return false
 		}
@@ -667,10 +668,10 @@ func (w *worker) deleteLostPVC(ctx context.Context, pvc *coreV1.PersistentVolume
 	w.a.V(1).M(pvc).F().S().Info("delete lost PVC start: %s/%s", pvc.Namespace, pvc.Name)
 	defer w.a.V(1).M(pvc).F().E().Info("delete lost PVC end: %s/%s", pvc.Namespace, pvc.Name)
 
-	w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, newDeleteOptions())
+	w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, controller.NewDeleteOptions())
 
 	for i := 0; i < 360; i++ {
-		curPVC, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
+		curPVC, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, controller.NewGetOptions())
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
 				return true

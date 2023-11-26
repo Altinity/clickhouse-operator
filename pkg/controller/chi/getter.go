@@ -25,6 +25,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
@@ -166,12 +167,12 @@ func (c *Controller) getStatefulSetByHost(host *chiV1.ChiHost) (*appsV1.Stateful
 	name := model.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
-	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, newGetOptions())
+	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, controller.NewGetOptions())
 }
 
 // getSecret gets secret
 func (c *Controller) getSecret(secret *coreV1.Secret) (*coreV1.Secret, error) {
-	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(newContext(), secret.Name, newGetOptions())
+	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(newContext(), secret.Name, controller.NewGetOptions())
 }
 
 // getPod gets pod. Accepted types:
@@ -187,7 +188,7 @@ func (c *Controller) getPod(obj interface{}) (*coreV1.Pod, error) {
 		name = model.CreatePodName(obj)
 		namespace = typedObj.Address.Namespace
 	}
-	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
+	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, controller.NewGetOptions())
 }
 
 // getPods gets all pods for provided entity
@@ -273,5 +274,5 @@ func (c *Controller) GetCHIByObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI boo
 		}
 	}
 
-	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(newContext(), chiName, newGetOptions())
+	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(newContext(), chiName, controller.NewGetOptions())
 }

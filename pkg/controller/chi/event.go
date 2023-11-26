@@ -22,6 +22,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
 const (
@@ -140,7 +141,7 @@ func (c *Controller) emitEvent(
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
-	_, err := c.kubeClient.CoreV1().Events(namespace).Create(newContext(), event, newCreateOptions())
+	_, err := c.kubeClient.CoreV1().Events(namespace).Create(newContext(), event, controller.NewCreateOptions())
 
 	if err != nil {
 		log.M(chi).F().Error("Create Event failed: %v", err)

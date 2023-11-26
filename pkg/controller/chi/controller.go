@@ -46,6 +46,7 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -700,7 +701,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *chiV1.ClickHou
 		Value: chi.ObjectMeta.Finalizers,
 	}})
 
-	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, newPatchOptions())
+	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, controller.NewPatchOptions())
 	if err != nil {
 		// Error update
 		log.V(1).M(chi).F().Error("%q", err)
@@ -764,7 +765,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chiV1.Cli
 
 	podIPs := c.getPodsIPs(chi)
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
 	if err != nil {
 		if opts.TolerateAbsence {
 			return nil
@@ -784,7 +785,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *chiV1.Cli
 	cur.EnsureStatus().CopyFrom(chi.Status, opts.CopyCHIStatusOptions)
 	cur.EnsureStatus().SetPodIPs(podIPs)
 
-	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, newUpdateOptions())
+	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, controller.NewUpdateOptions())
 	if err != nil {
 		// Error update
 		log.V(2).M(chi).F().Info("Got error upon update, may retry. err: %q", err)
@@ -812,7 +813,7 @@ func (c *Controller) poll(ctx context.Context, chi *chiV1.ClickHouseInstallation
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
 
 	for {
-		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, newGetOptions())
+		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
 		if f(cur, err) {
 			// Continue polling
 			if util.IsContextDone(ctx) {
@@ -837,7 +838,7 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *chiV1.ClickHouse
 	log.V(2).M(chi).S().P()
 	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, controller.NewGetOptions())
 	if err != nil {
 		return err
 	}
@@ -865,7 +866,7 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *chiV1.ClickHou
 	log.V(2).M(chi).S().P()
 	defer log.V(2).M(chi).E().P()
 
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, newGetOptions())
+	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Get(ctx, chi.Name, controller.NewGetOptions())
 	if err != nil {
 		return err
 	}

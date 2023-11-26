@@ -24,6 +24,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -62,7 +63,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chiV1.ClickHo
 	configMapCommonUsersName := model.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
-	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommon, newDeleteOptions())
+	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommon, controller.NewDeleteOptions())
 	switch {
 	case err == nil:
 		log.V(1).M(chi).Info("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommon)
@@ -72,7 +73,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chiV1.ClickHo
 		log.V(1).M(chi).F().Error("FAIL delete ConfigMap %s/%s err:%v", chi.Namespace, configMapCommon, err)
 	}
 
-	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommonUsersName, newDeleteOptions())
+	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommonUsersName, controller.NewDeleteOptions())
 	switch {
 	case err == nil:
 		log.V(1).M(chi).Info("OK delete ConfigMap %s/%s", chi.Namespace, configMapCommonUsersName)
@@ -95,7 +96,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 
 	name := model.CreatePodName(statefulSet)
 	log.V(1).M(host).Info("Delete Pod %s/%s", statefulSet.Namespace, name)
-	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(ctx, name, newDeleteOptions())
+	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	if err == nil {
 		log.V(1).M(host).Info("OK delete Pod %s/%s", statefulSet.Namespace, name)
 	} else if apiErrors.IsNotFound(err) {
@@ -141,7 +142,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 	// This is the proper and graceful way to delete StatefulSet
 	var zero int32 = 0
 	host.CurStatefulSet.Spec.Replicas = &zero
-	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, host.CurStatefulSet, newUpdateOptions()); err != nil {
+	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, host.CurStatefulSet, controller.NewUpdateOptions()); err != nil {
 		log.V(1).M(host).Error("UNABLE to update StatefulSet %s/%s", namespace, name)
 		return err
 	}
@@ -150,7 +151,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 	_ = c.waitHostReady(ctx, host)
 
 	// And now delete empty StatefulSet
-	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
+	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, controller.NewDeleteOptions()); err == nil {
 		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
 		c.waitHostDeleted(host)
 	} else if apiErrors.IsNotFound(err) {
@@ -208,7 +209,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chiV1.ChiHost) error {
 		}
 
 		// Delete PVC
-		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, newDeleteOptions()); err == nil {
+		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, controller.NewDeleteOptions()); err == nil {
 			log.V(1).M(host).Info("OK delete PVC %s/%s", namespace, pvc.Name)
 		} else if apiErrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found PVC %s/%s", namespace, pvc.Name)
@@ -231,7 +232,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chiV1.ChiHost) e
 	namespace := host.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
-	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, newDeleteOptions()); err == nil {
+	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions()); err == nil {
 		log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
 	} else if apiErrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
@@ -314,7 +315,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	}
 
 	// Check specified service exists
-	_, err := c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, newGetOptions())
+	_, err := c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, controller.NewGetOptions())
 
 	if err != nil {
 		// No such a service, nothing to delete
@@ -322,7 +323,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	}
 
 	// Delete service
-	err = c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, newDeleteOptions())
+	err = c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	if err == nil {
 		log.V(1).M(namespace, name).Info("OK delete Service %s/%s", namespace, name)
 	} else {
@@ -353,7 +354,7 @@ func (c *Controller) deleteSecretIfExists(ctx context.Context, namespace, name s
 	}
 
 	// Check specified service exists
-	_, err := c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, newGetOptions())
+	_, err := c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, controller.NewGetOptions())
 
 	if err != nil {
 		// No such a service, nothing to delete
@@ -361,7 +362,7 @@ func (c *Controller) deleteSecretIfExists(ctx context.Context, namespace, name s
 	}
 
 	// Delete
-	err = c.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, name, newDeleteOptions())
+	err = c.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	if err == nil {
 		log.V(1).M(namespace, name).Info("OK delete Secret/%s", namespace, name)
 	} else {
