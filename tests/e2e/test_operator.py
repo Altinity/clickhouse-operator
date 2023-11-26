@@ -3466,7 +3466,6 @@ def test_034(self):
 @TestScenario
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_ReprovisioningVolume("1.0"))
 @Name("test_036. Check operator volume re-provisioning")
-@Tags("NO_PARALLEL")
 def test_036(self):
     """Check clickhouse operator recreates volumes and schema if volume is broken."""
     create_shell_namespace_clickhouse_template()
@@ -3478,6 +3477,7 @@ def test_036(self):
 
     manifest = f"manifests/chi/test-036-volume-re-provisioning-1.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "simple"
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     with Given("chi exists"):

@@ -214,9 +214,12 @@ def get_count(kind, name="", label="", chi="", ns=None, shell=None):
     if chi != "" and label == "":
         label = f"-l clickhouse.altinity.com/chi={chi}"
 
+    if ns == None:
+        ns = current().context.test_namespace
+
     if kind == "pv":
         # pv is not namespaced so need to search namespace in claimRef
-        out = launch(f'get pv {label} -o yaml | grep "namespace: {current().context.test_namespace}"', ok_to_fail=True, shell=shell)
+        out = launch(f'get pv {label} -o yaml | grep "namespace: {ns}"', ok_to_fail=True, shell=shell)
     else:
         out = launch(
             f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}",
