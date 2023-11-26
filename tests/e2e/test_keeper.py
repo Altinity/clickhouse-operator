@@ -71,16 +71,11 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
                 pod_prefix = "zookeeper"
             else:
                 expected_outs = (
-                    "[keeper, clickhouse]",
-                    "[clickhouse, keeper]",
-                    "[keeper]",
+                    "keeper clickhouse",
+                    "clickhouse keeper",
+                    "keeper",
                 )
-                keeper_cmd = "if [[ ! $(command -v zkcli) ]]; then "
-                keeper_cmd += "wget -q -O /tmp/zkcli.tar.gz https://github.com/let-us-go/zkcli/releases/download/v0.4.0/zkcli-0.4.0-linux-amd64.tar.gz; "
-                keeper_cmd += "cd /tmp; tar -xf zkcli.tar.gz; "
-                keeper_cmd += "mv -fv ./zkcli-0.4.0-linux-amd64/zkcli /bin/zkcli; "
-                keeper_cmd += "fi; "
-                keeper_cmd += "zkcli -s 127.0.0.1:2181 ls /"
+                keeper_cmd = "clickhouse-keeper client -h 127.0.0.1 -p 2181 -q 'ls /'"
                 pod_prefix = "clickhouse-keeper"
 
             out = kubectl.launch(
@@ -174,12 +169,12 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
     zk_manifest = yaml_manifest.get_multidoc_manifest_data(util.get_full_path(keeper_manifest, lookup_in_host=True))
     for doc in zk_manifest:
         if doc["kind"] == "StatefulSet":
-            with When(f"Path Zookeeper replicas: {keeper_replica_count}"):
+            with When(f"Patch {keeper_type} replicas: {keeper_replica_count}"):
                 keeper_name = doc["metadata"]["name"]
                 kubectl.launch(
                     f"patch --type=merge sts {keeper_name} -p '{{\"spec\":{{\"replicas\":{keeper_replica_count}}}}}'"
                 )
-                retries_num = 10
+                retries_num = 20
                 for i in range(retries_num):
                     pod_counts = kubectl.get_count("pod", f"-l app={keeper_type}")
                     if pod_counts == keeper_replica_count:
@@ -187,8 +182,8 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
                     elif i >= retries_num - 1:
                         assert pod_counts == keeper_replica_count
                     with Then(f"Zookeeper not ready. "
-                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {2*(i+1)} seconds"):
-                        time.sleep(2*(i+1))
+                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {3*(i+1)} seconds"):
+                        time.sleep(3*(i+1))
 
 
 @TestOutline
@@ -233,7 +228,7 @@ def test_keeper_rescale_outline(
             insert_tables=["test_repl1"],
         )
 
-    total_iterations = 1
+    total_iterations = 3
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
@@ -298,7 +293,7 @@ def test_keeper_rescale_outline(
                 keeper_manifest_1_node=keeper_manifest_1_node,
                 keeper_manifest_3_node=keeper_manifest_3_node
             )
-        with Then("Start CH + ZK "):
+        with Then(f"Start CH + ZK, expect keeper node count={keeper_replica_count}"):
             start_stop_zk_and_clickhouse(
                 chi['metadata']['name'],
                 ch_stop=False,
