@@ -17,13 +17,12 @@ package chk
 import (
 	"context"
 	"fmt"
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	apiMachinery "k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,6 +31,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	//	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -59,7 +59,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Fetch the ClickHouseKeeper instance
 	new = &apiChk.ClickHouseKeeperInstallation{}
 	if err := r.Get(ctx, req.NamespacedName, new); err != nil {
-		if errors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile
 			// request. Owned objects are automatically garbage collected. For
 			// additional cleanup logic use finalizers.
@@ -107,7 +107,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	// Fetch the ClickHouseKeeper instance
 	dummy := &apiChk.ClickHouseKeeperInstallation{}
 	if err := r.Get(ctx, req.NamespacedName, dummy); err != nil {
-		if errors.IsNotFound(err) {
+		if apiErrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile
 			// request. Owned objects are automatically garbage collected. For
 			// additional cleanup logic use finalizers.
@@ -226,7 +226,7 @@ func (r *ChkReconciler) reconcile(
 		return err
 	}
 	err = r.Client.Get(context.TODO(), getNamespacedName(new), cur)
-	if err != nil && errors.IsNotFound(err) {
+	if err != nil && apiErrors.IsNotFound(err) {
 		log.V(1).Info("Creating new " + name)
 
 		if err = r.Client.Create(context.TODO(), new); err != nil {
@@ -291,7 +291,6 @@ func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInsta
 		cur.Status.NormalizedCHKCompleted = chk.DeepCopy()
 		cur.Status.NormalizedCHKCompleted.ObjectMeta.ManagedFields = nil
 		cur.Status.NormalizedCHKCompleted.Status = nil
-
 
 		if err := r.Status().Update(context.TODO(), cur); err != nil {
 			log.V(1).Error("err: %s", err.Error())

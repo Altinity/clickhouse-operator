@@ -42,9 +42,9 @@ func initKeeper(ctx context.Context) {
 		//WithOptions(ctrl.Options{
 		//	CacheSyncTimeout: 1*time.Second,
 		//}).Complete(&controller.ChkReconciler{
-			Client: manager.GetClient(),
-			Scheme: manager.GetScheme(),
-		})
+		Client: manager.GetClient(),
+		Scheme: manager.GetScheme(),
+	})
 	if err != nil {
 		os.Exit(1)
 	}
