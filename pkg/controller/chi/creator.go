@@ -223,7 +223,6 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 
 	// Convenience shortcuts
 	namespace := rollbackStatefulSet.Namespace
-	name := rollbackStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
 	switch chop.Config().Reconcile.StatefulSet.Update.OnFailure {

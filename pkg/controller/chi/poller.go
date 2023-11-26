@@ -17,190 +17,157 @@ package chi
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	apps "k8s.io/api/apps/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-const (
-	waitStatefulSetGenerationTimeoutBeforeStartBothering = 60
-	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
-)
-
-// StatefulSetPollOptions specifies polling options
-type StatefulSetPollOptions struct {
-	StartBotheringAfterTimeout time.Duration
-	GetErrorTimeout            time.Duration
-	Timeout                    time.Duration
-	MainInterval               time.Duration
-	BackgroundInterval         time.Duration
-}
-
-// NewStatefulSetPollOptions creates new poll options
-func NewStatefulSetPollOptions() *StatefulSetPollOptions {
-	return &StatefulSetPollOptions{}
-}
-
-// Ensure ensures poll options do exist
-func (o *StatefulSetPollOptions) Ensure() *StatefulSetPollOptions {
-	if o == nil {
-		return NewStatefulSetPollOptions()
+// waitHostNotReady polls host's StatefulSet for not exists or not ready
+func (c *Controller) waitHostNotReady(ctx context.Context, host *api.ChiHost) error {
+	err := c.pollHostStatefulSet(
+		ctx,
+		host,
+		controller.NewPollerOptions().
+			FromConfig(chop.Config()).
+			SetGetErrorTimeout(0),
+		func(_ context.Context, sts *apps.StatefulSet) bool {
+			return model.IsStatefulSetNotReady(sts)
+		},
+		nil,
+	)
+	if apiErrors.IsNotFound(err) {
+		err = nil
 	}
-	return o
+
+	return err
 }
 
-// FromConfig makes poll options from config
-func (o *StatefulSetPollOptions) FromConfig(config *api.OperatorConfig) *StatefulSetPollOptions {
-	if o == nil {
-		return nil
+// waitHostReady polls host's StatefulSet until it is ready
+func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error {
+	// Wait for StatefulSet to reach generation
+	err := c.pollHostStatefulSet(
+		ctx,
+		host,
+		nil,
+		func(_ctx context.Context, sts *apps.StatefulSet) bool {
+			if sts == nil {
+				return false
+			}
+			_ = c.deleteLabelReadyPod(_ctx, host)
+			_ = c.deleteAnnotationReadyService(_ctx, host)
+			return model.IsStatefulSetGeneration(sts, sts.Generation)
+		},
+		func(_ctx context.Context) {
+			_ = c.deleteLabelReadyPod(_ctx, host)
+			_ = c.deleteAnnotationReadyService(_ctx, host)
+		},
+	)
+	if err != nil {
+		return err
 	}
-	o.StartBotheringAfterTimeout = time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second
-	o.GetErrorTimeout = time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second
-	o.Timeout = time.Duration(config.Reconcile.StatefulSet.Update.Timeout) * time.Second
-	o.MainInterval = time.Duration(config.Reconcile.StatefulSet.Update.PollInterval) * time.Second
-	o.BackgroundInterval = 1 * time.Second
-	return o
+
+	// Wait StatefulSet to reach ready status
+	return c.pollHostStatefulSet(
+		ctx,
+		host,
+		nil,
+		func(_ctx context.Context, sts *apps.StatefulSet) bool {
+			_ = c.deleteLabelReadyPod(_ctx, host)
+			_ = c.deleteAnnotationReadyService(_ctx, host)
+			return model.IsStatefulSetReady(sts)
+		},
+		func(_ctx context.Context) {
+			_ = c.deleteLabelReadyPod(_ctx, host)
+			_ = c.deleteAnnotationReadyService(_ctx, host)
+		},
+	)
 }
 
-// SetCreateTimeout sets create timeout
-func (o *StatefulSetPollOptions) SetGetErrorTimeout(timeout time.Duration) *StatefulSetPollOptions {
-	if o == nil {
-		return nil
-	}
-	o.GetErrorTimeout = timeout
-	return o
-}
-
-type PollerFunctions struct {
-	Get            func(context.Context) (any, error)
-	IsDone         func(context.Context, any) bool
-	ShouldContinue func(context.Context, any, error) bool
-}
-
-func (p *PollerFunctions) CallGet(c context.Context) (any, error) {
-	if p == nil {
-		return nil, nil
-	}
-	if p.Get == nil {
-		return nil, nil
-	}
-	return p.Get(c)
-}
-
-func (p *PollerFunctions) CallIsDone(c context.Context, a any) bool {
-	if p == nil {
-		return false
-	}
-	if p.IsDone == nil {
-		return false
-	}
-	return p.IsDone(c, a)
-}
-
-func (p *PollerFunctions) CallShouldContinue(c context.Context, a any, e error) bool {
-	if p == nil {
-		return false
-	}
-	if p.ShouldContinue == nil {
-		return false
-	}
-	return p.ShouldContinue(c, a, e)
-}
-
-type PollerBackgroundFunctions struct {
-	F func(context.Context)
-}
-
-func poll(
-	ctx context.Context,
-	namespace, name string,
-	opts *StatefulSetPollOptions,
-	main *PollerFunctions,
-	background *PollerBackgroundFunctions,
-) error {
-	opts = opts.Ensure()
-	start := time.Now()
+// waitHostDeleted polls host's StatefulSet until it is not available
+func (c *Controller) waitHostDeleted(host *api.ChiHost) {
 	for {
-		if util.IsContextDone(ctx) {
-			log.V(2).Info("task is done")
-			return nil
+		// TODO
+		// Probably there would be better way to wait until k8s reported StatefulSet deleted
+		if _, err := c.getStatefulSet(host); err == nil {
+			log.V(2).Info("cache NOT yet synced")
+			time.Sleep(15 * time.Second)
+		} else {
+			log.V(1).Info("cache synced")
+			return
 		}
-
-		item, err := main.CallGet(ctx)
-		switch {
-		case err == nil:
-			// Object is found - process it
-			if main.CallIsDone(ctx, item) {
-				// All is good, job is done, exit
-				log.V(1).M(namespace, name).F().Info("OK %s/%s", namespace, name)
-				return nil
-			}
-			// Object is found, but processor function says we need to continue polling
-		case main.CallShouldContinue(ctx, item, err):
-			// Object is not found - it either failed to be created or just still not created
-			if (opts.GetErrorTimeout > 0) && (time.Since(start) >= opts.GetErrorTimeout) {
-				// No more wait for the object to be created. Consider create process as failed.
-				log.V(1).M(namespace, name).F().Error("Get() FAILED - item is not available and get timeout reached. Abort")
-				return err
-			}
-			// Object is not found - create timeout is not reached, we need to continue polling
-		default:
-			// Some kind of total error, abort polling
-			log.M(namespace, name).F().Error("%s/%s Get() FAILED", namespace, name)
-			return err
-		}
-
-		// Continue polling
-
-		// May be time has come to abort polling?
-		if time.Since(start) >= opts.Timeout {
-			// Timeout reached, no good result available, time to abort
-			log.V(1).M(namespace, name).F().Info("poll(%s/%s) - TIMEOUT reached", namespace, name)
-			return fmt.Errorf("poll(%s/%s) - wait timeout", namespace, name)
-		}
-
-		// Continue polling
-
-		// May be time has come to start bothers into logs?
-		if time.Since(start) >= opts.StartBotheringAfterTimeout {
-			// Start bothering with log messages after some time only
-			log.V(1).M(namespace, name).F().Info("WAIT:%s/%s", namespace, name)
-		}
-
-		// Wait some more time and lauch background process(es)
-		log.V(2).M(namespace, name).F().P()
-		sleepAndRunBackgroundProcess(ctx, opts, background)
-	} // for
+	}
 }
 
-func sleepAndRunBackgroundProcess(ctx context.Context, opts *StatefulSetPollOptions, background *PollerBackgroundFunctions) {
-	if ctx == nil {
-		ctx = context.Background()
+// pollHost polls host
+func (c *Controller) pollHost(
+	ctx context.Context,
+	host *api.ChiHost,
+	opts *controller.PollerOptions,
+	isDoneFn func(ctx context.Context, host *api.ChiHost) bool,
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
 	}
-	switch {
-	case opts.BackgroundInterval > 0:
-		mainIntervalTimeout := time.After(opts.MainInterval)
-		backgroundIntervalTimeout := time.After(opts.BackgroundInterval)
-		for {
-			select {
-			case <-ctx.Done():
-				// Context is done, nothing to do here more
-				return
-			case <-mainIntervalTimeout:
-				// Timeout reached, nothing to do here more
-				return
-			case <-backgroundIntervalTimeout:
-				// Function interval reached, time to call the func
-				if background.F != nil {
-					background.F(ctx)
-				}
-				backgroundIntervalTimeout = time.After(opts.BackgroundInterval)
-			}
-		}
-	default:
-		util.WaitContextDoneOrTimeout(ctx, opts.MainInterval)
+
+	opts = opts.Ensure().FromConfig(chop.Config())
+	namespace := host.Address.Namespace
+	name := host.Address.HostName
+
+	return controller.Poll(
+		ctx,
+		namespace, name,
+		opts,
+		&controller.PollerFunctions{
+			IsDone: func(_ctx context.Context, _ any) bool {
+				return isDoneFn(_ctx, host)
+			},
+		},
+		nil,
+	)
+}
+
+// pollHostStatefulSet polls host's StatefulSet
+func (c *Controller) pollHostStatefulSet(
+	ctx context.Context,
+	host *api.ChiHost,
+	opts *controller.PollerOptions,
+	isDoneFn func(context.Context, *apps.StatefulSet) bool,
+	backFn func(context.Context),
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
 	}
+
+	namespace := host.Address.Namespace
+	name := host.Address.StatefulSet
+
+	return controller.Poll(
+		ctx,
+		namespace, name,
+		opts,
+		&controller.PollerFunctions{
+			Get: func(_ctx context.Context) (any, error) {
+				return c.getStatefulSet(host)
+			},
+			IsDone: func(_ctx context.Context, a any) bool {
+				return isDoneFn(_ctx, a.(*apps.StatefulSet))
+			},
+			ShouldContinue: func(_ctx context.Context, _ any, e error) bool {
+				return apiErrors.IsNotFound(e)
+			},
+		},
+		&controller.PollerBackgroundFunctions{
+			F: backFn,
+		},
+	)
 }
