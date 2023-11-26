@@ -1259,9 +1259,8 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
         with By(f"remote_servers have {num_shards} shards"):
             assert num_shards == get_shards_from_remote_servers(chi, cluster)
         with By(f"ClickHouse recognizes {num_shards} shards in the cluster"):
-            for shard in range(1, num_shards):
+            for shard in range(num_shards):
                 shards = ""
-                nodes = ""
                 for i in range(1, 10):
                     shards = clickhouse.query(
                         chi,
@@ -1269,19 +1268,28 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
                         host=f"chi-{chi}-{cluster}-{shard}-0",
                         pwd=pwd,
                     )
-                    nodes = clickhouse.query(
-                        chi,
-                        "SELECT count() FROM cluster('all-sharded', cluster('all-sharded', system.one))",
-                        host=f"chi-{chi}-{cluster}-{shard}-0",
-                        pwd=pwd,
-                        )
                     if shards == str(num_shards):
-                        if num_replicas==0 or nodes == str(num_replicas*num_shards):
-                            break
+                        break;
                     with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                         time.sleep(i * 5)
-                assert str(num_shards) == shards
-                assert num_replicas==0 or nodes == str(num_replicas*num_shards)
+                assert shards == str(num_shards)
+
+        if num_replicas>0:
+            with By(f"ClickHouse recognizes {num_replicas} replicas in the cluster"):
+                for replica in range(num_replicas):
+                    replicas = ""
+                    for i in range(1, 10):
+                        replicas = clickhouse.query(
+                            chi,
+                            f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
+                            host=f"chi-{chi}-{cluster}-0-{replica}",
+                            pwd=pwd,
+                            )
+                        if replicas == str(num_replicas):
+                            break
+                        with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                            time.sleep(i * 5)
+                    assert replicas == str(num_replicas)
 
 @TestScenario
 @Name("test_014_0. Test that schema is correctly propagated on replicas")
