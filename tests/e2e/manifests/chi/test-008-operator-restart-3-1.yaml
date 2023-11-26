@@ -26,8 +26,8 @@ spec:
       podTemplate: default
   templates:
     podTemplates:
-      - name: default
-        spec:
-          containers:
-            - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.3
+    - name: default
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: clickhouse/clickhouse-server:22.8

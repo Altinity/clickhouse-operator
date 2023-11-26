@@ -133,13 +133,12 @@ def create_and_check(manifest, check, ns=None, shell=None, timeout=1800):
 
     apply_chi(util.get_full_path(manifest, False), ns=ns, timeout=timeout, shell=shell)
 
-    # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
-    # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
-    wait_chi_status(chi_name, "InProgress", ns=ns, retries=3, throw_error=False, shell=shell)
-
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns, shell=shell)
     else:
+        # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
+        # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
+        wait_chi_status(chi_name, "InProgress", ns=ns, retries=3, throw_error=False, shell=shell)
         wait_chi_status(chi_name, "Completed", ns=ns, shell=shell)
 
     if "object_counts" in check:
@@ -215,9 +214,12 @@ def get_count(kind, name="", label="", chi="", ns=None, shell=None):
     if chi != "" and label == "":
         label = f"-l clickhouse.altinity.com/chi={chi}"
 
+    if ns == None:
+        ns = current().context.test_namespace
+
     if kind == "pv":
         # pv is not namespaced so need to search namespace in claimRef
-        out = launch(f'get pv {label} -o yaml | grep "namespace: {current().context.test_namespace}"', ok_to_fail=True, shell=shell)
+        out = launch(f'get pv {label} -o yaml | grep "namespace: {ns}"', ok_to_fail=True, shell=shell)
     else:
         out = launch(
             f"get {kind} {name} -o=custom-columns=kind:kind,name:.metadata.name {label}",

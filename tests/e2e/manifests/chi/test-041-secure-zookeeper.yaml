@@ -19,7 +19,7 @@ spec:
                 - -x
                 - -c
                 - |
-                  
+
                   cat << EOF > /usr/local/share/ca-certificates/my_own_ca.crt &&
                   -----BEGIN CERTIFICATE-----
                   MIIDljCCAn6gAwIBAgIUWCSwiZeH4eBrc+WT3cYqX6pUrjYwDQYJKoZIhvcNAQEL
@@ -44,11 +44,11 @@ spec:
                   /Fa9ElbT45l+4g==
                   -----END CERTIFICATE-----
                   EOF
-                  
+
                   update-ca-certificates &&
-                  
+
                   openssl verify -x509_strict -CAfile /usr/local/share/ca-certificates/my_own_ca.crt /etc/clickhouse-server/config.d/server.crt &&
-                  
+
                   cat << EOF > /client.crt &&
                   -----BEGIN CERTIFICATE-----
                   MIIDIDCCAggCFCKfcPe/PGW8TtarQJwRTgXRkrEYMA0GCSqGSIb3DQEBCwUAMFQx
@@ -70,7 +70,7 @@ spec:
                   U6T8Pt3rU1lBqAWIVAxtH4DoTvLtwWc9pr9AJBSfRQmvseSB
                   -----END CERTIFICATE-----
                   EOF
-                  
+
                   cat << EOF > /client.key &&
                   -----BEGIN PRIVATE KEY-----
                   MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDBHg6uXdw/w3RI
@@ -101,9 +101,9 @@ spec:
                   ciPq4SysQPk8R3R/kQ5RvQ==
                   -----END PRIVATE KEY-----
                   EOF
-                  
+
                   openssl verify -x509_strict -CAfile /usr/local/share/ca-certificates/my_own_ca.crt /client.crt &&
-                  
+
                   /entrypoint.sh
 
   configuration:
@@ -115,8 +115,8 @@ spec:
     clusters:
       - name: "default"
         layout:
-          shardsCount: 2
-          replicasCount: 1
+          shardsCount: 1
+          replicasCount: 2
     settings:
       tcp_port: 9000 # keep for localhost
       tcp_port_secure: 9440
