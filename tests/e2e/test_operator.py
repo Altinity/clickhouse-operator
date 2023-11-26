@@ -454,7 +454,6 @@ def check_remote_servers(self, chi, shards, trigger_event, shell=None, cluster="
 
 @TestScenario
 @Name("test_008_1. Test operator restart")
-@Tags("NO_PARALLEL")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_RestartingOperator("1.0"))
 def test_008_1(self):
     create_shell_namespace_clickhouse_template()
@@ -472,7 +471,6 @@ def test_008_1(self):
 
 @TestScenario
 @Name("test_008_2. Test operator restart")
-@Tags("NO_PARALLEL")
 def test_008_2(self):
     create_shell_namespace_clickhouse_template()
 
@@ -489,7 +487,6 @@ def test_008_2(self):
 
 @TestScenario
 @Name("test_008_3. Test operator restart in the middle of reconcile")
-@Tags("NO_PARALLEL")
 def test_008_3(self):
     create_shell_namespace_clickhouse_template()
 

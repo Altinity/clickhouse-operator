@@ -7,7 +7,6 @@ metadata:
 spec:
   useTemplates:
     - name: persistent-volume
-    - name: clickhouse-version
   configuration:
     zookeeper:
       nodes:
@@ -25,3 +24,10 @@ spec:
     templates:
       dataVolumeClaimTemplate: default
       podTemplate: default
+  templates:
+    podTemplates:
+    - name: default
+      spec:
+        containers:
+        - name: clickhouse-pod
+          image: clickhouse/clickhouse-server:22.8
