@@ -194,8 +194,10 @@ func sleepAndRunBackgroundProcess(ctx context.Context, opts *PollerOptions, back
 				return
 			case <-backgroundIntervalTimeout:
 				// Function interval reached, time to call the func
-				if background.F != nil {
-					background.F(ctx)
+				if background != nil {
+					if background.F != nil {
+						background.F(ctx)
+					}
 				}
 				backgroundIntervalTimeout = time.After(opts.BackgroundInterval)
 			}
