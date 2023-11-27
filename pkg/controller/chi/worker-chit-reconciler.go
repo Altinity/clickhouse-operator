@@ -16,16 +16,16 @@ package chi
 
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
 func (w *worker) shouldUpdateCHITList() bool {
 	update := false
 	switch chop.Config().Template.CHI.Policy {
-	case chiV1.OperatorConfigCHIPolicyReadOnStart:
+	case api.OperatorConfigCHIPolicyReadOnStart:
 		update = w.isJustStarted()
-	case chiV1.OperatorConfigCHIPolicyApplyOnNextReconcile:
+	case api.OperatorConfigCHIPolicyApplyOnNextReconcile:
 		update = true
 	default:
 		update = false
@@ -34,12 +34,12 @@ func (w *worker) shouldUpdateCHITList() bool {
 }
 
 // addChit sync new CHIT - creates all its resources
-func (w *worker) addChit(chit *chiV1.ClickHouseInstallationTemplate) error {
+func (w *worker) addChit(chit *api.ClickHouseInstallationTemplate) error {
 	log.V(1).M(chit).F().P()
 
 	if w.shouldUpdateCHITList() {
 		log.V(1).M(chit).F().Info("Add CHIT: %s/%s", chit.Namespace, chit.Name)
-		chop.Config().AddCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+		chop.Config().AddCHITemplate((*api.ClickHouseInstallation)(chit))
 	} else {
 		log.V(1).M(chit).F().Info("CHIT will not be added: %s/%s", chit.Namespace, chit.Name)
 	}
@@ -47,7 +47,7 @@ func (w *worker) addChit(chit *chiV1.ClickHouseInstallationTemplate) error {
 }
 
 // updateChit sync CHIT which was already created earlier
-func (w *worker) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) error {
+func (w *worker) updateChit(old, new *api.ClickHouseInstallationTemplate) error {
 	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
 		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
 		// No need to react
@@ -57,7 +57,7 @@ func (w *worker) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) erro
 	log.V(1).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
 	if w.shouldUpdateCHITList() {
 		log.V(1).M(new).F().Info("Update CHIT: %s/%s", new.Namespace, new.Name)
-		chop.Config().UpdateCHITemplate((*chiV1.ClickHouseInstallation)(new))
+		chop.Config().UpdateCHITemplate((*api.ClickHouseInstallation)(new))
 	} else {
 		log.V(1).M(new).F().Info("CHIT will not be updated: %s/%s", new.Namespace, new.Name)
 	}
@@ -65,12 +65,12 @@ func (w *worker) updateChit(old, new *chiV1.ClickHouseInstallationTemplate) erro
 }
 
 // deleteChit deletes CHIT
-func (w *worker) deleteChit(chit *chiV1.ClickHouseInstallationTemplate) error {
+func (w *worker) deleteChit(chit *api.ClickHouseInstallationTemplate) error {
 	log.V(1).M(chit).F().P()
 
 	if w.shouldUpdateCHITList() {
 		log.V(1).M(chit).F().Info("Delete CHIT: %s/%s", chit.Namespace, chit.Name)
-		chop.Config().DeleteCHITemplate((*chiV1.ClickHouseInstallation)(chit))
+		chop.Config().DeleteCHITemplate((*api.ClickHouseInstallation)(chit))
 	} else {
 		log.V(1).M(chit).F().Info("CHIT will not be deleted: %s/%s", chit.Namespace, chit.Name)
 	}
