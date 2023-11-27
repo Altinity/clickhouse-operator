@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	// log "k8s.io/klog"
@@ -285,6 +286,8 @@ type OperatorConfigCHIRuntime struct {
 	TemplateFiles map[string]string `json:"templateFiles,omitempty" yaml:"templateFiles,omitempty"`
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
+	mutex     sync.RWMutex
+
 	// ClickHouseInstallation template
 	Template *ClickHouseInstallation `json:"-" yaml:"-"`
 }
@@ -516,9 +519,11 @@ func (c *OperatorConfig) readCHITemplates() (errs []error) {
 
 // enlistCHITemplate inserts template into templates catalog
 func (c *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation) {
-	if template.FoundIn(c.Template.CHI.Runtime.Templates) {
-		c.unlistCHITemplate(template)
-	}
+	c.unlistCHITemplate(template)
+
+	c.Template.CHI.Runtime.mutex.Lock()
+	defer c.Template.CHI.Runtime.mutex.Unlock()
+
 	if !template.FoundIn(c.Template.CHI.Runtime.Templates) {
 		c.Template.CHI.Runtime.Templates = append(c.Template.CHI.Runtime.Templates, template)
 	}
@@ -526,9 +531,13 @@ func (c *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation) {
 
 // unlistCHITemplate removes template from templates catalog
 func (c *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
+	c.Template.CHI.Runtime.mutex.Lock()
+	defer c.Template.CHI.Runtime.mutex.Unlock()
+
 	// Nullify found template entry
 	for _, _template := range c.Template.CHI.Runtime.Templates {
 		if template.MatchFullName(_template.Namespace, _template.Name) {
+			// Mark for deletion
 			_template.Name = ""
 			_template.Namespace = ""
 		}
@@ -547,6 +556,9 @@ func (c *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
 
 // FindTemplate finds specified template within possibly specified namespace
 func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, fallbackNamespace string) *ClickHouseInstallation {
+	c.Template.CHI.Runtime.mutex.RLock()
+	defer c.Template.CHI.Runtime.mutex.RUnlock()
+
 	// Try to find direct match
 	for _, _template := range c.Template.CHI.Runtime.Templates {
 		if _template.MatchFullName(use.Namespace, use.Name) {
@@ -579,6 +591,9 @@ func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, fallbackNamespace str
 // GetAutoTemplates gets all auto templates.
 // Auto templates are sorted alphabetically by tuple: namespace, name
 func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
+	c.Template.CHI.Runtime.mutex.RLock()
+	defer c.Template.CHI.Runtime.mutex.RUnlock()
+
 	// Extract auto-templates from all templates listed
 	var autoTemplates []*ClickHouseInstallation
 	for _, _template := range c.Template.CHI.Runtime.Templates {
