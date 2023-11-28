@@ -3843,6 +3843,7 @@ def test_040(self):
 
     with Then("uptime() should be more than 120 seconds as defined by a probe"):
         out = clickhouse.query(chi, "select uptime()")
+        print(f"clickhouse uptime: {out}")
         assert int(out) > 120
 
     with Finally("I clean up"):
