@@ -35,8 +35,6 @@ func (w *worker) shouldUpdateCHITList() bool {
 
 // addChit sync new CHIT - creates all its resources
 func (w *worker) addChit(chit *api.ClickHouseInstallationTemplate) error {
-	log.V(1).M(chit).F().P()
-
 	if w.shouldUpdateCHITList() {
 		log.V(1).M(chit).F().Info("Add CHIT: %s/%s", chit.Namespace, chit.Name)
 		chop.Config().AddCHITemplate((*api.ClickHouseInstallation)(chit))
