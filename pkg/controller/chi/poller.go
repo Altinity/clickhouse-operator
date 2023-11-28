@@ -35,6 +35,9 @@ func (c *Controller) waitHostNotReady(ctx context.Context, host *api.ChiHost) er
 	err := c.pollHostStatefulSet(
 		ctx,
 		host,
+		// Since we are waiting for host to be nopt readylet's assyme that it should exist already
+		// and thus let's set GetErrorTimeout to zero, since we are not expecting getter function
+		// to return any errors
 		controller.NewPollerOptions().
 			FromConfig(chop.Config()).
 			SetGetErrorTimeout(0),
@@ -56,7 +59,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 	err := c.pollHostStatefulSet(
 		ctx,
 		host,
-		nil,
+		nil, // rely on default options
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
 			if sts == nil {
 				return false
@@ -75,10 +78,10 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 	}
 
 	// Wait StatefulSet to reach ready status
-	return c.pollHostStatefulSet(
+	err = c.pollHostStatefulSet(
 		ctx,
 		host,
-		nil,
+		nil, // rely on default options
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
 			_ = c.deleteLabelReadyPod(_ctx, host)
 			_ = c.deleteAnnotationReadyService(_ctx, host)
@@ -89,6 +92,8 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 			_ = c.deleteAnnotationReadyService(_ctx, host)
 		},
 	)
+
+	return err
 }
 
 // waitHostDeleted polls host's StatefulSet until it is not available
@@ -146,6 +151,10 @@ func (c *Controller) pollHostStatefulSet(
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
+	}
+
+	if opts == nil {
+		opts = controller.NewPollerOptions().FromConfig(chop.Config())
 	}
 
 	namespace := host.Address.Namespace
