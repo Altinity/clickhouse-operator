@@ -97,6 +97,23 @@ func (n *Normalizer) CreateTemplatedCHI(
 	// New CHI starts with new context
 	n.ctx = NewNormalizerContext(options)
 
+	// Normalize start CHI
+	chi = n.normalizeStartCHI(chi)
+	// Create new chi that will be populated with data during normalization process
+	n.ctx.chi = n.createBaseCHI()
+
+	// At this moment context chi is either newly created 'empty' CHI or a system-wide template
+
+	// Apply templates - both auto and explicitly requested - on top of context chi
+	n.applyCHITemplates(chi)
+
+	// After all templates applied, place provided CHI on top of the whole stack
+	n.ctx.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
+
+	return n.normalize()
+}
+
+func (n *Normalizer) normalizeStartCHI(chi *chiV1.ClickHouseInstallation) *chiV1.ClickHouseInstallation {
 	if chi == nil {
 		// No CHI specified - meaning we are building over provided 'empty' CHI with no clusters inside
 		chi = newCHI()
@@ -105,26 +122,18 @@ func (n *Normalizer) CreateTemplatedCHI(
 		// Even in case having CHI provided, we need to insert default cluster in case no clusters specified
 		n.ctx.options.WithDefaultCluster = true
 	}
+	return chi
+}
 
-	// Create new chi that will be populated with data during normalization process
+func (n *Normalizer) createBaseCHI() *chiV1.ClickHouseInstallation {
 	// What base should be used to create CHI
 	if chop.Config().Template.CHI.Runtime.Template == nil {
 		// No template specified - start with clear page
-		n.ctx.chi = newCHI()
+		return newCHI()
 	} else {
 		// Template specified - start with template
-		n.ctx.chi = chop.Config().Template.CHI.Runtime.Template.DeepCopy()
+		return chop.Config().Template.CHI.Runtime.Template.DeepCopy()
 	}
-
-	// At this moment n.chi is either newly created 'empty' CHI or a system-wide template
-
-	// Apply templates - both auto and explicitly requested over n.ctx.chi
-	n.applyCHITemplates(chi)
-
-	// After all templates applied, place provided CHI on top of the whole stack
-	n.ctx.chi.MergeFrom(chi, chiV1.MergeTypeOverrideByNonEmptyValues)
-
-	return n.normalize()
 }
 
 // prepareListOfCHITemplates prepares list of CHI templates to be used by CHI
@@ -198,7 +207,7 @@ func (n *Normalizer) applyCHITemplates(chi *chiV1.ClickHouseInstallation) {
 
 		// And append used template to the list of used templates
 		n.ctx.chi.EnsureStatus().PushUsedTemplate(useTemplate)
-	}
+	} // list of templates
 
 	log.V(1).M(chi).F().Info("Used templates count: %d", n.ctx.chi.EnsureStatus().GetUsedTemplatesCount())
 }
