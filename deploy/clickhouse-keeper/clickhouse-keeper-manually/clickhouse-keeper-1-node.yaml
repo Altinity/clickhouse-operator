@@ -138,23 +138,25 @@ data:
     mkdir -p /tmp/clickhouse-keeper/config.d/
     if [[ "true" == "${ACTIVE_ENSEMBLE}" ]]; then
       # get current config from clickhouse-keeper
-      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get /keeper/config") 
+      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get /keeper/config" || true) 
       # generate dynamic config, add current server to xml
       {
         echo "<yandex><keeper_server>"
         echo "<server_id>${MY_ID}</server_id>"
         echo "<raft_configuration>"
         if [[ "0" == $(echo "${CURRENT_KEEPER_CONFIG}" | grep -c "${HOST}.${DOMAIN}") ]]; then
-          echo "<server><id>${MY_ID}</id><hostname>${HOST}.${DOMAIN}</hostname><port>${RAFT_PORT}</port><priority>0</priority></server>"
+          echo "<server><id>${MY_ID}</id><hostname>${HOST}.${DOMAIN}</hostname><port>${RAFT_PORT}</port><priority>1</priority><start_as_follower>true</start_as_follower></server>"
         fi
         while IFS= read -r line; do
           id=$(echo "$line" | cut -d '=' -f 1 | cut -d '.' -f 2)
-          hostname=$(echo "$line" | cut -d '=' -f 2 | cut -d ';' -f 1 | cut -d ':' -f 1)
-          port=$(echo "$line" | cut -d '=' -f 2 | cut -d ';' -f 1 | cut -d ':' -f 2)
-          priority=$(echo "$line" | cut -d ';' -f 3)
-          priority=${priority:-1}
-          port=${port:-$RAFT_PORT}
-          echo "<server><id>$id</id><hostname>$hostname</hostname><port>$port</port><priority>$priority</priority></server>"
+          if [[ "" != "${id}" ]]; then
+            hostname=$(echo "$line" | cut -d '=' -f 2 | cut -d ';' -f 1 | cut -d ':' -f 1)
+            port=$(echo "$line" | cut -d '=' -f 2 | cut -d ';' -f 1 | cut -d ':' -f 2)
+            priority=$(echo "$line" | cut -d ';' -f 3)
+            priority=${priority:-1}
+            port=${port:-$RAFT_PORT}
+            echo "<server><id>$id</id><hostname>$hostname</hostname><port>$port</port><priority>$priority</priority></server>"
+          fi
         done <<< "$CURRENT_KEEPER_CONFIG"      
         echo "</raft_configuration>"
         echo "</keeper_server></yandex>"
@@ -196,32 +198,31 @@ data:
     fi
     export MY_ID=$((ORD+1))
 
-    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
+    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
     CLUSTER_SIZE=$(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E '^server\.[0-9]+=') 
     echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MY_ID"
-    # If MyId > 1, this server is being permanently removed from raft_configuration.
-    if [[ "$MY_ID" -gt "1" ]]; then
-      # If ClusterSize < MyId, this server is being permanently removed from raft_configuration.
-      clickhouse-keeper-client -q "reconfig remove $MY_ID" ${KEEPER_URL}
-      touch /var/lib/clickhouse-keeper/terminated
+    # If CLUSTER_SIZE > 1, this server is being permanently removed from raft_configuration.
+    if [[ "$CLUSTER_SIZE" -gt "1" ]]; then
+      clickhouse-keeper-client --history-file=/dev/null -q "reconfig remove $MY_ID" ${KEEPER_URL}
     fi
 
     # Wait to remove $MY_ID from quorum
-    for (( i = 0; i < 6; i++ )); do
-        CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
-        if [[ "0" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=$HOST.+participant;[0-1]$") ]]; then
-          echo "$MY_ID removed from quorum"
-          break
-        else
-          echo "$MY_ID still present in quorum"
-        fi
-        sleep 1
-    done
+    # for (( i = 0; i < 6; i++ )); do
+    #    CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h localhost -p ${CLIENT_PORT} -q "get /keeper/config")
+    #    if [[ "0" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=$HOST.+participant;[0-1]$") ]]; then
+    #      echo "$MY_ID removed from quorum"
+    #      break
+    #    else
+    #      echo "$MY_ID still present in quorum"
+    #    fi
+    #    sleep 1
+    # done
+
     # Wait for client connections to drain. Kubernetes will wait until the configured
     # "terminationGracePeriodSeconds" before forcibly killing the container
     for (( i = 0; i < 3; i++ )); do
       CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "127.0.0.1" | wc -l`
-      if [[ "$CONN_COUNT" -gt 0 ]]; then
+      if [[ "$CONN_COUNT" -gt "0" ]]; then
         echo "$CONN_COUNT non-local connections still connected."
         sleep 1
       else
@@ -230,6 +231,7 @@ data:
       fi
     done
 
+    touch /var/lib/clickhouse-keeper/terminated
     # Kill the primary process ourselves to circumvent the terminationGracePeriodSeconds
     ps -ef | grep clickhouse-keeper | grep -v grep | awk '{print $1}' | xargs kill
     
@@ -277,28 +279,21 @@ data:
         exit 1
       fi
       MY_ID=$((ORD+1))
-      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper client -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get /keeper/config")
+      
+      CURRENT_KEEPER_CONFIG=$(clickhouse-keeper-client --history-file=/dev/null -h ${CLIENT_HOST} -p ${CLIENT_PORT} -q "get /keeper/config" || exit 0)
       # Check to see if clickhouse-keeper for this node is a participant in raft cluster
       if [[ "1" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=${HOST}.+participant;1$") ]]; then
         echo "clickhouse-keeper instance is available and an active participant"
         exit 0
-      fi
-      if [[ "1" == $(echo -e "${CURRENT_KEEPER_CONFIG}" | grep -c -E "^server.${MY_ID}=$HOST.+participant;0$") ]]; then
+      else
         echo "clickhouse-keeper instance is ready to add as participant with 1 weight."
     
         ROLE=participant
         WEIGHT=1
         KEEPER_URL=$(keeperConnectionString)
         NEW_KEEPER_CONFIG=$(keeperConfig)
-        clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
+        clickhouse-keeper-client --history-file=/dev/null -q "reconfig add 'server.$MY_ID=$NEW_KEEPER_CONFIG'" ${KEEPER_URL}
         exit 0        
-      else
-        echo "clickhouse-keeper instance is available as participant with 0 weight"
-        ROLE=participant
-        WEIGHT=0
-        KEEPER_URL=$(keeperConnectionString)
-        NEW_KEEPER_CONFIG=$(keeperConfig)
-        clickhouse-keeper-client -q "reconfig add server.$MY_ID=$NEW_KEEPER_CONFIG" ${KEEPER_URL}
       fi
     fi
 
@@ -378,7 +373,7 @@ spec:
               command:
                 - /conf/keeperLive.sh
             failureThreshold: 3
-            initialDelaySeconds: 10
+            initialDelaySeconds: 60
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 10
@@ -390,7 +385,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 10
+            timeoutSeconds: 20
           ports:
             - containerPort: 2181
               name: client
