@@ -302,21 +302,39 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.ChiHost) 
 const unknownVersion = "failed to query"
 
 // getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost, skipNewHost bool) string {
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost, skipNewHost bool) (string, error) {
 	if skipNewHost && (host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew) {
-		return "not applicable"
+		return "not applicable", nil
 	}
 
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
 	if err != nil {
 		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s", host.GetName())
-		return unknownVersion
+		return unknownVersion, err
 	}
 
 	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
 	host.Version = api.NewCHVersion(version)
 
-	return version
+	return version, nil
+}
+
+func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.ChiHost) (version string, err error) {
+	err = w.c.pollHost(
+		ctx,
+		host,
+		nil,
+		func(_ctx context.Context, _host *api.ChiHost) bool {
+			var e error
+			version, e = w.getHostClickHouseVersion(_ctx, _host, false)
+			if e == nil {
+				return true
+			}
+			w.a.V(1).M(host).F().Warning("Host is NOT alive: %s ", host.GetName())
+			return false
+		},
+	)
+	return
 }
 
 type reconcileHostStatefulSetOptions struct {
@@ -355,7 +373,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version := w.getHostClickHouseVersion(ctx, host, true)
+	version, _ := w.getHostClickHouseVersion(ctx, host, true)
 	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
 	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.GetName(), version)
@@ -616,12 +634,20 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 		defer w.reconcileCHIServiceFinal(ctx, host.CHI)
 	}
 
-	version := w.getHostClickHouseVersion(ctx, host, true)
-	w.a.V(1).
-		WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
-		WithStatusAction(host.GetCHI()).
-		M(host).F().
-		Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
+	// Check whether ClickHouse is running and accessible and what version is available
+	if version, err := w.getHostClickHouseVersion(ctx, host, true); err == nil {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
+	} else {
+		w.a.V(1).
+			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
+			WithStatusAction(host.GetCHI()).
+			M(host).F().
+			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+	}
 
 	// Create artifacts
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
@@ -667,21 +693,19 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	_ = w.reconcileHostService(ctx, host)
 
 	host.GetReconcileAttributes().UnsetAdd()
+
+	// Prepare for tables migration.
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
-	w.c.pollHost(
-		ctx,
-		host,
-		nil,
-		func(_ctx context.Context, _host *api.ChiHost) bool {
-			alive := w.getHostClickHouseVersion(_ctx, _host, false) != unknownVersion
-			if alive {
-				w.a.V(1).M(host).F().Info("Host is alive 1: %s ", host.GetName())
-			} else {
-				w.a.V(1).M(host).F().Warning("Host is NOT alive 1: %s ", host.GetName())
-			}
-			return alive
-		},
-	)
+	// Check whether ClickHouse is running and accessible and what version is available.
+	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
+		w.a.V(1).
+			M(host).F().
+			Info("Check host for ClickHouse availability before migrating tables. Host: %s ClickHouse version running: %s", host.GetName(), version)
+	} else {
+		w.a.V(1).
+			M(host).F().
+			Warning("Check host for ClickHouse availability before migrating tables. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
+	}
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {
@@ -692,24 +716,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 		return err
 	}
 
+	// Ensure host is running and accessible and what version is available.
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
-	w.c.pollHost(
-		ctx,
-		host,
-		nil,
-		func(_ctx context.Context, _host *api.ChiHost) bool {
-			alive := w.getHostClickHouseVersion(_ctx, _host, false) != unknownVersion
-			if alive {
-				w.a.V(1).M(host).F().Info("Host is alive 2: %s ", host.GetName())
-			} else {
-				w.a.V(1).M(host).F().Warning("Host is NOT alive 2: %s ", host.GetName())
-			}
-			return alive
-		},
-	)
-	version = w.getHostClickHouseVersion(ctx, host, false)
-	alive := version != unknownVersion
-	if alive {
+	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileCompleted).
 			WithStatusAction(host.CHI).
