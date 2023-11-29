@@ -286,6 +286,18 @@ func (s *ChiStatus) ReconcileComplete() {
 	})
 }
 
+// ReconcileAbort marks reconcile abortion
+func (s *ChiStatus) ReconcileAbort() {
+	doWithWriteLock(s, func(s *ChiStatus) {
+		if s == nil {
+			return
+		}
+		s.Status = StatusAborted
+		s.Action = ""
+		pushTaskIDCompletedNoSync(s)
+	})
+}
+
 // DeleteStart marks deletion start
 func (s *ChiStatus) DeleteStart() {
 	doWithWriteLock(s, func(s *ChiStatus) {
