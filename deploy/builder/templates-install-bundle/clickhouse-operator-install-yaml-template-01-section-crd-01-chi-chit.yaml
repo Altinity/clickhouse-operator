@@ -315,7 +315,7 @@ spec:
                   # nullable: true
                   description: |
                     Optional, applicable inside ClickHouseInstallationTemplate only.
-                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
+                    Defines current ClickHouseInstallationTemplate application options to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
