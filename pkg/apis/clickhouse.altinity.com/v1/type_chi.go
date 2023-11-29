@@ -19,7 +19,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
@@ -600,7 +599,7 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Templating.GetPolicy()) == TemplatingPolicyAuto
+	return chi.Spec.Templating.GetPolicy() == TemplatingPolicyAuto
 }
 
 // IsStopped checks whether CHI is stopped

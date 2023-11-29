@@ -568,12 +568,15 @@ func (n *Normalizer) normalizeTemplating(templating *chiV1.ChiTemplating) *chiV1
 		templating = chiV1.NewChiTemplating()
 	}
 	switch strings.ToLower(templating.GetPolicy()) {
-	case
-		chiV1.TemplatingPolicyManual,
-		chiV1.TemplatingPolicyAuto:
-		templating.SetPolicy(strings.ToLower(templating.GetPolicy()))
+	case strings.ToLower(chiV1.TemplatingPolicyManual):
+		// Known policy, overwrite it to ensure case-ness
+		templating.SetPolicy(chiV1.TemplatingPolicyManual)
+	case strings.ToLower(chiV1.TemplatingPolicyAuto):
+		// Known policy, overwrite it to ensure case-ness
+		templating.SetPolicy(chiV1.TemplatingPolicyAuto)
 	default:
-		templating.SetPolicy(strings.ToLower(chiV1.TemplatingPolicyManual))
+		// Unknown policy, fallback to default
+		templating.SetPolicy(chiV1.TemplatingPolicyManual)
 	}
 	return templating
 }
@@ -584,12 +587,15 @@ func (n *Normalizer) normalizeReconciling(reconciling *chiV1.ChiReconciling) *ch
 		reconciling = chiV1.NewChiReconciling().SetDefaults()
 	}
 	switch strings.ToLower(reconciling.GetPolicy()) {
-	case
-		chiV1.ReconcilingPolicyWait,
-		chiV1.ReconcilingPolicyNoWait:
-		reconciling.SetPolicy(strings.ToLower(reconciling.GetPolicy()))
+	case strings.ToLower(chiV1.ReconcilingPolicyWait):
+		// Known policy, overwrite it to ensure case-ness
+		reconciling.SetPolicy(chiV1.ReconcilingPolicyWait)
+	case strings.ToLower(chiV1.ReconcilingPolicyNoWait):
+		// Known policy, overwrite it to ensure case-ness
+		reconciling.SetPolicy(chiV1.ReconcilingPolicyNoWait)
 	default:
-		reconciling.SetPolicy(strings.ToLower(chiV1.ReconcilingPolicyUnspecified))
+		// Unknown policy, fallback to default
+		reconciling.SetPolicy(chiV1.ReconcilingPolicyUnspecified)
 	}
 	reconciling.Cleanup = n.normalizeReconcilingCleanup(reconciling.Cleanup)
 	return reconciling
