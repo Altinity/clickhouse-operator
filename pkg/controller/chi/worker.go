@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -694,13 +695,18 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 		Info("reconcile completed successfully, task id: %s", _chi.Spec.GetTaskID())
 }
 
-func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *api.ClickHouseInstallation, err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
-	chi.EnsureStatus().ReconcileComplete()
+	switch {
+	case err == nil:
+		chi.EnsureStatus().ReconcileComplete()
+	case errors.Is(err, errCRUDAbort):
+		chi.EnsureStatus().ReconcileAbort()
+	}
 	w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
 			MainFields: true,

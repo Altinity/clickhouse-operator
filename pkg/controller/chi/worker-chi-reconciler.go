@@ -105,7 +105,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 			WithStatusError(new).
 			M(new).F().
 			Error("FAILED to reconcile CHI err: %v", err)
-		w.markReconcileCompletedUnsuccessfully(ctx, new)
+		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 	} else {
 		// Post-process added items
 		if util.IsContextDone(ctx) {
