@@ -8,7 +8,6 @@ from requirements.requirements import *
 xfails = {
     # test_operator.py
     # "/regression/e2e.test_operator/test_028*": [(Fail, "In case of: 1) operator restarted on the different IP and 2) long time before operator received event, this test would fail due to RollingUpdate option")],
-    "/regression/e2e.test_operator/test_034*": [(Fail, "skip for now")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py
