@@ -465,9 +465,8 @@ func (n *Normalizer) normalizeStop(stop *chiV1.StringBool) *chiV1.StringBool {
 // normalizeRestart normalizes .spec.restart
 func (n *Normalizer) normalizeRestart(restart string) string {
 	switch strings.ToLower(restart) {
-	case strings.ToLower(chiV1.RestartAll):
-		return chiV1.RestartAll
 	case strings.ToLower(chiV1.RestartRollingUpdate):
+		// Known value, overwrite it to ensure case-ness
 		return chiV1.RestartRollingUpdate
 	}
 
@@ -568,14 +567,14 @@ func (n *Normalizer) normalizeTemplating(templating *chiV1.ChiTemplating) *chiV1
 		templating = chiV1.NewChiTemplating()
 	}
 	switch strings.ToLower(templating.GetPolicy()) {
-	case strings.ToLower(chiV1.TemplatingPolicyManual):
-		// Known policy, overwrite it to ensure case-ness
-		templating.SetPolicy(chiV1.TemplatingPolicyManual)
 	case strings.ToLower(chiV1.TemplatingPolicyAuto):
-		// Known policy, overwrite it to ensure case-ness
+		// Known value, overwrite it to ensure case-ness
 		templating.SetPolicy(chiV1.TemplatingPolicyAuto)
+	case strings.ToLower(chiV1.TemplatingPolicyManual):
+		// Known value, overwrite it to ensure case-ness
+		templating.SetPolicy(chiV1.TemplatingPolicyManual)
 	default:
-		// Unknown policy, fallback to default
+		// Unknown value, fallback to default
 		templating.SetPolicy(chiV1.TemplatingPolicyManual)
 	}
 	return templating
@@ -588,13 +587,13 @@ func (n *Normalizer) normalizeReconciling(reconciling *chiV1.ChiReconciling) *ch
 	}
 	switch strings.ToLower(reconciling.GetPolicy()) {
 	case strings.ToLower(chiV1.ReconcilingPolicyWait):
-		// Known policy, overwrite it to ensure case-ness
+		// Known value, overwrite it to ensure case-ness
 		reconciling.SetPolicy(chiV1.ReconcilingPolicyWait)
 	case strings.ToLower(chiV1.ReconcilingPolicyNoWait):
-		// Known policy, overwrite it to ensure case-ness
+		// Known value, overwrite it to ensure case-ness
 		reconciling.SetPolicy(chiV1.ReconcilingPolicyNoWait)
 	default:
-		// Unknown policy, fallback to default
+		// Unknown value, fallback to default
 		reconciling.SetPolicy(chiV1.ReconcilingPolicyUnspecified)
 	}
 	reconciling.Cleanup = n.normalizeReconcilingCleanup(reconciling.Cleanup)
@@ -625,11 +624,18 @@ func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chiV1.ChiCleanup) *chi
 }
 
 func (n *Normalizer) normalizeCleanup(str *string, value string) {
-	switch *str {
-	case
-		chiV1.ObjectsCleanupRetain,
-		chiV1.ObjectsCleanupDelete:
+	if str == nil {
+		return
+	}
+	switch strings.ToLower(*str) {
+	case strings.ToLower(chiV1.ObjectsCleanupRetain):
+		// Known value, overwrite it to ensure case-ness
+		*str = chiV1.ObjectsCleanupRetain
+	case strings.ToLower(chiV1.ObjectsCleanupDelete):
+		// Known value, overwrite it to ensure case-ness
+		*str = chiV1.ObjectsCleanupDelete
 	default:
+		// Unknown value, fallback to default
 		*str = value
 	}
 }
@@ -1420,21 +1426,28 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *chiV1.SchemaPolicy) *c
 
 	switch strings.ToLower(policy.Replica) {
 	case strings.ToLower(SchemaPolicyReplicaNone):
+		// Known value, overwrite it to ensure case-ness
 		policy.Replica = SchemaPolicyReplicaNone
 	case strings.ToLower(SchemaPolicyReplicaAll):
+		// Known value, overwrite it to ensure case-ness
 		policy.Replica = SchemaPolicyReplicaAll
 	default:
+		// Unknown value, fallback to default
 		policy.Replica = SchemaPolicyReplicaAll
 	}
 
 	switch strings.ToLower(policy.Shard) {
 	case strings.ToLower(SchemaPolicyShardNone):
+		// Known value, overwrite it to ensure case-ness
 		policy.Shard = SchemaPolicyShardNone
 	case strings.ToLower(SchemaPolicyShardAll):
+		// Known value, overwrite it to ensure case-ness
 		policy.Shard = SchemaPolicyShardAll
 	case strings.ToLower(SchemaPolicyShardDistributedTablesOnly):
+		// Known value, overwrite it to ensure case-ness
 		policy.Shard = SchemaPolicyShardDistributedTablesOnly
 	default:
+		// unknown value, fallback to default
 		policy.Shard = SchemaPolicyShardAll
 	}
 

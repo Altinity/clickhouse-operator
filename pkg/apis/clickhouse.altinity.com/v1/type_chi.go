@@ -587,8 +587,8 @@ func (chi *ClickHouseInstallation) FoundIn(haystack []*ClickHouseInstallation) b
 
 // Possible templating policies
 const (
-	TemplatingPolicyManual = "manual"
 	TemplatingPolicyAuto   = "auto"
+	TemplatingPolicyManual = "manual"
 )
 
 // IsAuto checks whether templating policy is auto
@@ -613,8 +613,6 @@ func (chi *ClickHouseInstallation) IsStopped() bool {
 // Restart constants present available values for .spec.restart
 // Controlling the operator's Clickhouse instances restart policy
 const (
-	// RestartAll specifies default value
-	RestartAll = "Restart"
 	// RestartRollingUpdate requires to roll over all hosts in the cluster and shutdown and reconcile each of it.
 	// This restart policy means that all hosts in the cluster would pass through shutdown/reconcile cycle.
 	RestartRollingUpdate = "RollingUpdate"
