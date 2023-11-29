@@ -15,19 +15,20 @@
 package chk
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	core "k8s.io/api/core/v1"
+
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	v1 "k8s.io/api/core/v1"
 )
 
-func getPodTemplate(chk *api.ClickHouseKeeperInstallation) apiChi.ChiPodTemplate {
+func getPodTemplate(chk *apiChk.ClickHouseKeeperInstallation) apiChi.ChiPodTemplate {
 	if len(chk.Spec.GetTemplates().GetPodTemplates()) < 1 {
 		return apiChi.ChiPodTemplate{}
 	}
 	return chk.Spec.GetTemplates().GetPodTemplates()[0]
 }
 
-func getPodTemplateAnnotations(chk *api.ClickHouseKeeperInstallation) map[string]string {
+func getPodTemplateAnnotations(chk *apiChk.ClickHouseKeeperInstallation) map[string]string {
 	if len(chk.Spec.GetTemplates().GetPodTemplates()) < 1 {
 		return nil
 	}
@@ -35,7 +36,7 @@ func getPodTemplateAnnotations(chk *api.ClickHouseKeeperInstallation) map[string
 	return getPodTemplate(chk).ObjectMeta.Annotations
 }
 
-func getPodTemplateLabels(chk *api.ClickHouseKeeperInstallation) map[string]string {
+func getPodTemplateLabels(chk *apiChk.ClickHouseKeeperInstallation) map[string]string {
 	if len(chk.Spec.GetTemplates().GetPodTemplates()) < 1 {
 		return nil
 	}
@@ -43,9 +44,9 @@ func getPodTemplateLabels(chk *api.ClickHouseKeeperInstallation) map[string]stri
 	return getPodTemplate(chk).ObjectMeta.Labels
 }
 
-func getVolumeClaimTemplates(chk *api.ClickHouseKeeperInstallation) (claims []v1.PersistentVolumeClaim) {
+func getVolumeClaimTemplates(chk *apiChk.ClickHouseKeeperInstallation) (claims []core.PersistentVolumeClaim) {
 	for _, template := range chk.Spec.GetTemplates().GetVolumeClaimTemplates() {
-		pvc := v1.PersistentVolumeClaim{
+		pvc := core.PersistentVolumeClaim{
 			ObjectMeta: template.ObjectMeta,
 			Spec:       template.Spec,
 		}

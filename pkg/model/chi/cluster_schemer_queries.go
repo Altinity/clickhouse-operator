@@ -16,13 +16,14 @@ package chi
 
 import (
 	"context"
+
 	"github.com/MakeNowJust/heredoc"
 
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // getDropTablesSQLs returns set of 'DROP TABLE ...' SQLs
-func (s *ClusterSchemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getDropTablesSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -45,12 +46,12 @@ func (s *ClusterSchemer) getDropTablesSQLs(ctx context.Context, host *chop.ChiHo
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, api.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 
 // getSyncTablesSQLs returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
-func (s *ClusterSchemer) getSyncTablesSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getSyncTablesSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
 	sql := heredoc.Doc(`
 		SELECT
 			DISTINCT name,
@@ -62,7 +63,7 @@ func (s *ClusterSchemer) getSyncTablesSQLs(ctx context.Context, host *chop.ChiHo
 		`,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, chop.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, api.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 

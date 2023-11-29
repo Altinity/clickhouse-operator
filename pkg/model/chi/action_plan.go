@@ -16,7 +16,8 @@ package chi
 
 import (
 	"gopkg.in/d4l3k/messagediff.v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -94,7 +95,7 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 	return ap
 }
 
-func (ap *ActionPlan) timestampEqual(old, new *metav1.Time) bool {
+func (ap *ActionPlan) timestampEqual(old, new *meta.Time) bool {
 	switch {
 	case (old == nil) && (new == nil):
 		// Both are useless

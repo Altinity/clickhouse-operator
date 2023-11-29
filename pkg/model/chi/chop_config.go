@@ -19,13 +19,13 @@ import (
 
 	"gopkg.in/d4l3k/messagediff.v1"
 
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
 // isZookeeperChangeRequiresReboot checks two ZooKeeper configs and decides,
 // whether config modifications require a reboot to be applied
-func isZookeeperChangeRequiresReboot(host *chiV1.ChiHost, a, b *chiV1.ChiZookeeperConfig) bool {
+func isZookeeperChangeRequiresReboot(host *api.ChiHost, a, b *api.ChiZookeeperConfig) bool {
 	return !a.Equals(b)
 }
 
@@ -33,9 +33,9 @@ func isZookeeperChangeRequiresReboot(host *chiV1.ChiHost, a, b *chiV1.ChiZookeep
 // Ex.: `prefix` = file
 // file/setting1
 // file/setting2
-func makePaths(a, b *chiV1.Settings, prefix string, path *messagediff.Path, value interface{}) (sections []string) {
-	if settings, ok := (value).(*chiV1.Settings); ok {
-		// Provided `value` is of type chiV1.Settings, which means that the whole
+func makePaths(a, b *api.Settings, prefix string, path *messagediff.Path, value interface{}) (sections []string) {
+	if settings, ok := (value).(*api.Settings); ok {
+		// Provided `value` is of type api.Settings, which means that the whole
 		// settings such as 'files' or 'settings' is being either added or removed
 		if settings == nil {
 			// Completely removed settings such as 'files' or 'settings', so the value changed from Settings to nil
@@ -51,7 +51,7 @@ func makePaths(a, b *chiV1.Settings, prefix string, path *messagediff.Path, valu
 			}
 		}
 	} else {
-		// Provided `value` is not of type chiV1.Settings, expecting it to be a piece of settings.
+		// Provided `value` is not of type api.Settings, expecting it to be a piece of settings.
 		// Modify settings such as 'files' or 'settings' but without full removal,
 		// something is still left in the remaining part of settings in case of deletion or added in case of addition.
 		suffix := ""
@@ -73,7 +73,7 @@ func makePaths(a, b *chiV1.Settings, prefix string, path *messagediff.Path, valu
 // Ex.: `prefix` = file
 // file/setting1
 // file/setting2
-func makePathsFromDiff(a, b *chiV1.Settings, diff *messagediff.Diff, prefix string) (res []string) {
+func makePathsFromDiff(a, b *api.Settings, diff *messagediff.Diff, prefix string) (res []string) {
 	for path, value := range diff.Added {
 		res = append(res, makePaths(a, b, prefix, path, value)...)
 	}
@@ -87,7 +87,7 @@ func makePathsFromDiff(a, b *chiV1.Settings, diff *messagediff.Diff, prefix stri
 }
 
 // isSettingsChangeRequiresReboot checks whether changes between two settings requires ClickHouse reboot
-func isSettingsChangeRequiresReboot(host *chiV1.ChiHost, section string, a, b *chiV1.Settings) bool {
+func isSettingsChangeRequiresReboot(host *api.ChiHost, section string, a, b *api.Settings) bool {
 	diff, equal := messagediff.DeepDiff(a, b)
 	if equal {
 		return false
@@ -97,7 +97,7 @@ func isSettingsChangeRequiresReboot(host *chiV1.ChiHost, section string, a, b *c
 }
 
 // hostVersionMatches checks whether host's ClickHouse version matches specified constraint
-func hostVersionMatches(host *chiV1.ChiHost, versionConstraint string) bool {
+func hostVersionMatches(host *api.ChiHost, versionConstraint string) bool {
 	// Special version of "*" - default version - has to satisfy all host versions
 	// Default version will also be used in case ClickHouse version is unknown.
 	// ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
@@ -106,7 +106,7 @@ func hostVersionMatches(host *chiV1.ChiHost, versionConstraint string) bool {
 }
 
 // ruleMatches checks whether provided rule (rule set) matches specified `path`
-func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (matches bool, value bool) {
+func ruleMatches(set api.OperatorConfigRestartPolicyRuleSet, path string) (matches bool, value bool) {
 	for pattern, val := range set {
 		if pattern.Match(path) {
 			matches = true
@@ -125,7 +125,7 @@ func ruleMatches(set chiV1.OperatorConfigRestartPolicyRuleSet, path string) (mat
 
 // getLatestConfigMatchValue returns value of the latest match of a specified `path` in ConfigRestartPolicy.Rules
 // in case match found in ConfigRestartPolicy.Rules or false
-func getLatestConfigMatchValue(host *chiV1.ChiHost, path string) (matches bool, value bool) {
+func getLatestConfigMatchValue(host *api.ChiHost, path string) (matches bool, value bool) {
 	// Check all rules
 	for _, r := range chop.Config().ClickHouse.ConfigRestartPolicy.Rules {
 		// Check ClickHouse version of a particular rule
@@ -146,7 +146,7 @@ func getLatestConfigMatchValue(host *chiV1.ChiHost, path string) (matches bool, 
 }
 
 // isListedChangeRequiresReboot checks whether any of the provided paths requires reboot to apply configuration
-func isListedChangeRequiresReboot(host *chiV1.ChiHost, paths []string) bool {
+func isListedChangeRequiresReboot(host *api.ChiHost, paths []string) bool {
 	// Check whether any path matches ClickHouse configuration restart policy rules requires reboot
 	for _, path := range paths {
 		if matches, value := getLatestConfigMatchValue(host, path); matches {
@@ -165,10 +165,10 @@ func isListedChangeRequiresReboot(host *chiV1.ChiHost, paths []string) bool {
 }
 
 // IsConfigurationChangeRequiresReboot checks whether configuration changes requires a reboot
-func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
+func IsConfigurationChangeRequiresReboot(host *api.ChiHost) bool {
 	// Zookeeper
 	{
-		var old, new *chiV1.ChiZookeeperConfig
+		var old, new *api.ChiZookeeperConfig
 		if host.HasAncestor() {
 			old = host.GetAncestor().GetZookeeper()
 		}
@@ -179,7 +179,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	}
 	// Profiles Global
 	{
-		var old, new *chiV1.Settings
+		var old, new *api.Settings
 		if host.HasAncestorCHI() {
 			old = host.GetAncestorCHI().Spec.Configuration.Profiles
 		}
@@ -192,7 +192,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	}
 	// Quotas Global
 	{
-		var old, new *chiV1.Settings
+		var old, new *api.Settings
 		if host.HasAncestorCHI() {
 			old = host.GetAncestorCHI().Spec.Configuration.Quotas
 		}
@@ -205,7 +205,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	}
 	// Settings Global
 	{
-		var old, new *chiV1.Settings
+		var old, new *api.Settings
 		if host.HasAncestorCHI() {
 			old = host.GetAncestorCHI().Spec.Configuration.Settings
 		}
@@ -218,7 +218,7 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	}
 	// Settings Local
 	{
-		var old, new *chiV1.Settings
+		var old, new *api.Settings
 		if host.HasAncestor() {
 			old = host.GetAncestor().Settings
 		}
@@ -229,18 +229,18 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	}
 	// Files Global
 	{
-		var old, new *chiV1.Settings
+		var old, new *api.Settings
 		if host.HasAncestorCHI() {
 			old = host.GetAncestorCHI().Spec.Configuration.Files.Filter(
 				nil,
-				[]chiV1.SettingsSection{chiV1.SectionUsers},
+				[]api.SettingsSection{api.SectionUsers},
 				true,
 			)
 		}
 		if host.HasCHI() {
 			new = host.GetCHI().Spec.Configuration.Files.Filter(
 				nil,
-				[]chiV1.SettingsSection{chiV1.SectionUsers},
+				[]api.SettingsSection{api.SectionUsers},
 				true,
 			)
 		}
@@ -250,17 +250,17 @@ func IsConfigurationChangeRequiresReboot(host *chiV1.ChiHost) bool {
 	}
 	// Files Local
 	{
-		var old, new *chiV1.Settings
+		var old, new *api.Settings
 		if host.HasAncestor() {
 			old = host.GetAncestor().Files.Filter(
 				nil,
-				[]chiV1.SettingsSection{chiV1.SectionUsers},
+				[]api.SettingsSection{api.SectionUsers},
 				true,
 			)
 		}
 		new = host.Files.Filter(
 			nil,
-			[]chiV1.SettingsSection{chiV1.SectionUsers},
+			[]api.SettingsSection{api.SectionUsers},
 			true,
 		)
 		if isSettingsChangeRequiresReboot(host, "files", old, new) {

@@ -15,12 +15,12 @@
 package chi
 
 import (
-	coreV1 "k8s.io/api/core/v1"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/queue"
 
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 const (
@@ -51,8 +51,8 @@ const (
 type ReconcileCHI struct {
 	PriorityQueueItem
 	cmd string
-	old *chiV1.ClickHouseInstallation
-	new *chiV1.ClickHouseInstallation
+	old *api.ClickHouseInstallation
+	new *api.ClickHouseInstallation
 }
 
 var _ queue.PriorityQueueItem = &ReconcileCHI{}
@@ -69,7 +69,7 @@ func (r ReconcileCHI) Handle() queue.T {
 }
 
 // NewReconcileCHI creates new reconcile request queue item
-func NewReconcileCHI(cmd string, old, new *chiV1.ClickHouseInstallation) *ReconcileCHI {
+func NewReconcileCHI(cmd string, old, new *api.ClickHouseInstallation) *ReconcileCHI {
 	return &ReconcileCHI{
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileCHI,
@@ -102,8 +102,8 @@ func NewReconcileCHI(cmd string, old, new *chiV1.ClickHouseInstallation) *Reconc
 type ReconcileCHIT struct {
 	PriorityQueueItem
 	cmd string
-	old *chiV1.ClickHouseInstallationTemplate
-	new *chiV1.ClickHouseInstallationTemplate
+	old *api.ClickHouseInstallationTemplate
+	new *api.ClickHouseInstallationTemplate
 }
 
 var _ queue.PriorityQueueItem = &ReconcileCHIT{}
@@ -120,7 +120,7 @@ func (r ReconcileCHIT) Handle() queue.T {
 }
 
 // NewReconcileCHIT creates new reconcile CHI template queue item
-func NewReconcileCHIT(cmd string, old, new *chiV1.ClickHouseInstallationTemplate) *ReconcileCHIT {
+func NewReconcileCHIT(cmd string, old, new *api.ClickHouseInstallationTemplate) *ReconcileCHIT {
 	return &ReconcileCHIT{
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileCHIT,
@@ -135,8 +135,8 @@ func NewReconcileCHIT(cmd string, old, new *chiV1.ClickHouseInstallationTemplate
 type ReconcileChopConfig struct {
 	PriorityQueueItem
 	cmd string
-	old *chiV1.ClickHouseOperatorConfiguration
-	new *chiV1.ClickHouseOperatorConfiguration
+	old *api.ClickHouseOperatorConfiguration
+	new *api.ClickHouseOperatorConfiguration
 }
 
 var _ queue.PriorityQueueItem = &ReconcileChopConfig{}
@@ -153,7 +153,7 @@ func (r ReconcileChopConfig) Handle() queue.T {
 }
 
 // NewReconcileChopConfig creates new CHOp config queue item
-func NewReconcileChopConfig(cmd string, old, new *chiV1.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
+func NewReconcileChopConfig(cmd string, old, new *api.ClickHouseOperatorConfiguration) *ReconcileChopConfig {
 	return &ReconcileChopConfig{
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileChopConfig,
@@ -168,8 +168,8 @@ func NewReconcileChopConfig(cmd string, old, new *chiV1.ClickHouseOperatorConfig
 type ReconcileEndpoints struct {
 	PriorityQueueItem
 	cmd string
-	old *coreV1.Endpoints
-	new *coreV1.Endpoints
+	old *core.Endpoints
+	new *core.Endpoints
 }
 
 var _ queue.PriorityQueueItem = &ReconcileEndpoints{}
@@ -186,7 +186,7 @@ func (r ReconcileEndpoints) Handle() queue.T {
 }
 
 // NewReconcileEndpoints creates new reconcile endpoints queue item
-func NewReconcileEndpoints(cmd string, old, new *coreV1.Endpoints) *ReconcileEndpoints {
+func NewReconcileEndpoints(cmd string, old, new *core.Endpoints) *ReconcileEndpoints {
 	return &ReconcileEndpoints{
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileEndpoints,
@@ -200,7 +200,7 @@ func NewReconcileEndpoints(cmd string, old, new *coreV1.Endpoints) *ReconcileEnd
 // DropDns specifies drop dns queue item
 type DropDns struct {
 	PriorityQueueItem
-	initiator *metaV1.ObjectMeta
+	initiator *meta.ObjectMeta
 }
 
 var _ queue.PriorityQueueItem = &DropDns{}
@@ -214,7 +214,7 @@ func (r DropDns) Handle() queue.T {
 }
 
 // NewDropDns creates new drop dns queue item
-func NewDropDns(initiator *metaV1.ObjectMeta) *DropDns {
+func NewDropDns(initiator *meta.ObjectMeta) *DropDns {
 	return &DropDns{
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityDropDNS,
@@ -227,8 +227,8 @@ func NewDropDns(initiator *metaV1.ObjectMeta) *DropDns {
 type ReconcilePod struct {
 	PriorityQueueItem
 	cmd string
-	old *coreV1.Pod
-	new *coreV1.Pod
+	old *core.Pod
+	new *core.Pod
 }
 
 var _ queue.PriorityQueueItem = &ReconcileEndpoints{}
@@ -245,7 +245,7 @@ func (r ReconcilePod) Handle() queue.T {
 }
 
 // NewReconcilePod creates new reconcile endpoints queue item
-func NewReconcilePod(cmd string, old, new *coreV1.Pod) *ReconcilePod {
+func NewReconcilePod(cmd string, old, new *core.Pod) *ReconcilePod {
 	return &ReconcilePod{
 		cmd: cmd,
 		old: old,

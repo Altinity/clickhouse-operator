@@ -22,7 +22,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -43,8 +43,8 @@ func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionPara
 }
 
 // shouldCreateDistributedObjects determines whether distributed objects should be created
-func shouldCreateDistributedObjects(host *chop.ChiHost) bool {
-	hosts := CreateFQDNs(host, chop.Cluster{}, false)
+func shouldCreateDistributedObjects(host *api.ChiHost) bool {
+	hosts := CreateFQDNs(host, api.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
@@ -79,7 +79,7 @@ func concatSlices[T any](slices [][]T) []T {
 
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
 // That includes all distributed tables, corresponding local tables and databases, if necessary
-func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
@@ -93,21 +93,21 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ch
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			createDatabaseDistributed(host.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			createTableDistributed(host.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			createFunction(host.Address.ClusterName),
 		),
 	)
@@ -117,9 +117,9 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ch
 }
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
-func shouldCreateReplicatedObjects(host *chop.ChiHost) bool {
-	shard := CreateFQDNs(host, chop.ChiShard{}, false)
-	cluster := CreateFQDNs(host, chop.Cluster{}, false)
+func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
+	shard := CreateFQDNs(host, api.ChiShard{}, false)
+	cluster := CreateFQDNs(host, api.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard
@@ -145,7 +145,7 @@ func shouldCreateReplicatedObjects(host *chop.ChiHost) bool {
 }
 
 // getReplicatedObjectsSQLs returns a list of objects that needs to be created on a host in a cluster
-func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *chop.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil
@@ -159,21 +159,21 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *cho
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			createDatabaseReplicated(host.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			createTableReplicated(host.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			CreateFQDNs(host, chop.ClickHouseInstallation{}, false),
+			CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			createFunction(host.Address.ClusterName),
 		),
 	)
@@ -183,7 +183,7 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *cho
 }
 
 // HostSyncTables calls SYSTEM SYNC REPLICA for replicated tables
-func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *chop.ChiHost) error {
+func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.ChiHost) error {
 	tableNames, syncTableSQLs, _ := s.getSyncTablesSQLs(ctx, host)
 	log.V(1).M(host).F().Info("Sync tables: %v as %v", tableNames, syncTableSQLs)
 	opts := clickhouse.NewQueryOptions()
@@ -192,7 +192,7 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *chop.ChiHost)
 }
 
 // HostDropReplica calls SYSTEM DROP REPLICA
-func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *chop.ChiHost) error {
+func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.ChiHost) error {
 	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", CreateInstanceHostname(hostToDrop), hostToRunOn.Address.HostName)
 	return s.ExecHost(ctx, hostToRunOn, []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", CreateInstanceHostname(hostToDrop))})
 }
@@ -200,7 +200,7 @@ func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostT
 // createTablesSQLs makes all SQL for migrating tables
 func (s *ClusterSchemer) createTablesSQLs(
 	ctx context.Context,
-	host *chop.ChiHost,
+	host *api.ChiHost,
 ) (
 	replicatedObjectNames []string,
 	replicatedCreateSQLs []string,
@@ -219,7 +219,7 @@ func (s *ClusterSchemer) createTablesSQLs(
 }
 
 // HostCreateTables creates tables on a new host
-func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHost) error {
+func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -258,14 +258,14 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *chop.ChiHos
 }
 
 // HostDropTables drops tables on a host
-func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *chop.ChiHost) error {
+func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *api.ChiHost) error {
 	tableNames, dropTableSQLs, _ := s.getDropTablesSQLs(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
 	return s.ExecHost(ctx, host, dropTableSQLs, clickhouse.NewQueryOptions().SetRetry(false))
 }
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
-func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost) bool {
+func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.ChiHost) bool {
 	inside := false
 	SQLs := []string{
 		heredoc.Docf(
@@ -288,22 +288,22 @@ func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *chop.ChiHost
 }
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
-func (s *ClusterSchemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHouseInstallation) error {
+func (s *ClusterSchemer) CHIDropDnsCache(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	sql := `SYSTEM DROP DNS CACHE`
-	chi.WalkHosts(func(host *chop.ChiHost) error {
+	chi.WalkHosts(func(host *api.ChiHost) error {
 		return s.ExecHost(ctx, host, []string{sql})
 	})
 	return nil
 }
 
 // HostActiveQueriesNum returns how many active queries are on the host
-func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *chop.ChiHost) (int, error) {
+func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *api.ChiHost) (int, error) {
 	sql := `SELECT count() FROM system.processes`
 	return s.QueryHostInt(ctx, host, sql)
 }
 
 // HostClickHouseVersion returns ClickHouse version on the host
-func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *chop.ChiHost) (string, error) {
+func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.ChiHost) (string, error) {
 	sql := `SELECT version()`
 	return s.QueryHostString(ctx, host, sql)
 }

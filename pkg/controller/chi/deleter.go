@@ -18,19 +18,19 @@ import (
 	"context"
 	"time"
 
-	appsV1 "k8s.io/api/apps/v1"
-	coreV1 "k8s.io/api/core/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
-func (c *Controller) deleteHost(ctx context.Context, host *chiV1.ChiHost) error {
+func (c *Controller) deleteHost(ctx context.Context, host *api.ChiHost) error {
 	log.V(1).M(host).S().Info(host.Address.ClusterNameString())
 
 	// Each host consists of:
@@ -45,7 +45,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *chiV1.ChiHost) error 
 }
 
 // deleteConfigMapsCHI
-func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
+func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -88,7 +88,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *chiV1.ClickHo
 }
 
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
-func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *appsV1.StatefulSet, host *chiV1.ChiHost) error {
+func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps.StatefulSet, host *api.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -110,7 +110,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
-func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost) error {
+func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -164,7 +164,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 }
 
 // syncStatefulSet
-func (c *Controller) syncStatefulSet(ctx context.Context, host *chiV1.ChiHost) {
+func (c *Controller) syncStatefulSet(ctx context.Context, host *api.ChiHost) {
 	for {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("task is done")
@@ -183,7 +183,7 @@ func (c *Controller) syncStatefulSet(ctx context.Context, host *chiV1.ChiHost) {
 }
 
 // deletePVC deletes PersistentVolumeClaim
-func (c *Controller) deletePVC(ctx context.Context, host *chiV1.ChiHost) error {
+func (c *Controller) deletePVC(ctx context.Context, host *api.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -193,7 +193,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chiV1.ChiHost) error {
 	defer log.V(2).M(host).E().P()
 
 	namespace := host.Address.Namespace
-	c.walkDiscoveredPVCs(host, func(pvc *coreV1.PersistentVolumeClaim) {
+	c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("task is done")
 			return
@@ -222,7 +222,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *chiV1.ChiHost) error {
 }
 
 // deleteConfigMap deletes ConfigMap
-func (c *Controller) deleteConfigMap(ctx context.Context, host *chiV1.ChiHost) error {
+func (c *Controller) deleteConfigMap(ctx context.Context, host *api.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -256,7 +256,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *chiV1.ChiHost) e
 }
 
 // deleteServiceHost deletes Service
-func (c *Controller) deleteServiceHost(ctx context.Context, host *chiV1.ChiHost) error {
+func (c *Controller) deleteServiceHost(ctx context.Context, host *api.ChiHost) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -269,7 +269,7 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *chiV1.ChiHost)
 }
 
 // deleteServiceShard
-func (c *Controller) deleteServiceShard(ctx context.Context, shard *chiV1.ChiShard) error {
+func (c *Controller) deleteServiceShard(ctx context.Context, shard *api.ChiShard) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -282,7 +282,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *chiV1.ChiSha
 }
 
 // deleteServiceCluster
-func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chiV1.Cluster) error {
+func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *api.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -295,7 +295,7 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *chiV1.Cl
 }
 
 // deleteServiceCHI
-func (c *Controller) deleteServiceCHI(ctx context.Context, chi *chiV1.ClickHouseInstallation) error {
+func (c *Controller) deleteServiceCHI(ctx context.Context, chi *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -334,7 +334,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 }
 
 // deleteSecretCluster
-func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *chiV1.Cluster) error {
+func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *api.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

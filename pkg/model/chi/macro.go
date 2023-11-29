@@ -18,7 +18,7 @@ import (
 	"strconv"
 	"strings"
 
-	chop "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -79,10 +79,10 @@ const (
 // macrosEngine
 type macrosEngine struct {
 	names   *namer
-	chi     *chop.ClickHouseInstallation
-	cluster *chop.Cluster
-	shard   *chop.ChiShard
-	host    *chop.ChiHost
+	chi     *api.ClickHouseInstallation
+	cluster *api.Cluster
+	shard   *api.ChiShard
+	host    *api.ChiHost
 }
 
 // macro
@@ -90,13 +90,13 @@ func macro(scope interface{}) *macrosEngine {
 	m := new(macrosEngine)
 	m.names = newNamer(namerContextNames)
 	switch t := scope.(type) {
-	case *chop.ClickHouseInstallation:
+	case *api.ClickHouseInstallation:
 		m.chi = t
-	case *chop.Cluster:
+	case *api.Cluster:
 		m.cluster = t
-	case *chop.ChiShard:
+	case *api.ChiShard:
 		m.shard = t
-	case *chop.ChiHost:
+	case *api.ChiHost:
 		m.host = t
 	}
 	return m
@@ -186,7 +186,7 @@ func (m *macrosEngine) newMapMacroReplacerShard() *util.MapReplacer {
 }
 
 // clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
-func clusterScopeIndexOfPreviousCycleTail(host *chop.ChiHost) int {
+func clusterScopeIndexOfPreviousCycleTail(host *api.ChiHost) int {
 	if host.Address.ClusterScopeCycleOffset == 0 {
 		// This is the cycle head - the first host of the cycle
 		// We need to point to previous host in this cluster - which would be previous cycle tail

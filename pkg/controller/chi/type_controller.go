@@ -18,53 +18,53 @@ import (
 	"time"
 
 	kube "k8s.io/client-go/kubernetes"
-	appslisters "k8s.io/client-go/listers/apps/v1"
-	corelisters "k8s.io/client-go/listers/core/v1"
+	appsListers "k8s.io/client-go/listers/apps/v1"
+	coreListers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	//"k8s.io/client-go/util/workqueue"
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	"github.com/altinity/queue"
 
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	choplisters "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
+	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 )
 
 // Controller defines CRO controller
 type Controller struct {
 	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
 	kubeClient kube.Interface
-	extClient  apiextensions.Interface
+	extClient  apiExtensions.Interface
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
-	chopClient chopclientset.Interface
+	chopClient chopClientSet.Interface
 
 	// chiLister used as chiLister.ClickHouseInstallations(namespace).Get(name)
-	chiLister choplisters.ClickHouseInstallationLister
+	chiLister chopListers.ClickHouseInstallationLister
 	// chiListerSynced used in waitForCacheSync()
 	chiListerSynced cache.InformerSynced
 
-	chitLister       choplisters.ClickHouseInstallationTemplateLister
+	chitLister       chopListers.ClickHouseInstallationTemplateLister
 	chitListerSynced cache.InformerSynced
 
 	// serviceLister used as serviceLister.Services(namespace).Get(name)
-	serviceLister corelisters.ServiceLister
+	serviceLister coreListers.ServiceLister
 	// serviceListerSynced used in waitForCacheSync()
 	serviceListerSynced cache.InformerSynced
 	// endpointsLister used as endpointsLister.Endpoints(namespace).Get(name)
-	endpointsLister corelisters.EndpointsLister
+	endpointsLister coreListers.EndpointsLister
 	// endpointsListerSynced used in waitForCacheSync()
 	endpointsListerSynced cache.InformerSynced
 	// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
-	configMapLister corelisters.ConfigMapLister
+	configMapLister coreListers.ConfigMapLister
 	// configMapListerSynced used in waitForCacheSync()
 	configMapListerSynced cache.InformerSynced
 	// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-	statefulSetLister appslisters.StatefulSetLister
+	statefulSetLister appsListers.StatefulSetLister
 	// statefulSetListerSynced used in waitForCacheSync()
 	statefulSetListerSynced cache.InformerSynced
 	// podLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-	podLister corelisters.PodLister
+	podLister coreListers.PodLister
 	// podListerSynced used in waitForCacheSync()
 	podListerSynced cache.InformerSynced
 
