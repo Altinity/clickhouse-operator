@@ -322,7 +322,7 @@ spec:
                   # nullable: true
                   description: |
                     Optional, applicable inside ClickHouseInstallationTemplate only.
-                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
+                    Defines current ClickHouseInstallationTemplate application options to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
@@ -331,6 +331,7 @@ spec:
                         will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
                         Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
+                        - ""
                         - "auto"
                         - "manual"
                     chiSelector:
@@ -353,6 +354,7 @@ spec:
                          - wait - should wait to exclude host, complete queries and include host back into the cluster
                          - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
                       enum:
+                        - ""
                         - "wait"
                         - "nowait"
                     configMapPropagationTimeout:
@@ -380,6 +382,7 @@ spec:
                               description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
+                                - ""
                                 - "Retain"
                                 - "Delete"
                             pvc:
@@ -630,6 +633,7 @@ spec:
                                 description: "how schema is propagated within a replica"
                                 enum:
                                   # List SchemaPolicyReplicaXXX constants from model
+                                  - ""
                                   - "None"
                                   - "All"
                               shard:
@@ -637,6 +641,7 @@ spec:
                                 description: "how schema is propagated between shards"
                                 enum:
                                   # List SchemaPolicyShardXXX constants from model
+                                  - ""
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
@@ -1534,7 +1539,7 @@ spec:
                   # nullable: true
                   description: |
                     Optional, applicable inside ClickHouseInstallationTemplate only.
-                    Defines current ClickHouseInstallationTemplate application policy to target ClickHouseInstallation(s)."
+                    Defines current ClickHouseInstallationTemplate application options to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
@@ -1543,6 +1548,7 @@ spec:
                         will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
                         Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
+                        - ""
                         - "auto"
                         - "manual"
                     chiSelector:
@@ -1565,6 +1571,7 @@ spec:
                          - wait - should wait to exclude host, complete queries and include host back into the cluster
                          - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
                       enum:
+                        - ""
                         - "wait"
                         - "nowait"
                     configMapPropagationTimeout:
@@ -1592,6 +1599,7 @@ spec:
                               description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
+                                - ""
                                 - "Retain"
                                 - "Delete"
                             pvc:
@@ -1842,6 +1850,7 @@ spec:
                                 description: "how schema is propagated within a replica"
                                 enum:
                                   # List SchemaPolicyReplicaXXX constants from model
+                                  - ""
                                   - "None"
                                   - "All"
                               shard:
@@ -1849,6 +1858,7 @@ spec:
                                 description: "how schema is propagated between shards"
                                 enum:
                                   # List SchemaPolicyShardXXX constants from model
+                                  - ""
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
@@ -2634,6 +2644,7 @@ spec:
                               - ReadOnStart. Accept CHIT updates on the operators start only.
                               - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
                           enum:
+                            - ""
                             - "ReadOnStart"
                             - "ApplyOnNextReconcile"
                         path:
