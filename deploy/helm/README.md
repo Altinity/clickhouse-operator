@@ -49,7 +49,7 @@ For upgrade please install CRDs separately:
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | operator.resources | object | `{}` | custom resource configuration |
-| podAnnotations | object | `{"prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the pod |
+| podAnnotations | object | `{"clickhouse-operator-metrics/port":"9999","clickhouse-operator-metrics/scrape":"true","prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the pod |
 | podSecurityContext | object | `{}` |  |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
