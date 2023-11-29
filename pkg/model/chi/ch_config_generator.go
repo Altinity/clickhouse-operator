@@ -361,8 +361,8 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 			util.Iline(b, 16, "<internal_replication>%s</internal_replication>", shard.InternalReplication)
 
 			//		<weight>X</weight>
-			if shard.Weight != nil && *shard.Weight >= 0 {
-				util.Iline(b, 16, "<weight>%d</weight>", *shard.Weight)
+			if shard.HasWeight() {
+				util.Iline(b, 16, "<weight>%d</weight>", shard.GetWeight())
 			}
 
 			shard.WalkHosts(func(host *api.ChiHost) error {
