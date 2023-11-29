@@ -167,12 +167,12 @@ func (c *Controller) getStatefulSetByHost(host *chiV1.ChiHost) (*appsV1.Stateful
 	name := model.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
-	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, controller.NewGetOptions())
+	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
 // getSecret gets secret
 func (c *Controller) getSecret(secret *coreV1.Secret) (*coreV1.Secret, error) {
-	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(newContext(), secret.Name, controller.NewGetOptions())
+	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(controller.NewContext(), secret.Name, controller.NewGetOptions())
 }
 
 // getPod gets pod. Accepted types:
@@ -188,7 +188,7 @@ func (c *Controller) getPod(obj interface{}) (*coreV1.Pod, error) {
 		name = model.CreatePodName(obj)
 		namespace = typedObj.Address.Namespace
 	}
-	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, controller.NewGetOptions())
+	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
 // getPods gets all pods for provided entity
@@ -274,5 +274,5 @@ func (c *Controller) GetCHIByObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI boo
 		}
 	}
 
-	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(newContext(), chiName, controller.NewGetOptions())
+	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(controller.NewContext(), chiName, controller.NewGetOptions())
 }

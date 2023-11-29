@@ -26,7 +26,7 @@ import (
 func (c *Controller) walkPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.PersistentVolumeClaim)) {
 	namespace := host.Address.Namespace
 	name := model.CreatePodName(host)
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, controller.NewGetOptions())
+	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s/%s err:%v", namespace, host.GetName(), err)
 		return
@@ -39,7 +39,7 @@ func (c *Controller) walkPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.Persistent
 		}
 
 		pvcName := volume.PersistentVolumeClaim.ClaimName
-		pvc, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(newContext(), pvcName, controller.NewGetOptions())
+		pvc, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(controller.NewContext(), pvcName, controller.NewGetOptions())
 		if err != nil {
 			log.M(host).F().Error("FAIL get PVC %s/%s for the host %s/%s with err:%v", namespace, pvcName, namespace, host.GetName(), err)
 			continue
@@ -52,7 +52,7 @@ func (c *Controller) walkPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.Persistent
 func (c *Controller) walkDiscoveredPVCs(host *chiV1.ChiHost, f func(pvc *coreV1.PersistentVolumeClaim)) {
 	namespace := host.Address.Namespace
 
-	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(newContext(), controller.NewListOptions(model.GetSelectorHostScope(host)))
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(controller.NewContext(), controller.NewListOptions(model.GetSelectorHostScope(host)))
 	if err != nil {
 		log.M(host).F().Error("FAIL get list of PVCs for the host %s/%s err:%v", namespace, host.GetName(), err)
 		return
