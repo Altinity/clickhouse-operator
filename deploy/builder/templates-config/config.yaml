@@ -27,6 +27,9 @@ clickhouse:
     ##
     ################################################
     file:
+      # Each 'path' can be either absolute or relative.
+      # In case path is absolute - it is used as is
+      # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
       path:
         # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
         common: config.d
