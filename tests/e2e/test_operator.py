@@ -3944,7 +3944,7 @@ def test_042(self):
         )
 
         with Then("Operator should apply changes, and both pods should be created"):
-            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_chi_status(chi, "Aborted", retries=20)
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
         with And("First node is in CrashLoopBackOff"):
@@ -3973,7 +3973,7 @@ def test_042(self):
         )
 
         with Then("Operator should apply changes, and both pods should be created"):
-            kubectl.wait_chi_status(chi, "Completed", retries=20)
+            kubectl.wait_chi_status(chi, "Aborted", retries=20)
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
         with And("First node is in CrashLoopBackOff"):
