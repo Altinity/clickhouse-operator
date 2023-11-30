@@ -103,7 +103,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *chiV1.ClickHouseIns
 			WithStatusError(new).
 			M(new).F().
 			Error("FAILED to reconcile CHI err: %v", err)
-		w.markReconcileCompletedUnsuccessfully(ctx, new)
+		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 	} else {
 		// Post-process added items
 		if util.IsContextDone(ctx) {
@@ -665,7 +665,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 
 	host.GetReconcileAttributes().UnsetAdd()
 	// Sometimes service needs some time to start after creation before being accessible for usage
-	time.Sleep(30 * time.Second)
+	// time.Sleep(30 * time.Second)
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {

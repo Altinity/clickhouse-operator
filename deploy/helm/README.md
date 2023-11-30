@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.22.0](https://img.shields.io/badge/Version-0.22.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.22.0](https://img.shields.io/badge/AppVersion-0.22.0-informational?style=flat-square)
+![Version: 0.22.1](https://img.shields.io/badge/Version-0.22.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.22.1](https://img.shields.io/badge/AppVersion-0.22.1-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -49,7 +49,7 @@ For upgrade please install CRDs separately:
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | operator.resources | object | `{}` | custom resource configuration |
-| podAnnotations | object | `{"prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the pod |
+| podAnnotations | object | `{"clickhouse-operator-metrics/port":"9999","clickhouse-operator-metrics/scrape":"true","prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the pod |
 | podSecurityContext | object | `{}` |  |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |

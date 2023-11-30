@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.22.0
+# OPERATOR_VERSION=0.22.1
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -141,11 +141,13 @@ spec:
             taskIDsStarted:
               type: array
               description: "Started task ids"
+              nullable: true
               items:
                 type: string
             taskIDsCompleted:
               type: array
               description: "Completed task ids"
+              nullable: true
               items:
                 type: string
             action:
@@ -154,6 +156,7 @@ spec:
             actions:
               type: array
               description: "Actions"
+              nullable: true
               items:
                 type: string
             error:
@@ -162,6 +165,7 @@ spec:
             errors:
               type: array
               description: "Errors"
+              nullable: true
               items:
                 type: string
             hostsUpdated:
@@ -187,16 +191,19 @@ spec:
             pods:
               type: array
               description: "Pods"
+              nullable: true
               items:
                 type: string
             pod-ips:
               type: array
               description: "Pod IPs"
+              nullable: true
               items:
                 type: string
             fqdns:
               type: array
               description: "Pods FQDNs"
+              nullable: true
               items:
                 type: string
             endpoint:
@@ -217,11 +224,13 @@ spec:
             hostsWithTablesCreated:
               type: array
               description: "List of hosts with tables created by the operator"
+              nullable: true
               items:
                 type: string
             usedTemplates:
               type: array
               description: "List of templates used to build this CHI"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
               items:
                 type: object
@@ -305,6 +314,7 @@ spec:
                     will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
                     Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                   enum:
+                    - ""
                     - "auto"
                     - "manual"
                 chiSelector:
@@ -342,6 +352,7 @@ spec:
                           description: "behavior policy for unknown StatefulSet, Delete by default"
                           enum:
                             # List ObjectsCleanupXXX constants from model
+                            - ""
                             - "Retain"
                             - "Delete"
                         pvc:
@@ -590,6 +601,7 @@ spec:
                             description: "how schema is propagated within a replica"
                             enum:
                               # List SchemaPolicyReplicaXXX constants from model
+                              - ""
                               - "None"
                               - "All"
                           shard:
@@ -597,6 +609,7 @@ spec:
                             description: "how schema is propagated between shards"
                             enum:
                               # List SchemaPolicyShardXXX constants from model
+                              - ""
                               - "None"
                               - "All"
                               - "DistributedTablesOnly"
@@ -1181,14 +1194,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.22.0
+# OPERATOR_VERSION=0.22.1
 #
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1316,11 +1329,13 @@ spec:
             taskIDsStarted:
               type: array
               description: "Started task ids"
+              nullable: true
               items:
                 type: string
             taskIDsCompleted:
               type: array
               description: "Completed task ids"
+              nullable: true
               items:
                 type: string
             action:
@@ -1329,6 +1344,7 @@ spec:
             actions:
               type: array
               description: "Actions"
+              nullable: true
               items:
                 type: string
             error:
@@ -1337,6 +1353,7 @@ spec:
             errors:
               type: array
               description: "Errors"
+              nullable: true
               items:
                 type: string
             hostsUpdated:
@@ -1362,16 +1379,19 @@ spec:
             pods:
               type: array
               description: "Pods"
+              nullable: true
               items:
                 type: string
             pod-ips:
               type: array
               description: "Pod IPs"
+              nullable: true
               items:
                 type: string
             fqdns:
               type: array
               description: "Pods FQDNs"
+              nullable: true
               items:
                 type: string
             endpoint:
@@ -1392,11 +1412,13 @@ spec:
             hostsWithTablesCreated:
               type: array
               description: "List of hosts with tables created by the operator"
+              nullable: true
               items:
                 type: string
             usedTemplates:
               type: array
               description: "List of templates used to build this CHI"
+              nullable: true
               x-kubernetes-preserve-unknown-fields: true
               items:
                 type: object
@@ -1480,6 +1502,7 @@ spec:
                     will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
                     Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                   enum:
+                    - ""
                     - "auto"
                     - "manual"
                 chiSelector:
@@ -1517,6 +1540,7 @@ spec:
                           description: "behavior policy for unknown StatefulSet, Delete by default"
                           enum:
                             # List ObjectsCleanupXXX constants from model
+                            - ""
                             - "Retain"
                             - "Delete"
                         pvc:
@@ -1765,6 +1789,7 @@ spec:
                             description: "how schema is propagated within a replica"
                             enum:
                               # List SchemaPolicyReplicaXXX constants from model
+                              - ""
                               - "None"
                               - "All"
                           shard:
@@ -1772,6 +1797,7 @@ spec:
                             description: "how schema is propagated between shards"
                             enum:
                               # List SchemaPolicyShardXXX constants from model
+                              - ""
                               - "None"
                               - "All"
                               - "DistributedTablesOnly"
@@ -2359,7 +2385,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2551,6 +2577,7 @@ spec:
                           - ReadOnStart. Accept CHIT updates on the operators start only.
                           - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
                       enum:
+                        - ""
                         - "ReadOnStart"
                         - "ApplyOnNextReconcile"
                     path:
@@ -2763,7 +2790,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 ---
 # Template Parameters:
 #
@@ -2780,7 +2807,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 rules:
   - apiGroups:
       - ""
@@ -2938,7 +2965,7 @@ metadata:
   name: clickhouse-operator-kube-system
   #namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -2960,7 +2987,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3314,7 +3341,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 data:
 ---
@@ -3330,7 +3357,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3424,7 +3451,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -3522,7 +3549,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -3574,7 +3601,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=kube-system
 #   COMMENT=
-#   OPERATOR_VERSION=0.22.0
+#   OPERATOR_VERSION=0.22.1
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -3584,7 +3611,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -3595,9 +3622,9 @@ stringData:
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.22.0
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.22.1
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.22.0
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.22.1
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -3608,7 +3635,7 @@ metadata:
   name: clickhouse-operator
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -3622,6 +3649,8 @@ spec:
       annotations:
         prometheus.io/port: '8888'
         prometheus.io/scrape: 'true'
+        clickhouse-operator-metrics/port: '9999'
+        clickhouse-operator-metrics/scrape: 'true'
     spec:
       serviceAccountName: clickhouse-operator
       volumes:
@@ -3642,7 +3671,7 @@ spec:
             name: etc-clickhouse-operator-usersd-files
       containers:
         - name: clickhouse-operator
-          image: altinity/clickhouse-operator:0.22.0
+          image: altinity/clickhouse-operator:0.22.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3708,7 +3737,7 @@ spec:
             - containerPort: 9999
               name: metrics
         - name: metrics-exporter
-          image: altinity/metrics-exporter:0.22.0
+          image: altinity/metrics-exporter:0.22.1
           imagePullPolicy: Always
           volumeMounts:
             - name: etc-clickhouse-operator-folder
@@ -3790,7 +3819,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: kube-system
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
     app: clickhouse-operator
 spec:
   ports:

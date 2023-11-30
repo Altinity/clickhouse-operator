@@ -7,7 +7,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.22.0
+    clickhouse.altinity.com/chop: 0.22.1
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -203,6 +203,7 @@ spec:
                               - ReadOnStart. Accept CHIT updates on the operators start only.
                               - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
                           enum:
+                            - ""
                             - "ReadOnStart"
                             - "ApplyOnNextReconcile"
                         path:
