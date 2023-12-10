@@ -329,19 +329,18 @@ spec:
               that ZooKeeper consistency model allows.
 
         - alert: ClickHouseDiskUsage
-          expr: |
-            (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.1
-            or ( (chi_clickhouse_metric_DiskFreeBytes / chi_clickhouse_metric_DiskTotalBytes) < 0.15 and ALERTS{alertname="ClickHouseDiskUsage",alertstate="firing"} == 1)
+          expr: predict_linear(chi_clickhouse_metric_DiskFreeBytes[1d],86400) < 0
           labels:
             severity: high
           annotations:
             identifier: "{{ $labels.hostname }}.{{ $labels.disk }}"
-            summary: "Disk Usage in `&lt;yandex&gt;&lt;path&gt;` > 90%"
+            summary: "Disk free space enough less 24 hour"
             description: |-
               `{{ $labels.disk }}` data size: {{ with printf "chi_clickhouse_metric_DiskDataBytes{hostname='%s',exported_namespace='%s',disk='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.disk | query }}{{ . | first | value | humanize1024 }}B {{ end }}
-              `{{ $labels.disk }}` disk free: {{ with printf "chi_clickhouse_metric_DiskFreeBytes{hostname='%s',exported_namespace='%s',disk='%s'}}" .Labels.hostname .Labels.exported_namespace .Labels.disk | query }}{{ . | first | value | humanize1024 }}B {{ end }}
-              `{{ $labels.disk }}` disk size: {{ with printf "chi_clickhouse_metric_DiskTotalBytes{hostname='%s',exported_namespace='%s',disk='%s'}}" .Labels.hostname .Labels.exported_namespace .Labels.disk | query }}{{ . | first | value | humanize1024 }}B {{ end }}
-              currently k8s CSI support resize of Persistent Volumes, moreover you can try add another volume to existing pod with restart pod
+              `{{ $labels.disk }}` disk free: {{ with printf "chi_clickhouse_metric_DiskFreeBytes{hostname='%s',exported_namespace='%s',disk='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.disk | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              `{{ $labels.disk }}` disk size: {{ with printf "chi_clickhouse_metric_DiskTotalBytes{hostname='%s',exported_namespace='%s',disk='%s'}" .Labels.hostname .Labels.exported_namespace .Labels.disk | query }}{{ . | first | value | humanize1024 }}B {{ end }}
+              To avoid switching to read-only mode, please scale-up storage.
+              Currently k8s CSI support resize of Persistent Volumes, moreover you can try add another volume to existing pod with restart pod
               please read documentation:
               - https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/
               - https://github.com/Altinity/clickhouse-operator/blob/master/docs/storage.md
