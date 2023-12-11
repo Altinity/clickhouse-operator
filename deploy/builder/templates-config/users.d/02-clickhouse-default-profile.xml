@@ -8,6 +8,8 @@
       <parallel_view_processing>1</parallel_view_processing>
       <do_not_merge_across_partitions_select_final>1</do_not_merge_across_partitions_select_final>
       <load_balancing>nearest_hostname</load_balancing>
+      <materialize_ttl_recalculate_only>1</materialize_ttl_recalculate_only>
+      <prefer_localhost_replica>0</prefer_localhost_replica>
     </default>
   </profiles>
 </yandex>
