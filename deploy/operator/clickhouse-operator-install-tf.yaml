@@ -3138,6 +3138,7 @@ data:
     
               - zookeeper/*: "yes"
     
+              - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
               - files/config.d/*dict*.xml: "no"
     
