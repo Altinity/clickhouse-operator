@@ -559,7 +559,7 @@ def test_008_3(self):
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.21.0", version_to=None):
+def test_009_1(self, version_from="0.22.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -581,7 +581,7 @@ def test_009_1(self, version_from="0.21.0", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.21.0", version_to=None):
+def test_009_2(self, version_from="0.22.0", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -1819,6 +1819,27 @@ def test_016(self):
         with And("ClickHouse SHOULD BE restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time < new_start_time
+
+    # test-016-settings-05.yaml
+    with When("Add a change to an existing xml file"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-016-settings-05.yaml",
+            check={
+                "do_not_delete": 1,
+            },
+        )
+
+        with And("ClickHouse SHOULD BE restarted"):
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            assert start_time < new_start_time
+
+        with And("Macro 'test' value should be changed"):
+            out = clickhouse.query(
+                chi,
+                sql="select substitution from system.macros where macro='test'",
+            )
+            assert out == "test-changed"
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
