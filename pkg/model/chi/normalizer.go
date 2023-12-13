@@ -1231,11 +1231,8 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *ap
 	}
 }
 
+// normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, username string) {
-	//
-	// Deal with passwords
-	//
-
 	// Values from the secret have higher priority
 	n.substWithSecretField(users, username, "password", "k8s_secret_password")
 	n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
@@ -1250,22 +1247,25 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 	if users.Has(username + "/password_double_sha1_hex") {
 		users.Delete(username + "/password_sha256_hex")
 		users.Delete(username + "/password")
-		return // move to the next user
+		// This is all for this user
+		return
 	}
 
 	// Than goes password_sha256_hex, thus keep it only
 	if users.Has(username + "/password_sha256_hex") {
 		users.Delete(username + "/password_double_sha1_hex")
 		users.Delete(username + "/password")
-		return // move to the next user
+		// This is all for this user
+		return
 	}
 
-	// From now on we either have a plaintext password specified, or no password at all
+	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
 
 	if users.Get(username + "/password").HasAttributes() {
-		// Have plaintext password explicitly specified via ENV vars
-		// This is still OK
-		return // move to the next user
+		// Have plaintext password explicitly specified via ENV var
+		// This is fine
+		// This is all for this user
+		return
 	}
 
 	// From now on we either have plaintext password specified as an explicit string, or no password at all
@@ -1274,7 +1274,7 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 
 	// Apply default password for password-less non-default users
 	// 1. NB "default" user keeps empty password in here.
-	// 2. ClickHouse user gets password from his section of chop configuration
+	// 2. ClickHouse user gets password from his section of CHOp configuration
 	// 3. All the rest users get default password
 	if passwordPlaintext == "" {
 		switch username {
@@ -1284,6 +1284,7 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 			// User used by CHOp to access instances
 			passwordPlaintext = chop.Config().ClickHouse.Access.Password
 		default:
+			// All the rest users get default password
 			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
 		}
 	}
@@ -1291,8 +1292,8 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 	// Replace plaintext password with encrypted
 	if passwordPlaintext != "" {
 		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-		users.Set(username+"/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-		// And keep only one password specification
+		users.Set(username + "/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+		// And keep only one password specification - delete all the rest (if any exists)
 		users.Delete(username + "/password_double_sha1_hex")
 		users.Delete(username + "/password")
 	}
