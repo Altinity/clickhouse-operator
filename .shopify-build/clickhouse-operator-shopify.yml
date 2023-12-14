@@ -1,0 +1,26 @@
+containers:
+  default:
+    build:
+      from: ubuntu-latest
+      type: ci
+  clickhouse-operator:
+    environment: production
+    application: clickhouse-operator
+    dockerfile:
+      dir: .
+      path: dockerfile/operator/Dockerfile
+      tag_latest: false
+  clickhouse-operator-dev:
+    environment: dev
+    application: clickhouse-operator
+    dockerfile:
+      dir: .
+      path: dockerfile/operator/Dockerfile
+      tag_latest: false
+
+
+steps:
+  - build: clickhouse-operator
+    branches: "main"
+  - build: clickhouse-operator-dev
+    branches: "!main"
