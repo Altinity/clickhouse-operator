@@ -1281,24 +1281,28 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 		case defaultUsername:
 			// NB "default" user keeps empty password in here.
 		case chop.Config().ClickHouse.Access.Username:
-			// User used by CHOp to access instances
+			// User used by CHOp to access instances gets ClickHouse access password from "ClickHouse.Access.Password"
 			passwordPlaintext = chop.Config().ClickHouse.Access.Password
 		default:
-			// All the rest users get default password
+			// All the rest users get default password from "ClickHouse.Config.User.Default.Password"
 			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
 		}
 	}
 
-	// Replace plaintext password with encrypted
-	if passwordPlaintext != "" {
-		passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-		users.Set(username + "/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-		// And keep only one password specification - delete all the rest (if any exists)
-		users.Delete(username + "/password_double_sha1_hex")
-		users.Delete(username + "/password")
+	// NB "default" user may keep empty password in here.
+	if passwordPlaintext == "" {
+		// This is fine
+		// This is all for this user
+		return
 	}
 
-	// NB "default" user may keep empty password in here.
+	// Have plaintext password specified.
+	// Replace plaintext password with encrypted one
+	passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
+	users.Set(username + "/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+	// And keep only one password specification - delete all the rest (if any exists)
+	users.Delete(username + "/password_double_sha1_hex")
+	users.Delete(username + "/password")
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
