@@ -17,7 +17,6 @@ package chop
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -248,7 +247,7 @@ func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.Opera
 // buildConfigFromFile returns OperatorConfig struct built out of specified file path
 func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.OperatorConfig, error) {
 	// Read config file content
-	yamlText, err := ioutil.ReadFile(filepath.Clean(configFilePath))
+	yamlText, err := os.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		return nil, err
 	}
