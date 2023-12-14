@@ -202,6 +202,9 @@ configs:
           ##
           ################################################
           file:
+            # Each 'path' can be either absolute or relative.
+            # In case path is absolute - it is used as is
+            # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
             path:
               # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
               common: config.d
@@ -276,6 +279,7 @@ configs:
 
                 - zookeeper/*: "yes"
 
+                - files/*.xml: "yes"
                 - files/config.d/*.xml: "yes"
                 - files/config.d/*dict*.xml: "no"
 
@@ -630,6 +634,8 @@ configs:
             <parallel_view_processing>1</parallel_view_processing>
             <do_not_merge_across_partitions_select_final>1</do_not_merge_across_partitions_select_final>
             <load_balancing>nearest_hostname</load_balancing>
+            <prefer_localhost_replica>0</prefer_localhost_replica>
+            <!-- materialize_ttl_recalculate_only>1</materialize_ttl_recalculate_only> 21.10 and above -->
           </default>
         </profiles>
       </yandex>
