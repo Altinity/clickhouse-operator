@@ -17,11 +17,12 @@ package chi
 import (
 	"time"
 
-	coreV1 "k8s.io/api/core/v1"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
 const (
@@ -63,7 +64,7 @@ const (
 
 // EventInfo emits event Info
 func (c *Controller) EventInfo(
-	chi *chiV1.ClickHouseInstallation,
+	chi *api.ClickHouseInstallation,
 	action string,
 	reason string,
 	message string,
@@ -73,7 +74,7 @@ func (c *Controller) EventInfo(
 
 // EventWarning emits event Warning
 func (c *Controller) EventWarning(
-	chi *chiV1.ClickHouseInstallation,
+	chi *api.ClickHouseInstallation,
 	action string,
 	reason string,
 	message string,
@@ -83,7 +84,7 @@ func (c *Controller) EventWarning(
 
 // EventError emits event Error
 func (c *Controller) EventError(
-	chi *chiV1.ClickHouseInstallation,
+	chi *api.ClickHouseInstallation,
 	action string,
 	reason string,
 	message string,
@@ -97,7 +98,7 @@ func (c *Controller) EventError(
 // reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
 func (c *Controller) emitEvent(
-	chi *chiV1.ClickHouseInstallation,
+	chi *api.ClickHouseInstallation,
 	_type string,
 	action string,
 	reason string,
@@ -110,11 +111,11 @@ func (c *Controller) emitEvent(
 	uid := chi.UID
 	resourceVersion := chi.ResourceVersion
 
-	event := &coreV1.Event{
-		ObjectMeta: metaV1.ObjectMeta{
+	event := &core.Event{
+		ObjectMeta: meta.ObjectMeta{
 			GenerateName: "chop-chi-",
 		},
-		InvolvedObject: coreV1.ObjectReference{
+		InvolvedObject: core.ObjectReference{
 			Kind:            kind,
 			Namespace:       namespace,
 			Name:            name,
@@ -124,13 +125,13 @@ func (c *Controller) emitEvent(
 		},
 		Reason:  reason,
 		Message: message,
-		Source: coreV1.EventSource{
+		Source: core.EventSource{
 			Component: componentName,
 		},
-		FirstTimestamp: metaV1.Time{
+		FirstTimestamp: meta.Time{
 			Time: now,
 		},
-		LastTimestamp: metaV1.Time{
+		LastTimestamp: meta.Time{
 			Time: now,
 		},
 		Count:               1,
@@ -140,7 +141,7 @@ func (c *Controller) emitEvent(
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
-	_, err := c.kubeClient.CoreV1().Events(namespace).Create(newContext(), event, newCreateOptions())
+	_, err := c.kubeClient.CoreV1().Events(namespace).Create(controller.NewContext(), event, controller.NewCreateOptions())
 
 	if err != nil {
 		log.M(chi).F().Error("Create Event failed: %v", err)

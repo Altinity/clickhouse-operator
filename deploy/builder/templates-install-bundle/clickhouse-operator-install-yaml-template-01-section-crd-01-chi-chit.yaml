@@ -149,11 +149,13 @@ spec:
                 taskIDsStarted:
                   type: array
                   description: "Started task ids"
+                  nullable: true
                   items:
                     type: string
                 taskIDsCompleted:
                   type: array
                   description: "Completed task ids"
+                  nullable: true
                   items:
                     type: string
                 action:
@@ -162,6 +164,7 @@ spec:
                 actions:
                   type: array
                   description: "Actions"
+                  nullable: true
                   items:
                     type: string
                 error:
@@ -170,6 +173,7 @@ spec:
                 errors:
                   type: array
                   description: "Errors"
+                  nullable: true
                   items:
                     type: string
                 hostsUpdated:
@@ -195,16 +199,19 @@ spec:
                 pods:
                   type: array
                   description: "Pods"
+                  nullable: true
                   items:
                     type: string
                 pod-ips:
                   type: array
                   description: "Pod IPs"
+                  nullable: true
                   items:
                     type: string
                 fqdns:
                   type: array
                   description: "Pods FQDNs"
+                  nullable: true
                   items:
                     type: string
                 endpoint:
@@ -225,11 +232,13 @@ spec:
                 hostsWithTablesCreated:
                   type: array
                   description: "List of hosts with tables created by the operator"
+                  nullable: true
                   items:
                     type: string
                 usedTemplates:
                   type: array
                   description: "List of templates used to build this CHI"
+                  nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                   items:
                     type: object
@@ -304,7 +313,9 @@ spec:
                 templating:
                   type: object
                   # nullable: true
-                  description: "Optional, defines policy for applying current ClickHouseInstallationTemplate to ClickHouseInstallation(s)"
+                  description: |
+                    Optional, applicable inside ClickHouseInstallationTemplate only.
+                    Defines current ClickHouseInstallationTemplate application options to target ClickHouseInstallation(s)."
                   properties:
                     policy:
                       type: string
@@ -313,6 +324,7 @@ spec:
                         will be auto-added into ClickHouseInstallation, selectable by `chiSelector`.
                         Default value is `manual`, meaning ClickHouseInstallation should request this ClickhouseInstallationTemplate explicitly.
                       enum:
+                        - ""
                         - "auto"
                         - "manual"
                     chiSelector:
@@ -322,12 +334,22 @@ spec:
                       x-kubernetes-preserve-unknown-fields: true
                 reconciling:
                   type: object
-                  description: "optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
+                  description: "Optional, allows tuning reconciling cycle for ClickhouseInstallation from clickhouse-operator side"
                   # nullable: true
                   properties:
                     policy:
                       type: string
-                      description: DEPRECATED
+                      description: |
+                        DISCUSSED TO BE DEPRECATED
+                        Syntax sugar
+                        Overrides all three 'reconcile.host.wait.{exclude, queries, include}' values from the operator's config
+                        Possible values:
+                         - wait - should wait to exclude host, complete queries and include host back into the cluster
+                         - nowait - should NOT wait to exclude host, complete queries and include host back into the cluster
+                      enum:
+                        - ""
+                        - "wait"
+                        - "nowait"
                     configMapPropagationTimeout:
                       type: integer
                       description: |
@@ -337,48 +359,54 @@ spec:
                       maximum: 3600
                     cleanup:
                       type: object
-                      description: "optional, define behavior for cleanup Kubernetes resources during reconcile cycle"
+                      description: "Optional, defines behavior for cleanup Kubernetes resources during reconcile cycle"
                       # nullable: true
                       properties:
                         unknownObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when found Kubernetes resources which should be managed with clickhouse-operator, but not have `ownerReference` to any currently managed `ClickHouseInstallation` resource, default behavior is `Delete`"
+                          description: |
+                            Describes what clickhouse-operator should do with found Kubernetes resources which should be managed by clickhouse-operator,
+                            but do not have `ownerReference` to any currently managed `ClickHouseInstallation` resource.
+                            Default behavior is `Delete`"
                           # nullable: true
                           properties:
                             statefulSet: &TypeObjectsCleanup
                               type: string
-                              description: "behavior policy for unknown StatefulSet, Delete by default"
+                              description: "Behavior policy for unknown StatefulSet, `Delete` by default"
                               enum:
                                 # List ObjectsCleanupXXX constants from model
+                                - ""
                                 - "Retain"
                                 - "Delete"
                             pvc:
                               type: string
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown PVC, Delete by default"
+                              description: "Behavior policy for unknown PVC, `Delete` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown ConfigMap, Delete by default"
+                              description: "Behavior policy for unknown ConfigMap, `Delete` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for unknown Service, Delete by default"
+                              description: "Behavior policy for unknown Service, `Delete` by default"
                         reconcileFailedObjects:
                           type: object
-                          description: "what clickhouse-operator shall do when reconciling Kubernetes resources are failed, default behavior is `Retain`"
+                          description: |
+                            Describes what clickhouse-operator should do with Kubernetes resources which are failed during reconcile.
+                            Default behavior is `Retain`"
                           # nullable: true
                           properties:
                             statefulSet:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed StatefulSet reconciling, Retain by default"
+                              description: "Behavior policy for failed StatefulSet, `Retain` by default"
                             pvc:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed PVC reconciling, Retain by default"
+                              description: "Behavior policy for failed PVC, `Retain` by default"
                             configMap:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed ConfigMap reconciling, Retain by default"
+                              description: "Behavior policy for failed ConfigMap, `Retain` by default"
                             service:
                               <<: *TypeObjectsCleanup
-                              description: "behavior policy for failed Service reconciling, Retain by default"
+                              description: "Behavior policy for failed Service, `Retain` by default"
                 defaults:
                   type: object
                   description: |
@@ -598,6 +626,7 @@ spec:
                                 description: "how schema is propagated within a replica"
                                 enum:
                                   # List SchemaPolicyReplicaXXX constants from model
+                                  - ""
                                   - "None"
                                   - "All"
                               shard:
@@ -605,6 +634,7 @@ spec:
                                 description: "how schema is propagated between shards"
                                 enum:
                                   # List SchemaPolicyShardXXX constants from model
+                                  - ""
                                   - "None"
                                   - "All"
                                   - "DistributedTablesOnly"
@@ -1075,17 +1105,17 @@ spec:
                                 topologyKey:
                                   type: string
                                   description: "use for inter-pod affinity look to `pod.spec.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution.podAffinityTerm.topologyKey`, More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#inter-pod-affinity-and-anti-affinity"
-                          spec:
-                            # TODO specify PodSpec
-                            type: object
-                            description: "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
-                            # nullable: true
-                            x-kubernetes-preserve-unknown-fields: true
                           metadata:
                             type: object
                             description: |
                               allows pass standard object's metadata from template to Pod
                               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                            # nullable: true
+                            x-kubernetes-preserve-unknown-fields: true
+                          spec:
+                            # TODO specify PodSpec
+                            type: object
+                            description: "allows define whole Pod.spec inside StaefulSet.spec, look to https://kubernetes.io/docs/concepts/workloads/pods/#pod-templates for details"
                             # nullable: true
                             x-kubernetes-preserve-unknown-fields: true
 

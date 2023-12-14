@@ -17,23 +17,24 @@ package chi
 import (
 	"fmt"
 
-	appsV1 "k8s.io/api/apps/v1"
-	coreV1 "k8s.io/api/core/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
-	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8slabels "k8s.io/apimachinery/pkg/labels"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sLabels "k8s.io/apimachinery/pkg/labels"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopmodel "github.com/altinity/clickhouse-operator/pkg/model"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getConfigMap(objMeta *metaV1.ObjectMeta, byNameOnly bool) (*coreV1.ConfigMap, error) {
+func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*core.ConfigMap, error) {
 	get := c.configMapLister.ConfigMaps(objMeta.Namespace).Get
 	list := c.configMapLister.ConfigMaps(objMeta.Namespace).List
-	var objects []*coreV1.ConfigMap
+	var objects []*core.ConfigMap
 
 	// Check whether object with such name already exists
 	obj, err := get(objMeta.Name)
@@ -56,8 +57,8 @@ func (c *Controller) getConfigMap(objMeta *metaV1.ObjectMeta, byNameOnly bool) (
 
 	// Try to find by labels
 
-	var selector k8slabels.Selector
-	if selector, err = chopmodel.MakeSelectorFromObjectMeta(objMeta); err != nil {
+	var selector k8sLabels.Selector
+	if selector, err = model.MakeSelectorFromObjectMeta(objMeta); err != nil {
 		return nil, err
 	}
 
@@ -66,7 +67,7 @@ func (c *Controller) getConfigMap(objMeta *metaV1.ObjectMeta, byNameOnly bool) (
 	}
 
 	if len(objects) == 0 {
-		return nil, apiErrors.NewNotFound(appsV1.Resource("ConfigMap"), objMeta.Name)
+		return nil, apiErrors.NewNotFound(apps.Resource("ConfigMap"), objMeta.Name)
 	}
 
 	if len(objects) == 1 {
@@ -81,14 +82,14 @@ func (c *Controller) getConfigMap(objMeta *metaV1.ObjectMeta, byNameOnly bool) (
 // getService gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.ChiHost
-func (c *Controller) getService(obj interface{}) (*coreV1.Service, error) {
+func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *coreV1.Service:
+	case *core.Service:
 		name = typedObj.Name
 		namespace = typedObj.Namespace
-	case *chiV1.ChiHost:
-		name = chopmodel.CreateStatefulSetServiceName(typedObj)
+	case *api.ChiHost:
+		name = model.CreateStatefulSetServiceName(typedObj)
 		namespace = typedObj.Address.Namespace
 	}
 	return c.serviceLister.Services(namespace).Get(name)
@@ -98,15 +99,15 @@ func (c *Controller) getService(obj interface{}) (*coreV1.Service, error) {
 // getStatefulSet gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.ChiHost
-func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*appsV1.StatefulSet, error) {
+func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.StatefulSet, error) {
 	switch typedObj := obj.(type) {
-	case *metaV1.ObjectMeta:
+	case *meta.ObjectMeta:
 		var b bool
 		if len(byName) > 0 {
 			b = byName[0]
 		}
 		return c.getStatefulSetByMeta(typedObj, b)
-	case *chiV1.ChiHost:
+	case *api.ChiHost:
 		return c.getStatefulSetByHost(typedObj)
 	}
 	return nil, fmt.Errorf("unknown type")
@@ -114,10 +115,10 @@ func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*appsV1.St
 
 // getStatefulSet gets StatefulSet either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getStatefulSetByMeta(meta *metaV1.ObjectMeta, byNameOnly bool) (*appsV1.StatefulSet, error) {
+func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
 	get := c.statefulSetLister.StatefulSets(meta.Namespace).Get
 	list := c.statefulSetLister.StatefulSets(meta.Namespace).List
-	var objects []*appsV1.StatefulSet
+	var objects []*apps.StatefulSet
 
 	// Check whether object with such name already exists
 	obj, err := get(meta.Name)
@@ -138,8 +139,8 @@ func (c *Controller) getStatefulSetByMeta(meta *metaV1.ObjectMeta, byNameOnly bo
 		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", meta.Namespace, meta.Name)
 	}
 
-	var selector k8slabels.Selector
-	if selector, err = chopmodel.MakeSelectorFromObjectMeta(meta); err != nil {
+	var selector k8sLabels.Selector
+	if selector, err = model.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
@@ -148,7 +149,7 @@ func (c *Controller) getStatefulSetByMeta(meta *metaV1.ObjectMeta, byNameOnly bo
 	}
 
 	if len(objects) == 0 {
-		return nil, apiErrors.NewNotFound(appsV1.Resource("StatefulSet"), meta.Name)
+		return nil, apiErrors.NewNotFound(apps.Resource("StatefulSet"), meta.Name)
 	}
 
 	if len(objects) == 1 {
@@ -161,49 +162,49 @@ func (c *Controller) getStatefulSetByMeta(meta *metaV1.ObjectMeta, byNameOnly bo
 }
 
 // getStatefulSetByHost finds StatefulSet of a specified host
-func (c *Controller) getStatefulSetByHost(host *chiV1.ChiHost) (*appsV1.StatefulSet, error) {
+func (c *Controller) getStatefulSetByHost(host *api.ChiHost) (*apps.StatefulSet, error) {
 	// Namespaced name
-	name := chopmodel.CreateStatefulSetName(host)
+	name := model.CreateStatefulSetName(host)
 	namespace := host.Address.Namespace
 
-	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(newContext(), name, newGetOptions())
+	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
 // getSecret gets secret
-func (c *Controller) getSecret(secret *coreV1.Secret) (*coreV1.Secret, error) {
-	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(newContext(), secret.Name, newGetOptions())
+func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
+	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(controller.NewContext(), secret.Name, controller.NewGetOptions())
 }
 
 // getPod gets pod. Accepted types:
 //  1. *apps.StatefulSet
 //  2. *chop.ChiHost
-func (c *Controller) getPod(obj interface{}) (*coreV1.Pod, error) {
+func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *appsV1.StatefulSet:
-		name = chopmodel.CreatePodName(obj)
+	case *apps.StatefulSet:
+		name = model.CreatePodName(obj)
 		namespace = typedObj.Namespace
-	case *chiV1.ChiHost:
-		name = chopmodel.CreatePodName(obj)
+	case *api.ChiHost:
+		name = model.CreatePodName(obj)
 		namespace = typedObj.Address.Namespace
 	}
-	return c.kubeClient.CoreV1().Pods(namespace).Get(newContext(), name, newGetOptions())
+	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
 // getPods gets all pods for provided entity
-func (c *Controller) getPods(obj interface{}) []*coreV1.Pod {
+func (c *Controller) getPods(obj interface{}) []*core.Pod {
 	switch typed := obj.(type) {
-	case *chiV1.ClickHouseInstallation:
+	case *api.ClickHouseInstallation:
 		return c.getPodsOfCHI(typed)
-	case *chiV1.Cluster:
+	case *api.Cluster:
 		return c.getPodsOfCluster(typed)
-	case *chiV1.ChiShard:
+	case *api.ChiShard:
 		return c.getPodsOfShard(typed)
 	case
-		*chiV1.ChiHost,
-		*appsV1.StatefulSet:
+		*api.ChiHost,
+		*apps.StatefulSet:
 		if pod, err := c.getPod(typed); err == nil {
-			return []*coreV1.Pod{
+			return []*core.Pod{
 				pod,
 			}
 		}
@@ -212,8 +213,8 @@ func (c *Controller) getPods(obj interface{}) []*coreV1.Pod {
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *Controller) getPodsOfCluster(cluster *chiV1.Cluster) (pods []*coreV1.Pod) {
-	cluster.WalkHosts(func(host *chiV1.ChiHost) error {
+func (c *Controller) getPodsOfCluster(cluster *api.Cluster) (pods []*core.Pod) {
+	cluster.WalkHosts(func(host *api.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -223,8 +224,8 @@ func (c *Controller) getPodsOfCluster(cluster *chiV1.Cluster) (pods []*coreV1.Po
 }
 
 // getPodsOfShard gets all pods in a shard
-func (c *Controller) getPodsOfShard(shard *chiV1.ChiShard) (pods []*coreV1.Pod) {
-	shard.WalkHosts(func(host *chiV1.ChiHost) error {
+func (c *Controller) getPodsOfShard(shard *api.ChiShard) (pods []*core.Pod) {
+	shard.WalkHosts(func(host *api.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -234,8 +235,8 @@ func (c *Controller) getPodsOfShard(shard *chiV1.ChiShard) (pods []*coreV1.Pod) 
 }
 
 // getPodsOfCHI gets all pods in a CHI
-func (c *Controller) getPodsOfCHI(chi *chiV1.ClickHouseInstallation) (pods []*coreV1.Pod) {
-	chi.WalkHosts(func(host *chiV1.ChiHost) error {
+func (c *Controller) getPodsOfCHI(chi *api.ClickHouseInstallation) (pods []*core.Pod) {
+	chi.WalkHosts(func(host *api.ChiHost) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -261,17 +262,17 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(objectMeta *metaV1.ObjectMeta, isCHI bool) (*chiV1.ClickHouseInstallation, error) {
+func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool) (*api.ClickHouseInstallation, error) {
 	var chiName string
 	var err error
 	if isCHI {
 		chiName = objectMeta.Name
 	} else {
-		chiName, err = chopmodel.GetCHINameFromObjectMeta(objectMeta)
+		chiName, err = model.GetCHINameFromObjectMeta(objectMeta)
 		if err != nil {
 			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
 		}
 	}
 
-	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(newContext(), chiName, newGetOptions())
+	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(controller.NewContext(), chiName, controller.NewGetOptions())
 }

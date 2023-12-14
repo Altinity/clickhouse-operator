@@ -7,6 +7,7 @@ import e2e.settings as settings
 import e2e.kubectl as kubectl
 import e2e.clickhouse as clickhouse
 import e2e.util as util
+import e2e.steps as steps
 
 from testflows.core import *
 from testflows.asserts import error
@@ -481,6 +482,15 @@ def test_backup_not_run(self, chi, minio_spec):
 @TestModule
 @Name("e2e.test_backup_alerts")
 def test(self):
+    with Given("I setup settings"):
+        steps.set_settings()
+    with Given("I create shell"):
+        shell = steps.get_shell()
+        self.context.shell = shell
+
+    util.clean_namespace(delete_chi=True)
+    util.install_operator_if_not_exist()
+
     _, _, _, _, chi = alerts.initialize(
         chi_file="manifests/chi/test-cluster-for-backups.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-backups.yaml",

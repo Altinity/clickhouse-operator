@@ -18,11 +18,11 @@ import (
 	"k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // walkContainers walks with specified func over all containers of the specified host
-func (c *Controller) walkContainers(host *chiV1.ChiHost, f func(container *v1.Container)) {
+func (c *Controller) walkContainers(host *api.ChiHost, f func(container *v1.Container)) {
 	pod, err := c.getPod(host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host '%s' err: %v", host.Address.NamespaceNameString(), err)
@@ -36,7 +36,7 @@ func (c *Controller) walkContainers(host *chiV1.ChiHost, f func(container *v1.Co
 }
 
 // walkContainerStatuses walks with specified func over all statuses of the specified host
-func (c *Controller) walkContainerStatuses(host *chiV1.ChiHost, f func(status *v1.ContainerStatus)) {
+func (c *Controller) walkContainerStatuses(host *api.ChiHost, f func(status *v1.ContainerStatus)) {
 	pod, err := c.getPod(host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
@@ -50,7 +50,7 @@ func (c *Controller) walkContainerStatuses(host *chiV1.ChiHost, f func(status *v
 }
 
 // isHostRunning checks whether ALL containers of the specified host are running
-func (c *Controller) isHostRunning(host *chiV1.ChiHost) bool {
+func (c *Controller) isHostRunning(host *api.ChiHost) bool {
 	all := true
 	c.walkContainerStatuses(host, func(status *v1.ContainerStatus) {
 		if status.State.Running == nil {

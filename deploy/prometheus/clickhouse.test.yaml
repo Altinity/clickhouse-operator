@@ -1,0 +1,40 @@
+rule_files:
+  - prometheus-alert-rules-clickhouse.yaml
+evaluation_interval: 30s
+tests:
+  - name: ClickHouseDiskUsage
+    interval: 30s
+    input_series:
+      - series: "chi_clickhouse_metric_DiskFreeBytes{hostname='chi-test-test-0-0-0',disk='default'}"
+        values: "10000-10x999 10+5x500 5000-5x999"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ClickHouseDiskUsage
+        exp_alerts:
+          - exp_labels:
+              disk: default
+              hostname: chi-test-test-0-0-0
+              severity: high
+            exp_annotations:
+              description: "`default` data size: \n`default` disk free: 9.756kiB \n`default` disk size: \nTo avoid switching to read-only mode, please scale-up storage.\nCurrently k8s CSI support resize of Persistent Volumes, moreover you can try add another volume to existing pod with restart pod\nplease read documentation:\n- https://kubernetes.io/blog/2018/07/12/resizing-persistent-volumes-using-kubernetes/\n- https://github.com/Altinity/clickhouse-operator/blob/master/docs/storage.md\n- https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree/#table_engine-mergetree-multiple-volumes\n- https://clickhouse.com/docs/en/engines/table-engines/mergetree-family/mergetree/#mergetree-table-ttl"
+              identifier: "chi-test-test-0-0-0.default"
+              summary: "Disk free space enough less 24 hour"
+
+  - name: ClickHouseMetricsExporterDown
+    interval: 30s
+    input_series:
+      - series: 'up{app="clickhouse-operator", pod_name="clickhouse-operator-XXX"}'
+        values: "0+0x10"
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ClickHouseMetricsExporterDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              pod_name: clickhouse-operator-XXX
+              app: clickhouse-operator
+            exp_annotations:
+              description: "`metrics-exporter` not sent data more than 1 minutes.\nPlease check instance status\n```kubectl logs -n  clickhouse-operator-XXX -c metrics-exporter -f```"
+              identifier: "clickhouse-operator-XXX"
+              summary: "metrics-exporter possible down"
+

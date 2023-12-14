@@ -1,6 +1,6 @@
 # altinity-clickhouse-operator
 
-![Version: 0.22.0](https://img.shields.io/badge/Version-0.22.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.22.0](https://img.shields.io/badge/AppVersion-0.22.0-informational?style=flat-square)
+![Version: 0.23.0](https://img.shields.io/badge/Version-0.23.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.23.0](https://img.shields.io/badge/AppVersion-0.23.0-informational?style=flat-square)
 
 Helm chart to deploy [altinity-clickhouse-operator](https://github.com/Altinity/clickhouse-operator).
 
@@ -33,23 +33,23 @@ For upgrade please install CRDs separately:
 | dashboards.enabled | bool | `false` | provision grafana dashboards as secrets (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-6.33.1/charts/grafana/values.yaml#L679 ) |
 | dashboards.grafana_folder | string | `"clickhouse"` |  |
 | fullnameOverride | string | `""` | full name of the chart. |
-| imagePullSecrets | list | `[]` | image pull secret for private images |
+| imagePullSecrets | list | `[]` | image pull secret for private images in clickhouse-operator pod  possible value format [{"name":"your-secret-name"}]  look `kubectl explain pod.spec.imagePullSecrets` for details |
 | metrics.containerSecurityContext | object | `{}` |  |
 | metrics.enabled | bool | `true` |  |
-| metrics.env | list | `[]` | additional environment variables for the deployment |
+| metrics.env | list | `[]` | additional environment variables for the deployment of metrics-exporter containers possible format value [{"name": "SAMPLE", "value": "text"}] |
 | metrics.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | metrics.image.repository | string | `"altinity/metrics-exporter"` | image repository |
 | metrics.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
 | metrics.resources | object | `{}` | custom resource configuration |
 | nameOverride | string | `""` | override name of the chart |
-| nodeSelector | object | `{}` | node for scheduler pod assignment |
+| nodeSelector | object | `{}` | node for scheduler pod assignment, look `kubectl explain pod.spec.nodeSelector` for details |
 | operator.containerSecurityContext | object | `{}` |  |
-| operator.env | list | `[]` | additional environment variables for the deployment |
+| operator.env | list | `[]` | additional environment variables for the clickhouse-operator container in deployment possible format value [{"name": "SAMPLE", "value": "text"}] |
 | operator.image.pullPolicy | string | `"IfNotPresent"` | image pull policy |
 | operator.image.repository | string | `"altinity/clickhouse-operator"` | image repository |
 | operator.image.tag | string | `""` | image tag (chart's appVersion value will be used if not set) |
-| operator.resources | object | `{}` | custom resource configuration |
-| podAnnotations | object | `{"prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the pod |
+| operator.resources | object | `{}` | custom resource configuration, look `kubectl explain pod.spec.containers.resources` for details |
+| podAnnotations | object | `{"clickhouse-operator-metrics/port":"9999","clickhouse-operator-metrics/scrape":"true","prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the clickhouse-operator pod, look `kubectl explain pod.spec.annotations` for details |
 | podSecurityContext | object | `{}` |  |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
@@ -58,6 +58,6 @@ For upgrade please install CRDs separately:
 | serviceAccount.create | bool | `true` | specifies whether a service account should be created |
 | serviceAccount.name | string | `nil` | the name of the service account to use; if not set and create is true, a name is generated using the fullname template |
 | serviceMonitor.additionalLabels | object | `{}` | additional labels for service monitor |
-| serviceMonitor.enabled | bool | `false` | ServiceMonitor CRD is created for a prometheus operator |
-| tolerations | list | `[]` | tolerations for scheduler pod assignment |
+| serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a (prometheus-operator)[https://github.com/prometheus-operator/prometheus-operator] |
+| tolerations | list | `[]` | tolerations for scheduler pod assignment, look `kubectl explain pod.spec.tolerations` for details |
 

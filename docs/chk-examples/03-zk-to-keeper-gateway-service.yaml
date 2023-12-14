@@ -1,0 +1,17 @@
+# Fake Service to drop-in replacement in tests
+apiVersion: v1
+kind: Service
+metadata:
+  # DNS would be like zookeeper.namespace.svc
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  ports:
+    - port: 2181
+      name: client
+    - port: 7000
+      name: prometheus
+  selector:
+    app: clickhouse-keeper
+    what: node

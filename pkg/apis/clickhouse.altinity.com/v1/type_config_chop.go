@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	// log "k8s.io/klog"
@@ -285,6 +286,8 @@ type OperatorConfigCHIRuntime struct {
 	TemplateFiles map[string]string `json:"templateFiles,omitempty" yaml:"templateFiles,omitempty"`
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
+	mutex     sync.RWMutex
+
 	// ClickHouseInstallation template
 	Template *ClickHouseInstallation `json:"-" yaml:"-"`
 }
@@ -516,33 +519,46 @@ func (c *OperatorConfig) readCHITemplates() (errs []error) {
 
 // enlistCHITemplate inserts template into templates catalog
 func (c *OperatorConfig) enlistCHITemplate(template *ClickHouseInstallation) {
-	if c.Template.CHI.Runtime.Templates == nil {
-		c.Template.CHI.Runtime.Templates = make([]*ClickHouseInstallation, 0)
+	c.unlistCHITemplate(template)
+
+	c.Template.CHI.Runtime.mutex.Lock()
+	defer c.Template.CHI.Runtime.mutex.Unlock()
+
+	if !template.FoundIn(c.Template.CHI.Runtime.Templates) {
+		c.Template.CHI.Runtime.Templates = append(c.Template.CHI.Runtime.Templates, template)
 	}
-	c.Template.CHI.Runtime.Templates = append(c.Template.CHI.Runtime.Templates, template)
 }
 
 // unlistCHITemplate removes template from templates catalog
 func (c *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
-	if c.Template.CHI.Runtime.Templates == nil {
-		return
-	}
+	c.Template.CHI.Runtime.mutex.Lock()
+	defer c.Template.CHI.Runtime.mutex.Unlock()
 
 	// Nullify found template entry
 	for _, _template := range c.Template.CHI.Runtime.Templates {
-		if (_template.Name == template.Name) && (_template.Namespace == template.Namespace) {
-			// TODO normalize
-			//config.CHITemplates[i] = nil
+		if template.MatchFullName(_template.Namespace, _template.Name) {
+			// Mark for deletion
 			_template.Name = ""
 			_template.Namespace = ""
 		}
 	}
-	// Compact the slice
-	// TODO compact the slice
+
+	// Compact the slice - exclude empty-named templates
+	var named []*ClickHouseInstallation
+	for _, _template := range c.Template.CHI.Runtime.Templates {
+		if !_template.MatchFullName("", "") {
+			named = append(named, _template)
+		}
+	}
+
+	c.Template.CHI.Runtime.Templates = named
 }
 
-// FindTemplate finds specified template
-func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *ClickHouseInstallation {
+// FindTemplate finds specified template within possibly specified namespace
+func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, fallbackNamespace string) *ClickHouseInstallation {
+	c.Template.CHI.Runtime.mutex.RLock()
+	defer c.Template.CHI.Runtime.mutex.RUnlock()
+
 	// Try to find direct match
 	for _, _template := range c.Template.CHI.Runtime.Templates {
 		if _template.MatchFullName(use.Namespace, use.Name) {
@@ -552,17 +568,18 @@ func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *Cl
 	}
 
 	// Direct match is not possible.
+	// Let's try to find by name only
 
 	if use.Namespace != "" {
-		// With fully-specified use template direct (full name) only match is applicable, and it is not possible
+		// With fully-specified template namespace+name pair direct (full name) only match is applicable
 		// This is strange situation, however
 		return nil
 	}
 
-	// Improvise with use.Namespace
+	// Look for templates with specified name in explicitly specified namespace
 
 	for _, _template := range c.Template.CHI.Runtime.Templates {
-		if _template.MatchFullName(namespace, use.Name) {
+		if _template.MatchFullName(fallbackNamespace, use.Name) {
 			// Found template with searched name in specified namespace
 			return _template
 		}
@@ -574,6 +591,9 @@ func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, namespace string) *Cl
 // GetAutoTemplates gets all auto templates.
 // Auto templates are sorted alphabetically by tuple: namespace, name
 func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
+	c.Template.CHI.Runtime.mutex.RLock()
+	defer c.Template.CHI.Runtime.mutex.RUnlock()
+
 	// Extract auto-templates from all templates listed
 	var autoTemplates []*ClickHouseInstallation
 	for _, _template := range c.Template.CHI.Runtime.Templates {
@@ -582,38 +602,34 @@ func (c *OperatorConfig) GetAutoTemplates() []*ClickHouseInstallation {
 		}
 	}
 
-	// Prepare sorted list of namespaces
+	// Prepare sorted unique list of namespaces
 	var namespaces []string
 	for _, _template := range autoTemplates {
-		found := false
-		for _, namespace := range namespaces {
-			if namespace == _template.Namespace {
-				// Already has it
-				found = true
-				break
-			}
-		}
-		if !found {
+		// Append template's namespace to the list of namespaces
+		if !util.StringSliceContains(namespaces, _template.Namespace) {
 			namespaces = append(namespaces, _template.Namespace)
 		}
 	}
 	sort.Strings(namespaces)
 
+	// Prepare sorted list of templates
 	var sortedTemplates []*ClickHouseInstallation
+	// Walk over sorted unique namespaces
 	for _, namespace := range namespaces {
-		// Prepare sorted list of names within this namespace
+		// Prepare sorted unique list of names within this namespace
 		var names []string
 		for _, _template := range autoTemplates {
-			if _template.Namespace == namespace {
+			if _template.MatchNamespace(namespace) && !util.StringSliceContains(names, _template.Name) {
 				names = append(names, _template.Name)
 			}
 		}
 		sort.Strings(names)
 
-		// Walk over sorted list of names within this namespace and append to the result list of templates
+		// Walk over sorted unique list of names within this namespace
+		// and append first unseen before template to the result list of templates
 		for _, name := range names {
 			for _, _template := range autoTemplates {
-				if (_template.Namespace == namespace) && (_template.Name == name) {
+				if _template.MatchFullName(namespace, name) && !_template.FoundIn(sortedTemplates) {
 					sortedTemplates = append(sortedTemplates, _template)
 				}
 			}

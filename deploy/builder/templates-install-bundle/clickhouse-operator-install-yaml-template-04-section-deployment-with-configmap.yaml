@@ -29,6 +29,8 @@ spec:
       annotations:
         prometheus.io/port: '8888'
         prometheus.io/scrape: 'true'
+        clickhouse-operator-metrics/port: '9999'
+        clickhouse-operator-metrics/scrape: 'true'
     spec:
       serviceAccountName: clickhouse-operator
       volumes:

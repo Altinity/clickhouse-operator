@@ -22,14 +22,8 @@ package v1
 const (
 	StatusInProgress  = "InProgress"
 	StatusCompleted   = "Completed"
+	StatusAborted     = "Aborted"
 	StatusTerminating = "Terminating"
-)
-
-// Possible kinds of CRDs
-const (
-	ClickHouseInstallationCRDResourceKind         = "ClickHouseInstallation"
-	ClickHouseInstallationTemplateCRDResourceKind = "ClickHouseInstallationTemplate"
-	ClickHouseOperatorCRDResourceKind             = "ClickHouseOperator"
 )
 
 // used in type OperatorConfig struct
