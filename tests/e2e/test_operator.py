@@ -4235,6 +4235,64 @@ def test_045_2(self):
     test_045(manifest=f"manifests/chi/test-045-2-wait-query-finish.yaml")
 
 
+@TestScenario
+@Name("test_047. Zero weighted shard")
+def test_047(self):
+    """Check that clickhouse-operator supports specifying shard weight as 0 and
+    check that data not inserted into zero-weighted shard in distributed table."""
+
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type=self.context.keeper_type)
+    manifest = f"manifests/chi/test-047-zero-weighted-shard.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "default"
+    with Given("CHI with 2 shards is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                },
+            )
+    numbers = 100
+    with When("I create distributed table"):
+        create_table = """
+            CREATE TABLE test_local_047 ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace(
+            "\r", ""
+        ).replace(
+            "\n", ""
+        )
+        clickhouse.query(chi, create_table)
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_distr_047 ON CLUSTER 'default' AS test_local_047 "
+            "Engine = Distributed('default', default, test_local_047, a%2)",
+        )
+
+    with And("I insert data in the distributed table"):
+        clickhouse.query(chi, f"INSERT INTO test_distr_047 select * from numbers({numbers})")
+
+    with Then("I check only non-zero weighted shard contains data"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_047", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == "0"
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_047", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers}"
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_047", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers}"
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_047", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers}"
+
+    with Finally("I clean up"):
+            with By("deleting chi"):
+                kubectl.delete_chi(chi)
+            with And("deleting test namespace"):
+                delete_test_namespace()
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
