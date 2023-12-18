@@ -1299,7 +1299,7 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 	// Have plaintext password specified.
 	// Replace plaintext password with encrypted one
 	passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-	users.Set(username + "/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+	users.Set(username+"/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
 	// And keep only one password specification - delete all the rest (if any exists)
 	users.Delete(username + "/password_double_sha1_hex")
 	users.Delete(username + "/password")
