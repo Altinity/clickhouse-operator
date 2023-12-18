@@ -101,6 +101,11 @@ func NewSettingVectorFromAny(untyped any) (*Setting, bool) {
 	return nil, false
 }
 
+const (
+	// Float with fractional part less than ignoreThreshold is considered to be int and is casted to int
+	ignoreThreshold = 0.001
+)
+
 func parseScalar(untyped any) (string, bool) {
 	var scalarValue string
 	var isKnownType bool

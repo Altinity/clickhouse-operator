@@ -22,11 +22,6 @@ import (
 	"strings"
 )
 
-const (
-	// Float with fractional part less than ignoreThreshold is considered to be int and is casted to int
-	ignoreThreshold = 0.001
-)
-
 // SettingsSection specifies settings section
 type SettingsSection string
 
