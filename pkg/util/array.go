@@ -129,3 +129,10 @@ func Slice2String(name string, slice []string) string {
 
 	return b.String()
 }
+
+func Prefix(slice []string, prefix string) (res []string) {
+	for _, entry := range slice {
+		res = append(res, prefix+entry)
+	}
+	return res
+}

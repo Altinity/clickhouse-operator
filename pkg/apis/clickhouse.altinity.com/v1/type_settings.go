@@ -17,6 +17,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"regexp"
 	"sort"
 	"strings"
@@ -148,7 +149,7 @@ func (s *Settings) Get(name string) *Setting {
 // SetKey sets key setting.
 func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 	if s == nil {
-		return
+		return s
 	}
 	// Lazy load
 	if *s == nil {
@@ -163,7 +164,7 @@ func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 // Storage key is used internally.
 func (s *Settings) Set(name string, setting *Setting) *Settings {
 	if s == nil {
-		return
+		return s
 	}
 	// Lazy load
 	if *s == nil {
@@ -209,7 +210,7 @@ func (s *Settings) IsZero() bool {
 // SetIfNotExists sets named setting
 func (s *Settings) SetIfNotExists(name string, setting *Setting) *Settings {
 	if s == nil {
-		return
+		return s
 	}
 	if !s.Has(name) {
 		s.Set(name, setting)
@@ -642,25 +643,22 @@ func listModifiedSettingsPaths(a, b *Settings, path *messagediff.Path, value int
 // file/setting1
 // file/setting2
 func listPrefixedModifiedSettingsPaths(a, b *Settings, pathPrefix string, path *messagediff.Path, value interface{}) (paths []string) {
-	for _, nonPrefixedPath := range listModifiedSettingsPaths(a, b, path, value) {
-		paths = append(paths, pathPrefix+"/"+nonPrefixedPath)
-	}
-	return paths
+	return util.Prefix(listModifiedSettingsPaths(a, b, path, value), pathPrefix+"/")
 }
 
 // ListAffectedSettingsPathsFromDiff makes list of paths that were modified between two settings prefixed with the specified `prefix`
 // Ex.: `prefix` = file
 // file/setting1
 // file/setting2
-func ListAffectedSettingsPathsFromDiff(a, b *Settings, diff *messagediff.Diff, prefix string) (res []string) {
+func ListAffectedSettingsPathsFromDiff(a, b *Settings, diff *messagediff.Diff, prefix string) (paths []string) {
 	for path, value := range diff.Added {
-		res = append(res, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+		paths = append(paths, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
 	}
 	for path, value := range diff.Removed {
-		res = append(res, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+		paths = append(paths, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
 	}
 	for path, value := range diff.Modified {
-		res = append(res, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+		paths = append(paths, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
 	}
-	return res
+	return paths
 }
