@@ -136,3 +136,17 @@ func Prefix(slice []string, prefix string) (res []string) {
 	}
 	return res
 }
+
+func Unique(slice []string) (unique []string) {
+	found := make(map[string]bool)
+
+	for _, entry := range slice {
+		found[entry] = true
+	}
+
+	for entry := range found {
+		unique = append(unique, entry)
+	}
+
+	return unique
+}
