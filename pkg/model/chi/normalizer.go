@@ -930,43 +930,43 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 }
 
 // substWithSecretField substitute users settings field with value from k8s secret
-func (n *Normalizer) substWithSecretField(users *api.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
+func (n *Normalizer) substWithSecretField(user *api.SettingsUser, userSettingsField, userSettingsK8SSecretField string) bool {
 	// Has to have source field specified
-	if !users.Has(username + "/" + userSettingsK8SSecretField) {
+	if !user.Has(user.Username() + "/" + userSettingsK8SSecretField) {
 		return false
 	}
 
 	// Anyway remove source field, it should not be included into final ClickHouse config,
 	// because these source fields are synthetic ones (clickhouse does not know them).
-	defer users.Delete(username + "/" + userSettingsK8SSecretField)
+	defer user.Delete(user.Username() + "/" + userSettingsK8SSecretField)
 
-	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	secretFieldAddress := user.Get(user.Username() + "/" + userSettingsK8SSecretField).String()
 
 	secretFieldValue, err := n.fetchSecretFieldValue(secretFieldAddress)
 	if err != nil {
 		return false
 	}
 
-	users.Set(username+"/"+userSettingsField, api.NewSettingScalar(secretFieldValue))
+	user.Set(user.Username()+"/"+userSettingsField, api.NewSettingScalar(secretFieldValue))
 	return true
 }
 
 // substWithSecretEnvField substitute users settings field with value from k8s secret stored in ENV var
-func (n *Normalizer) substWithSecretEnvField(users *api.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
+func (n *Normalizer) substWithSecretEnvField(user *api.SettingsUser, userSettingsField, userSettingsK8SSecretField string) bool {
 	// Fetch secret name and key within secret
-	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	secretFieldAddress := user.Get(user.Username() + "/" + userSettingsK8SSecretField).String()
 	_, secretName, key, err := parseSecretFieldAddress(secretFieldAddress)
 	if err != nil {
 		return false
 	}
 
 	// Subst plaintext field with secret field
-	if !n.substWithSecretField(users, username, userSettingsField, userSettingsK8SSecretField) {
+	if !n.substWithSecretField(user, userSettingsField, userSettingsK8SSecretField) {
 		return false
 	}
 
 	// ENV VAR name and value
-	envVarName := username + "_" + userSettingsField
+	envVarName := user.Username() + "_" + userSettingsField
 	n.appendEnvVar(
 		core.EnvVar{
 			Name: envVarName,
@@ -982,7 +982,7 @@ func (n *Normalizer) substWithSecretEnvField(users *api.Settings, username strin
 	)
 
 	// Replace setting with empty value and reference to ENV VAR
-	users.Set(username+"/"+userSettingsField, api.NewSettingScalar("").SetAttribute("from_env", envVarName))
+	user.Set(user.Username()+"/"+userSettingsField, api.NewSettingScalar("").SetAttribute("from_env", envVarName))
 	return true
 }
 
@@ -1134,30 +1134,30 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
-		n.normalizeConfigurationUser(users, username)
+		n.normalizeConfigurationUser(api.NewSettingsUser(users, username))
 	}
 
 	// Remove plain password for the default user
-	n.removePlainPassword(users, defaultUsername)
+	n.removePlainPassword(api.NewSettingsUser(users, defaultUsername))
 
 	return users
 }
 
-func (n *Normalizer) removePlainPassword(users *api.Settings, username string) {
-	if users.Has(username+"/password_double_sha1_hex") || users.Has(username+"/password_sha256_hex") {
+func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
+	if user.Has(user.Username()+"/password_double_sha1_hex") || user.Has(user.Username()+"/password_sha256_hex") {
 		// If user has encrypted password specified, we need to delete existing plaintext password.
 		// Set "remove" flag for user's "password", which is specified as empty in stock ClickHouse users.xml,
 		// thus we need to overwrite it.
-		users.Set(username+"/password", api.NewSettingScalar("").SetAttribute("remove", "1"))
+		user.Set(user.Username()+"/password", api.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 }
 
-func (n *Normalizer) normalizeConfigurationUser(users *api.Settings, username string) {
-	n.normalizeConfigurationUserEnsureMandatoryFields(users, username)
-	n.normalizeConfigurationUserPassword(users, username)
+func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
+	n.normalizeConfigurationUserEnsureMandatoryFields(user)
+	n.normalizeConfigurationUserPassword(user)
 }
 
-func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(users *api.Settings, username string) {
+func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.SettingsUser) {
 	chopUsername := chop.Config().ClickHouse.Access.Username
 	//
 	// Ensure each user has mandatory sections:
@@ -1172,7 +1172,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(users *api.
 	hostRegexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
 	// Some users may have special options
-	switch username {
+	switch user.Username() {
 	case defaultUsername:
 		ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
 		if !n.ctx.options.DefaultUserInsertHostRegex {
@@ -1188,7 +1188,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(users *api.
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	n.setMandatoryUserFields(users, username, &userFields{
+	n.setMandatoryUserFields(user, &userFields{
 		profile:    profile,
 		quota:      quota,
 		ips:        ips,
@@ -1204,53 +1204,53 @@ type userFields struct {
 }
 
 // setMandatoryUserFields sets user fields
-func (n *Normalizer) setMandatoryUserFields(users *api.Settings, username string, fields *userFields) {
+func (n *Normalizer) setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
 	if fields.profile != "" {
-		users.SetIfNotExists(username+"/profile", api.NewSettingScalar(fields.profile))
+		user.SetIfNotExists(user.Username()+"/profile", api.NewSettingScalar(fields.profile))
 	}
 	if fields.quota != "" {
-		users.SetIfNotExists(username+"/quota", api.NewSettingScalar(fields.quota))
+		user.SetIfNotExists(user.Username()+"/quota", api.NewSettingScalar(fields.quota))
 	}
 	if len(fields.ips) > 0 {
-		users.Set(username+"/networks/ip", api.NewSettingVector(fields.ips).MergeFrom(users.Get(username+"/networks/ip")))
+		user.Set(user.Username()+"/networks/ip", api.NewSettingVector(fields.ips).MergeFrom(user.Get(user.Username()+"/networks/ip")))
 	}
 	if fields.hostRegexp != "" {
-		users.SetIfNotExists(username+"/networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
+		user.SetIfNotExists(user.Username()+"/networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
 	}
 }
 
 // normalizeConfigurationUserPassword deals with user passwords
-func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, username string) {
+func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
 	// Values from the secret have higher priority
-	n.substWithSecretField(users, username, "password", "k8s_secret_password")
-	n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-	n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+	n.substWithSecretField(user, "password", "k8s_secret_password")
+	n.substWithSecretField(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+	n.substWithSecretField(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
 	// Values from the secret passed via ENV have even higher priority
-	n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
-	n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
-	n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
+	n.substWithSecretEnvField(user, "password", "k8s_secret_env_password")
+	n.substWithSecretEnvField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
+	n.substWithSecretEnvField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
 
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-	if users.Has(username + "/password_double_sha1_hex") {
-		users.Delete(username + "/password_sha256_hex")
-		users.Delete(username + "/password")
+	if user.Has(user.Username() + "/password_double_sha1_hex") {
+		user.Delete(user.Username() + "/password_sha256_hex")
+		user.Delete(user.Username() + "/password")
 		// This is all for this user
 		return
 	}
 
 	// Than goes password_sha256_hex, thus keep it only
-	if users.Has(username + "/password_sha256_hex") {
-		users.Delete(username + "/password_double_sha1_hex")
-		users.Delete(username + "/password")
+	if user.Has(user.Username() + "/password_sha256_hex") {
+		user.Delete(user.Username() + "/password_double_sha1_hex")
+		user.Delete(user.Username() + "/password")
 		// This is all for this user
 		return
 	}
 
 	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
 
-	if users.Get(username + "/password").HasAttributes() {
+	if user.Get(user.Username() + "/password").HasAttributes() {
 		// Have plaintext password explicitly specified via ENV var
 		// This is fine
 		// This is all for this user
@@ -1259,14 +1259,14 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 
 	// From now on we either have plaintext password specified as an explicit string, or no password at all
 
-	passwordPlaintext := users.Get(username + "/password").String()
+	passwordPlaintext := user.Get(user.Username() + "/password").String()
 
 	// Apply default password for password-less non-default users
 	// 1. NB "default" user keeps empty password in here.
 	// 2. ClickHouse user gets password from his section of CHOp configuration
 	// 3. All the rest users get default password
 	if passwordPlaintext == "" {
-		switch username {
+		switch user.Username() {
 		case defaultUsername:
 			// NB "default" user keeps empty password in here.
 		case chop.Config().ClickHouse.Access.Username:
@@ -1288,10 +1288,10 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 	// Have plaintext password specified.
 	// Replace plaintext password with encrypted one
 	passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-	users.Set(username+"/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+	user.Set(user.Username()+"/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
 	// And keep only one password specification - delete all the rest (if any exists)
-	users.Delete(username + "/password_double_sha1_hex")
-	users.Delete(username + "/password")
+	user.Delete(user.Username() + "/password_double_sha1_hex")
+	user.Delete(user.Username() + "/password")
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
