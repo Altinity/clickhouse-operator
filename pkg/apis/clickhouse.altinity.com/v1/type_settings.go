@@ -218,6 +218,27 @@ func (s *Settings) Names() (names []string) {
 	return names
 }
 
+// Prefixes gets prefixes of the settings
+func (s *Settings) Prefixes(unique bool) (prefixes []string) {
+	s.WalkKeys(func(key string, setting *Setting) {
+		if prefix, err := getPrefixFromPath(key); err == nil {
+			prefixes = append(prefixes, prefix)
+		}
+	})
+
+	if unique {
+		prefixes = util.Unique(prefixes)
+	}
+
+	sort.Strings(prefixes)
+	return prefixes
+}
+
+// Groups gets groups of the settings
+func (s *Settings) Groups() []string {
+	return s.Prefixes(true)
+}
+
 // UnmarshalJSON unmarshal JSON
 func (s *Settings) UnmarshalJSON(data []byte) error {
 	if s == nil {
@@ -333,8 +354,8 @@ func (s *Settings) MergeFromCB(src *Settings, filter func(name string, setting *
 	return s
 }
 
-// ExtractSection returns map of the specified settings section
-func (s *Settings) ExtractSection(section SettingsSection, includeSettingWithNoSectionSpecified bool) (m map[string]string) {
+// GetSection returns map of the specified settings section
+func (s *Settings) GetSection(section SettingsSection, includeSettingWithNoSectionSpecified bool) (values map[string]string) {
 	if s == nil {
 		return nil
 	}
@@ -367,16 +388,16 @@ func (s *Settings) ExtractSection(section SettingsSection, includeSettingWithNoS
 			return
 		}
 
-		if m == nil {
+		if values == nil {
 			// Lazy load
-			m = make(map[string]string)
+			values = make(map[string]string)
 		}
 
 		// Fetch file content
-		m[filename] = setting.ScalarString()
+		values[filename] = setting.ScalarString()
 	})
 
-	return m
+	return values
 }
 
 // Filter filters settings according to include and exclude lists

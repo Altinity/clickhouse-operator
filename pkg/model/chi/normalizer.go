@@ -940,7 +940,9 @@ func (n *Normalizer) substWithSecretField(users *api.Settings, username string, 
 	// because these source fields are synthetic ones (clickhouse does not know them).
 	defer users.Delete(username + "/" + userSettingsK8SSecretField)
 
-	secretFieldValue, err := n.fetchSecretFieldValue(users, username, userSettingsK8SSecretField)
+	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+
+	secretFieldValue, err := n.fetchSecretFieldValue(secretFieldAddress)
 	if err != nil {
 		return false
 	}
@@ -952,7 +954,8 @@ func (n *Normalizer) substWithSecretField(users *api.Settings, username string, 
 // substWithSecretEnvField substitute users settings field with value from k8s secret stored in ENV var
 func (n *Normalizer) substWithSecretEnvField(users *api.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
 	// Fetch secret name and key within secret
-	_, secretName, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField)
+	secretFieldAddress := users.Get(username + "/" + userSettingsK8SSecretField).String()
+	_, secretName, key, err := parseSecretFieldAddress(secretFieldAddress)
 	if err != nil {
 		return false
 	}
@@ -1037,10 +1040,7 @@ var (
 )
 
 // parseSecretFieldAddress parses address into namespace, name, key triple
-func parseSecretFieldAddress(users *api.Settings, username, userSettingsK8SSecretField string) (string, string, string, error) {
-	settingsPath := username + "/" + userSettingsK8SSecretField
-	secretFieldAddress := users.Get(settingsPath).String()
-
+func parseSecretFieldAddress(secretFieldAddress string) (string, string, string, error) {
 	// Sanity check. In case secretFieldAddress not specified nothing to do here
 	if secretFieldAddress == "" {
 		return "", "", "", ErrSecretFieldNotFound
@@ -1062,13 +1062,13 @@ func parseSecretFieldAddress(users *api.Settings, username, userSettingsK8SSecre
 		key = tags[2]
 	default:
 		// Skip incorrect entry
-		log.V(1).Warning("unable to parse secret field address: '%s:%s'", settingsPath, secretFieldAddress)
+		log.V(1).Warning("unable to parse secret field address: '%s:%s'", secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
 	// Sanity check
 	if (namespace == "") || (name == "") || (key == "") {
-		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s:%s'", settingsPath, secretFieldAddress)
+		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s:%s'", secretFieldAddress)
 		return "", "", "", ErrSecretFieldNotFound
 	}
 
@@ -1076,9 +1076,9 @@ func parseSecretFieldAddress(users *api.Settings, username, userSettingsK8SSecre
 }
 
 // fetchSecretFieldValue fetches the value of the specified field in the specified secret
-func (n *Normalizer) fetchSecretFieldValue(users *api.Settings, username, userSettingsK8SSecretField string) (string, error) {
+func (n *Normalizer) fetchSecretFieldValue(secretFieldAddress string) (string, error) {
 	// Fetch address of the field
-	namespace, name, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField)
+	namespace, name, key, err := parseSecretFieldAddress(secretFieldAddress)
 	if err != nil {
 		return "", err
 	}
@@ -1096,41 +1096,15 @@ func (n *Normalizer) fetchSecretFieldValue(users *api.Settings, username, userSe
 		}
 	}
 
-	log.V(1).M(namespace, name).F().Info("unable to locate in specified address (namespace/name/key triple) from: %s/%s", username, userSettingsK8SSecretField)
+	log.V(1).M(namespace, name).F().Info("unable to locate in specified address (namespace/name/key triple) from: %s", secretFieldAddress)
 	return "", ErrSecretFieldNotFound
 }
 
-// normalizeUsersList extracts usernames from provided 'users' settings
-func (n *Normalizer) normalizeUsersList(users *api.Settings, extra ...string) (usernames []string) {
-	// Extract username from path
-	usernameMap := make(map[string]bool)
-	users.Walk(func(path string, _ *api.Setting) {
-		// Split username/action into username and all the rest. Ex. 'admin/password', 'admin/networks/ip'
-		tags := strings.Split(path, "/")
-
-		// Basic sanity check - need to have at least "username/something" pair
-		// This "something" part is not used, it just has to be
-		if len(tags) < 2 {
-			// Skip incorrect entry
-			return
-		}
-
-		// Register username
-		username := tags[0]
-		usernameMap[username] = true
-	})
-
-	// Add extra users
-	for _, username := range extra {
-		if username != "" {
-			usernameMap[username] = true
-		}
-	}
-
-	// Make sorted list of unique usernames
-	for username := range usernameMap {
-		usernames = append(usernames, username)
-	}
+// normalizeUsersList extracts usernames from provided 'users' settings and adds some extra usernames
+func (n *Normalizer) normalizeUsersList(users *api.Settings, extraUsernames ...string) (usernames []string) {
+	usernames = append(usernames, users.Groups()...)
+	usernames = append(usernames, extraUsernames...)
+	usernames = util.Unique(usernames)
 	sort.Strings(usernames)
 
 	return usernames
@@ -1142,10 +1116,7 @@ const chopProfile = "clickhouse_operator"
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Settings {
 	// Ensure and normalize user settings
-	if users == nil {
-		users = api.NewSettings()
-	}
-	users.Normalize()
+	users = users.Ensure().Normalize()
 
 	// Add special "default" user to the list of users, which is used/required for:
 	// 1. ClickHouse hosts to communicate with each other
@@ -1166,7 +1137,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 		n.normalizeConfigurationUser(users, username)
 	}
 
-	// Remove plain password for default user
+	// Remove plain password for the default user
 	n.removePlainPassword(users, defaultUsername)
 
 	return users
@@ -1182,11 +1153,11 @@ func (n *Normalizer) removePlainPassword(users *api.Settings, username string) {
 }
 
 func (n *Normalizer) normalizeConfigurationUser(users *api.Settings, username string) {
-	n.normalizeConfigurationUserEnsureMandatorySections(users, username)
+	n.normalizeConfigurationUserEnsureMandatoryFields(users, username)
 	n.normalizeConfigurationUserPassword(users, username)
 }
 
-func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *api.Settings, username string) {
+func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(users *api.Settings, username string) {
 	chopUsername := chop.Config().ClickHouse.Access.Username
 	//
 	// Ensure each user has mandatory sections:
@@ -1198,14 +1169,14 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *ap
 	profile := chop.Config().ClickHouse.Config.User.Default.Profile
 	quota := chop.Config().ClickHouse.Config.User.Default.Quota
 	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+	hostRegexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
 	// Some users may have special options
 	switch username {
 	case defaultUsername:
 		ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
 		if !n.ctx.options.DefaultUserInsertHostRegex {
-			regexp = ""
+			hostRegexp = ""
 		}
 	case chopUsername:
 		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_IP)
@@ -1213,21 +1184,39 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *ap
 		profile = chopProfile
 		quota = ""
 		ips = []string{ip}
-		regexp = ""
+		hostRegexp = ""
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	if profile != "" {
-		users.SetIfNotExists(username+"/profile", api.NewSettingScalar(profile))
+	n.setMandatoryUserFields(users, username, &userFields{
+		profile:    profile,
+		quota:      quota,
+		ips:        ips,
+		hostRegexp: hostRegexp,
+	})
+}
+
+type userFields struct {
+	profile    string
+	quota      string
+	ips        []string
+	hostRegexp string
+}
+
+// setMandatoryUserFields sets user fields
+func (n *Normalizer) setMandatoryUserFields(users *api.Settings, username string, fields *userFields) {
+	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
+	if fields.profile != "" {
+		users.SetIfNotExists(username+"/profile", api.NewSettingScalar(fields.profile))
 	}
-	if quota != "" {
-		users.SetIfNotExists(username+"/quota", api.NewSettingScalar(quota))
+	if fields.quota != "" {
+		users.SetIfNotExists(username+"/quota", api.NewSettingScalar(fields.quota))
 	}
-	if len(ips) > 0 {
-		users.Set(username+"/networks/ip", api.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
+	if len(fields.ips) > 0 {
+		users.Set(username+"/networks/ip", api.NewSettingVector(fields.ips).MergeFrom(users.Get(username+"/networks/ip")))
 	}
-	if regexp != "" {
-		users.SetIfNotExists(username+"/networks/host_regexp", api.NewSettingScalar(regexp))
+	if fields.hostRegexp != "" {
+		users.SetIfNotExists(username+"/networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
 	}
 }
 

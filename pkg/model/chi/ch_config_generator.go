@@ -87,7 +87,7 @@ func (c *ClickHouseConfigGenerator) GetSectionFromFiles(section api.SettingsSect
 
 	// Extract particular section from files
 
-	return files.ExtractSection(section, includeUnspecified)
+	return files.GetSection(section, includeUnspecified)
 }
 
 // GetHostZookeeper creates data for "zookeeper.xml"
