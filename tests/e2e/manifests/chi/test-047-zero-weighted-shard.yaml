@@ -1,0 +1,22 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: test-047-zero-weighted-shard
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      nodes:
+        - host: zookeeper
+          port: 2181
+    clusters:
+      - name: default
+        layout:
+          shards:
+            - name: "0"
+              weight: 0
+              replicasCount: 1
+            - name: "1"
+              weight: 1
+              replicasCount: 1
