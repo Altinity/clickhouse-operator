@@ -2753,7 +2753,7 @@ version: 1.0
 
 [ClickHouse Operator] SHALL support specifying shard `<weight>` setting which will be used
 during insert into tables using `Distributed` engine.
-This value SHALL be be applied in `<remote_servers>` inside [ConfigMap] mounted in
+This value SHALL be applied in `<remote_servers>` inside [ConfigMap] mounted in
 `/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`.
 
 For example,

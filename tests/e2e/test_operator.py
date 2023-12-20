@@ -4236,6 +4236,7 @@ def test_045_2(self):
 
 
 @TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Weight("1.0"))
 @Name("test_047. Zero weighted shard")
 def test_047(self):
     """Check that clickhouse-operator supports specifying shard weight as 0 and
@@ -4286,11 +4287,23 @@ def test_047(self):
         out = clickhouse.query(chi, "SELECT count(*) from test_distr_047", host=f"chi-{chi}-{cluster}-1-0-0")
         assert out == f"{numbers}"
 
+    with Then("I check weight is specified in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml file"):
+        r = kubectl.launch(
+            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
+            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 7 | tail -n 1'"""
+        )
+        assert "<weight>0</weight>" in r
+        r = kubectl.launch(
+            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
+            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 16 | tail -n 1'"""
+            )
+        assert "<weight>1</weight>" in r
+
     with Finally("I clean up"):
-            with By("deleting chi"):
-                kubectl.delete_chi(chi)
-            with And("deleting test namespace"):
-                delete_test_namespace()
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestModule

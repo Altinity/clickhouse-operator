@@ -3328,7 +3328,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     description=(
         '[ClickHouse Operator] SHALL support specifying shard `<weight>` setting which will be used\n'
         'during insert into tables using `Distributed` engine.\n'
-        'This value SHALL be be applied in `<remote_servers>` inside [ConfigMap] mounted in\n'
+        'This value SHALL be applied in `<remote_servers>` inside [ConfigMap] mounted in\n'
         '`/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`.\n'
         '\n'
         'For example,\n'
@@ -9912,7 +9912,7 @@ version: 1.0
 
 [ClickHouse Operator] SHALL support specifying shard `<weight>` setting which will be used
 during insert into tables using `Distributed` engine.
-This value SHALL be be applied in `<remote_servers>` inside [ConfigMap] mounted in
+This value SHALL be applied in `<remote_servers>` inside [ConfigMap] mounted in
 `/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml`.
 
 For example,
