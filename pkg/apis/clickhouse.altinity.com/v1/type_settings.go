@@ -40,8 +40,8 @@ type Settings struct {
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
-	m := makeSettings()
-	return &m
+	s := makeSettings()
+	return &s
 }
 
 func makeSettings() Settings {
