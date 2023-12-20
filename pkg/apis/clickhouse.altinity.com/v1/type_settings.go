@@ -17,12 +17,13 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"regexp"
 	"sort"
 	"strings"
 
 	"gopkg.in/d4l3k/messagediff.v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Specify returned errors for being re-used
@@ -33,7 +34,9 @@ var (
 )
 
 // Settings specifies settings
-type Settings map[string]*Setting
+type Settings struct {
+	m map[string]*Setting
+}
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
@@ -42,7 +45,9 @@ func NewSettings() *Settings {
 }
 
 func makeSettings() Settings {
-	return make(map[string]*Setting)
+	return Settings{
+		m: make(map[string]*Setting),
+	}
 }
 
 // Ensure ensures settings
@@ -68,7 +73,7 @@ func (s *Settings) Len() int {
 	if s == nil {
 		return 0
 	}
-	return len(*s)
+	return len(s.m)
 }
 
 // WalkKeys walks over settings with a function. Function receives key and setting.
@@ -79,7 +84,7 @@ func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
 	if s.Len() == 0 {
 		return
 	}
-	for key := range *s {
+	for key := range s.m {
 		f(key, s.GetKey(key))
 	}
 }
@@ -93,7 +98,7 @@ func (s *Settings) Walk(f func(name string, setting *Setting)) {
 	if s.Len() == 0 {
 		return
 	}
-	for key := range *s {
+	for key := range s.m {
 		f(s.Key2Name(key), s.Get(s.Key2Name(key)))
 	}
 }
@@ -106,7 +111,7 @@ func (s *Settings) HasKey(key string) bool {
 	if s.Len() == 0 {
 		return false
 	}
-	_, ok := (*s)[key]
+	_, ok := s.m[key]
 	return ok
 }
 
@@ -119,7 +124,7 @@ func (s *Settings) Has(name string) bool {
 	if s.Len() == 0 {
 		return false
 	}
-	_, ok := (*s)[s.Name2Key(name)]
+	_, ok := s.m[s.Name2Key(name)]
 	return ok
 }
 
@@ -131,7 +136,7 @@ func (s *Settings) GetKey(key string) *Setting {
 	if s.Len() == 0 {
 		return nil
 	}
-	return (*s)[key]
+	return s.m[key]
 }
 
 // Get gets named setting.
@@ -143,7 +148,7 @@ func (s *Settings) Get(name string) *Setting {
 	if s.Len() == 0 {
 		return nil
 	}
-	return (*s)[s.Name2Key(name)]
+	return s.m[s.Name2Key(name)]
 }
 
 // SetKey sets key setting.
@@ -151,12 +156,7 @@ func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 	if s == nil {
 		return s
 	}
-	// Lazy load
-	if *s == nil {
-		*s = makeSettings()
-	}
-	(*s)[key] = setting
-
+	s.m[key] = setting
 	return s
 }
 
@@ -166,12 +166,7 @@ func (s *Settings) Set(name string, setting *Setting) *Settings {
 	if s == nil {
 		return s
 	}
-	// Lazy load
-	if *s == nil {
-		*s = makeSettings()
-	}
-	(*s)[s.Name2Key(name)] = setting
-
+	s.m[s.Name2Key(name)] = setting
 	return s
 }
 
@@ -184,7 +179,7 @@ func (s *Settings) DeleteKey(key string) {
 		return
 	}
 	// Delete storage key
-	delete(*s, key)
+	delete(s.m, key)
 }
 
 // Delete deletes named setting
@@ -196,7 +191,7 @@ func (s *Settings) Delete(name string) {
 		return
 	}
 	// Delete storage key
-	delete(*s, s.Name2Key(name))
+	delete(s.m, s.Name2Key(name))
 }
 
 // IsZero checks whether settings is zero
@@ -338,8 +333,7 @@ func (s *Settings) MergeFrom(src *Settings) *Settings {
 	}
 
 	src.Walk(func(name string, value *Setting) {
-		s = s.Ensure()
-		s.SetIfNotExists(name, value)
+		s = s.Ensure().SetIfNotExists(name, value)
 	})
 
 	return s
@@ -354,8 +348,7 @@ func (s *Settings) MergeFromCB(src *Settings, filter func(name string, setting *
 	src.Walk(func(name string, value *Setting) {
 		if filter(name, value) {
 			// Accept this setting
-			s = s.Ensure()
-			s.Set(name, value)
+			s = s.Ensure().Set(name, value)
 		}
 	})
 
@@ -440,9 +433,7 @@ func (s *Settings) Filter(
 		}
 
 		// We'd like to get this setting
-
-		res = res.Ensure()
-		res.SetKey(key, s.GetKey(key))
+		res = res.Ensure().SetKey(key, s.GetKey(key))
 	})
 
 	return res
