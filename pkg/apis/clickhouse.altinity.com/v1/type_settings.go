@@ -40,17 +40,22 @@ type Settings struct {
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
-	s := makeSettings()
-	return &s
+	s := &Settings{}
+	s.EnsureInternals()
+	return s
 }
 
-func makeSettings() Settings {
-	return Settings{
-		m: make(map[string]*Setting),
+// EnsureInternals ensures all internals of the structure are in place
+func (s *Settings) EnsureInternals() {
+	if s == nil {
+		return
+	}
+	if s.m == nil {
+		s.m = make(map[string]*Setting)
 	}
 }
 
-// Ensure ensures settings
+// Ensure ensures settings are in place
 func (s *Settings) Ensure() *Settings {
 	if s == nil {
 		return NewSettings()
@@ -84,6 +89,7 @@ func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
 	if s.Len() == 0 {
 		return
 	}
+	// Walk storage keys
 	for key := range s.m {
 		f(key, s.GetKey(key))
 	}
@@ -92,15 +98,9 @@ func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
 // Walk walks over settings with a function. Function receives name and setting.
 // Storage key is used internally.
 func (s *Settings) Walk(f func(name string, setting *Setting)) {
-	if s == nil {
-		return
-	}
-	if s.Len() == 0 {
-		return
-	}
-	for key := range s.m {
-		f(s.Key2Name(key), s.Get(s.Key2Name(key)))
-	}
+	s.WalkKeys(func(key string, _setting *Setting) {
+		f(s.Key2Name(key), _setting)
+	})
 }
 
 // HasKey checks whether key setting exists.
@@ -111,6 +111,7 @@ func (s *Settings) HasKey(key string) bool {
 	if s.Len() == 0 {
 		return false
 	}
+	// Check storage key exists
 	_, ok := s.m[key]
 	return ok
 }
@@ -118,14 +119,7 @@ func (s *Settings) HasKey(key string) bool {
 // Has checks whether named setting exists.
 // Storage key is used internally.
 func (s *Settings) Has(name string) bool {
-	if s == nil {
-		return false
-	}
-	if s.Len() == 0 {
-		return false
-	}
-	_, ok := s.m[s.Name2Key(name)]
-	return ok
+	return s.HasKey(s.Name2Key(name))
 }
 
 // GetKey gets key setting.
@@ -136,19 +130,14 @@ func (s *Settings) GetKey(key string) *Setting {
 	if s.Len() == 0 {
 		return nil
 	}
+	// get value by storage key
 	return s.m[key]
 }
 
 // Get gets named setting.
 // Storage key is used internally.
 func (s *Settings) Get(name string) *Setting {
-	if s == nil {
-		return nil
-	}
-	if s.Len() == 0 {
-		return nil
-	}
-	return s.m[s.Name2Key(name)]
+	return s.GetKey(s.Name2Key(name))
 }
 
 // SetKey sets key setting.
@@ -156,6 +145,8 @@ func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 	if s == nil {
 		return s
 	}
+	s.EnsureInternals()
+	// Set with storage key
 	s.m[key] = setting
 	return s
 }
@@ -163,11 +154,7 @@ func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 // Set sets named setting.
 // Storage key is used internally.
 func (s *Settings) Set(name string, setting *Setting) *Settings {
-	if s == nil {
-		return s
-	}
-	s.m[s.Name2Key(name)] = setting
-	return s
+	return s.SetKey(s.Name2Key(name), setting)
 }
 
 // DeleteKey deletes key setting
@@ -184,14 +171,7 @@ func (s *Settings) DeleteKey(key string) {
 
 // Delete deletes named setting
 func (s *Settings) Delete(name string) {
-	if s == nil {
-		return
-	}
-	if !s.Has(name) {
-		return
-	}
-	// Delete storage key
-	delete(s.m, s.Name2Key(name))
+	s.DeleteKey(s.Name2Key(name))
 }
 
 // IsZero checks whether settings is zero
@@ -210,7 +190,6 @@ func (s *Settings) SetIfNotExists(name string, setting *Setting) *Settings {
 	if !s.Has(name) {
 		s.Set(name, setting)
 	}
-
 	return s
 }
 
@@ -220,7 +199,6 @@ func (s *Settings) SetScalarsFromMap(m map[string]string) *Settings {
 	for name, value := range m {
 		s.Set(name, NewSettingScalar(value))
 	}
-
 	return s
 }
 
