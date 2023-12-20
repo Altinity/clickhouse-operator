@@ -255,7 +255,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         shell=shell_1
     )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -311,7 +311,9 @@ def check_operator_restart(chi, wait_objects, pod, shell=None):
     with When("Restart operator"):
         util.restart_operator(shell=shell)
         time.sleep(15)
+        print(f"wait objects")
         kubectl.wait_objects(chi, wait_objects, shell=shell)
+        print(f"wait chi status")
         kubectl.wait_chi_status(chi, "Completed", shell=shell)
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell)
 
@@ -375,7 +377,7 @@ def test_operator_restart(self, manifest, service, version=None):
         shell=shell_1
     )
 
-    Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True,)(
+    Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True)(
         host=service,
         user="test_008",
         password="test_008",
@@ -384,7 +386,7 @@ def test_operator_restart(self, manifest, service, version=None):
         shell=shell_2
     )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -393,7 +395,11 @@ def test_operator_restart(self, manifest, service, version=None):
 
     check_operator_restart(
         chi=chi,
-        wait_objects={"statefulset": 2, "pod": 2, "service": 3},
+        wait_objects={
+            "statefulset": 2,
+            "pod": 2,
+            "service": 3,
+        },
         pod=f"chi-{chi}-{cluster}-0-0-0",
         shell=shell_4
     )
@@ -535,7 +541,7 @@ def test_008_3(self):
         shell_1 = get_shell()
         shell_2 = get_shell()
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -3018,7 +3024,7 @@ def test_030(self):
         shell_2 = get_shell()
 
     trigger_event = threading.Event()
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         cluster="default",
         shards=2,
@@ -3270,7 +3276,7 @@ def test_032(self):
         shell=shell_1
     )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         cluster="default",
         shards=2,

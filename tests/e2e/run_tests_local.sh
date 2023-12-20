@@ -19,6 +19,25 @@ EXECUTABLE="${EXECUTABLE:-"run_tests_operator.sh"}"
 #EXECUTABLE="${EXECUTABLE:-"run_tests_metrics.sh"}"
 
 
+echo "prepare images"
+IMAGES="
+clickhouse/clickhouse-server:22.3
+clickhouse/clickhouse-server:22.6
+clickhouse/clickhouse-server:22.7
+clickhouse/clickhouse-server:22.8
+clickhouse/clickhouse-server:23.3
+clickhouse/clickhouse-server:23.8
+clickhouse/clickhouse-server:latest
+altinity/clickhouse-server:22.8.15.25.altinitystable
+docker.io/zookeeper:3.8.1
+"
+for image in ${IMAGES}; do
+    docker pull -q ${image} && \
+    echo "pushing to minikube" && \
+    minikube image load ${image} --overwrite=false --daemon=true
+done
+echo "images prepared"
+
 echo "Build" && \
 ${CUR_DIR}/../../dev/image_build_all_dev.sh && \
 echo "Load images" && \
