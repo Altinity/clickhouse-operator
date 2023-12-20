@@ -127,9 +127,10 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 		return
 	}
 
+	// Propagate host section only
 	cluster.Files = cluster.Files.MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
 		if section, err := getSectionFromPath(path); err == nil {
-			if section == SectionHost {
+			if section.Equal(SectionHost) {
 				return true
 			}
 		}

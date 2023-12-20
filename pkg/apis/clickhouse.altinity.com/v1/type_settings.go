@@ -20,24 +20,15 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-)
 
-// SettingsSection specifies settings section
-type SettingsSection string
-
-// Configuration sections
-// Each section translates into separate ConfigMap mapped into Pod
-var (
-	SectionEmpty  SettingsSection = ""
-	SectionCommon SettingsSection = "COMMON"
-	SectionUsers  SettingsSection = "USERS"
-	SectionHost   SettingsSection = "HOST"
+	"gopkg.in/d4l3k/messagediff.v1"
 )
 
 // Specify returned errors for being re-used
 var (
-	errorNoSectionSpecified  = fmt.Errorf("no section specified")
-	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
+	errorNoSectionSpecified = fmt.Errorf("no section specified")
+	errorNoPrefixSpecified  = fmt.Errorf("no prefix specified")
+	errorNoSuffixSpecified  = fmt.Errorf("no suffix specified")
 )
 
 // Settings specifies settings
@@ -53,352 +44,418 @@ func makeSettings() Settings {
 	return make(map[string]*Setting)
 }
 
+// Ensure ensures settings
+func (s *Settings) Ensure() *Settings {
+	if s == nil {
+		return NewSettings()
+	}
+	return s
+}
+
+// Name2Key converts name to storage key. This is the opposite to Key2Name
+func (s *Settings) Name2Key(name string) string {
+	return name
+}
+
+// Key2Name converts storage key to name. This is the opposite to Name2Key
+func (s *Settings) Key2Name(key string) string {
+	return key
+}
+
 // Len gets length of the settings
-func (settings *Settings) Len() int {
-	if settings == nil {
+func (s *Settings) Len() int {
+	if s == nil {
 		return 0
 	}
-	return len(*settings)
+	return len(*s)
 }
 
-// IsZero checks whether settings is zero
-func (settings *Settings) IsZero() bool {
-	if settings == nil {
-		return true
-	}
-	return settings.Len() == 0
-}
-
-// Walk walks over settings
-func (settings *Settings) Walk(f func(name string, setting *Setting)) {
-	if settings == nil {
+// WalkKeys walks over settings with a function. Function receives key and setting.
+func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
+	if s == nil {
 		return
 	}
-	if settings.Len() == 0 {
+	if s.Len() == 0 {
 		return
 	}
-	for name := range *settings {
-		f(name, settings.Get(name))
+	for key := range *s {
+		f(key, s.GetKey(key))
 	}
 }
 
-// Has checks whether named setting exists
-func (settings *Settings) Has(name string) bool {
-	if settings == nil {
+// Walk walks over settings with a function. Function receives name and setting.
+// Storage key is used internally.
+func (s *Settings) Walk(f func(name string, setting *Setting)) {
+	if s == nil {
+		return
+	}
+	if s.Len() == 0 {
+		return
+	}
+	for key := range *s {
+		f(s.Key2Name(key), s.Get(s.Key2Name(key)))
+	}
+}
+
+// HasKey checks whether key setting exists.
+func (s *Settings) HasKey(key string) bool {
+	if s == nil {
 		return false
 	}
-	if settings.Len() == 0 {
+	if s.Len() == 0 {
 		return false
 	}
-	_, ok := (*settings)[name]
+	_, ok := (*s)[key]
 	return ok
 }
 
-// Get gets named setting
-func (settings *Settings) Get(name string) *Setting {
-	if settings == nil {
-		return nil
+// Has checks whether named setting exists.
+// Storage key is used internally.
+func (s *Settings) Has(name string) bool {
+	if s == nil {
+		return false
 	}
-	if settings.Len() == 0 {
-		return nil
+	if s.Len() == 0 {
+		return false
 	}
-	return (*settings)[name]
+	_, ok := (*s)[s.Name2Key(name)]
+	return ok
 }
 
-// Set sets named setting
-func (settings *Settings) Set(name string, setting *Setting) {
-	if settings == nil {
+// GetKey gets key setting.
+func (s *Settings) GetKey(key string) *Setting {
+	if s == nil {
+		return nil
+	}
+	if s.Len() == 0 {
+		return nil
+	}
+	return (*s)[key]
+}
+
+// Get gets named setting.
+// Storage key is used internally.
+func (s *Settings) Get(name string) *Setting {
+	if s == nil {
+		return nil
+	}
+	if s.Len() == 0 {
+		return nil
+	}
+	return (*s)[s.Name2Key(name)]
+}
+
+// SetKey sets key setting.
+func (s *Settings) SetKey(key string, setting *Setting) *Settings {
+	if s == nil {
 		return
 	}
 	// Lazy load
-	if *settings == nil {
-		*settings = makeSettings()
+	if *s == nil {
+		*s = makeSettings()
 	}
-	(*settings)[name] = setting
+	(*s)[key] = setting
+
+	return s
+}
+
+// Set sets named setting.
+// Storage key is used internally.
+func (s *Settings) Set(name string, setting *Setting) *Settings {
+	if s == nil {
+		return
+	}
+	// Lazy load
+	if *s == nil {
+		*s = makeSettings()
+	}
+	(*s)[s.Name2Key(name)] = setting
+
+	return s
+}
+
+// DeleteKey deletes key setting
+func (s *Settings) DeleteKey(key string) {
+	if s == nil {
+		return
+	}
+	if !s.HasKey(key) {
+		return
+	}
+	// Delete storage key
+	delete(*s, key)
+}
+
+// Delete deletes named setting
+func (s *Settings) Delete(name string) {
+	if s == nil {
+		return
+	}
+	if !s.Has(name) {
+		return
+	}
+	// Delete storage key
+	delete(*s, s.Name2Key(name))
+}
+
+// IsZero checks whether settings is zero
+func (s *Settings) IsZero() bool {
+	if s == nil {
+		return true
+	}
+	return s.Len() == 0
 }
 
 // SetIfNotExists sets named setting
-func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
-	if settings == nil {
+func (s *Settings) SetIfNotExists(name string, setting *Setting) *Settings {
+	if s == nil {
 		return
 	}
-	if !settings.Has(name) {
-		settings.Set(name, setting)
+	if !s.Has(name) {
+		s.Set(name, setting)
 	}
+
+	return s
 }
 
 // SetScalarsFromMap sets multiple scalars from map
-func (settings *Settings) SetScalarsFromMap(m map[string]string) {
-	for key, value := range m {
-		settings.Set(key, NewSettingScalar(value))
+func (s *Settings) SetScalarsFromMap(m map[string]string) *Settings {
+	// Copy values from the map
+	for name, value := range m {
+		s.Set(name, NewSettingScalar(value))
 	}
+
+	return s
+}
+
+// Keys gets keys of the settings
+func (s *Settings) Keys() (keys []string) {
+	s.WalkKeys(func(key string, setting *Setting) {
+		keys = append(keys, key)
+	})
+	return keys
 }
 
 // Names gets names of the settings
-func (settings *Settings) Names() (names []string) {
-	settings.Walk(func(name string, setting *Setting) {
+func (s *Settings) Names() (names []string) {
+	s.Walk(func(name string, setting *Setting) {
 		names = append(names, name)
 	})
 	return names
 }
 
-// Delete deletes named setting
-func (settings *Settings) Delete(name string) {
-	if settings == nil {
-		return
-	}
-	if !settings.Has(name) {
-		return
-	}
-	delete(*settings, name)
-}
-
 // UnmarshalJSON unmarshal JSON
-func (settings *Settings) UnmarshalJSON(data []byte) error {
-	if settings == nil {
+func (s *Settings) UnmarshalJSON(data []byte) error {
+	if s == nil {
 		return fmt.Errorf("unable to unmashal with nil")
 	}
 
-	type mapOfAnyType map[string]any
-	var untypedMap mapOfAnyType
+	// Prepare untyped map at first
+	type untypedMapType map[string]any
+	var untypedMap untypedMapType
+
+	// Provided binary data is expected to unmarshal into untyped map, because settings are map-like struct
 	if err := json.Unmarshal(data, &untypedMap); err != nil {
 		return err
 	}
 
+	// Entries are expected to exist
 	if len(untypedMap) == 0 {
 		return nil
 	}
 
-	for name, untyped := range untypedMap {
+	// Create entries from untyped map in result settings
+	for key, untyped := range untypedMap {
 		if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok {
-			settings.Set(name, scalarSetting)
+			s.SetKey(key, scalarSetting)
 			continue // for
 		}
 
 		if vectorSetting, ok := NewSettingVectorFromAny(untyped); ok {
 			if vectorSetting.Len() > 0 {
-				settings.Set(name, vectorSetting)
+				s.SetKey(key, vectorSetting)
 			}
 			continue // for
 		}
+
+		// Unknown type of entry in untyped map
+		// Should error be reported?
+		// Skip for now
 	}
 
 	return nil
 }
 
 // MarshalJSON marshals JSON
-func (settings *Settings) MarshalJSON() ([]byte, error) {
-	if settings == nil {
+func (s *Settings) MarshalJSON() ([]byte, error) {
+	if s == nil {
 		return json.Marshal(nil)
 	}
 
 	raw := make(map[string]interface{})
-	settings.Walk(func(name string, setting *Setting) {
-		raw[name] = setting.AsAny()
+	s.WalkKeys(func(key string, setting *Setting) {
+		raw[key] = setting.AsAny()
 	})
 
 	return json.Marshal(raw)
 }
 
-// getValueAsScalarString
-func (settings *Settings) getValueAsScalarString(name string) (string, bool) {
-	if !settings.Has(name) {
-		return "", false
-	}
-	setting := settings.Get(name)
-	if setting.IsScalar() {
-		return setting.ScalarString(), true
-	}
-	return "", false
-}
-
-// getValueAsVectorString
-func (settings *Settings) getValueAsVectorString(name string) ([]string, bool) {
-	if !settings.Has(name) {
-		return nil, false
-	}
-	setting := settings.Get(name)
-	if setting.IsScalar() {
-		return nil, false
-	}
-	return setting.VectorString(), true
-}
-
 // fetchPort
-func (settings *Settings) fetchPort(name string) int32 {
-	return int32(settings.Get(name).ScalarInt())
+func (s *Settings) fetchPort(name string) int32 {
+	return int32(s.Get(name).ScalarInt())
 }
 
 // GetTCPPort gets TCP port from settings
-func (settings *Settings) GetTCPPort() int32 {
-	return settings.fetchPort("tcp_port")
+func (s *Settings) GetTCPPort() int32 {
+	return s.fetchPort("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
-func (settings *Settings) GetTCPPortSecure() int32 {
-	return settings.fetchPort("tcp_port_secure")
+func (s *Settings) GetTCPPortSecure() int32 {
+	return s.fetchPort("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
-func (settings *Settings) GetHTTPPort() int32 {
-	return settings.fetchPort("http_port")
+func (s *Settings) GetHTTPPort() int32 {
+	return s.fetchPort("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
-func (settings *Settings) GetHTTPSPort() int32 {
-	return settings.fetchPort("https_port")
+func (s *Settings) GetHTTPSPort() int32 {
+	return s.fetchPort("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
-func (settings *Settings) GetInterserverHTTPPort() int32 {
-	return settings.fetchPort("interserver_http_port")
+func (s *Settings) GetInterserverHTTPPort() int32 {
+	return s.fetchPort("interserver_http_port")
 }
 
 // MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func (settings *Settings) MergeFrom(src *Settings) *Settings {
+func (s *Settings) MergeFrom(src *Settings) *Settings {
 	if src.Len() == 0 {
-		return settings
+		return s
 	}
 
-	src.Walk(func(key string, value *Setting) {
-		// Lazy load
-		if settings == nil {
-			settings = NewSettings()
-		}
-		settings.SetIfNotExists(key, value)
+	src.Walk(func(name string, value *Setting) {
+		s = s.Ensure()
+		s.SetIfNotExists(name, value)
 	})
 
-	return settings
+	return s
 }
 
 // MergeFromCB merges settings from src approved by filtering callback function
-func (settings *Settings) MergeFromCB(src *Settings, filter func(path string, setting *Setting) bool) *Settings {
+func (s *Settings) MergeFromCB(src *Settings, filter func(name string, setting *Setting) bool) *Settings {
 	if src.Len() == 0 {
-		return settings
+		return s
 	}
 
-	src.Walk(func(key string, value *Setting) {
-		if filter(key, value) {
-			// Lazy load
-			if settings == nil {
-				settings = NewSettings()
-			}
-			// Accept
-			settings.Set(key, value)
+	src.Walk(func(name string, value *Setting) {
+		if filter(name, value) {
+			// Accept this setting
+			s = s.Ensure()
+			s.Set(name, value)
 		}
 	})
 
-	return settings
+	return s
 }
 
-// GetSectionStringMap returns map of settings sections
-func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) (m map[string]string) {
-	if settings == nil {
+// ExtractSection returns map of the specified settings section
+func (s *Settings) ExtractSection(section SettingsSection, includeSettingWithNoSectionSpecified bool) (m map[string]string) {
+	if s == nil {
 		return nil
 	}
 
-	settings.Walk(func(path string, _ *Setting) {
-		_section, err := getSectionFromPath(path)
-		if (err == nil) && (_section != section) {
-			// This is not the section we are looking for, skip to next
+	s.WalkKeys(func(key string, setting *Setting) {
+		_section, err := getSectionFromPath(key)
+		if (err == nil) && !_section.Equal(section) {
+			// This is not the section we are looking for, skip to the next
 			return
 		}
 		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have a complex error, skip to next
+			// We have a complex error, skip to the next
 			return
 		}
-		if (err == errorNoSectionSpecified) && !includeUnspecified {
-			// We are not ready to include unspecified section, skip to next
+		if (err == errorNoSectionSpecified) && !includeSettingWithNoSectionSpecified {
+			// We are not ready to include setting with unspecified section, skip to the next
 			return
 		}
 
-		// We'd like to get this section
+		// Looks like we are ready to include this setting into result set
 
-		filename, err := getFilenameFromPath(path)
+		filename, err := getFilenameFromPath(key)
 		if err != nil {
 			// We need to have filename specified
 			return
 		}
 
-		if scalar, ok := settings.getValueAsScalarString(path); ok {
-			if m == nil {
-				// Lazy load
-				m = make(map[string]string)
-			}
-			m[filename] = scalar
-		} else {
-			// Skip vector for now
+		if !setting.IsScalar() {
+			// We are ready to accept scalars only
+			return
 		}
+
+		if m == nil {
+			// Lazy load
+			m = make(map[string]string)
+		}
+
+		// Fetch file content
+		m[filename] = setting.ScalarString()
 	})
 
 	return m
 }
 
-// inArray checks whether needle is in haystack
-func inArray(needle SettingsSection, haystack []SettingsSection) bool {
-	for _, item := range haystack {
-		if item == needle {
-			return true
-		}
-	}
-	return false
-}
-
 // Filter filters settings according to include and exclude lists
-func (settings *Settings) Filter(
+func (s *Settings) Filter(
 	includeSections []SettingsSection,
 	excludeSections []SettingsSection,
-	includeUnspecified bool,
+	includeSettingWithNoSectionSpecified bool,
 ) (res *Settings) {
-	if settings.Len() == 0 {
+	if s.Len() == 0 {
 		return res
 	}
 
-	settings.Walk(func(path string, _ *Setting) {
-		_section, err := getSectionFromPath(path)
+	s.WalkKeys(func(key string, _ *Setting) {
+		section, err := getSectionFromPath(key)
 
-		var include bool
-		var exclude bool
-
-		if err == nil {
-			include = (includeSections == nil) || inArray(_section, includeSections)
-			exclude = (excludeSections != nil) && inArray(_section, excludeSections)
-		}
-
-		include = include && !exclude
-
-		if (err == nil) && !include {
-			// This is not the section we are looking for, skip to next
-			return
-		}
 		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have a complex error, skip to next
+			// We have a complex error, skip to the next
 			return
 		}
-		if (err == errorNoSectionSpecified) && !includeUnspecified {
-			// We are not ready to include unspecified section, skip to next
+		if (err == errorNoSectionSpecified) && !includeSettingWithNoSectionSpecified {
+			// We are not ready to include unspecified section, skip to the next
 			return
 		}
 
-		// We'd like to get this section
-		if res == nil {
-			res = NewSettings()
+		// No include sections specified is treated as 'include by default'
+		include := section.In(includeSections) || (includeSections == nil)
+		exclude := section.In(excludeSections)
+
+		if !include || exclude {
+			// This is not the section we are looking for, skip to the next
+			return
 		}
-		res.Set(path, settings.Get(path))
+
+		// We'd like to get this setting
+
+		res = res.Ensure()
+		res.SetKey(key, s.GetKey(key))
 	})
 
 	return res
 }
 
 // AsSortedSliceOfStrings return settings as sorted strings
-func (settings *Settings) AsSortedSliceOfStrings() []string {
-	if settings == nil {
+func (s *Settings) AsSortedSliceOfStrings() []string {
+	if s == nil {
 		return nil
 	}
 
 	// Sort keys
 	var keys []string
-	settings.Walk(func(key string, _ *Setting) {
+	s.WalkKeys(func(key string, _ *Setting) {
 		keys = append(keys, key)
 	})
 	sort.Strings(keys)
@@ -408,98 +465,202 @@ func (settings *Settings) AsSortedSliceOfStrings() []string {
 	// Walk over sorted keys
 	for _, key := range keys {
 		res = append(res, key)
-		res = append(res, settings.Get(key).String())
+		res = append(res, s.GetKey(key).String())
 	}
 
 	return res
 }
 
 // Normalize normalizes settings
-func (settings *Settings) Normalize() {
-	settings.normalizePaths()
+func (s *Settings) Normalize() *Settings {
+	s.normalizeKeys()
+	return s
 }
 
-// normalizePaths normalizes paths in settings
-func (settings *Settings) normalizePaths() {
-	if settings.Len() == 0 {
+// normalizeKeys normalizes keys in settings, treating them as paths
+func (s *Settings) normalizeKeys() {
+	if s.Len() == 0 {
 		return
 	}
 
-	pathsToNormalize := make([]string, 0, 0)
+	var keysToNormalize []string
 
-	// Find entries with paths to normalize
-	settings.Walk(func(unNormalizedPath string, _ *Setting) {
-		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
-		if len(normalizedPath) != len(unNormalizedPath) {
+	// Find entries with keys to normalize
+	s.WalkKeys(func(key string, _ *Setting) {
+		if _, modified := normalizeKeyAsPath(key); modified {
 			// Normalization changed something. This path has to be normalized
-			pathsToNormalize = append(pathsToNormalize, unNormalizedPath)
+			keysToNormalize = append(keysToNormalize, key)
 		}
 	})
 
-	// Add entries with normalized paths
-	for _, unNormalizedPath := range pathsToNormalize {
-		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
-		settings.Set(normalizedPath, settings.Get(unNormalizedPath))
+	// Add entries with normalized keys
+	for _, unNormalizedKey := range keysToNormalize {
+		normalizedKey, _ := normalizeKeyAsPath(unNormalizedKey)
+		s.SetKey(normalizedKey, s.GetKey(unNormalizedKey))
 	}
 
-	// Delete entries with un-normalized paths
-	for _, unNormalizedPath := range pathsToNormalize {
-		settings.Delete(unNormalizedPath)
+	// Delete entries with un-normalized keys
+	for _, unNormalizedKey := range keysToNormalize {
+		s.DeleteKey(unNormalizedKey)
 	}
 }
 
-// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings, files} section
-// Normalized path looks like 'a/b/c'
-func normalizeSettingsKeyAsPath(path string) string {
-	// Normalize multi-'/' values (like '//') to single-'/'
+// normalizeKeyAsPath normalizes key which is treated as a path
+// Normalized key looks like 'a/b/c'
+// Used in in .spec.configuration.{users, profiles, quotas, settings, files} sections
+func normalizeKeyAsPath(path string) (string, bool) {
+	// Find all multi-'/' values (like '//')
 	re := regexp.MustCompile("//+")
-	path = re.ReplaceAllString(path, "/")
 
+	// Squash all multi-'/' values (like '//') to single-'/'
+	normalized := re.ReplaceAllString(path, "/")
 	// Cut all leading and trailing '/', so the result would be 'a/b/c'
-	return strings.Trim(path, "/")
+	normalized = strings.Trim(normalized, "/")
+
+	return normalized, normalized != path
+}
+
+func getPrefixFromPath(path string) (string, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		// We need to have path to be at least 2 entries in order to have prefix
+		return "", errorNoPrefixSpecified
+	}
+
+	// Extract the first component from the path
+	prefix := parts[0]
+	if prefix == "" {
+		return "", errorNoPrefixSpecified
+	}
+
+	return prefix, nil
+}
+
+func getSuffixFromPath(path string) (string, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 1 {
+		// We need to have path to be at least one entry - which will be the suffix
+		return "", errorNoSuffixSpecified
+	}
+
+	// Extract the last component from the path
+	suffix := parts[len(parts)-1]
+	if suffix == "" {
+		// We need to have path to be at least one entry - which will be the suffix
+		return "", errorNoSuffixSpecified
+	}
+
+	return suffix, nil
 }
 
 // getSectionFromPath
 func getSectionFromPath(path string) (SettingsSection, error) {
-	parts := strings.Split(path, "/")
-	if len(parts) < 2 {
-		// We need to have path to be at least section/file.name
+	// String representation of the section
+	section, err := getPrefixFromPath(path)
+	if err != nil {
+		// We need to have path to be at least 'section/file.name'
 		return SectionEmpty, errorNoSectionSpecified
 	}
 
-	section := parts[0]
-	return string2Section(section)
-}
-
-// string2Section
-func string2Section(section string) (SettingsSection, error) {
-	if strings.EqualFold(section, string(SectionCommon)) || strings.EqualFold(section, CommonConfigDir) {
+	// Check dir names to determine which section path points to
+	configDir := section
+	switch {
+	case strings.EqualFold(configDir, CommonConfigDir):
 		return SectionCommon, nil
-	}
-	if strings.EqualFold(section, string(SectionUsers)) || strings.EqualFold(section, UsersConfigDir) {
+	case strings.EqualFold(configDir, UsersConfigDir):
 		return SectionUsers, nil
-	}
-	if strings.EqualFold(section, string(SectionHost)) || strings.EqualFold(section, HostConfigDir) {
+	case strings.EqualFold(configDir, HostConfigDir):
 		return SectionHost, nil
+	}
+
+	{
+		// TODO - either provide example or just remove this part
+		// Check explicitly specified sections. This is never(?) used
+		section := NewSettingsSectionFromString(section)
+		switch {
+		case SectionCommon.Equal(section):
+			return SectionCommon, nil
+		case SectionUsers.Equal(section):
+			return SectionUsers, nil
+		case SectionHost.Equal(section):
+			return SectionHost, nil
+		}
 	}
 
 	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
 }
 
-// getFilenameFromPath
 func getFilenameFromPath(path string) (string, error) {
-	parts := strings.Split(path, "/")
-	if len(parts) < 1 {
-		// We need to have path to be at least one entry - which will be 'filename'
-		return "", errorNoFilenameSpecified
+	return getSuffixFromPath(path)
+}
+
+// listModifiedSettingsPaths makes list of paths that were modified between two settings.
+// Ex.:
+// confid.d/setting1
+// confid.d/setting2
+func listModifiedSettingsPaths(a, b *Settings, path *messagediff.Path, value interface{}) (paths []string) {
+	if settings, ok := (value).(*Settings); ok {
+		// Provided `value` is of type api.Settings, which means that the whole
+		// settings such as 'files' or 'settings' is being either added or removed
+		if settings == nil {
+			// Completely removed settings such as 'files' or 'settings', so the value changed from Settings to nil
+			// List all entries from settings that are removed
+			for _, name := range a.Keys() {
+				paths = append(paths, name)
+			}
+		} else {
+			// Introduced new settings such as 'files' or 'settings', so the value changed from nil to Settings
+			// List all entries from settings that is added
+			for _, name := range b.Keys() {
+				paths = append(paths, name)
+			}
+		}
+	} else {
+		// Provided `value` is not of type api.Settings, thus expecting it to be a piece of settings.
+		// Modify (without full removal or addition) settings such as 'files' or 'settings',
+		// something is still left in the remaining part of settings in case of deletion or added in case of addition.
+		// Build string representation of path to updated element
+		var pathElements []string
+		for _, pathNode := range *path {
+			switch mk := pathNode.(type) {
+			case messagediff.MapKey:
+				switch pathElement := mk.Key.(type) {
+				case string:
+					pathElements = append(pathElements, pathElement)
+				}
+			}
+		}
+		paths = append(paths, strings.Join(pathElements, "/"))
 	}
 
-	// Extract last component from path
-	filename := parts[len(parts)-1]
-	if filename == "" {
-		// We need to have path to be at least one entry - which will be 'filename'
-		return "", errorNoFilenameSpecified
-	}
+	return paths
+}
 
-	return filename, nil
+// listPrefixedModifiedSettingsPaths makes list of paths that were modified between two settings.
+// Each entry in the list is prefixed with the specified `pathPrefix`
+// Ex.: `prefix` = file
+// file/setting1
+// file/setting2
+func listPrefixedModifiedSettingsPaths(a, b *Settings, pathPrefix string, path *messagediff.Path, value interface{}) (paths []string) {
+	for _, nonPrefixedPath := range listModifiedSettingsPaths(a, b, path, value) {
+		paths = append(paths, pathPrefix+"/"+nonPrefixedPath)
+	}
+	return paths
+}
+
+// ListAffectedSettingsPathsFromDiff makes list of paths that were modified between two settings prefixed with the specified `prefix`
+// Ex.: `prefix` = file
+// file/setting1
+// file/setting2
+func ListAffectedSettingsPathsFromDiff(a, b *Settings, diff *messagediff.Diff, prefix string) (res []string) {
+	for path, value := range diff.Added {
+		res = append(res, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+	}
+	for path, value := range diff.Removed {
+		res = append(res, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+	}
+	for path, value := range diff.Modified {
+		res = append(res, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+	}
+	return res
 }

@@ -16,9 +16,6 @@ package v1
 
 import (
 	"fmt"
-	"math"
-	"reflect"
-	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -48,198 +45,6 @@ type Setting struct {
 // Ensure required interface implementation
 var _ yaml.Marshaler = &Setting{}
 
-// NewSettingScalar makes new scalar Setting
-func NewSettingScalar(scalar string) *Setting {
-	return &Setting{
-		isScalar: true,
-		scalar:   scalar,
-	}
-}
-
-// NewSettingScalarFromAny makes new scalar Setting from untyped
-func NewSettingScalarFromAny(untyped any) (*Setting, bool) {
-	if scalarValue, ok := parseScalar(untyped); ok {
-		return NewSettingScalar(scalarValue), true
-	}
-
-	return nil, false
-}
-
-// NewSettingVector makes new vector Setting
-func NewSettingVector(vector []string) *Setting {
-	return &Setting{
-		isScalar: false,
-		vector:   vector,
-	}
-}
-
-// NewSettingVectorFromAny makes new vector Setting from untyped
-func NewSettingVectorFromAny(untyped any) (*Setting, bool) {
-	var vectorValue []string
-	var isKnownType bool
-
-	typeOf := reflect.TypeOf(untyped)
-	if typeOf == nil {
-		// Unable to determine type of the value
-		return nil, false
-	}
-
-	switch untyped.(type) {
-	case // vector
-		[]interface{}:
-		for _, _untyped := range untyped.([]interface{}) {
-			if scalarValue, ok := parseScalar(_untyped); ok {
-				vectorValue = append(vectorValue, scalarValue)
-			}
-		}
-		isKnownType = true
-	}
-
-	if isKnownType {
-		return NewSettingVector(vectorValue), true
-	}
-	return nil, false
-}
-
-const (
-	// Float with fractional part less than ignoreThreshold is considered to be int and is casted to int
-	ignoreThreshold = 0.001
-)
-
-func parseScalar(untyped any) (string, bool) {
-	var scalarValue string
-	var isKnownType bool
-
-	typeOf := reflect.TypeOf(untyped)
-	if typeOf == nil {
-		// Unable to determine type of the value
-		return "", false
-	}
-
-	switch untyped.(type) {
-	case // scalar
-		int, uint,
-		int8, uint8,
-		int16, uint16,
-		int32, uint32,
-		int64, uint64,
-		bool,
-		string:
-		scalarValue = fmt.Sprintf("%v", untyped)
-		isKnownType = true
-	case // scalar
-		float32:
-		floatVal := untyped.(float32)
-		// What is the fractional part of the float value?
-		// If it is too small, we can consider the value to be an int value
-		_, frac := math.Modf(float64(floatVal))
-		if frac > ignoreThreshold {
-			// Consider it float
-			scalarValue = fmt.Sprintf("%f", untyped)
-		} else {
-			// Consider it int
-			intVal := int64(floatVal)
-			scalarValue = fmt.Sprintf("%v", intVal)
-		}
-		isKnownType = true
-	case // scalar
-		float64:
-		floatVal := untyped.(float64)
-		// What is the fractional part of the float value?
-		// If it is too small, we can consider the value to be an int value
-		_, frac := math.Modf(floatVal)
-		if frac > ignoreThreshold {
-			// Consider it float
-			scalarValue = fmt.Sprintf("%f", untyped)
-		} else {
-			// Consider it int
-			intVal := int64(floatVal)
-			scalarValue = fmt.Sprintf("%v", intVal)
-		}
-		isKnownType = true
-	}
-
-	if isKnownType {
-		return scalarValue, true
-	}
-	return "", false
-}
-
-// IsScalar checks whether setting is a scalar value
-func (s *Setting) IsScalar() bool {
-	if s == nil {
-		return false
-	}
-	return s.isScalar
-}
-
-// IsVector checks whether setting is a vector value
-func (s *Setting) IsVector() bool {
-	if s == nil {
-		return false
-	}
-	return !s.isScalar
-}
-
-// ScalarString gets string scalar value of a setting
-func (s *Setting) ScalarString() string {
-	if s == nil {
-		return ""
-	}
-	return s.scalar
-}
-
-// ScalarInt gets int scalar value of a setting
-func (s *Setting) ScalarInt() int {
-	if s == nil {
-		return 0
-	}
-	if value, err := strconv.Atoi(s.scalar); err == nil {
-		return value
-	}
-
-	return 0
-}
-
-// ScalarAny gets scalar value of a setting as any
-func (s *Setting) ScalarAny() any {
-	if s == nil {
-		return nil
-	}
-
-	return s.scalar
-}
-
-// VectorString gets vector values of a setting
-func (s *Setting) VectorString() []string {
-	if s == nil {
-		return nil
-	}
-	return s.vector
-}
-
-// VectorAny gets vector value of a setting as any
-func (s *Setting) VectorAny() any {
-	if s == nil {
-		return nil
-	}
-
-	return s.vector
-}
-
-// AsVectorString gets value of a setting as vector. ScalarString value is casted to vector
-func (s *Setting) AsVectorString() []string {
-	if s == nil {
-		return nil
-	}
-	if s.isScalar {
-		return []string{
-			s.scalar,
-		}
-	}
-	return s.vector
-}
-
 // AsAny gets value of a setting as vector. ScalarString value is casted to vector
 func (s *Setting) AsAny() any {
 	if s == nil {
@@ -249,17 +54,6 @@ func (s *Setting) AsAny() any {
 		return s.ScalarAny()
 	}
 	return s.VectorAny()
-}
-
-// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to VectorString
-func (s *Setting) CastToVector() *Setting {
-	if s == nil {
-		return nil
-	}
-	if s.isScalar {
-		return NewSettingVector(s.AsVectorString())
-	}
-	return s
 }
 
 // SetAttribute sets attribute of the setting
@@ -308,13 +102,14 @@ func (s *Setting) Attributes() string {
 
 // Len returns number of entries in the Setting (be it scalar or vector)
 func (s *Setting) Len() int {
-	if s.IsVector() {
+	switch {
+	case s.IsVector():
 		return len(s.vector)
-	}
-	if s.IsScalar() {
+	case s.IsScalar():
 		return 1
+	default:
+		return 0
 	}
-	return 0
 }
 
 // MergeFrom merges from specified source
