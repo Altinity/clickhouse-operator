@@ -1821,6 +1821,7 @@ func (in *OperatorConfigCHIRuntime) DeepCopyInto(out *OperatorConfigCHIRuntime) 
 			}
 		}
 	}
+	out.mutex = in.mutex
 	if in.Template != nil {
 		in, out := &in.Template, &out.Template
 		*out = new(ClickHouseInstallation)
