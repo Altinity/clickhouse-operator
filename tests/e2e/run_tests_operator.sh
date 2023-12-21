@@ -9,7 +9,7 @@ export IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"Always"}"
 ONLY="${ONLY:-"*"}"
 #MAX_PARALLEL=${MAX_PARALLEL:-20}
 
-python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_operator/${ONLY}" -o short --trim-results on --debug --native --test-to-end
+python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_operator/${ONLY}" -o short --trim-results on --debug --native
 #python3 "$CUR_DIR/../regression.py" --only="/regression/e2e.test_operator/${ONLY}" --parallel-pool ${MAX_PARALLEL} -o short --trim-results on --debug --native
 #python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/* -o short --trim-results on --debug --native --native
 #python3 "$CUR_DIR/../regression.py" --only=/regression/e2e.test_operator/* --trim-results on --debug --native --native
