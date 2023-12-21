@@ -16,28 +16,18 @@ package v1
 
 // SettingsUser specifies settings of a user
 type SettingsUser struct {
-	*Settings
+	Settings
 	username string
 }
 
-// NewSettings creates new settings
+// NewSettingsUser creates new user settings
 func NewSettingsUser(settings *Settings, username string) *SettingsUser {
 	s := &SettingsUser{
-		Settings: settings,
+		Settings: *settings,
 		username: username,
 	}
-
+	s.converter = NewSettingsName2KeyConverterPrefix(username)
 	return s
-}
-
-// Name2Key converts name to storage key. This is the opposite to Key2Name
-func (s *SettingsUser) Name2Key(name string) string {
-	return name
-}
-
-// Key2Name converts storage key to name. This is the opposite to Name2Key
-func (s *SettingsUser) Key2Name(key string) string {
-	return key
 }
 
 // Username gets username

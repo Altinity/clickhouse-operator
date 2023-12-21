@@ -33,26 +33,53 @@ var (
 	errorNoSuffixSpecified  = fmt.Errorf("no suffix specified")
 )
 
+// SettingsName2KeyConverter is an interface to describe different converters.
+// Implements 'Strategy' pattern.
+type SettingsName2KeyConverter interface {
+	// Name2Key converts name to storage key. This is the opposite to Key2Name
+	Name2Key(name string) string
+	// Key2Name converts storage key to name. This is the opposite to Name2Key
+	Key2Name(key string) string
+	// DeepCopySettingsName2KeyConverter is required for code auto-generator
+	DeepCopySettingsName2KeyConverter() SettingsName2KeyConverter
+}
+
 // Settings specifies settings
 type Settings struct {
+	// m is a data storage
 	m map[string]*Setting
+	// converter is an interface to describe different converters.
+	// Implements 'Strategy' pattern.
+	converter SettingsName2KeyConverter
 }
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
 	s := &Settings{}
-	s.EnsureInternals()
+	s.ensureInternals()
 	return s
 }
 
-// EnsureInternals ensures all internals of the structure are in place
-func (s *Settings) EnsureInternals() {
+// ensureInternals ensures all internals of the structure are in place
+func (s *Settings) ensureInternals() {
 	if s == nil {
 		return
 	}
 	if s.m == nil {
 		s.m = make(map[string]*Setting)
 	}
+}
+
+// ensureConverter ensures converter in place
+func (s *Settings) ensureConverter() SettingsName2KeyConverter {
+	if s == nil {
+		// Just return converter
+		return NewSettingsName2KeyConverterPlain()
+	}
+	if s.converter == nil {
+		s.converter = NewSettingsName2KeyConverterPlain()
+	}
+	return s.converter
 }
 
 // Ensure ensures settings are in place
@@ -65,12 +92,12 @@ func (s *Settings) Ensure() *Settings {
 
 // Name2Key converts name to storage key. This is the opposite to Key2Name
 func (s *Settings) Name2Key(name string) string {
-	return name
+	return s.ensureConverter().Name2Key(name)
 }
 
 // Key2Name converts storage key to name. This is the opposite to Name2Key
 func (s *Settings) Key2Name(key string) string {
-	return key
+	return s.ensureConverter().Key2Name(key)
 }
 
 // Len gets length of the settings
@@ -145,7 +172,7 @@ func (s *Settings) SetKey(key string, setting *Setting) *Settings {
 	if s == nil {
 		return s
 	}
-	s.EnsureInternals()
+	s.ensureInternals()
 	// Set with storage key
 	s.m[key] = setting
 	return s
@@ -295,7 +322,7 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-// fetchPort
+// fetchPort is the base function to fetch int32 port value
 func (s *Settings) fetchPort(name string) int32 {
 	return int32(s.Get(name).ScalarInt())
 }

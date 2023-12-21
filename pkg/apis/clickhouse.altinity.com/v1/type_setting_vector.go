@@ -91,14 +91,3 @@ func (s *Setting) AsVectorString() []string {
 	}
 	return s.vector
 }
-
-// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to VectorString
-func (s *Setting) CastToVector() *Setting {
-	if s == nil {
-		return nil
-	}
-	if s.isScalar {
-		return NewSettingVector(s.AsVectorString())
-	}
-	return s
-}
