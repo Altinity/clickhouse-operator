@@ -538,6 +538,7 @@ func normalizeKeyAsPath(path string) (string, bool) {
 	return normalized, normalized != path
 }
 
+// getPrefixFromPath
 func getPrefixFromPath(path string) (string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 2 {
@@ -554,6 +555,7 @@ func getPrefixFromPath(path string) (string, error) {
 	return prefix, nil
 }
 
+// getSuffixFromPath
 func getSuffixFromPath(path string) (string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) < 1 {
@@ -608,6 +610,7 @@ func getSectionFromPath(path string) (SettingsSection, error) {
 	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
 }
 
+// getFilenameFromPath
 func getFilenameFromPath(path string) (string, error) {
 	return getSuffixFromPath(path)
 }
