@@ -19,6 +19,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"sort"
 	"strings"
 
@@ -929,43 +930,59 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 	return zk
 }
 
-// substWithSecretField substitute users settings field with value from k8s secret
-func (n *Normalizer) substWithSecretField(user *api.SettingsUser, userSettingsField, userSettingsK8SSecretField string) bool {
+// substWithSecretFieldValue substitute users settings field with value from k8s secret
+func (n *Normalizer) substWithSecretFieldValue(user *api.SettingsUser, dstField, srcSecretRefField string) bool {
 	// Has to have source field specified
-	if !user.Has(userSettingsK8SSecretField) {
+	if !user.Has(srcSecretRefField) {
 		return false
 	}
 
 	// Anyway remove source field, it should not be included into final ClickHouse config,
 	// because these source fields are synthetic ones (clickhouse does not know them).
-	defer user.Delete(userSettingsK8SSecretField)
+	defer user.Delete(srcSecretRefField)
 
-	secretFieldAddress := user.Get(userSettingsK8SSecretField).String()
-	secretFieldValue, err := n.fetchSecretFieldValue(secretFieldAddress)
+	// Get value pointed to by the source field
+	secretFieldAddress := user.Get(srcSecretRefField).String()
+	// Fetch k8s address of the field
+	secretNamespace, secretName, key, err := parseSecretFieldAddress(secretFieldAddress)
+	if err != nil {
+		log.V(1).M(n.ctx.chi).F().
+			Warning("unable to parse secret field address %s as %s/%s/%s", secretFieldAddress, secretNamespace, secretName, key)
+		return false
+	}
+
+	secretFieldValue, err := n.fetchSecretFieldValue(secretNamespace, secretName, key)
 	if err != nil {
 		return false
 	}
 
-	user.Set(userSettingsField, api.NewSettingScalar(secretFieldValue))
+	// Set value as dst
+	user.Set(dstField, api.NewSettingScalar(secretFieldValue))
 	return true
 }
 
-// substWithSecretEnvField substitute users settings field with value from k8s secret stored in ENV var
-func (n *Normalizer) substWithSecretEnvField(user *api.SettingsUser, userSettingsField, userSettingsK8SSecretField string) bool {
-	// Fetch secret name and key within secret
-	secretFieldAddress := user.Get(userSettingsK8SSecretField).String()
-	_, secretName, key, err := parseSecretFieldAddress(secretFieldAddress)
-	if err != nil {
+// substWithEnvRefToSecretField substitute users settings field with value from k8s secret stored in ENV var
+func (n *Normalizer) substWithEnvRefToSecretField(user *api.SettingsUser, dstField, srcSecretRefField string) bool {
+	// Has to have source field specified
+	if !user.Has(srcSecretRefField) {
 		return false
 	}
 
-	// Subst plaintext field with secret field
-	if !n.substWithSecretField(user, userSettingsField, userSettingsK8SSecretField) {
+	// Anyway remove source field, it should not be included into final ClickHouse config,
+	// because these source fields are synthetic ones (clickhouse does not know them).
+	defer user.Delete(srcSecretRefField)
+
+	// Fetch secret name and key within secret
+	secretFieldAddress := user.Get(srcSecretRefField).String()
+	secretNamespace, secretName, key, err := parseSecretFieldAddress(secretFieldAddress)
+	if err != nil {
+		log.V(1).M(n.ctx.chi).F().
+			Warning("unable to parse secret field address %s as %s/%s/%s", secretFieldAddress, secretNamespace, secretName, key)
 		return false
 	}
 
 	// ENV VAR name and value
-	envVarName := user.Username() + "_" + userSettingsField
+	envVarName := user.Username() + "_" + dstField
 	n.appendEnvVar(
 		core.EnvVar{
 			Name: envVarName,
@@ -981,7 +998,7 @@ func (n *Normalizer) substWithSecretEnvField(user *api.SettingsUser, userSetting
 	)
 
 	// Replace setting with empty value and reference to ENV VAR
-	user.Set(userSettingsField, api.NewSettingScalar("").SetAttribute("from_env", envVarName))
+	user.Set(dstField, api.NewSettingScalar("").SetAttribute("from_env", envVarName))
 
 	return true
 }
@@ -1076,14 +1093,11 @@ func parseSecretFieldAddress(secretFieldAddress string) (string, string, string,
 }
 
 // fetchSecretFieldValue fetches the value of the specified field in the specified secret
-func (n *Normalizer) fetchSecretFieldValue(secretFieldAddress string) (string, error) {
-	// Fetch address of the field
-	namespace, name, key, err := parseSecretFieldAddress(secretFieldAddress)
-	if err != nil {
-		return "", err
-	}
+// TODO this is the only useage of k8s API in the normalizer. How to remove it?
+func (n *Normalizer) fetchSecretFieldValue(namespace, name, key string) (string, error) {
 
-	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, meta.GetOptions{})
+	// Fetch the secret
+	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 	if err != nil {
 		log.V(1).M(namespace, name).F().Info("unable to read secret %v", err)
 		return "", ErrSecretFieldNotFound
@@ -1096,7 +1110,9 @@ func (n *Normalizer) fetchSecretFieldValue(secretFieldAddress string) (string, e
 		}
 	}
 
-	log.V(1).M(namespace, name).F().Info("unable to locate in specified address (namespace/name/key triple) from: %s", secretFieldAddress)
+	log.V(1).M(namespace, name).F().
+		Warning("unable to locate secret data by namespace/name/key: %s/%s/%s", namespace, name, key)
+
 	return "", ErrSecretFieldNotFound
 }
 
@@ -1224,14 +1240,14 @@ func (n *Normalizer) setMandatoryUserFields(user *api.SettingsUser, fields *user
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
 	// Values from the secret have higher priority
-	n.substWithSecretField(user, "password", "k8s_secret_password")
-	n.substWithSecretField(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-	n.substWithSecretField(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+	n.substWithSecretFieldValue(user, "password", "k8s_secret_password")
+	n.substWithSecretFieldValue(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+	n.substWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
 	// Values from the secret passed via ENV have even higher priority
-	n.substWithSecretEnvField(user, "password", "k8s_secret_env_password")
-	n.substWithSecretEnvField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
-	n.substWithSecretEnvField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
+	n.substWithEnvRefToSecretField(user, "password", "k8s_secret_env_password")
+	n.substWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
+	n.substWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
 
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 	if user.Has("password_double_sha1_hex") {
