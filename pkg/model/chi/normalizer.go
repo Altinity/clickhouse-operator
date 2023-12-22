@@ -930,8 +930,13 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 	return zk
 }
 
-// substWithSecretFieldValue substitute users settings field with value from k8s secret
-func (n *Normalizer) substWithSecretFieldValue(user *api.SettingsUser, dstField, srcSecretRefField string) bool {
+// substUserSettingsFieldWithSecret substitute users settings field with new setting built from the secret
+func (n *Normalizer) substUserSettingsFieldWithSecret(
+	user *api.SettingsUser,
+	dstField,
+	srcSecretRefField string,
+	newSettingCreator func(secretNamespace, secretName, key string) (*api.Setting, error),
+) bool {
 	// Has to have source field specified
 	if !user.Has(srcSecretRefField) {
 		return false
@@ -951,56 +956,51 @@ func (n *Normalizer) substWithSecretFieldValue(user *api.SettingsUser, dstField,
 		return false
 	}
 
-	secretFieldValue, err := n.fetchSecretFieldValue(secretNamespace, secretName, key)
+	setting, err := newSettingCreator(secretNamespace, secretName, key)
 	if err != nil {
 		return false
 	}
 
 	// Set value as dst
-	user.Set(dstField, api.NewSettingScalar(secretFieldValue))
+	user.Set(dstField, setting)
 	return true
+}
+
+// substWithSecretFieldValue substitute users settings field with value from k8s secret
+func (n *Normalizer) substWithSecretFieldValue(user *api.SettingsUser, dstField, srcSecretRefField string) bool {
+	return n.substUserSettingsFieldWithSecret(user, dstField, srcSecretRefField,
+		func(secretNamespace, secretName, key string) (*api.Setting, error) {
+			secretFieldValue, err := n.fetchSecretFieldValue(secretNamespace, secretName, key)
+			if err != nil {
+				return nil, err
+			}
+
+			return api.NewSettingScalar(secretFieldValue), nil
+		})
 }
 
 // substWithEnvRefToSecretField substitute users settings field with value from k8s secret stored in ENV var
 func (n *Normalizer) substWithEnvRefToSecretField(user *api.SettingsUser, dstField, srcSecretRefField string) bool {
-	// Has to have source field specified
-	if !user.Has(srcSecretRefField) {
-		return false
-	}
-
-	// Anyway remove source field, it should not be included into final ClickHouse config,
-	// because these source fields are synthetic ones (clickhouse does not know them).
-	defer user.Delete(srcSecretRefField)
-
-	// Fetch secret name and key within secret
-	secretFieldAddress := user.Get(srcSecretRefField).String()
-	secretNamespace, secretName, key, err := parseSecretFieldAddress(secretFieldAddress)
-	if err != nil {
-		log.V(1).M(n.ctx.chi).F().
-			Warning("unable to parse secret field address %s as %s/%s/%s", secretFieldAddress, secretNamespace, secretName, key)
-		return false
-	}
-
-	// ENV VAR name and value
-	envVarName := user.Username() + "_" + dstField
-	n.appendEnvVar(
-		core.EnvVar{
-			Name: envVarName,
-			ValueFrom: &core.EnvVarSource{
-				SecretKeyRef: &core.SecretKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: secretName,
+	return n.substUserSettingsFieldWithSecret(user, dstField, srcSecretRefField,
+		func(secretNamespace, secretName, key string) (*api.Setting, error) {
+			// ENV VAR name and value
+			envVarName := user.Username() + "_" + dstField
+			n.appendEnvVar(
+				core.EnvVar{
+					Name: envVarName,
+					ValueFrom: &core.EnvVarSource{
+						SecretKeyRef: &core.SecretKeySelector{
+							LocalObjectReference: core.LocalObjectReference{
+								Name: secretName,
+							},
+							Key: key,
+						},
 					},
-					Key: key,
 				},
-			},
-		},
-	)
+			)
 
-	// Replace setting with empty value and reference to ENV VAR
-	user.Set(dstField, api.NewSettingScalar("").SetAttribute("from_env", envVarName))
-
-	return true
+			return api.NewSettingScalar("").SetAttribute("from_env", envVarName), nil
+		})
 }
 
 const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
