@@ -82,9 +82,9 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
             keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = (
-                "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
+                "clickhouse-keeper-1-node-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
-            keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-with-CHK-resource/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
@@ -98,7 +98,7 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
                 keeper_nodes = doc["spec"]["replicas"]
         expected_docs = {
             "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
-            "clickhouse-keeper": 7,
+            "clickhouse-keeper": 2,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
         expected_pod_prefix = {
