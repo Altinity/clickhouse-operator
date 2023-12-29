@@ -93,7 +93,7 @@ spec:
       containers:
         - name: kubernetes-zookeeper
           imagePullPolicy: IfNotPresent
-          image: "docker.io/zookeeper:3.8.1"
+          image: "docker.io/zookeeper:3.8.3"
           resources:
             requests:
               memory: "512M"

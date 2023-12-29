@@ -565,7 +565,7 @@ def test_008_3(self):
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.22.0", version_to=None):
+def test_009_1(self, version_from="0.22.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -587,7 +587,7 @@ def test_009_1(self, version_from="0.22.0", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.22.0", version_to=None):
+def test_009_2(self, version_from="0.22.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -1272,7 +1272,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
                         pwd=pwd,
                     )
                     if shards == str(num_shards):
-                        break;
+                        break
                     with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                         time.sleep(i * 5)
                 assert shards == str(num_shards)
@@ -1492,7 +1492,7 @@ def test_014_0(self):
         with Then(
             f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"
         ):
-            out = clickhouse.query_with_error(chi_name, "INSERT INTO test_local_014 VALUES(2)")
+            out = clickhouse.query_with_error(chi_name, "SET insert_keeper_max_retries=0; INSERT INTO test_local_014 VALUES(2)")
             assert "Table is in readonly mode" in out
 
         with Then(f"Wait for {self.context.keeper_type} pod to come back"):
@@ -1728,7 +1728,7 @@ def test_016(self):
     with And("query_log should be disabled"):
         clickhouse.query(chi, sql="system flush logs")
         out = clickhouse.query_with_error(chi, sql="select count() from system.query_log")
-        assert "doesn't exist" in out
+        assert "doesn't exist" in out or "does not exist" in out
 
     with And("max_memory_usage should be 7000000000"):
         out = clickhouse.query(chi, sql="select value from system.settings where name='max_memory_usage'")
@@ -2865,7 +2865,7 @@ def test_028(self):
         cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
         kubectl.launch(cmd)
         with Then("Operator should let the query to finish"):
-            out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
+            out = clickhouse.query_with_error(chi, "SELECT count(sleepEachRow(1)) FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0")
             assert out == "30"
 
         pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
@@ -4204,7 +4204,7 @@ def test_045(self, manifest):
     with Then("operator SHALL not wait for the query to finish"):
         out = clickhouse.query_with_error(
             chi_name=chi,
-            sql=f"select count(sleepEachRow(1)) from numbers({counter})",
+            sql=f"SELECT count(sleepEachRow(1)) FROM numbers({counter}) SETTINGS function_sleep_max_microseconds_per_block=0",
             timeout=120)
         assert out != counter, error()
 

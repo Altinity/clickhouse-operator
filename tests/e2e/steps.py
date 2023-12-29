@@ -110,14 +110,17 @@ def set_settings(self):
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-21.3.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-21.8.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-22.3.yaml"
-    self.context.clickhouse_template = define("clickhouse_template", "manifests/chit/tpl-clickhouse-22.8.yaml")
-    self.context.clickhouse_template_old = define("clickhouse_template_old", "manifests/chit/tpl-clickhouse-22.3.yaml")#todo
+    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-22.8.yaml"
+    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.3.yaml"
+    # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.8.yaml"
+    self.context.clickhouse_template = define("clickhouse_template", "manifests/chit/tpl-clickhouse-23.8.yaml")
+    self.context.clickhouse_template_old = define("clickhouse_template_old", "manifests/chit/tpl-clickhouse-23.3.yaml")
 
     self.context.clickhouse_version = define("clickhouse_version", get_ch_version(test_file=self.context.clickhouse_template))
     self.context.clickhouse_version_old = define("clickhouse_version_old", get_ch_version(test_file=self.context.clickhouse_template_old))
 
     self.context.prometheus_namespace = define("prometheus_namespace", "prometheus")
-    self.context.prometheus_operator_version = define("prometheus_operator_version", "0.57")
+    self.context.prometheus_operator_version = define("prometheus_operator_version", "0.68")
     self.context.prometheus_scrape_interval = define("prometheus_scrape_interval", 10)
 
     self.context.minio_version = define("minio_version", "latest")

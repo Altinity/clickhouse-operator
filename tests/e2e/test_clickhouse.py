@@ -14,7 +14,7 @@ from testflows.asserts import error
 @Name("test_ch_001. Insert quorum")
 def test_ch_001(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
-    quorum_template = "manifests/chit/tpl-clickhouse-22.3.yaml"
+    quorum_template = "manifests/chit/tpl-clickhouse-stable.yaml"
     chit_data = yaml_manifest.get_manifest_data(util.get_full_path(quorum_template))
 
     kubectl.launch(
@@ -161,7 +161,7 @@ def test_ch_002(self):
     kubectl.create_and_check(
         "manifests/chi/test-ch-002-row-level.yaml",
         {
-            "apply_templates": {"manifests/chit/tpl-clickhouse-22.3.yaml"},
+            "apply_templates": {"manifests/chit/tpl-clickhouse-stable.yaml"},
             "do_not_delete": 1,
         },
     )

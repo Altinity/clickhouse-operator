@@ -2,20 +2,16 @@ apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallationTemplate"
 
 metadata:
-  name: clickhouse-alerts-latest-version
+  name: clickhouse-version
 spec:
   defaults:
     templates:
-      podTemplate: clickhouse-alerts
+      podTemplate: default
   templates:
     podTemplates:
-      - name: clickhouse-alerts
-        metadata:
-          annotations:
-            prometheus.io/port: '8888'
-            prometheus.io/scrape: 'true'
+      - name: default
         spec:
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:23.8
-              imagePullPolicy: Always
+              imagePullPolicy: IfNotPresent

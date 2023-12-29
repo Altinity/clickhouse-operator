@@ -29,7 +29,7 @@ clickhouse/clickhouse-server:23.3
 clickhouse/clickhouse-server:23.8
 clickhouse/clickhouse-server:latest
 altinity/clickhouse-server:22.8.15.25.altinitystable
-docker.io/zookeeper:3.8.1
+docker.io/zookeeper:3.8.3
 "
 for image in ${IMAGES}; do
     docker pull -q ${image} && \
