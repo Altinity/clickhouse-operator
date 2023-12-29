@@ -21,15 +21,22 @@ import (
 // NewSettingVector makes new vector Setting
 func NewSettingVector(vector []string) *Setting {
 	return &Setting{
-		isScalar: false,
-		vector:   vector,
+		_type:  SettingTypeVector,
+		vector: vector,
 	}
 }
 
 // NewSettingVectorFromAny makes new vector Setting from untyped
 func NewSettingVectorFromAny(untyped any) (*Setting, bool) {
+	if vector, ok := parseSettingVectorValue(untyped); ok {
+		return NewSettingVector(vector), true
+	}
+
+	return nil, false
+}
+
+func parseSettingVectorValue(untyped any) ([]string, bool) {
 	var vectorValue []string
-	var isKnownType bool
 
 	typeOf := reflect.TypeOf(untyped)
 	if typeOf == nil {
@@ -37,41 +44,33 @@ func NewSettingVectorFromAny(untyped any) (*Setting, bool) {
 		return nil, false
 	}
 
-	switch untyped.(type) {
-	case // vector
-		[]interface{}:
-		for _, _untyped := range untyped.([]interface{}) {
-			if scalarValue, ok := parseScalar(_untyped); ok {
+	if vector, ok := untyped.([]any); ok {
+		for _, possibleScalar := range vector {
+			if scalarValue, ok := parseSettingScalarValue(possibleScalar); ok {
 				vectorValue = append(vectorValue, scalarValue)
 			}
 		}
-		isKnownType = true
+		return vectorValue, true
 	}
 
-	if isKnownType {
-		return NewSettingVector(vectorValue), true
-	}
 	return nil, false
 }
 
 // IsVector checks whether setting is a vector value
 func (s *Setting) IsVector() bool {
-	if s == nil {
-		return false
-	}
-	return !s.isScalar
+	return s.Type() == SettingTypeVector
 }
 
-// VectorString gets vector values of a setting
-func (s *Setting) VectorString() []string {
+// VectorOfStrings gets vector values of a setting
+func (s *Setting) VectorOfStrings() []string {
 	if s == nil {
 		return nil
 	}
 	return s.vector
 }
 
-// VectorAny gets vector value of a setting as any
-func (s *Setting) VectorAny() any {
+// vectorAsAny gets vector value of a setting as any
+func (s *Setting) vectorAsAny() any {
 	if s == nil {
 		return nil
 	}
@@ -79,14 +78,14 @@ func (s *Setting) VectorAny() any {
 	return s.vector
 }
 
-// AsVectorString gets value of a setting as vector. ScalarString value is casted to vector
-func (s *Setting) AsVectorString() []string {
+// AsVectorOfStrings gets value of a setting as vector. ScalarString value is casted to vector
+func (s *Setting) AsVectorOfStrings() []string {
 	if s == nil {
 		return nil
 	}
-	if s.isScalar {
+	if s.IsScalar() {
 		return []string{
-			s.scalar,
+			s.ScalarString(),
 		}
 	}
 	return s.vector

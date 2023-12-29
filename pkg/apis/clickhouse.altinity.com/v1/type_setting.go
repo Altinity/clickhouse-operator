@@ -36,11 +36,21 @@ import (
 
 // Setting represents one settings, which can be either a sting or a vector of strings
 type Setting struct {
-	isScalar   bool
+	_type      SettingType
 	scalar     string
 	vector     []string
+	src        *SettingSource
 	attributes map[string]string
 }
+
+type SettingType string
+
+const (
+	SettingTypeUnknown SettingType = "unknown"
+	SettingTypeScalar  SettingType = "scalar"
+	SettingTypeVector  SettingType = "vector"
+	SettingTypeSource  SettingType = "source"
+)
 
 // Ensure required interface implementation
 var _ yaml.Marshaler = &Setting{}
@@ -50,10 +60,23 @@ func (s *Setting) AsAny() any {
 	if s == nil {
 		return nil
 	}
-	if s.IsScalar() {
-		return s.ScalarAny()
+	switch s.Type() {
+	case SettingTypeScalar:
+		return s.scalarAsAny()
+	case SettingTypeVector:
+		return s.vectorAsAny()
+	case SettingTypeSource:
+		return s.sourceAsAny()
 	}
-	return s.VectorAny()
+	return nil
+}
+
+// Type gets type odf the setting
+func (s *Setting) Type() SettingType {
+	if s == nil {
+		return SettingTypeUnknown
+	}
+	return s._type
 }
 
 // SetAttribute sets attribute of the setting
@@ -102,13 +125,29 @@ func (s *Setting) Attributes() string {
 
 // Len returns number of entries in the Setting (be it scalar or vector)
 func (s *Setting) Len() int {
-	switch {
-	case s.IsVector():
+	switch s.Type() {
+	case SettingTypeScalar:
+		return 1
+	case SettingTypeVector:
 		return len(s.vector)
-	case s.IsScalar():
+	case SettingTypeSource:
 		return 1
 	default:
 		return 0
+	}
+}
+
+// HasValue checks whether setting has a zero-value (no value)
+func (s *Setting) HasValue() bool {
+	switch s.Type() {
+	case SettingTypeScalar:
+		return s.Len() > 0
+	case SettingTypeVector:
+		return s.Len() > 0
+	case SettingTypeSource:
+		return s.src.HasValue()
+	default:
+		return false
 	}
 }
 
@@ -122,14 +161,14 @@ func (s *Setting) MergeFrom(from *Setting) *Setting {
 	// Can merge from Vector only
 	from = from.CastToVector()
 
-	// Reasonable to merge from non-zero vector only
-	if from.Len() < 1 {
+	// Reasonable to merge values only
+	if !from.HasValue() {
 		return s
 	}
 
 	// In case recipient does not exist just copy values from source
 	if s == nil {
-		new := NewSettingVector(from.VectorString())
+		new := NewSettingVector(from.VectorOfStrings())
 		new.attributes = util.MergeStringMapsPreserve(new.attributes, from.attributes)
 		return new
 	}
@@ -146,16 +185,30 @@ func (s *Setting) String() string {
 		return ""
 	}
 
+	switch s.Type() {
+	case SettingTypeScalar:
+		return s.ScalarString()
+	case SettingTypeVector:
+		return "[" + strings.Join(s.vector, ", ") + "]"
+	case SettingTypeSource:
+		return "data source"
+	}
+
+	return ""
+}
+
+// String gets string value of a setting. Vector is combined into one string
+func (s *Setting) StringFull() string {
+	if s == nil {
+		return ""
+	}
+
 	attributes := ""
 	if s.HasAttributes() {
 		attributes = ":[" + s.Attributes() + "]"
 	}
 
-	if s.isScalar {
-		return s.scalar + attributes
-	}
-
-	return "[" + strings.Join(s.vector, ", ") + "]" + attributes
+	return s.String() + attributes
 }
 
 // MarshalYAML implements yaml.Marshaler interface
@@ -163,13 +216,14 @@ func (s *Setting) MarshalYAML() (interface{}, error) {
 	return s.String(), nil
 }
 
-// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to VectorString
+// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to VectorOfStrings
 func (s *Setting) CastToVector() *Setting {
 	if s == nil {
 		return nil
 	}
-	if s.isScalar {
-		return NewSettingVector(s.AsVectorString())
+	switch s.Type() {
+	case SettingTypeScalar:
+		return NewSettingVector(s.AsVectorOfStrings())
 	}
 	return s
 }
