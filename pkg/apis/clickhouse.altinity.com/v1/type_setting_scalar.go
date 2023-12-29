@@ -24,15 +24,15 @@ import (
 // NewSettingScalar makes new scalar Setting
 func NewSettingScalar(scalar string) *Setting {
 	return &Setting{
-		isScalar: true,
-		scalar:   scalar,
+		_type:  SettingTypeScalar,
+		scalar: scalar,
 	}
 }
 
 // NewSettingScalarFromAny makes new scalar Setting from untyped
 func NewSettingScalarFromAny(untyped any) (*Setting, bool) {
-	if scalarValue, ok := parseScalar(untyped); ok {
-		return NewSettingScalar(scalarValue), true
+	if scalar, ok := parseSettingScalarValue(untyped); ok {
+		return NewSettingScalar(scalar), true
 	}
 
 	return nil, false
@@ -43,7 +43,7 @@ const (
 	ignoreThreshold = 0.001
 )
 
-func parseScalar(untyped any) (string, bool) {
+func parseSettingScalarValue(untyped any) (string, bool) {
 	var scalarValue string
 	var isKnownType bool
 
@@ -104,10 +104,7 @@ func parseScalar(untyped any) (string, bool) {
 
 // IsScalar checks whether setting is a scalar value
 func (s *Setting) IsScalar() bool {
-	if s == nil {
-		return false
-	}
-	return s.isScalar
+	return s.Type() == SettingTypeScalar
 }
 
 // ScalarString gets string scalar value of a setting
@@ -130,8 +127,8 @@ func (s *Setting) ScalarInt() int {
 	return 0
 }
 
-// ScalarAny gets scalar value of a setting as any
-func (s *Setting) ScalarAny() any {
+// scalarAsAny gets scalar value of a setting as any
+func (s *Setting) scalarAsAny() any {
 	if s == nil {
 		return nil
 	}

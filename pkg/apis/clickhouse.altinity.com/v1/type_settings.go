@@ -288,15 +288,18 @@ func (s *Settings) UnmarshalJSON(data []byte) error {
 
 	// Create entries from untyped map in result settings
 	for key, untyped := range untypedMap {
-		if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok {
+		if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok && scalarSetting.HasValue() {
 			s.SetKey(key, scalarSetting)
 			continue // for
 		}
 
-		if vectorSetting, ok := NewSettingVectorFromAny(untyped); ok {
-			if vectorSetting.Len() > 0 {
-				s.SetKey(key, vectorSetting)
-			}
+		if vectorSetting, ok := NewSettingVectorFromAny(untyped); ok && vectorSetting.HasValue() {
+			s.SetKey(key, vectorSetting)
+			continue // for
+		}
+
+		if srcSetting, ok := NewSettingSourceFromAny(untyped); ok && srcSetting.HasValue() {
+			s.SetKey(key, srcSetting)
 			continue // for
 		}
 
@@ -483,7 +486,7 @@ func (s *Settings) AsSortedSliceOfStrings() []string {
 	// Walk over sorted keys
 	for _, key := range keys {
 		res = append(res, key)
-		res = append(res, s.GetKey(key).String())
+		res = append(res, s.GetKey(key).StringFull())
 	}
 
 	return res

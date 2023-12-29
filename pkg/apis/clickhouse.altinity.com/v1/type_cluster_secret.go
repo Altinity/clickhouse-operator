@@ -20,14 +20,9 @@ import (
 
 // ClusterSecret defines the shared secret for nodes to authenticate each other with
 type ClusterSecret struct {
-	Auto      *StringBool          `json:"auto,omitempty"      yaml:"auto,omitempty"`
-	Value     string               `json:"value,omitempty"     yaml:"value,omitempty"`
-	ValueFrom *ClusterSecretSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
-}
-
-// ClusterSecretSource mirrors k8s SecretSource type
-type ClusterSecretSource struct {
-	SecretKeyRef *core.SecretKeySelector `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty"`
+	Auto      *StringBool `json:"auto,omitempty"      yaml:"auto,omitempty"`
+	Value     string      `json:"value,omitempty"     yaml:"value,omitempty"`
+	ValueFrom *DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }
 
 // ClusterSecretSourceName specifies name of the source where secret is provided
