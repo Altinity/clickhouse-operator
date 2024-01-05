@@ -17,6 +17,7 @@ package model
 import (
 	"context"
 	"fmt"
+	r "github.com/altinity/clickhouse-operator/pkg/util/retry"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -300,6 +301,72 @@ func (s *ClusterSchemer) CHIDropDnsCache(ctx context.Context, chi *chop.ClickHou
 func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *chop.ChiHost) (int, error) {
 	sql := `SELECT count() FROM system.processes`
 	return s.QueryHostInt(ctx, host, sql)
+}
+
+func (s *ClusterSchemer) HostDefaultDisk(ctx context.Context, host *chop.ChiHost) (string, error) {
+	sql := "SELECT name, path FROM system.disks;"
+	defaultPath := ""
+	err := r.Retry(ctx, 10, "Query DefaultDisk", log.V(1).M(host).F(),
+		func() error {
+			q, err := s.QueryHost(ctx, host, sql)
+			if err != nil {
+				return err
+			}
+			if q == nil {
+				return fmt.Errorf("empty query")
+			}
+			if q.Rows == nil {
+				return fmt.Errorf("no rows")
+			}
+			for q.Rows.Next() {
+				var name, path string
+				if err := q.Rows.Scan(&name, &path); err != nil {
+					log.V(1).F().Error("UNABLE to scan row err: %v", err)
+					return err
+				}
+				if name == "default" {
+					defaultPath = path
+				}
+			}
+			defer q.Close()
+			return nil
+		})
+	if err != nil {
+		return "", fmt.Errorf("cann not found default disk path")
+	}
+	return defaultPath, nil
+}
+
+func (s *ClusterSchemer) HostGetUsers(ctx context.Context, host *chop.ChiHost) ([]string, error) {
+	sql := "SELECT name FROM system.users;"
+	var users []string
+	err := r.Retry(ctx, 10, "Select sql", log.V(1).M(host).F(),
+		func() error {
+			q, err := s.QueryHost(ctx, host, sql)
+			if err != nil {
+				return err
+			}
+			if q == nil {
+				return fmt.Errorf("empty query")
+			}
+			if q.Rows == nil {
+				return fmt.Errorf("no rows")
+			}
+			for q.Rows.Next() {
+				var user string
+				if err := q.Rows.Scan(&user); err != nil {
+					log.V(1).F().Error("UNABLE to scan row err: %v", err)
+					return err
+				}
+				users = append(users, user)
+			}
+			defer q.Close()
+			return nil
+		})
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
 }
 
 // HostClickHouseVersion returns ClickHouse version on the host

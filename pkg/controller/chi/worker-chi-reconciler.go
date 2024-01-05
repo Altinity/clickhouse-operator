@@ -668,6 +668,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *chiV1.ChiHost) error {
 	// time.Sleep(30 * time.Second)
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
+	_ = w.migrateUsers(ctx, host)
+
 	if err := w.includeHost(ctx, host); err != nil {
 		metricsHostReconcilesErrors(ctx)
 		w.a.V(1).

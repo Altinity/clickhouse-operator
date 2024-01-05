@@ -885,6 +885,101 @@ func (a migrateTableOptionsArr) First() *migrateTableOptions {
 	return nil
 }
 
+// migrateUsers
+func (w *worker) migrateUsers(ctx context.Context, host *chiV1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+	if !w.shouldMigrateUsers(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to add users on host %d to shard %d in cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return nil
+	}
+	// Need to migrate users
+	w.a.V(1).
+		WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.GetCHI()).
+		M(host).F().
+		Info("Adding users on shard/host:%d/%d cluster:%s", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName)
+	err := w.syncUsers(ctx, host)
+
+	if err != nil {
+		w.a.M(host).F().Error("ERROR sync User on host %s. err: %v", host.Name, err)
+	}
+	_ = w.c.waitHostReady(ctx, host)
+	return err
+}
+
+func (w *worker) syncUsers(ctx context.Context, host *chiV1.ChiHost) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("ctx is done")
+		return nil
+	}
+	needSync, selectHost := w.needSyncUsers(ctx, host)
+	if needSync {
+		srcSts, _ := w.c.getStatefulSet(selectHost)
+		dstSts, _ := w.c.getStatefulSet(host)
+
+		namespace := host.CHI.Namespace
+		// find the first hosts， and get the default path
+		path, err := w.schemer.HostDefaultDisk(ctx, selectHost)
+		err = SyncUsers(namespace, srcSts.Name+"-0", dstSts.Name+"-0", "clickhouse", path+"access")
+		if err != nil {
+			return err
+		}
+	}
+	log.V(1).Info("need not sync users")
+	return nil
+}
+
+func (w *worker) needSyncUsers(ctx context.Context, host *chiV1.ChiHost) (bool, *chiV1.ChiHost) {
+	selectedHost := w.getSelectedHost(host)
+	if selectedHost.Name == host.Name {
+		return false, selectedHost
+	}
+	selectUsers, err := w.schemer.HostGetUsers(ctx, selectedHost)
+	log.V(1).Info("host %s selectUsers is %v", selectedHost.Name, selectUsers)
+	if err != nil {
+		w.a.M(host).F().Error("ERROR HostGetUser on host %s. err: %v", selectedHost.Name, err)
+	}
+	// 如果 当前shard 只有一个host， 则从其他的shard 进行查询并判断
+	users, err := w.schemer.HostGetUsers(ctx, host)
+	log.V(1).Info("host %s users is %v", host.Name, selectUsers)
+	if err != nil {
+		w.a.M(host).F().Error("ERROR HostGetUser on host %s. err: %v", host.Name, err)
+	}
+	if len(selectUsers) == len(users) {
+		return false, selectedHost
+	}
+	return true, selectedHost
+}
+
+func (w *worker) getSelectedHost(host *chiV1.ChiHost) *chiV1.ChiHost {
+	// 获取集群中可用的host
+	for clusterIndex := range host.GetCHI().Spec.Configuration.Clusters {
+		cluster := host.GetCHI().Spec.Configuration.Clusters[clusterIndex]
+		for shardIndex := range cluster.Layout.Shards {
+			shard := &cluster.Layout.Shards[shardIndex]
+			for replicaIndex := range shard.Hosts {
+				curHost := shard.Hosts[replicaIndex]
+				// 选择和自己不同的Host 并且判断当前的host的sts状态是否可用
+				if curHost.Name != host.Name {
+					curSts, err := w.c.getStatefulSet(curHost)
+					if err != nil {
+						continue
+					}
+					if curSts.Status.Replicas == curSts.Status.ReadyReplicas {
+						return curHost
+					}
+				}
+			}
+		}
+	}
+	return host
+}
+
 // migrateTables
 func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost, opts ...*migrateTableOptions) error {
 	if util.IsContextDone(ctx) {
@@ -930,6 +1025,20 @@ func (w *worker) migrateTables(ctx context.Context, host *chiV1.ChiHost, opts ..
 			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v", host.Address.ShardIndex, host.Address.ReplicaIndex, host.Address.ClusterName, err)
 	}
 	return err
+}
+
+func (w *worker) shouldMigrateUsers(host *chiV1.ChiHost) bool {
+	switch {
+	case host.GetCHI().IsStopped():
+		// Stopped host is not able to receive data
+		return false
+	case host.GetReconcileAttributes().GetStatus() == chiV1.ObjectStatusSame:
+		// No need to migrate on the same host
+		return false
+	}
+	// 连接两个两个sts 校验host 与另外的两个host 中用户是否相同， 相同则不执行syncUser
+
+	return true
 }
 
 // shouldMigrateTables
