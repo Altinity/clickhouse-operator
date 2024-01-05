@@ -708,6 +708,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	}
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
+	_ = w.migrateUsers(ctx, host)
+
 	if err := w.includeHost(ctx, host); err != nil {
 		metricsHostReconcilesErrors(ctx)
 		w.a.V(1).
