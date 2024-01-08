@@ -136,7 +136,7 @@ func createTableDistributed(cluster string) string {
 				engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
-		WHERE database IN (select name from system.databases where engine in (%s))
+		WHERE has((select groupArray(name) from system.databases where engine in (%s)), database)
 		ORDER BY order
 		`,
 		cluster,
@@ -173,7 +173,7 @@ func createTableReplicated(cluster string) string {
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
 			database NOT IN (%s) AND
-			database IN (select name from system.databases where engine in (%s)) AND
+			has((select groupArray(name) from system.databases where engine in (%s)), database) AND
 			create_table_query != '' AND
 			name NOT LIKE '.inner.%%' AND
 			name NOT LIKE '.inner_id.%%'
