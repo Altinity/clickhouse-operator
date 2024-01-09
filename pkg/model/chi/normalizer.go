@@ -1388,7 +1388,7 @@ func (n *Normalizer) substWithMount(settings *api.Settings, srcSecretRefField st
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
 			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
-			filename := secretAddress.Key
+			filename := srcSecretRefField
 
 			if !ok1 || !ok2 {
 				return nil, fmt.Errorf("unable to build k8s object name")
