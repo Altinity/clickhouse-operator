@@ -55,6 +55,8 @@ const (
 	// 5. operator-provided additional config files
 	dirPathHostConfig = "/etc/clickhouse-server/" + api.HostConfigDir + "/"
 
+	dirPathSecretFilesConfig = "/etc/clickhouse-server/secret-files.d/"
+
 	// dirPathClickHouseData specifies full path of data folder where ClickHouse would place its data storage
 	dirPathClickHouseData = "/var/lib/clickhouse"
 
