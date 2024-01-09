@@ -25,5 +25,9 @@ func (a ObjectAddress) AnyEmpty() bool {
 }
 
 func (a ObjectAddress) String() string {
-	return a.Namespace + "/" + a.Name + "/" + a.Key
+	return a.Render("/")
+}
+
+func (a ObjectAddress) Render(sep string) string {
+	return a.Namespace + sep + a.Name + sep + a.Key
 }
