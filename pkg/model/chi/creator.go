@@ -466,7 +466,7 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 		return
 	}
 
-	container.Env = append(container.Env, host.GetCHI().Attributes.ExchangeEnv...)
+	container.Env = append(container.Env, host.GetCHI().Attributes.AdditionalEnvVars...)
 }
 
 // ensureClickHouseContainerSpecified
@@ -522,8 +522,8 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 		},
 	}
 
-	// Setup volumes based on ConfigMaps into Pod Template
-	c.statefulSetSetupVolumesForConfigMaps(statefulSet, host)
+	// Setup volumes
+	c.statefulSetSetupVolumes(statefulSet, host)
 	// Setup statefulSet according to troubleshoot mode (if any)
 	c.setupTroubleshoot(statefulSet)
 	// Setup dedicated log container
@@ -601,7 +601,13 @@ func (c *Creator) getPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
 	return podTemplate
 }
 
-// statefulSetSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects with
+// statefulSetSetupVolumes setup all volumes
+func (c *Creator) statefulSetSetupVolumes(statefulSet *apps.StatefulSet, host *api.ChiHost) {
+	c.statefulSetSetupVolumesForConfigMaps(statefulSet, host)
+	c.statefulSetSetupVolumesForSecrets(statefulSet, host)
+}
+
+// statefulSetSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
 func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 	configMapHostName := CreateConfigMapHostName(host)
 	configMapCommonName := CreateConfigMapCommonName(c.chi)
@@ -626,6 +632,27 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 			newVolumeMount(configMapCommonName, dirPathCommonConfig),
 			newVolumeMount(configMapCommonUsersName, dirPathUsersConfig),
 			newVolumeMount(configMapHostName, dirPathHostConfig),
+		)
+	}
+}
+
+// statefulSetSetupVolumesForSecrets adds to each container in the Pod VolumeMount objects
+func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSet, host *api.ChiHost) {
+
+	// Add all ConfigMap objects as Volume objects of type ConfigMap
+	c.statefulSetAppendVolumes(
+		statefulSet,
+		host.GetCHI().Attributes.AdditionalVolumes...,
+	)
+
+	// And reference these Volumes in each Container via VolumeMount
+	// So Pod will have Secrets mounted as Volumes
+	for i := range statefulSet.Spec.Template.Spec.Containers {
+		// Convenience wrapper
+		container := &statefulSet.Spec.Template.Spec.Containers[i]
+		c.containerAppendVolumeMounts(
+			container,
+			host.GetCHI().Attributes.AdditionalVolumeMounts...,
 		)
 	}
 }
