@@ -82,6 +82,7 @@ func (c *ClickHouseConfigGenerator) GetSectionFromFiles(section api.SettingsSect
 		// We are looking into Common files
 		files = c.chi.Spec.Configuration.Files
 	} else {
+		// We are looking into host's personal files
 		files = host.Files
 	}
 
