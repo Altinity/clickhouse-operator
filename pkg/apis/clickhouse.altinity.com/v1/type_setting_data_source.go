@@ -15,7 +15,7 @@
 package v1
 
 import (
-	"reflect"
+	"encoding/json"
 
 	core "k8s.io/api/core/v1"
 )
@@ -23,6 +23,14 @@ import (
 // SettingSource defines setting as a ref to some data source
 type SettingSource struct {
 	ValueFrom *DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
+}
+
+// GetNameKey gets name and key from the secret ref
+func (s *SettingSource) GetNameKey() (string, string) {
+	if ref := s.GetSecretKeyRef(); ref != nil {
+		return ref.Name, ref.Key
+	}
+	return "", ""
 }
 
 // GetSecretKeyRef gets SecretKeySelector (typically named as SecretKeyRef) or nil
@@ -70,22 +78,18 @@ func NewSettingSourceFromAny(untyped any) (*Setting, bool) {
 }
 
 func parseSettingSourceValue(untyped any) (*SettingSource, bool) {
-	typeOf := reflect.TypeOf(untyped)
-	if typeOf == nil {
-		// Unable to determine type of the value
+	jsonStr, err := json.Marshal(untyped)
+	if err != nil {
 		return nil, false
 	}
 
-	switch untyped.(type) {
-	case SettingSource:
-		src := untyped.(SettingSource)
-		return &src, true
-	case *SettingSource:
-		src := untyped.(*SettingSource)
-		return src, true
+	// Convert json string to struct
+	var settingSource SettingSource
+	if err := json.Unmarshal(jsonStr, &settingSource); err != nil {
+		return nil, false
 	}
 
-	return nil, false
+	return &settingSource, true
 }
 
 // sourceAsAny gets source value of a setting as any
@@ -100,6 +104,14 @@ func (s *Setting) sourceAsAny() any {
 // IsSource checks whether setting is a source value
 func (s *Setting) IsSource() bool {
 	return s.Type() == SettingTypeSource
+}
+
+// GetNameKey gets name and key of source setting
+func (s *Setting) GetNameKey() (string, string) {
+	if ref := s.GetSecretKeyRef(); ref != nil {
+		return ref.Name, ref.Key
+	}
+	return "", ""
 }
 
 // GetSecretKeyRef gets SecretKeySelector (typically named as SecretKeyRef) or nil
