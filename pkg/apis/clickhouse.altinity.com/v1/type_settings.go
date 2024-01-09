@@ -122,10 +122,35 @@ func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
 	}
 }
 
+// WalkKeysSafe walks over settings with a function. Function receives key and setting.
+func (s *Settings) WalkKeysSafe(f func(key string, setting *Setting)) {
+	if s == nil {
+		return
+	}
+	if s.Len() == 0 {
+		return
+	}
+	// Walk storage keys
+	keys := s.Keys()
+	for _, key := range keys {
+		if s.HasKey(key) {
+			f(key, s.GetKey(key))
+		}
+	}
+}
+
 // Walk walks over settings with a function. Function receives name and setting.
 // Storage key is used internally.
 func (s *Settings) Walk(f func(name string, setting *Setting)) {
 	s.WalkKeys(func(key string, _setting *Setting) {
+		f(s.Key2Name(key), _setting)
+	})
+}
+
+// WalkSafe walks over settings with a function. Function receives name and setting.
+// Storage key is used internally.
+func (s *Settings) WalkSafe(f func(name string, setting *Setting)) {
+	s.WalkKeysSafe(func(key string, _setting *Setting) {
 		f(s.Key2Name(key), _setting)
 	})
 }
@@ -392,20 +417,21 @@ func (s *Settings) GetSection(section SettingsSection, includeSettingWithNoSecti
 
 	s.WalkKeys(func(key string, setting *Setting) {
 		_section, err := getSectionFromPath(key)
-		if (err == nil) && !_section.Equal(section) {
-			// This is not the section we are looking for, skip to the next
+		switch {
+		case (err == nil) && !_section.Equal(section):
+			// Section is specified in this key.
+			// And this is not the section we are looking for, skip to the next
 			return
-		}
-		if (err != nil) && (err != errorNoSectionSpecified) {
+		case (err != nil) && (err != errorNoSectionSpecified):
 			// We have a complex error, skip to the next
 			return
-		}
-		if (err == errorNoSectionSpecified) && !includeSettingWithNoSectionSpecified {
+		case (err == errorNoSectionSpecified) && !includeSettingWithNoSectionSpecified:
+			// Section is not specified in this key.
 			// We are not ready to include setting with unspecified section, skip to the next
 			return
 		}
 
-		// Looks like we are ready to include this setting into result set
+		// Looks like we are ready to include this setting into the result set
 
 		filename, err := getFilenameFromPath(key)
 		if err != nil {
