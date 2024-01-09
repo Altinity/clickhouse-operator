@@ -20,6 +20,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -523,13 +524,18 @@ func (n *Normalizer) normalizeConfiguration(conf *api.Configuration) *api.Config
 		conf = api.NewConfiguration()
 	}
 	conf.Zookeeper = n.normalizeConfigurationZookeeper(conf.Zookeeper)
+	n.normalizeConfigurationSettingsBased(conf)
+	conf.Clusters = n.normalizeClusters(conf.Clusters)
+	return conf
+}
+
+// normalizeConfigurationSettingsBased normalizes Settings-based configuration
+func (n *Normalizer) normalizeConfigurationSettingsBased(conf *api.Configuration) {
 	conf.Users = n.normalizeConfigurationUsers(conf.Users)
 	conf.Profiles = n.normalizeConfigurationProfiles(conf.Profiles)
 	conf.Quotas = n.normalizeConfigurationQuotas(conf.Quotas)
 	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
 	conf.Files = n.normalizeConfigurationFiles(conf.Files)
-	conf.Clusters = n.normalizeClusters(conf.Clusters)
-	return conf
 }
 
 // normalizeTemplates normalizes .spec.templates
@@ -930,47 +936,56 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 	return zk
 }
 
-// substUserSettingsFieldWithSecret substitute users settings field with new setting built from the secret
-func (n *Normalizer) substUserSettingsFieldWithSecret(
-	user *api.SettingsUser,
+type SettingsSubstitution interface {
+	Has(string) bool
+	Get(string) *api.Setting
+	Set(string, *api.Setting) *api.Settings
+	Delete(string)
+}
+
+// substSettingsFieldWithDataFromDataSource substitute settings field with new setting built from the data source
+func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
+	settings SettingsSubstitution,
 	dstField,
 	srcSecretRefField string,
-	newSettingCreator func(secretNamespace, secretName, key string) (*api.Setting, error),
+	parseScalarString bool,
+	newSettingCreator func(api.ObjectAddress) (*api.Setting, error),
 ) bool {
 	// Has to have source field specified
-	if !user.Has(srcSecretRefField) {
+	if !settings.Has(srcSecretRefField) {
 		return false
 	}
 
-	// Anyway remove source field, it should not be included into final ClickHouse config,
-	// because these source fields are synthetic ones (clickhouse does not know them).
-	defer user.Delete(srcSecretRefField)
-
-	// Get value pointed to by the source field
-	secretFieldAddress := user.Get(srcSecretRefField).String()
-	// Fetch k8s address of the field
-	secretNamespace, secretName, key, err := parseSecretFieldAddress(secretFieldAddress)
+	// Fetch data source address from the source setting field
+	secretAddress, err := settings.Get(srcSecretRefField).FetchDataSourceAddress(n.ctx.chi.Namespace, parseScalarString)
 	if err != nil {
-		log.V(1).M(n.ctx.chi).F().
-			Warning("unable to parse secret field address %s as %s/%s/%s", secretFieldAddress, secretNamespace, secretName, key)
+		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
 		return false
 	}
 
-	setting, err := newSettingCreator(secretNamespace, secretName, key)
-	if err != nil {
-		return false
+	// Create setting from the secret with a provided function
+	if newSetting, err := newSettingCreator(secretAddress); err == nil {
+		// Set the new setting as dst.
+		// Replacing src in case src name is the same as dst name.
+		settings.Set(dstField, newSetting)
 	}
 
-	// Set value as dst
-	user.Set(dstField, setting)
+	// In case we are NOT replacing the same field with its new value, then remove the source field.
+	// Typically non-replaced source field is not expected to be included into the final ClickHouse config,
+	// mainly because very often these source fields are synthetic ones (clickhouse does not know them).
+	if dstField != srcSecretRefField {
+		settings.Delete(srcSecretRefField)
+	}
+
+	// All is done
 	return true
 }
 
-// substWithSecretFieldValue substitute users settings field with value from k8s secret
-func (n *Normalizer) substWithSecretFieldValue(user *api.SettingsUser, dstField, srcSecretRefField string) bool {
-	return n.substUserSettingsFieldWithSecret(user, dstField, srcSecretRefField,
-		func(secretNamespace, secretName, key string) (*api.Setting, error) {
-			secretFieldValue, err := n.fetchSecretFieldValue(secretNamespace, secretName, key)
+// substWithSecretFieldValue substitute users settings field with the value read from k8s secret
+func (n *Normalizer) substWithSecretFieldValue(settings SettingsSubstitution, dstField, srcSecretRefField string) bool {
+	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, true,
+		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+			secretFieldValue, err := n.fetchSecretFieldValue(secretAddress)
 			if err != nil {
 				return nil, err
 			}
@@ -979,21 +994,25 @@ func (n *Normalizer) substWithSecretFieldValue(user *api.SettingsUser, dstField,
 		})
 }
 
-// substWithEnvRefToSecretField substitute users settings field with value from k8s secret stored in ENV var
-func (n *Normalizer) substWithEnvRefToSecretField(user *api.SettingsUser, dstField, srcSecretRefField string) bool {
-	return n.substUserSettingsFieldWithSecret(user, dstField, srcSecretRefField,
-		func(secretNamespace, secretName, key string) (*api.Setting, error) {
+// substWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
+func (n *Normalizer) substWithEnvRefToSecretField(
+	settings SettingsSubstitution,
+	dstField, srcSecretRefField, envVarNamePrefix string,
+	parseScalarString bool,
+) bool {
+	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, parseScalarString,
+		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			// ENV VAR name and value
-			envVarName := user.Username() + "_" + dstField
-			n.appendEnvVar(
+			envVarName := envVarNamePrefix + "_" + dstField
+			n.appendAdditionalEnvVar(
 				core.EnvVar{
 					Name: envVarName,
 					ValueFrom: &core.EnvVarSource{
 						SecretKeyRef: &core.SecretKeySelector{
 							LocalObjectReference: core.LocalObjectReference{
-								Name: secretName,
+								Name: secretAddress.Name,
 							},
-							Key: key,
+							Key: secretAddress.Key,
 						},
 					},
 				},
@@ -1013,7 +1032,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 	case api.ClusterSecretSourceSecretRef:
 		// Secret has explicit SecretKeyRef
 		// Set the password for internode communication using an ENV VAR
-		n.appendEnvVar(
+		n.appendAdditionalEnvVar(
 			core.EnvVar{
 				Name: internodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -1024,7 +1043,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 	case api.ClusterSecretSourceAuto:
 		// Secret is auto-generated
 		// Set the password for internode communication using an ENV VAR
-		n.appendEnvVar(
+		n.appendAdditionalEnvVar(
 			core.EnvVar{
 				Name: internodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -1035,85 +1054,78 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 	}
 }
 
-func (n *Normalizer) appendEnvVar(envVar core.EnvVar) {
+func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
 	// Sanity check
 	if envVar.Name == "" {
 		return
 	}
 
-	for _, existingEnvVar := range n.ctx.chi.Attributes.ExchangeEnv {
+	for _, existingEnvVar := range n.ctx.chi.Attributes.AdditionalEnvVars {
 		if existingEnvVar.Name == envVar.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Attributes.ExchangeEnv = append(n.ctx.chi.Attributes.ExchangeEnv, envVar)
+	n.ctx.chi.Attributes.AdditionalEnvVars = append(n.ctx.chi.Attributes.AdditionalEnvVars, envVar)
 }
 
-var (
-	// ErrSecretFieldNotFound specifies error when secret key is not found
-	ErrSecretFieldNotFound = fmt.Errorf("not found")
-)
-
-// parseSecretFieldAddress parses address into namespace, name, key triple
-func parseSecretFieldAddress(secretFieldAddress string) (string, string, string, error) {
-	// Sanity check. In case secretFieldAddress not specified nothing to do here
-	if secretFieldAddress == "" {
-		return "", "", "", ErrSecretFieldNotFound
-	}
-
-	// Extract secret's namespace and name and then field name within the secret,
-	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted in the settings
-	var namespace, name, key string
-	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
-	case 2:
-		// Assume namespace is omitted. Expect to have name/key pair
-		namespace = chop.Config().Runtime.Namespace
-		name = tags[0]
-		key = tags[1]
-	case 3:
-		// All components are in place. Expect to have namespace/name/key triple
-		namespace = tags[0]
-		name = tags[1]
-		key = tags[2]
-	default:
-		// Skip incorrect entry
-		log.V(1).Warning("unable to parse secret field address: '%s:%s'", secretFieldAddress)
-		return "", "", "", ErrSecretFieldNotFound
-	}
-
+func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
 	// Sanity check
-	if (namespace == "") || (name == "") || (key == "") {
-		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s:%s'", secretFieldAddress)
-		return "", "", "", ErrSecretFieldNotFound
+	if volume.Name == "" {
+		return
 	}
 
-	return namespace, name, key, nil
+	for _, existingVolume := range n.ctx.chi.Attributes.AdditionalVolumes {
+		if existingVolume.Name == volume.Name {
+			// Such a variable already exists
+			return
+		}
+	}
+
+	n.ctx.chi.Attributes.AdditionalVolumes = append(n.ctx.chi.Attributes.AdditionalVolumes, volume)
 }
+
+func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
+	// Sanity check
+	if volumeMount.Name == "" {
+		return
+	}
+
+	for _, existingVolumeMount := range n.ctx.chi.Attributes.AdditionalVolumeMounts {
+		if existingVolumeMount.Name == volumeMount.Name {
+			// Such a variable already exists
+			return
+		}
+	}
+
+	n.ctx.chi.Attributes.AdditionalVolumeMounts = append(n.ctx.chi.Attributes.AdditionalVolumeMounts, volumeMount)
+}
+
+var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
 
 // fetchSecretFieldValue fetches the value of the specified field in the specified secret
 // TODO this is the only useage of k8s API in the normalizer. How to remove it?
-func (n *Normalizer) fetchSecretFieldValue(namespace, name, key string) (string, error) {
+func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (string, error) {
 
 	// Fetch the secret
-	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+	secret, err := n.kubeClient.CoreV1().Secrets(secretAddress.Namespace).Get(context.TODO(), secretAddress.Name, controller.NewGetOptions())
 	if err != nil {
-		log.V(1).M(namespace, name).F().Info("unable to read secret %v", err)
-		return "", ErrSecretFieldNotFound
+		log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().Info("unable to read secret %s %v", secretAddress, err)
+		return "", ErrSecretValueNotFound
 	}
 
 	// Find the field within the secret
 	for k, value := range secret.Data {
-		if key == k {
+		if secretAddress.Key == k {
 			return string(value), nil
 		}
 	}
 
-	log.V(1).M(namespace, name).F().
-		Warning("unable to locate secret data by namespace/name/key: %s/%s/%s", namespace, name, key)
+	log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().
+		Warning("unable to locate secret data by namespace/name/key: %s", secretAddress)
 
-	return "", ErrSecretFieldNotFound
+	return "", ErrSecretValueNotFound
 }
 
 // normalizeUsersList extracts usernames from provided 'users' settings and adds some extra usernames
@@ -1140,7 +1152,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 	// Add special "chop" user to the list of users, which is used/required for:
 	// 1. Operator to communicate with hosts
 	usernames := n.normalizeUsersList(
-		// Original users list
+		// user-based settings contains non-explicit users list in it
 		users,
 		// Add default user which always exists
 		defaultUsername,
@@ -1169,6 +1181,18 @@ func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
 }
 
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
+	i := 1
+	user.WalkSafe(func(name string, setting *api.Setting) {
+		if strings.HasPrefix(name, "k8s_secret_") {
+			// TODO remove as obsoleted
+			// Skip this user field, it will be processed later
+		} else {
+			envVarNamePrefix := fmt.Sprintf("USER_VAR_%d", i)
+			n.substWithEnvRefToSecretField(user, name, name, envVarNamePrefix, false)
+			i = i + 1
+		}
+	})
+
 	n.normalizeConfigurationUserEnsureMandatoryFields(user)
 	n.normalizeConfigurationUserPassword(user)
 }
@@ -1245,9 +1269,9 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 	n.substWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
 	// Values from the secret passed via ENV have even higher priority
-	n.substWithEnvRefToSecretField(user, "password", "k8s_secret_env_password")
-	n.substWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
-	n.substWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
+	n.substWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", user.Username(), true)
+	n.substWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", user.Username(), true)
+	n.substWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", user.Username(), true)
 
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 	if user.Has("password_double_sha1_hex") {
@@ -1296,7 +1320,8 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 		}
 	}
 
-	// NB "default" user may keep empty password in here.
+	// It may come that plaintext password is still empty.
+	// For example, "default" quite often has empty password.
 	if passwordPlaintext == "" {
 		// This is fine
 		// This is all for this user
@@ -1349,7 +1374,50 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 		return nil
 	}
 	files.Normalize()
+
+	files.WalkSafe(func(key string, setting *api.Setting) {
+		n.substWithMount(files, key)
+	})
+
 	return files
+}
+
+func (n *Normalizer) substWithMount(settings *api.Settings, srcSecretRefField string) bool {
+	var defaultMode int32 = 0644
+	return n.substSettingsFieldWithDataFromDataSource(settings, "", srcSecretRefField, false,
+		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
+			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
+			filename := secretAddress.Key
+
+			if !ok1 || !ok2 {
+				return nil, fmt.Errorf("unable to build k8s object name")
+			}
+
+			n.appendAdditionalVolume(core.Volume{
+				Name: volumeName,
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: secretAddress.Name,
+						Items: []core.KeyToPath{
+							{
+								Key:  secretAddress.Key,
+								Path: filename,
+							},
+						},
+						DefaultMode: &defaultMode,
+					},
+				},
+			})
+			n.appendAdditionalVolumeMount(core.VolumeMount{
+				Name:      volumeMountName,
+				ReadOnly:  true,
+				MountPath: filepath.Join(dirPathSecretFilesConfig, filename),
+				SubPath:   filename,
+			})
+
+			return nil, fmt.Errorf("no need to create a new setting")
+		})
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
