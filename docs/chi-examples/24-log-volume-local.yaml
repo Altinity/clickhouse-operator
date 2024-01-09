@@ -1,0 +1,61 @@
+---
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: "log-volume-local"
+spec:
+  troubleshoot: "yes"
+  configuration:
+    files:
+      config.d/log_rotation.xml: |-
+        <clickhouse>
+            <logger>
+                <level>trace</level>
+                <log>/var/log/clickhouse-server/clickhouse-server.log</log>
+                <errorlog>/var/log/clickhouse-server/clickhouse-server.err.log</errorlog>
+                <size>1000M</size>
+                <count>5</count>
+                <console>1</console>
+            </logger>
+        </clickhouse>
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 1
+        templates:
+          podTemplate: log-volume-local
+          dataVolumeClaimTemplate: data-volume
+
+  templates:
+    podTemplates:
+      - name: log-volume-local
+        spec:
+#          securityContext:
+#            runAsUser: 101
+#            runAsGroup: 101
+#            fsGroup: 101
+          containers:
+            - name: clickhouse
+              command:
+                - /bin/sh
+                - -c
+                - chown clickhouse:clickhouse /var/log/clickhouse-server && /entrypoint.sh
+              image: clickhouse/clickhouse-server:latest
+              volumeMounts:
+                - name: log-volume-local
+                  mountPath: /var/log/clickhouse-server
+                - name: data-volume
+                  mountPath: /var/lib/clickhouse
+          volumes:
+            - name: log-volume-local
+              hostPath:
+                path: /var/log/clickhouse-server
+                type: DirectoryOrCreate
+
+    volumeClaimTemplates:
+      - name: data-volume
+        spec:
+          accessModes: [ "ReadWriteOnce" ]
+          resources:
+            requests:
+              storage: 10Gi
