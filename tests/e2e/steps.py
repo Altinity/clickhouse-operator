@@ -113,7 +113,7 @@ def set_settings(self):
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-22.8.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.3.yaml"
     # self.context.clickhouse_template = "manifests/chit/tpl-clickhouse-23.8.yaml"
-    self.context.clickhouse_template = define("clickhouse_template", "manifests/chit/tpl-clickhouse-23.8.yaml")
+    self.context.clickhouse_template = define("clickhouse_template",  os.getenv("CLICKHOUSE_TEMPLATE") if "CLICKHOUSE_TEMPLATE" in os.environ else "manifests/chit/tpl-clickhouse-stable.yaml")
     self.context.clickhouse_template_old = define("clickhouse_template_old", "manifests/chit/tpl-clickhouse-23.3.yaml")
 
     self.context.clickhouse_version = define("clickhouse_version", get_ch_version(test_file=self.context.clickhouse_template))
