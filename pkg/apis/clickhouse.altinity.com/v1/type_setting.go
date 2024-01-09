@@ -227,3 +227,59 @@ func (s *Setting) CastToVector() *Setting {
 	}
 	return s
 }
+
+var ErrDataSourceAddressHasIncorrectFormat = fmt.Errorf("data source address has incorrect format")
+
+// FetchDataSourceAddress fetches data source address from the setting.
+// defaultNamespace specifies default namespace to be used in case there is no namespace specified in data source address.
+func (s *Setting) FetchDataSourceAddress(defaultNamespace string, parseScalarString bool) (ObjectAddress, error) {
+	switch s.Type() {
+	case SettingTypeScalar:
+		if parseScalarString {
+			// Fetch k8s address of the field from the string
+			return s.parseDataSourceAddress(s.String(), defaultNamespace)
+		}
+	case SettingTypeSource:
+		// Fetch k8s address of the field from the source ref
+		name, key := s.GetNameKey()
+		return ObjectAddress{
+			Namespace: defaultNamespace,
+			Name:      name,
+			Key:       key,
+		}, nil
+	}
+
+	return ObjectAddress{}, fmt.Errorf("%w - unknown setting type", ErrDataSourceAddressHasIncorrectFormat)
+}
+
+// parseDataSourceAddress parses address into namespace, name, key triple
+func (s *Setting) parseDataSourceAddress(dataSourceAddress, defaultNamespace string) (addr ObjectAddress, err error) {
+	// Extract data source's namespace and name and then field name within the data source,
+	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted though
+	switch tags := strings.Split(dataSourceAddress, "/"); len(tags) {
+	case 3:
+		// All components are in place. Expect to have namespace/name/key triple
+		addr.Namespace = tags[0]
+		addr.Name = tags[1]
+		addr.Key = tags[2]
+	case 2:
+		// Assume namespace is omitted. Expect to have name/key pair
+		addr.Namespace = defaultNamespace
+		addr.Name = tags[0]
+		addr.Key = tags[1]
+	default:
+		// Skip incorrect entry
+		return ObjectAddress{}, fmt.Errorf("%w, dataSourceAddress: %s", ErrDataSourceAddressHasIncorrectFormat, dataSourceAddress)
+	}
+
+	// Sanity check for all address components being in place
+	if addr.AnyEmpty() {
+		return ObjectAddress{}, fmt.Errorf(
+			"%w, %s/%s/%s",
+			ErrDataSourceAddressHasIncorrectFormat,
+			addr.Namespace, addr.Name, addr.Key,
+		)
+	}
+
+	return addr, nil
+}
