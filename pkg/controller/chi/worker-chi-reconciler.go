@@ -842,12 +842,12 @@ func (w *worker) reconcileService(ctx context.Context, chi *api.ClickHouseInstal
 	curService, err := w.c.getService(service)
 
 	if curService != nil {
-		// We have Service - try to update it
+		// We have the Service - try to update it
 		err = w.updateService(ctx, chi, curService, service)
 	}
 
 	if err != nil {
-		// Service not found or not updated. Try to recreate
+		// The Service is either not found or not updated. Try to recreate it
 		_ = w.c.deleteServiceIfExists(ctx, service.Namespace, service.Name)
 		err = w.createService(ctx, chi, service)
 	}
