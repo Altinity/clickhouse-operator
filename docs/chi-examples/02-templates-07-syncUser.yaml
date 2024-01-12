@@ -1,0 +1,52 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "sync-users"
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse
+      dataVolumeClaimTemplate: data-pvc-template
+  configuration:
+    files:
+      config.d/replicated_user_directories.xml: |
+        <clickhouse>
+           <user_directories replace="replace">
+             <users_xml>
+               <path>users.xml</path>
+             </users_xml>
+             <replicated>
+               <zookeeper_path>/clickhouse/access</zookeeper_path>
+             </replicated>
+           </user_directories>
+        </clickhouse>
+    # deploy zookeeper separatelly, look examples in https://github.com/Altinity/clickhouse-operator/blob/master/deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node.yaml
+    zookeeper:
+      nodes:
+        - host: zookeeper.zoo1ns
+    clusters:
+      - name: "shard1-repl2"
+        layout:
+          shardsCount: 1
+          replicasCount: 2
+  templates:
+    podTemplates:
+      - name: clickhouse
+        spec:
+          nodeSelector:
+            ckop: my
+          containers:
+            - name: clickhouse
+              image: clickhouse-server:22.10.3.27
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - mountPath: /var/lib/clickhouse
+                  name: local-pvc-my
+    volumeClaimTemplates:
+      - name: data-pvc-template
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage:
