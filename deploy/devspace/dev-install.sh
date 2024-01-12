@@ -60,7 +60,8 @@ case "${DEPLOY_OPERATOR}" in
             MANIFEST_PRINT_CRD="no"                                                    \
             MANIFEST_PRINT_RBAC_CLUSTERED="no"                                         \
             MANIFEST_PRINT_RBAC_NAMESPACED="no"                                        \
-        "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh"             \
+            \
+            "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh"         \
         )
         ;;
     *)
