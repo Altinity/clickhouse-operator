@@ -6,7 +6,7 @@ spec:
   defaults:
     templates:
       podTemplate: clickhouse
-      dataVolumeClaimTemplate: localpvc-storage
+      dataVolumeClaimTemplate: data-pvc-template
   configuration:
     files:
       config.d/replicated_user_directories.xml: |
@@ -20,6 +20,7 @@ spec:
              </replicated>
            </user_directories>
         </clickhouse>
+    # deploy zookeeper separatelly, look examples in https://github.com/Altinity/clickhouse-operator/blob/master/deploy/zookeeper/quick-start-persistent-volume/zookeeper-1-node.yaml
     zookeeper:
       nodes:
         - host: zookeeper.zoo1ns
@@ -42,11 +43,10 @@ spec:
                 - mountPath: /var/lib/clickhouse
                   name: local-pvc-my
     volumeClaimTemplates:
-      - name: local-pvc-my
+      - name: data-pvc-template
         spec:
-          storageClassName: my-localpv
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 5Gi
+              storage:
