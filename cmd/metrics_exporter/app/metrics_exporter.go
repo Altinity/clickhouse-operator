@@ -33,7 +33,7 @@ import (
 // Prometheus exporter defaults
 const (
 	defaultMetricsEndpoint = ":8888"
-	defaultChiListEP       = ":8888"
+	defaultChiListEndPoint = ":8888"
 
 	metricsPath = "/metrics"
 	chiListPath = "/chi"
@@ -65,7 +65,7 @@ func init() {
 	flag.StringVar(&kubeConfigFile, "kubeconfig", "", "Path to custom kubernetes config file. Makes sense if runs outside of the cluster only.")
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
 	flag.StringVar(&metricsEP, "metrics-endpoint", defaultMetricsEndpoint, "The Prometheus exporter endpoint.")
-	flag.StringVar(&chiListEP, "chi-list-endpoint", defaultChiListEP, "The CHI list endpoint.")
+	flag.StringVar(&chiListEP, "chi-list-endpoint", defaultChiListEndPoint, "The CHI list endpoint.")
 	flag.Parse()
 }
 
