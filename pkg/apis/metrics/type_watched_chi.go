@@ -21,9 +21,11 @@ import (
 
 // WatchedCHI specifies watched ClickHouseInstallation
 type WatchedCHI struct {
-	Namespace string            `json:"namespace"`
-	Name      string            `json:"name"`
-	Clusters  []*WatchedCluster `json:"clusters"`
+	Namespace   string            `json:"namespace"`
+	Name        string            `json:"name"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	Clusters    []*WatchedCluster `json:"clusters"`
 }
 
 // WatchedCluster specifies watched cluster
@@ -55,6 +57,8 @@ func (chi *WatchedCHI) readFrom(c *v1.ClickHouseInstallation) {
 	}
 	chi.Namespace = c.Namespace
 	chi.Name = c.Name
+	chi.Labels = c.Labels
+	chi.Annotations = c.Annotations
 
 	c.WalkClusters(func(cl *v1.Cluster) error {
 		cluster := &WatchedCluster{}
