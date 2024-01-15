@@ -81,7 +81,7 @@ func (cm *ConfigManager) Init() error {
 	cm.runtimeParams = cm.getEnvVarParams()
 	cm.logEnvVarParams()
 
-	// Get initial config from file
+	// Get initial config from the file
 	cm.fileConfig, err = cm.getFileBasedConfig(cm.initConfigFilePath)
 	if err != nil {
 		return err
@@ -294,7 +294,7 @@ func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 	}
 }
 
-// getEnvVarParams returns map[string]string of ENV VARS with some runtime parameters
+// getEnvVarParams returns base set of runtime parameters filled by ENV vars
 func (cm *ConfigManager) getEnvVarParams() map[string]string {
 	params := make(map[string]string)
 	// Extract parameters from ENV VARS
