@@ -274,8 +274,8 @@ func (cm *ConfigManager) buildDefaultConfig() (*chiv1.OperatorConfig, error) {
 	return config, nil
 }
 
-// getEnvVarParamNames return list of ENV VARS parameter names
-func (cm *ConfigManager) getEnvVarParamNames() []string {
+// listSupportedEnvVarNames return list of ENV vars that the operator supports
+func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	return []string{
 		chiv1.OPERATOR_POD_NODE_NAME,
@@ -298,7 +298,7 @@ func (cm *ConfigManager) getEnvVarParamNames() []string {
 func (cm *ConfigManager) getEnvVarParams() map[string]string {
 	params := make(map[string]string)
 	// Extract parameters from ENV VARS
-	for _, varName := range cm.getEnvVarParamNames() {
+	for _, varName := range cm.listSupportedEnvVarNames() {
 		params[varName] = os.Getenv(varName)
 	}
 
