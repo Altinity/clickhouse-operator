@@ -15,19 +15,14 @@
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
 )
 
 // ClusterSecret defines the shared secret for nodes to authenticate each other with
 type ClusterSecret struct {
-	Auto      *StringBool          `json:"auto,omitempty"      yaml:"auto,omitempty"`
-	Value     string               `json:"value,omitempty"     yaml:"value,omitempty"`
-	ValueFrom *ClusterSecretSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
-}
-
-// ClusterSecretSource mirrors k8s SecretSource type
-type ClusterSecretSource struct {
-	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty" yaml:"secretKeyRef,omitempty"`
+	Auto      *StringBool `json:"auto,omitempty"      yaml:"auto,omitempty"`
+	Value     string      `json:"value,omitempty"     yaml:"value,omitempty"`
+	ValueFrom *DataSource `json:"valueFrom,omitempty" yaml:"valueFrom,omitempty"`
 }
 
 // ClusterSecretSourceName specifies name of the source where secret is provided
@@ -76,7 +71,7 @@ func (s *ClusterSecret) HasValue() bool {
 }
 
 // GetSecretKeyRef gets SecretKeySelector (typically named as SecretKeyRef) or nil
-func (s *ClusterSecret) GetSecretKeyRef() *corev1.SecretKeySelector {
+func (s *ClusterSecret) GetSecretKeyRef() *core.SecretKeySelector {
 	if s == nil {
 		return nil
 	}
@@ -92,9 +87,9 @@ func (s *ClusterSecret) HasSecretKeyRef() bool {
 }
 
 // GetAutoSecretKeyRef gets SecretKeySelector (typically named as SecretKeyRef) of an auto-generated secret or nil
-func (s *ClusterSecret) GetAutoSecretKeyRef(name string) *corev1.SecretKeySelector {
-	return &corev1.SecretKeySelector{
-		LocalObjectReference: corev1.LocalObjectReference{
+func (s *ClusterSecret) GetAutoSecretKeyRef(name string) *core.SecretKeySelector {
+	return &core.SecretKeySelector{
+		LocalObjectReference: core.LocalObjectReference{
 			Name: name,
 		},
 		Key: "secret",

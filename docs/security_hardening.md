@@ -89,22 +89,34 @@ spec:
     - name: clickhouse-version
   configuration:
     users:
-      user1/password: pwduser1          # This will be hashed in ClickHouse config files, but this NOT RECOMMENDED
+      user1/password: pwduser1  # This will be hashed in ClickHouse config files, but this NOT RECOMMENDED
       user2/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
       user3/password_double_sha1_hex: cbe205a7351dd15397bf423957559512bd4be395
 ```
 
 ### Using secrets
 
-The operator provides a special syntax to read passwords and password hashes from a secret as follows:
+The operator supports syntax to read passwords and password hashes from a secret as follows:
 
 ```yaml
 spec:
   configuration:
     users:
-      user1/k8s_secret_password: clickhouse-secret/pwduser1
-      user2/k8s_secret_password_sha256_hex: clickhouse-secret/pwduser2
-      user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser1
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser2          
+      user3/password_double_sha1_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser3                
 ```
 
 The following example refers to the secret:
@@ -122,9 +134,16 @@ stringData:
 
 ```
 
-**Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration.
-The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed.
-This approach requires recreating the ClickHouse podTemplates when adding new users. It can be configured as follows:
+**DEPRECATED**: Since version 0.23 the syntax to read passwords and password hashes from a secret using special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes is deprecated:
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/k8s_secret_password: clickhouse-secret/pwduser1
+      user2/k8s_secret_password_sha256_hex: clickhouse-secret/pwduser2
+      user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
+```
 
 ```yaml
 spec:

@@ -373,12 +373,10 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
 func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *apiChi.Settings {
-	if settings == nil {
-		settings = apiChi.NewSettings()
-	}
-	settings = settings.MergeFrom(defaultKeeperSettings(n.ctx.chk.Spec.GetPath()))
-	settings.Normalize()
-	return settings
+	return settings.
+		Ensure().
+		MergeFrom(defaultKeeperSettings(n.ctx.chk.Spec.GetPath())).
+		Normalize()
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster

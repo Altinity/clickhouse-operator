@@ -508,10 +508,10 @@ func (t *ChkTemplates) GetServiceTemplates() []apiChi.ChiServiceTemplate {
 func (spec *ChkSpec) GetPath() string {
 	switch {
 	case spec.GetConfiguration().GetSettings().Has("keeper_server/storage_path"):
-		return spec.GetConfiguration().GetSettings().Get("keeper_server/storage_path").ScalarString()
+		return spec.GetConfiguration().GetSettings().Get("keeper_server/storage_path").String()
 
 	case spec.GetConfiguration().GetSettings().Has("keeper_server/path"):
-		return spec.GetConfiguration().GetSettings().Get("keeper_server/path").ScalarString()
+		return spec.GetConfiguration().GetSettings().Get("keeper_server/path").String()
 
 	default:
 		return "/var/lib/clickhouse_keeper"

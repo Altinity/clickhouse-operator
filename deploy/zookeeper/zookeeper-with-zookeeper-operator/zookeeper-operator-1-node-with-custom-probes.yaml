@@ -453,7 +453,7 @@ spec:
             fieldRef:
               apiVersion: v1
               fieldPath: metadata.annotations['sidecar.istio.io/status']
-      image: docker.io/zookeeper:3.8.1
+      image: docker.io/zookeeper:3.8.3
       imagePullPolicy: Always
       lifecycle:
         preStop:

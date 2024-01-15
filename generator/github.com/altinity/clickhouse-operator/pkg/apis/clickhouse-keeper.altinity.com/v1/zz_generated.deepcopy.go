@@ -69,21 +69,7 @@ func (in *ChkConfiguration) DeepCopyInto(out *ChkConfiguration) {
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
 		*out = new(clickhousealtinitycomv1.Settings)
-		if **in != nil {
-			in, out := *in, *out
-			*out = make(map[string]*clickhousealtinitycomv1.Setting, len(*in))
-			for key, val := range *in {
-				var outVal *clickhousealtinitycomv1.Setting
-				if val == nil {
-					(*out)[key] = nil
-				} else {
-					in, out := &val, &outVal
-					*out = new(clickhousealtinitycomv1.Setting)
-					(*in).DeepCopyInto(*out)
-				}
-				(*out)[key] = outVal
-			}
-		}
+		(*in).DeepCopyInto(*out)
 	}
 	if in.Clusters != nil {
 		in, out := &in.Clusters, &out.Clusters

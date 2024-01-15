@@ -128,7 +128,8 @@ def rescale_zk_and_clickhouse(
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f"manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml",
-        chi_template_file="manifests/chit/tpl-clickhouse-latest.yaml",
+        #
+        chi_template_file="manifests/chit/tpl-clickhouse-stable.yaml",
         chi_name="test-cluster-for-zk",
         keeper_manifest=keeper_manifest,
         keeper_type=keeper_type,

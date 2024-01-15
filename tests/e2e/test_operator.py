@@ -255,7 +255,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         shell=shell_1
     )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -311,7 +311,9 @@ def check_operator_restart(chi, wait_objects, pod, shell=None):
     with When("Restart operator"):
         util.restart_operator(shell=shell)
         time.sleep(15)
+        print(f"wait objects")
         kubectl.wait_objects(chi, wait_objects, shell=shell)
+        print(f"wait chi status")
         kubectl.wait_chi_status(chi, "Completed", shell=shell)
         new_start_time = kubectl.get_field("pod", pod, ".status.startTime", shell=shell)
 
@@ -375,7 +377,7 @@ def test_operator_restart(self, manifest, service, version=None):
         shell=shell_1
     )
 
-    Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True,)(
+    Check("insert into distributed table until receive stop event", test=run_insert_query, parallel=True)(
         host=service,
         user="test_008",
         password="test_008",
@@ -384,7 +386,7 @@ def test_operator_restart(self, manifest, service, version=None):
         shell=shell_2
     )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -393,7 +395,11 @@ def test_operator_restart(self, manifest, service, version=None):
 
     check_operator_restart(
         chi=chi,
-        wait_objects={"statefulset": 2, "pod": 2, "service": 3},
+        wait_objects={
+            "statefulset": 2,
+            "pod": 2,
+            "service": 3,
+        },
         pod=f"chi-{chi}-{cluster}-0-0-0",
         shell=shell_4
     )
@@ -535,7 +541,7 @@ def test_008_3(self):
         shell_1 = get_shell()
         shell_2 = get_shell()
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         shards=2,
         trigger_event=trigger_event,
@@ -559,7 +565,7 @@ def test_008_3(self):
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.22.0", version_to=None):
+def test_009_1(self, version_from="0.22.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -581,7 +587,7 @@ def test_009_1(self, version_from="0.22.0", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.22.0", version_to=None):
+def test_009_2(self, version_from="0.22.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -897,6 +903,10 @@ def test_011_3(self):
 
         with And("Connection to localhost should succeed with user4"):
             out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user4", pwd="pwduser4")
+            assert out == "OK"
+
+        with And("Connection to localhost should succeed with user5"):
+            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user5", pwd="pwduser5")
             assert out == "OK"
 
         kubectl.delete_chi("test-011-secrets")
@@ -1266,7 +1276,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
                         pwd=pwd,
                     )
                     if shards == str(num_shards):
-                        break;
+                        break
                     with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                         time.sleep(i * 5)
                 assert shards == str(num_shards)
@@ -1486,7 +1496,7 @@ def test_014_0(self):
         with Then(
             f"try insert into the table while {self.context.keeper_type} offline table should be in readonly mode"
         ):
-            out = clickhouse.query_with_error(chi_name, "INSERT INTO test_local_014 VALUES(2)")
+            out = clickhouse.query_with_error(chi_name, "SET insert_keeper_max_retries=0; INSERT INTO test_local_014 VALUES(2)")
             assert "Table is in readonly mode" in out
 
         with Then(f"Wait for {self.context.keeper_type} pod to come back"):
@@ -1722,7 +1732,7 @@ def test_016(self):
     with And("query_log should be disabled"):
         clickhouse.query(chi, sql="system flush logs")
         out = clickhouse.query_with_error(chi, sql="select count() from system.query_log")
-        assert "doesn't exist" in out
+        assert "doesn't exist" in out or "does not exist" in out
 
     with And("max_memory_usage should be 7000000000"):
         out = clickhouse.query(chi, sql="select value from system.settings where name='max_memory_usage'")
@@ -2859,7 +2869,7 @@ def test_028(self):
         cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/restart","value":"RollingUpdate"}}]\''
         kubectl.launch(cmd)
         with Then("Operator should let the query to finish"):
-            out = clickhouse.query_with_error(chi, "select count(sleepEachRow(1)) from numbers(30)")
+            out = clickhouse.query_with_error(chi, "SELECT count(sleepEachRow(1)) FROM numbers(30) SETTINGS function_sleep_max_microseconds_per_block=0")
             assert out == "30"
 
         pod_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
@@ -3018,7 +3028,7 @@ def test_030(self):
         shell_2 = get_shell()
 
     trigger_event = threading.Event()
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         cluster="default",
         shards=2,
@@ -3270,7 +3280,7 @@ def test_032(self):
         shell=shell_1
     )
 
-    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True,)(
+    Check("Check that cluster definition does not change during restart", test=check_remote_servers, parallel=True)(
         chi=chi,
         cluster="default",
         shards=2,
@@ -4198,7 +4208,7 @@ def test_045(self, manifest):
     with Then("operator SHALL not wait for the query to finish"):
         out = clickhouse.query_with_error(
             chi_name=chi,
-            sql=f"select count(sleepEachRow(1)) from numbers({counter})",
+            sql=f"SELECT count(sleepEachRow(1)) FROM numbers({counter}) SETTINGS function_sleep_max_microseconds_per_block=0",
             timeout=120)
         assert out != counter, error()
 
@@ -4233,6 +4243,77 @@ def test_045_2(self):
         util.apply_operator_config("manifests/chopconf/test-045-chopconf.yaml")
 
     test_045(manifest=f"manifests/chi/test-045-2-wait-query-finish.yaml")
+
+
+@TestScenario
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Weight("1.0"))
+@Name("test_047. Zero weighted shard")
+def test_047(self):
+    """Check that clickhouse-operator supports specifying shard weight as 0 and
+    check that data not inserted into zero-weighted shard in distributed table."""
+
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type=self.context.keeper_type)
+    manifest = f"manifests/chi/test-047-zero-weighted-shard.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "default"
+    with Given("CHI with 2 shards is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                },
+            )
+    numbers = 100
+    with When("I create distributed table"):
+        create_table = """
+            CREATE TABLE test_local_047 ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace(
+            "\r", ""
+        ).replace(
+            "\n", ""
+        )
+        clickhouse.query(chi, create_table)
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_distr_047 ON CLUSTER 'default' AS test_local_047 "
+            "Engine = Distributed('default', default, test_local_047, a%2)",
+        )
+
+    with And("I insert data in the distributed table"):
+        clickhouse.query(chi, f"INSERT INTO test_distr_047 select * from numbers({numbers})")
+
+    with Then("I check only non-zero weighted shard contains data"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_047", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == "0"
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_047", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers}"
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_047", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers}"
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_047", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers}"
+
+    with Then("I check weight is specified in /etc/clickhouse-server/config.d/chop-generated-remote_servers.xml file"):
+        r = kubectl.launch(
+            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
+            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 7 | tail -n 1'"""
+        )
+        assert "<weight>0</weight>" in r
+        r = kubectl.launch(
+            f"""exec chi-{chi}-default-0-0-0 -- bash -c 'cat """
+            f"""/etc/clickhouse-server/config.d/chop-generated-remote_servers.xml | head -n 16 | tail -n 1'"""
+            )
+        assert "<weight>1</weight>" in r
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestModule

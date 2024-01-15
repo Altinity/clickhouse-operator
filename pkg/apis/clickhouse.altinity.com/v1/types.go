@@ -49,8 +49,10 @@ type ClickHouseInstallation struct {
 
 // ComparableAttributes specifies CHI attributes that are comparable
 type ComparableAttributes struct {
-	ExchangeEnv  []core.EnvVar `json:"-" yaml:"-"`
-	SkipOwnerRef bool          `json:"-" yaml:"-"`
+	AdditionalEnvVars      []core.EnvVar      `json:"-" yaml:"-"`
+	AdditionalVolumes      []core.Volume      `json:"-" yaml:"-"`
+	AdditionalVolumeMounts []core.VolumeMount `json:"-" yaml:"-"`
+	SkipOwnerRef           bool               `json:"-" yaml:"-"`
 }
 
 // +genclient

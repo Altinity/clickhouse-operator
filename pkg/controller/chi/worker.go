@@ -1313,14 +1313,18 @@ func (w *worker) updateService(
 	ctx context.Context,
 	chi *api.ClickHouseInstallation,
 	curService *core.Service,
-	newService1 *core.Service,
+	targetService *core.Service,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	newService := newService1.DeepCopy()
+	newService := targetService.DeepCopy()
+
+	if curService.Spec.Type != newService.Spec.Type {
+		return fmt.Errorf("just recreate the service in case of service type change")
+	}
 
 	// Updating a Service is a complicated business
 
@@ -1396,10 +1400,6 @@ func (w *worker) updateService(
 	// And only now we are ready to actually update the service with new version of the service
 	//
 
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
 	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(ctx, newService, controller.NewUpdateOptions())
 	if err == nil {
 		w.a.V(1).

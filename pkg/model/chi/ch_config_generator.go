@@ -75,19 +75,20 @@ func (c *ClickHouseConfigGenerator) GetSettings(host *api.ChiHost) string {
 	return c.generateXMLConfig(host.Settings, "")
 }
 
-// GetFiles creates data for custom common config files
-func (c *ClickHouseConfigGenerator) GetFiles(section api.SettingsSection, includeUnspecified bool, host *api.ChiHost) map[string]string {
+// GetSectionFromFiles creates data for custom common config files
+func (c *ClickHouseConfigGenerator) GetSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.ChiHost) map[string]string {
 	var files *api.Settings
 	if host == nil {
 		// We are looking into Common files
 		files = c.chi.Spec.Configuration.Files
 	} else {
+		// We are looking into host's personal files
 		files = host.Files
 	}
 
-	// Extract particular section from cm
+	// Extract particular section from files
 
-	return files.GetSectionStringMap(section, includeUnspecified)
+	return files.GetSection(section, includeUnspecified)
 }
 
 // GetHostZookeeper creates data for "zookeeper.xml"

@@ -1,15 +1,11 @@
 #!/bin/bash
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
-MANIFEST_ROOT="$(realpath ${PROJECT_ROOT}/deploy)"
 
 source "${CUR_DIR}/dev-config.sh"
 
 echo "Create ${OPERATOR_NAMESPACE} namespace"
 kubectl create namespace "${OPERATOR_NAMESPACE}"
-
-export MINIKUBE="${MINIKUBE:-"yes"}"
 
 echo "Install operator requirements"
 echo "OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE}"
@@ -38,7 +34,7 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
         "dev")
             echo "Build" && \
             ${PROJECT_ROOT}/dev/image_build_all_dev.sh && \
-            echo "Load images" && \
+            echo "Load images into minikube" && \
             minikube image load "${OPERATOR_IMAGE}" && \
             minikube image load "${METRICS_EXPORTER_IMAGE}" && \
             echo "Images prepared"
@@ -49,7 +45,7 @@ fi
 
 echo "Deploy operator's deployment"
 case "${DEPLOY_OPERATOR}" in
-    "yes" | "release" | "prod" | "latest" | "dev")
+    "yes" | "release" | "prod" | "latest" | "local" | "dev")
         echo "Install operator from Docker Registry (dockerhub or whatever)"
         kubectl -n "${OPERATOR_NAMESPACE}" apply -f <(                                 \
             OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE}"                                 \
@@ -64,7 +60,8 @@ case "${DEPLOY_OPERATOR}" in
             MANIFEST_PRINT_CRD="no"                                                    \
             MANIFEST_PRINT_RBAC_CLUSTERED="no"                                         \
             MANIFEST_PRINT_RBAC_NAMESPACED="no"                                        \
-        "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh"             \
+            \
+            "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh"         \
         )
         ;;
     *)

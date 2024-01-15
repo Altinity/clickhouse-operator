@@ -19,6 +19,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -522,13 +524,18 @@ func (n *Normalizer) normalizeConfiguration(conf *api.Configuration) *api.Config
 		conf = api.NewConfiguration()
 	}
 	conf.Zookeeper = n.normalizeConfigurationZookeeper(conf.Zookeeper)
+	n.normalizeConfigurationSettingsBased(conf)
+	conf.Clusters = n.normalizeClusters(conf.Clusters)
+	return conf
+}
+
+// normalizeConfigurationSettingsBased normalizes Settings-based configuration
+func (n *Normalizer) normalizeConfigurationSettingsBased(conf *api.Configuration) {
 	conf.Users = n.normalizeConfigurationUsers(conf.Users)
 	conf.Profiles = n.normalizeConfigurationProfiles(conf.Profiles)
 	conf.Quotas = n.normalizeConfigurationQuotas(conf.Quotas)
 	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
 	conf.Files = n.normalizeConfigurationFiles(conf.Files)
-	conf.Clusters = n.normalizeClusters(conf.Clusters)
-	return conf
 }
 
 // normalizeTemplates normalizes .spec.templates
@@ -929,58 +936,90 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 	return zk
 }
 
-// substWithSecretField substitute users settings field with value from k8s secret
-func (n *Normalizer) substWithSecretField(users *api.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
+type SettingsSubstitution interface {
+	Has(string) bool
+	Get(string) *api.Setting
+	Set(string, *api.Setting) *api.Settings
+	Delete(string)
+}
+
+// substSettingsFieldWithDataFromDataSource substitute settings field with new setting built from the data source
+func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
+	settings SettingsSubstitution,
+	dstField,
+	srcSecretRefField string,
+	parseScalarString bool,
+	newSettingCreator func(api.ObjectAddress) (*api.Setting, error),
+) bool {
 	// Has to have source field specified
-	if !users.Has(username + "/" + userSettingsK8SSecretField) {
+	if !settings.Has(srcSecretRefField) {
 		return false
 	}
 
-	// Anyway remove source field, it should not be included into final ClickHouse config,
-	// because these source fields are synthetic ones (clickhouse does not know them).
-	defer users.Delete(username + "/" + userSettingsK8SSecretField)
-
-	secretFieldValue, err := n.fetchSecretFieldValue(users, username, userSettingsK8SSecretField)
+	// Fetch data source address from the source setting field
+	secretAddress, err := settings.Get(srcSecretRefField).FetchDataSourceAddress(n.ctx.chi.Namespace, parseScalarString)
 	if err != nil {
+		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
 		return false
 	}
 
-	users.Set(username+"/"+userSettingsField, api.NewSettingScalar(secretFieldValue))
+	// Create setting from the secret with a provided function
+	if newSetting, err := newSettingCreator(secretAddress); err == nil {
+		// Set the new setting as dst.
+		// Replacing src in case src name is the same as dst name.
+		settings.Set(dstField, newSetting)
+	}
+
+	// In case we are NOT replacing the same field with its new value, then remove the source field.
+	// Typically non-replaced source field is not expected to be included into the final ClickHouse config,
+	// mainly because very often these source fields are synthetic ones (clickhouse does not know them).
+	if dstField != srcSecretRefField {
+		settings.Delete(srcSecretRefField)
+	}
+
+	// All is done
 	return true
 }
 
-// substWithSecretEnvField substitute users settings field with value from k8s secret stored in ENV var
-func (n *Normalizer) substWithSecretEnvField(users *api.Settings, username string, userSettingsField, userSettingsK8SSecretField string) bool {
-	// Fetch secret name and key within secret
-	_, secretName, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField)
-	if err != nil {
-		return false
-	}
+// substWithSecretFieldValue substitute users settings field with the value read from k8s secret
+func (n *Normalizer) substWithSecretFieldValue(settings SettingsSubstitution, dstField, srcSecretRefField string) bool {
+	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, true,
+		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+			secretFieldValue, err := n.fetchSecretFieldValue(secretAddress)
+			if err != nil {
+				return nil, err
+			}
 
-	// Subst plaintext field with secret field
-	if !n.substWithSecretField(users, username, userSettingsField, userSettingsK8SSecretField) {
-		return false
-	}
+			return api.NewSettingScalar(secretFieldValue), nil
+		})
+}
 
-	// ENV VAR name and value
-	envVarName := username + "_" + userSettingsField
-	n.appendEnvVar(
-		core.EnvVar{
-			Name: envVarName,
-			ValueFrom: &core.EnvVarSource{
-				SecretKeyRef: &core.SecretKeySelector{
-					LocalObjectReference: core.LocalObjectReference{
-						Name: secretName,
+// substWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
+func (n *Normalizer) substWithEnvRefToSecretField(
+	settings SettingsSubstitution,
+	dstField, srcSecretRefField, envVarNamePrefix string,
+	parseScalarString bool,
+) bool {
+	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, parseScalarString,
+		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+			// ENV VAR name and value
+			envVarName := envVarNamePrefix + "_" + dstField
+			n.appendAdditionalEnvVar(
+				core.EnvVar{
+					Name: envVarName,
+					ValueFrom: &core.EnvVarSource{
+						SecretKeyRef: &core.SecretKeySelector{
+							LocalObjectReference: core.LocalObjectReference{
+								Name: secretAddress.Name,
+							},
+							Key: secretAddress.Key,
+						},
 					},
-					Key: key,
 				},
-			},
-		},
-	)
+			)
 
-	// Replace setting with empty value and reference to ENV VAR
-	users.Set(username+"/"+userSettingsField, api.NewSettingScalar("").SetAttribute("from_env", envVarName))
-	return true
+			return api.NewSettingScalar("").SetAttribute("from_env", envVarName), nil
+		})
 }
 
 const internodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
@@ -993,7 +1032,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 	case api.ClusterSecretSourceSecretRef:
 		// Secret has explicit SecretKeyRef
 		// Set the password for internode communication using an ENV VAR
-		n.appendEnvVar(
+		n.appendAdditionalEnvVar(
 			core.EnvVar{
 				Name: internodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -1004,7 +1043,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 	case api.ClusterSecretSourceAuto:
 		// Secret is auto-generated
 		// Set the password for internode communication using an ENV VAR
-		n.appendEnvVar(
+		n.appendAdditionalEnvVar(
 			core.EnvVar{
 				Name: internodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -1015,122 +1054,85 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 	}
 }
 
-func (n *Normalizer) appendEnvVar(envVar core.EnvVar) {
+func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
 	// Sanity check
 	if envVar.Name == "" {
 		return
 	}
 
-	for _, existingEnvVar := range n.ctx.chi.Attributes.ExchangeEnv {
+	for _, existingEnvVar := range n.ctx.chi.Attributes.AdditionalEnvVars {
 		if existingEnvVar.Name == envVar.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Attributes.ExchangeEnv = append(n.ctx.chi.Attributes.ExchangeEnv, envVar)
+	n.ctx.chi.Attributes.AdditionalEnvVars = append(n.ctx.chi.Attributes.AdditionalEnvVars, envVar)
 }
 
-var (
-	// ErrSecretFieldNotFound specifies error when secret key is not found
-	ErrSecretFieldNotFound = fmt.Errorf("not found")
-)
-
-// parseSecretFieldAddress parses address into namespace, name, key triple
-func parseSecretFieldAddress(users *api.Settings, username, userSettingsK8SSecretField string) (string, string, string, error) {
-	settingsPath := username + "/" + userSettingsK8SSecretField
-	secretFieldAddress := users.Get(settingsPath).String()
-
-	// Sanity check. In case secretFieldAddress not specified nothing to do here
-	if secretFieldAddress == "" {
-		return "", "", "", ErrSecretFieldNotFound
-	}
-
-	// Extract secret's namespace and name and then field name within the secret,
-	// by splitting namespace/name/field (aka key) triple. Namespace can be omitted in the settings
-	var namespace, name, key string
-	switch tags := strings.Split(secretFieldAddress, "/"); len(tags) {
-	case 2:
-		// Assume namespace is omitted. Expect to have name/key pair
-		namespace = chop.Config().Runtime.Namespace
-		name = tags[0]
-		key = tags[1]
-	case 3:
-		// All components are in place. Expect to have namespace/name/key triple
-		namespace = tags[0]
-		name = tags[1]
-		key = tags[2]
-	default:
-		// Skip incorrect entry
-		log.V(1).Warning("unable to parse secret field address: '%s:%s'", settingsPath, secretFieldAddress)
-		return "", "", "", ErrSecretFieldNotFound
-	}
-
+func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
 	// Sanity check
-	if (namespace == "") || (name == "") || (key == "") {
-		log.V(1).M(namespace, name).F().Warning("incorrect secret field address: '%s:%s'", settingsPath, secretFieldAddress)
-		return "", "", "", ErrSecretFieldNotFound
+	if volume.Name == "" {
+		return
 	}
 
-	return namespace, name, key, nil
+	for _, existingVolume := range n.ctx.chi.Attributes.AdditionalVolumes {
+		if existingVolume.Name == volume.Name {
+			// Such a variable already exists
+			return
+		}
+	}
+
+	n.ctx.chi.Attributes.AdditionalVolumes = append(n.ctx.chi.Attributes.AdditionalVolumes, volume)
 }
+
+func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
+	// Sanity check
+	if volumeMount.Name == "" {
+		return
+	}
+
+	for _, existingVolumeMount := range n.ctx.chi.Attributes.AdditionalVolumeMounts {
+		if existingVolumeMount.Name == volumeMount.Name {
+			// Such a variable already exists
+			return
+		}
+	}
+
+	n.ctx.chi.Attributes.AdditionalVolumeMounts = append(n.ctx.chi.Attributes.AdditionalVolumeMounts, volumeMount)
+}
+
+var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
 
 // fetchSecretFieldValue fetches the value of the specified field in the specified secret
-func (n *Normalizer) fetchSecretFieldValue(users *api.Settings, username, userSettingsK8SSecretField string) (string, error) {
-	// Fetch address of the field
-	namespace, name, key, err := parseSecretFieldAddress(users, username, userSettingsK8SSecretField)
-	if err != nil {
-		return "", err
-	}
+// TODO this is the only useage of k8s API in the normalizer. How to remove it?
+func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (string, error) {
 
-	secret, err := n.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, meta.GetOptions{})
+	// Fetch the secret
+	secret, err := n.kubeClient.CoreV1().Secrets(secretAddress.Namespace).Get(context.TODO(), secretAddress.Name, controller.NewGetOptions())
 	if err != nil {
-		log.V(1).M(namespace, name).F().Info("unable to read secret %v", err)
-		return "", ErrSecretFieldNotFound
+		log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().Info("unable to read secret %s %v", secretAddress, err)
+		return "", ErrSecretValueNotFound
 	}
 
 	// Find the field within the secret
 	for k, value := range secret.Data {
-		if key == k {
+		if secretAddress.Key == k {
 			return string(value), nil
 		}
 	}
 
-	log.V(1).M(namespace, name).F().Info("unable to locate in specified address (namespace/name/key triple) from: %s/%s", username, userSettingsK8SSecretField)
-	return "", ErrSecretFieldNotFound
+	log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().
+		Warning("unable to locate secret data by namespace/name/key: %s", secretAddress)
+
+	return "", ErrSecretValueNotFound
 }
 
-// normalizeUsersList extracts usernames from provided 'users' settings
-func (n *Normalizer) normalizeUsersList(users *api.Settings, extra ...string) (usernames []string) {
-	// Extract username from path
-	usernameMap := make(map[string]bool)
-	users.Walk(func(path string, _ *api.Setting) {
-		// Split username/action into username and all the rest. Ex. 'admin/password', 'admin/networks/ip'
-		tags := strings.Split(path, "/")
-
-		// Basic sanity check - need to have at least "username/something" pair
-		// This "something" part is not used, it just has to be
-		if len(tags) < 2 {
-			// Skip incorrect entry
-			return
-		}
-
-		// Register username
-		username := tags[0]
-		usernameMap[username] = true
-	})
-
-	// Add extra users
-	for _, username := range extra {
-		if username != "" {
-			usernameMap[username] = true
-		}
-	}
-
-	// Make sorted list of unique usernames
-	for username := range usernameMap {
-		usernames = append(usernames, username)
-	}
+// normalizeUsersList extracts usernames from provided 'users' settings and adds some extra usernames
+func (n *Normalizer) normalizeUsersList(users *api.Settings, extraUsernames ...string) (usernames []string) {
+	usernames = append(usernames, users.Groups()...)
+	usernames = append(usernames, extraUsernames...)
+	usernames = util.Unique(usernames)
 	sort.Strings(usernames)
 
 	return usernames
@@ -1142,10 +1144,7 @@ const chopProfile = "clickhouse_operator"
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Settings {
 	// Ensure and normalize user settings
-	if users == nil {
-		users = api.NewSettings()
-	}
-	users.Normalize()
+	users = users.Ensure().Normalize()
 
 	// Add special "default" user to the list of users, which is used/required for:
 	// 1. ClickHouse hosts to communicate with each other
@@ -1153,7 +1152,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 	// Add special "chop" user to the list of users, which is used/required for:
 	// 1. Operator to communicate with hosts
 	usernames := n.normalizeUsersList(
-		// Original users list
+		// user-based settings contains non-explicit users list in it
 		users,
 		// Add default user which always exists
 		defaultUsername,
@@ -1163,33 +1162,44 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 
 	// Normalize each user in the list of users
 	for _, username := range usernames {
-		n.normalizeConfigurationUser(users, username)
+		n.normalizeConfigurationUser(api.NewSettingsUser(users, username))
 	}
 
-	// Remove plain password for default user
-	n.removePlainPassword(users, defaultUsername)
+	// Remove plain password for the default user
+	n.removePlainPassword(api.NewSettingsUser(users, defaultUsername))
 
 	return users
 }
 
-func (n *Normalizer) removePlainPassword(users *api.Settings, username string) {
-	if users.Has(username+"/password_double_sha1_hex") || users.Has(username+"/password_sha256_hex") {
+func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
+	if user.Has("password_double_sha1_hex") || user.Has("password_sha256_hex") {
 		// If user has encrypted password specified, we need to delete existing plaintext password.
 		// Set "remove" flag for user's "password", which is specified as empty in stock ClickHouse users.xml,
 		// thus we need to overwrite it.
-		users.Set(username+"/password", api.NewSettingScalar("").SetAttribute("remove", "1"))
+		user.Set("password", api.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 }
 
-func (n *Normalizer) normalizeConfigurationUser(users *api.Settings, username string) {
-	n.normalizeConfigurationUserEnsureMandatorySections(users, username)
-	n.normalizeConfigurationUserPassword(users, username)
+func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
+	i := 1
+	user.WalkSafe(func(name string, setting *api.Setting) {
+		if strings.HasPrefix(name, "k8s_secret_") {
+			// TODO remove as obsoleted
+			// Skip this user field, it will be processed later
+		} else {
+			envVarNamePrefix := fmt.Sprintf("USER_VAR_%d", i)
+			n.substWithEnvRefToSecretField(user, name, name, envVarNamePrefix, false)
+			i = i + 1
+		}
+	})
+
+	n.normalizeConfigurationUserEnsureMandatoryFields(user)
+	n.normalizeConfigurationUserPassword(user)
 }
 
-func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *api.Settings, username string) {
-	chopUsername := chop.Config().ClickHouse.Access.Username
+func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.SettingsUser) {
 	//
-	// Ensure each user has mandatory sections:
+	// Ensure each user has mandatory fields:
 	//
 	// 1. user/profile
 	// 2. user/quota
@@ -1198,71 +1208,91 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatorySections(users *ap
 	profile := chop.Config().ClickHouse.Config.User.Default.Profile
 	quota := chop.Config().ClickHouse.Config.User.Default.Quota
 	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	regexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+	hostRegexp := CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
-	// Some users may have special options
-	switch username {
+	// Some users may have special options for mandatory fields
+	switch user.Username() {
 	case defaultUsername:
+		// "default" user
 		ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
 		if !n.ctx.options.DefaultUserInsertHostRegex {
-			regexp = ""
+			hostRegexp = ""
 		}
-	case chopUsername:
+	case chop.Config().ClickHouse.Access.Username:
+		// User used by CHOp to access ClickHouse instances.
 		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_IP)
 
 		profile = chopProfile
 		quota = ""
 		ips = []string{ip}
-		regexp = ""
+		hostRegexp = ""
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	if profile != "" {
-		users.SetIfNotExists(username+"/profile", api.NewSettingScalar(profile))
+	n.setMandatoryUserFields(user, &userFields{
+		profile:    profile,
+		quota:      quota,
+		ips:        ips,
+		hostRegexp: hostRegexp,
+	})
+}
+
+type userFields struct {
+	profile    string
+	quota      string
+	ips        []string
+	hostRegexp string
+}
+
+// setMandatoryUserFields sets user fields
+func (n *Normalizer) setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
+	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
+	if fields.profile != "" {
+		user.SetIfNotExists("profile", api.NewSettingScalar(fields.profile))
 	}
-	if quota != "" {
-		users.SetIfNotExists(username+"/quota", api.NewSettingScalar(quota))
+	if fields.quota != "" {
+		user.SetIfNotExists("quota", api.NewSettingScalar(fields.quota))
 	}
-	if len(ips) > 0 {
-		users.Set(username+"/networks/ip", api.NewSettingVector(ips).MergeFrom(users.Get(username+"/networks/ip")))
+	if len(fields.ips) > 0 {
+		user.Set("networks/ip", api.NewSettingVector(fields.ips).MergeFrom(user.Get("networks/ip")))
 	}
-	if regexp != "" {
-		users.SetIfNotExists(username+"/networks/host_regexp", api.NewSettingScalar(regexp))
+	if fields.hostRegexp != "" {
+		user.SetIfNotExists("networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
 	}
 }
 
 // normalizeConfigurationUserPassword deals with user passwords
-func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, username string) {
+func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
 	// Values from the secret have higher priority
-	n.substWithSecretField(users, username, "password", "k8s_secret_password")
-	n.substWithSecretField(users, username, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-	n.substWithSecretField(users, username, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+	n.substWithSecretFieldValue(user, "password", "k8s_secret_password")
+	n.substWithSecretFieldValue(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+	n.substWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
 	// Values from the secret passed via ENV have even higher priority
-	n.substWithSecretEnvField(users, username, "password", "k8s_secret_env_password")
-	n.substWithSecretEnvField(users, username, "password_sha256_hex", "k8s_secret_env_password_sha256_hex")
-	n.substWithSecretEnvField(users, username, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex")
+	n.substWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", user.Username(), true)
+	n.substWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", user.Username(), true)
+	n.substWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", user.Username(), true)
 
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-	if users.Has(username + "/password_double_sha1_hex") {
-		users.Delete(username + "/password_sha256_hex")
-		users.Delete(username + "/password")
+	if user.Has("password_double_sha1_hex") {
+		user.Delete("password_sha256_hex")
+		user.Delete("password")
 		// This is all for this user
 		return
 	}
 
 	// Than goes password_sha256_hex, thus keep it only
-	if users.Has(username + "/password_sha256_hex") {
-		users.Delete(username + "/password_double_sha1_hex")
-		users.Delete(username + "/password")
+	if user.Has("password_sha256_hex") {
+		user.Delete("password_double_sha1_hex")
+		user.Delete("password")
 		// This is all for this user
 		return
 	}
 
 	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
 
-	if users.Get(username + "/password").HasAttributes() {
-		// Have plaintext password explicitly specified via ENV var
+	if user.Get("password").HasAttributes() {
+		// Have plaintext password with attributes - means we have plaintext password explicitly specified via ENV var
 		// This is fine
 		// This is all for this user
 		return
@@ -1270,18 +1300,19 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 
 	// From now on we either have plaintext password specified as an explicit string, or no password at all
 
-	passwordPlaintext := users.Get(username + "/password").String()
+	passwordPlaintext := user.Get("password").String()
 
 	// Apply default password for password-less non-default users
 	// 1. NB "default" user keeps empty password in here.
 	// 2. ClickHouse user gets password from his section of CHOp configuration
 	// 3. All the rest users get default password
 	if passwordPlaintext == "" {
-		switch username {
+		switch user.Username() {
 		case defaultUsername:
 			// NB "default" user keeps empty password in here.
 		case chop.Config().ClickHouse.Access.Username:
-			// User used by CHOp to access instances gets ClickHouse access password from "ClickHouse.Access.Password"
+			// User used by CHOp to access ClickHouse instances.
+			// Gets ClickHouse access password from "ClickHouse.Access.Password"
 			passwordPlaintext = chop.Config().ClickHouse.Access.Password
 		default:
 			// All the rest users get default password from "ClickHouse.Config.User.Default.Password"
@@ -1289,7 +1320,8 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 		}
 	}
 
-	// NB "default" user may keep empty password in here.
+	// It may come that plaintext password is still empty.
+	// For example, "default" quite often has empty password.
 	if passwordPlaintext == "" {
 		// This is fine
 		// This is all for this user
@@ -1299,10 +1331,10 @@ func (n *Normalizer) normalizeConfigurationUserPassword(users *api.Settings, use
 	// Have plaintext password specified.
 	// Replace plaintext password with encrypted one
 	passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-	users.Set(username + "/password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
+	user.Set("password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
 	// And keep only one password specification - delete all the rest (if any exists)
-	users.Delete(username + "/password_double_sha1_hex")
-	users.Delete(username + "/password")
+	user.Delete("password_double_sha1_hex")
+	user.Delete("password")
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
@@ -1342,7 +1374,50 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 		return nil
 	}
 	files.Normalize()
+
+	files.WalkSafe(func(key string, setting *api.Setting) {
+		n.substWithMount(files, key)
+	})
+
 	return files
+}
+
+func (n *Normalizer) substWithMount(settings *api.Settings, srcSecretRefField string) bool {
+	var defaultMode int32 = 0644
+	return n.substSettingsFieldWithDataFromDataSource(settings, "", srcSecretRefField, false,
+		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
+			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
+			filename := srcSecretRefField
+
+			if !ok1 || !ok2 {
+				return nil, fmt.Errorf("unable to build k8s object name")
+			}
+
+			n.appendAdditionalVolume(core.Volume{
+				Name: volumeName,
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: secretAddress.Name,
+						Items: []core.KeyToPath{
+							{
+								Key:  secretAddress.Key,
+								Path: filename,
+							},
+						},
+						DefaultMode: &defaultMode,
+					},
+				},
+			})
+			n.appendAdditionalVolumeMount(core.VolumeMount{
+				Name:      volumeMountName,
+				ReadOnly:  true,
+				MountPath: filepath.Join(dirPathSecretFilesConfig, filename),
+				SubPath:   filename,
+			})
+
+			return nil, fmt.Errorf("no need to create a new setting")
+		})
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
