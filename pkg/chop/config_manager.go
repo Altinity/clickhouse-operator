@@ -16,6 +16,7 @@ package chop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -139,7 +140,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 		return
 	}
 
-	// Get sorted names of ClickHouseOperatorConfiguration objects from the list of objects
+	// Get sorted list of names of ClickHouseOperatorConfiguration objects located in specified namespace
 	var names []string
 	for i := range cm.chopConfigList.Items {
 		chOperatorConfiguration := &cm.chopConfigList.Items[i]
@@ -147,7 +148,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 	}
 	sort.Strings(names)
 
-	// Build sorted slice of configs
+	// Build sorted list of configs
 	for _, name := range names {
 		for i := range cm.chopConfigList.Items {
 			// Convenience wrapper
@@ -200,52 +201,93 @@ func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfigur
 	return false
 }
 
+const (
+	fileIsOptional  = true
+	fileIsMandatory = false
+)
+
 // getFileBasedConfig creates OperatorConfig object based on file specified
 func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.OperatorConfig, error) {
-	// In case we have config file specified - that's it
+	// Check config files in the following order:
+	// 1. Explicitly specified config file as CLI option
+	// 2. Explicitly specified config file as ENV var
+	// 3. Well-known config file in home dir
+	// 4. Well-known config file in /etc
+	// In case no file found fallback to default config
+
+	// 1. Check config file as explicitly specified CLI option
 	if len(configFilePath) > 0 {
-		// Config file explicitly specified as CLI flag
-		conf, err := cm.buildConfigFromFile(configFilePath)
+		// Config file explicitly specified as CLI flag, has to have this file
+		// Absence of the file is an error
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsMandatory)
 		if err != nil {
 			return nil, err
 		}
-		return conf, nil
-	}
-
-	// No file specified - look for ENV var config file path specification
-	if len(os.Getenv(chiv1.CHOP_CONFIG)) > 0 {
-		// Config file explicitly specified as ENV var
-		conf, err := cm.buildConfigFromFile(os.Getenv(chiv1.CHOP_CONFIG))
-		if err != nil {
-			return nil, err
-		}
-		return conf, nil
-	}
-
-	// No ENV var specified - look into user's homedir
-	// Try to find ~/.clickhouse-operator/config.yaml
-	usr, err := user.Current()
-	if err == nil {
-		// OS user found. Parse ~/.clickhouse-operator/config.yaml file
-		if conf, err := cm.buildConfigFromFile(filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")); err == nil {
-			// Able to build config, all is fine
+		if conf != nil {
 			return conf, nil
 		}
+		// Since file is a mandatory one - has to fail
+		return nil, fmt.Errorf("welcome Schrodinger: no conf, no err")
 	}
 
-	// No config file in user's homedir - look for global config in /etc/
+	// 2. Check config file as explicitly specified ENV var
+	configFilePath = os.Getenv(chiv1.CHOP_CONFIG)
+	if len(configFilePath) > 0 {
+		// Config file explicitly specified as ENV var, has to have this file
+		// Absence of the file is an error
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsMandatory)
+		if err != nil {
+			return nil, err
+		}
+		if conf != nil {
+			return conf, nil
+		}
+		// Since file is a mandatory one - has to fail
+		return nil, fmt.Errorf("welcome Schrodinger: no conf, no err")
+	}
+
+	// 3. Check config file as well-known config file in home dir
+	// Try to find ~/.clickhouse-operator/config.yaml
+	if usr, err := user.Current(); err == nil {
+		// OS user found. Parse ~/.clickhouse-operator/config.yaml file
+		// File is optional, absence of the file is not an error
+		configFilePath = filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsOptional)
+		if err != nil {
+			return nil, err
+		}
+		if conf != nil {
+			return conf, nil
+		}
+		// Since file is an optional one - no return, continue with the next option
+	}
+
+	// 3. Check config file as well-known config file in /etc
 	// Try to find /etc/clickhouse-operator/config.yaml
-	if conf, err := cm.buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
-		// Able to build config, all is fine
-		return conf, nil
+	{
+		configFilePath = "/etc/clickhouse-operator/config.yaml"
+		// File is optional, absence of the file is not an error
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsOptional)
+		if err != nil {
+			return nil, err
+		}
+		if conf != nil {
+			return conf, nil
+		}
+		// Since file is an optional one - no return, continue with the next option
 	}
 
-	// No config file found, use default one
+	// No any config file found, use default configuration
 	return cm.buildDefaultConfig()
 }
 
 // buildConfigFromFile returns OperatorConfig struct built out of specified file path
-func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.OperatorConfig, error) {
+func (cm *ConfigManager) buildConfigFromFile(configFilePath string, optional bool) (*chiv1.OperatorConfig, error) {
+	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) && optional {
+		// File does not exist, but it is optional. so there is not error per se
+		return nil, nil
+	}
+
 	// Read config file content
 	yamlText, err := os.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
