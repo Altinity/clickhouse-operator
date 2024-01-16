@@ -149,6 +149,12 @@ metadata:
   name: "simple-01"
 spec:
   configuration:
+    users:
+      # printf 'test_password' | sha256sum
+      test_user/password_sha256_hex: 10a6e6cc8311a3e2bcc09bf6c199adecd5dd59408c343e926b129c4914f3cb01
+      # to allow access outside from kubernetes
+      test_user/networks/ip:
+        - 0.0.0.0/0
     clusters:
       - name: "simple"
 ```
@@ -182,7 +188,7 @@ There are several ways to connect to ClickHouse on Kubenetes.
 
 1. In case the previous command `kubectl get service -n test-clickhouse-operator` reported **EXTERNAL-IP** (abc-123.us-east-1.elb.amazonaws.com in our case) we can directly access ClickHouse with:
 ```bash
-clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com -u clickhouse_operator --password clickhouse_operator_password 
+clickhouse-client -h abc-123.us-east-1.elb.amazonaws.com -u test_user --password test_password 
 ```
 ```text
 ClickHouse client version 18.14.12.

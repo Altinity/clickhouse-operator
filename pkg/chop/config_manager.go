@@ -16,6 +16,7 @@ package chop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/user"
@@ -23,12 +24,12 @@ import (
 	"sort"
 
 	"github.com/kubernetes-sigs/yaml"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
 // ConfigManager specifies configuration manager in charge of operator's configuration
@@ -37,24 +38,24 @@ type ConfigManager struct {
 	kubeClient *kube.Clientset
 
 	// chopClient is a k8s client able to communicate with operator's Custom Resources
-	chopClient *chopclientset.Clientset
+	chopClient *chopClientSet.Clientset
 
 	// chopConfigList is a list of available operator configurations
-	chopConfigList *chiv1.ClickHouseOperatorConfigurationList
+	chopConfigList *api.ClickHouseOperatorConfigurationList
 
 	// initConfigFilePath is a path to the configuration file, which will be used as initial/seed
 	// to build final config, which will be used/consumed by users
 	initConfigFilePath string
 
 	// fileConfig is a prepared file-based config
-	fileConfig *chiv1.OperatorConfig
+	fileConfig *api.OperatorConfig
 
 	// crConfigs is a slice of prepared Custom Resource based configs
-	crConfigs []*chiv1.OperatorConfig
+	crConfigs []*api.OperatorConfig
 
 	// config is the final config, built as merge of all available configs.
 	// This config is ready to use/be consumed by users
-	config *chiv1.OperatorConfig
+	config *api.OperatorConfig
 
 	// runtimeParams is set/map of runtime params, influencing configuration
 	runtimeParams map[string]string
@@ -63,7 +64,7 @@ type ConfigManager struct {
 // NewConfigManager creates new ConfigManager
 func NewConfigManager(
 	kubeClient *kube.Clientset,
-	chopClient *chopclientset.Clientset,
+	chopClient *chopClientSet.Clientset,
 	initConfigFilePath string,
 ) *ConfigManager {
 	return &ConfigManager{
@@ -81,7 +82,7 @@ func (cm *ConfigManager) Init() error {
 	cm.runtimeParams = cm.getEnvVarParams()
 	cm.logEnvVarParams()
 
-	// Get initial config from file
+	// Get initial config from the file
 	cm.fileConfig, err = cm.getFileBasedConfig(cm.initConfigFilePath)
 	if err != nil {
 		return err
@@ -117,7 +118,7 @@ func (cm *ConfigManager) Init() error {
 }
 
 // Config is an access wrapper
-func (cm *ConfigManager) Config() *chiv1.OperatorConfig {
+func (cm *ConfigManager) Config() *api.OperatorConfig {
 	return cm.config
 }
 
@@ -130,7 +131,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
-	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), metav1.ListOptions{}); err != nil {
+	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), controller.NewListOptions()); err != nil {
 		log.V(1).F().Error("Error read ClickHouseOperatorConfigurations %v", err)
 		return
 	}
@@ -139,7 +140,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 		return
 	}
 
-	// Get sorted names of ClickHouseOperatorConfiguration objects from the list of objects
+	// Get sorted list of names of ClickHouseOperatorConfiguration objects located in specified namespace
 	var names []string
 	for i := range cm.chopConfigList.Items {
 		chOperatorConfiguration := &cm.chopConfigList.Items[i]
@@ -147,7 +148,7 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 	}
 	sort.Strings(names)
 
-	// Build sorted slice of configs
+	// Build sorted list of configs
 	for _, name := range names {
 		for i := range cm.chopConfigList.Items {
 			// Convenience wrapper
@@ -180,12 +181,12 @@ func (cm *ConfigManager) buildUnifiedConfig() {
 
 	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		_ = cm.config.MergeFrom(chOperatorConfiguration, chiv1.MergeTypeOverrideByNonEmptyValues)
+		_ = cm.config.MergeFrom(chOperatorConfiguration, api.MergeTypeOverrideByNonEmptyValues)
 	}
 }
 
 // IsConfigListed checks whether specified ClickHouseOperatorConfiguration is listed in list of ClickHouseOperatorConfiguration(s)
-func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfiguration) bool {
+func (cm *ConfigManager) IsConfigListed(config *api.ClickHouseOperatorConfiguration) bool {
 	for i := range cm.chopConfigList.Items {
 		chOperatorConfiguration := &cm.chopConfigList.Items[i]
 
@@ -200,52 +201,93 @@ func (cm *ConfigManager) IsConfigListed(config *chiv1.ClickHouseOperatorConfigur
 	return false
 }
 
+const (
+	fileIsOptional  = true
+	fileIsMandatory = false
+)
+
 // getFileBasedConfig creates OperatorConfig object based on file specified
-func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*chiv1.OperatorConfig, error) {
-	// In case we have config file specified - that's it
+func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*api.OperatorConfig, error) {
+	// Check config files in the following order:
+	// 1. Explicitly specified config file as CLI option
+	// 2. Explicitly specified config file as ENV var
+	// 3. Well-known config file in home dir
+	// 4. Well-known config file in /etc
+	// In case no file found fallback to default config
+
+	// 1. Check config file as explicitly specified CLI option
 	if len(configFilePath) > 0 {
-		// Config file explicitly specified as CLI flag
-		conf, err := cm.buildConfigFromFile(configFilePath)
+		// Config file is explicitly specified as a CLI flag, has to have this file.
+		// Absence of the file is an error.
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsMandatory)
 		if err != nil {
 			return nil, err
 		}
-		return conf, nil
-	}
-
-	// No file specified - look for ENV var config file path specification
-	if len(os.Getenv(chiv1.CHOP_CONFIG)) > 0 {
-		// Config file explicitly specified as ENV var
-		conf, err := cm.buildConfigFromFile(os.Getenv(chiv1.CHOP_CONFIG))
-		if err != nil {
-			return nil, err
-		}
-		return conf, nil
-	}
-
-	// No ENV var specified - look into user's homedir
-	// Try to find ~/.clickhouse-operator/config.yaml
-	usr, err := user.Current()
-	if err == nil {
-		// OS user found. Parse ~/.clickhouse-operator/config.yaml file
-		if conf, err := cm.buildConfigFromFile(filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")); err == nil {
-			// Able to build config, all is fine
+		if conf != nil {
 			return conf, nil
 		}
+		// Since this file is a mandatory one - has to fail
+		return nil, fmt.Errorf("welcome Schrodinger: no conf, no err")
 	}
 
-	// No config file in user's homedir - look for global config in /etc/
+	// 2. Check config file as explicitly specified ENV var
+	configFilePath = os.Getenv(api.CHOP_CONFIG)
+	if len(configFilePath) > 0 {
+		// Config file is explicitly specified as an ENV var, has to have this file.
+		// Absence of the file is an error.
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsMandatory)
+		if err != nil {
+			return nil, err
+		}
+		if conf != nil {
+			return conf, nil
+		}
+		// Since this file is a mandatory one - has to fail
+		return nil, fmt.Errorf("welcome Schrodinger: no conf, no err")
+	}
+
+	// 3. Check config file as well-known config file in home dir
+	// Try to find ~/.clickhouse-operator/config.yaml
+	if usr, err := user.Current(); err == nil {
+		// OS user found. Parse ~/.clickhouse-operator/config.yaml file
+		// File is optional, absence of the file is not an error.
+		configFilePath = filepath.Join(usr.HomeDir, ".clickhouse-operator", "config.yaml")
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsOptional)
+		if err != nil {
+			return nil, err
+		}
+		if conf != nil {
+			return conf, nil
+		}
+		// Since this file is an optional one - no return, continue to the next option
+	}
+
+	// 3. Check config file as well-known config file in /etc
 	// Try to find /etc/clickhouse-operator/config.yaml
-	if conf, err := cm.buildConfigFromFile("/etc/clickhouse-operator/config.yaml"); err == nil {
-		// Able to build config, all is fine
-		return conf, nil
+	{
+		configFilePath = "/etc/clickhouse-operator/config.yaml"
+		// File is optional, absence of the file is not an error
+		conf, err := cm.buildConfigFromFile(configFilePath, fileIsOptional)
+		if err != nil {
+			return nil, err
+		}
+		if conf != nil {
+			return conf, nil
+		}
+		// Since this file is an optional one - no return, continue to the next option
 	}
 
-	// No config file found, use default one
+	// No any config file found, fallback to default configuration
 	return cm.buildDefaultConfig()
 }
 
 // buildConfigFromFile returns OperatorConfig struct built out of specified file path
-func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.OperatorConfig, error) {
+func (cm *ConfigManager) buildConfigFromFile(configFilePath string, optional bool) (*api.OperatorConfig, error) {
+	if _, err := os.Stat(configFilePath); errors.Is(err, os.ErrNotExist) && optional {
+		// File does not exist, but it is optional. so there is not error per se
+		return nil, nil
+	}
+
 	// Read config file content
 	yamlText, err := os.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
@@ -253,7 +295,7 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Oper
 	}
 
 	// Parse config file content into OperatorConfig struct
-	config := new(chiv1.OperatorConfig)
+	config := new(api.OperatorConfig)
 	err = yaml.Unmarshal(yamlText, config)
 	if err != nil {
 		return nil, err
@@ -268,37 +310,37 @@ func (cm *ConfigManager) buildConfigFromFile(configFilePath string) (*chiv1.Oper
 }
 
 // buildDefaultConfig returns default OperatorConfig
-func (cm *ConfigManager) buildDefaultConfig() (*chiv1.OperatorConfig, error) {
-	config := new(chiv1.OperatorConfig)
+func (cm *ConfigManager) buildDefaultConfig() (*api.OperatorConfig, error) {
+	config := api.OperatorConfig{}
 
-	return config, nil
+	return &config, nil
 }
 
-// getEnvVarParamNames return list of ENV VARS parameter names
-func (cm *ConfigManager) getEnvVarParamNames() []string {
+// listSupportedEnvVarNames return list of ENV vars that the operator supports
+func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	return []string{
-		chiv1.OPERATOR_POD_NODE_NAME,
-		chiv1.OPERATOR_POD_NAME,
-		chiv1.OPERATOR_POD_NAMESPACE,
-		chiv1.OPERATOR_POD_IP,
-		chiv1.OPERATOR_POD_SERVICE_ACCOUNT,
+		api.OPERATOR_POD_NODE_NAME,
+		api.OPERATOR_POD_NAME,
+		api.OPERATOR_POD_NAMESPACE,
+		api.OPERATOR_POD_IP,
+		api.OPERATOR_POD_SERVICE_ACCOUNT,
 
-		chiv1.OPERATOR_CONTAINER_CPU_REQUEST,
-		chiv1.OPERATOR_CONTAINER_CPU_LIMIT,
-		chiv1.OPERATOR_CONTAINER_MEM_REQUEST,
-		chiv1.OPERATOR_CONTAINER_MEM_LIMIT,
+		api.OPERATOR_CONTAINER_CPU_REQUEST,
+		api.OPERATOR_CONTAINER_CPU_LIMIT,
+		api.OPERATOR_CONTAINER_MEM_REQUEST,
+		api.OPERATOR_CONTAINER_MEM_LIMIT,
 
-		chiv1.WATCH_NAMESPACE,
-		chiv1.WATCH_NAMESPACES,
+		api.WATCH_NAMESPACE,
+		api.WATCH_NAMESPACES,
 	}
 }
 
-// getEnvVarParams returns map[string]string of ENV VARS with some runtime parameters
+// getEnvVarParams returns base set of runtime parameters filled by ENV vars
 func (cm *ConfigManager) getEnvVarParams() map[string]string {
 	params := make(map[string]string)
 	// Extract parameters from ENV VARS
-	for _, varName := range cm.getEnvVarParamNames() {
+	for _, varName := range cm.listSupportedEnvVarNames() {
 		params[varName] = os.Getenv(varName)
 	}
 
@@ -357,8 +399,8 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	namespace := cm.config.ClickHouse.Access.Secret.Namespace
 	if namespace == "" {
 		// No namespace explicitly specified, let's look into namespace where pod is running
-		if cm.HasRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE) {
-			namespace, _ = cm.GetRuntimeParam(chiv1.OPERATOR_POD_NAMESPACE)
+		if cm.HasRuntimeParam(api.OPERATOR_POD_NAMESPACE) {
+			namespace, _ = cm.GetRuntimeParam(api.OPERATOR_POD_NAMESPACE)
 		}
 	}
 
@@ -369,7 +411,7 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 		return
 	}
 
-	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 	if err != nil {
 		cm.config.ClickHouse.Access.Secret.Runtime.Error = err.Error()
 		return
