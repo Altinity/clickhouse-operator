@@ -19,9 +19,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// NewListOptions returns filled metav1.ListOptions
-func NewListOptions(labelsMap map[string]string) meta.ListOptions {
-	labelSelector := labels.SelectorFromSet(labelsMap)
+// NewListOptions returns filled meta.ListOptions
+func NewListOptions(labelsMaps ...map[string]string) meta.ListOptions {
+	if len(labelsMaps) == 0 {
+		return meta.ListOptions{}
+	}
+
+	labelMap := labelsMaps[0]
+	labelSelector := labels.SelectorFromSet(labelMap)
 	return meta.ListOptions{
 		LabelSelector: labelSelector.String(),
 	}
