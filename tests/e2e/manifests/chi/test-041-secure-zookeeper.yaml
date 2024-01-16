@@ -12,7 +12,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+              image: altinity/clickhouse-server:23.8.8.21.altinitystable
               imagePullPolicy: IfNotPresent
               command:
                 - /bin/bash
@@ -125,7 +125,6 @@ spec:
       https_port: 8443
     files:
       settings.xml: |
-        <?xml version="1.0" encoding="utf-8"?>
         <yandex>
           <openSSL>
             <server>

@@ -876,9 +876,7 @@ def test_011_3(self):
 
     with Given("test-011-secrets.yaml with secret storage"):
         kubectl.apply(
-            util.get_full_path("manifests/secret/test-011-secret.yaml", False),
-            ns=self.context.test_namespace,
-            timeout=300,
+            util.get_full_path("manifests/secret/test-011-secret.yaml"),
         )
 
         kubectl.create_and_check(
@@ -2974,7 +2972,7 @@ def test_029(self):
 
     manifest = "manifests/chi/test-029-distribution.yaml"
 
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, lookup_in_host=True))
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -3414,6 +3412,11 @@ def test_034(self):
 
     kubectl.delete_chi(chi)
 
+    with Given("clickhouse-certs.yaml secret is installed"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/clickhouse-certs.yaml"),
+        )
+
     with When("create the chi with secure connection"):
         manifest = "manifests/chi/test-034-https.yaml"
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
@@ -3732,6 +3735,11 @@ def test_039(self, step=0, delete_chi=0):
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
+    with Given("clickhouse-certs.yaml secret is installed"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/clickhouse-certs.yaml"),
+    )
+
     with Given("chi exists"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -3893,6 +3901,11 @@ def test_041(self):
     manifest = f"manifests/chi/test-041-secure-zookeeper.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type, keeper_manifest="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc-secure.yaml")
+
+    with Given("clickhouse-certs.yaml secret is installed"):
+        kubectl.apply(
+            util.get_full_path("manifests/secret/clickhouse-certs.yaml"),
+    )
 
     with Given("chi exists"):
         kubectl.create_and_check(

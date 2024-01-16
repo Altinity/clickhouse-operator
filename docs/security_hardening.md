@@ -273,16 +273,78 @@ spec:
             </server>
           </openSSL>
         </clickhouse>
-      server.crt: |
+      config.d/server.crt: |
         ***
 
-      server.key: |
+      config.d/server.key: |
         ***
 
-      dhparam.pem: |
+      config.d/dhparam.pem: |
         ***
 
 ```
+
+Certificate files can also be stored in secrets. 
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-certs
+type: Opaque
+stringData:
+  server.crt: |
+        ***
+
+  server.key: |
+        ***
+
+  dhparam.pem: |
+        ***
+```
+
+and referred as below:
+
+
+```yaml
+spec:
+  configuration:
+    files:
+      openssl.xml: |
+        <clickhouse>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/secret-files.d/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secret-files.d/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/secret-files.d/dhparam.pem</dhParamsFile>
+              <verificationMode>none</verificationMode>
+              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <disableProtocols>sslv2,sslv3</disableProtocols>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+        </clickhouse>
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.crt
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.key
+      dhparam.pem:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: dhparam.pem
+
+```
+
+**Note**: secret files are mapped into `secret-files.d` configuration folder.
+
 
 ### Disabling insecure connections
 
