@@ -247,7 +247,7 @@ spec:
             key: AWS_ACCESS_KEY_ID
 ```
 
-Under the hood, secrets can be mapped to environment variables and referred in XML configuration files using ```from_env``` syntax. So the snippet above is equivalent to the following:
+Under the hood, secrets settings are mapped to environment variables and referred in XML configuration files using ```from_env``` syntax. So the snippet above is equivalent to the following:
 
 ```yaml
 spec:
