@@ -34,7 +34,7 @@ The following `users.xml` is set up by operator for a cluster that has two nodes
 
 ### The 'clickhouse_operator' user
 
-The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing  ClickHouse replicas and shards, and also for collecting monitoring data. The **user** and **password** values are stored in a secret.
+The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing ClickHouse replicas and shards, and also for collecting monitoring data. The **user** and **password** values are stored in a secret.
 
 The following example shows how **secret** is referenced in the **clickhouse_operator** configuration:
 
@@ -67,7 +67,7 @@ To change '**clickhouse_operator**' user password you can modify `etc-clickhouse
 
 See [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for more information about operator configuration files.
 
-The operator protects access for the '**clickhouse\_operator**' user using an IP mask. When deploying a user into a ClickHouse server, access is restricted to the IP address of the pod where the operator is running, and nothing else. Therefore, the '**clickhouse_operator**' user can not be used outside of this pod.
+The operator also protects access for the '**clickhouse\_operator**' user using an IP mask. When deploying a user into a ClickHouse server, access is restricted to the IP address of the pod where the operator is running, and nothing else. Therefore, the '**clickhouse_operator**' user can not be used outside of this pod.
 
 ## Securing ClickHouse users
 
@@ -96,7 +96,7 @@ spec:
 
 ### Using secrets
 
-The operator supports syntax to read passwords and password hashes from a secret as follows:
+The operator also allows user to specify passwords and password hashes in a Kubernetes secret as follows:
 
 ```yaml
 spec:
@@ -134,7 +134,7 @@ stringData:
 
 ```
 
-**DEPRECATED**: Since version 0.23 the syntax to read passwords and password hashes from a secret using special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes is deprecated:
+**DEPRECATED**: Since version 0.23.x the syntax to read passwords and password hashes from a secret using special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes is deprecated:
 
 ```yaml
 spec:
@@ -211,6 +211,78 @@ spec:
               key: "secret"
 ```
 
+## Securing ClickHouse server settings
+
+Some ClickHouse server settings may contain sensitive data, for example, passwords or keys to access external systems. ClickHouse allows a user to keep connection information for external systems in [Named Collections](https://clickhouse.com/docs/en/operations/named-collections) defined by DDL, but sometimes it is more convenient to store keys in server configuration files. In order to do it securely, sensitive information needs to be stored in secrets.
+
+For example, in order to access S3 bucket one may define the following secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+type: Opaque
+stringData:
+  AWS_SECRET_ACCESS_KEY: *****
+  AWS_ACCESS_KEY_ID: *****
+```
+
+Secret can be referred in ```ClickHouseInstllation``` as follows:
+
+```yaml
+spec:
+  configuration:
+    settings:
+      s3/my_bucket/endpoint: "https://my-bucket.s3.amazonaws.com/sample/"
+      s3/my_bucket/secret_access_key:
+        valueFrom:
+          secretKeyRef:
+            name: s3-credentials
+            key: AWS_SECRET_ACCESS_KEY
+      s3/my_bucket/access_key:
+        valueFrom:
+          secretKeyRef:
+            name: s3-credentials
+            key: AWS_ACCESS_KEY_ID
+```
+
+Under the hood, secrets can be mapped to environment variables and referred in XML configuration files using ```from_env``` syntax. So the snippet above is equivalent to the following:
+
+```yaml
+spec:
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+          - name: clickhouse
+            image: altinity/clickhouse-server:23.3.8.22.altinitystable
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+  configuration:
+    files:
+		config.d/s3.xml: |
+		  <clickhouse>
+		    <s3>
+		      <my_bucket>
+		        <endpoint>https://my-bucket.s3.amazonaws.com/sample/</endpoint>
+   		        <access_key_id from_env="AWS_ACCESS_KEY_ID"></access_key_id>
+               <secret_access_key from_env="AWS_SECRET_ACCESS_KEY"></secret_access_key>
+            </my_bucket>
+          </s3>
+        </clickhouse>
+```
+
 ## Securing the network
 
 This section covers how to secure your network.
@@ -284,7 +356,7 @@ spec:
 
 ```
 
-Certificate files can also be stored in secrets. 
+Certificate files can also be stored in secrets: 
 
 ```yaml
 apiVersion: v1
