@@ -271,12 +271,12 @@ spec:
                   key: AWS_SECRET_ACCESS_KEY
   configuration:
     files:
-		config.d/s3.xml: |
-		  <clickhouse>
-		    <s3>
-		      <my_bucket>
-		        <endpoint>https://my-bucket.s3.amazonaws.com/sample/</endpoint>
-   		        <access_key_id from_env="AWS_ACCESS_KEY_ID"></access_key_id>
+      config.d/s3.xml: |
+        <clickhouse>
+          <s3>
+            <my_bucket>
+               <endpoint>https://my-bucket.s3.amazonaws.com/sample/</endpoint>
+               <access_key_id from_env="AWS_ACCESS_KEY_ID"></access_key_id>
                <secret_access_key from_env="AWS_SECRET_ACCESS_KEY"></secret_access_key>
             </my_bucket>
           </s3>
