@@ -18,5 +18,9 @@ minikube delete
 if [[ ! -z "${PRUNE}" ]]; then
     docker system prune -f
 fi
+minikube version
 minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}"
-k9s -c ns
+
+if [[ -z ${SKIP_K9S} ]]; then
+    k9s -c ns
+fi
