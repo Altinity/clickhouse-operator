@@ -19,17 +19,19 @@
 package v1
 
 const (
-	// OPERATOR_POD_NODE_NAME name from spec.nodeName: ip-172-20-52-62.ec2.internal
+	// OPERATOR_POD_NODE_NAME name from spec.nodeName Ex.: ip-172-20-52-62.ec2.internal
 	OPERATOR_POD_NODE_NAME = "OPERATOR_POD_NODE_NAME"
-	// OPERATOR_POD_NAME name from metadata.name: clickhouse-operator-6f87589dbb-ftcsf
+	// OPERATOR_POD_NAME name from metadata.name Ex.: clickhouse-operator-6f87589dbb-ftcsf
 	OPERATOR_POD_NAME = "OPERATOR_POD_NAME"
-	// OPERATOR_POD_NAMESPACE name from metadata.namespace: kube-system
+	// OPERATOR_POD_NAMESPACE name from metadata.namespace Ex.: kube-system
 	OPERATOR_POD_NAMESPACE = "OPERATOR_POD_NAMESPACE"
-	// OPERATOR_POD_IP ip from status.podIP: 100.96.3.2
+	// OPERATOR_POD_IP ip from status.podIP Ex.: 100.96.3.2
 	OPERATOR_POD_IP = "OPERATOR_POD_IP"
 	// OPERATOR_POD_SERVICE_ACCOUNT service account
-	// spec.serviceAccount: clickhouse-operator
-	// spec.serviceAccountName: clickhouse-operator
+	// from
+	// spec.serviceAccount
+	// spec.serviceAccountName
+	// Ex.: clickhouse-operator
 	OPERATOR_POD_SERVICE_ACCOUNT = "OPERATOR_POD_SERVICE_ACCOUNT"
 
 	// OPERATOR_CONTAINER_CPU_REQUEST from .containers.resources.requests.cpu
@@ -51,6 +53,6 @@ const (
 	// WATCH_NAMESPACES and WATCH_NAMESPACE specifies what namespaces to watch
 	WATCH_NAMESPACES = "WATCH_NAMESPACES"
 
-	// CHOP_CONFIG clickhouse operator configuration
+	// CHOP_CONFIG path to clickhouse operator configuration file
 	CHOP_CONFIG = "CHOP_CONFIG"
 )
