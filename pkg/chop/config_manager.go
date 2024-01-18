@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -231,7 +232,7 @@ func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*api.Operato
 	}
 
 	// 2. Check config file as explicitly specified ENV var
-	configFilePath = os.Getenv(api.CHOP_CONFIG)
+	configFilePath = os.Getenv(deployment.CHOP_CONFIG)
 	if len(configFilePath) > 0 {
 		// Config file is explicitly specified as an ENV var, has to have this file.
 		// Absence of the file is an error.
@@ -320,19 +321,19 @@ func (cm *ConfigManager) buildDefaultConfig() (*api.OperatorConfig, error) {
 func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 	// This list of ENV VARS is specified in operator .yaml manifest, section "kind: Deployment"
 	return []string{
-		api.OPERATOR_POD_NODE_NAME,
-		api.OPERATOR_POD_NAME,
-		api.OPERATOR_POD_NAMESPACE,
-		api.OPERATOR_POD_IP,
-		api.OPERATOR_POD_SERVICE_ACCOUNT,
+		deployment.OPERATOR_POD_NODE_NAME,
+		deployment.OPERATOR_POD_NAME,
+		deployment.OPERATOR_POD_NAMESPACE,
+		deployment.OPERATOR_POD_IP,
+		deployment.OPERATOR_POD_SERVICE_ACCOUNT,
 
-		api.OPERATOR_CONTAINER_CPU_REQUEST,
-		api.OPERATOR_CONTAINER_CPU_LIMIT,
-		api.OPERATOR_CONTAINER_MEM_REQUEST,
-		api.OPERATOR_CONTAINER_MEM_LIMIT,
+		deployment.OPERATOR_CONTAINER_CPU_REQUEST,
+		deployment.OPERATOR_CONTAINER_CPU_LIMIT,
+		deployment.OPERATOR_CONTAINER_MEM_REQUEST,
+		deployment.OPERATOR_CONTAINER_MEM_LIMIT,
 
-		api.WATCH_NAMESPACE,
-		api.WATCH_NAMESPACES,
+		deployment.WATCH_NAMESPACE,
+		deployment.WATCH_NAMESPACES,
 	}
 }
 
@@ -399,8 +400,8 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	namespace := cm.config.ClickHouse.Access.Secret.Namespace
 	if namespace == "" {
 		// No namespace explicitly specified, let's look into namespace where pod is running
-		if cm.HasRuntimeParam(api.OPERATOR_POD_NAMESPACE) {
-			namespace, _ = cm.GetRuntimeParam(api.OPERATOR_POD_NAMESPACE)
+		if cm.HasRuntimeParam(deployment.OPERATOR_POD_NAMESPACE) {
+			namespace, _ = cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
 		}
 	}
 

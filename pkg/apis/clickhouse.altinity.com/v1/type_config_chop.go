@@ -16,6 +16,7 @@ package v1
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"os"
 	"regexp"
 	"sort"
@@ -848,7 +849,7 @@ func (c *OperatorConfig) normalizeSectionPod() {
 // normalize() makes fully-and-correctly filled OperatorConfig
 func (c *OperatorConfig) normalize() {
 	c.move()
-	c.Runtime.Namespace = os.Getenv(OPERATOR_POD_NAMESPACE)
+	c.Runtime.Namespace = os.Getenv(deployment.OPERATOR_POD_NAMESPACE)
 
 	c.normalizeSectionClickHouseConfigurationFile()
 	c.normalizeSectionClickHouseConfigurationUserDefault()
@@ -865,12 +866,12 @@ func (c *OperatorConfig) normalize() {
 
 // applyEnvVarParams applies ENV VARS over config
 func (c *OperatorConfig) applyEnvVarParams() {
-	if ns := os.Getenv(WATCH_NAMESPACE); len(ns) > 0 {
+	if ns := os.Getenv(deployment.WATCH_NAMESPACE); len(ns) > 0 {
 		// We have WATCH_NAMESPACE explicitly specified
 		c.Watch.Namespaces = []string{ns}
 	}
 
-	if nss := os.Getenv(WATCH_NAMESPACES); len(nss) > 0 {
+	if nss := os.Getenv(deployment.WATCH_NAMESPACES); len(nss) > 0 {
 		// We have WATCH_NAMESPACES explicitly specified
 		namespaces := strings.FieldsFunc(nss, func(r rune) bool {
 			return r == ':' || r == ','

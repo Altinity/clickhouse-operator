@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +k8s:deepcopy-gen=package,register
-// +groupName=clickhouse.altinity.com
-
-// Package v1 defines version 1 of the API used with ClickHouse Installation Custom Resources.
-package v1
+package deployment
 
 const (
 	// OPERATOR_POD_NODE_NAME name from spec.nodeName Ex.: ip-172-20-52-62.ec2.internal

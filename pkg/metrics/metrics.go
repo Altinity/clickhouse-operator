@@ -26,14 +26,14 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 func newOTELResource() (*otelResource.Resource, error) {
-	pod, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_NAME)
-	namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_NAMESPACE)
+	pod, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
+	namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
 	return otelResource.Merge(
 		otelResource.Default(),
 		otelResource.NewWithAttributes(

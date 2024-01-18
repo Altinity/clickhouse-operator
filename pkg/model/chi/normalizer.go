@@ -19,7 +19,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -32,7 +31,9 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -437,7 +438,7 @@ func (n *Normalizer) fillStatus() {
 		fqdns = append(fqdns, CreateFQDN(host))
 		return nil
 	})
-	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_IP)
+	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 	n.ctx.chi.FillStatus(endpoint, pods, fqdns, ip)
 }
 
@@ -1220,7 +1221,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 		}
 	case chop.Config().ClickHouse.Access.Username:
 		// User used by CHOp to access ClickHouse instances.
-		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_IP)
+		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
 
 		profile = chopProfile
 		quota = ""
