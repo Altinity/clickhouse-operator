@@ -6,21 +6,21 @@ NODES="${NODES:-"1"}"
 # Ex: v1.2.3, 'stable' for v1.23.3, 'latest' for v1.23.4-rc.0)
 KUBERNETES_VERSION="${KUBERNETES_VERSION:-"stable"}"
 
-PRUNE="${PRUNE:-""}"
+DOCKER_PRUNE="${DOCKER_PRUNE:-""}"
 
 echo "Launching kubernetes cluster."
 echo "k8s version: ${KUBERNETES_VERSION}"
 echo "nodes:       ${NODES}"
-echo "prune:       ${PRUNE}"
+echo "docker prune:${DOCKER_PRUNE}"
 sleep 5
 
 minikube delete
-if [[ ! -z "${PRUNE}" ]]; then
+if [[ ! -z "${DOCKER_PRUNE}" ]]; then
     docker system prune -f
 fi
 minikube version
 minikube start --kubernetes-version="${KUBERNETES_VERSION}" --nodes="${NODES}"
 
-if [[ -z ${SKIP_K9S} ]]; then
+if [[ -z "${SKIP_K9S}" ]]; then
     k9s -c ns
 fi

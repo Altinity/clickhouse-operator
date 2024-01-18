@@ -1,5 +1,7 @@
 #!/bin/bash
 
+MINIKUBE_RESET="${MINIKUBE_RESET:-""}"
+
 function start_run {
   local run_to_start=${1}
   echo "start run ${run_to_start}"
