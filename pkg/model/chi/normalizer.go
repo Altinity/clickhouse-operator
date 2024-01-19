@@ -982,8 +982,8 @@ func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
 	return true
 }
 
-// substWithSecretFieldValue substitute users settings field with the value read from k8s secret
-func (n *Normalizer) substWithSecretFieldValue(settings SettingsSubstitution, dstField, srcSecretRefField string) bool {
+// substSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
+func (n *Normalizer) substSettingsFieldWithSecretFieldValue(settings SettingsSubstitution, dstField, srcSecretRefField string) bool {
 	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, true,
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			secretFieldValue, err := n.fetchSecretFieldValue(secretAddress)
@@ -995,8 +995,8 @@ func (n *Normalizer) substWithSecretFieldValue(settings SettingsSubstitution, ds
 		})
 }
 
-// substWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
-func (n *Normalizer) substWithEnvRefToSecretField(
+// substSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
+func (n *Normalizer) substSettingsFieldWithEnvRefToSecretField(
 	settings SettingsSubstitution,
 	dstField, srcSecretRefField, envVarNamePrefix string,
 	parseScalarString bool,
@@ -1020,6 +1020,44 @@ func (n *Normalizer) substWithEnvRefToSecretField(
 			)
 
 			return api.NewSettingScalar("").SetAttribute("from_env", envVarName), nil
+		})
+}
+
+func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, srcSecretRefField string) bool {
+	var defaultMode int32 = 0644
+	return n.substSettingsFieldWithDataFromDataSource(settings, "", srcSecretRefField, false,
+		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
+			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
+			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
+			filename := srcSecretRefField
+
+			if !ok1 || !ok2 {
+				return nil, fmt.Errorf("unable to build k8s object name")
+			}
+
+			n.appendAdditionalVolume(core.Volume{
+				Name: volumeName,
+				VolumeSource: core.VolumeSource{
+					Secret: &core.SecretVolumeSource{
+						SecretName: secretAddress.Name,
+						Items: []core.KeyToPath{
+							{
+								Key:  secretAddress.Key,
+								Path: filename,
+							},
+						},
+						DefaultMode: &defaultMode,
+					},
+				},
+			})
+			n.appendAdditionalVolumeMount(core.VolumeMount{
+				Name:      volumeMountName,
+				ReadOnly:  true,
+				MountPath: filepath.Join(dirPathSecretFilesConfig, filename),
+				SubPath:   filename,
+			})
+
+			return nil, fmt.Errorf("no need to create a new setting")
 		})
 }
 
@@ -1181,6 +1219,11 @@ func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
 	}
 }
 
+const (
+	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS_VAR_%d_%s"
+	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS_VAR_%d_%s"
+)
+
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 	i := 1
 	user.WalkSafe(func(name string, setting *api.Setting) {
@@ -1188,8 +1231,8 @@ func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 			// TODO remove as obsoleted
 			// Skip this user field, it will be processed later
 		} else {
-			envVarNamePrefix := fmt.Sprintf("USER_VAR_%d", i)
-			n.substWithEnvRefToSecretField(user, name, name, envVarNamePrefix, false)
+			envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationUsers, i, name)
+			n.substSettingsFieldWithEnvRefToSecretField(user, name, name, envVarNamePrefix, false)
 			i = i + 1
 		}
 	})
@@ -1265,14 +1308,14 @@ func (n *Normalizer) setMandatoryUserFields(user *api.SettingsUser, fields *user
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
 	// Values from the secret have higher priority
-	n.substWithSecretFieldValue(user, "password", "k8s_secret_password")
-	n.substWithSecretFieldValue(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-	n.substWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
+	n.substSettingsFieldWithSecretFieldValue(user, "password", "k8s_secret_password")
+	n.substSettingsFieldWithSecretFieldValue(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
+	n.substSettingsFieldWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
 	// Values from the secret passed via ENV have even higher priority
-	n.substWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", user.Username(), true)
-	n.substWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", user.Username(), true)
-	n.substWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", user.Username(), true)
+	n.substSettingsFieldWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", user.Username(), true)
+	n.substSettingsFieldWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", user.Username(), true)
+	n.substSettingsFieldWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", user.Username(), true)
 
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 	if user.Has("password_double_sha1_hex") {
@@ -1365,6 +1408,13 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api
 		return nil
 	}
 	settings.Normalize()
+
+	i := 1
+	settings.WalkSafe(func(name string, setting *api.Setting) {
+		envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationSettings, i, name)
+		n.substSettingsFieldWithEnvRefToSecretField(settings, name, name, envVarNamePrefix, false)
+		i = i + 1
+	})
 	return settings
 }
 
@@ -1377,48 +1427,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 	files.Normalize()
 
 	files.WalkSafe(func(key string, setting *api.Setting) {
-		n.substWithMount(files, key)
+		n.substSettingsFieldWithMountedFile(files, key)
 	})
 
 	return files
-}
-
-func (n *Normalizer) substWithMount(settings *api.Settings, srcSecretRefField string) bool {
-	var defaultMode int32 = 0644
-	return n.substSettingsFieldWithDataFromDataSource(settings, "", srcSecretRefField, false,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
-			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
-			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
-			filename := srcSecretRefField
-
-			if !ok1 || !ok2 {
-				return nil, fmt.Errorf("unable to build k8s object name")
-			}
-
-			n.appendAdditionalVolume(core.Volume{
-				Name: volumeName,
-				VolumeSource: core.VolumeSource{
-					Secret: &core.SecretVolumeSource{
-						SecretName: secretAddress.Name,
-						Items: []core.KeyToPath{
-							{
-								Key:  secretAddress.Key,
-								Path: filename,
-							},
-						},
-						DefaultMode: &defaultMode,
-					},
-				},
-			})
-			n.appendAdditionalVolumeMount(core.VolumeMount{
-				Name:      volumeMountName,
-				ReadOnly:  true,
-				MountPath: filepath.Join(dirPathSecretFilesConfig, filename),
-				SubPath:   filename,
-			})
-
-			return nil, fmt.Errorf("no need to create a new setting")
-		})
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
