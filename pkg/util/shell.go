@@ -19,12 +19,12 @@ import (
 	"strings"
 )
 
-const shellEnvVarNameFmt string = "[A-Z]([_A-Z0-9]*[A-Z0-9])?"
 const shellEnvVarNameMaxLength int = 63
 
-var shellEnvVarNameRegexp = regexp.MustCompile("^" + shellEnvVarNameFmt + "$")
-var shellEnvVarNameStartRegexp = regexp.MustCompile("^" + "[A-Z]")
+var shellEnvVarNameRegexp = regexp.MustCompile("^[A-Z]([_A-Z0-9]*[A-Z0-9])?$")
+var shellEnvVarNameStartRegexp = regexp.MustCompile("^[A-Z]")
 var shellEnvVarNameNotAllowedCharsRegexp = regexp.MustCompile("[^_A-Z0-9]")
+var shellEnvVarNameReplaceCharsRegexp = regexp.MustCompile("[/]")
 
 func BuildShellEnvVarName(str string) (string, bool) {
 	// Must be uppercase
@@ -37,6 +37,8 @@ func BuildShellEnvVarName(str string) (string, bool) {
 			str = str[1:]
 		}
 	}
+	// Replace replaceable chars
+	str = shellEnvVarNameReplaceCharsRegexp.ReplaceAllString(str, "_")
 	// Remove not allowed chars
 	str = shellEnvVarNameNotAllowedCharsRegexp.ReplaceAllString(str, "")
 	// Must have limited length
