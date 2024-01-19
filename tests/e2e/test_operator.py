@@ -874,6 +874,8 @@ def test_011_2(self):
 def test_011_3(self):
     create_shell_namespace_clickhouse_template()
 
+    chi = "test-011-secrets"
+
     with Given("test-011-secrets.yaml with secret storage"):
         kubectl.apply(
             util.get_full_path("manifests/secret/test-011-secret.yaml"),
@@ -887,27 +889,49 @@ def test_011_3(self):
             },
         )
 
-        with Then("Connection to localhost should succeed with user1"):
-            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user1", pwd="pwduser1")
+        with Then("Connection to localhost should succeed with user1/k8s_secret_password"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user1", pwd="pwduser1")
             assert out == "OK"
 
-        with And("Connection to localhost should succeed with user2"):
-            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user2", pwd="pwduser2")
+        with And("Connection to localhost should succeed with user2/k8s_secret_password_sha256_hex"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user2", pwd="pwduser2")
             assert out == "OK"
 
-        with And("Connection to localhost should succeed with user3"):
-            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user3", pwd="pwduser3")
+        with And("Connection to localhost should succeed with user3/k8s_secret_password_double_sha1_hex"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user3", pwd="pwduser3")
             assert out == "OK"
 
-        with And("Connection to localhost should succeed with user4"):
-            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user4", pwd="pwduser4")
+        with And("Connection to localhost should succeed with user4/k8s_secret_env_password"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user4", pwd="pwduser4")
             assert out == "OK"
 
-        with And("Connection to localhost should succeed with user5"):
-            out = clickhouse.query_with_error("test-011-secrets", "select 'OK'", user="user5", pwd="pwduser5")
+        with And("Connection to localhost should succeed with user5/password defined in valueFrom/secretKeyRef"):
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user5", pwd="pwduser5")
             assert out == "OK"
 
-        kubectl.delete_chi("test-011-secrets")
+        with And("Settings should be securely populated from a secret"):
+            pod = kubectl.get_pod_spec(chi)
+            envs = pod["containers"][0]["env"]
+            sasl_username_env = ""
+            sasl_password_env = ""
+            for e in envs:
+                if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
+                     sasl_username_env = e["name"]
+                if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
+                     sasl_password_env = e["name"]
+
+            with By("Secrets are properly propagated to env variables"):
+                note(f"Found env variables: {sasl_username_env} {sasl_password_env}")
+                assert sasl_username_env != ""
+                assert sasl_password_env != ""
+
+            with By("Secrets are properly referenced from settings.xml"):
+                cfm = kubectl.get("configmap", f"chi-{chi}-common-configd")
+                settings_xml = cfm["data"]["chop-generated-settings.xml"]
+                assert f"sasl_username from_env=\"{sasl_username_env}\"" in settings_xml
+                assert f"sasl_password from_env=\"{sasl_password_env}\"" in settings_xml
+
+        kubectl.delete_chi(chi)
         kubectl.launch(
             "delete secret test-011-secret",
             ns=self.context.test_namespace,
