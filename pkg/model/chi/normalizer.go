@@ -942,6 +942,7 @@ type SettingsSubstitution interface {
 	Get(string) *api.Setting
 	Set(string, *api.Setting) *api.Settings
 	Delete(string)
+	Name2Key(string) string
 }
 
 // substSettingsFieldWithDataFromDataSource substitute settings field with new setting built from the data source
@@ -1005,7 +1006,7 @@ func (n *Normalizer) substSettingsFieldWithEnvRefToSecretField(
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			// ENV VAR name and value
 			// In case not OK env var name will be empty and config will be incorrect. CH may not start
-			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + dstField)
+			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + settings.Name2Key(dstField))
 			n.appendAdditionalEnvVar(
 				core.EnvVar{
 					Name: envVarName,
