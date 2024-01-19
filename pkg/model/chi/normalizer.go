@@ -1649,7 +1649,7 @@ func (n *Normalizer) normalizeShard(shard *api.ChiShard, cluster *api.Cluster, s
 	shard.InheritSettingsFrom(cluster)
 	shard.Settings = n.normalizeConfigurationSettings(shard.Settings)
 	shard.InheritFilesFrom(cluster)
-	shard.Files = n.normalizeConfigurationSettings(shard.Files)
+	shard.Files = n.normalizeConfigurationFiles(shard.Files)
 	shard.InheritTemplatesFrom(cluster)
 	// Normalize Replicas
 	n.normalizeShardReplicasCount(shard, cluster.Layout.ReplicasCount)
@@ -1665,7 +1665,7 @@ func (n *Normalizer) normalizeReplica(replica *api.ChiReplica, cluster *api.Clus
 	replica.InheritSettingsFrom(cluster)
 	replica.Settings = n.normalizeConfigurationSettings(replica.Settings)
 	replica.InheritFilesFrom(cluster)
-	replica.Files = n.normalizeConfigurationSettings(replica.Files)
+	replica.Files = n.normalizeConfigurationFiles(replica.Files)
 	replica.InheritTemplatesFrom(cluster)
 	// Normalize Shards
 	n.normalizeReplicaShardsCount(replica, cluster.Layout.ShardsCount)
@@ -1790,7 +1790,7 @@ func (n *Normalizer) normalizeHost(
 	host.InheritSettingsFrom(s, r)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
 	host.InheritFilesFrom(s, r)
-	host.Files = n.normalizeConfigurationSettings(host.Files)
+	host.Files = n.normalizeConfigurationFiles(host.Files)
 	host.InheritTemplatesFrom(s, r, nil)
 }
 
