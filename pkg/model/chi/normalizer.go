@@ -1004,7 +1004,8 @@ func (n *Normalizer) substSettingsFieldWithEnvRefToSecretField(
 	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, parseScalarString,
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			// ENV VAR name and value
-			envVarName := envVarNamePrefix + "_" + dstField
+			// In case not OK env var name will be empty and config will be incorrect. CH may not start
+			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + dstField)
 			n.appendAdditionalEnvVar(
 				core.EnvVar{
 					Name: envVarName,
@@ -1220,8 +1221,8 @@ func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
 }
 
 const (
-	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS_VAR_%d_%s"
-	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS_VAR_%d_%s"
+	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS_VAR_%d"
+	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS_VAR_%d"
 )
 
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
@@ -1231,7 +1232,7 @@ func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
 			// TODO remove as obsoleted
 			// Skip this user field, it will be processed later
 		} else {
-			envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationUsers, i, name)
+			envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationUsers, i)
 			n.substSettingsFieldWithEnvRefToSecretField(user, name, name, envVarNamePrefix, false)
 			i = i + 1
 		}
@@ -1411,7 +1412,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api
 
 	i := 1
 	settings.WalkSafe(func(name string, setting *api.Setting) {
-		envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationSettings, i, name)
+		envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationSettings, i)
 		n.substSettingsFieldWithEnvRefToSecretField(settings, name, name, envVarNamePrefix, false)
 		i = i + 1
 	})
