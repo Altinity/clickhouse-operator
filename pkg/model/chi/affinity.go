@@ -21,6 +21,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -236,7 +237,7 @@ func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
-		case api.PodDistributionNamespaceAffinity:
+		case deployment.PodDistributionNamespaceAffinity:
 			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
@@ -248,7 +249,7 @@ func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
 					},
 				),
 			)
-		case api.PodDistributionClickHouseInstallationAffinity:
+		case deployment.PodDistributionClickHouseInstallationAffinity:
 			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
@@ -260,7 +261,7 @@ func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
 					},
 				),
 			)
-		case api.PodDistributionClusterAffinity:
+		case deployment.PodDistributionClusterAffinity:
 			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
@@ -272,7 +273,7 @@ func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
 					},
 				),
 			)
-		case api.PodDistributionShardAffinity:
+		case deployment.PodDistributionShardAffinity:
 			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
@@ -284,7 +285,7 @@ func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
 					},
 				),
 			)
-		case api.PodDistributionReplicaAffinity:
+		case deployment.PodDistributionReplicaAffinity:
 			added = true
 			podAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
 				podAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
@@ -296,7 +297,7 @@ func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
 					},
 				),
 			)
-		case api.PodDistributionPreviousTailAffinity:
+		case deployment.PodDistributionPreviousTailAffinity:
 			// Newer k8s insists on Required for this Affinity
 			added = true
 			podAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
@@ -455,36 +456,36 @@ func newMatchLabels(
 	var scopeLabels map[string]string
 
 	switch podDistribution.Scope {
-	case api.PodDistributionScopeShard:
+	case deployment.PodDistributionScopeShard:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
 			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 			LabelShardName:   macrosShardName,
 		}
-	case api.PodDistributionScopeReplica:
+	case deployment.PodDistributionScopeReplica:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
 			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 			LabelReplicaName: macrosReplicaName,
 		}
-	case api.PodDistributionScopeCluster:
+	case deployment.PodDistributionScopeCluster:
 		scopeLabels = map[string]string{
 			LabelNamespace:   macrosNamespace,
 			LabelCHIName:     macrosChiName,
 			LabelClusterName: macrosClusterName,
 		}
-	case api.PodDistributionScopeClickHouseInstallation:
+	case deployment.PodDistributionScopeClickHouseInstallation:
 		scopeLabels = map[string]string{
 			LabelNamespace: macrosNamespace,
 			LabelCHIName:   macrosChiName,
 		}
-	case api.PodDistributionScopeNamespace:
+	case deployment.PodDistributionScopeNamespace:
 		scopeLabels = map[string]string{
 			LabelNamespace: macrosNamespace,
 		}
-	case api.PodDistributionScopeGlobal:
+	case deployment.PodDistributionScopeGlobal:
 		scopeLabels = map[string]string{}
 	}
 
@@ -501,7 +502,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
 		switch podDistribution.Type {
-		case api.PodDistributionClickHouseAntiAffinity:
+		case deployment.PodDistributionClickHouseAntiAffinity:
 			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -515,7 +516,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 					),
 				),
 			)
-		case api.PodDistributionMaxNumberPerNode:
+		case deployment.PodDistributionMaxNumberPerNode:
 			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -529,7 +530,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 					),
 				),
 			)
-		case api.PodDistributionShardAntiAffinity:
+		case deployment.PodDistributionShardAntiAffinity:
 			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -543,7 +544,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 					),
 				),
 			)
-		case api.PodDistributionReplicaAntiAffinity:
+		case deployment.PodDistributionReplicaAntiAffinity:
 			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -557,7 +558,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 					),
 				),
 			)
-		case api.PodDistributionAnotherNamespaceAntiAffinity:
+		case deployment.PodDistributionAnotherNamespaceAntiAffinity:
 			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -574,7 +575,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 					},
 				),
 			)
-		case api.PodDistributionAnotherClickHouseInstallationAntiAffinity:
+		case deployment.PodDistributionAnotherClickHouseInstallationAntiAffinity:
 			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
@@ -591,7 +592,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 					},
 				),
 			)
-		case api.PodDistributionAnotherClusterAntiAffinity:
+		case deployment.PodDistributionAnotherClusterAntiAffinity:
 			added = true
 			podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
 				podAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,

@@ -26,6 +26,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -1157,7 +1158,7 @@ func newDefaultHostTemplate(name string) *api.ChiHostTemplate {
 		Name: name,
 		PortDistribution: []api.ChiPortDistribution{
 			{
-				Type: api.PortDistributionUnspecified,
+				Type: deployment.PortDistributionUnspecified,
 			},
 		},
 		Spec: api.ChiHost{
@@ -1178,7 +1179,7 @@ func newDefaultHostTemplateForHostNetwork(name string) *api.ChiHostTemplate {
 		Name: name,
 		PortDistribution: []api.ChiPortDistribution{
 			{
-				Type: api.PortDistributionClusterScopeIndex,
+				Type: deployment.PortDistributionClusterScopeIndex,
 			},
 		},
 		Spec: api.ChiHost{

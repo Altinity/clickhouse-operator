@@ -22,6 +22,7 @@ import (
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
@@ -214,24 +215,24 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *apiChi.ChiPodDist
 	}
 	switch podDistribution.Type {
 	case
-		apiChi.PodDistributionUnspecified,
+		deployment.PodDistributionUnspecified,
 		// AntiAffinity section
-		apiChi.PodDistributionClickHouseAntiAffinity,
-		apiChi.PodDistributionShardAntiAffinity,
-		apiChi.PodDistributionReplicaAntiAffinity:
+		deployment.PodDistributionClickHouseAntiAffinity,
+		deployment.PodDistributionShardAntiAffinity,
+		deployment.PodDistributionReplicaAntiAffinity:
 		// PodDistribution is known
 		if podDistribution.Scope == "" {
-			podDistribution.Scope = apiChi.PodDistributionScopeCluster
+			podDistribution.Scope = deployment.PodDistributionScopeCluster
 		}
 		return nil
 	case
-		apiChi.PodDistributionAnotherNamespaceAntiAffinity,
-		apiChi.PodDistributionAnotherClickHouseInstallationAntiAffinity,
-		apiChi.PodDistributionAnotherClusterAntiAffinity:
+		deployment.PodDistributionAnotherNamespaceAntiAffinity,
+		deployment.PodDistributionAnotherClickHouseInstallationAntiAffinity,
+		deployment.PodDistributionAnotherClusterAntiAffinity:
 		// PodDistribution is known
 		return nil
 	case
-		apiChi.PodDistributionMaxNumberPerNode:
+		deployment.PodDistributionMaxNumberPerNode:
 		// PodDistribution is known
 		if podDistribution.Number < 0 {
 			podDistribution.Number = 0
@@ -239,22 +240,22 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *apiChi.ChiPodDist
 		return nil
 	case
 		// Affinity section
-		apiChi.PodDistributionNamespaceAffinity,
-		apiChi.PodDistributionClickHouseInstallationAffinity,
-		apiChi.PodDistributionClusterAffinity,
-		apiChi.PodDistributionShardAffinity,
-		apiChi.PodDistributionReplicaAffinity,
-		apiChi.PodDistributionPreviousTailAffinity:
+		deployment.PodDistributionNamespaceAffinity,
+		deployment.PodDistributionClickHouseInstallationAffinity,
+		deployment.PodDistributionClusterAffinity,
+		deployment.PodDistributionShardAffinity,
+		deployment.PodDistributionReplicaAffinity,
+		deployment.PodDistributionPreviousTailAffinity:
 		// PodDistribution is known
 		return nil
 
-	case apiChi.PodDistributionCircularReplication:
+	case deployment.PodDistributionCircularReplication:
 		// PodDistribution is known
 		// PodDistributionCircularReplication is a shortcut to simplify complex set of other distributions
 		// All shortcuts have to be expanded
 
 		if podDistribution.Scope == "" {
-			podDistribution.Scope = apiChi.PodDistributionScopeCluster
+			podDistribution.Scope = deployment.PodDistributionScopeCluster
 		}
 
 		// TODO need to support multi-cluster
@@ -263,37 +264,37 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *apiChi.ChiPodDist
 		// Expand shortcut
 		return []apiChi.ChiPodDistribution{
 			{
-				Type:  apiChi.PodDistributionShardAntiAffinity,
+				Type:  deployment.PodDistributionShardAntiAffinity,
 				Scope: podDistribution.Scope,
 			},
 			{
-				Type:  apiChi.PodDistributionReplicaAntiAffinity,
+				Type:  deployment.PodDistributionReplicaAntiAffinity,
 				Scope: podDistribution.Scope,
 			},
 			{
-				Type:   apiChi.PodDistributionMaxNumberPerNode,
+				Type:   deployment.PodDistributionMaxNumberPerNode,
 				Scope:  podDistribution.Scope,
 				Number: cluster.Layout.ReplicasCount,
 			},
 
 			{
-				Type: apiChi.PodDistributionPreviousTailAffinity,
+				Type: deployment.PodDistributionPreviousTailAffinity,
 			},
 
 			{
-				Type: apiChi.PodDistributionNamespaceAffinity,
+				Type: deployment.PodDistributionNamespaceAffinity,
 			},
 			{
-				Type: apiChi.PodDistributionClickHouseInstallationAffinity,
+				Type: deployment.PodDistributionClickHouseInstallationAffinity,
 			},
 			{
-				Type: apiChi.PodDistributionClusterAffinity,
+				Type: deployment.PodDistributionClusterAffinity,
 			},
 		}
 	}
 
 	// PodDistribution is not known
-	podDistribution.Type = apiChi.PodDistributionUnspecified
+	podDistribution.Type = deployment.PodDistributionUnspecified
 	return nil
 }
 

@@ -16,7 +16,6 @@ package v1
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"os"
 	"regexp"
 	"sort"
@@ -31,6 +30,7 @@ import (
 	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -109,6 +109,29 @@ const (
 const (
 	UsernameReplacer = "***"
 	PasswordReplacer = "***"
+)
+
+const (
+	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
+	OnStatefulSetCreateFailureActionAbort = "abort"
+
+	// What to do in case StatefulSet can't reach new Generation - delete newly created problematic StatefulSet
+	OnStatefulSetCreateFailureActionDelete = "delete"
+
+	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
+	OnStatefulSetCreateFailureActionIgnore = "ignore"
+)
+
+const (
+	// What to do in case StatefulSet can't reach new Generation - abort CHI reconcile
+	OnStatefulSetUpdateFailureActionAbort = "abort"
+
+	// What to do in case StatefulSet can't reach new Generation - delete Pod and rollback StatefulSet to previous Generation
+	// Pod would be recreated by StatefulSet based on rollback-ed configuration
+	OnStatefulSetUpdateFailureActionRollback = "rollback"
+
+	// What to do in case StatefulSet can't reach new Generation - do nothing, keep StatefulSet broken and move to the next
+	OnStatefulSetUpdateFailureActionIgnore = "ignore"
 )
 
 // OperatorConfig specifies operator configuration

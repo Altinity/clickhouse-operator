@@ -330,7 +330,7 @@ func hostApplyHostTemplate(host *api.ChiHost, template *api.ChiHostTemplate) {
 
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
-		case api.PortDistributionUnspecified:
+		case deployment.PortDistributionUnspecified:
 			if api.IsPortUnassigned(host.TCPPort) {
 				host.TCPPort = template.Spec.TCPPort
 			}
@@ -346,7 +346,7 @@ func hostApplyHostTemplate(host *api.ChiHost, template *api.ChiHostTemplate) {
 			if api.IsPortUnassigned(host.InterserverHTTPPort) {
 				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
 			}
-		case api.PortDistributionClusterScopeIndex:
+		case deployment.PortDistributionClusterScopeIndex:
 			if api.IsPortUnassigned(host.TCPPort) {
 				base := chDefaultTCPPortNumber
 				if api.IsPortAssigned(template.Spec.TCPPort) {
@@ -657,7 +657,7 @@ func (n *Normalizer) normalizeHostTemplate(template *api.ChiHostTemplate) {
 	if template.PortDistribution == nil {
 		// In case no PortDistribution provided - setup default one
 		template.PortDistribution = []api.ChiPortDistribution{
-			{Type: api.PortDistributionUnspecified},
+			{Type: deployment.PortDistributionUnspecified},
 		}
 	}
 	// Normalize PortDistribution
@@ -665,12 +665,12 @@ func (n *Normalizer) normalizeHostTemplate(template *api.ChiHostTemplate) {
 		portDistribution := &template.PortDistribution[i]
 		switch portDistribution.Type {
 		case
-			api.PortDistributionUnspecified,
-			api.PortDistributionClusterScopeIndex:
+			deployment.PortDistributionUnspecified,
+			deployment.PortDistributionClusterScopeIndex:
 			// distribution is known
 		default:
 			// distribution is not known
-			portDistribution.Type = api.PortDistributionUnspecified
+			portDistribution.Type = deployment.PortDistributionUnspecified
 		}
 	}
 
@@ -726,24 +726,24 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *api.ChiPodDistrib
 	}
 	switch podDistribution.Type {
 	case
-		api.PodDistributionUnspecified,
+		deployment.PodDistributionUnspecified,
 		// AntiAffinity section
-		api.PodDistributionClickHouseAntiAffinity,
-		api.PodDistributionShardAntiAffinity,
-		api.PodDistributionReplicaAntiAffinity:
+		deployment.PodDistributionClickHouseAntiAffinity,
+		deployment.PodDistributionShardAntiAffinity,
+		deployment.PodDistributionReplicaAntiAffinity:
 		// PodDistribution is known
 		if podDistribution.Scope == "" {
-			podDistribution.Scope = api.PodDistributionScopeCluster
+			podDistribution.Scope = deployment.PodDistributionScopeCluster
 		}
 		return nil
 	case
-		api.PodDistributionAnotherNamespaceAntiAffinity,
-		api.PodDistributionAnotherClickHouseInstallationAntiAffinity,
-		api.PodDistributionAnotherClusterAntiAffinity:
+		deployment.PodDistributionAnotherNamespaceAntiAffinity,
+		deployment.PodDistributionAnotherClickHouseInstallationAntiAffinity,
+		deployment.PodDistributionAnotherClusterAntiAffinity:
 		// PodDistribution is known
 		return nil
 	case
-		api.PodDistributionMaxNumberPerNode:
+		deployment.PodDistributionMaxNumberPerNode:
 		// PodDistribution is known
 		if podDistribution.Number < 0 {
 			podDistribution.Number = 0
@@ -751,22 +751,22 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *api.ChiPodDistrib
 		return nil
 	case
 		// Affinity section
-		api.PodDistributionNamespaceAffinity,
-		api.PodDistributionClickHouseInstallationAffinity,
-		api.PodDistributionClusterAffinity,
-		api.PodDistributionShardAffinity,
-		api.PodDistributionReplicaAffinity,
-		api.PodDistributionPreviousTailAffinity:
+		deployment.PodDistributionNamespaceAffinity,
+		deployment.PodDistributionClickHouseInstallationAffinity,
+		deployment.PodDistributionClusterAffinity,
+		deployment.PodDistributionShardAffinity,
+		deployment.PodDistributionReplicaAffinity,
+		deployment.PodDistributionPreviousTailAffinity:
 		// PodDistribution is known
 		return nil
 
-	case api.PodDistributionCircularReplication:
+	case deployment.PodDistributionCircularReplication:
 		// PodDistribution is known
 		// PodDistributionCircularReplication is a shortcut to simplify complex set of other distributions
 		// All shortcuts have to be expanded
 
 		if podDistribution.Scope == "" {
-			podDistribution.Scope = api.PodDistributionScopeCluster
+			podDistribution.Scope = deployment.PodDistributionScopeCluster
 		}
 
 		// TODO need to support multi-cluster
@@ -775,37 +775,37 @@ func (n *Normalizer) normalizePodDistribution(podDistribution *api.ChiPodDistrib
 		// Expand shortcut
 		return []api.ChiPodDistribution{
 			{
-				Type:  api.PodDistributionShardAntiAffinity,
+				Type:  deployment.PodDistributionShardAntiAffinity,
 				Scope: podDistribution.Scope,
 			},
 			{
-				Type:  api.PodDistributionReplicaAntiAffinity,
+				Type:  deployment.PodDistributionReplicaAntiAffinity,
 				Scope: podDistribution.Scope,
 			},
 			{
-				Type:   api.PodDistributionMaxNumberPerNode,
+				Type:   deployment.PodDistributionMaxNumberPerNode,
 				Scope:  podDistribution.Scope,
 				Number: cluster.Layout.ReplicasCount,
 			},
 
 			{
-				Type: api.PodDistributionPreviousTailAffinity,
+				Type: deployment.PodDistributionPreviousTailAffinity,
 			},
 
 			{
-				Type: api.PodDistributionNamespaceAffinity,
+				Type: deployment.PodDistributionNamespaceAffinity,
 			},
 			{
-				Type: api.PodDistributionClickHouseInstallationAffinity,
+				Type: deployment.PodDistributionClickHouseInstallationAffinity,
 			},
 			{
-				Type: api.PodDistributionClusterAffinity,
+				Type: deployment.PodDistributionClusterAffinity,
 			},
 		}
 	}
 
 	// PodDistribution is not known
-	podDistribution.Type = api.PodDistributionUnspecified
+	podDistribution.Type = deployment.PodDistributionUnspecified
 	return nil
 }
 

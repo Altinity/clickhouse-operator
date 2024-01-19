@@ -23,6 +23,7 @@ import (
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -57,7 +58,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
-			if podDistribution.Type == PodDistributionMaxNumberPerNode {
+			if podDistribution.Type == deployment.PodDistributionMaxNumberPerNode {
 				maxNumberOfPodsPerNode = podDistribution.Number
 			}
 		}
