@@ -976,6 +976,9 @@ def test_012(self):
         kubectl.check_service("service-default", "ClusterIP")
 
     node_port = kubectl.get("service", "service-test-012")["spec"]["ports"][0]["nodePort"]
+    service_test_012_created = kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
+    service_default_created = kubectl.get_field("service", "service-default", ".metadata.creationTimestamp")
+
 
     with Then("Update chi"):
         kubectl.create_and_check(
@@ -995,6 +998,15 @@ def test_012(self):
             assert (
                 new_node_port == node_port
             ), f"LoadBalancer.spec.ports[0].nodePort changed from {node_port} to {new_node_port}"
+
+        with And("Service for default cluster should change to LoadBalancer"):
+            kubectl.check_service("service-default", "LoadBalancer")
+
+        with And("Service should not be re-created if type has not been changed"):
+            assert service_test_012_created == kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
+
+        with And("Service should be re-created if type has been changed"):
+            assert service_default_created != kubectl.get_field("service", "service-default", ".metadata.creationTimestamp")
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
