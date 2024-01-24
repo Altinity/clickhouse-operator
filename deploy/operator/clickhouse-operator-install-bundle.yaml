@@ -2771,7 +2771,7 @@ spec:
                       type: integer
                       description: |
                         revisionHistoryLimit is the maximum number of revisions that will be
-                        maintained in the StatefulSet's revision history.                         
+                        maintained in the StatefulSet's revision history.
                         Look details in `statefulset.spec.revisionHistoryLimit`
                 pod:
                   type: object
@@ -2780,7 +2780,7 @@ spec:
                     terminationGracePeriod:
                       type: integer
                       description: |
-                        Optional duration in seconds the pod needs to terminate gracefully. 
+                        Optional duration in seconds the pod needs to terminate gracefully.
                         Look details in `pod.spec.terminationGracePeriodSeconds`
                 logger:
                   type: object
@@ -3036,7 +3036,7 @@ data:
     #   CH_PASSWORD_PLAIN=
     #   CH_CREDENTIALS_SECRET_NAMESPACE=
     #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
-    
+
     ################################################
     ##
     ## Watch section
@@ -3049,7 +3049,7 @@ data:
       # Regexp is applicable.
       #namespaces: ["dev", "test"]
       namespaces: []
-    
+
     clickhouse:
       configuration:
         ################################################
@@ -3104,7 +3104,7 @@ data:
         network:
           # Default host_regexp to limit network connectivity from outside
           hostRegexpTemplate: "(chi-{chi}-[^.]+\\d+-\\d+|clickhouse\\-{chi})\\.{namespace}\\.svc\\.cluster\\.local$"
-    
+
       ################################################
       ##
       ## Configuration restart policy section
@@ -3128,19 +3128,19 @@ data:
               - settings/max_concurrent_queries: "no"
               - settings/models_config: "no"
               - settings/user_defined_executable_functions_config: "no"
-    
+
               - zookeeper/*: "yes"
-    
+
               - files/*.xml: "yes"
               - files/config.d/*.xml: "yes"
               - files/config.d/*dict*.xml: "no"
-    
+
               - profiles/default/background_*_pool_size: "yes"
               - profiles/default/max_*_for_server: "yes"
           - version: "21.*"
             rules:
               - settings/logger: "yes"
-    
+
       #################################################
       ##
       ## Access to ClickHouse instances
@@ -3162,7 +3162,7 @@ data:
         username: ""
         password: ""
         rootCA: ""
-    
+
         # Location of the k8s Secret with username and password to be used by the operator to connect to ClickHouse instances.
         # Can be used instead of explicitly specified username and password available in sections:
         #   - clickhouse.access.username
@@ -3177,7 +3177,7 @@ data:
           name: "clickhouse-operator"
         # Port where to connect to ClickHouse instances to
         port: 8123
-    
+
         # Timeouts used to limit connection and queries from the operator to ClickHouse instances
         # Specified in seconds.
         timeouts:
@@ -3185,13 +3185,13 @@ data:
           connect: 1
           # Timout to perform SQL query from the operator to ClickHouse instances. In seconds.
           query: 4
-    
+
       #################################################
       ##
       ## Metrics collection
       ##
       ################################################
-    
+
       metrics:
         # Timeouts used to limit connection and queries from the metrics exporter to ClickHouse instances
         # Specified in seconds.
@@ -3200,7 +3200,7 @@ data:
           # Upon reaching this timeout metrics collection is aborted and no more metrics are collected in this cycle.
           # All collected metrics are returned.
           collect: 9
-    
+
     ################################################
     ##
     ## Template(s) management section
@@ -3213,12 +3213,12 @@ data:
         #   - ReadOnStart. Accept CHIT updates on the operators start only.
         #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
         policy: ApplyOnNextReconcile
-    
+
         # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
         # Templates are added to the list of all templates and used when CHI is reconciled.
         # Templates are applied in sorted alpha-numeric order.
         path: templates.d
-    
+
     ################################################
     ##
     ## Reconcile section
@@ -3229,7 +3229,7 @@ data:
       runtime:
         # Max number of concurrent CHI reconciles in progress
         reconcileCHIsThreadsNumber: 10
-    
+
         # The operator reconciles shards concurrently in each CHI with the following limitations:
         #   1. Number of shards being reconciled (and thus having hosts down) in each CHI concurrently
         #      can not be greater than 'reconcileShardsThreadsNumber'.
@@ -3237,12 +3237,12 @@ data:
         #      can not be greater than 'reconcileShardsMaxConcurrencyPercent'.
         #   3. The first shard is always reconciled alone. Concurrency starts from the second shard and onward.
         # Thus limiting number of shards being reconciled (and thus having hosts down) in each CHI by both number and percentage
-    
+
         # Max number of concurrent shard reconciles within one CHI in progress
         reconcileShardsThreadsNumber: 5
         # Max percentage of concurrent shard reconciles within one CHI in progress
         reconcileShardsMaxConcurrencyPercent: 50
-    
+
       # Reconcile StatefulSet scenario
       statefulSet:
         # Create StatefulSet scenario
@@ -3255,7 +3255,7 @@ data:
           # 2. delete - delete newly created problematic StatefulSet and follow 'abort' path afterwards.
           # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: ignore
-    
+
         # Update StatefulSet scenario
         update:
           # How many seconds to wait for created/updated StatefulSet to be 'Ready'
@@ -3272,7 +3272,7 @@ data:
           #    Follow 'abort' path afterwards.
           # 3. ignore - ignore an error, pretend nothing happened, continue reconcile and move on to the next StatefulSet.
           onFailure: abort
-    
+
       # Reconcile Host scenario
       host:
         # Whether the operator during reconcile procedure should wait for a ClickHouse host:
@@ -3284,7 +3284,7 @@ data:
           exclude: true
           queries: true
           include: false
-    
+
     ################################################
     ##
     ## Annotations management section
@@ -3299,7 +3299,7 @@ data:
       include: []
       # Exclude annotations from the following list:
       exclude: []
-    
+
     ################################################
     ##
     ## Labels management section
@@ -3328,7 +3328,7 @@ data:
       #  LabelClusterScopeCycleIndex
       #  LabelClusterScopeCycleOffset
       appendScope: "no"
-    
+
     ################################################
     ##
     ## StatefulSet management section
@@ -3336,7 +3336,7 @@ data:
     ################################################
     statefulSet:
       revisionHistoryLimit: 0
-    
+
     ################################################
     ##
     ## Pod management section
@@ -3348,7 +3348,7 @@ data:
       # SIGTERM and SIGKILL during Pod termination process.
       # Increase this number is case of slow shutdown.
       terminationGracePeriod: 30
-    
+
     ################################################
     ##
     ## Log parameters section
@@ -3377,7 +3377,6 @@ metadata:
   labels:
     clickhouse.altinity.com/chop: 0.22.2
     app: clickhouse-operator
-data:
 ---
 # Template Parameters:
 #

@@ -3344,7 +3344,6 @@ metadata:
   labels:
     clickhouse.altinity.com/chop: 0.22.2
     app: clickhouse-operator
-data:
 ---
 # Template Parameters:
 #
