@@ -1657,6 +1657,29 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallation = Requi
     num='4.32.1'
 )
 
+RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseKeeperInstallation',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL provide support to define custom resources\n'
+        'of the `ClickHouseKeeperInstallation` kind specified using `.kind` property.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'kind: "ClickHouseKeeperInstallation"\n'
+        '```\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.32.2'
+)
+
 RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallationTemplate = Requirement(
     name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate',
     version='1.0',
@@ -1683,7 +1706,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallationTemplate
     ),
     link=None,
     level=3,
-    num='4.32.2'
+    num='4.32.3'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseOperatorConfiguration = Requirement(
@@ -1710,7 +1733,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseOperatorConfiguratio
     ),
     link=None,
     level=3,
-    num='4.32.3'
+    num='4.32.4'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Metadata = Requirement(
@@ -6392,14 +6415,15 @@ QA_SRS026_ClickHouse_Operator = Specification(
         Heading(name='Service', level=2, num='3.9'),
         Heading(name='PVC', level=2, num='3.10'),
         Heading(name='CHI', level=2, num='3.11'),
-        Heading(name='Shard', level=2, num='3.12'),
-        Heading(name='Replica', level=2, num='3.13'),
-        Heading(name='ConfigMap', level=2, num='3.14'),
-        Heading(name='StatefulSet', level=2, num='3.15'),
-        Heading(name='`bool enum` Type', level=2, num='3.16'),
-        Heading(name='`string` Type', level=2, num='3.17'),
-        Heading(name='`integer` Type', level=2, num='3.18'),
-        Heading(name='`array` Type', level=2, num='3.19'),
+        Heading(name='CHKI', level=2, num='3.12'),
+        Heading(name='Shard', level=2, num='3.13'),
+        Heading(name='Replica', level=2, num='3.14'),
+        Heading(name='ConfigMap', level=2, num='3.15'),
+        Heading(name='StatefulSet', level=2, num='3.16'),
+        Heading(name='`bool enum` Type', level=2, num='3.17'),
+        Heading(name='`string` Type', level=2, num='3.18'),
+        Heading(name='`integer` Type', level=2, num='3.19'),
+        Heading(name='`array` Type', level=2, num='3.20'),
         Heading(name='Requirements', level=1, num='4'),
         Heading(name='General', level=2, num='4.1'),
         Heading(name='RQ.SRS-026.ClickHouseOperator', level=4, num='4.1.0.1'),
@@ -6571,8 +6595,9 @@ QA_SRS026_ClickHouse_Operator = Specification(
         Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion', level=3, num='4.31.1'),
         Heading(name='Resource Kind', level=2, num='4.32'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation', level=3, num='4.32.1'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate', level=3, num='4.32.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration', level=3, num='4.32.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseKeeperInstallation', level=3, num='4.32.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate', level=3, num='4.32.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration', level=3, num='4.32.4'),
         Heading(name='Metadata', level=2, num='4.33'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata', level=3, num='4.33.1'),
         Heading(name='Cluster Specification', level=2, num='4.34'),
@@ -6988,6 +7013,7 @@ QA_SRS026_ClickHouse_Operator = Specification(
         RQ_SRS_026_ClickHouseOperator_CustomResource_CustomResourceDefinition,
         RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallation,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallationTemplate,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseOperatorConfiguration,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Metadata,
@@ -7718,7 +7744,7 @@ By design each [StatefulSet] produces only one [Pod] and each [Pod] runs only
 one container with one `clickhouse-server` process.
 
 The operator watches for any changes to any resource that have either
-_ClickHouseInstallation_, _ClickHouseInstallationTemplate_, and
+_ClickHouseInstallation_, _ClickHouseInstallationTemplate_, _ClickHouseKeeperInstallation_, and
 _ClickHouseOperatorConfiguration_ kind and when change is detected the operator launches
 a reconciling cycle that creates or updates [Kubernetes] resources.
 
@@ -7788,6 +7814,11 @@ See https://kubernetes.io/docs/concepts/storage/persistent-volumes/.
 ### CHI
 
 Custom resource of `ClickHouseInstallation` kind that describes a [ClickHouse]
+cluster inside [Kubernetes].
+
+### CHKI
+
+Custom resource of `ClickHouseKeeperInstallation` kind that describes a clickhouse-keeper
 cluster inside [Kubernetes].
 
 ### Shard
@@ -8740,6 +8771,18 @@ For example,
 
 ```yaml
 kind: "ClickHouseInstallation"
+```
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseKeeperInstallation
+version: 1.0
+
+[ClickHouse Operator] SHALL provide support to define custom resources
+of the `ClickHouseKeeperInstallation` kind specified using `.kind` property.
+
+For example,
+
+```yaml
+kind: "ClickHouseKeeperInstallation"
 ```
 
 #### RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate

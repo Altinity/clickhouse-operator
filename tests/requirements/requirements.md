@@ -559,7 +559,7 @@ By design each [StatefulSet] produces only one [Pod] and each [Pod] runs only
 one container with one `clickhouse-server` process.
 
 The operator watches for any changes to any resource that have either
-_ClickHouseInstallation_, _ClickHouseInstallationTemplate_, and
+_ClickHouseInstallation_, _ClickHouseInstallationTemplate_, _ClickHouseKeeperInstallation_, and
 _ClickHouseOperatorConfiguration_ kind and when change is detected the operator launches
 a reconciling cycle that creates or updates [Kubernetes] resources.
 
@@ -629,6 +629,11 @@ See https://kubernetes.io/docs/concepts/storage/persistent-volumes/.
 ### CHI
 
 Custom resource of `ClickHouseInstallation` kind that describes a [ClickHouse]
+cluster inside [Kubernetes].
+
+### CHKI
+
+Custom resource of `ClickHouseKeeperInstallation` kind that describes a clickhouse-keeper
 cluster inside [Kubernetes].
 
 ### Shard
@@ -1581,6 +1586,18 @@ For example,
 
 ```yaml
 kind: "ClickHouseInstallation"
+```
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseKeeperInstallation
+version: 1.0
+
+[ClickHouse Operator] SHALL provide support to define custom resources
+of the `ClickHouseKeeperInstallation` kind specified using `.kind` property.
+
+For example,
+
+```yaml
+kind: "ClickHouseKeeperInstallation"
 ```
 
 #### RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate

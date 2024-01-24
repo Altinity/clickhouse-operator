@@ -4319,7 +4319,7 @@ def test_048(self):
     """""" #todo
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="clickhouse-keeper")
+    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"

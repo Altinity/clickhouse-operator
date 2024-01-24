@@ -24,9 +24,9 @@ metadata:
 spec:
   configuration:
     clusters:
-      - name: "simple-1"
+      - name: "simple-3"
         layout:
-          replicasCount: 1
+          replicasCount: 3
     settings:
       logger/level: "trace"
       logger/console: "true"
