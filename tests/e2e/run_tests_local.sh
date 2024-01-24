@@ -10,6 +10,7 @@ IMAGE_PULL_POLICY="${IMAGE_PULL_POLICY:-"IfNotPresent"}"
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"test"}"
 OPERATOR_INSTALL="${OPERATOR_INSTALL:-"yes"}"
 ONLY="${ONLY:-"*"}"
+MINIKUBE_RESET="${MINIKUBE_RESET:-""}"
 
 # replace | apply
 KUBECTL_MODE="${KUBECTL_MODE:-"replace"}"
@@ -19,6 +20,10 @@ EXECUTABLE="${EXECUTABLE:-"run_tests_operator.sh"}"
 #EXECUTABLE="${EXECUTABLE:-"run_tests_metrics.sh"}"
 
 MINIKUBE_PRELOAD_IMAGES="${MINIKUBE_PRELOAD_IMAGES:-""}"
+
+if [[ ! -z ${MINIKUBE_RESET} ]]; then
+    SKIP_K9S=yes ./run_minikube_reset.sh
+fi
 
 if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
     echo "pre-load images into minikube"
