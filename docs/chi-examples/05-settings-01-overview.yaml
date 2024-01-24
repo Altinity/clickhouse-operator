@@ -43,7 +43,7 @@ spec:
             name: clickhouse-credentials
             key: password_plain
       # User 'user_secret_ref_password_sha256_hex' has sha256 hex password specified as reference to the secret's field
-      user_secret_ref_password_sha256_hex:/password_sha256_hex:
+      user_secret_ref_password_sha256_hex/password_sha256_hex:
         valueFrom:
           secretKeyRef:
             name: clickhouse-credentials
