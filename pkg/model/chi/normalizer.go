@@ -959,7 +959,8 @@ func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
 	}
 
 	// Fetch data source address from the source setting field
-	secretAddress, err := settings.Get(srcSecretRefField).FetchDataSourceAddress(n.ctx.chi.Namespace, parseScalarString)
+	setting := settings.Get(srcSecretRefField)
+	secretAddress, err := setting.FetchDataSourceAddress(n.ctx.chi.Namespace, parseScalarString)
 	if err != nil {
 		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
 		return false
@@ -1045,18 +1046,27 @@ func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, s
 						Items: []core.KeyToPath{
 							{
 								Key:  secretAddress.Key,
-								Path: filename,
+								//Path: filename,
+								Path: secretAddress.Key,
 							},
 						},
 						DefaultMode: &defaultMode,
 					},
 				},
 			})
+
+			// TODO setting may have specified mountPath explicitly
+			mountPath := filepath.Join(dirPathSecretFilesConfig, filename)
+			// TODO setting may have specified subPath explicitly
+			// Mount as file
+			//subPath := filename
+			// Mount as folder
+			subPath := ""
 			n.appendAdditionalVolumeMount(core.VolumeMount{
 				Name:      volumeMountName,
 				ReadOnly:  true,
-				MountPath: filepath.Join(dirPathSecretFilesConfig, filename),
-				SubPath:   filename,
+				MountPath: mountPath,
+				SubPath:   subPath,
 			})
 
 			return nil, fmt.Errorf("no need to create a new setting")
