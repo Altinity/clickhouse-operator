@@ -417,17 +417,6 @@ spec:
 
 **NOTE**: secret files are mapped into `secrets.d` configuration folder using the following rule:
  `/etc/clickhouse-server/secrets.d/<config_file_name>/<secret_name>/<secret_key>`.
-Where `<config_file_name>` is the name of the file as it is named in `configuration.files` or `configuration.settings` sections.
-So for
-```yaml
-      server.crt:
-        valueFrom:
-          secretKeyRef:
-            name: clickhouse-certs
-            key: server.crt
-```
-just follow names as `server.crt` comes from `server.crt:`, then comes `clickhouse-certs` from `name: clickhouse-certs` 
-and last `server.crt` from `key: server.crt`  
 
 ### Disabling insecure connections
 
