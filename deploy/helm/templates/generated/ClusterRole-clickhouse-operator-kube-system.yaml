@@ -188,11 +188,11 @@ rules:
       - clickhousekeeperinstallations
     verbs:
       - get
+      - list
+      - watch
       - patch
       - update
       - delete
-      - list
-      - watch
   - apiGroups:
       - clickhouse-keeper.altinity.com
     resources:
