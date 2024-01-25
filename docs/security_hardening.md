@@ -386,9 +386,9 @@ spec:
         <clickhouse>
           <openSSL>
             <server>
-              <certificateFile>/etc/clickhouse-server/secret-files.d/server.crt/server.crt</certificateFile>
-              <privateKeyFile>/etc/clickhouse-server/secret-files.d/server.key/server.key</privateKeyFile>
-              <dhParamsFile>/etc/clickhouse-server/secret-files.d/dhparam.pem/dhparam.pem</dhParamsFile>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-certs/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-certs/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/secrets.d/dhparam.pem/clickhouse-certs/dhparam.pem</dhParamsFile>
               <verificationMode>none</verificationMode>
               <loadDefaultCAFile>true</loadDefaultCAFile>
               <cacheSessions>true</cacheSessions>
@@ -415,9 +415,19 @@ spec:
 
 ```
 
-**NOTE**: secret files are mapped into `secret-files.d` configuration folder using the following rule:
- `/etc/clickhouse-server/secret-files.d/<config_file_name>/<secret_key>`. In the example above `<config_file_name>` and `<secret_key>` match each other for every secret.
-
+**NOTE**: secret files are mapped into `secrets.d` configuration folder using the following rule:
+ `/etc/clickhouse-server/secrets.d/<config_file_name>/<secret_name>/<secret_key>`.
+Where `<config_file_name>` is the name of the file as it is named in `configuration.files` or `configuration.settings` sections.
+So for
+```yaml
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.crt
+```
+just follow names as `server.crt` comes from `server.crt:`, then comes `clickhouse-certs` from `name: clickhouse-certs` 
+and last `server.crt` from `key: server.crt`  
 
 ### Disabling insecure connections
 
