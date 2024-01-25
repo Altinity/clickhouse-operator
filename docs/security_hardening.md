@@ -415,7 +415,8 @@ spec:
 
 ```
 
-**Note**: secret files are mapped into `secret-files.d` configuration folder.
+**NOTE**: secret files are mapped into `secret-files.d` configuration folder using the following rule:
+ `/etc/clickhouse-server/secret-files.d/<config_file_name>/<secret_key>`. In the example above `<config_file_name>` and `<secret_key>` match each other for every secret.
 
 
 ### Disabling insecure connections
