@@ -1032,7 +1032,8 @@ func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, s
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
 			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
-			filename := srcSecretRefField
+			filenameInSettingsOrFiles := srcSecretRefField
+			filenameInMountedFS := secretAddress.Key
 
 			if !ok1 || !ok2 {
 				return nil, fmt.Errorf("unable to build k8s object name")
@@ -1046,8 +1047,7 @@ func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, s
 						Items: []core.KeyToPath{
 							{
 								Key:  secretAddress.Key,
-								//Path: filename,
-								Path: secretAddress.Key,
+								Path: filenameInMountedFS,
 							},
 						},
 						DefaultMode: &defaultMode,
@@ -1056,7 +1056,7 @@ func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, s
 			})
 
 			// TODO setting may have specified mountPath explicitly
-			mountPath := filepath.Join(dirPathSecretFilesConfig, filename)
+			mountPath := filepath.Join(dirPathSecretFilesConfig, filenameInSettingsOrFiles, secretAddress.Name)
 			// TODO setting may have specified subPath explicitly
 			// Mount as file
 			//subPath := filename
