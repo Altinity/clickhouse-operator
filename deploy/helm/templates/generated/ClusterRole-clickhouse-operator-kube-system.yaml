@@ -15,6 +15,9 @@ metadata:
   labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
   namespace: {{ .Release.Namespace }}
 rules:
+  #
+  # Base group-less resources
+  #
   - apiGroups:
       - ""
     resources:
@@ -66,6 +69,16 @@ rules:
       - watch
       - delete
   - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+  #
+  # apps.* resources
+  #
+  - apiGroups:
       - apps
     resources:
       - statefulsets
@@ -86,17 +99,21 @@ rules:
       - patch
       - update
       - delete
+  # The operator deployment personally, identified by name
   - apiGroups:
       - apps
-    resourceNames:
-      - {{ include "altinity-clickhouse-operator.fullname" . }}
     resources:
       - deployments
+    resourceNames:
+      - {{ include "altinity-clickhouse-operator.fullname" . }}
     verbs:
       - get
       - patch
       - update
       - delete
+  #
+  # policy.* resources
+  #
   - apiGroups:
       - policy
     resources:
@@ -109,19 +126,35 @@ rules:
       - watch
       - create
       - delete
+  #
+  # apiextensions
+  #
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs:
+      - get
+      - list
+  # clickhouse - related resources
   - apiGroups:
       - clickhouse.altinity.com
+    #
+    # The operators specific Custom Resources
+    #
+
     resources:
       - clickhouseinstallations
     verbs:
       - get
+      - list
+      - watch
       - patch
       - update
       - delete
   - apiGroups:
       - clickhouse.altinity.com
     resources:
-      - clickhouseinstallations
       - clickhouseinstallationtemplates
       - clickhouseoperatorconfigurations
     verbs:
@@ -148,6 +181,7 @@ rules:
       - patch
       - create
       - delete
+  # clickhouse-keeper - related resources
   - apiGroups:
       - clickhouse-keeper.altinity.com
     resources:
@@ -175,17 +209,3 @@ rules:
       - patch
       - create
       - delete
-  - apiGroups:
-      - ""
-    resources:
-      - secrets
-    verbs:
-      - get
-      - list
-  - apiGroups:
-      - apiextensions.k8s.io
-    resources:
-      - customresourcedefinitions
-    verbs:
-      - get
-      - list
