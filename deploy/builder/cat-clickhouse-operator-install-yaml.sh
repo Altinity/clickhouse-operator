@@ -255,7 +255,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${TMP_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment, w/o ConfigMaps
 
-        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment.yaml"
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-01-no-configmap.yaml"
         ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
         render_separator
         cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |                                  \
@@ -349,7 +349,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
                 envsubst
 
         # Render Deployment
-        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml"
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-01-with-configmap.yaml"
         ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
         render_separator
         cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |                                  \
