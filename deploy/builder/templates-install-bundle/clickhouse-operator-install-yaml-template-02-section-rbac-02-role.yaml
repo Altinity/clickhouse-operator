@@ -220,8 +220,8 @@ rules:
       - create
       - delete
 ---
-# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
-# ClusterRoleBinding is namespace-less and must have unique name
+# Setup [Cluster]RoleBinding between [Cluster]Role and ServiceAccount.
+# [Cluster]RoleBinding is namespace-less and must have unique name
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ${ROLE_BINDING_KIND}
 metadata:

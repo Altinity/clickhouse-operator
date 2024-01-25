@@ -143,7 +143,7 @@ fi
 # Render RBAC section for ClusterRole
 if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" ]]; then
     # Render Account
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-account.yaml"
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-service-account.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
@@ -171,7 +171,7 @@ fi
 # Render RBAC section for Role
 if [[ "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then
     # Render Account
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-account.yaml"
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-service-account.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
