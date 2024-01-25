@@ -310,7 +310,7 @@ type OperatorConfigCHIRuntime struct {
 	TemplateFiles map[string]string `json:"templateFiles,omitempty" yaml:"templateFiles,omitempty"`
 	// CHI template objects unmarshalled from CHITemplateFiles. Maps "metadata.name->object"
 	Templates []*ClickHouseInstallation `json:"-" yaml:"-"`
-	mutex     sync.RWMutex
+	mutex     sync.RWMutex              `json:"-" yaml:"-"`
 
 	// ClickHouseInstallation template
 	Template *ClickHouseInstallation `json:"-" yaml:"-"`
