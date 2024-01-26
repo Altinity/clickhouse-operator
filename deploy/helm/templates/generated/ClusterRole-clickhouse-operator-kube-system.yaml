@@ -1,12 +1,10 @@
-# Template Parameters:
-#
-# NAMESPACE=kube-system
-# COMMENT=#
-# ROLE_KIND=ClusterRole
-# ROLE_NAME=clickhouse-operator-kube-system
-# ROLE_BINDING_KIND=ClusterRoleBinding
-# ROLE_BINDING_NAME=clickhouse-operator-kube-system
-#
+# Specifies either
+#   ClusterRole
+# or
+#   Role
+# to be bound to ServiceAccount.
+# ClusterRole is namespace-less and must have unique name
+# Role is namespace-bound
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -16,7 +14,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
 rules:
   #
-  # Base group-less resources
+  # Core API group
   #
   - apiGroups:
       - ""

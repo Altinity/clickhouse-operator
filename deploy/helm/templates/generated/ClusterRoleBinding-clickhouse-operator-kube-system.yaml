@@ -1,5 +1,9 @@
-# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
+# Specifies either
+#   ClusterRoleBinding between ClusterRole and ServiceAccount.
+# or
+#   RoleBinding between Role and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
+# RoleBinding is namespace-bound
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
