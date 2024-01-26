@@ -12,11 +12,13 @@ import (
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntime "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	//	ctrl "sigs.k8s.io/controller-runtime/pkg/controller"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
 )
 
@@ -41,6 +43,9 @@ func initKeeper(ctx context.Context) {
 
 	manager, err = ctrlRuntime.NewManager(ctrlRuntime.GetConfigOrDie(), ctrlRuntime.Options{
 		Scheme: scheme,
+		Cache: cache.Options{
+			Namespaces: []string{chop.Config().GetInformerNamespace()},
+		},
 	})
 	if err != nil {
 		os.Exit(1)
@@ -49,13 +54,13 @@ func initKeeper(ctx context.Context) {
 	err = ctrlRuntime.
 		NewControllerManagedBy(manager).
 		For(&api.ClickHouseKeeperInstallation{}).
-		Owns(&apps.StatefulSet{}).Complete(&controller.ChkReconciler{
-		//WithOptions(ctrl.Options{
-		//	CacheSyncTimeout: 1*time.Second,
-		//}).Complete(&controller.ChkReconciler{
-		Client: manager.GetClient(),
-		Scheme: manager.GetScheme(),
-	})
+		Owns(&apps.StatefulSet{}).
+		Complete(
+			&controller.ChkReconciler{
+				Client: manager.GetClient(),
+				Scheme: manager.GetScheme(),
+			},
+		)
 	if err != nil {
 		os.Exit(1)
 	}
