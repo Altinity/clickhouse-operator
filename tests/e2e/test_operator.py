@@ -1308,6 +1308,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
                         f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
                         host=f"chi-{chi}-{cluster}-{shard}-0",
                         pwd=pwd,
+                        with_error=True,
                     )
                     if shards == str(num_shards):
                         break
@@ -1325,6 +1326,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
                             f"select uniq(replica_num) from system.clusters where cluster ='{cluster}'",
                             host=f"chi-{chi}-{cluster}-0-{replica}",
                             pwd=pwd,
+                            with_error=True,
                             )
                         if replicas == str(num_replicas):
                             break
@@ -3572,92 +3574,109 @@ def test_036(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
-    with When("Delete PV", description="delete PV on replica 0"):
-        # Prepare counters
-        pvc_count = kubectl.get_count("pvc", chi=chi)
-        pv_count = kubectl.get_count("pv")
-        print(f"pvc_count: {pvc_count}")
-        print(f"pv_count: {pv_count}")
+    def delete_volume():
+        with When("Delete PV", description="delete PV on replica 0"):
+            # Prepare counters
+            pvc_count = kubectl.get_count("pvc", chi=chi)
+            pv_count = kubectl.get_count("pv")
+            print(f"pvc_count: {pvc_count}")
+            print(f"pv_count: {pv_count}")
 
-        pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
-        # retry
-        kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2)
-        kubectl.launch(
-            f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
-        )
-        # Give it some time to be deleted
-        time.sleep(10)
-        kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
-        kubectl.launch(
-            f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
-            ok_to_fail = True
-        )
-        kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
-        kubectl.launch(
-            f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
-            ok_to_fail=True
-        )
-        # Give it some time to be deleted
-        time.sleep(10)
-
-        with Then("PVC should be kept, PV should be deleted"):
-            new_pvc_count = kubectl.get_count("pvc", chi=chi)
-            new_pv_count = kubectl.get_count("pv")
-            print(f"new_pvc_count: {new_pvc_count}")
-            print(f"new_pv_count: {new_pv_count}")
-            assert new_pvc_count == pvc_count
-            assert new_pv_count < pv_count
-
-    with And("Wait for PVC to detect PV is lost"):
-        # Need to add more retries on real kubernetes
-        kubectl.wait_field(
-            kind="pvc",
-            name="default-chi-test-036-volume-re-provisioning-simple-0-0-0",
-            field=".status.phase",
-            value="Lost",
-        )
-
-    with Then("Kick operator to start reconcile cycle to fix lost PV"):
-        kubectl.create_and_check(
-            manifest=f"manifests/chi/test-036-volume-re-provisioning-2.yaml",
-            check={
-                "apply_templates": {
-                    current().context.clickhouse_template,
-                },
-                "pod_count": 2,
-                "do_not_delete": 1,
-            },
-        )
-
-    with Then("I check PV is recreated"):
-        kubectl.wait_field(
-            "pvc",
-            "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
-            ".status.phase",
-            "Bound",
-        )
-        kubectl.wait_object(
-            "pv",
-            kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0"),
-        )
-        size = kubectl.get_pv_size("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
-        assert size == "1Gi", error()
-
-    with And("I check data on each replica"):
-        with By("checking data on the replica 0"):
-            r = clickhouse.query(
-                chi,
-                pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
-                sql="SELECT count(*) FROM test_local_036",
+            pv_name = kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+            # retry
+            kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2)
+            kubectl.launch(
+                f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
             )
-            assert r == "10000", error()
-        with And("checking data on the replica 1"):
-            r = clickhouse.query(
-                chi,
-                pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
-                sql="SELECT count(*) FROM test_local_036",
+            # Give it some time to be deleted
+            time.sleep(10)
+            kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
+            kubectl.launch(
+                f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+                ok_to_fail = True
             )
-            assert r == "10000", error()
+            kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
+            kubectl.launch(
+                f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+                ok_to_fail=True
+            )
+            # Give it some time to be deleted
+            time.sleep(10)
+
+            with Then("PVC should be kept, PV should be deleted"):
+                new_pvc_count = kubectl.get_count("pvc", chi=chi)
+                new_pv_count = kubectl.get_count("pv")
+                print(f"new_pvc_count: {new_pvc_count}")
+                print(f"new_pv_count: {new_pv_count}")
+                assert new_pvc_count == pvc_count
+                assert new_pv_count < pv_count
+
+        with And("Wait for PVC to detect PV is lost"):
+            # Need to add more retries on real kubernetes
+            kubectl.wait_field(
+                kind="pvc",
+                name="default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                field=".status.phase",
+                value="Lost",
+            )
+
+    def delete_pvc():
+        with When("Delete StatefulSet and PVC", description="delete StatefulSet on replica 0"):
+            kubectl.launch("delete sts chi-test-036-volume-re-provisioning-simple-0-0")
+            kubectl.launch("delete pvc default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+
+        with Then("Wait for statefulset is deleted"):
+            for i in range(5):
+                if kubectl.get_count("sts", "chi-test-036-volume-re-provisioning-simple-0-0") == 0:
+                    break
+                time.sleep(10)
+        assert kubectl.get_count("sts", "chi-test-036-volume-re-provisioning-simple-0-0") == 0, "StatefulSet is not deleted"
+        assert kubectl.get_count("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0") == 0, "PVC is not deleted"
+
+
+    def check_data_is_recovered(taskID):
+        with Then(f"Kick operator to start reconcile cycle to fix lost {taskID}"):
+            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{taskID}"}}]\''
+            kubectl.launch(cmd)
+            kubectl.wait_chi_status(chi, "InProgress")
+            kubectl.wait_chi_status(chi, "Completed")
+            wait_for_cluster(chi, cluster, 1, 2)
+
+        with Then("I check PV is recreated"):
+            kubectl.wait_field(
+                "pvc",
+                "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
+                ".status.phase",
+                "Bound",
+            )
+            kubectl.wait_object(
+                "pv",
+                kubectl.get_pv_name("default-chi-test-036-volume-re-provisioning-simple-0-0-0"),
+            )
+            size = kubectl.get_pv_size("default-chi-test-036-volume-re-provisioning-simple-0-0-0")
+            assert size == "1Gi", error()
+
+        with And("I check data on each replica"):
+            with By("checking data on the replica 0"):
+                r = clickhouse.query(
+                    chi,
+                    pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                    sql="SELECT count(*) FROM test_local_036",
+                )
+                assert r == "10000", error()
+            with And("checking data on the replica 1"):
+                r = clickhouse.query(
+                    chi,
+                    pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
+                    sql="SELECT count(*) FROM test_local_036",
+                )
+                assert r == "10000", error()
+
+    delete_pvc()
+    check_data_is_recovered("PVC")
+
+    delete_volume()
+    check_data_is_recovered("Volume")
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
