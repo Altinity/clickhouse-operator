@@ -51,6 +51,7 @@ For upgrade please install CRDs separately:
 | operator.resources | object | `{}` | custom resource configuration, look `kubectl explain pod.spec.containers.resources` for details |
 | podAnnotations | object | `{"clickhouse-operator-metrics/port":"9999","clickhouse-operator-metrics/scrape":"true","prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the clickhouse-operator pod, look `kubectl explain pod.spec.annotations` for details |
 | podSecurityContext | object | `{}` |  |
+| rbac.create | bool | `true` | specifies whether cluster roles and cluster role bindings should be created |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
 | secret.username | string | `"clickhouse_operator"` | operator credentials username |

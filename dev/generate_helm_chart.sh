@@ -267,6 +267,9 @@ function update_clusterrolebinding_resource() {
   yq e -i '.roleRef.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
   yq e -i '(.subjects[] | select(.kind == "ServiceAccount")) |= with(. ; .name = "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}" | .namespace = "{{ .Release.Namespace }}")' "${file}"
 
+  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
+
   perl -pi -e "s/'//g" "${file}"
 }
 
@@ -284,6 +287,9 @@ function update_clusterrole_resource() {
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
 
   yq e -i '(.rules[] | select(.resourceNames | contains(["clickhouse-operator"])) | .resourceNames) = ["{{ include \"altinity-clickhouse-operator.fullname\" . }}"]' "${file}"
+
+  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
 
   perl -pi -e "s/'//g" "${file}"
 }
