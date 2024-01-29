@@ -74,16 +74,14 @@ def restart_operator(ns=None, timeout=600, shell=None):
     print(f"new operator pod: {new_pod_name} ip: {new_pod_ip}")
 
 
-def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=False):
+def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_install=False):
     if force_install or kubectl.get_count("service", name=keeper_type) == 0:
 
         if keeper_type == "zookeeper":
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
         if keeper_type == "clickhouse-keeper":
-            keeper_manifest = (
-                "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
-            )
+            keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
