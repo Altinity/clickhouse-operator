@@ -4313,13 +4313,14 @@ def test_047(self):
 
 
 @TestScenario
-@Requirements()
 @Name("test_048. Clickhouse-keeper")
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
 def test_048(self):
-    """""" #todo
+    """Check clickhouse-operator support ClickHouseKeeperInstallation."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI")
+    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"

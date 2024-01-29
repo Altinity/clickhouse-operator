@@ -448,7 +448,7 @@ def test_keeper_probes_outline(
             )
 
     with Then("Check liveness and readiness probes fail"):
-        zk_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
+        zk_pod_prefix = "clickhouse-keeper" if "clickhouse-keeper" in keeper_type else "zookeeper"
         for zk_pod in range(3):
             out = kubectl.launch(f"describe pod {zk_pod_prefix}-{zk_pod}")
             assert "probe failed" not in out, "all probes shall be successful"

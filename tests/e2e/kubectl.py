@@ -138,8 +138,8 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
     else:
         # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
         # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
-        # wait_field(kind=kind, name=chi_name, field=".status.status", value="InProgress"
-        #            , ns=ns, retries=3, throw_error=False, shell=shell)
+        wait_field(kind=kind, name=chi_name, field=".status.status", value="InProgress"
+                   , ns=ns, retries=3, throw_error=False, shell=shell)
         wait_field(kind=kind, name=chi_name, field=".status.status", value="Completed"
                    , ns=ns, shell=shell)
 
