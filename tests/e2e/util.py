@@ -83,6 +83,11 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
+        if keeper_type == "clickhouse-keeper_with_CHKI":
+            keeper_manifest = (
+                "clickhouse-keeper-1-node-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
+            )
+            keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-with-CHK-resource/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
@@ -97,12 +102,14 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         expected_docs = {
             "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
             "clickhouse-keeper": 7,
+            "clickhouse-keeper_with_CHKI": 2,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
         expected_pod_prefix = {
             "zookeeper": "zookeeper",
             "zookeeper-operator": "zookeeper",
             "clickhouse-keeper": "clickhouse-keeper",
+            "clickhouse-keeper_with_CHKI": "clickhouse-keeper"
         }
         assert (
             docs_count == expected_docs[keeper_type]
@@ -152,6 +159,8 @@ def install_clickhouse_and_keeper(
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml"
+        if keeper_type == "clickhouse-keeper_with_CHKI":
+            keeper_manifest = "clickhouse-keeper-1-node-for-test-only.yaml"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml"
 
@@ -170,7 +179,7 @@ def install_clickhouse_and_keeper(
 
         chi_manifest_data = yaml_manifest.get_manifest_data(get_full_path(chi_file))
         layout = chi_manifest_data["spec"]["configuration"]["clusters"][0]["layout"]
-        expected_nodes = 1 * layout["shardsCount"] * layout["replicasCount"]
+        expected_nodes = 1 * layout["replicasCount"] if ("clickhouse-keeper" in keeper_type) else 1 * layout["shardsCount"] * layout["replicasCount"]
         check = {
             "apply_templates": [
                 chi_template_file,

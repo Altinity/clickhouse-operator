@@ -118,7 +118,7 @@ def delete_all_keeper(ns=None):
                     launch(f"delete {resource_type} -n {current().context.test_namespace} {name}", ok_to_fail=True)
 
 
-def create_and_check(manifest, check, ns=None, shell=None, timeout=1800):
+def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1800):
     chi_name = yaml_manifest.get_chi_name(util.get_full_path(f"{manifest}"))
 
     # state_field = ".status.taskID"
@@ -138,8 +138,10 @@ def create_and_check(manifest, check, ns=None, shell=None, timeout=1800):
     else:
         # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
         # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
-        wait_chi_status(chi_name, "InProgress", ns=ns, retries=3, throw_error=False, shell=shell)
-        wait_chi_status(chi_name, "Completed", ns=ns, shell=shell)
+        wait_field(kind=kind, name=chi_name, field=".status.status", value="InProgress"
+                   , ns=ns, retries=3, throw_error=False, shell=shell)
+        wait_field(kind=kind, name=chi_name, field=".status.status", value="Completed"
+                   , ns=ns, shell=shell)
 
     if "object_counts" in check:
         wait_objects(chi_name, check["object_counts"], ns=ns, shell=shell)

@@ -4384,6 +4384,65 @@ def test_047(self):
             delete_test_namespace()
 
 
+@TestScenario
+@Name("test_048. Clickhouse-keeper")
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
+def test_048(self):
+    """Check clickhouse-operator support ClickHouseKeeperInstallation."""
+
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
+    manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "default"
+    with Given("CHI with 2 shards"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                },
+            )
+    numbers = 100
+    with When("I create distributed table"):
+        create_table = """
+            CREATE TABLE test_local_048 ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace(
+            "\r", ""
+        ).replace(
+            "\n", ""
+        )
+        clickhouse.query(chi, create_table)
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_distr_048 ON CLUSTER 'default' AS test_local_048 "
+            "Engine = Distributed('default', default, test_local_048, a%2)",
+        )
+
+    with And("I insert data in the distributed table"):
+        clickhouse.query(chi, f"INSERT INTO test_distr_048 select * from numbers({numbers})")
+
+    with Then("I check clickhouse-keeper properly works"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers // 2}", error()
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers // 2}", error()
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers}", error()
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers}", error()
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
