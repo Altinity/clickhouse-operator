@@ -587,11 +587,11 @@ func (c *Creator) getPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		c.a.V(1).F().Info("statefulSet %s use custom template: %s", statefulSetName, podTemplate.Name)
+		c.a.V(3).F().Info("statefulSet %s use custom template: %s", statefulSetName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
 		podTemplate = newDefaultPodTemplate(statefulSetName, host)
-		c.a.V(1).F().Info("statefulSet %s use default generated template", statefulSetName)
+		c.a.V(3).F().Info("statefulSet %s use default generated template", statefulSetName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
@@ -1030,7 +1030,7 @@ func (c *Creator) containerAppendVolumeMount(container *core.Container, volumeMo
 		volumeMount,
 	)
 
-	c.a.V(2).F().Info(
+	c.a.V(3).F().Info(
 		"container:%s volumeMount added: %s on %s",
 		container.Name,
 		volumeMount.Name,
