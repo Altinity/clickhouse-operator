@@ -70,7 +70,7 @@ func (c *CHOp) Config() *v1.OperatorConfig {
 	return c.ConfigManager.Config()
 }
 
-// SetupLog sets up loggging options
+// SetupLog sets up logging options
 func (c *CHOp) SetupLog() {
 	updated := false
 	if c.Config().Logger.LogToStderr != "" {
