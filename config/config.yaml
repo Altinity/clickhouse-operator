@@ -11,6 +11,7 @@
 #   CH_PASSWORD_PLAIN=
 #   CH_CREDENTIALS_SECRET_NAMESPACE=
 #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
+#   VERBOSITY=2
 
 ################################################
 ##
@@ -336,7 +337,7 @@ pod:
 logger:
   logtostderr: "true"
   alsologtostderr: "false"
-  v: "1"
+  v: "2"
   stderrthreshold: ""
   vmodule: ""
   log_backtrace_at: ""

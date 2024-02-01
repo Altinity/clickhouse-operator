@@ -180,6 +180,7 @@ configs:
       #   CH_PASSWORD_PLAIN=
       #   CH_CREDENTIALS_SECRET_NAMESPACE=
       #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
+      #   VERBOSITY=1
 
       ################################################
       ##
