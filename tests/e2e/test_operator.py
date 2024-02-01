@@ -2227,6 +2227,11 @@ def test_020_2(self):
     test_020(step=2)
 
 
+def pause():
+    if settings.step_by_step:
+        input("Press Enter to continue...")
+
+
 @TestCheck
 def test_021(self, step=1):
     manifest = f"manifests/chi/test-021-{step}-rescale-volume-01.yaml"
@@ -2250,7 +2255,7 @@ def test_021(self, step=1):
         },
     )
 
-    with Then("Storage size should be 1Gi"):
+    with Then("Disk1 size should be 1Gi"):
         size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
         print(f"size: {size}")
         assert size == "1Gi"
@@ -2262,7 +2267,8 @@ def test_021(self, step=1):
 
     start_time = kubectl.get_field("pod", f"chi-{chi}-{cluster}-0-0-0", ".status.startTime")
 
-    with When("Re-scale volume configuration to 2Gi"):
+    with When("Upscale disk1 size to 2Gi"):
+        pause()
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-021-{step}-rescale-volume-02-enlarge-disk.yaml",
             check={
@@ -2271,7 +2277,7 @@ def test_021(self, step=1):
             },
         )
 
-        with Then("Storage size should be 2Gi"):
+        with Then("Disk1 size should be 2Gi"):
             kubectl.wait_field(
                 "pvc",
                 f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0",
@@ -2295,7 +2301,8 @@ def test_021(self, step=1):
                 with Then("Storage provisioner is Operator. Pod should not be restarted"):
                     assert start_time == new_start_time
 
-    with When("Add a second disk"):
+    with When("Add disk2"):
+        pause()
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-021-{step}-rescale-volume-03-add-disk.yaml",
             check={
@@ -2310,6 +2317,7 @@ def test_021(self, step=1):
         # Adding new volume takes time, so pod_volumes check does not work
 
         with Then("There should be two PVC"):
+            pause()
             size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             assert size == "2Gi"
             kubectl.wait_object("pvc", f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0")
@@ -2324,6 +2332,7 @@ def test_021(self, step=1):
             assert size == "1Gi"
 
         with And("There should be two disks recognized by ClickHouse"):
+            pause()
             kubectl.wait_pod_status(f"chi-test-021-{step}-rescale-volume-simple-0-0-0", "Running")
             # ClickHouse requires some time to mount volume. Race conditions.
             # TODO: wait for proper pod state and check the liveness probe probably. This is better than waiting
@@ -2337,10 +2346,12 @@ def test_021(self, step=1):
             assert out == "2"
 
         with And("Table should exist"):
+            pause()
             out = clickhouse.query(chi, "select * from test_local_021")
             assert out == "1"
 
-    with When("There are two disks test the move"):
+    with When("Test data move from disk1 to disk2"):
+        pause()
         with Then("Data should be initially on a default disk"):
             out = clickhouse.query(chi, "select disk_name from system.parts where table='test_local_021'")
             print(f"out : {out}")
@@ -2359,7 +2370,13 @@ def test_021(self, step=1):
                 print(f"want: disk2")
                 assert out == "disk2"
 
-    with When("Try reducing the disk size and also change a version to recreate the stateful set"):
+        with And("Table should exist"):
+            pause()
+            out = clickhouse.query(chi, "select * from test_local_021")
+            assert out == "1"
+
+    with When("Downscale disk1 back to 1Gi"):
+        pause()
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-021-{step}-rescale-volume-04-decrease-disk.yaml",
             check={
@@ -2368,16 +2385,20 @@ def test_021(self, step=1):
             },
         )
 
-        with Then("Storage size should be unchanged 2Gi"):
+        with Then("Disk1 size should be unchanged 2Gi"):
+            pause()
             size = kubectl.get_pvc_size(f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0")
             print(f"size: {size}")
             assert size == "2Gi"
 
         with And("Table should exist"):
+            pause()
             out = clickhouse.query(chi, "select * from test_local_021")
             assert out == "1"
 
         with And("PVC status should not be Terminating"):
+            pause()
+            time.sleep(10)
             status = kubectl.get_field(
                 "pvc",
                 f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0",
@@ -2385,7 +2406,8 @@ def test_021(self, step=1):
             )
             assert status != "Terminating"
 
-    with When("Revert disk size back to 2Gi"):
+    with When("Revert disk1 size back to 2Gi - upscale disk size"):
+        pause()
         kubectl.create_and_check(
             manifest=f"manifests/chi/test-021-{step}-rescale-volume-03-add-disk.yaml",
             check={
@@ -2394,7 +2416,8 @@ def test_021(self, step=1):
             },
         )
 
-        with Then("Storage size should be 2Gi"):
+        with Then("Disk1 size should be 2Gi"):
+            pause()
             kubectl.wait_field(
                 "pvc",
                 f"disk1-chi-test-021-{step}-rescale-volume-simple-0-0-0",
@@ -2406,8 +2429,19 @@ def test_021(self, step=1):
             assert size == "2Gi"
 
         with And("Table should exist"):
+            pause()
             out = clickhouse.query(chi, "select * from test_local_021")
             assert out == "1"
+
+        with And("PVC status should not be Terminating"):
+            pause()
+            time.sleep(10)
+            status = kubectl.get_field(
+                "pvc",
+                f"disk2-chi-test-021-{step}-rescale-volume-simple-0-0-0",
+                ".status.phase",
+            )
+            assert status != "Terminating"
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
@@ -3574,7 +3608,7 @@ def test_036(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
-    def delete_volume():
+    def delete_pv():
         with When("Delete PV", description="delete PV on replica 0"):
             # Prepare counters
             pvc_count = kubectl.get_count("pvc", chi=chi)
@@ -3593,7 +3627,7 @@ def test_036(self):
             kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
             kubectl.launch(
                 f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
-                ok_to_fail = True
+                ok_to_fail=True
             )
             kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
             kubectl.launch(
@@ -3620,29 +3654,72 @@ def test_036(self):
                 value="Lost",
             )
 
-    def delete_pvc():
+    def delete_sts_and_pvc():
         with When("Delete StatefulSet and PVC", description="delete StatefulSet on replica 0"):
             kubectl.launch("delete sts chi-test-036-volume-re-provisioning-simple-0-0")
             kubectl.launch("delete pvc default-chi-test-036-volume-re-provisioning-simple-0-0-0")
 
-        with Then("Wait for statefulset is deleted"):
+        with Then("Wait for StatefulSet is deleted"):
             for i in range(5):
                 if kubectl.get_count("sts", "chi-test-036-volume-re-provisioning-simple-0-0") == 0:
                     break
                 time.sleep(10)
+
+        with Then("Wait for PVC is deleted"):
+            for i in range(5):
+                if kubectl.get_count("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0") == 0:
+                    break
+                time.sleep(10)
+
         assert kubectl.get_count("sts", "chi-test-036-volume-re-provisioning-simple-0-0") == 0, "StatefulSet is not deleted"
         assert kubectl.get_count("pvc", "default-chi-test-036-volume-re-provisioning-simple-0-0-0") == 0, "PVC is not deleted"
 
+    def delete_pvc():
+        with When("Delete PVC", description="delete PVC on replica 0"):
+            # Prepare counters
+            pvc_count = kubectl.get_count("pvc", chi=chi)
+            pv_count = kubectl.get_count("pv")
+            print(f"pvc_count: {pvc_count}")
+            print(f"pv_count: {pv_count}")
 
-    def check_data_is_recovered(taskID):
-        with Then(f"Kick operator to start reconcile cycle to fix lost {taskID}"):
-            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{taskID}"}}]\''
+            pvc_name = f"default-chi-test-036-volume-re-provisioning-simple-0-0-0"
+            # retry
+            kubectl.launch(f"delete pvc {pvc_name} --force &", shell=shell_2)
+            kubectl.launch(
+                f"""patch pvc {pvc_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
+            )
+            # Give it some time to be deleted
+            time.sleep(10)
+            kubectl.launch(f"delete pvc {pvc_name} --force &", shell=shell_2, ok_to_fail=True)
+            kubectl.launch(
+                f"""patch pvc {pvc_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+                ok_to_fail=True
+            )
+            kubectl.launch(f"delete pvc {pvc_name} --force &", shell=shell_2, ok_to_fail=True)
+            kubectl.launch(
+                f"""patch pvc {pvc_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
+                ok_to_fail=True
+            )
+            # Give it some time to be deleted
+            time.sleep(10)
+
+            with Then("PVC should be deleted, PV should be deleted as well"):
+                new_pvc_count = kubectl.get_count("pvc", chi=chi)
+                new_pv_count = kubectl.get_count("pv")
+                print(f"new_pvc_count: {new_pvc_count}")
+                print(f"new_pv_count: {new_pv_count}")
+                assert new_pvc_count < pvc_count
+                assert new_pv_count < pv_count
+
+    def check_data_is_recovered(reconcile_task_id):
+        with Then(f"Kick operator to start reconcile cycle to fix lost {reconcile_task_id}"):
+            cmd = f'patch chi {chi} --type=\'json\' --patch=\'[{{"op":"add","path":"/spec/taskID","value":"{reconcile_task_id}"}}]\''
             kubectl.launch(cmd)
             kubectl.wait_chi_status(chi, "InProgress")
             kubectl.wait_chi_status(chi, "Completed")
             wait_for_cluster(chi, cluster, 1, 2)
 
-        with Then("I check PV is recreated"):
+        with Then("I check PV is in place"):
             kubectl.wait_field(
                 "pvc",
                 "default-chi-test-036-volume-re-provisioning-simple-0-0-0",
@@ -3672,11 +3749,14 @@ def test_036(self):
                 )
                 assert r == "10000", error()
 
-    delete_pvc()
-    check_data_is_recovered("PVC")
+    delete_sts_and_pvc()
+    check_data_is_recovered("reconcile-after-STS-and-PVC-deleted")
 
-    delete_volume()
-    check_data_is_recovered("Volume")
+    delete_pvc()
+    check_data_is_recovered("reconcile-after-PVC-deleted")
+    
+    delete_pv()
+    check_data_is_recovered("reconcile-after-PV-deleted")
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
