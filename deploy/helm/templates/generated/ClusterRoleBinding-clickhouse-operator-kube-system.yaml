@@ -1,3 +1,4 @@
+{{- if .Values.rbac.create -}}
 # Specifies either
 #   ClusterRoleBinding between ClusterRole and ServiceAccount.
 # or
@@ -19,3 +20,4 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+{{- end }}

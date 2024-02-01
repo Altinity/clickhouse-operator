@@ -81,3 +81,19 @@ metadata:
   labels:
     {{- include "altinity-clickhouse-operator.labels" . | nindent 4 }}
 {{- end }}
+
+{{/*
+*/}}
+{{- define "altinity-clickhouse-operator.configmap-data" }}
+{{- $root := index . 0 }}
+{{- $data := index . 1 }}
+{{- if not $data -}}
+null
+{{ end }}
+{{- range $k, $v := $data }}
+{{- if not (kindIs "string" $v) }}
+{{- $v = toYaml $v }}
+{{- end }}
+{{- tpl (toYaml (dict $k $v)) $root }}
+{{ end }}
+{{- end }}

@@ -1,3 +1,4 @@
+{{- if .Values.rbac.create -}}
 # Specifies either
 #   ClusterRole
 # or
@@ -207,3 +208,4 @@ rules:
       - patch
       - create
       - delete
+{{- end }}

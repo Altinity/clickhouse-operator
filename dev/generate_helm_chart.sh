@@ -229,8 +229,12 @@ function update_configmap_resource() {
   data=$(yq e '.data' "${file}")
 
   if [ "${name}" = "etc-clickhouse-operator-files" ]; then
-    readonly search='name: "clickhouse-operator"'
-    readonly replace='name: "{{ include "altinity-clickhouse-operator.fullname" . }}"'
+    local search='name: "clickhouse-operator"'
+    local replace="name: '{{ include \"altinity-clickhouse-operator.fullname\" . }}'"
+    data=${data/"${search}"/"${replace}"}
+
+    search='config.yaml: |'
+    replace='config.yaml:'
     data=${data/"${search}"/"${replace}"}
   fi
 
@@ -241,7 +245,7 @@ function update_configmap_resource() {
   yq e -i '.metadata.name |= "{{ printf \"%s-'"${name_suffix}"'\" (include \"altinity-clickhouse-operator.fullname\" .) }}"' "${file}"
   yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
-  yq e -i '.data |= "{{ tpl (toYaml .Values.configs.'"${cameled_name}"') . | nindent 2 }}"' "${file}"
+  yq e -i '.data |= "{{ include \"altinity-clickhouse-operator.configmap-data\" (list . .Values.configs.'"${cameled_name}"') | nindent 2 }}"' "${file}"
 
   if [ -z "${data}" ]; then
     yq e -i '.configs.'"${cameled_name}"' |= null' "${values_yaml}"
@@ -267,6 +271,9 @@ function update_clusterrolebinding_resource() {
   yq e -i '.roleRef.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
   yq e -i '(.subjects[] | select(.kind == "ServiceAccount")) |= with(. ; .name = "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}" | .namespace = "{{ .Release.Namespace }}")' "${file}"
 
+  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
+
   perl -pi -e "s/'//g" "${file}"
 }
 
@@ -284,6 +291,9 @@ function update_clusterrole_resource() {
   yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
 
   yq e -i '(.rules[] | select(.resourceNames | contains(["clickhouse-operator"])) | .resourceNames) = ["{{ include \"altinity-clickhouse-operator.fullname\" . }}"]' "${file}"
+
+  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
 
   perl -pi -e "s/'//g" "${file}"
 }

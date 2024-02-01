@@ -123,6 +123,8 @@ def set_settings(self):
     self.context.prometheus_operator_version = define("prometheus_operator_version", "0.68")
     self.context.prometheus_scrape_interval = define("prometheus_scrape_interval", 10)
 
+    self.context.keeper_type = define("keeper_type", os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper") # zookeeper | clickhouse_keeper
+
     self.context.minio_version = define("minio_version", "latest")
 
 
