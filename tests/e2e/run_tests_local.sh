@@ -47,7 +47,7 @@ if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
 fi
 
 echo "Build" && \
-${CUR_DIR}/../../dev/image_build_all_dev.sh && \
+VERBOSITY=2 ${CUR_DIR}/../../dev/image_build_all_dev.sh && \
 echo "Load images" && \
 minikube image load "${OPERATOR_IMAGE}" && \
 minikube image load "${METRICS_EXPORTER_IMAGE}" && \
