@@ -49,7 +49,7 @@ func MessageDiffString(diff *messagediff.Diff, equal bool) string {
 // MessageDiffItemString stringifies one map[*messagediff.Path]interface{} item
 func MessageDiffItemString(banner, defaultPath string, items map[*messagediff.Path]interface{}) string {
 	var str string
-	str += fmt.Sprintf("AP item start -------------------------\n")
+	str += fmt.Sprintf("Diff item start -------------------------\n")
 	str += fmt.Sprintf("%s: %d\n", banner, len(items))
 	i := 0
 	for pathPtr := range items {
@@ -70,10 +70,10 @@ func MessageDiffItemString(banner, defaultPath string, items map[*messagediff.Pa
 		if path == "" {
 			path = defaultPath
 		}
-		str += fmt.Sprintf("ap item path [%d]:'%s'\n", i, path)
+		str += fmt.Sprintf("diff item path [%d]:'%s'\n", i, path)
 
-		short := fmt.Sprintf("ap item value[%d]:'%+v'\n", i, items[pathPtr])
-		full := fmt.Sprintf("ap item value[%d]:'%s'\n", i, Dump(items[pathPtr]))
+		short := fmt.Sprintf("diff item value[%d]:'%+v'\n", i, items[pathPtr])
+		full := fmt.Sprintf("diff item value[%d]:'%s'\n", i, Dump(items[pathPtr]))
 		if len(full) < 300 {
 			str += full
 		} else {
@@ -81,7 +81,7 @@ func MessageDiffItemString(banner, defaultPath string, items map[*messagediff.Pa
 		}
 		i++
 	}
-	str += fmt.Sprintf("AP item end -------------------------\n")
+	str += fmt.Sprintf("Diff item end -------------------------\n")
 
 	return str
 }
