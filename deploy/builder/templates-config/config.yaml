@@ -5,6 +5,7 @@
 #   CH_PASSWORD_PLAIN=${CH_PASSWORD_PLAIN}
 #   CH_CREDENTIALS_SECRET_NAMESPACE=${CH_CREDENTIALS_SECRET_NAMESPACE}
 #   CH_CREDENTIALS_SECRET_NAME=${CH_CREDENTIALS_SECRET_NAME}
+#   VERBOSITY=${VERBOSITY}
 
 ################################################
 ##
@@ -330,7 +331,7 @@ pod:
 logger:
   logtostderr: "true"
   alsologtostderr: "false"
-  v: "1"
+  v: "${VERBOSITY}"
   stderrthreshold: ""
   vmodule: ""
   log_backtrace_at: ""
