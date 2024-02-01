@@ -656,29 +656,37 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	return true
 }
 
-func (w *worker) deleteLostPVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
+func (w *worker) isLostPV(pvc *core.PersistentVolumeClaim) bool {
 	if pvc == nil {
 		return false
 	}
 
-	if pvc.Status.Phase != core.ClaimLost {
-		return false
-	}
+	return pvc.Status.Phase == core.ClaimLost
+}
 
-	w.a.V(1).M(pvc).F().S().Info("delete lost PVC start: %s/%s", pvc.Namespace, pvc.Name)
-	defer w.a.V(1).M(pvc).F().E().Info("delete lost PVC end: %s/%s", pvc.Namespace, pvc.Name)
+func (w *worker) deletePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
+	w.a.V(1).M(pvc).F().S().Info("delete PVC with lost PV start: %s/%s", pvc.Namespace, pvc.Name)
+	defer w.a.V(1).M(pvc).F().E().Info("delete PVC with lost PV end: %s/%s", pvc.Namespace, pvc.Name)
 
+	w.a.V(2).M(pvc).F().Info("PVC with lost PV about to be deleted: %s/%s", pvc.Namespace, pvc.Name)
 	w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, controller.NewDeleteOptions())
 
 	for i := 0; i < 360; i++ {
+
+		// Check availability
+		w.a.V(2).M(pvc).F().Info("check PVC with lost PV availability: %s/%s", pvc.Namespace, pvc.Name)
 		curPVC, err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, controller.NewGetOptions())
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
+				// Not available - concider to bbe deleted
+				w.a.V(1).M(pvc).F().Warning("PVC with lost PV was deleted: %s/%s", pvc.Namespace, pvc.Name)
 				return true
 			}
 		}
+
+		// PVC is not deleted (yet?). May be it has finalizers installed. Need to clean them.
 		if len(curPVC.Finalizers) > 0 {
-			w.a.V(1).M(pvc).F().Info("clean finalizers for lost PVC: %s/%s", pvc.Namespace, pvc.Name)
+			w.a.V(2).M(pvc).F().Info("clean finalizers for PVC with lost PV: %s/%s", pvc.Namespace, pvc.Name)
 			curPVC.Finalizers = nil
 			w.c.updatePersistentVolumeClaim(ctx, curPVC)
 		}

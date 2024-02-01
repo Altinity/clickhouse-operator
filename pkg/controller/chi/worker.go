@@ -21,8 +21,6 @@ import (
 	"time"
 
 	"github.com/juliangruber/go-intersect"
-	"gopkg.in/d4l3k/messagediff.v1"
-
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -846,7 +844,7 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api
 	}
 
 	w.prepareDesiredStatefulSet(host, shutdown)
-	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host.DesiredStatefulSet.ObjectMeta))
+	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host))
 }
 
 // prepareDesiredStatefulSet prepares desired StatefulSet
@@ -939,7 +937,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.ChiHost, opts ...*
 func (w *worker) shouldMigrateTables(host *api.ChiHost, opts ...*migrateTableOptions) bool {
 	o := NewMigrateTableOptionsArr(opts...).First()
 
-	// Deal with special cases
+	// Deal with special cases in order of priority
 	switch {
 	case host.IsStopped():
 		// Stopped host is not able to receive any data, migration is inapplicable
@@ -949,12 +947,11 @@ func (w *worker) shouldMigrateTables(host *api.ChiHost, opts ...*migrateTableOpt
 		// Force migration requested
 		return true
 
-	case util.InArray(model.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated()):
+	case model.HostHasTablesCreated(host):
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
-	case host.GetCHI().EnsureStatus().GetHostsCount() == host.GetCHI().EnsureStatus().GetHostsAddedCount():
-		// TODO there should be better way to detect newly created CHI
+	case model.HostIsNewOne(host):
 		// CHI is new, all hosts were added
 		return false
 	}
@@ -1115,33 +1112,33 @@ func (w *worker) shouldExcludeHost(host *api.ChiHost) bool {
 	case host.IsStopped():
 		w.a.V(1).
 			M(host).F().
-			Info("Host is stopped, no need to exclude stopped host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-		return false
-	case w.shouldForceRestartHost(host):
-		w.a.V(1).
-			M(host).F().
-			Info("Host should be restarted, need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-		return true
-	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew:
-		w.a.V(1).
-			M(host).F().
-			Info("Host is new, no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
-		return false
-	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame:
-		w.a.V(1).
-			M(host).F().
-			Info("Host is the same, would not be updated, no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Host is stopped, no need to exclude stopped host. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case host.GetShard().HostsCount() == 1:
 		w.a.V(1).
 			M(host).F().
-			Info("Host is the only host in shard (means no replication), no need to exclude host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Host is the only host in the shard (means no replication), no need to exclude. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return false
+	case w.shouldForceRestartHost(host):
+		w.a.V(1).
+			M(host).F().
+			Info("Host should be restarted, need to exclude. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return true
+	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew:
+		w.a.V(1).
+			M(host).F().
+			Info("Host is new, no need to exclude. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		return false
+	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame:
+		w.a.V(1).
+			M(host).F().
+			Info("Host is the same, would not be updated, no need to exclude. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	}
 
 	w.a.V(1).
 		M(host).F().
-		Info("Host should be excluded, host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		Info("Host should be excluded. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 
 	return true
 }
@@ -1174,23 +1171,23 @@ func (w *worker) shouldWaitQueries(host *api.ChiHost) bool {
 	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew:
 		w.a.V(1).
 			M(host).F().
-			Info("No need to wait for queries to complete, host is a new one host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("No need to wait for queries to complete, host is a new one. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return false
 	case chop.Config().Reconcile.Host.Wait.Queries.Value():
 		w.a.V(1).
 			M(host).F().
-			Info("Will wait for queries to complete according to CHOp config reconcile.host.wait.queries setting, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Will wait for queries to complete according to CHOp config 'reconcile.host.wait.queries' setting. Host is not yet in the cluster. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
-			Info("Will wait for queries to complete according to CHI reconciling.policy setting, host is not yet in the cluster host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Will wait for queries to complete according to CHI 'reconciling.policy' setting. Host is not yet in the cluster. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 		return true
 	}
 
 	w.a.V(1).
 		M(host).F().
-		Info("Will NOT wait for queries to complete host %d shard %d cluster %s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+		Info("Will NOT wait for queries to complete on the host. Host/shard/cluster %d/%d/%s", host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
 	return false
 }
 
@@ -1470,21 +1467,30 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 }
 
 // getStatefulSetStatus gets StatefulSet status
-func (w *worker) getStatefulSetStatus(meta meta.ObjectMeta) api.ObjectStatus {
+func (w *worker) getStatefulSetStatus(host *api.ChiHost) api.ObjectStatus {
+	meta := host.DesiredStatefulSet.ObjectMeta
 	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
 	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
 
 	curStatefulSet, err := w.c.getStatefulSet(&meta, false)
 	switch {
 	case curStatefulSet != nil:
-		// Have StatefulSet available, try to perform label-based comparison
+		w.a.V(2).M(meta).Info("Have StatefulSet available, try to perform label-based comparison for %s/%s", meta.Namespace, meta.Name)
 		return w.getObjectStatusFromMetas(curStatefulSet.ObjectMeta, meta)
 
 	case apiErrors.IsNotFound(err):
-		// No cur StatefulSet available and it is not found - adding new one
-		return api.ObjectStatusNew
+		// StatefulSet is not found at the moment.
+		// However, it may be just deleted
+		w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found. Either new one or deleted for %s/%s", meta.Namespace, meta.Name)
+		if host.IsNewOne() {
+			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is new one. New one for %s/%s", meta.Namespace, meta.Name)
+			return api.ObjectStatusNew
+		}
+		w.a.V(1).M(meta).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for %s/%s", meta.Namespace, meta.Name)
+		return api.ObjectStatusModified
 
 	default:
+		w.a.V(2).M(meta).Warning("Have no StatefulSet available, nor it is not found for %s/%s err: %v", meta.Namespace, meta.Name, err)
 		return api.ObjectStatusUnknown
 	}
 }
@@ -1682,9 +1688,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error
 			WithStatusAction(host.CHI).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
-		diff, equal := messagediff.DeepDiff(curStatefulSet.Spec, newStatefulSet.Spec)
-		w.a.V(2).M(host).Info("StatefulSet.Spec diff:")
-		w.a.V(2).M(host).Info(util.MessageDiffString(diff, equal))
+		w.dumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
 		return w.recreateStatefulSet(ctx, host)
 	case errCRUDUnexpectedFlow:
 		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
@@ -1703,8 +1707,7 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost) err
 	}
 
 	_ = w.c.deleteStatefulSet(ctx, host)
-	_ = w.reconcilePVCs(ctx, host)
-	//host.StatefulSet = host.DesiredStatefulSet
+	_ = w.reconcilePVCs(ctx, host, api.DesiredStatefulSet)
 	return w.createStatefulSet(ctx, host)
 }
 
