@@ -129,7 +129,7 @@ func (c *Controller) addEventHandlersCHI(
 			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			log.V(2).M(chi).Info("chiInformer.AddFunc")
+			log.V(3).M(chi).Info("chiInformer.AddFunc")
 			c.enqueueObject(NewReconcileCHI(reconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -138,7 +138,7 @@ func (c *Controller) addEventHandlersCHI(
 			if !chop.Config().IsWatchedNamespace(newChi.Namespace) {
 				return
 			}
-			log.V(2).M(newChi).Info("chiInformer.UpdateFunc")
+			log.V(3).M(newChi).Info("chiInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileCHI(reconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -146,7 +146,7 @@ func (c *Controller) addEventHandlersCHI(
 			if !chop.Config().IsWatchedNamespace(chi.Namespace) {
 				return
 			}
-			log.V(2).M(chi).Info("chiInformer.DeleteFunc")
+			log.V(3).M(chi).Info("chiInformer.DeleteFunc")
 			c.enqueueObject(NewReconcileCHI(reconcileDelete, chi, nil))
 		},
 	})
@@ -161,7 +161,7 @@ func (c *Controller) addEventHandlersCHIT(
 			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			log.V(2).M(chit).Info("chitInformer.AddFunc")
+			log.V(3).M(chit).Info("chitInformer.AddFunc")
 			c.enqueueObject(NewReconcileCHIT(reconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -170,7 +170,7 @@ func (c *Controller) addEventHandlersCHIT(
 			if !chop.Config().IsWatchedNamespace(newChit.Namespace) {
 				return
 			}
-			log.V(2).M(newChit).Info("chitInformer.UpdateFunc")
+			log.V(3).M(newChit).Info("chitInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileCHIT(reconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -178,7 +178,7 @@ func (c *Controller) addEventHandlersCHIT(
 			if !chop.Config().IsWatchedNamespace(chit.Namespace) {
 				return
 			}
-			log.V(2).M(chit).Info("chitInformer.DeleteFunc")
+			log.V(3).M(chit).Info("chitInformer.DeleteFunc")
 			c.enqueueObject(NewReconcileCHIT(reconcileDelete, chit, nil))
 		},
 	})
@@ -193,7 +193,7 @@ func (c *Controller) addEventHandlersChopConfig(
 			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
-			log.V(2).M(chopConfig).Info("chopInformer.AddFunc")
+			log.V(3).M(chopConfig).Info("chopInformer.AddFunc")
 			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
@@ -202,7 +202,7 @@ func (c *Controller) addEventHandlersChopConfig(
 			if !chop.Config().IsWatchedNamespace(newChopConfig.Namespace) {
 				return
 			}
-			log.V(2).M(newChopConfig).Info("chopInformer.UpdateFunc")
+			log.V(3).M(newChopConfig).Info("chopInformer.UpdateFunc")
 			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -210,7 +210,7 @@ func (c *Controller) addEventHandlersChopConfig(
 			if !chop.Config().IsWatchedNamespace(chopConfig.Namespace) {
 				return
 			}
-			log.V(2).M(chopConfig).Info("chopInformer.DeleteFunc")
+			log.V(3).M(chopConfig).Info("chopInformer.DeleteFunc")
 			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
 		},
 	})
@@ -324,7 +324,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).M(endpoints).Info("endpointsInformer.AddFunc")
+			log.V(3).M(endpoints).Info("endpointsInformer.AddFunc")
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldEndpoints := old.(*core.Endpoints)
@@ -332,7 +332,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&oldEndpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
+			log.V(3).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
 			if updated(oldEndpoints, newEndpoints) {
 				c.enqueueObject(NewReconcileEndpoints(reconcileUpdate, oldEndpoints, newEndpoints))
 				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
@@ -343,7 +343,7 @@ func (c *Controller) addEventHandlersEndpoint(
 			if !c.isTrackedObject(&endpoints.ObjectMeta) {
 				return
 			}
-			log.V(2).M(endpoints).Info("endpointsInformer.DeleteFunc")
+			log.V(3).M(endpoints).Info("endpointsInformer.DeleteFunc")
 		},
 	})
 }
@@ -424,7 +424,7 @@ func (c *Controller) addEventHandlersPod(
 			if !c.isTrackedObject(&newPod.ObjectMeta) {
 				return
 			}
-			log.V(2).M(newPod).Info("podInformer.UpdateFunc")
+			log.V(3).M(newPod).Info("podInformer.UpdateFunc")
 			c.enqueueObject(NewReconcilePod(reconcileUpdate, oldPod, newPod))
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -761,7 +761,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 	}
 
 	namespace, name := util.NamespaceName(chi.ObjectMeta)
-	log.V(2).M(chi).F().Info("Update CHI status")
+	log.V(3).M(chi).F().Info("Update CHI status")
 
 	podIPs := c.getPodsIPs(chi)
 
@@ -794,7 +794,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 
 	// Propagate updated ResourceVersion into chi
 	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
-		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
+		log.V(3).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
 		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
 		return nil
 	}
