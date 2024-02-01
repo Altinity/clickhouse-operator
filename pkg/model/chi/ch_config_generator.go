@@ -17,6 +17,7 @@ package chi
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -253,7 +254,12 @@ func (o *RemoteServersGeneratorOptions) String() string {
 	if o == nil {
 		return "(nil)"
 	}
-	return fmt.Sprintf("exclude hosts: %v, attributes: %s", o.exclude.hosts, o.exclude.attributes)
+
+	var hostnames []string
+	for _, host := range o.exclude.hosts {
+		hostnames = append(hostnames, host.Name)
+	}
+	return fmt.Sprintf("exclude hosts: %s, attributes: %s", "["+strings.Join(hostnames, ",")+"]", o.exclude.attributes)
 }
 
 // defaultRemoteServersGeneratorOptions
