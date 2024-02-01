@@ -77,3 +77,5 @@ prometheus_operator_version = "0.68"
 prometheus_scrape_interval = 10
 
 minio_version = "latest"
+
+step_by_step = True if "STEP" in os.environ else False
