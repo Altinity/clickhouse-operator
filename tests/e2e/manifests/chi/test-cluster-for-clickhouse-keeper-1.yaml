@@ -7,7 +7,8 @@ metadata:
 
 spec:
   useTemplates:
-    - name: clickhouse-latest-version
+    # todo wait when fix https://github.com/ClickHouse/ClickHouse/issues/52991#issuecomment-1871175633
+    - name: clickhouse-version
     - name: persistent-volume
   configuration:
     zookeeper:

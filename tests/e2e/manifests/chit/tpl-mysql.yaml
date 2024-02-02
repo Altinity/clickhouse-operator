@@ -1,0 +1,29 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+
+metadata:
+  name: mysql-port
+spec:
+  templating:
+    policy: auto
+  configuration:
+    settings:
+      mysql_port: 9004
+  templates:
+    podTemplates:
+      - name: clickhouse-replica-1
+        spec:
+          containers:
+            - name: clickhouse-pod
+              ports:
+              - containerPort: 9004
+                name: mysql
+                protocol: TCP
+      - name: clickhouse-replica-2
+        spec:
+          containers:
+            - name: clickhouse-pod
+              ports:
+              - containerPort: 9004
+                name: mysql
+                protocol: TCP

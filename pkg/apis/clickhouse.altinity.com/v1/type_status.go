@@ -15,16 +15,25 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/clickhouse-operator/pkg/version"
 	"sort"
 	"sync"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 const (
 	maxActions = 10
 	maxErrors  = 10
 	maxTaskIDs = 10
+)
+
+// Possible CHI statuses
+const (
+	StatusInProgress  = "InProgress"
+	StatusCompleted   = "Completed"
+	StatusAborted     = "Aborted"
+	StatusTerminating = "Terminating"
 )
 
 // ChiStatus defines status section of ClickHouseInstallation resource.

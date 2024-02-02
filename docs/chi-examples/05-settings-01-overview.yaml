@@ -4,12 +4,9 @@ metadata:
   name: clickhouse-credentials
 type: Opaque
 stringData:
-  testpwduser1: password
-  testpwduser2: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
-  testpwduser3: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
-  testenvpwduser1: password
-  testenvpwduser2: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
-  testenvpwduser3: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+  password_plain: password
+  password_sha256_hex: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
+  password_double_sha1_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
 ---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
@@ -18,8 +15,10 @@ metadata:
 spec:
   configuration:
     users:
+      # User 'default' has plain 'password' specified, while user 'admin' has 'password_sha256_hex' specified
       default/password: qwerty
-      # test user has 'password' specified, while admin user has 'password_sha256_hex' specified
+
+      # User 'test' has plain 'password' specified, while user 'admin' has 'password_sha256_hex' specified
       test/password: qwerty
       test/networks/ip:
         - "127.0.0.1/32"
@@ -30,25 +29,50 @@ spec:
         - "dbname1"
         - "dbname2"
         - "dbname3"
-      # reference to namespace/name/field in the secret with plain password
-      testpwduser1/k8s_secret_password: dev/clickhouse-credentials/testpwduser1
-      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
-      testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/testpwduser2
-      testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/testpwduser3
-      # reference to namespace/name/field in the secret with plain password
-      testenvpwduser1/k8s_secret_env_password: dev/clickhouse-credentials/testenvpwduser1
-      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
-      testenvpwduser2/k8s_secret_env_password_sha256_hex: clickhouse-credentials/testenvpwduser2
-      testenvpwduser3/k8s_secret_env_password_double_sha1_hex: clickhouse-credentials/testenvpwduser3
-      # admin use has 'password_sha256_hex' so actual password value is not published
+
+      # User 'admin' has 'password_sha256_hex' specified, thus plain password value is not published
       admin/password_sha256_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
       admin/networks/ip: "127.0.0.1/32"
       admin/profile: default
       admin/quota: default
-      # readonly user has 'password' field specified, not 'password_sha256_hex' as admin user above
+
+      # User 'user_secret_ref_password_plain' has plain password specified as reference to the secret's field
+      user_secret_ref_password_plain/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: password_plain
+      # User 'user_secret_ref_password_sha256_hex' has sha256 hex password specified as reference to the secret's field
+      user_secret_ref_password_sha256_hex/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: password_sha256_hex
+
+      # User 'user_secret_ref_password_double_sha1_hex' has double sha1 hex password specified as reference to the secret's field
+      user_secret_ref_password_double_sha1_hex/password_double_sha1_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: password_double_sha1_hex
+
+      # User 'readonly' has plain 'password' specified
       readonly/password: readonly_password
       readonly/profile: readonly
       readonly/quota: default
+
+      # reference to namespace/name/field in the secret with plain password
+      testpwduser1/k8s_secret_password: dev/clickhouse-credentials/password_plain
+      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      testpwduser2/k8s_secret_password_sha256_hex: clickhouse-credentials/password_sha256_hex
+      testpwduser3/k8s_secret_password_double_sha1_hex: clickhouse-credentials/password_double_sha1_hex
+
+      # reference to namespace/name/field in the secret with plain password
+      testenvpwduser1/k8s_secret_env_password: dev/clickhouse-credentials/password_plain
+      # reference to the same namespace as operator is running in/name/field in the secret with sha256 password
+      testenvpwduser2/k8s_secret_env_password_sha256_hex: clickhouse-credentials/password_sha256_hex
+      testenvpwduser3/k8s_secret_env_password_double_sha1_hex: clickhouse-credentials/password_double_sha1_hex
+
     profiles:
       test_profile/max_memory_usage: 1000000000
       test_profile/readonly: 1

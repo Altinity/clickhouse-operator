@@ -74,20 +74,23 @@ def restart_operator(ns=None, timeout=600, shell=None):
     print(f"new operator pod: {new_pod_name} ip: {new_pod_ip}")
 
 
-def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=False):
+def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_install=False):
     if force_install or kubectl.get_count("service", name=keeper_type) == 0:
 
         if keeper_type == "zookeeper":
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml" if keeper_manifest == "" else keeper_manifest
-            keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
         if keeper_type == "clickhouse-keeper":
+            keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
+            keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
+        if keeper_type == "clickhouse-keeper_with_CHKI":
             keeper_manifest = (
-                "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
+                "clickhouse-keeper-1-node-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
-            keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-with-CHK-resource/{keeper_manifest}"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml" if keeper_manifest == "" else keeper_manifest
-            keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+            keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
 
         multi_doc = yaml_manifest.get_multidoc_manifest_data(get_full_path(keeper_manifest, lookup_in_host=True))
         keeper_nodes = 1
@@ -98,13 +101,15 @@ def require_keeper(keeper_manifest="", keeper_type="zookeeper", force_install=Fa
                 keeper_nodes = doc["spec"]["replicas"]
         expected_docs = {
             "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
-            "clickhouse-keeper": 6,
+            "clickhouse-keeper": 7,
+            "clickhouse-keeper_with_CHKI": 2,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
         expected_pod_prefix = {
             "zookeeper": "zookeeper",
             "zookeeper-operator": "zookeeper",
             "clickhouse-keeper": "clickhouse-keeper",
+            "clickhouse-keeper_with_CHKI": "clickhouse-keeper"
         }
         assert (
             docs_count == expected_docs[keeper_type]
@@ -154,6 +159,8 @@ def install_clickhouse_and_keeper(
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml"
+        if keeper_type == "clickhouse-keeper_with_CHKI":
+            keeper_manifest = "clickhouse-keeper-1-node-for-test-only.yaml"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml"
 
@@ -172,7 +179,7 @@ def install_clickhouse_and_keeper(
 
         chi_manifest_data = yaml_manifest.get_manifest_data(get_full_path(chi_file))
         layout = chi_manifest_data["spec"]["configuration"]["clusters"][0]["layout"]
-        expected_nodes = 1 * layout["shardsCount"] * layout["replicasCount"]
+        expected_nodes = 1 * layout["replicasCount"] if ("clickhouse-keeper" in keeper_type) else 1 * layout["shardsCount"] * layout["replicasCount"]
         check = {
             "apply_templates": [
                 chi_template_file,
@@ -320,7 +327,7 @@ def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     for i in range(retries):
         readonly_replicas = clickhouse.query(
             chi["metadata"]["name"],
-            "SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
+            "SYSTEM DROP DNS CACHE; SELECT groupArray(if(value<0,0,value)) FROM cluster('all-sharded',system.metrics) WHERE metric='ReadonlyReplica'",
         )
         if readonly_replicas == expected_replicas:
             message(f"OK ReadonlyReplica actual={readonly_replicas}, expected={expected_replicas}")

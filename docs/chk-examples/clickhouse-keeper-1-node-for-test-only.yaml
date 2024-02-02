@@ -1,0 +1,44 @@
+---
+# Fake Service to drop-in replacement in tests
+apiVersion: v1
+kind: Service
+metadata:
+  # DNS would be like zookeeper.namespace.svc
+  name: zookeeper
+  labels:
+    app: zookeeper
+spec:
+  ports:
+    - port: 2181
+      name: client
+    - port: 7000
+      name: prometheus
+  selector:
+    app: clickhouse-keeper
+    what: node
+---
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: clickhouse-keeper
+spec:
+  configuration:
+    clusters:
+      - name: "simple-1"
+        layout:
+          replicasCount: 1
+    settings:
+      logger/level: "trace"
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      keeper_server/storage_path: /var/lib/clickhouse-keeper
+      keeper_server/tcp_port: "2181"
+      keeper_server/four_letter_word_white_list: "*"
+      keeper_server/coordination_settings/raft_logs_level: "information"
+      keeper_server/raft_configuration/server/port: "9444"
+      prometheus/endpoint: "/metrics"
+      prometheus/port: "7000"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+      prometheus/status_info: "false"

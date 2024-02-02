@@ -17,7 +17,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+              image: clickhouse/clickhouse-server:23.8
               env:
                 - name: TEST_ENV
                   value: TEST_ENV_VALUE

@@ -1,5 +1,10 @@
-# Setup ClusterRoleBinding between ClusterRole and ServiceAccount.
+{{- if .Values.rbac.create -}}
+# Specifies either
+#   ClusterRoleBinding between ClusterRole and ServiceAccount.
+# or
+#   RoleBinding between Role and ServiceAccount.
 # ClusterRoleBinding is namespace-less and must have unique name
+# RoleBinding is namespace-bound
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -15,3 +20,4 @@ subjects:
   - kind: ServiceAccount
     name: {{ include "altinity-clickhouse-operator.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+{{- end }}

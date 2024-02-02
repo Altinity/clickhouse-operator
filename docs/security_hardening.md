@@ -34,7 +34,7 @@ The following `users.xml` is set up by operator for a cluster that has two nodes
 
 ### The 'clickhouse_operator' user
 
-The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing  ClickHouse replicas and shards, and also for collecting monitoring data. The **user** and **password** values are stored in a secret.
+The '**clickhouse_operator**' user is used by the operator itself to perform DMLs when adding or removing ClickHouse replicas and shards, and also for collecting monitoring data. The **user** and **password** values are stored in a secret.
 
 The following example shows how **secret** is referenced in the **clickhouse_operator** configuration:
 
@@ -67,7 +67,7 @@ To change '**clickhouse_operator**' user password you can modify `etc-clickhouse
 
 See [operator configuration](https://github.com/Altinity/clickhouse-operator/blob/master/docs/operator_configuration.md) for more information about operator configuration files.
 
-The operator protects access for the '**clickhouse\_operator**' user using an IP mask. When deploying a user into a ClickHouse server, access is restricted to the IP address of the pod where the operator is running, and nothing else. Therefore, the '**clickhouse_operator**' user can not be used outside of this pod.
+The operator also protects access for the '**clickhouse\_operator**' user using an IP mask. When deploying a user into a ClickHouse server, access is restricted to the IP address of the pod where the operator is running, and nothing else. Therefore, the '**clickhouse_operator**' user can not be used outside of this pod.
 
 ## Securing ClickHouse users
 
@@ -89,22 +89,34 @@ spec:
     - name: clickhouse-version
   configuration:
     users:
-      user1/password: pwduser1          # This will be hashed in ClickHouse config files, but this NOT RECOMMENDED
+      user1/password: pwduser1  # This will be hashed in ClickHouse config files, but this NOT RECOMMENDED
       user2/password_sha256_hex: 716b36073a90c6fe1d445ac1af85f4777c5b7a155cea359961826a030513e448
       user3/password_double_sha1_hex: cbe205a7351dd15397bf423957559512bd4be395
 ```
 
 ### Using secrets
 
-The operator provides a special syntax to read passwords and password hashes from a secret as follows:
+The operator also allows user to specify passwords and password hashes in a Kubernetes secret as follows:
 
 ```yaml
 spec:
   configuration:
     users:
-      user1/k8s_secret_password: clickhouse-secret/pwduser1
-      user2/k8s_secret_password_sha256_hex: clickhouse-secret/pwduser2
-      user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
+      user1/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser1
+      user2/password_sha256_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser2          
+      user3/password_double_sha1_hex:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse_secret
+            key: pwduser3                
 ```
 
 The following example refers to the secret:
@@ -122,9 +134,16 @@ stringData:
 
 ```
 
-**Note**: While passwords are retrieved from secrets and no longer appear in the `ClickHouseInstallation`, hashes still deployed to the ClickHouse `users.xml` configuration.
-The alternate approach is to map secrets to environment variables and use the ClickHouse '**from_env**' feature that reads parts of configuration from the environment variables, so even hashes are not exposed.
-This approach requires recreating the ClickHouse podTemplates when adding new users. It can be configured as follows:
+**DEPRECATED**: Since version 0.23.x the syntax to read passwords and password hashes from a secret using special 'k8s\_secret\_' and 'k8s\_secret\_env\_' prefixes is deprecated:
+
+```yaml
+spec:
+  configuration:
+    users:
+      user1/k8s_secret_password: clickhouse-secret/pwduser1
+      user2/k8s_secret_password_sha256_hex: clickhouse-secret/pwduser2
+      user3/k8s_secret_password_double_sha1_hex: clickhouse-secret/pwduser3
+```
 
 ```yaml
 spec:
@@ -192,6 +211,78 @@ spec:
               key: "secret"
 ```
 
+## Securing ClickHouse server settings
+
+Some ClickHouse server settings may contain sensitive data, for example, passwords or keys to access external systems. ClickHouse allows a user to keep connection information for external systems in [Named Collections](https://clickhouse.com/docs/en/operations/named-collections) defined by DDL, but sometimes it is more convenient to store keys in server configuration files. In order to do it securely, sensitive information needs to be stored in secrets.
+
+For example, in order to access S3 bucket one may define the following secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+type: Opaque
+stringData:
+  AWS_SECRET_ACCESS_KEY: *****
+  AWS_ACCESS_KEY_ID: *****
+```
+
+Secret can be referred in ```ClickHouseInstllation``` as follows:
+
+```yaml
+spec:
+  configuration:
+    settings:
+      s3/my_bucket/endpoint: "https://my-bucket.s3.amazonaws.com/sample/"
+      s3/my_bucket/secret_access_key:
+        valueFrom:
+          secretKeyRef:
+            name: s3-credentials
+            key: AWS_SECRET_ACCESS_KEY
+      s3/my_bucket/access_key:
+        valueFrom:
+          secretKeyRef:
+            name: s3-credentials
+            key: AWS_ACCESS_KEY_ID
+```
+
+Under the hood, secrets settings are mapped to environment variables and referred in XML configuration files using ```from_env``` syntax. So the snippet above is equivalent to the following:
+
+```yaml
+spec:
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+          - name: clickhouse
+            image: altinity/clickhouse-server:23.3.8.22.altinitystable
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: s3-credentials
+                  key: AWS_SECRET_ACCESS_KEY
+  configuration:
+    files:
+      config.d/s3.xml: |
+        <clickhouse>
+          <s3>
+            <my_bucket>
+               <endpoint>https://my-bucket.s3.amazonaws.com/sample/</endpoint>
+               <access_key_id from_env="AWS_ACCESS_KEY_ID"></access_key_id>
+               <secret_access_key from_env="AWS_SECRET_ACCESS_KEY"></secret_access_key>
+            </my_bucket>
+          </s3>
+        </clickhouse>
+```
+
 ## Securing the network
 
 This section covers how to secure your network.
@@ -254,16 +345,78 @@ spec:
             </server>
           </openSSL>
         </clickhouse>
-      server.crt: |
+      config.d/server.crt: |
         ***
 
-      server.key: |
+      config.d/server.key: |
         ***
 
-      dhparam.pem: |
+      config.d/dhparam.pem: |
         ***
 
 ```
+
+Certificate files can also be stored in secrets: 
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clickhouse-certs
+type: Opaque
+stringData:
+  server.crt: |
+        ***
+
+  server.key: |
+        ***
+
+  dhparam.pem: |
+        ***
+```
+
+and referred as below:
+
+
+```yaml
+spec:
+  configuration:
+    files:
+      openssl.xml: |
+        <clickhouse>
+          <openSSL>
+            <server>
+              <certificateFile>/etc/clickhouse-server/secrets.d/server.crt/clickhouse-certs/server.crt</certificateFile>
+              <privateKeyFile>/etc/clickhouse-server/secrets.d/server.key/clickhouse-certs/server.key</privateKeyFile>
+              <dhParamsFile>/etc/clickhouse-server/secrets.d/dhparam.pem/clickhouse-certs/dhparam.pem</dhParamsFile>
+              <verificationMode>none</verificationMode>
+              <loadDefaultCAFile>true</loadDefaultCAFile>
+              <cacheSessions>true</cacheSessions>
+              <disableProtocols>sslv2,sslv3</disableProtocols>
+              <preferServerCiphers>true</preferServerCiphers>
+            </server>
+          </openSSL>
+        </clickhouse>
+      server.crt:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.crt
+      server.key:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: server.key
+      dhparam.pem:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-certs
+            key: dhparam.pem
+
+```
+
+**NOTE**: secret files are mapped into `secrets.d` configuration folder using the following rule:
+ `/etc/clickhouse-server/secrets.d/<config_file_name>/<secret_name>/<secret_key>`.
 
 ### Disabling insecure connections
 

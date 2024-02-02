@@ -56,6 +56,7 @@ EOF
         CH_PASSWORD_PLAIN="${CH_PASSWORD_PLAIN:-""}" \
         CH_CREDENTIALS_SECRET_NAMESPACE="${CH_CREDENTIALS_SECRET_NAMESPACE:-""}" \
         CH_CREDENTIALS_SECRET_NAME="${CH_CREDENTIALS_SECRET_NAME:-"clickhouse-operator"}" \
+        VERBOSITY="${VERBOSITY:-"1"}" \
         envsubst \
         >> "${dst}"
 }

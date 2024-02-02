@@ -1,0 +1,8 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: chk-simple-1
+spec:
+  configuration:
+    clusters:
+      - name: "simple-1"

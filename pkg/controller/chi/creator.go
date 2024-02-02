@@ -19,18 +19,19 @@ import (
 	"fmt"
 
 	"gopkg.in/d4l3k/messagediff.v1"
-	appsV1 "k8s.io/api/apps/v1"
-	coreV1 "k8s.io/api/core/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost) ErrorCRUD {
+func (c *Controller) createStatefulSet(ctx context.Context, host *api.ChiHost) ErrorCRUD {
 	log.V(1).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -41,7 +42,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 	statefulSet := host.DesiredStatefulSet
 
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
-	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, newCreateOptions()); err != nil {
+	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions()); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
 		return errCRUDRecreate
 	}
@@ -59,9 +60,9 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *chiV1.ChiHost)
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *Controller) updateStatefulSet(
 	ctx context.Context,
-	oldStatefulSet *appsV1.StatefulSet,
-	newStatefulSet *appsV1.StatefulSet,
-	host *chiV1.ChiHost,
+	oldStatefulSet *apps.StatefulSet,
+	newStatefulSet *apps.StatefulSet,
+	host *api.ChiHost,
 ) ErrorCRUD {
 	log.V(2).M(host).F().P()
 
@@ -71,7 +72,7 @@ func (c *Controller) updateStatefulSet(
 	}
 
 	// Apply newStatefulSet and wait for Generation to change
-	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(ctx, newStatefulSet, newUpdateOptions())
+	updatedStatefulSet, err := c.kubeClient.AppsV1().StatefulSets(newStatefulSet.Namespace).Update(ctx, newStatefulSet, controller.NewUpdateOptions())
 	if err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update failed. err: %v", err)
 		diff, equal := messagediff.DeepDiff(oldStatefulSet.Spec, newStatefulSet.Spec)
@@ -125,7 +126,7 @@ func (c *Controller) updateStatefulSet(
 
 // Comment out PV
 // updatePersistentVolume
-//func (c *Controller) updatePersistentVolume(ctx context.Context, pv *coreV1.PersistentVolume) (*coreV1.PersistentVolume, error) {
+//func (c *Controller) updatePersistentVolume(ctx context.Context, pv *core.PersistentVolume) (*core.PersistentVolume, error) {
 //	log.V(2).M(pv).F().P()
 //	if util.IsContextDone(ctx) {
 //		log.V(2).Info("task is done")
@@ -144,18 +145,18 @@ func (c *Controller) updateStatefulSet(
 //}
 
 // updatePersistentVolumeClaim
-func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV1.PersistentVolumeClaim) (*coreV1.PersistentVolumeClaim, error) {
+func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil, fmt.Errorf("task is done")
 	}
 
-	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, newGetOptions())
+	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, controller.NewGetOptions())
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
 			// This is not an error per se, means PVC is not created (yet)?
-			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, newCreateOptions())
+			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, controller.NewCreateOptions())
 			if err != nil {
 				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)
 			}
@@ -166,22 +167,23 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *coreV
 		return nil, err
 	}
 
-	pvcUpdated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, newUpdateOptions())
-	if err != nil {
-		// Update failed
-		//if strings.Contains(err.Error(), "field can not be less than previous value") {
-		//	return pvc, nil
-		//} else {
-		log.V(1).M(pvc).F().Error("unable to Update PVC err: %v", err)
-		//	return nil, err
-		//}
+	pvcUpdated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, controller.NewUpdateOptions())
+	if err == nil {
+		return pvcUpdated, err
 	}
-	return pvcUpdated, err
+
+	// Update failed
+	// May want to suppress special case of an error
+	//if strings.Contains(err.Error(), "field can not be less than previous value") {
+	//	return pvc, nil
+	//}
+	log.V(1).M(pvc).F().Error("unable to Update PVC err: %v", err)
+	return nil, err
 }
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
-func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.ChiHost) ErrorCRUD {
+func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *api.ChiHost) ErrorCRUD {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return errCRUDIgnore
@@ -189,18 +191,18 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.
 
 	// What to do with StatefulSet - look into chop configuration settings
 	switch chop.Config().Reconcile.StatefulSet.Create.OnFailure {
-	case chiV1.OnStatefulSetCreateFailureActionAbort:
+	case api.OnStatefulSetCreateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort")
 		return errCRUDAbort
 
-	case chiV1.OnStatefulSetCreateFailureActionDelete:
+	case api.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
 		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(host.DesiredStatefulSet.ObjectMeta))
 		_ = c.deleteHost(ctx, host)
 		return c.shouldContinueOnCreateFailed()
 
-	case chiV1.OnStatefulSetCreateFailureActionIgnore:
+	case api.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(host.DesiredStatefulSet.ObjectMeta))
 		return errCRUDIgnore
@@ -215,7 +217,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *chiV1.
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
-func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *appsV1.StatefulSet, host *chiV1.ChiHost) ErrorCRUD {
+func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *api.ChiHost) ErrorCRUD {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return errCRUDIgnore
@@ -223,19 +225,18 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 
 	// Convenience shortcuts
 	namespace := rollbackStatefulSet.Namespace
-	name := rollbackStatefulSet.Name
 
 	// What to do with StatefulSet - look into chop configuration settings
 	switch chop.Config().Reconcile.StatefulSet.Update.OnFailure {
-	case chiV1.OnStatefulSetUpdateFailureActionAbort:
+	case api.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
 		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return errCRUDAbort
 
-	case chiV1.OnStatefulSetUpdateFailureActionRollback:
+	case api.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
-		statefulSet, err := c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, newGetOptions())
+		statefulSet, err := c.getStatefulSet(host)
 		if err != nil {
 			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta), err)
 			return c.shouldContinueOnUpdateFailed()
@@ -247,12 +248,12 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		// it is the only way to go. Just delete Pod and StatefulSet will recreated Pod with current .spec
 		// This will rollback Pod to previous .spec
 		statefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
-		statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, newUpdateOptions())
+		statefulSet, _ = c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, statefulSet, controller.NewUpdateOptions())
 		_ = c.statefulSetDeletePod(ctx, statefulSet, host)
 
 		return c.shouldContinueOnUpdateFailed()
 
-	case chiV1.OnStatefulSetUpdateFailureActionIgnore:
+	case api.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
 		return errCRUDIgnore
@@ -293,7 +294,7 @@ func (c *Controller) shouldContinueOnUpdateFailed() ErrorCRUD {
 	return errCRUDAbort
 }
 
-func (c *Controller) createSecret(ctx context.Context, secret *coreV1.Secret) error {
+func (c *Controller) createSecret(ctx context.Context, secret *core.Secret) error {
 	log.V(1).M(secret).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -302,7 +303,7 @@ func (c *Controller) createSecret(ctx context.Context, secret *coreV1.Secret) er
 	}
 
 	log.V(1).Info("Create Secret %s/%s", secret.Namespace, secret.Name)
-	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, newCreateOptions()); err != nil {
+	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, controller.NewCreateOptions()); err != nil {
 		// Unable to create StatefulSet at all
 		log.V(1).Error("Create Secret %s/%s failed err:%v", secret.Namespace, secret.Name, err)
 		return err

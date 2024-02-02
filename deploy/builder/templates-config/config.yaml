@@ -5,6 +5,7 @@
 #   CH_PASSWORD_PLAIN=${CH_PASSWORD_PLAIN}
 #   CH_CREDENTIALS_SECRET_NAMESPACE=${CH_CREDENTIALS_SECRET_NAMESPACE}
 #   CH_CREDENTIALS_SECRET_NAME=${CH_CREDENTIALS_SECRET_NAME}
+#   VERBOSITY=${VERBOSITY}
 
 ################################################
 ##
@@ -27,6 +28,9 @@ clickhouse:
     ##
     ################################################
     file:
+      # Each 'path' can be either absolute or relative.
+      # In case path is absolute - it is used as is
+      # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
       path:
         # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
         common: config.d
@@ -83,6 +87,7 @@ clickhouse:
   configurationRestartPolicy:
     rules:
       # IMPORTANT!
+      # Special version of "*" - default version - has to satisfy all ClickHouse versions.
       # Default version will also be used in case ClickHouse version is unknown.
       # ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
       # ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
@@ -326,7 +331,7 @@ pod:
 logger:
   logtostderr: "true"
   alsologtostderr: "false"
-  v: "1"
+  v: "${VERBOSITY}"
   stderrthreshold: ""
   vmodule: ""
   log_backtrace_at: ""

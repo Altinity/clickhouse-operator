@@ -7,6 +7,7 @@ import e2e.settings as settings
 import e2e.kubectl as kubectl
 import e2e.clickhouse as clickhouse
 import e2e.util as util
+import e2e.steps as steps
 
 from testflows.core import *
 from testflows.asserts import error
@@ -36,7 +37,7 @@ def exec_on_backup_container(
     )
 
 
-def get_backup_metric_value(backup_pod, metric_name, ns=settings.test_namespace):
+def get_backup_metric_value(backup_pod, metric_name, ns):
     cmd = (
         f"curl -sL http://127.0.0.1:7171/metrics | grep -E '^({metric_name}) [+-]?[0-9]+([.][0-9]+)?' | cut -d ' ' -f 2"
     )
@@ -170,6 +171,7 @@ def test_backup_is_success(self, chi, minio_spec):
         backup_successful_before = get_backup_metric_value(
             backup_pod,
             "clickhouse_backup_successful_backups|clickhouse_backup_successful_creates",
+            ns=self.context.test_namespace
         )
         list_before = exec_on_backup_container(backup_pod, "curl -sL http://127.0.0.1:7171/backup/list")
         exec_on_backup_container(
@@ -192,6 +194,7 @@ def test_backup_is_success(self, chi, minio_spec):
         backup_successful_after = get_backup_metric_value(
             backup_pod,
             "clickhouse_backup_successful_backups|clickhouse_backup_successful_creates",
+            ns=self.context.test_namespace,
         )
         assert backup_successful_before != backup_successful_after, error(
             "clickhouse_backup_successful_backups shall increased"
@@ -481,6 +484,15 @@ def test_backup_not_run(self, chi, minio_spec):
 @TestModule
 @Name("e2e.test_backup_alerts")
 def test(self):
+    with Given("I setup settings"):
+        steps.set_settings()
+    with Given("I create shell"):
+        shell = steps.get_shell()
+        self.context.shell = shell
+
+    util.clean_namespace(delete_chi=True)
+    util.install_operator_if_not_exist()
+
     _, _, _, _, chi = alerts.initialize(
         chi_file="manifests/chi/test-cluster-for-backups.yaml",
         chi_template_file="manifests/chit/tpl-clickhouse-backups.yaml",

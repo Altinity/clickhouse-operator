@@ -126,23 +126,31 @@ if [[ "${MANIFEST_PRINT_CRD}" == "yes" ]]; then
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-        NAMESPACE="${OPERATOR_NAMESPACE}"       \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}"      \
-        OPERATOR_VERSION="${OPERATOR_VERSION}"  \
+        NAMESPACE="${OPERATOR_NAMESPACE}"         \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}"        \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
+        envsubst
+
+    # Render CHK
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-01-section-crd-03-chk.yaml"
+    ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
+    render_separator
+    cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
 fi
 
 # Render RBAC section for ClusterRole
 if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" ]]; then
     # Render Account
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-account.yaml"
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-service-account.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
         COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
-        NAMESPACE="${OPERATOR_NAMESPACE}"       \
-        NAME="clickhouse-operator"              \
-        OPERATOR_VERSION="${OPERATOR_VERSION}"  \
+        NAMESPACE="${OPERATOR_NAMESPACE}"         \
+        NAME="clickhouse-operator"                \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
 
     # Render Role
@@ -150,9 +158,9 @@ if [[ "${MANIFEST_PRINT_RBAC_CLUSTERED}" == "yes" ]]; then
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-        NAMESPACE="${OPERATOR_NAMESPACE}"       \
-        COMMENT="#"                             \
-        ROLE_KIND="ClusterRole"                 \
+        NAMESPACE="${OPERATOR_NAMESPACE}"         \
+        COMMENT="#"                               \
+        ROLE_KIND="ClusterRole"                   \
         ROLE_NAME="clickhouse-operator-${OPERATOR_NAMESPACE}"         \
         ROLE_BINDING_KIND="ClusterRoleBinding"                        \
         ROLE_BINDING_NAME="clickhouse-operator-${OPERATOR_NAMESPACE}" \
@@ -163,13 +171,13 @@ fi
 # Render RBAC section for Role
 if [[ "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then
     # Render Account
-    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-account.yaml"
+    SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-02-section-rbac-01-service-account.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-        NAMESPACE="${OPERATOR_NAMESPACE}"       \
-        NAME="clickhouse-operator"              \
-        OPERATOR_VERSION="${OPERATOR_VERSION}"  \
+        NAMESPACE="${OPERATOR_NAMESPACE}"         \
+        NAME="clickhouse-operator"                \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
 
     # Render Role
@@ -177,13 +185,13 @@ if [[ "${MANIFEST_PRINT_RBAC_NAMESPACED}" == "yes" ]]; then
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
-        NAMESPACE="${OPERATOR_NAMESPACE}"       \
-        COMMENT=""                              \
-        ROLE_KIND="Role"                        \
-        ROLE_NAME="clickhouse-operator"         \
-        ROLE_BINDING_KIND="RoleBinding"         \
-        ROLE_BINDING_NAME="clickhouse-operator" \
-        OPERATOR_VERSION="${OPERATOR_VERSION}"  \
+        NAMESPACE="${OPERATOR_NAMESPACE}"         \
+        COMMENT=""                                \
+        ROLE_KIND="Role"                          \
+        ROLE_NAME="clickhouse-operator"           \
+        ROLE_BINDING_KIND="RoleBinding"           \
+        ROLE_BINDING_NAME="clickhouse-operator"   \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
 fi
 
@@ -203,7 +211,7 @@ function render_configmap_header() {
     SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-03-section-env-01-configmap-header.yaml"
     ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
     # Render ConfigMap header template with vars substitution
-    cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
+    cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |  \
             COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
             NAMESPACE="${OPERATOR_NAMESPACE}"      \
             NAME="${CM_NAME}"                      \
@@ -247,7 +255,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
     if [[ -z "${TMP_CONFIG_FILE}" ]]; then
         # No config file specified, render simple deployment, w/o ConfigMaps
 
-        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment.yaml"
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-01-no-configmap.yaml"
         ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
         render_separator
         cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |                                  \
@@ -341,7 +349,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
                 envsubst
 
         # Render Deployment
-        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-with-configmap.yaml"
+        SECTION_FILE_NAME="clickhouse-operator-install-yaml-template-04-section-deployment-01-with-configmap.yaml"
         ensure_file "${TEMPLATES_DIR}" "${SECTION_FILE_NAME}" "${REPO_PATH_TEMPLATES_PATH}"
         render_separator
         cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" |                                  \
@@ -363,8 +371,8 @@ if [[ "${MANIFEST_PRINT_SERVICE_METRICS}" == "yes" ]]; then
     render_separator
     cat "${TEMPLATES_DIR}/${SECTION_FILE_NAME}" | \
         COMMENT="$(cut_namespace_for_kubectl "${OPERATOR_NAMESPACE}")" \
-        NAMESPACE="${OPERATOR_NAMESPACE}"       \
-        OPERATOR_IMAGE="${OPERATOR_IMAGE}"      \
-        OPERATOR_VERSION="${OPERATOR_VERSION}"  \
+        NAMESPACE="${OPERATOR_NAMESPACE}"         \
+        OPERATOR_IMAGE="${OPERATOR_IMAGE}"        \
+        OPERATOR_VERSION="${OPERATOR_VERSION}"    \
         envsubst
 fi

@@ -62,7 +62,7 @@ func (v *CHVersion) Matches(constraint string) bool {
 	return matches
 }
 
-// IsUnknown checls whether version is unknown
+// IsUnknown checks whether ClickHouse version is unknown
 func (v *CHVersion) IsUnknown() bool {
 	if v == nil {
 		return true

@@ -16,23 +16,24 @@ package metrics
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	otelApi "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	otelResource "go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"net/http"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	chiV1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 func newOTELResource() (*otelResource.Resource, error) {
-	pod, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_NAME)
-	namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_NAMESPACE)
+	pod, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAME)
+	namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE)
 	return otelResource.Merge(
 		otelResource.Default(),
 		otelResource.NewWithAttributes(
@@ -45,7 +46,7 @@ func newOTELResource() (*otelResource.Resource, error) {
 	)
 }
 
-func StartMetricsExporter() {
+func StartMetricsExporter(endpoint, path string) {
 	// Create resource.
 	resource, err := newOTELResource()
 	if err != nil {
@@ -54,7 +55,7 @@ func StartMetricsExporter() {
 
 	// Prometheus exporter embeds a default OpenTelemetry Reader and implements prometheus.Collector,
 	// allowing it to be used as both a Reader and Collector.
-	//namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(chiV1.OPERATOR_POD_NAMESPACE)
+	//namespace, _ := chop.Get().ConfigManager.GetRuntimeParam(api.OPERATOR_POD_NAMESPACE)
 	exporter, err := prometheus.New(
 		prometheus.WithoutUnits(),
 		//prometheus.WithoutTargetInfo(),
@@ -82,10 +83,10 @@ func StartMetricsExporter() {
 	//otel.SetMeterProvider(meterProvider)
 	//meter := otel.Meter("chi_meter_2")
 
-	// Start the prometheus HTTP server and pass the exporter Collector to it
-	go serveMetrics()
-
 	meter = meterProvider.Meter("clickhouse-operator-meter", otelApi.WithInstrumentationVersion(version.Version))
+
+	// Start the prometheus HTTP server and pass the exporter Collector to it
+	serveMetrics(endpoint, path)
 }
 
 var meter otelApi.Meter
@@ -94,10 +95,10 @@ func Meter() otelApi.Meter {
 	return meter
 }
 
-func serveMetrics() {
-	fmt.Printf("serving metrics at :9999/metrics")
-	http.Handle("/metrics", promhttp.Handler())
-	err := http.ListenAndServe(":9999", nil)
+func serveMetrics(addr, path string) {
+	fmt.Printf("serving metrics at %s%s", addr, path)
+	http.Handle(path, promhttp.Handler())
+	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		fmt.Printf("error serving http: %v", err)
 		return

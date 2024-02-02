@@ -17,691 +17,492 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"math"
-	"reflect"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
+	"gopkg.in/d4l3k/messagediff.v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-const (
-	// Float with fractional part less than ignoreThreshold is considered to be int and is casted to int
-	ignoreThreshold = 0.001
-)
-
-// SettingsSection specifies settings section
-type SettingsSection string
-
-// Configuration sections
-// Each section translates into separate ConfigMap mapped into Pod
-var (
-	SectionEmpty  SettingsSection = ""
-	SectionCommon SettingsSection = "COMMON"
-	SectionUsers  SettingsSection = "USERS"
-	SectionHost   SettingsSection = "HOST"
-)
-
 // Specify returned errors for being re-used
 var (
-	errorNoSectionSpecified  = fmt.Errorf("no section specified")
-	errorNoFilenameSpecified = fmt.Errorf("no filename specified")
+	errorNoSectionSpecified = fmt.Errorf("no section specified")
+	errorNoPrefixSpecified  = fmt.Errorf("no prefix specified")
+	errorNoSuffixSpecified  = fmt.Errorf("no suffix specified")
 )
 
-// Settings value can be one of:
-// 1. scalar value (string, int, bool, etc).
-//		Ex.:
-//			user1/networks/ip: "::/0"
-// 2. vector of scalars
-//		Ex.:
-//			user1/networks/ip:
-//				- "127.0.0.1"
-//				- "192.168.1.2"
-// We do not know types of these scalars in advance also
-
-// Setting represents one settings, which can be either a sting or a vector of strings
-type Setting struct {
-	isScalar   bool
-	scalar     string
-	vector     []string
-	attributes map[string]string
-}
-
-// Ensure required interface implementation
-var _ yaml.Marshaler = &Setting{}
-
-// NewSettingScalar makes new scalar Setting
-func NewSettingScalar(scalar string) *Setting {
-	return &Setting{
-		isScalar: true,
-		scalar:   scalar,
-	}
-}
-
-// NewSettingVector makes new vector Setting
-func NewSettingVector(vector []string) *Setting {
-	return &Setting{
-		isScalar: false,
-		vector:   vector,
-	}
-}
-
-// IsScalar checks whether setting is a scalar value
-func (s *Setting) IsScalar() bool {
-	if s == nil {
-		return false
-	}
-	return s.isScalar
-}
-
-// IsVector checks whether setting is a vector value
-func (s *Setting) IsVector() bool {
-	if s == nil {
-		return false
-	}
-	return !s.isScalar
-}
-
-// Scalar gets scalar value of a setting
-func (s *Setting) Scalar() string {
-	if s == nil {
-		return ""
-	}
-	return s.scalar
-}
-
-// Vector gets vector values of a setting
-func (s *Setting) Vector() []string {
-	if s == nil {
-		return nil
-	}
-	return s.vector
-}
-
-// AsVector gets value of a setting as vector. Scalar value is casted to vector
-func (s *Setting) AsVector() []string {
-	if s == nil {
-		return nil
-	}
-	if s.isScalar {
-		return []string{
-			s.scalar,
-		}
-	}
-	return s.vector
-}
-
-// CastToVector returns either Setting in case it is vector or newly created Setting with value casted to Vector
-func (s *Setting) CastToVector() *Setting {
-	if s == nil {
-		return nil
-	}
-	if s.isScalar {
-		return NewSettingVector(s.AsVector())
-	}
-	return s
-}
-
-// SetAttribute sets attribute of the setting
-func (s *Setting) SetAttribute(name, value string) *Setting {
-	if s == nil {
-		return nil
-	}
-	if s.attributes == nil {
-		s.attributes = make(map[string]string)
-	}
-	s.attributes[name] = value
-	return s
-}
-
-// HasAttribute checks whether setting has specified attribute
-func (s *Setting) HasAttribute(name string) bool {
-	if s == nil {
-		return false
-	}
-	if s.attributes == nil {
-		return false
-	}
-	_, ok := s.attributes[name]
-	return ok
-}
-
-// HasAttributes checks whether setting has attributes
-func (s *Setting) HasAttributes() bool {
-	if s == nil {
-		return false
-	}
-	return len(s.attributes) > 0
-}
-
-// Attributes returns string form of attributes - used to config tag creation
-func (s *Setting) Attributes() string {
-	if s == nil {
-		return ""
-	}
-	a := ""
-	for name, value := range s.attributes {
-		a += fmt.Sprintf(` %s="%s"`, name, value)
-	}
-	return a
-}
-
-// Len returns number of entries n the Setting
-func (s *Setting) Len() int {
-	if s.IsVector() {
-		return len(s.vector)
-	}
-	if s.IsScalar() {
-		return 1
-	}
-	return 0
-}
-
-// MergeFrom merges from specified source
-func (s *Setting) MergeFrom(from *Setting) *Setting {
-	// Need to have something to merge from
-	if from == nil {
-		return s
-	}
-
-	// Can merge from Vector only
-	from = from.CastToVector()
-
-	// Reasonable to merge from non-zero vector only
-	if from.Len() < 1 {
-		return s
-	}
-
-	// In case recipient does not exist just copy values from source
-	if s == nil {
-		news := NewSettingVector(from.Vector())
-		news.attributes = util.MergeStringMapsPreserve(news.attributes, from.attributes)
-		return news
-	}
-
-	s.vector = util.MergeStringArrays(s.vector, from.vector)
-	s.attributes = util.MergeStringMapsPreserve(s.attributes, from.attributes)
-
-	return s
-}
-
-// String gets string value of a setting. Vector is combined into one string
-func (s *Setting) String() string {
-	if s == nil {
-		return ""
-	}
-
-	attributes := ""
-	if s.HasAttributes() {
-		attributes = ":[" + s.Attributes() + "]"
-	}
-
-	if s.isScalar {
-		return s.scalar + attributes
-	}
-
-	return "[" + strings.Join(s.vector, ", ") + "]" + attributes
-}
-
-// MarshalYAML implements yaml.Marshaler interface
-func (s *Setting) MarshalYAML() (interface{}, error) {
-	return s.String(), nil
+// SettingsName2KeyConverter is an interface to describe different converters.
+// Implements 'Strategy' pattern.
+type SettingsName2KeyConverter interface {
+	// Name2Key converts name to storage key. This is the opposite to Key2Name
+	Name2Key(name string) string
+	// Key2Name converts storage key to name. This is the opposite to Name2Key
+	Key2Name(key string) string
+	// DeepCopySettingsName2KeyConverter is required for code auto-generator
+	DeepCopySettingsName2KeyConverter() SettingsName2KeyConverter
 }
 
 // Settings specifies settings
-type Settings map[string]*Setting
+type Settings struct {
+	// m is a data storage
+	m map[string]*Setting
+	// converter is an interface to describe different converters.
+	// Implements 'Strategy' pattern.
+	converter SettingsName2KeyConverter
+}
 
 // NewSettings creates new settings
 func NewSettings() *Settings {
-	m := makeSettings()
-	return &m
+	s := &Settings{}
+	s.ensureInternals()
+	return s
 }
 
-func makeSettings() Settings {
-	return make(map[string]*Setting)
+// ensureInternals ensures all internals of the structure are in place
+func (s *Settings) ensureInternals() {
+	if s == nil {
+		return
+	}
+	if s.m == nil {
+		s.m = make(map[string]*Setting)
+	}
+}
+
+// ensureConverter ensures converter in place
+func (s *Settings) ensureConverter() SettingsName2KeyConverter {
+	if s == nil {
+		// Just return converter
+		return NewSettingsName2KeyConverterPlain()
+	}
+	if s.converter == nil {
+		s.converter = NewSettingsName2KeyConverterPlain()
+	}
+	return s.converter
+}
+
+// Ensure ensures settings are in place
+func (s *Settings) Ensure() *Settings {
+	if s == nil {
+		return NewSettings()
+	}
+	return s
+}
+
+// Name2Key converts name to storage key. This is the opposite to Key2Name
+func (s *Settings) Name2Key(name string) string {
+	return s.ensureConverter().Name2Key(name)
+}
+
+// Key2Name converts storage key to name. This is the opposite to Name2Key
+func (s *Settings) Key2Name(key string) string {
+	return s.ensureConverter().Key2Name(key)
 }
 
 // Len gets length of the settings
-func (settings *Settings) Len() int {
-	if settings == nil {
+func (s *Settings) Len() int {
+	if s == nil {
 		return 0
 	}
-	return len(*settings)
+	return len(s.m)
 }
 
-// IsZero checks whether settings is zero
-func (settings *Settings) IsZero() bool {
-	if settings == nil {
-		return true
-	}
-	return settings.Len() == 0
-}
-
-// Walk walks over settings
-func (settings *Settings) Walk(f func(name string, setting *Setting)) {
-	if settings == nil {
+// WalkKeys walks over settings with a function. Function receives key and setting.
+func (s *Settings) WalkKeys(f func(key string, setting *Setting)) {
+	if s == nil {
 		return
 	}
-	if settings.Len() == 0 {
+	if s.Len() == 0 {
 		return
 	}
-	for name := range *settings {
-		f(name, settings.Get(name))
+	// Walk storage keys
+	for key := range s.m {
+		f(key, s.GetKey(key))
 	}
 }
 
-// Has checks whether named setting exists
-func (settings *Settings) Has(name string) bool {
-	if settings == nil {
+// WalkKeysSafe walks over settings with a function. Function receives key and setting.
+func (s *Settings) WalkKeysSafe(f func(key string, setting *Setting)) {
+	if s == nil {
+		return
+	}
+	if s.Len() == 0 {
+		return
+	}
+	// Walk storage keys
+	keys := s.Keys()
+	for _, key := range keys {
+		if s.HasKey(key) {
+			f(key, s.GetKey(key))
+		}
+	}
+}
+
+// Walk walks over settings with a function. Function receives name and setting.
+// Storage key is used internally.
+func (s *Settings) Walk(f func(name string, setting *Setting)) {
+	s.WalkKeys(func(key string, _setting *Setting) {
+		f(s.Key2Name(key), _setting)
+	})
+}
+
+// WalkSafe walks over settings with a function. Function receives name and setting.
+// Storage key is used internally.
+func (s *Settings) WalkSafe(f func(name string, setting *Setting)) {
+	s.WalkKeysSafe(func(key string, _setting *Setting) {
+		f(s.Key2Name(key), _setting)
+	})
+}
+
+// HasKey checks whether key setting exists.
+func (s *Settings) HasKey(key string) bool {
+	if s == nil {
 		return false
 	}
-	if settings.Len() == 0 {
+	if s.Len() == 0 {
 		return false
 	}
-	_, ok := (*settings)[name]
+	// Check storage key exists
+	_, ok := s.m[key]
 	return ok
 }
 
-// Get gets named setting
-func (settings *Settings) Get(name string) *Setting {
-	if settings == nil {
-		return nil
-	}
-	if settings.Len() == 0 {
-		return nil
-	}
-	return (*settings)[name]
+// Has checks whether named setting exists.
+// Storage key is used internally.
+func (s *Settings) Has(name string) bool {
+	return s.HasKey(s.Name2Key(name))
 }
 
-// Set sets named setting
-func (settings *Settings) Set(name string, setting *Setting) {
-	if settings == nil {
+// GetKey gets key setting.
+func (s *Settings) GetKey(key string) *Setting {
+	if s == nil {
+		return nil
+	}
+	if s.Len() == 0 {
+		return nil
+	}
+	// get value by storage key
+	return s.m[key]
+}
+
+// Get gets named setting.
+// Storage key is used internally.
+func (s *Settings) Get(name string) *Setting {
+	return s.GetKey(s.Name2Key(name))
+}
+
+// SetKey sets key setting.
+func (s *Settings) SetKey(key string, setting *Setting) *Settings {
+	if s == nil {
+		return s
+	}
+	s.ensureInternals()
+	// Set with storage key
+	s.m[key] = setting
+	return s
+}
+
+// Set sets named setting.
+// Storage key is used internally.
+func (s *Settings) Set(name string, setting *Setting) *Settings {
+	return s.SetKey(s.Name2Key(name), setting)
+}
+
+// DeleteKey deletes key setting
+func (s *Settings) DeleteKey(key string) {
+	if s == nil {
 		return
 	}
-	// Lazy load
-	if *settings == nil {
-		*settings = makeSettings()
+	if !s.HasKey(key) {
+		return
 	}
-	(*settings)[name] = setting
+	// Delete storage key
+	delete(s.m, key)
+}
+
+// Delete deletes named setting
+func (s *Settings) Delete(name string) {
+	s.DeleteKey(s.Name2Key(name))
+}
+
+// IsZero checks whether settings is zero
+func (s *Settings) IsZero() bool {
+	if s == nil {
+		return true
+	}
+	return s.Len() == 0
 }
 
 // SetIfNotExists sets named setting
-func (settings *Settings) SetIfNotExists(name string, setting *Setting) {
-	if settings == nil {
-		return
+func (s *Settings) SetIfNotExists(name string, setting *Setting) *Settings {
+	if s == nil {
+		return s
 	}
-	if !settings.Has(name) {
-		settings.Set(name, setting)
+	if !s.Has(name) {
+		s.Set(name, setting)
 	}
+	return s
+}
+
+// SetScalarsFromMap sets multiple scalars from map
+func (s *Settings) SetScalarsFromMap(m map[string]string) *Settings {
+	// Copy values from the map
+	for name, value := range m {
+		s.Set(name, NewSettingScalar(value))
+	}
+	return s
+}
+
+// Keys gets keys of the settings
+func (s *Settings) Keys() (keys []string) {
+	s.WalkKeys(func(key string, setting *Setting) {
+		keys = append(keys, key)
+	})
+	return keys
 }
 
 // Names gets names of the settings
-func (settings *Settings) Names() (names []string) {
-	settings.Walk(func(name string, setting *Setting) {
+func (s *Settings) Names() (names []string) {
+	s.Walk(func(name string, setting *Setting) {
 		names = append(names, name)
 	})
 	return names
 }
 
-// Delete deletes named setting
-func (settings *Settings) Delete(name string) {
-	if settings == nil {
-		return
+// Prefixes gets prefixes of the settings
+func (s *Settings) Prefixes(unique bool) (prefixes []string) {
+	s.WalkKeys(func(key string, setting *Setting) {
+		if prefix, err := getPrefixFromPath(key); err == nil {
+			prefixes = append(prefixes, prefix)
+		}
+	})
+
+	if unique {
+		prefixes = util.Unique(prefixes)
 	}
-	if !settings.Has(name) {
-		return
-	}
-	delete(*settings, name)
+
+	sort.Strings(prefixes)
+	return prefixes
+}
+
+// Groups gets groups of the settings
+func (s *Settings) Groups() []string {
+	return s.Prefixes(true)
 }
 
 // UnmarshalJSON unmarshal JSON
-func (settings *Settings) UnmarshalJSON(data []byte) error {
-	if settings == nil {
+func (s *Settings) UnmarshalJSON(data []byte) error {
+	if s == nil {
 		return fmt.Errorf("unable to unmashal with nil")
 	}
-	type untypedMapType map[string]interface{}
+
+	// Prepare untyped map at first
+	type untypedMapType map[string]any
 	var untypedMap untypedMapType
+
+	// Provided binary data is expected to unmarshal into untyped map, because settings are map-like struct
 	if err := json.Unmarshal(data, &untypedMap); err != nil {
 		return err
 	}
 
+	// Entries are expected to exist
 	if len(untypedMap) == 0 {
 		return nil
 	}
 
-	for name, untyped := range untypedMap {
-		if scalar, ok := unmarshalScalar(untyped); ok {
-			settings.Set(name, NewSettingScalar(scalar))
-		} else if vector, ok := unmarshalVector(untyped); ok {
-			if len(vector) > 0 {
-				settings.Set(name, NewSettingVector(vector))
-			}
+	// Create entries from untyped map in result settings
+	for key, untyped := range untypedMap {
+		if scalarSetting, ok := NewSettingScalarFromAny(untyped); ok && scalarSetting.HasValue() {
+			s.SetKey(key, scalarSetting)
+			continue // for
 		}
+
+		if vectorSetting, ok := NewSettingVectorFromAny(untyped); ok && vectorSetting.HasValue() {
+			s.SetKey(key, vectorSetting)
+			continue // for
+		}
+
+		if srcSetting, ok := NewSettingSourceFromAny(untyped); ok && srcSetting.HasValue() {
+			s.SetKey(key, srcSetting)
+			continue // for
+		}
+
+		// Unknown type of entry in untyped map
+		// Should error be reported?
+		// Skip for now
 	}
 
 	return nil
 }
 
 // MarshalJSON marshals JSON
-func (settings *Settings) MarshalJSON() ([]byte, error) {
-	if settings == nil {
+func (s *Settings) MarshalJSON() ([]byte, error) {
+	if s == nil {
 		return json.Marshal(nil)
 	}
 
 	raw := make(map[string]interface{})
-	settings.Walk(func(name string, setting *Setting) {
-		if setting.isScalar {
-			raw[name] = setting.scalar
-		} else {
-			raw[name] = setting.vector
-		}
+	s.WalkKeys(func(key string, setting *Setting) {
+		raw[key] = setting.AsAny()
 	})
 
 	return json.Marshal(raw)
 }
 
-// unmarshalScalar
-func unmarshalScalar(untyped interface{}) (string, bool) {
-	var res string
-	var knownType bool
-
-	typeOf := reflect.TypeOf(untyped)
-	if typeOf == nil {
-		// Unable to determine type of the value
-		return "", false
-	}
-
-	switch untyped.(type) {
-	case // scalar
-		int, uint,
-		int8, uint8,
-		int16, uint16,
-		int32, uint32,
-		int64, uint64,
-		bool,
-		string:
-		res = fmt.Sprintf("%v", untyped)
-		knownType = true
-	case // scalar
-		float32:
-		floatVal := untyped.(float32)
-		_, frac := math.Modf(float64(floatVal))
-		if frac > ignoreThreshold {
-			// Consider it float
-			res = fmt.Sprintf("%f", untyped)
-		} else {
-			// Consider it int
-			intVal := int64(floatVal)
-			res = fmt.Sprintf("%v", intVal)
-		}
-		knownType = true
-	case // scalar
-		float64:
-		floatVal := untyped.(float64)
-		_, frac := math.Modf(floatVal)
-		if frac > ignoreThreshold {
-			// Consider it float
-			res = fmt.Sprintf("%f", untyped)
-		} else {
-			// Consider it int
-			intVal := int64(floatVal)
-			res = fmt.Sprintf("%v", intVal)
-		}
-		knownType = true
-	}
-
-	if knownType {
-		return res, true
-	}
-	return "", false
-}
-
-// unmarshalVector
-func unmarshalVector(untyped interface{}) ([]string, bool) {
-	var res []string
-	var knownType bool
-
-	typeOf := reflect.TypeOf(untyped)
-	if typeOf == nil {
-		// Unable to determine type of the value
-		return nil, false
-	}
-
-	switch untyped.(type) {
-	case // vector
-		[]interface{}:
-		for _, _untyped := range untyped.([]interface{}) {
-			if scalar, ok := unmarshalScalar(_untyped); ok {
-				res = append(res, scalar)
-			}
-		}
-		knownType = true
-	}
-
-	if knownType {
-		return res, true
-	}
-	return nil, false
-}
-
-// getValueAsScalar
-func (settings *Settings) getValueAsScalar(name string) (string, bool) {
-	if !settings.Has(name) {
-		return "", false
-	}
-	setting := settings.Get(name)
-	if setting.IsScalar() {
-		return setting.Scalar(), true
-	}
-	return "", false
-}
-
-// getValueAsVector
-func (settings *Settings) getValueAsVector(name string) ([]string, bool) {
-	if !settings.Has(name) {
-		return nil, false
-	}
-	setting := settings.Get(name)
-	if setting.IsScalar() {
-		return nil, false
-	}
-	return setting.Vector(), true
-}
-
-// getValueAsInt
-func (settings *Settings) getValueAsInt(name string) int {
-	value, ok := settings.getValueAsScalar(name)
-	if !ok {
-		return 0
-	}
-
-	i, err := strconv.Atoi(value)
-	if err != nil {
-		return 0
-	}
-
-	return i
-}
-
-// fetchPort
-func (settings *Settings) fetchPort(name string) int32 {
-	return int32(settings.getValueAsInt(name))
+// fetchPort is the base function to fetch int32 port value
+func (s *Settings) fetchPort(name string) int32 {
+	return int32(s.Get(name).ScalarInt())
 }
 
 // GetTCPPort gets TCP port from settings
-func (settings *Settings) GetTCPPort() int32 {
-	return settings.fetchPort("tcp_port")
+func (s *Settings) GetTCPPort() int32 {
+	return s.fetchPort("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
-func (settings *Settings) GetTCPPortSecure() int32 {
-	return settings.fetchPort("tcp_port_secure")
+func (s *Settings) GetTCPPortSecure() int32 {
+	return s.fetchPort("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
-func (settings *Settings) GetHTTPPort() int32 {
-	return settings.fetchPort("http_port")
+func (s *Settings) GetHTTPPort() int32 {
+	return s.fetchPort("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
-func (settings *Settings) GetHTTPSPort() int32 {
-	return settings.fetchPort("https_port")
+func (s *Settings) GetHTTPSPort() int32 {
+	return s.fetchPort("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
-func (settings *Settings) GetInterserverHTTPPort() int32 {
-	return settings.fetchPort("interserver_http_port")
+func (s *Settings) GetInterserverHTTPPort() int32 {
+	return s.fetchPort("interserver_http_port")
 }
 
 // MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func (settings *Settings) MergeFrom(src *Settings) *Settings {
+func (s *Settings) MergeFrom(src *Settings) *Settings {
 	if src.Len() == 0 {
-		return settings
+		return s
 	}
 
-	src.Walk(func(key string, value *Setting) {
-		// Lazy load
-		if settings == nil {
-			settings = NewSettings()
-		}
-		settings.SetIfNotExists(key, value)
+	src.Walk(func(name string, value *Setting) {
+		s = s.Ensure().SetIfNotExists(name, value)
 	})
 
-	return settings
+	return s
 }
 
 // MergeFromCB merges settings from src approved by filtering callback function
-func (settings *Settings) MergeFromCB(src *Settings, filter func(path string, setting *Setting) bool) *Settings {
+func (s *Settings) MergeFromCB(src *Settings, filter func(name string, setting *Setting) bool) *Settings {
 	if src.Len() == 0 {
-		return settings
+		return s
 	}
 
-	src.Walk(func(key string, value *Setting) {
-		if filter(key, value) {
-			// Lazy load
-			if settings == nil {
-				settings = NewSettings()
-			}
-			// Accept
-			settings.Set(key, value)
+	src.Walk(func(name string, value *Setting) {
+		if filter(name, value) {
+			// Accept this setting
+			s = s.Ensure().Set(name, value)
 		}
 	})
 
-	return settings
+	return s
 }
 
-// GetSectionStringMap returns map of settings sections
-func (settings *Settings) GetSectionStringMap(section SettingsSection, includeUnspecified bool) (m map[string]string) {
-	if settings == nil {
+// GetSection returns map of the specified settings section
+func (s *Settings) GetSection(section SettingsSection, includeSettingWithNoSectionSpecified bool) (values map[string]string) {
+	if s == nil {
 		return nil
 	}
 
-	settings.Walk(func(path string, _ *Setting) {
-		_section, err := getSectionFromPath(path)
-		if (err == nil) && (_section != section) {
-			// This is not the section we are looking for, skip to next
+	s.WalkKeys(func(key string, setting *Setting) {
+		_section, err := getSectionFromPath(key)
+		switch {
+		case (err == nil) && !_section.Equal(section):
+			// Section is specified in this key.
+			// And this is not the section we are looking for, skip to the next
 			return
-		}
-		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have a complex error, skip to next
+		case (err != nil) && (err != errorNoSectionSpecified):
+			// We have a complex error, skip to the next
 			return
-		}
-		if (err == errorNoSectionSpecified) && !includeUnspecified {
-			// We are not ready to include unspecified section, skip to next
+		case (err == errorNoSectionSpecified) && !includeSettingWithNoSectionSpecified:
+			// Section is not specified in this key.
+			// We are not ready to include setting with unspecified section, skip to the next
 			return
 		}
 
-		// We'd like to get this section
+		// Looks like we are ready to include this setting into the result set
 
-		filename, err := getFilenameFromPath(path)
+		filename, err := getFilenameFromPath(key)
 		if err != nil {
 			// We need to have filename specified
 			return
 		}
 
-		if scalar, ok := settings.getValueAsScalar(path); ok {
-			if m == nil {
-				// Lazy load
-				m = make(map[string]string)
-			}
-			m[filename] = scalar
-		} else {
-			// Skip vector for now
+		if !setting.IsScalar() {
+			// We are ready to accept scalars only
+			return
 		}
+
+		if values == nil {
+			// Lazy load
+			values = make(map[string]string)
+		}
+
+		// Fetch file content
+		values[filename] = setting.ScalarString()
 	})
 
-	return m
-}
-
-// inArray checks whether needle is in haystack
-func inArray(needle SettingsSection, haystack []SettingsSection) bool {
-	for _, item := range haystack {
-		if item == needle {
-			return true
-		}
-	}
-	return false
+	return values
 }
 
 // Filter filters settings according to include and exclude lists
-func (settings *Settings) Filter(
+func (s *Settings) Filter(
 	includeSections []SettingsSection,
 	excludeSections []SettingsSection,
-	includeUnspecified bool,
+	includeSettingWithNoSectionSpecified bool,
 ) (res *Settings) {
-	if settings.Len() == 0 {
+	if s.Len() == 0 {
 		return res
 	}
 
-	settings.Walk(func(path string, _ *Setting) {
-		_section, err := getSectionFromPath(path)
+	s.WalkKeys(func(key string, _ *Setting) {
+		section, err := getSectionFromPath(key)
 
-		var include bool
-		var exclude bool
-
-		if err == nil {
-			include = (includeSections == nil) || inArray(_section, includeSections)
-			exclude = (excludeSections != nil) && inArray(_section, excludeSections)
-		}
-
-		include = include && !exclude
-
-		if (err == nil) && !include {
-			// This is not the section we are looking for, skip to next
-			return
-		}
 		if (err != nil) && (err != errorNoSectionSpecified) {
-			// We have a complex error, skip to next
+			// We have a complex error, skip to the next
 			return
 		}
-		if (err == errorNoSectionSpecified) && !includeUnspecified {
-			// We are not ready to include unspecified section, skip to next
+		if (err == errorNoSectionSpecified) && !includeSettingWithNoSectionSpecified {
+			// We are not ready to include unspecified section, skip to the next
 			return
 		}
 
-		// We'd like to get this section
-		if res == nil {
-			res = NewSettings()
+		// No include sections specified is treated as 'include by default'
+		include := section.In(includeSections) || (includeSections == nil)
+		exclude := section.In(excludeSections)
+
+		if !include || exclude {
+			// This is not the section we are looking for, skip to the next
+			return
 		}
-		res.Set(path, settings.Get(path))
+
+		// We'd like to get this setting
+		res = res.Ensure().SetKey(key, s.GetKey(key))
 	})
 
 	return res
 }
 
 // AsSortedSliceOfStrings return settings as sorted strings
-func (settings *Settings) AsSortedSliceOfStrings() []string {
-	if settings == nil {
+func (s *Settings) AsSortedSliceOfStrings() []string {
+	if s == nil {
 		return nil
 	}
 
 	// Sort keys
 	var keys []string
-	settings.Walk(func(key string, _ *Setting) {
+	s.WalkKeys(func(key string, _ *Setting) {
 		keys = append(keys, key)
 	})
 	sort.Strings(keys)
@@ -711,79 +512,128 @@ func (settings *Settings) AsSortedSliceOfStrings() []string {
 	// Walk over sorted keys
 	for _, key := range keys {
 		res = append(res, key)
-		res = append(res, settings.Get(key).String())
+		res = append(res, s.GetKey(key).StringFull())
 	}
 
 	return res
 }
 
 // Normalize normalizes settings
-func (settings *Settings) Normalize() {
-	settings.normalizePaths()
+func (s *Settings) Normalize() *Settings {
+	s.normalizeKeys()
+	return s
 }
 
-// normalizePaths normalizes paths in settings
-func (settings *Settings) normalizePaths() {
-	if settings.Len() == 0 {
+// normalizeKeys normalizes keys in settings, treating them as paths
+func (s *Settings) normalizeKeys() {
+	if s.Len() == 0 {
 		return
 	}
 
-	pathsToNormalize := make([]string, 0, 0)
+	var keysToNormalize []string
 
-	// Find entries with paths to normalize
-	settings.Walk(func(unNormalizedPath string, _ *Setting) {
-		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
-		if len(normalizedPath) != len(unNormalizedPath) {
+	// Find entries with keys to normalize
+	s.WalkKeys(func(key string, _ *Setting) {
+		if _, modified := normalizeKeyAsPath(key); modified {
 			// Normalization changed something. This path has to be normalized
-			pathsToNormalize = append(pathsToNormalize, unNormalizedPath)
+			keysToNormalize = append(keysToNormalize, key)
 		}
 	})
 
-	// Add entries with normalized paths
-	for _, unNormalizedPath := range pathsToNormalize {
-		normalizedPath := normalizeSettingsKeyAsPath(unNormalizedPath)
-		settings.Set(normalizedPath, settings.Get(unNormalizedPath))
+	// Add entries with normalized keys
+	for _, unNormalizedKey := range keysToNormalize {
+		normalizedKey, _ := normalizeKeyAsPath(unNormalizedKey)
+		s.SetKey(normalizedKey, s.GetKey(unNormalizedKey))
 	}
 
-	// Delete entries with un-normalized paths
-	for _, unNormalizedPath := range pathsToNormalize {
-		settings.Delete(unNormalizedPath)
+	// Delete entries with un-normalized keys
+	for _, unNormalizedKey := range keysToNormalize {
+		s.DeleteKey(unNormalizedKey)
 	}
 }
 
-// normalizeSettingsKeyAsPath normalizes path in .spec.configuration.{users, profiles, quotas, settings, files} section
-// Normalized path looks like 'a/b/c'
-func normalizeSettingsKeyAsPath(path string) string {
-	// Normalize multi-'/' values (like '//') to single-'/'
+// normalizeKeyAsPath normalizes key which is treated as a path
+// Normalized key looks like 'a/b/c'
+// Used in in .spec.configuration.{users, profiles, quotas, settings, files} sections
+func normalizeKeyAsPath(path string) (string, bool) {
+	// Find all multi-'/' values (like '//')
 	re := regexp.MustCompile("//+")
-	path = re.ReplaceAllString(path, "/")
 
+	// Squash all multi-'/' values (like '//') to single-'/'
+	normalized := re.ReplaceAllString(path, "/")
 	// Cut all leading and trailing '/', so the result would be 'a/b/c'
-	return strings.Trim(path, "/")
+	normalized = strings.Trim(normalized, "/")
+
+	return normalized, normalized != path
+}
+
+// getPrefixFromPath
+func getPrefixFromPath(path string) (string, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		// We need to have path to be at least 2 entries in order to have prefix
+		return "", errorNoPrefixSpecified
+	}
+
+	// Extract the first component from the path
+	prefix := parts[0]
+	if prefix == "" {
+		return "", errorNoPrefixSpecified
+	}
+
+	return prefix, nil
+}
+
+// getSuffixFromPath
+func getSuffixFromPath(path string) (string, error) {
+	parts := strings.Split(path, "/")
+	if len(parts) < 1 {
+		// We need to have path to be at least one entry - which will be the suffix
+		return "", errorNoSuffixSpecified
+	}
+
+	// Extract the last component from the path
+	suffix := parts[len(parts)-1]
+	if suffix == "" {
+		// We need to have path to be at least one entry - which will be the suffix
+		return "", errorNoSuffixSpecified
+	}
+
+	return suffix, nil
 }
 
 // getSectionFromPath
 func getSectionFromPath(path string) (SettingsSection, error) {
-	parts := strings.Split(path, "/")
-	if len(parts) < 2 {
-		// We need to have path to be at least section/file.name
+	// String representation of the section
+	section, err := getPrefixFromPath(path)
+	if err != nil {
+		// We need to have path to be at least 'section/file.name'
 		return SectionEmpty, errorNoSectionSpecified
 	}
 
-	section := parts[0]
-	return string2Section(section)
-}
-
-// string2Section
-func string2Section(section string) (SettingsSection, error) {
-	if strings.EqualFold(section, string(SectionCommon)) || strings.EqualFold(section, CommonConfigDir) {
+	// Check dir names to determine which section path points to
+	configDir := section
+	switch {
+	case strings.EqualFold(configDir, CommonConfigDir):
 		return SectionCommon, nil
-	}
-	if strings.EqualFold(section, string(SectionUsers)) || strings.EqualFold(section, UsersConfigDir) {
+	case strings.EqualFold(configDir, UsersConfigDir):
 		return SectionUsers, nil
-	}
-	if strings.EqualFold(section, string(SectionHost)) || strings.EqualFold(section, HostConfigDir) {
+	case strings.EqualFold(configDir, HostConfigDir):
 		return SectionHost, nil
+	}
+
+	{
+		// TODO - either provide example or just remove this part
+		// Check explicitly specified sections. This is never(?) used
+		section := NewSettingsSectionFromString(section)
+		switch {
+		case SectionCommon.Equal(section):
+			return SectionCommon, nil
+		case SectionUsers.Equal(section):
+			return SectionUsers, nil
+		case SectionHost.Equal(section):
+			return SectionHost, nil
+		}
 	}
 
 	return SectionEmpty, fmt.Errorf("unknown section specified %v", section)
@@ -791,18 +641,73 @@ func string2Section(section string) (SettingsSection, error) {
 
 // getFilenameFromPath
 func getFilenameFromPath(path string) (string, error) {
-	parts := strings.Split(path, "/")
-	if len(parts) < 1 {
-		// We need to have path to be at least one entry - which will be 'filename'
-		return "", errorNoFilenameSpecified
+	return getSuffixFromPath(path)
+}
+
+// listModifiedSettingsPaths makes list of paths that were modified between two settings.
+// Ex.:
+// confid.d/setting1
+// confid.d/setting2
+func listModifiedSettingsPaths(a, b *Settings, path *messagediff.Path, value interface{}) (paths []string) {
+	if settings, ok := (value).(*Settings); ok {
+		// Provided `value` is of type api.Settings, which means that the whole
+		// settings such as 'files' or 'settings' is being either added or removed
+		if settings == nil {
+			// Completely removed settings such as 'files' or 'settings', so the value changed from Settings to nil
+			// List all entries from settings that are removed
+			for _, name := range a.Keys() {
+				paths = append(paths, name)
+			}
+		} else {
+			// Introduced new settings such as 'files' or 'settings', so the value changed from nil to Settings
+			// List all entries from settings that is added
+			for _, name := range b.Keys() {
+				paths = append(paths, name)
+			}
+		}
+	} else {
+		// Provided `value` is not of type api.Settings, thus expecting it to be a piece of settings.
+		// Modify (without full removal or addition) settings such as 'files' or 'settings',
+		// something is still left in the remaining part of settings in case of deletion or added in case of addition.
+		// Build string representation of path to updated element
+		var pathElements []string
+		for _, pathNode := range *path {
+			switch mk := pathNode.(type) {
+			case messagediff.MapKey:
+				switch pathElement := mk.Key.(type) {
+				case string:
+					pathElements = append(pathElements, pathElement)
+				}
+			}
+		}
+		paths = append(paths, strings.Join(pathElements, "/"))
 	}
 
-	// Extract last component from path
-	filename := parts[len(parts)-1]
-	if filename == "" {
-		// We need to have path to be at least one entry - which will be 'filename'
-		return "", errorNoFilenameSpecified
-	}
+	return paths
+}
 
-	return filename, nil
+// listPrefixedModifiedSettingsPaths makes list of paths that were modified between two settings.
+// Each entry in the list is prefixed with the specified `pathPrefix`
+// Ex.: `prefix` = file
+// file/setting1
+// file/setting2
+func listPrefixedModifiedSettingsPaths(a, b *Settings, pathPrefix string, path *messagediff.Path, value interface{}) (paths []string) {
+	return util.Prefix(listModifiedSettingsPaths(a, b, path, value), pathPrefix+"/")
+}
+
+// ListAffectedSettingsPathsFromDiff makes list of paths that were modified between two settings prefixed with the specified `prefix`
+// Ex.: `prefix` = file
+// file/setting1
+// file/setting2
+func ListAffectedSettingsPathsFromDiff(a, b *Settings, diff *messagediff.Diff, prefix string) (paths []string) {
+	for path, value := range diff.Added {
+		paths = append(paths, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+	}
+	for path, value := range diff.Removed {
+		paths = append(paths, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+	}
+	for path, value := range diff.Modified {
+		paths = append(paths, listPrefixedModifiedSettingsPaths(a, b, prefix, path, value)...)
+	}
+	return paths
 }

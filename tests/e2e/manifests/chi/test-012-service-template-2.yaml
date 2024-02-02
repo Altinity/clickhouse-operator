@@ -40,8 +40,8 @@ spec:
               port: 8123
             - name: tcp
               port: 9000
-          type: ClusterIP
-          clusterIP: None
+          type: LoadBalancer
+          externalTrafficPolicy: Local
       - name: replica-service-template
         generateName: "service-{chi}-{shard}-{replica}"
         spec:

@@ -242,6 +242,17 @@ func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTem
 	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 
+// IsStopped checks whether host is stopped
+func (host *ChiHost) IsStopped() bool {
+	return host.GetCHI().IsStopped()
+}
+
+// IsNewOne checks whether host is a new one
+// TODO unify with model HostIsNewOne
+func (host *ChiHost) IsNewOne() bool {
+	return !host.HasAncestor()
+}
+
 // WhichStatefulSet specifies which StatefulSet we are going to process in host functions
 type WhichStatefulSet string
 

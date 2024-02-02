@@ -1,0 +1,173 @@
+# Setup Zookeeper StatefulSet
+# Possible params:
+# 1. replicas
+# 2. memory
+# 3. cpu
+# 4. storage
+# 5. storageClassName
+# 6. user to run app
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  # nodes would be named as zookeeper-0, zookeeper-1, zookeeper-2
+  name: zookeeper
+spec:
+  selector:
+    matchLabels:
+      app: zookeeper
+  serviceName: zookeepers
+  replicas: 3
+  updateStrategy:
+    type: RollingUpdate
+  podManagementPolicy: Parallel
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+        what: node
+      annotations:
+        prometheus.io/port: '7000'
+        prometheus.io/scrape: 'true'
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "app"
+                    operator: In
+                    values:
+                      - zookeeper
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: kubernetes-zookeeper
+          imagePullPolicy: IfNotPresent
+          image: "docker.io/zookeeper:3.8.3"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+          ports:
+            - containerPort: 2181
+              name: client
+            - containerPort: 2888
+              name: server
+            - containerPort: 3888
+              name: leader-election
+            - containerPort: 7000
+              name: prometheus
+# See those links for proper startup settings:
+# https://github.com/kow3ns/kubernetes-zookeeper/blob/master/docker/scripts/start-zookeeper
+# https://clickhouse.yandex/docs/en/operations/tips/#zookeeper
+# https://github.com/ClickHouse/ClickHouse/issues/11781
+          command:
+            - bash
+            - -x
+            - -c
+            - |
+              SERVERS=3 &&
+              HOST=`hostname -s` &&
+              DOMAIN=`hostname -d` &&
+              CLIENT_PORT=2181 &&
+              SERVER_PORT=2888 &&
+              ELECTION_PORT=3888 &&
+              PROMETHEUS_PORT=7000 &&
+              ZOO_DATA_DIR=/var/lib/zookeeper/data &&
+              ZOO_DATA_LOG_DIR=/var/lib/zookeeper/datalog &&
+              {
+                echo "clientPort=${CLIENT_PORT}"
+                echo 'tickTime=2000'
+                echo 'initLimit=300'
+                echo 'syncLimit=10'
+                echo 'maxClientCnxns=2000'
+                echo 'maxTimeToWaitForEpoch=2000'
+                echo 'maxSessionTimeout=60000000'
+                echo "dataDir=${ZOO_DATA_DIR}"
+                echo "dataLogDir=${ZOO_DATA_LOG_DIR}"
+                echo 'autopurge.snapRetainCount=10'
+                echo 'autopurge.purgeInterval=1'
+                echo 'preAllocSize=131072'
+                echo 'snapCount=3000000'
+                echo 'leaderServes=yes'
+                echo 'standaloneEnabled=false'
+                echo '4lw.commands.whitelist=*'
+                echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
+                echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
+                echo "zookeeper.skipACL=true"
+              } > /conf/zoo.cfg &&
+              {
+                echo "zookeeper.root.logger=CONSOLE"
+                echo "zookeeper.console.threshold=INFO"
+                echo "log4j.rootLogger=\${zookeeper.root.logger}"
+                echo "log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender"
+                echo "log4j.appender.CONSOLE.Threshold=\${zookeeper.console.threshold}"
+                echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
+                echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n"
+              } > /conf/log4j.properties &&
+              echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"' > /conf/java.env &&
+              if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+                  NAME=${BASH_REMATCH[1]}
+                  ORD=${BASH_REMATCH[2]}
+              else
+                  echo "Failed to parse name and ordinal of Pod"
+                  exit 1
+              fi &&
+              mkdir -p ${ZOO_DATA_DIR} &&
+              mkdir -p ${ZOO_DATA_LOG_DIR} &&
+              export MY_ID=$((ORD+1)) &&
+              echo $MY_ID > $ZOO_DATA_DIR/myid &&
+              for (( i=1; i<=$SERVERS; i++ )); do
+                  echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> /conf/zoo.cfg;
+              done &&
+              if [[ $SERVERS -eq 1 ]]; then
+                  echo "group.1=1" >> /conf/zoo.cfg;
+              else
+                  echo "group.1=1:2:3" >> /conf/zoo.cfg;
+              fi &&
+              chown -Rv zookeeper "$ZOO_DATA_DIR" "$ZOO_DATA_LOG_DIR" "$ZOO_LOG_DIR" "$ZOO_CONF_DIR" &&
+              zkServer.sh start-foreground
+          readinessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - bash
+                - -c
+                - "OK=$(echo ruok | nc 127.0.0.1 2181); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi"
+            initialDelaySeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: datadir-volume
+              mountPath: /var/lib/zookeeper
+      # Run as a non-privileged user
+      securityContext:
+        runAsUser: 1000
+        fsGroup: 1000
+      ## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
+      ## Uncomment what is required
+      volumes:
+        - name: datadir-volume
+          emptyDir:
+            medium: "" #accepted values:  empty str (means node's default medium) or Memory
+            sizeLimit: 1Gi
+## Mount either emptyDir via volume or PV of 'storageclass-zookeeper' storageClass
+## Uncomment what is required
+#  volumeClaimTemplates:
+#  - metadata:
+#      name: datadir-volume
+#    spec:
+#      accessModes:
+#        - ReadWriteOnce
+#      resources:
+#        requests:
+#          storage: 1Gi
+## storageClassName has to be coordinated with k8s admin and has to be created as a `kind: StorageClass` resource
+## In case no storageClassName specified at all - means use default storageClassName
+## In case storageClassName specified as empty value "" - means do dot use dynamic provisioning
+#      storageClassName: storageclass-zookeeper

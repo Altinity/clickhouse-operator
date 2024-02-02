@@ -8,19 +8,20 @@ import e2e.yaml_manifest as yaml_manifest
 from testflows.core import *
 from e2e.steps import *
 
+from requirements.requirements import *
 
 def wait_keeper_ready(keeper_type="zookeeper", pod_count=3, retries_number=10):
     svc_name = "zookeeper-client" if keeper_type == "zookeeper-operator" else "zookeeper"
     expected_containers = "1/1"
-    expected_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
+    expected_pod_prefix = "clickhouse-keeper" if "clickhouse-keeper" in keeper_type else "zookeeper"
     for i in range(retries_number):
         ready_pods = kubectl.launch(
-            f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l"
+            f"get pods | grep {expected_pod_prefix} | grep Running | grep '{expected_containers}' | wc -l", ok_to_fail=True
         )
         ready_endpoints = "0"
         if ready_pods == str(pod_count):
             ready_endpoints = kubectl.launch(
-                f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l"
+                f"get endpoints {svc_name} -o json | jq '.subsets[].addresses[].ip' | wc -l", ok_to_fail=True
             )
             if ready_endpoints == str(pod_count):
                 break
@@ -71,16 +72,11 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
                 pod_prefix = "zookeeper"
             else:
                 expected_outs = (
-                    "[keeper, clickhouse]",
-                    "[clickhouse, keeper]",
-                    "[keeper]",
+                    "keeper clickhouse",
+                    "clickhouse keeper",
+                    "keeper",
                 )
-                keeper_cmd = "if [[ ! $(command -v zkcli) ]]; then "
-                keeper_cmd += "wget -q -O /tmp/zkcli.tar.gz https://github.com/let-us-go/zkcli/releases/download/v0.4.0/zkcli-0.4.0-linux-amd64.tar.gz; "
-                keeper_cmd += "cd /tmp; tar -xf zkcli.tar.gz; "
-                keeper_cmd += "mv -fv ./zkcli-0.4.0-linux-amd64/zkcli /bin/zkcli; "
-                keeper_cmd += "fi; "
-                keeper_cmd += "zkcli -s 127.0.0.1:2181 ls /"
+                keeper_cmd = "clickhouse-keeper client -h 127.0.0.1 -p 2181 -q 'ls /'"
                 pod_prefix = "clickhouse-keeper"
 
             out = kubectl.launch(
@@ -109,6 +105,7 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
             "zookeeper": "2",
             "zookeeper-operator": "3",
             "clickhouse-keeper": "2",
+            "clickhouse-keeper_with_CHKI": "2",
         }
         if expected_out[keeper_type] != out.strip(" \t\r\n") and i + 1 < retry_count:
             with Then(f"{keeper_type} system.zookeeper not ready, wait {(i + 1) * 3} sec"):
@@ -133,7 +130,8 @@ def rescale_zk_and_clickhouse(
     keeper_manifest = keeper_manifest_1_node if keeper_node_count == 1 else keeper_manifest_3_node
     _, chi = util.install_clickhouse_and_keeper(
         chi_file=f"manifests/chi/test-cluster-for-{keeper_type}-{ch_node_count}.yaml",
-        chi_template_file="manifests/chit/tpl-clickhouse-latest.yaml",
+        #
+        chi_template_file="manifests/chit/tpl-clickhouse-stable.yaml",
         chi_name="test-cluster-for-zk",
         keeper_manifest=keeper_manifest,
         keeper_type=keeper_type,
@@ -165,21 +163,21 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
     if keeper_replica_count > 1:
         keeper_manifest = keeper_manifest_3_node
     if keeper_type == "zookeeper":
-        keeper_manifest = f"../../deploy/zookeeper/quick-start-persistent-volume/{keeper_manifest}"
+        keeper_manifest = f"../../deploy/zookeeper/zookeeper-manually/quick-start-persistent-volume/{keeper_manifest}"
     if keeper_type == "clickhouse-keeper":
-        keeper_manifest = f"../../deploy/clickhouse-keeper/{keeper_manifest}"
+        keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
     if keeper_type == "zookeeper-operator":
-        keeper_manifest = f"../../deploy/zookeeper-operator/{keeper_manifest}"
+        keeper_manifest = f"../../deploy/zookeeper/zookeeper-with-zookeeper-operator/{keeper_manifest}"
 
     zk_manifest = yaml_manifest.get_multidoc_manifest_data(util.get_full_path(keeper_manifest, lookup_in_host=True))
     for doc in zk_manifest:
         if doc["kind"] == "StatefulSet":
-            with When(f"Path Zookeeper replicas: {keeper_replica_count}"):
+            with When(f"Patch {keeper_type} replicas: {keeper_replica_count}"):
                 keeper_name = doc["metadata"]["name"]
                 kubectl.launch(
                     f"patch --type=merge sts {keeper_name} -p '{{\"spec\":{{\"replicas\":{keeper_replica_count}}}}}'"
                 )
-                retries_num = 10
+                retries_num = 20
                 for i in range(retries_num):
                     pod_counts = kubectl.get_count("pod", f"-l app={keeper_type}")
                     if pod_counts == keeper_replica_count:
@@ -187,8 +185,8 @@ def start_stop_zk_and_clickhouse(chi_name, ch_stop, keeper_replica_count, keeper
                     elif i >= retries_num - 1:
                         assert pod_counts == keeper_replica_count
                     with Then(f"Zookeeper not ready. "
-                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {2*(i+1)} seconds"):
-                        time.sleep(2*(i+1))
+                              f"Pods expected={keeper_replica_count} actual={pod_counts}, wait {3*(i+1)} seconds"):
+                        time.sleep(3*(i+1))
 
 
 @TestOutline
@@ -233,7 +231,7 @@ def test_keeper_rescale_outline(
             insert_tables=["test_repl1"],
         )
 
-    total_iterations = 1
+    total_iterations = 3
     for iteration in range(total_iterations):
         with When(f"ITERATION {iteration}"):
             with Then("CH 1 -> 2 wait complete + ZK 1 -> 3 nowait"):
@@ -298,7 +296,7 @@ def test_keeper_rescale_outline(
                 keeper_manifest_1_node=keeper_manifest_1_node,
                 keeper_manifest_3_node=keeper_manifest_3_node
             )
-        with Then("Start CH + ZK "):
+        with Then(f"Start CH + ZK, expect keeper node count={keeper_replica_count}"):
             start_stop_zk_and_clickhouse(
                 chi['metadata']['name'],
                 ch_stop=False,
@@ -350,6 +348,18 @@ def test_clickhouse_keeper_rescale(self):
         pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
         keeper_manifest_1_node="clickhouse-keeper-1-node-256M-for-test-only.yaml",
         keeper_manifest_3_node="clickhouse-keeper-3-nodes-256M-for-test-only.yaml",
+    )
+
+
+@TestScenario
+@Name("test_clickhouse_keeper_rescale_CHKI using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
+def test_clickhouse_keeper_rescale_CHKI(self):
+    test_keeper_rescale_outline(
+        keeper_type="clickhouse-keeper_with_CHKI",
+        pod_for_insert_data="chi-test-cluster-for-zk-default-0-1-0",
+        keeper_manifest_1_node="clickhouse-keeper-1-node-for-test-only.yaml",
+        keeper_manifest_3_node="clickhouse-keeper-3-node-for-test-only.yaml",
     )
 
 
@@ -439,7 +449,7 @@ def test_keeper_probes_outline(
             )
 
     with Then("Check liveness and readiness probes fail"):
-        zk_pod_prefix = "clickhouse-keeper" if keeper_type == "clickhouse-keeper" else "zookeeper"
+        zk_pod_prefix = "clickhouse-keeper" if "clickhouse-keeper" in keeper_type else "zookeeper"
         for zk_pod in range(3):
             out = kubectl.launch(f"describe pod {zk_pod_prefix}-{zk_pod}")
             assert "probe failed" not in out, "all probes shall be successful"
@@ -508,6 +518,20 @@ def test_clickhouse_keeper_probes_workload(self):
     )
 
 
+@TestScenario
+@Name(
+    "test_clickhouse_keeper_probes_workload_with_CHKI. Liveness + Readiness probes shall works fine "
+    "under workload in multi-datacenter installation"
+)
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
+def test_clickhouse_keeper_probes_workload_with_CHKI(self):
+    test_keeper_probes_outline(
+        keeper_type="clickhouse-keeper_with_CHKI",
+        keeper_manifest_1_node="clickhouse-keeper-1-node-for-test-only.yaml",
+        keeper_manifest_3_node="clickhouse-keeper-3-node-for-test-only.yaml",
+    )
+
+
 @TestModule
 @Name("e2e.test_keeper")
 def test(self):
@@ -522,6 +546,7 @@ def test(self):
     all_tests = [
         test_zookeeper_operator_rescale,
         test_clickhouse_keeper_rescale,
+        test_clickhouse_keeper_rescale_CHKI,
         test_zookeeper_pvc_scaleout_rescale,
         test_zookeeper_rescale,
 
@@ -529,6 +554,7 @@ def test(self):
         test_zookeeper_pvc_probes_workload,
         test_zookeeper_operator_probes_workload,
         test_clickhouse_keeper_probes_workload,
+        test_clickhouse_keeper_probes_workload_with_CHKI,
     ]
 
     util.clean_namespace(delete_chi=True, delete_keeper=True)

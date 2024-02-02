@@ -129,3 +129,24 @@ func Slice2String(name string, slice []string) string {
 
 	return b.String()
 }
+
+func Prefix(slice []string, prefix string) (res []string) {
+	for _, entry := range slice {
+		res = append(res, prefix+entry)
+	}
+	return res
+}
+
+func Unique(slice []string) (unique []string) {
+	found := make(map[string]bool)
+
+	for _, entry := range slice {
+		found[entry] = true
+	}
+
+	for entry := range found {
+		unique = append(unique, entry)
+	}
+
+	return unique
+}

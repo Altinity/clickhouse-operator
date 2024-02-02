@@ -19,11 +19,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -58,7 +58,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
-			if podDistribution.Type == PodDistributionMaxNumberPerNode {
+			if podDistribution.Type == deployment.PodDistributionMaxNumberPerNode {
 				maxNumberOfPodsPerNode = podDistribution.Number
 			}
 		}
@@ -555,6 +555,14 @@ func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate,
 	return chi.GetServiceTemplate(name)
 }
 
+// MatchNamespace matches namespace
+func (chi *ClickHouseInstallation) MatchNamespace(namespace string) bool {
+	if chi == nil {
+		return false
+	}
+	return chi.Namespace == namespace
+}
+
 // MatchFullName matches full name
 func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	if chi == nil {
@@ -563,10 +571,25 @@ func (chi *ClickHouseInstallation) MatchFullName(namespace, name string) bool {
 	return (chi.Namespace == namespace) && (chi.Name == name)
 }
 
+// FoundIn checks whether CHI can be found in haystack
+func (chi *ClickHouseInstallation) FoundIn(haystack []*ClickHouseInstallation) bool {
+	if chi == nil {
+		return false
+	}
+
+	for _, candidate := range haystack {
+		if candidate.MatchFullName(chi.Namespace, chi.Name) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Possible templating policies
 const (
-	TemplatingPolicyManual = "manual"
 	TemplatingPolicyAuto   = "auto"
+	TemplatingPolicyManual = "manual"
 )
 
 // IsAuto checks whether templating policy is auto
@@ -577,7 +600,7 @@ func (chi *ClickHouseInstallation) IsAuto() bool {
 	if (chi.Namespace == "") && (chi.Name == "") {
 		return false
 	}
-	return strings.ToLower(chi.Spec.Templating.GetPolicy()) == TemplatingPolicyAuto
+	return chi.Spec.Templating.GetPolicy() == TemplatingPolicyAuto
 }
 
 // IsStopped checks whether CHI is stopped
@@ -591,8 +614,6 @@ func (chi *ClickHouseInstallation) IsStopped() bool {
 // Restart constants present available values for .spec.restart
 // Controlling the operator's Clickhouse instances restart policy
 const (
-	// RestartAll specifies default value
-	RestartAll = "Restart"
 	// RestartRollingUpdate requires to roll over all hosts in the cluster and shutdown and reconcile each of it.
 	// This restart policy means that all hosts in the cluster would pass through shutdown/reconcile cycle.
 	RestartRollingUpdate = "RollingUpdate"
@@ -697,8 +718,8 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	}
 
 	// Otherwise, we need to acquire a lock to initialize the field.
-	chi.statusMu.Lock()
-	defer chi.statusMu.Unlock()
+	chi.statusCreatorMutex.Lock()
+	defer chi.statusCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
 	if chi.Status == nil {
 		chi.Status = &ChiStatus{}

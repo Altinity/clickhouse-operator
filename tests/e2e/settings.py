@@ -30,7 +30,7 @@ kubectl_cmd = (
 
 kubectl_cmd = os.getenv("KUBECTL_CMD") if "KUBECTL_CMD" in os.environ else kubectl_cmd
 
-test_namespace = os.getenv("TEST_NAMESPACE") if "TEST_NAMESPACE" in os.environ else None
+test_namespace = os.getenv("TEST_NAMESPACE") if "TEST_NAMESPACE" in os.environ else 'test'
 operator_version = (
     os.getenv("OPERATOR_VERSION")
     if "OPERATOR_VERSION" in os.environ else
@@ -65,14 +65,19 @@ clickhouse_template = (
     # "manifests/chit/tpl-clickhouse-22.3.yaml"
     # "manifests/chit/tpl-clickhouse-22.8.yaml"
     # "manifests/chit/tpl-clickhouse-23.3.yaml"
+    # "manifests/chit/tpl-clickhouse-23.8.yaml"
 )
-clickhouse_template_old = "manifests/chit/tpl-clickhouse-22.8.yaml"
+clickhouse_template_old = "manifests/chit/tpl-clickhouse-23.3.yaml"
 
 clickhouse_version = get_ch_version(clickhouse_template)
 clickhouse_version_old = get_ch_version(clickhouse_template_old)
 
+keeper_type = os.getenv("KEEPER_TYPE") if "KEEPER_TYPE" in os.environ else "zookeeper" # zookeeper | clickhouse_keeper
+
 prometheus_namespace = "prometheus"
-prometheus_operator_version = "0.62"
+prometheus_operator_version = "0.68"
 prometheus_scrape_interval = 10
 
 minio_version = "latest"
+
+step_by_step = True if "STEP" in os.environ else False

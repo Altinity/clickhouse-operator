@@ -15,7 +15,7 @@
 package clickhouse
 
 import (
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // ClusterConnectionParams represents connection parameters to the whole cluster
@@ -34,7 +34,7 @@ func NewClusterConnectionParams(scheme, username, password, rootCA string, port 
 
 // NewClusterConnectionParamsFromCHOpConfig is the same as NewClusterConnectionParams, but works with
 // CHOp config to get parameters from
-func NewClusterConnectionParamsFromCHOpConfig(config *v1.OperatorConfig) *ClusterConnectionParams {
+func NewClusterConnectionParamsFromCHOpConfig(config *api.OperatorConfig) *ClusterConnectionParams {
 	params := NewClusterConnectionParams(
 		config.ClickHouse.Access.Scheme,
 		config.ClickHouse.Access.Username,

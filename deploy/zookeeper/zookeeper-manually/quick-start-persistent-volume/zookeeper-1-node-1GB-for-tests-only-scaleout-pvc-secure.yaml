@@ -1,0 +1,663 @@
+# Following manifests based on https://github.com/pravega/zookeeper-operator/
+---
+# service for REST administration and reconfiguration
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper-admin-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-admin-server
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: zookeeper
+
+---
+# service for clickhouse zookeeper client connections
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-client
+      port: 2281
+      protocol: TCP
+      targetPort: 2281
+  selector:
+    app: zookeeper
+    what: node
+---
+# headless service for Zookeeper Quorum Election and service name
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper-headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: false
+  ports:
+    - name: tcp-client
+      port: 2281
+      protocol: TCP
+      targetPort: 2281
+    - name: tcp-quorum
+      port: 2888
+      protocol: TCP
+      targetPort: 2888
+    - name: tcp-leader-election
+      port: 3888
+      protocol: TCP
+      targetPort: 3888
+    - name: tcp-metrics
+      port: 7000
+      protocol: TCP
+      targetPort: 7000
+    - name: tcp-admin-server
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: zookeeper
+---
+# ConfigMap with common startup scripts and base config
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper-scripts
+data:
+  env.sh: |
+    #!/usr/bin/env bash
+    export DOMAIN=`hostname -d`
+    export QUORUM_PORT=2888
+    export LEADER_PORT=3888
+    export CLIENT_HOST=zookeeper
+    export CLIENT_PORT=2281
+    export ADMIN_SERVER_HOST=zookeeper-admin-server
+    export ADMIN_SERVER_PORT=8080
+    export CLUSTER_NAME=zookeeper
+    export ZOO_LOG4J_PROP="WARN, CONSOLE"
+  java.env: |
+    JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"
+  log4j.properties: |
+    zookeeper.root.logger=CONSOLE
+    zookeeper.console.threshold=INFO
+    log4j.rootLogger=${zookeeper.root.logger}
+    log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender
+    log4j.appender.CONSOLE.Threshold=${zookeeper.console.threshold}
+    log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout
+    log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n
+  configuration.xsl: |
+    <?xml version="1.0"?>
+    <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
+    <xsl:output method="html"/>
+    <xsl:template match="configuration">
+    <html>
+    <body>
+    <table border="1">
+    <tr>
+     <td>name</td>
+     <td>value</td>
+     <td>description</td>
+    </tr>
+    <xsl:for-each select="property">
+    <tr>
+      <td><a name="{name}"><xsl:value-of select="name"/></a></td>
+      <td><xsl:value-of select="value"/></td>
+      <td><xsl:value-of select="description"/></td>
+    </tr>
+    </xsl:for-each>
+    </table>
+    </body>
+    </html>
+    </xsl:template>
+    </xsl:stylesheet>
+  logback.xml: |
+    <!--
+    Copyright 2022 The Apache Software Foundation
+    
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+    "License"); you may not use this file except in compliance
+    with the License.  You may obtain a copy of the License at
+    
+    http://www.apache.org/licenses/LICENSE-2.0
+    
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    
+    Define some default values that can be overridden by system properties
+    -->
+    <configuration>
+    <!-- Uncomment this if you would like to expose Logback JMX beans -->
+    <!--jmxConfigurator /-->
+    
+    <property name="zookeeper.console.threshold" value="INFO" />
+    
+    <property name="zookeeper.log.dir" value="." />
+    <property name="zookeeper.log.file" value="zookeeper.log" />
+    <property name="zookeeper.log.threshold" value="INFO" />
+    <property name="zookeeper.log.maxfilesize" value="256MB" />
+    <property name="zookeeper.log.maxbackupindex" value="20" />
+    
+    <!--
+    console
+    Add "console" to root logger if you want to use this
+    -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+    <pattern>%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n</pattern>
+    </encoder>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+    <level>${zookeeper.console.threshold}</level>
+    </filter>
+    </appender>
+    
+    <!--
+    Add ROLLINGFILE to root logger to get log file output
+    -->
+    <!--appender name="ROLLINGFILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <File>${zookeeper.log.dir}/${zookeeper.log.file}</File>
+    <encoder>
+    <pattern>%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n</pattern>
+    </encoder>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+    <level>${zookeeper.log.threshold}</level>
+    </filter>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+    <maxIndex>${zookeeper.log.maxbackupindex}</maxIndex>
+    <FileNamePattern>${zookeeper.log.dir}/${zookeeper.log.file}.%i</FileNamePattern>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+    <MaxFileSize>${zookeeper.log.maxfilesize}</MaxFileSize>
+    </triggeringPolicy>
+    </appender-->
+    
+    <!--
+    Add TRACEFILE to root logger to get log file output
+    Log TRACE level and above messages to a log file
+    -->
+    <!--property name="zookeeper.tracelog.dir" value="${zookeeper.log.dir}" />
+    <property name="zookeeper.tracelog.file" value="zookeeper_trace.log" />
+    <appender name="TRACEFILE" class="ch.qos.logback.core.FileAppender">
+    <File>${zookeeper.tracelog.dir}/${zookeeper.tracelog.file}</File>
+    <encoder>
+    <pattern>%d{ISO8601} [myid:%X{myid}] - %-5p [%t:%C{1}@%L] - %m%n</pattern>
+    </encoder>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+    <level>TRACE</level>
+    </filter>
+    </appender-->
+    
+    <!--
+    zk audit logging
+    -->
+    <!--property name="zookeeper.auditlog.file" value="zookeeper_audit.log" />
+    <property name="zookeeper.auditlog.threshold" value="INFO" />
+    <property name="audit.logger" value="INFO, RFAAUDIT" />
+    
+    <appender name="RFAAUDIT" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <File>${zookeeper.log.dir}/${zookeeper.auditlog.file}</File>
+    <encoder>
+    <pattern>%d{ISO8601} %p %c{2}: %m%n</pattern>
+    </encoder>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+    <level>${zookeeper.auditlog.threshold}</level>
+    </filter>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+    <maxIndex>10</maxIndex>
+    <FileNamePattern>${zookeeper.log.dir}/${zookeeper.auditlog.file}.%i</FileNamePattern>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+    <MaxFileSize>10MB</MaxFileSize>
+    </triggeringPolicy>
+    </appender>
+    
+    <logger name="org.apache.zookeeper.audit.Slf4jAuditLogger" additivity="false" level="${audit.logger}">
+    <appender-ref ref="RFAAUDIT" />
+    </logger-->
+    
+    <root level="INFO">
+    <appender-ref ref="CONSOLE" />
+    </root>
+    </configuration>
+  zookeeperFunctions.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    set -ex
+    function zkConfig() {
+      echo "$HOST.$DOMAIN:$QUORUM_PORT:$LEADER_PORT:$ROLE;$CLIENT_PORT"
+    }
+    function zkConnectionString() {
+      # If the client service address is not yet available, then return localhost
+      set +e
+      getent hosts "${CLIENT_HOST}" 2>/dev/null 1>/dev/null
+      if [[ $? -ne 0 ]]; then
+        set -e
+        echo "localhost:${CLIENT_PORT}"
+      else
+        set -e
+        echo "${CLIENT_HOST}:${CLIENT_PORT}"
+      fi
+    }
+  zookeeperStart.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+
+    set -ex
+    # TODO think how to add nslookup to docker image
+    # apt-get update && apt-get install --no-install-recommends -y dnsutils procps
+    
+    HOST=`hostname -s`
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
+    LOG4J_CONF=/var/lib/zookeeper/conf/log4j-quiet.properties
+    STATIC_CONFIG=$VOLUME_DIR/conf/zoo.cfg
+    
+    if [[ ! -d "$VOLUME_DIR/data" ]]; then
+      mkdir -p $VOLUME_DIR/data
+      chown zookeeper $VOLUME_DIR/data
+    fi
+    if [[ ! -d "$VOLUME_DIR/datalog" ]]; then
+      mkdir -p $VOLUME_DIR/datalog
+      chown zookeeper $VOLUME_DIR/datalog
+    fi
+    ZOOCFGDIR=/var/lib/zookeeper/conf 
+    if [[ ! -d "$ZOOCFGDIR" ]]; then
+      mkdir -p $ZOOCFGDIR
+      chown zookeeper $ZOOCFGDIR
+    fi
+    
+    # Extract resource name and this members ordinal value from pod hostname
+    if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+        NAME=${BASH_REMATCH[1]}
+        ORD=${BASH_REMATCH[2]}
+    else
+        echo Failed to parse name and ordinal of Pod
+        exit 1
+    fi
+    
+    MYID=$((ORD+1))
+    
+    # Values for first startup
+    WRITE_CONFIGURATION=true
+    REGISTER_NODE=true
+    ONDISK_MYID_CONFIG=false
+    ONDISK_DYN_CONFIG=false
+    DOMAIN=`hostname -d` 
+    CLIENT_PORT=2281 
+    SERVER_PORT=2888 
+    ELECTION_PORT=3888 
+    PROMETHEUS_PORT=7000 
+    ZOO_DATA_DIR=/var/lib/zookeeper/data 
+    ZOO_DATA_LOG_DIR=/var/lib/zookeeper/datalog 
+    {
+      echo "secureClientPortAddress=$(hostname -f)"
+      echo "secureClientPort=${CLIENT_PORT}"
+      echo 'tickTime=2000'
+      echo 'initLimit=300'
+      echo 'syncLimit=10'
+      echo 'maxClientCnxns=2000'
+      echo 'maxTimeToWaitForEpoch=2000'
+      echo 'maxSessionTimeout=60000000'
+      echo "dataDir=${ZOO_DATA_DIR}"
+      echo "dataLogDir=${ZOO_DATA_LOG_DIR}"
+      echo 'autopurge.snapRetainCount=10'
+      echo 'autopurge.purgeInterval=1'
+      echo 'preAllocSize=131072'
+      echo 'snapCount=3000000'
+      echo 'leaderServes=yes'
+      echo 'standaloneEnabled=true'
+      echo 'metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider'
+      echo "metricsProvider.httpPort=${PROMETHEUS_PORT}"
+      echo "skipACL=true"
+      echo "fastleader.maxNotificationInterval=10000"
+      echo "serverCnxnFactory=org.apache.zookeeper.server.NettyServerCnxnFactory"
+      echo "ssl.keyStore.location=/keystore.jks" 
+      echo "ssl.keyStore.password=keystore"
+      echo "ssl.trustStore.location=/truststore.jks"
+      echo "ssl.trustStore.password=truststore"
+      echo "admin.enableServer=true"
+    } > $ZOOCFGDIR/zoo.cfg 
+    {
+      echo "zookeeper.root.logger=CONSOLE"
+      echo "zookeeper.console.threshold=INFO"
+      echo "log4j.rootLogger=\${zookeeper.root.logger}"
+      echo "log4j.appender.CONSOLE=org.apache.log4j.ConsoleAppender"
+      echo "log4j.appender.CONSOLE.Threshold=\${zookeeper.console.threshold}"
+      echo "log4j.appender.CONSOLE.layout=org.apache.log4j.PatternLayout"
+      echo "log4j.appender.CONSOLE.layout.ConversionPattern=%d{ISO8601} - %-5p [%t:%C{1}@%L] - %m%n"
+    } > $ZOOCFGDIR/log4j.properties 
+    echo 'JVMFLAGS="-Xms128M -Xmx1G -XX:ActiveProcessorCount=8 -XX:+AlwaysPreTouch -Djute.maxbuffer=8388608 -XX:MaxGCPauseMillis=50"' > $ZOOCFGDIR/java.env 
+    if [[ $HOST =~ (.*)-([0-9]+)$ ]]; then
+        NAME=${BASH_REMATCH[1]} &&
+        ORD=${BASH_REMATCH[2]};
+    else
+        echo "Failed to parse name and ordinal of Pod" 
+        exit 1;
+    fi 
+    mkdir -p ${ZOO_DATA_DIR} 
+    mkdir -p ${ZOO_DATA_LOG_DIR} 
+    export MY_ID=$((ORD+1)) 
+    echo $MY_ID > $ZOO_DATA_DIR/myid 
+    for (( i=1; i<=$SERVERS; i++ )); do
+        echo "server.$i=$NAME-$((i-1)).$DOMAIN:$SERVER_PORT:$ELECTION_PORT" >> $ZOOCFGDIR/zoo.cfg;
+    done 
+    if [[ $SERVERS -eq 1 ]]; then
+        echo "group.1=1" >> $ZOOCFGDIR/zoo.cfg;
+    else
+        echo "group.1=1:2:3" >> $ZOOCFGDIR/zoo.cfg;
+    fi 
+    for (( i=1; i<=$SERVERS; i++ )); do
+        WEIGHT=1
+        if [[ $i == 1 ]]; then
+          WEIGHT=10
+        fi
+        echo "weight.$i=$WEIGHT" >> $ZOOCFGDIR/zoo.cfg;
+    done 
+    sed -i 's/# keyUsage = cRLSign, keyCertSign/keyUsage = cRLSign, keyCertSign/' /usr/lib/ssl/openssl.cnf 
+    cat << EOF > /usr/local/share/ca-certificates/my_own_ca.crt 
+    -----BEGIN CERTIFICATE-----
+    MIIDljCCAn6gAwIBAgIUWCSwiZeH4eBrc+WT3cYqX6pUrjYwDQYJKoZIhvcNAQEL
+    BQAwVDELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+    GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDENMAsGA1UEAwwEcm9vdDAeFw0yMzA2
+    MDcxMTE5MTRaFw0zMzA2MDQxMTE5MTRaMFQxCzAJBgNVBAYTAkFVMRMwEQYDVQQI
+    DApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQx
+    DTALBgNVBAMMBHJvb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCI
+    fMKmdtx5BGna7LqGdu0C+xacNb6TjZ10SeEbeznRJ+axHG5UgyVWspN2w6PX4CUH
+    gHNDBfYbeNyfJ2HQSCprxDhxv9p9s0wfta70S1hEzsuNjgKtk8vm7f6B4SkZx56A
+    OumnENzGlx0oiGEW7qalez5QPa5veUbFDnmIBk6VLn6ILPXTKBgk22RT0I4fCq73
+    RKdtJFirPjnnOl16ognN+0I3Okfu05j52wi1HqK8L6bI+Gw02Ke9Zz0UtG0ssdcj
+    OQPzslTie5ZzpGcytv6WxpBPYKFcCNQrzyE8AUlNnOzxwIEZcE8Nx/SiT6W9NAIJ
+    PiPiEZcHfxid/0a1B15NAgMBAAGjYDBeMB0GA1UdDgQWBBTiZPq3TeMW9fr4syd0
+    F34J4x9SBDAfBgNVHSMEGDAWgBTiZPq3TeMW9fr4syd0F34J4x9SBDAPBgNVHRMB
+    Af8EBTADAQH/MAsGA1UdDwQEAwIBBjANBgkqhkiG9w0BAQsFAAOCAQEAKGuPxfzt
+    +268pzmxpYDMoMdKcTZ3JduhBBPsQKHV+ShV4EiEQ/0IduHnnjtzFIBBzVyYe8kt
+    FH/dI3F0umhNIxRtkchr3R26DfNhpBYzlE4Sm6WTeCGsYdYxhWU7deB72KmG2jiU
+    w4/ZfYp/JCM0TQ/uZpetYmoFwpPfNMqAAyiDiWiL8Fheky2VL7l51FMPe5H49BMY
+    JG6QmpCooEQ34Fxbc2FifyjcBagfJAUDdnxs9lgEYquY8uaEb0zBF9rtZH3IpJ1o
+    H+5YdoDBJBlV/EtJsET8wzQr/bJIodUs1qSSreL3QiXgAy9X9HFeEcN0dhReR8M+
+    /Fa9ElbT45l+4g==
+    -----END CERTIFICATE-----
+    EOF
+    
+    update-ca-certificates 
+    
+    cat << EOF > /my_own_ca.key 
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCIfMKmdtx5BGna
+    7LqGdu0C+xacNb6TjZ10SeEbeznRJ+axHG5UgyVWspN2w6PX4CUHgHNDBfYbeNyf
+    J2HQSCprxDhxv9p9s0wfta70S1hEzsuNjgKtk8vm7f6B4SkZx56AOumnENzGlx0o
+    iGEW7qalez5QPa5veUbFDnmIBk6VLn6ILPXTKBgk22RT0I4fCq73RKdtJFirPjnn
+    Ol16ognN+0I3Okfu05j52wi1HqK8L6bI+Gw02Ke9Zz0UtG0ssdcjOQPzslTie5Zz
+    pGcytv6WxpBPYKFcCNQrzyE8AUlNnOzxwIEZcE8Nx/SiT6W9NAIJPiPiEZcHfxid
+    /0a1B15NAgMBAAECggEAHpxwoZoV75RkU2P1n5PLq3f6BbXuFLTVxA+Py7SS7ox2
+    6nEYc57oQG4TsbbGJ/QPCgQulbEgFeBBBvbzsp2E2h+rkyN20utkHtaGMyc02FXT
+    BF/9zMVRnWzyQFnp+GyzaUoNPlmDUozwzrbro5OJz6J5AtEarsix7R9GdZIIjN+J
+    S2NjO/mcD6wujaqbjXSHFUqXAcZDcGZuhmwra0Y3izepaHSPGgNM1BzZnqhXaytj
+    UKggu1MAYnPz4YsxFz3JkJqNeTTR85YSE5gx8JzZAs+ikqj8Qc/ndH9o16Lk12Xa
+    qoEOT1kNf6FNsbCsS3CqazPpG3XSeYusHvT6E/lq1wKBgQC7i1dZnwBY3f0izncb
+    AXAg7ncUPMK70dLkdZ3UEXKa3DRbPCEZCPyE1U2346OJBF64ncxGNjLs+bfKquiU
+    Yxi6xotdTVjn/xXE/1624JqXO7YwV7W7B8B4G4Mm0s6rDLcepNWHyUgfteVpeENK
+    8f1IyRGVM9ggoicNJ1u4t/20uwKBgQC6ToQJZoBGng+VvgDWkqbMUd84vMyQsIbq
+    G2C2h6mHJWn9j0Nfz71xqdtNx2fsXVkln24iOY4yJfQUm1QGp9i4WSh49g+F+o2K
+    /eu0XWIe7OjDM/InLxqTNyoj5ZWAi06rw/mQSrU6eCuZ6FrIU2Mjh6n+/GjR2n69
+    6/2/I6sMlwKBgQCWKZmFHrRuc0ANsHbZXqtjEsyxnXzmWbicSDhY5qd2qz4YluqB
+    WxqlWQzjYhc8zAzzkRVQWnEoIUIxueqDdV0Fn5dS222GRE4v77DsiKX+1UapKnFO
+    EYTgJlc6rKvhdUrh9GUsVdOz4DaR3kMzLNL6hlPXvS0d4/eUpqDgJCG1pQKBgFhv
+    jsN7kWZz/wfgkjtIj76rGl+vVxdThCc6abUbPoC1ZNOEnsGrNczviPcpsY4EXZ27
+    SScb1QC+/VaOyNsD757KS6jnfETnwyp4D9uk/D+by31legvZky7QX8N8ZnQHLIfi
+    VeOFYvNnOaMsJXO0CXpDGpG8NPFwWvtCO0fw4W/vAoGAaYpk6VTWTw4cih/1dnRf
+    2LQbEO05lFkRSMtEuqgkWUKvWZjnNRdDU3yXqaz0Pgee7drObUwRnKL3Ywj1QY7H
+    zbaEWIZEZ2PId2Bs/5bSOA9VcExZZDNpGd7I2pBosKpHXT5Y+VszdxLMCnmsRzyq
+    LRSX0TaG3xyggkcVlyyAcPw=
+    -----END PRIVATE KEY-----
+    EOF
+
+    keytool -genkeypair -alias server -keyalg RSA -keystore /keystore.jks -keysize 2048 -dname "CN=$(hostname -f),OU=Dept,O=Example.com,L=City,ST=State,C=US" -storepass keystore 
+    
+    keytool -certreq -alias server -keystore /keystore.jks -file /server.csr -storepass keystore 
+    
+    openssl x509 -sha256 -req -in /server.csr -CA /usr/local/share/ca-certificates/my_own_ca.crt -CAkey /my_own_ca.key -CAcreateserial -out /server.crt -days 365 
+    
+    openssl verify -x509_strict -CAfile /usr/local/share/ca-certificates/my_own_ca.crt /server.crt 
+    
+    keytool -importcert -alias ca -file /usr/local/share/ca-certificates/my_own_ca.crt -keystore /keystore.jks -storepass keystore -storetype JKS -noprompt 
+    
+    keytool -importcert -alias server -file /server.crt -keystore /keystore.jks -storepass keystore -storetype JKS -noprompt 
+    
+    keytool -importcert -alias my_own_ca -file /usr/local/share/ca-certificates/my_own_ca.crt -keystore /truststore.jks -storepass truststore -storetype JKS -noprompt 
+    
+    export CLIENT_JVMFLAGS="-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty -Dzookeeper.client.secure=true -Dzookeeper.ssl.keyStore.location=/keystore.jks -Dzookeeper.ssl.keyStore.password=keystore -Dzookeeper.ssl.trustStore.location=/truststore.jks -Dzookeeper.ssl.trustStore.password=truststore" 
+
+    cp /conf/logback.xml $ZOOCFGDIR
+    cp /conf/configuration.xsl $ZOOCFGDIR
+    
+    zkServer.sh --config $ZOOCFGDIR start-foreground
+    
+  zookeeperTeardown.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    
+    set -ex
+    exec > /proc/1/fd/1
+    exec 2> /proc/1/fd/2
+
+    
+    VOLUME_DIR=/var/lib/zookeeper
+    MYID_FILE=$VOLUME_DIR/data/myid
+    DYNCONFIG=$VOLUME_DIR/zoo.cfg.dynamic
+    LOG4J_CONF=/conf/log4j-quiet.properties
+    
+    # Wait for client connections to drain. Kubernetes will wait until the configured
+    # "terminationGracePeriodSeconds" before forcibly killing the container
+    CONN_COUNT=`echo $(exec 3<>/dev/tcp/127.0.0.1/2181 ; printf "cons" >&3 ; IFS=; tee <&3; exec 3<&- ;) | grep -v "^$" | grep -v "/127.0.0.1:" | wc -l`
+    for (( i = 0; i < 6; i++ )); do
+      if [[ "$CONN_COUNT" -gt 0 ]]; then
+        echo "$CONN_COUNT non-local connections still connected."
+        sleep 5
+      else
+        echo "$CONN_COUNT non-local connections"
+        break
+      fi
+    done
+    
+    # Check to see if zookeeper service for this node is a participant
+    set +e
+    ZKURL=$(zkConnectionString)
+    set -e
+    MYID=`cat $MYID_FILE`
+    CLUSTER_SIZE=$(zkCli.sh -server ${ZKURL} config | grep -c -E '^server\.[0-9]+=') 
+    echo "CLUSTER_SIZE=$CLUSTER_SIZE, MyId=$MYID"
+    if [[ "$MYID" -gt "1" ]]; then
+      # If ClusterSize < MyId, this server is being permanantly removed.
+      zkCli.sh  -server ${ZKURL} reconfig -remove $MYID | grep -E '^server\.[0-9]+='  > $DYNCONFIG 
+      echo $?
+    fi
+    
+    # Kill the primary process ourselves to circumvent the terminationGracePeriodSeconds
+    ps -ef | grep zoo.cfg | grep -v grep | awk '{print $2}' | xargs kill
+
+  zookeeperLive.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    set -ex
+    
+    export ZOOCFGDIR=/var/lib/zookeeper/conf
+    export CLIENT_JVMFLAGS="-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty -Dzookeeper.client.secure=true -Dzookeeper.ssl.keyStore.location=/keystore.jks -Dzookeeper.ssl.keyStore.password=keystore -Dzookeeper.ssl.trustStore.location=/truststore.jks -Dzookeeper.ssl.trustStore.password=truststore"; 
+    export status=$(zkServer.sh --config $ZOOCFGDIR status | grep Mode);
+    if [[ $status ]] ; then
+      exit 0;
+    else
+      exit 1;
+    fi
+
+  zookeeperReady.sh: |
+    #!/usr/bin/env bash
+    # Copyright (c) 2018 Dell Inc., or its subsidiaries. All Rights Reserved.
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #     https://www.apache.org/licenses/LICENSE-2.0
+    set -ex
+    
+    export ZOOCFGDIR=/var/lib/zookeeper/conf
+    export CLIENT_JVMFLAGS="-Dzookeeper.clientCnxnSocket=org.apache.zookeeper.ClientCnxnSocketNetty -Dzookeeper.client.secure=true -Dzookeeper.ssl.keyStore.location=/keystore.jks -Dzookeeper.ssl.keyStore.password=keystore -Dzookeeper.ssl.trustStore.location=/truststore.jks -Dzookeeper.ssl.trustStore.password=truststore"; 
+    export status=$(zkServer.sh --config $ZOOCFGDIR status | grep Mode);
+    if [[ $status ]] ; then
+      exit 0;
+    else
+      exit 1;
+    fi
+
+---
+# Main StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: zookeeper
+  name: zookeeper
+
+spec:
+#  https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention
+#  requires alpha `StatefulSetAutoDeletePVC=true` feature gate
+#  persistentVolumeClaimRetentionPolicy:
+#    whenDeleted: Delete
+#    whenScaled: Delete
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  serviceName: zookeeper-headless
+  template:
+    metadata:
+      generateName: zookeeper
+      labels:
+        app: zookeeper
+        what: node
+      annotations:
+        prometheus.io/port: '7000'
+        prometheus.io/scrape: 'true'
+    spec:
+#      affinity:
+#        podAntiAffinity:
+#          requiredDuringSchedulingIgnoredDuringExecution:
+#            - labelSelector:
+#                matchExpressions:
+#                  - key: "app"
+#                    operator: In
+#                    values:
+#                      - zookeeper
+#              # TODO think about multi-AZ EKS
+#              # topologyKey: topology.kubernetes.io/zone
+#              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: zookeeper
+          command:
+            - /conf/zookeeperStart.sh
+          image: docker.io/zookeeper:3.8.3
+          imagePullPolicy: Always
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /conf/zookeeperTeardown.sh
+          livenessProbe:
+            exec:
+              command:
+                - /conf/zookeeperLive.sh
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - /conf/zookeeperReady.sh
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 10
+          ports:
+            - containerPort: 2181
+              name: client
+              protocol: TCP
+            - containerPort: 2888
+              name: quorum
+              protocol: TCP
+            - containerPort: 3888
+              name: leader-election
+              protocol: TCP
+            - containerPort: 7000
+              name: metrics
+              protocol: TCP
+            - containerPort: 8080
+              name: admin-server
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/zookeeper
+              name: datadir-volume
+            - mountPath: /conf
+              name: conf
+          env:
+            - name: SERVERS
+              value: "1"
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - configMap:
+            name: zookeeper-scripts
+            defaultMode: 0777
+          name: conf
+      securityContext:
+        runAsUser: 0
+        fsGroup: 0
+  volumeClaimTemplates:
+    - metadata:
+        name: datadir-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
