@@ -5,6 +5,26 @@ metadata:
 spec:
   configuration:
     users:
-      user_name/grants/query:
-        - "GRANT SHOW ON *.*"
-        - "GRANT SELECT ON *.* WITH GRANT OPTION"
+      myuser/profile: readonly
+      myuser/grants/query:
+        - "GRANT SELECT,INSERT,ALTER,CREATE,DROP,TRUNCATE,OPTIMIZE,SHOW,dictGet,REMOTE ON canarydb.*"
+      myuser/allow_databases/database:
+        - "canarydb"
+      myuser2/profile: default
+      myuser2/grants/query:
+        - "GRANT limited_role"
+    files:
+      users.d/limited_role.xml:
+        <clickhouse>
+          <roles>
+            <limited_role>
+              <grants>
+                <query>REVOKE ALL ON *.*</query>
+                <query>GRANT SELECT,INSERT,ALTER,CREATE,DROP,TRUNCATE,OPTIMIZE,SHOW,dictGet ON db1.*</query>
+                <query>GRANT SELECT,INSERT,ALTER,CREATE,DROP,TRUNCATE,OPTIMIZE,SHOW,dictGet ON db2.*</query>
+                <query>GRANT SELECT,INSERT,ALTER,CREATE,DROP,TRUNCATE,OPTIMIZE,SHOW,dictGet ON db3.*</query>
+                <query>GRANT SELECT,SHOW,dictGet,REMOTE ON *.*</query>
+              </grants>
+            </limited_role>
+          </roles>
+        </clickhouse>
