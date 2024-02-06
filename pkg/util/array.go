@@ -150,3 +150,12 @@ func Unique(slice []string) (unique []string) {
 
 	return unique
 }
+
+func NonEmpty(slice []string) (nonEmpty []string) {
+	for _, str := range slice {
+		if str != "" {
+			nonEmpty = append(nonEmpty, str)
+		}
+	}
+	return nonEmpty
+}
