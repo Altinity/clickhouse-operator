@@ -61,7 +61,7 @@ func initClickHouse(ctx context.Context) {
 	// Create operator instance
 	chop.New(kubeClient, chopClient, chopConfigFile)
 	log.V(1).F().Info("Config parsed:")
-	log.Info(chop.Config().String(true))
+	log.Info("\n" + chop.Config().String(true))
 
 	// Create Informers
 	kubeInformerFactory := kubeinformers.NewSharedInformerFactoryWithOptions(
