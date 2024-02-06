@@ -89,13 +89,14 @@ func (cm *ConfigManager) Init() error {
 		return err
 	}
 	log.V(1).Info("File-based CHOP config start:")
-	log.V(1).Info(cm.fileConfig.String(true))
+	log.V(1).Info("\n" + cm.fileConfig.String(true))
 	log.V(1).Info("File-based CHOP config end.")
 
-	// Get configs from all config Custom Resources
-	watchedNamespace := cm.fileConfig.GetInformerNamespace()
-	cm.getCRBasedConfigs(watchedNamespace)
-	cm.logCRBasedConfigs()
+	// Get configs from all config Custom Resources that are located in the namespace where Operator is running
+	if namespace, ok := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE); ok {
+		cm.getCRBasedConfigs(namespace)
+		cm.logCRBasedConfigs()
+	}
 
 	// Prepare one unified config from all available config pieces
 	cm.buildUnifiedConfig()
@@ -104,7 +105,7 @@ func (cm *ConfigManager) Init() error {
 
 	// From now on we have one unified CHOP config
 	log.V(1).Info("Unified CHOP config (but not post-processed yet) start:")
-	log.V(1).Info(cm.config.String(true))
+	log.V(1).Info("\n" + cm.config.String(true))
 	log.V(1).Info("Unified CHOP config (but not post-processed yet) end.")
 
 	// Finalize config by post-processing
@@ -112,7 +113,7 @@ func (cm *ConfigManager) Init() error {
 
 	// OperatorConfig is ready
 	log.V(1).Info("Final CHOP config start:")
-	log.V(1).Info(cm.config.String(true))
+	log.V(1).Info("\n" + cm.config.String(true))
 	log.V(1).Info("Final CHOP config end.")
 
 	return nil
@@ -130,10 +131,12 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 		return
 	}
 
+	log.V(1).F().Info("Looking for ClickHouseOperatorConfigurations in namespace '%s'.", namespace)
+
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), controller.NewListOptions()); err != nil {
-		log.V(1).F().Error("Error read ClickHouseOperatorConfigurations %v", err)
+		log.V(1).F().Error("Error read ClickHouseOperatorConfigurations in namespace '%s'. Err: %v", namespace, err)
 		return
 	}
 
@@ -385,12 +388,12 @@ func (cm *ConfigManager) GetRuntimeParam(name string) (string, bool) {
 
 // fetchSecretCredentials
 func (cm *ConfigManager) fetchSecretCredentials() {
-	// Secret name where to look for credentials
+	// Secret name where to look for ClickHouse access credentials
 	name := cm.config.ClickHouse.Access.Secret.Name
 
 	// Do we need to fetch credentials from the secret?
 	if name == "" {
-		// No name specified, no need to read secret
+		// No secret name specified, no need to read it
 		return
 	}
 
@@ -415,18 +418,22 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 	if err != nil {
 		cm.config.ClickHouse.Access.Secret.Runtime.Error = err.Error()
+		log.V(1).Warning("Unable to fetch secret '%s/%s'", namespace, name)
 		return
 	}
 
 	cm.config.ClickHouse.Access.Secret.Runtime.Fetched = true
+	log.V(1).Info("Secret fetched %s/%s :", namespace, name)
 
 	// Find username and password from credentials
 	for key, value := range secret.Data {
 		switch key {
 		case "username":
 			cm.config.ClickHouse.Access.Secret.Runtime.Username = string(value)
+			log.V(1).Info("Username read from secret '%s/%s'", namespace, name)
 		case "password":
 			cm.config.ClickHouse.Access.Secret.Runtime.Password = string(value)
+			log.V(1).Info("Password read from secret '%s/%s'", namespace, name)
 		}
 	}
 }
