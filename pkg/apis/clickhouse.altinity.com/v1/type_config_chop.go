@@ -63,8 +63,8 @@ const (
 	// 2. Schema maintenance
 	// User credentials can be specified in additional ClickHouse config files located in `chUsersConfigsPath` folder
 	defaultChScheme   = ChSchemeAuto
-	defaultChUsername = ""
-	defaultChPassword = ""
+	defaultChUsername = "clickhouse_operator"
+	defaultChPassword = "clickhouse_operator_password"
 	defaultChPort     = 8123
 	defaultChRootCA   = ""
 
