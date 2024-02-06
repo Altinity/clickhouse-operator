@@ -662,6 +662,9 @@ def test_011_1(self):
         kubectl.create_and_check(
             manifest="manifests/chi/test-011-insecured-cluster.yaml",
             check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
                 "chi_status": "InProgress",
                 "do_not_delete": 1,
             },
@@ -680,7 +683,7 @@ def test_011_1(self):
                 for ip in ips:
                     ips_l.append(ip.text)
                 # Expected output: ['::1', '127.0.0.1', '127.0.0.2', <pod1 ip>, <pod2 ip>]
-                print(f"users.xml: {ips_l}")
+                print(f"default user's IPs: {ips_l}")
                 assert len(ips) == 5
 
             clickhouse.query("test-011-secured-cluster", "SYSTEM RELOAD CONFIG")
@@ -712,7 +715,9 @@ def test_011_1(self):
         with When("Remove host_regexp for default user"):
             kubectl.create_and_check(
                 manifest="manifests/chi/test-011-secured-cluster-2.yaml",
-                check={"do_not_delete": 1},
+                check={
+                    "do_not_delete": 1,
+                },
             )
 
             with Then("Make sure host_regexp is disabled"):
@@ -810,9 +815,9 @@ def test_011_1(self):
             )
             assert out != "OK"
 
-    with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+    # with Finally("I clean up"):
+    #     with By("deleting test namespace"):
+    #         delete_test_namespace()
 
 
 @TestScenario
