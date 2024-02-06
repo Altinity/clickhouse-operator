@@ -118,6 +118,34 @@ spec:
           - kind: PersistentVolumeClaim
             name: ''
             version: v1
+      - description: ClickHouse Keeper Installation - ClickHouse Keeper cluster instance
+        displayName: ClickHouseKeeperInstallation
+        group: clickhouse-keeper.altinity.com
+        kind: ClickHouseKeeperInstallation
+        name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
+        version: v1
+        resources:
+          - kind: Service
+            name: ''
+            version: v1
+          - kind: Endpoint
+            name: ''
+            version: v1
+          - kind: Pod
+            name: ''
+            version: v1
+          - kind: StatefulSet
+            name: ''
+            version: v1
+          - kind: ConfigMap
+            name: ''
+            version: v1
+          - kind: Event
+            name: ''
+            version: v1
+          - kind: PersistentVolumeClaim
+            name: ''
+            version: v1
   description: |-
     ## ClickHouse
     [ClickHouse](https://clickhouse.yandex) is an open source column-oriented database management system capable of real time generation of analytical data reports.

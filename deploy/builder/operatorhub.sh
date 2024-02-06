@@ -8,7 +8,13 @@ SRC_ROOT="$(realpath "${CUR_DIR}/../..")"
 
 # 0.9.3
 VERSION=$(cd "${SRC_ROOT}"; cat release)
-PREVIOUS_VERSION="${PREVIOUS_VERSION:-0.18.0}"
+PREVIOUS_VERSION="${PREVIOUS_VERSION}"
+
+if [[ -z "${PREVIOUS_VERSION}" ]]; then
+    echo "PREVIOUS_VERSION is not specified. Unable to proceed."
+    echo "Abort."
+    exit 1
+fi
 
 echo "PREVIOUS_VERSION: ${PREVIOUS_VERSION}"
 echo "VERSION: ${VERSION}"
@@ -81,7 +87,7 @@ rm "${CVV_FILE_TEMPLATE}"
 CHI="clickhouseinstallations.clickhouse.altinity.com"
 CHIT="clickhouseinstallationtemplates.clickhouse.altinity.com"
 CONF="clickhouseoperatorconfigurations.clickhouse.altinity.com"
-
+CHK="clickhousekeeperinstallations.clickhouse-keeper.altinity.com"
 
 # Build partial .yaml manifest(s)
 MANIFEST_PRINT_CRD="yes" \
@@ -106,6 +112,14 @@ MANIFEST_PRINT_RBAC_NAMESPACED="no" \
 MANIFEST_PRINT_DEPLOYMENT="no" \
 MANIFEST_PRINT_SERVICE_METRICS="no" \
 "${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CONF}\")" > "${MANIFESTS_DIR}/${CONF}.crd.yaml"
+
+# Build partial .yaml manifest(s)
+MANIFEST_PRINT_CRD="yes" \
+MANIFEST_PRINT_RBAC_CLUSTERED="no" \
+MANIFEST_PRINT_RBAC_NAMESPACED="no" \
+MANIFEST_PRINT_DEPLOYMENT="no" \
+MANIFEST_PRINT_SERVICE_METRICS="no" \
+"${CUR_DIR}/cat-clickhouse-operator-install-yaml.sh" | yq "select(.metadata.name == \"${CHK}\")" > "${MANIFESTS_DIR}/${CHK}.crd.yaml"
 
 # TODO
 # Package file not used any more?

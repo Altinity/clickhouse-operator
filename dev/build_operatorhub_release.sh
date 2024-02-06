@@ -5,16 +5,21 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 # Where community-operators sources are located
-DEFAULT_CO_PATH=~/dev/community-operators/operators/clickhouse
-CO_PATH=${CO_PATH:-${DEFAULT_CO_PATH}}
+
+DEFAULT_CO_REPO_PATH=~/dev/community-operators
+CO_REPO_PATH="${CO_REPO_PATH:-"${DEFAULT_CO_REPO_PATH}"}"
+DEFAULT_CO_FOLDER_PATH="${CO_REPO_PATH}/operators/clickhouse"
+CO_FOLDER_PATH="${CO_FOLDER_PATH:-"${DEFAULT_CO_FOLDER_PATH}"}"
 
 # Ask to prepare copy of required files
-echo "Please ensure new clickhouse folder in operatorhub repo is available :"
-echo "${CO_PATH}"
+echo "Please check operatorhub repo and clickhouse folder within the repo are available :"
+echo "Repo:  ${CO_REPO_PATH}"
+echo "Folder:${CO_FOLDER_PATH}"
 read -n 1 -r -s -p $'Press enter to continue...\n'
 
-if [[ ! -d "${CO_PATH}" ]]; then
-    echo "Folder ${CO_PATH} is not available! Abort."
+if [[ ! -d "${CO_FOLDER_PATH}" ]]; then
+    echo "Folder ${CO_FOLDER_PATH} is not available."
+    echo "Abort."
     exit 1
 fi
 
@@ -29,8 +34,10 @@ else
 fi
 
 if [[ -z "${PREVIOUS_VERSION}" ]]; then
-    echo "Please specify PREVIOUS_VERSION earlier published on operatorhub, like"
+    echo "No PREVIOUS_VERSION available."
+    echo "Please specify PREVIOUS_VERSION earlier published on operatorhub, like:"
     echo "PREVIOUS_VERSION=0.18.1"
+    echo "Abort."
     exit 1
 else
     echo "Going to use"
@@ -43,8 +50,8 @@ read -n 1 -r -s -p $'Press enter to continue...\n'
 PREVIOUS_VERSION="${PREVIOUS_VERSION}" ${SRC_ROOT}/deploy/builder/operatorhub.sh
 
 OPERATORHUB_DIR="${SRC_ROOT}/deploy/operatorhub"
-DST_MANIFESTS_DIR="${CO_PATH}/${VERSION}/manifests/"
-DST_METADATA_DIR="${CO_PATH}/${VERSION}/metadata/"
+DST_MANIFESTS_DIR="${CO_FOLDER_PATH}/${VERSION}/manifests/"
+DST_METADATA_DIR="${CO_FOLDER_PATH}/${VERSION}/metadata/"
 mkdir -p "${DST_MANIFESTS_DIR}"
 mkdir -p "${DST_METADATA_DIR}"
 cp -r "${OPERATORHUB_DIR}/${VERSION}/"* "${DST_MANIFESTS_DIR}"
