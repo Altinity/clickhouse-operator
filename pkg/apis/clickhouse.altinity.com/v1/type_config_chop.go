@@ -143,6 +143,22 @@ const (
 // Do not forget to update func (config *OperatorConfig) String()
 // Do not forget to update CRD spec
 
+// OperatorConfigRuntime specifies runtime config
+type OperatorConfigRuntime struct {
+	// Full path to the config file and folder where file part of this OperatorConfig originates from
+	ConfigFilePath   string `json:"configFilePath"   yaml:"configFilePath"`
+	ConfigFolderPath string `json:"configFolderPath" yaml:"configFolderPath"`
+	// Namespace and Name of the config Custom Resource
+	ConfigCRNamespace string `json:"configCRNamespace" yaml:"configCRNamespace"`
+	ConfigCRName      string `json:"configCRName"      yaml:"configCRName"`
+
+	// ConfigCRSources specifies list of Custom Resource-based configuration sources
+	ConfigCRSources []ConfigCRSource `json:"configCRSources" yaml:"configCRSources"`
+
+	// Namespace specifies namespace where the operator runs
+	Namespace string `json:"namespace" yaml:"namespace"`
+}
+
 // OperatorConfigWatch specifies watch section
 type OperatorConfigWatch struct {
 	// Namespaces where operator watches for events
@@ -375,15 +391,14 @@ type OperatorConfigLabel struct {
 	} `json:"runtime" yaml:"runtime"`
 }
 
+type ConfigCRSource struct {
+	Namespace string
+	Name      string
+}
+
 // OperatorConfig specifies operator config
 type OperatorConfig struct {
-	Runtime struct {
-		// Full path to the config file and folder where this OperatorConfig originates from
-		ConfigFilePath   string
-		ConfigFolderPath string
-		// Namespace specifies namespace where operator runs
-		Namespace string
-	}
+	Runtime     OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
 	Watch       OperatorConfigWatch      `json:"watch"      yaml:"watch"`
 	ClickHouse  OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
 	Template    OperatorConfigTemplate   `json:"template"   yaml:"template"`
@@ -693,7 +708,6 @@ func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
-
 }
 
 func (c *OperatorConfig) normalizeSectionTemplate() {
