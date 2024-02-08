@@ -76,7 +76,7 @@ spec:
                     topologyKey: "kubernetes.io/hostname"
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:23.8
               volumeMounts:
                 - name: storage-vc-template
                   mountPath: /var/lib/clickhouse

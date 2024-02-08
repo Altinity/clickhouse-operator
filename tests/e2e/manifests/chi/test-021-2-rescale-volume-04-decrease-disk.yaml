@@ -40,7 +40,7 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.8
+              image: clickhouse/clickhouse-server:23.8
               volumeMounts:
                 - name: disk1
                   mountPath: /var/lib/clickhouse

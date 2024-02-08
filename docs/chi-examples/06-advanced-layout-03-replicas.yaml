@@ -32,17 +32,17 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.1
+              image: clickhouse/clickhouse-server:23.8
 
       - name: clickhouse:22.3
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.2
+              image: clickhouse/clickhouse-server:23.8
 
 
       - name: clickhouse:22.3
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:23.8

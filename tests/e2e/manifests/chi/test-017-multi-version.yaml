@@ -9,12 +9,12 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.3
+          image: clickhouse/clickhouse-server:23.8
     - name: v22.8
       spec:
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.8
+          image: clickhouse/clickhouse-server:23.8
   configuration:
     clusters:
     - name: default
