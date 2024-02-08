@@ -20,7 +20,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/golang/glog"
@@ -72,7 +71,7 @@ func (w *CHIPrometheusWriter) WriteMetrics(data [][]string) {
 		} else {
 			metricType = prometheus.GaugeValue
 		}
-		name := convertMetricName(metric[0])
+		name := metric[0]
 		desc := metric[2]
 		value := metric[1]
 		w.writeSingleMetricToPrometheus(
@@ -288,39 +287,22 @@ func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(
 		labelValues...,
 	)
 	if err != nil {
-		log.Warningf("Error creating metric %s: %s", name, err)
+		log.Warningf("Error creating metric: %s err: %s", name, err)
 		return
 	}
 	select {
 	case out <- m:
 	case <-time.After(writeMetricWaitTimeout):
-		log.Warningf("Error sending metric to the channel %s", name)
+		log.Warningf("Error sending metric to the channel: %s", name)
 	}
 }
 
 // newDescription creates a new prometheus.Desc object
 func newDescription(name, help string, labels []string) *prometheus.Desc {
 	return prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, subsystem, name),
+		prometheus.BuildFQName(namespace, subsystem, util.BuildPrometheusMetricName(name)),
 		help,
 		util.BuildPrometheusLabels(labels...),
 		nil,
 	)
-}
-
-// convertMetricName converts the given string to snake case following the Golang format:
-// acronyms are converted to lower-case and preceded by an underscore.
-func convertMetricName(in string) string {
-	/*runes := []rune(in)
-	length := len(runes)
-
-	var out []rune
-	for i := 0; i < length; i++ {
-		if i > 0 && unicode.IsUpper(runes[i]) && ((i+1 < length && unicode.IsLower(runes[i+1])) || unicode.IsLower(runes[i-1])) {
-			out = append(out, '_')
-		}
-		out = append(out, unicode.ToLower(runes[i]))
-	}*/
-
-	return strings.NewReplacer("-", "_", ".", "_").Replace(in)
 }
