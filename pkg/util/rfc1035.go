@@ -19,12 +19,14 @@ import (
 	"strings"
 )
 
-const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 const dns1035LabelMaxLength int = 63
+const dns1035LabelFormat string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+const dns1035LabelStartFormat string = "[a-z]"
+const dns1035LabelNotAllowedCharsFormat string = "[^-a-z0-9]"
 
-var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
-var dns1035LabelStartRegexp = regexp.MustCompile("^" + "[a-z]")
-var dns1035LabelNotAllowedCharsRegexp = regexp.MustCompile("[^-a-z0-9]")
+var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFormat + "$")
+var dns1035LabelStartRegexp = regexp.MustCompile("^" + dns1035LabelStartFormat)
+var dns1035LabelNotAllowedCharsRegexp = regexp.MustCompile(dns1035LabelNotAllowedCharsFormat)
 
 func BuildRFC1035Label(str string) (string, bool) {
 	// Must be lowercase
@@ -44,15 +46,15 @@ func BuildRFC1035Label(str string) (string, bool) {
 		str = str[0:dns1035LabelMaxLength]
 	}
 
-	if IsDNS1035Label(str) {
+	if IsValidDNS1035Label(str) {
 		return str, true
 	}
 
 	return "", false
 }
 
-// IsDNS1035Label tests for a string that conforms to the definition of a label in DNS (RFC 1035).
-func IsDNS1035Label(value string) bool {
+// IsValidDNS1035Label tests for a string that conforms to the definition of a label in DNS (RFC 1035).
+func IsValidDNS1035Label(value string) bool {
 	if len(value) > dns1035LabelMaxLength {
 		return false
 	}
