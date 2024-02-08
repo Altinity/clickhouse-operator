@@ -29,6 +29,17 @@ const prometheusLabelNotAllowedCharsFormat string = "[^a-zA-Z0-9_]"
 var prometheusLabelRegexp = regexp.MustCompile("^" + prometheusLabelFormat + "$")
 var prometheusLabelNotAllowedCharsRegexp = regexp.MustCompile(prometheusLabelNotAllowedCharsFormat)
 
+// Metric names may contain ASCII letters, digits, underscores, and colons.
+// It must match the regex [a-zA-Z_:][a-zA-Z0-9_:]*
+// For more details check:
+// https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
+
+const prometheusMetricFormat string = "[a-zA-Z_:][a-zA-Z0-9_:]*"
+const prometheusMetricNotAllowedCharsFormat string = "[^a-zA-Z0-9_:]"
+
+var prometheusMetricRegexp = regexp.MustCompile("^" + prometheusMetricFormat + "$")
+var prometheusMetricNotAllowedCharsRegexp = regexp.MustCompile(prometheusMetricNotAllowedCharsFormat)
+
 func BuildPrometheusLabel(label string) string {
 	// Replace not allowed chars
 	return prometheusLabelNotAllowedCharsRegexp.ReplaceAllString(label, "_")
@@ -52,4 +63,14 @@ func IsValidPrometheusLabelValue(value string) bool {
 	// For more details check:
 	// https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
 	return true
+}
+
+func BuildPrometheusMetricName(name string) string {
+	// Replace not allowed chars
+	return prometheusMetricNotAllowedCharsRegexp.ReplaceAllString(name, "_")
+}
+
+// IsValidPrometheusMetricName tests for a string that conforms to the definition of a metric in Prometheus
+func IsValidPrometheusMetricName(value string) bool {
+	return prometheusMetricRegexp.MatchString(value)
 }
