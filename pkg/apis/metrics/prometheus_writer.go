@@ -1,4 +1,5 @@
 // Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@ package metrics
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,15 +72,14 @@ func (w *CHIPrometheusWriter) WriteMetrics(data [][]string) {
 		} else {
 			metricType = prometheus.GaugeValue
 		}
+		name := convertMetricName(metric[0])
+		desc := metric[2]
+		value := metric[1]
 		w.writeSingleMetricToPrometheus(
 			w.out,
-			convertMetricName(metric[0]),
-			metric[2],
-			metric[1],
-			metricType,
-			nil,
-			nil,
-		)
+			name, desc,
+			metricType, value,
+			nil, nil)
 	}
 }
 
@@ -90,23 +91,28 @@ func (w *CHIPrometheusWriter) WriteTableSizes(data [][]string) {
 		if len(metric) < 2 {
 			continue
 		}
-		labels := []string{"database", "table", "active"}
-		values := []string{metric[0], metric[1], metric[2]}
+		labelNames := []string{"database", "table", "active"}
+		labelValues := []string{metric[0], metric[1], metric[2]}
 		w.writeSingleMetricToPrometheus(w.out,
-			"table_partitions", "Number of partitions of the table", metric[3], prometheus.GaugeValue,
-			labels, values)
+			"table_partitions", "Number of partitions of the table",
+			prometheus.GaugeValue, metric[3],
+			labelNames, labelValues)
 		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts", "Number of parts of the table", metric[4], prometheus.GaugeValue,
-			labels, values)
+			"table_parts", "Number of parts of the table",
+			prometheus.GaugeValue, metric[4],
+			labelNames, labelValues)
 		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts_bytes", "Table size in bytes", metric[5], prometheus.GaugeValue,
-			labels, values)
+			"table_parts_bytes", "Table size in bytes",
+			prometheus.GaugeValue, metric[5],
+			labelNames, labelValues)
 		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[6], prometheus.GaugeValue,
-			labels, values)
+			"table_parts_bytes_uncompressed", "Table size in bytes uncompressed",
+			prometheus.GaugeValue, metric[6],
+			labelNames, labelValues)
 		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts_rows", "Number of rows in the table", metric[7], prometheus.GaugeValue,
-			labels, values)
+			"table_parts_rows", "Number of rows in the table",
+			prometheus.GaugeValue, metric[7],
+			labelNames, labelValues)
 	}
 }
 
@@ -142,73 +148,77 @@ func (w *CHIPrometheusWriter) WriteSystemParts(data [][]string) {
 // WriteSystemReplicas writes system replicas
 func (w *CHIPrometheusWriter) WriteSystemReplicas(data [][]string) {
 	for _, metric := range data {
+		labelNames := []string{"database", "table"}
+		labelValues := []string{metric[0], metric[1]}
 		w.writeSingleMetricToPrometheus(w.out,
-			"system_replicas_is_session_expired", "Number of expired Zookeeper sessions of the table", metric[2], prometheus.GaugeValue,
-			// Label names
-			[]string{"database", "table"},
-			// Label values
-			[]string{metric[0], metric[1]})
+			"system_replicas_is_session_expired", "Number of expired Zookeeper sessions of the table",
+			prometheus.GaugeValue, metric[2],
+			labelNames, labelValues)
 	}
 }
 
 // WriteMutations writes mutations
 func (w *CHIPrometheusWriter) WriteMutations(data [][]string) {
 	for _, metric := range data {
-		labels := []string{"database", "table"}
-		values := []string{metric[0], metric[1]}
+		labelNames := []string{"database", "table"}
+		labelValues := []string{metric[0], metric[1]}
 		w.writeSingleMetricToPrometheus(w.out,
-			"table_mutations", "Number of active mutations for the table", metric[2], prometheus.GaugeValue,
-			labels, values)
+			"table_mutations", "Number of active mutations for the table",
+			prometheus.GaugeValue, metric[2],
+			labelNames, labelValues)
 		w.writeSingleMetricToPrometheus(w.out,
-			"table_mutations_parts_to_do", "Number of data parts that need to be mutated for the mutation to finish", metric[3], prometheus.GaugeValue,
-			labels, values)
+			"table_mutations_parts_to_do", "Number of data parts that need to be mutated for the mutation to finish",
+			prometheus.GaugeValue, metric[3],
+			labelNames, labelValues)
 	}
 }
 
 // WriteSystemDisks writes system disks
 func (w *CHIPrometheusWriter) WriteSystemDisks(data [][]string) {
 	for _, metric := range data {
-		labels := []string{"disk"}
-		values := []string{metric[0]}
+		labelNames := []string{"disk"}
+		labelValues := []string{metric[0]}
 		w.writeSingleMetricToPrometheus(w.out,
-			"metric_DiskFreeBytes", "Free disk space available from system.disks", metric[1], prometheus.GaugeValue,
-			labels, values)
+			"metric_DiskFreeBytes", "Free disk space available from system.disks",
+			prometheus.GaugeValue, metric[1],
+			labelNames, labelValues)
 		w.writeSingleMetricToPrometheus(w.out,
-			"metric_DiskTotalBytes", "Total disk space available from system.disks", metric[2], prometheus.GaugeValue,
-			labels, values)
+			"metric_DiskTotalBytes", "Total disk space available from system.disks",
+			prometheus.GaugeValue, metric[2],
+			labelNames, labelValues)
 	}
 }
 
 // WriteDetachedParts writes detached parts
 func (w *CHIPrometheusWriter) WriteDetachedParts(data [][]string) {
 	for _, metric := range data {
+		labelNames := []string{"database", "table", "disk", "reason"}
+		labelValues := []string{metric[1], metric[2], metric[3], metric[4]}
 		w.writeSingleMetricToPrometheus(w.out,
-			"metric_DetachedParts", "Count of currently detached parts from system.detached_parts", metric[0], prometheus.GaugeValue,
-			// Label names
-			[]string{"database", "table", "disk", "reason"},
-			// Label values
-			[]string{metric[1], metric[2], metric[3], metric[4]})
+			"metric_DetachedParts", "Count of currently detached parts from system.detached_parts",
+			prometheus.GaugeValue, metric[0],
+			labelNames, labelValues)
 	}
 }
 
 // WriteErrorFetch writes error fetch
 func (w *CHIPrometheusWriter) WriteErrorFetch(fetchType string) {
+	labelNames := []string{"fetch_type"}
+	labelValues := []string{fetchType}
 	w.writeSingleMetricToPrometheus(w.out,
-		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
-		// Label names
-		[]string{"fetch_type"},
-		// Label values
-		[]string{fetchType})
+		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful",
+		prometheus.GaugeValue, "1",
+		labelNames, labelValues)
 }
 
 // WriteOKFetch writes successful fetch
 func (w *CHIPrometheusWriter) WriteOKFetch(fetchType string) {
+	labelNames := []string{"fetch_type"}
+	labelValues := []string{fetchType}
 	w.writeSingleMetricToPrometheus(w.out,
-		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "0", prometheus.GaugeValue,
-		// Label names
-		[]string{"fetch_type"},
-		// Label values
-		[]string{fetchType})
+		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful",
+		prometheus.GaugeValue, "0",
+		labelNames, labelValues)
 }
 
 func (w *CHIPrometheusWriter) getCHILabels() (labels []string) {
@@ -261,8 +271,8 @@ func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(
 	out chan<- prometheus.Metric,
 	name string,
 	desc string,
-	value string,
 	metricType prometheus.ValueType,
+	value string,
 	optionalLabels []string,
 	optionalLabelValues []string,
 ) {
@@ -293,7 +303,7 @@ func newDescription(name, help string, labels []string) *prometheus.Desc {
 	return prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, subsystem, name),
 		help,
-		labels,
+		util.BuildPrometheusLabels(labels...),
 		nil,
 	)
 }
