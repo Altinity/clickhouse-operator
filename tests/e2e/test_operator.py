@@ -815,9 +815,9 @@ def test_011_1(self):
             )
             assert out != "OK"
 
-    # with Finally("I clean up"):
-    #     with By("deleting test namespace"):
-    #         delete_test_namespace()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
