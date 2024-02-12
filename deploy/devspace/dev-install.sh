@@ -4,10 +4,10 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 source "${CUR_DIR}/dev-config.sh"
 
-echo "Create ${OPERATOR_NAMESPACE} namespace"
+echo "Create namespace to deploy the operator into: ${OPERATOR_NAMESPACE}"
 kubectl create namespace "${OPERATOR_NAMESPACE}"
 
-echo "Install operator requirements"
+echo "Install operator requirements with the following options:"
 echo "OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE}"
 echo "OPERATOR_VERSION=${OPERATOR_VERSION}"
 echo "OPERATOR_IMAGE=${OPERATOR_IMAGE}"
