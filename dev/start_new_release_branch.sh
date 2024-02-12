@@ -23,13 +23,13 @@ cat "${SRC_ROOT}/release" "${SRC_ROOT}/releases" > "${SRC_ROOT}/releases_tmp" &&
 echo "${NEW_RELEASE}" > "${SRC_ROOT}/release"
 
 # Commit new branch
-git add ..
-git commit -m "${NEW_RELEASE}"
+COMMIT=$(cd "${SRC_ROOT}" && git add . && git commit -m "${NEW_RELEASE}")
+echo ${COMMIT}
 
 # Some niceness
-echo "Releases"
+echo "Releases:"
 cat "${SRC_ROOT}/release"
-head -n5 "${SRC_ROOT}/releases"
+head -n3 "${SRC_ROOT}/releases"
 
-echo "git status"
+echo "git status:"
 git status
