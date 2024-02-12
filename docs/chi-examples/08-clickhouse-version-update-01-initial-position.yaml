@@ -7,7 +7,7 @@ spec:
     clusters:
       - name: update
         templates:
-          podTemplate: clickhouse:22.2
+          podTemplate: clickhouse:23.3
         layout:
           shards:
             - replicas:
@@ -17,8 +17,8 @@ spec:
 
   templates:
     podTemplates:
-      - name: clickhouse:22.2
+      - name: clickhouse:23.3
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.2
+              image: clickhouse/clickhouse-server:23.3

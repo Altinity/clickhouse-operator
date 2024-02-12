@@ -3,8 +3,11 @@ kind: "ClickHouseKeeperInstallation"
 metadata:
   name: chk-1-node
 spec:
-  replicas: 1
   configuration:
+    clusters:
+      - name: "simple-1"
+        layout:
+          replicasCount: 1
     settings:
       logger/level: "trace"
       logger/console: "true"
@@ -22,24 +25,8 @@ spec:
       prometheus/status_info: "false"
   templates:
     podTemplates:
-      - name: pod1
-        metadata:
-          labels:
-            app: clickhouse-keeper
-            what: node
+      - name: default
         spec:
-          affinity:
-            podAntiAffinity:
-              preferredDuringSchedulingIgnoredDuringExecution:
-                - weight: 50
-                  podAffinityTerm:
-                    labelSelector:
-                      matchExpressions:
-                        - key: "app"
-                          operator: In
-                          values:
-                            - clickhouse-keeper
-                    topologyKey: "kubernetes.io/hostname"
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
@@ -52,7 +39,7 @@ spec:
                   memory: "4Gi"
                   cpu: "2"
     volumeClaimTemplates:
-      - name: t1
+      - name: default
         metadata:
           name: both-paths
         spec:

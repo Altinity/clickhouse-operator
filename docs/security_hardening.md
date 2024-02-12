@@ -512,7 +512,7 @@ spec:
     - name: default
       containers:
       - name: clickhouse-pod
-        image: clickhouse/clickhouse-server:22.8
+        image: clickhouse/clickhouse-server:23.8
         ports:
         - name: http
           containerPort: 8123
