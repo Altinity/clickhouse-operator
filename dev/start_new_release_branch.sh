@@ -31,3 +31,5 @@ echo "Releases"
 cat "${SRC_ROOT}/release"
 head -n5 "${SRC_ROOT}/releases"
 
+echo "git status"
+git status
