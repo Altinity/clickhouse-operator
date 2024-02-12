@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
           - name: clickhouse
-            image: clickhouse/clickhouse-server:22.3
+            image: clickhouse/clickhouse-server:23.8
           - name: clickhouse-log
             image: registry.access.redhat.com/ubi8/ubi-minimal:latest
             command:

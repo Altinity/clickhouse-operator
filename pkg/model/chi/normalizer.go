@@ -1183,7 +1183,7 @@ func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (str
 func (n *Normalizer) normalizeUsersList(users *api.Settings, extraUsernames ...string) (usernames []string) {
 	usernames = append(usernames, users.Groups()...)
 	usernames = append(usernames, extraUsernames...)
-	usernames = util.Unique(usernames)
+	usernames = util.NonEmpty(util.Unique(usernames))
 	sort.Strings(usernames)
 
 	return usernames

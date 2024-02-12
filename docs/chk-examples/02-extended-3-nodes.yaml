@@ -3,64 +3,64 @@ kind: "ClickHouseKeeperInstallation"
 metadata:
   name: chk-3-nodes
 spec:
-  replicas: 3
-  settings:
-    logger/level: "trace"
-    logger/console: "true"
-    listen_host: "0.0.0.0"
-    keeper_server/storage_path: /var/lib/clickhouse-keeper
-    keeper_server/tcp_port: "2181"
-    keeper_server/four_letter_word_white_list: "*"
-    keeper_server/coordination_settings/raft_logs_level: "information"
-    keeper_server/raft_configuration/server/port: "9444"
-    prometheus/endpoint: "/metrics"
-    prometheus/port: "7000"
-    prometheus/metrics: "true"
-    prometheus/events: "true"
-    prometheus/asynchronous_metrics: "true"
-    prometheus/status_info: "false"
-  podTemplate:
-    metadata:
-      labels:
-        app: clickhouse-keeper
-        what: node
-    spec:
-      # affinity removed to allow use in single node test environment
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: "app"
-                    operator: In
-                    values:
-                      - clickhouse-keeper
-              topologyKey: "kubernetes.io/hostname"
-      containers:
-        - name: clickhouse-keeper
-          imagePullPolicy: IfNotPresent
-          image: "clickhouse/clickhouse-keeper:head-alpine"
+  configuration:
+    clusters:
+      - name: "simple-3"
+        layout:
+          replicasCount: 3
+    settings:
+      logger/level: "trace"
+      logger/console: "true"
+      listen_host: "0.0.0.0"
+      keeper_server/storage_path: /var/lib/clickhouse-keeper
+      keeper_server/tcp_port: "2181"
+      keeper_server/four_letter_word_white_list: "*"
+      keeper_server/coordination_settings/raft_logs_level: "information"
+      keeper_server/raft_configuration/server/port: "9444"
+      prometheus/endpoint: "/metrics"
+      prometheus/port: "7000"
+      prometheus/metrics: "true"
+      prometheus/events: "true"
+      prometheus/asynchronous_metrics: "true"
+      prometheus/status_info: "false"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          # affinity removed to allow use in single node test environment
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: "app"
+                        operator: In
+                        values:
+                          - clickhouse-keeper
+                  topologyKey: "kubernetes.io/hostname"
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:head-alpine"
+              resources:
+                requests:
+                  memory: "256M"
+                  cpu: "1"
+                limits:
+                  memory: "4Gi"
+                  cpu: "2"
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
           resources:
             requests:
-              memory: "256M"
-              cpu: "1"
-            limits:
-              memory: "4Gi"
-              cpu: "2"
-  volumeClaimTemplates:
-    - metadata:
-        name: log-storage-path
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 10Gi
-    - metadata:
-        name: snapshot-storage-path
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 10Gi
+              storage: 10Gi
+      - name: snapshot-storage-path
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi

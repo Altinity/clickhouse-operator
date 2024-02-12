@@ -39,7 +39,7 @@ spec:
           containers:
             # Main container
             - name: clickhouse
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:23.8
               volumeMounts:
                 - name: sidecar-configmap-volume
                   mountPath: /configmap-volume

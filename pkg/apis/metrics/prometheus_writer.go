@@ -18,12 +18,13 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/golang/glog"
 	// log "k8s.io/klog"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 const (
@@ -64,6 +65,11 @@ func (w *CHIPrometheusWriter) WriteMetrics(data [][]string) {
 		if len(metric) < 2 {
 			continue
 		}
+
+		// Build metric from data row
+		name := metric[0]
+		value := metric[1]
+		desc := metric[2]
 		var metricType prometheus.ValueType
 		if metric[3] == "counter" {
 			metricType = prometheus.CounterValue
@@ -71,14 +77,9 @@ func (w *CHIPrometheusWriter) WriteMetrics(data [][]string) {
 			metricType = prometheus.GaugeValue
 		}
 		w.writeSingleMetricToPrometheus(
-			w.out,
-			convertMetricName(metric[0]),
-			metric[2],
-			metric[1],
-			metricType,
-			nil,
-			nil,
-		)
+			name, desc,
+			metricType, value,
+			nil, nil)
 	}
 }
 
@@ -90,23 +91,28 @@ func (w *CHIPrometheusWriter) WriteTableSizes(data [][]string) {
 		if len(metric) < 2 {
 			continue
 		}
-		labels := []string{"database", "table", "active"}
-		values := []string{metric[0], metric[1], metric[2]}
-		w.writeSingleMetricToPrometheus(w.out,
-			"table_partitions", "Number of partitions of the table", metric[3], prometheus.GaugeValue,
-			labels, values)
-		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts", "Number of parts of the table", metric[4], prometheus.GaugeValue,
-			labels, values)
-		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts_bytes", "Table size in bytes", metric[5], prometheus.GaugeValue,
-			labels, values)
-		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts_bytes_uncompressed", "Table size in bytes uncompressed", metric[6], prometheus.GaugeValue,
-			labels, values)
-		w.writeSingleMetricToPrometheus(w.out,
-			"table_parts_rows", "Number of rows in the table", metric[7], prometheus.GaugeValue,
-			labels, values)
+		labelNames := []string{"database", "table", "active"}
+		labelValues := []string{metric[0], metric[1], metric[2]}
+		w.writeSingleMetricToPrometheus(
+			"table_partitions", "Number of partitions of the table",
+			prometheus.GaugeValue, metric[3],
+			labelNames, labelValues)
+		w.writeSingleMetricToPrometheus(
+			"table_parts", "Number of parts of the table",
+			prometheus.GaugeValue, metric[4],
+			labelNames, labelValues)
+		w.writeSingleMetricToPrometheus(
+			"table_parts_bytes", "Table size in bytes",
+			prometheus.GaugeValue, metric[5],
+			labelNames, labelValues)
+		w.writeSingleMetricToPrometheus(
+			"table_parts_bytes_uncompressed", "Table size in bytes uncompressed",
+			prometheus.GaugeValue, metric[6],
+			labelNames, labelValues)
+		w.writeSingleMetricToPrometheus(
+			"table_parts_rows", "Number of rows in the table",
+			prometheus.GaugeValue, metric[7],
+			labelNames, labelValues)
 	}
 }
 
@@ -142,73 +148,77 @@ func (w *CHIPrometheusWriter) WriteSystemParts(data [][]string) {
 // WriteSystemReplicas writes system replicas
 func (w *CHIPrometheusWriter) WriteSystemReplicas(data [][]string) {
 	for _, metric := range data {
-		w.writeSingleMetricToPrometheus(w.out,
-			"system_replicas_is_session_expired", "Number of expired Zookeeper sessions of the table", metric[2], prometheus.GaugeValue,
-			// Label names
-			[]string{"database", "table"},
-			// Label values
-			[]string{metric[0], metric[1]})
+		labelNames := []string{"database", "table"}
+		labelValues := []string{metric[0], metric[1]}
+		w.writeSingleMetricToPrometheus(
+			"system_replicas_is_session_expired", "Number of expired Zookeeper sessions of the table",
+			prometheus.GaugeValue, metric[2],
+			labelNames, labelValues)
 	}
 }
 
 // WriteMutations writes mutations
 func (w *CHIPrometheusWriter) WriteMutations(data [][]string) {
 	for _, metric := range data {
-		labels := []string{"database", "table"}
-		values := []string{metric[0], metric[1]}
-		w.writeSingleMetricToPrometheus(w.out,
-			"table_mutations", "Number of active mutations for the table", metric[2], prometheus.GaugeValue,
-			labels, values)
-		w.writeSingleMetricToPrometheus(w.out,
-			"table_mutations_parts_to_do", "Number of data parts that need to be mutated for the mutation to finish", metric[3], prometheus.GaugeValue,
-			labels, values)
+		labelNames := []string{"database", "table"}
+		labelValues := []string{metric[0], metric[1]}
+		w.writeSingleMetricToPrometheus(
+			"table_mutations", "Number of active mutations for the table",
+			prometheus.GaugeValue, metric[2],
+			labelNames, labelValues)
+		w.writeSingleMetricToPrometheus(
+			"table_mutations_parts_to_do", "Number of data parts that need to be mutated for the mutation to finish",
+			prometheus.GaugeValue, metric[3],
+			labelNames, labelValues)
 	}
 }
 
 // WriteSystemDisks writes system disks
 func (w *CHIPrometheusWriter) WriteSystemDisks(data [][]string) {
 	for _, metric := range data {
-		labels := []string{"disk"}
-		values := []string{metric[0]}
-		w.writeSingleMetricToPrometheus(w.out,
-			"metric_DiskFreeBytes", "Free disk space available from system.disks", metric[1], prometheus.GaugeValue,
-			labels, values)
-		w.writeSingleMetricToPrometheus(w.out,
-			"metric_DiskTotalBytes", "Total disk space available from system.disks", metric[2], prometheus.GaugeValue,
-			labels, values)
+		labelNames := []string{"disk"}
+		labelValues := []string{metric[0]}
+		w.writeSingleMetricToPrometheus(
+			"metric_DiskFreeBytes", "Free disk space available from system.disks",
+			prometheus.GaugeValue, metric[1],
+			labelNames, labelValues)
+		w.writeSingleMetricToPrometheus(
+			"metric_DiskTotalBytes", "Total disk space available from system.disks",
+			prometheus.GaugeValue, metric[2],
+			labelNames, labelValues)
 	}
 }
 
 // WriteDetachedParts writes detached parts
 func (w *CHIPrometheusWriter) WriteDetachedParts(data [][]string) {
 	for _, metric := range data {
-		w.writeSingleMetricToPrometheus(w.out,
-			"metric_DetachedParts", "Count of currently detached parts from system.detached_parts", metric[0], prometheus.GaugeValue,
-			// Label names
-			[]string{"database", "table", "disk", "reason"},
-			// Label values
-			[]string{metric[1], metric[2], metric[3], metric[4]})
+		labelNames := []string{"database", "table", "disk", "reason"}
+		labelValues := []string{metric[1], metric[2], metric[3], metric[4]}
+		w.writeSingleMetricToPrometheus(
+			"metric_DetachedParts", "Count of currently detached parts from system.detached_parts",
+			prometheus.GaugeValue, metric[0],
+			labelNames, labelValues)
 	}
 }
 
 // WriteErrorFetch writes error fetch
 func (w *CHIPrometheusWriter) WriteErrorFetch(fetchType string) {
-	w.writeSingleMetricToPrometheus(w.out,
-		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "1", prometheus.GaugeValue,
-		// Label names
-		[]string{"fetch_type"},
-		// Label values
-		[]string{fetchType})
+	labelNames := []string{"fetch_type"}
+	labelValues := []string{fetchType}
+	w.writeSingleMetricToPrometheus(
+		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful",
+		prometheus.GaugeValue, "1",
+		labelNames, labelValues)
 }
 
 // WriteOKFetch writes successful fetch
 func (w *CHIPrometheusWriter) WriteOKFetch(fetchType string) {
-	w.writeSingleMetricToPrometheus(w.out,
-		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful", "0", prometheus.GaugeValue,
-		// Label names
-		[]string{"fetch_type"},
-		// Label values
-		[]string{fetchType})
+	labelNames := []string{"fetch_type"}
+	labelValues := []string{fetchType}
+	w.writeSingleMetricToPrometheus(
+		"metric_fetch_errors", "status of fetching metrics from ClickHouse 1 - unsuccessful, 0 - successful",
+		prometheus.GaugeValue, "0",
+		labelNames, labelValues)
 }
 
 func (w *CHIPrometheusWriter) getCHILabels() (labels []string) {
@@ -258,59 +268,44 @@ func (w *CHIPrometheusWriter) getMandatoryLabelsAndValues() (mandatoryLabels []s
 }
 
 func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(
-	out chan<- prometheus.Metric,
 	name string,
 	desc string,
-	value string,
 	metricType prometheus.ValueType,
+	value string,
 	optionalLabels []string,
 	optionalLabelValues []string,
 ) {
-	labels, labelValues := w.getMandatoryLabelsAndValues()
-	labels = append(labels, optionalLabels...)
+	// Prepare mandatory set of labels
+	labelNames, labelValues := w.getMandatoryLabelsAndValues()
+	// Append optional labels
+	labelNames = append(labelNames, optionalLabels...)
 	labelValues = append(labelValues, optionalLabelValues...)
 
 	floatValue, _ := strconv.ParseFloat(value, 64)
-	m, err := prometheus.NewConstMetric(
-		newDescription(name, desc, labels),
+	metric, err := prometheus.NewConstMetric(
+		newMetricDescriptor(name, desc, labelNames),
 		metricType,
 		floatValue,
 		labelValues...,
 	)
 	if err != nil {
-		log.Warningf("Error creating metric %s: %s", name, err)
+		log.Warningf("Error creating metric: %s err: %s", name, err)
 		return
 	}
+	// Send metric into channel
 	select {
-	case out <- m:
+	case w.out <- metric:
 	case <-time.After(writeMetricWaitTimeout):
-		log.Warningf("Error sending metric to the channel %s", name)
+		log.Warningf("Error sending metric to the channel: %s", name)
 	}
 }
 
-// newDescription creates a new prometheus.Desc object
-func newDescription(name, help string, labels []string) *prometheus.Desc {
+// newMetricDescriptor creates a new prometheus.Desc object
+func newMetricDescriptor(name, help string, labels []string) *prometheus.Desc {
 	return prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, subsystem, name),
+		prometheus.BuildFQName(namespace, subsystem, util.BuildPrometheusMetricName(name)),
 		help,
-		labels,
+		util.BuildPrometheusLabels(labels...),
 		nil,
 	)
-}
-
-// convertMetricName converts the given string to snake case following the Golang format:
-// acronyms are converted to lower-case and preceded by an underscore.
-func convertMetricName(in string) string {
-	/*runes := []rune(in)
-	length := len(runes)
-
-	var out []rune
-	for i := 0; i < length; i++ {
-		if i > 0 && unicode.IsUpper(runes[i]) && ((i+1 < length && unicode.IsLower(runes[i+1])) || unicode.IsLower(runes[i-1])) {
-			out = append(out, '_')
-		}
-		out = append(out, unicode.ToLower(runes[i]))
-	}*/
-
-	return strings.NewReplacer("-", "_", ".", "_").Replace(in)
 }

@@ -1,0 +1,20 @@
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: operatorgroup
+  namespace: mynamespace
+spec:
+  targetNamespaces:
+  - mynamespace
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: clickhouse
+  namespace: mynamespace
+spec:
+  channel: latest
+  name: clickhouse
+  source: operatorhubio-catalog
+  sourceNamespace: olm
+  installPlanApproval: Automatic

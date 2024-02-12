@@ -70,17 +70,17 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	if new.HasAncestor() {
-		log.V(1).M(new).F().Info("has ancestor, use it as a base for reconcile. CHK: %s/%s", new.Namespace, new.Name)
+		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CHK: %s/%s", new.Namespace, new.Name)
 		old = new.GetAncestor()
 	} else {
-		log.V(1).M(new).F().Info("has NO ancestor, use empty CHK as a base for reconcile. CHK: %s/%s", new.Namespace, new.Name)
+		log.V(2).M(new).F().Info("has NO ancestor, use empty CHK as a base for reconcile. CHK: %s/%s", new.Namespace, new.Name)
 		old = nil
 	}
 
-	log.V(1).M(new).F().Info("Normalized OLD CHK: %s/%s", new.Namespace, new.Name)
+	log.V(2).M(new).F().Info("Normalized OLD CHK: %s/%s", new.Namespace, new.Name)
 	old = r.normalize(old)
 
-	log.V(1).M(new).F().Info("Normalized NEW CHK %s/%s", new.Namespace, new.Name)
+	log.V(2).M(new).F().Info("Normalized NEW CHK %s/%s", new.Namespace, new.Name)
 	new = r.normalize(new)
 	new.SetAncestor(old)
 
@@ -279,7 +279,7 @@ func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInsta
 				})
 		}
 
-		log.V(1).Info("ReadyReplicas: " + fmt.Sprintf("%v", cur.Status.ReadyReplicas))
+		log.V(2).Info("ReadyReplicas: " + fmt.Sprintf("%v", cur.Status.ReadyReplicas))
 
 		if len(readyMembers) == model.GetReplicasCount(chk) {
 			cur.Status.Status = "Completed"

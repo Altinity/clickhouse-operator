@@ -88,14 +88,14 @@ func (cm *ConfigManager) Init() error {
 	if err != nil {
 		return err
 	}
-	log.V(1).Info("File-based CHOP config start:")
-	log.V(1).Info(cm.fileConfig.String(true))
-	log.V(1).Info("File-based CHOP config end.")
+	log.V(1).Info("File-based CHOP config:")
+	log.V(1).Info("\n" + cm.fileConfig.String(true))
 
-	// Get configs from all config Custom Resources
-	watchedNamespace := cm.fileConfig.GetInformerNamespace()
-	cm.getCRBasedConfigs(watchedNamespace)
-	cm.logCRBasedConfigs()
+	// Get configs from all config Custom Resources that are located in the namespace where Operator is running
+	if namespace, ok := cm.GetRuntimeParam(deployment.OPERATOR_POD_NAMESPACE); ok {
+		cm.getAllCRBasedConfigs(namespace)
+		cm.logAllCRBasedConfigs()
+	}
 
 	// Prepare one unified config from all available config pieces
 	cm.buildUnifiedConfig()
@@ -103,17 +103,15 @@ func (cm *ConfigManager) Init() error {
 	cm.fetchSecretCredentials()
 
 	// From now on we have one unified CHOP config
-	log.V(1).Info("Unified CHOP config (but not post-processed yet) start:")
-	log.V(1).Info(cm.config.String(true))
-	log.V(1).Info("Unified CHOP config (but not post-processed yet) end.")
+	log.V(1).Info("Unified CHOP config - with secret data fetched (but not post-processed yet):")
+	log.V(1).Info("\n" + cm.config.String(true))
 
 	// Finalize config by post-processing
 	cm.Postprocess()
 
 	// OperatorConfig is ready
-	log.V(1).Info("Final CHOP config start:")
-	log.V(1).Info(cm.config.String(true))
-	log.V(1).Info("Final CHOP config end.")
+	log.V(1).Info("Final CHOP config:")
+	log.V(1).Info("\n" + cm.config.String(true))
 
 	return nil
 }
@@ -123,17 +121,19 @@ func (cm *ConfigManager) Config() *api.OperatorConfig {
 	return cm.config
 }
 
-// getCRBasedConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
-func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
+// getAllCRBasedConfigs reads all ClickHouseOperatorConfiguration objects in specified namespace
+func (cm *ConfigManager) getAllCRBasedConfigs(namespace string) {
 	// We need to have chop kube client available in order to fetch ClickHouseOperatorConfiguration objects
 	if cm.chopClient == nil {
 		return
 	}
 
+	log.V(1).F().Info("Looking for ClickHouseOperatorConfigurations in namespace '%s'.", namespace)
+
 	// Get list of ClickHouseOperatorConfiguration objects
 	var err error
 	if cm.chopConfigList, err = cm.chopClient.ClickhouseV1().ClickHouseOperatorConfigurations(namespace).List(context.TODO(), controller.NewListOptions()); err != nil {
-		log.V(1).F().Error("Error read ClickHouseOperatorConfigurations %v", err)
+		log.V(1).F().Error("Error read ClickHouseOperatorConfigurations in namespace '%s'. Err: %v", namespace, err)
 		return
 	}
 
@@ -156,21 +156,23 @@ func (cm *ConfigManager) getCRBasedConfigs(namespace string) {
 			chOperatorConfiguration := &cm.chopConfigList.Items[i]
 			if chOperatorConfiguration.Name == name {
 				// Save location info into OperatorConfig itself
-				chOperatorConfiguration.Spec.Runtime.ConfigFolderPath = namespace
-				chOperatorConfiguration.Spec.Runtime.ConfigFilePath = name
+				chOperatorConfiguration.Spec.Runtime.ConfigCRNamespace = namespace
+				chOperatorConfiguration.Spec.Runtime.ConfigCRName = name
 
 				cm.crConfigs = append(cm.crConfigs, &chOperatorConfiguration.Spec)
+
+				log.V(1).F().Error("Append ClickHouseOperatorConfigurations '%s/%s'.", namespace, name)
 				continue
 			}
 		}
 	}
 }
 
-// logCRBasedConfigs writes all ClickHouseOperatorConfiguration objects into log
-func (cm *ConfigManager) logCRBasedConfigs() {
+// logAllCRBasedConfigs writes all ClickHouseOperatorConfiguration objects into log
+func (cm *ConfigManager) logAllCRBasedConfigs() {
 	for _, chOperatorConfiguration := range cm.crConfigs {
-		log.V(1).Info("chop config %s/%s :", chOperatorConfiguration.Runtime.ConfigFolderPath, chOperatorConfiguration.Runtime.ConfigFilePath)
-		log.V(1).Info(chOperatorConfiguration.String(true))
+		log.V(1).Info("CR-based chop config: %s/%s :", chOperatorConfiguration.Runtime.ConfigCRNamespace, chOperatorConfiguration.Runtime.ConfigCRName)
+		log.V(1).Info("\n" + chOperatorConfiguration.String(true))
 	}
 }
 
@@ -183,6 +185,10 @@ func (cm *ConfigManager) buildUnifiedConfig() {
 	// Merge all the rest CR-based configs into base config
 	for _, chOperatorConfiguration := range cm.crConfigs {
 		_ = cm.config.MergeFrom(chOperatorConfiguration, api.MergeTypeOverrideByNonEmptyValues)
+		cm.config.Runtime.ConfigCRSources = append(cm.config.Runtime.ConfigCRSources, api.ConfigCRSource{
+			Namespace: chOperatorConfiguration.Runtime.ConfigCRNamespace,
+			Name:      chOperatorConfiguration.Runtime.ConfigCRName,
+		})
 	}
 }
 
@@ -207,14 +213,14 @@ const (
 	fileIsMandatory = false
 )
 
-// getFileBasedConfig creates OperatorConfig object based on file specified
+// getFileBasedConfig creates one OperatorConfig object based on the first available configuration file
 func (cm *ConfigManager) getFileBasedConfig(configFilePath string) (*api.OperatorConfig, error) {
-	// Check config files in the following order:
+	// Check config files availability in the following order:
 	// 1. Explicitly specified config file as CLI option
 	// 2. Explicitly specified config file as ENV var
 	// 3. Well-known config file in home dir
 	// 4. Well-known config file in /etc
-	// In case no file found fallback to default config
+	// In case no file found fallback to the default config
 
 	// 1. Check config file as explicitly specified CLI option
 	if len(configFilePath) > 0 {
@@ -385,12 +391,12 @@ func (cm *ConfigManager) GetRuntimeParam(name string) (string, bool) {
 
 // fetchSecretCredentials
 func (cm *ConfigManager) fetchSecretCredentials() {
-	// Secret name where to look for credentials
+	// Secret name where to look for ClickHouse access credentials
 	name := cm.config.ClickHouse.Access.Secret.Name
 
 	// Do we need to fetch credentials from the secret?
 	if name == "" {
-		// No name specified, no need to read secret
+		// No secret name specified, no need to read it
 		return
 	}
 
@@ -405,6 +411,8 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 		}
 	}
 
+	log.V(1).Info("Going to search for username/password in the secret '%s/%s'", namespace, name)
+
 	// Sanity check
 	if namespace == "" {
 		// We've already checked that name is not empty
@@ -415,18 +423,22 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 	if err != nil {
 		cm.config.ClickHouse.Access.Secret.Runtime.Error = err.Error()
+		log.V(1).Warning("Unable to fetch secret '%s/%s'", namespace, name)
 		return
 	}
 
 	cm.config.ClickHouse.Access.Secret.Runtime.Fetched = true
+	log.V(1).Info("Secret fetched %s/%s :", namespace, name)
 
 	// Find username and password from credentials
 	for key, value := range secret.Data {
 		switch key {
 		case "username":
 			cm.config.ClickHouse.Access.Secret.Runtime.Username = string(value)
+			log.V(1).Info("Username read from the secret '%s/%s'", namespace, name)
 		case "password":
 			cm.config.ClickHouse.Access.Secret.Runtime.Password = string(value)
+			log.V(1).Info("Password read from the secret '%s/%s'", namespace, name)
 		}
 	}
 }

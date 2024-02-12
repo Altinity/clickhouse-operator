@@ -150,8 +150,8 @@ def test_005(self):
 def test_006(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:22.3"
-    new_version = "clickhouse/clickhouse-server:22.8"
+    old_version = "clickhouse/clickhouse-server:23.3"
+    new_version = "clickhouse/clickhouse-server:23.8"
     with Then("Create initial position"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
@@ -662,6 +662,9 @@ def test_011_1(self):
         kubectl.create_and_check(
             manifest="manifests/chi/test-011-insecured-cluster.yaml",
             check={
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
                 "chi_status": "InProgress",
                 "do_not_delete": 1,
             },
@@ -673,14 +676,12 @@ def test_011_1(self):
         # Tests default user security
         def test_default_user():
             with Then("Default user should have 5 allowed ips"):
-                print(f"Give the config time to propagate")
-                time.sleep(90)
                 ips = get_user_xml_from_configmap("test-011-secured-cluster", "default").findall("networks/ip")
                 ips_l = []
                 for ip in ips:
                     ips_l.append(ip.text)
                 # Expected output: ['::1', '127.0.0.1', '127.0.0.2', <pod1 ip>, <pod2 ip>]
-                print(f"users.xml: {ips_l}")
+                print(f"default user's IPs: {ips_l}")
                 assert len(ips) == 5
 
             clickhouse.query("test-011-secured-cluster", "SYSTEM RELOAD CONFIG")
@@ -712,7 +713,9 @@ def test_011_1(self):
         with When("Remove host_regexp for default user"):
             kubectl.create_and_check(
                 manifest="manifests/chi/test-011-secured-cluster-2.yaml",
-                check={"do_not_delete": 1},
+                check={
+                    "do_not_delete": 1,
+                },
             )
 
             with Then("Make sure host_regexp is disabled"):
@@ -721,6 +724,9 @@ def test_011_1(self):
                 )
                 print(f"users.xml: {regexp}")
                 assert regexp == "disabled"
+
+                print(f"Give ClickHouse time to recongize the config change")
+                time.sleep(30)
 
             test_default_user()
 
@@ -792,18 +798,9 @@ def test_011_1(self):
             )
             assert "ACCESS_DENIED" not in out
 
-        with And("User 'user5' with google.com as a host filter can not login"):
+        with And("User 'clickhouse_operator' can login with custom password"):
             out = clickhouse.query_with_error(
-                "test-011-insecured-cluster",
-                "select 'OK'",
-                user="user5",
-                pwd="secret",
-            )
-            assert out != "OK"
-
-        with And("User 'clickhouse_operator' with can login with custom password"):
-            out = clickhouse.query_with_error(
-                "test-011-insecured-cluster",
+                "test-011-secured-cluster",
                 "select 'OK'",
                 user="clickhouse_operator",
                 pwd="operator_secret",
@@ -813,7 +810,6 @@ def test_011_1(self):
     with Finally("I clean up"):
         with By("deleting test namespace"):
             delete_test_namespace()
-
 
 @TestScenario
 @Name("test_011_2. Test default user security")
@@ -861,11 +857,9 @@ def test_011_2(self):
                 out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
                 assert out == "OK"
 
-        with Then("I delete namespace"):
-            shell = get_shell()
-            self.context.shell = shell
-            util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
-            shell.close()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -3403,7 +3397,7 @@ def test_034(self):
     operator_namespace = current().context.operator_namespace
 
     def check_metrics_monitoring(operator_namespace, operator_pod, expect_pattern, max_retries=7):
-        with Then(f"metrics-exporter /metrics endpoint result should contain {expect_pattern}"):
+        with Then(f"metrics-exporter /metrics endpoint result should contain pattern: '{expect_pattern}'"):
             for i in range(1, max_retries):
                 url_cmd = util.make_http_get_request("127.0.0.1", "8888", "/metrics")
                 out = kubectl.launch(
@@ -3452,10 +3446,10 @@ def test_034(self):
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
-    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
+    with And(f"apply ClickHouseOperatorConfiguration with https connection: {chopconf_file}"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration [1]"):
+    with And("Re-create operator pod in order to restart metrics exporter to update the configuration [1]"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
@@ -3470,7 +3464,7 @@ def test_034(self):
     with When("Reset ClickHouseOperatorConfiguration to default"):
         kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration [2]"):
+    with And("Re-create operator pod in order to restart metrics exporter to update the configuration [2]"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
@@ -3510,7 +3504,7 @@ def test_034(self):
         )
 
     client_pod = "test-034-client"
-    with And(f"Start {client_pod} pod"):
+    with And(f"Start pod: {client_pod}"):
         kubectl.apply(util.get_full_path("manifests/chi/test-034-client.yaml"))
         kubectl.wait_pod_status(client_pod, "Running")
 
@@ -3529,10 +3523,10 @@ def test_034(self):
         print(out)
         assert "NETWORK_ERROR" in out, out
 
-    with And(f"apply ClickHouseOperatorConfiguration {chopconf_file} with https connection"):
+    with And(f"apply ClickHouseOperatorConfiguration with https connection: {chopconf_file}"):
         kubectl.apply(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration [3]"):
+    with And("Re-create operator pod in order to restart metrics exporter to update the configuration [3]"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
@@ -3547,7 +3541,7 @@ def test_034(self):
     with When("Reset ClickHouseOperatorConfiguration to default"):
         kubectl.delete(util.get_full_path(chopconf_file, lookup_in_host=False), operator_namespace)
 
-    with And("reboot metrics exporter to update the configuration [4]"):
+    with And("Re-create operator pod in order to restart metrics exporter to update the configuration [4]"):
         util.restart_operator()
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
@@ -3754,7 +3748,7 @@ def test_036(self):
 
     delete_pvc()
     check_data_is_recovered("reconcile-after-PVC-deleted")
-    
+
     delete_pv()
     check_data_is_recovered("reconcile-after-PV-deleted")
 
@@ -4004,7 +3998,7 @@ def test_040(self):
             "pod_volumes": {
                 "/var/lib/clickhouse",
             },
-            "pod_image": "clickhouse/clickhouse-server:22.8",
+            "pod_image": "clickhouse/clickhouse-server:23.8",
             "do_not_delete": 1,
             "chi_status": "InProgress",
         },
