@@ -15,6 +15,6 @@ spec:
       podTemplate: clickhouse-old
   configuration:
     clusters:
-    - name: shards
+    - name: default
       layout:
         replicasCount: 2
