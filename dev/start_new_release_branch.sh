@@ -2,17 +2,66 @@
 
 # Start new release branch
 
+
+#
+# Increments version represented as x.y.z
+# $1: version itself
+# $2: number of part: 0 – major, 1 – minor, 2 – patch
+#
+increment_version() {
+    local version="${1}"
+    local what="${2}"
+
+    local delimiter="."
+    local array=($(echo "${version}" | tr "${delimiter}" '\n'))
+
+    array[${what}]=$((array[${what}]+1))
+    if [ ${what} -lt 2 ]; then array[2]=0; fi
+    if [ ${what} -lt 1 ]; then array[1]=0; fi
+    echo $(local IFS=${delimiter} ; echo "${array[*]}")
+}
+
 # Source configuration
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 CUR_RELEASE=$(cat "${SRC_ROOT}/release")
-echo "Starting new release. Current release ${CUR_RELEASE}"
-
+echo "Starting new release."
+echo "Current release: ${CUR_RELEASE}"
+echo "What would you like to start. Possible options:"
+echo "  1 - new major version"
+echo "  2 - new minor version"
+echo "  3 - new patch version"
+echo "  x.y.z - in case you'd like to start something completely new just write your preferred version"
 echo -n "Enter new release: "
-read NEW_RELEASE
+read COMMAND
+# Trim EOL from the command received
+COMMAND=$(echo "${COMMAND}" | tr -d '\n\t\r ')
+echo "Provided command is: ${COMMAND}"
+echo -n "Which means we are going to "
 
-echo "Starting new release ${NEW_RELEASE}"
+case "${COMMAND}" in
+    "1")
+        NEW_RELEASE=$(increment_version "${CUR_RELEASE}" 0)
+        echo "start new MAJOR release: ${NEW_RELEASE}"
+        ;;
+    "2")
+        NEW_RELEASE=$(increment_version "${CUR_RELEASE}" 1)
+        echo "start new MINOR release: ${NEW_RELEASE}"
+        ;;
+    "3")
+        NEW_RELEASE=$(increment_version "${CUR_RELEASE}" 2)
+        echo "start new PATCH release: ${NEW_RELEASE}"
+        ;;
+    *)
+        NEW_RELEASE="${COMMAND}"
+        echo "start new CUSTOM version: ${NEW_RELEASE}"
+        ;;
+esac
+
+read -p "Press enter to continue"
+
+echo "Starting new release: ${NEW_RELEASE}"
 
 # Create release branch
 git branch "${NEW_RELEASE}"
