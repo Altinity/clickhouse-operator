@@ -123,7 +123,7 @@ spec:
 
     templates:
       hostTemplate: host-template-custom-ports
-      podTemplate: clickhouse-v22.2
+      podTemplate: clickhouse-v23.8
       dataVolumeClaimTemplate: default-volume-claim
       logVolumeClaimTemplate: default-volume-claim
       serviceTemplate: chi-service-template
@@ -203,7 +203,7 @@ spec:
 
       - name: all-counts
         templates:
-          podTemplate: clickhouse-v22.2
+          podTemplate: clickhouse-v23.8
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         schemaPolicy:
@@ -215,7 +215,7 @@ spec:
 
       - name: shards-only
         templates:
-          podTemplate: clickhouse-v22.2
+          podTemplate: clickhouse-v23.8
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         layout:
@@ -224,7 +224,7 @@ spec:
 
       - name: replicas-only
         templates:
-          podTemplate: clickhouse-v22.2
+          podTemplate: clickhouse-v23.8
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         layout:
@@ -233,7 +233,7 @@ spec:
 
       - name: customized
         templates:
-          podTemplate: clickhouse-v22.2
+          podTemplate: clickhouse-v23.8
           dataVolumeClaimTemplate: default-volume-claim
           logVolumeClaimTemplate: default-volume-claim
         schemaPolicy:
@@ -246,13 +246,13 @@ spec:
               weight: 1
               internalReplication: Disabled
               templates:
-                podTemplate: clickhouse-v22.2
+                podTemplate: clickhouse-v23.8
                 dataVolumeClaimTemplate: default-volume-claim
                 logVolumeClaimTemplate: default-volume-claim
 
             - name: shard1
               templates:
-                podTemplate: clickhouse-v22.2
+                podTemplate: clickhouse-v23.8
                 dataVolumeClaimTemplate: default-volume-claim
                 logVolumeClaimTemplate: default-volume-claim
               replicas:
@@ -263,7 +263,7 @@ spec:
             - name: shard2
               replicasCount: 3
               templates:
-                podTemplate: clickhouse-v22.2
+                podTemplate: clickhouse-v23.8
                 dataVolumeClaimTemplate: default-volume-claim
                 logVolumeClaimTemplate: default-volume-claim
                 replicaServiceTemplate: replica-service-template
@@ -273,7 +273,7 @@ spec:
                   httpPort: 8123
                   interserverHTTPPort: 9009
                   templates:
-                    podTemplate: clickhouse-v22.3
+                    podTemplate: clickhouse-v23.8
                     dataVolumeClaimTemplate: default-volume-claim
                     logVolumeClaimTemplate: default-volume-claim
                     replicaServiceTemplate: replica-service-template
@@ -486,7 +486,7 @@ spec:
     podTemplates:
       # multiple pod templates makes possible to update version smoothly
       # pod template for ClickHouse v18.16.1
-      - name: clickhouse-v22.3
+      - name: clickhouse-v23.8
         # We may need to label nodes with clickhouse=allow label for this example to run
         # See ./label_nodes.sh for this purpose
         zone:
@@ -589,8 +589,8 @@ spec:
               args:
                 - "while true; do sleep 30; done;"
 
-      # pod template for ClickHouse v22.2
-      - name: clickhouse-v22.2
+      # pod template for ClickHouse v23.8
+      - name: clickhouse-v23.8
         # type ObjectMeta struct {} from k8s.io/meta/v1
         metadata:
           labels:

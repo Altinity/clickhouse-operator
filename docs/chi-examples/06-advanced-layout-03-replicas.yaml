@@ -10,17 +10,17 @@ spec:
           shardsCount: 4
           replicas:
             - templates:
-                podTemplate: clickhouse:22.1
+                podTemplate: clickhouse:22.8
               httpPort: 8000
               tcpPort: 8001
               interserverHTTPPort: 8002
             - templates:
-                podTemplate: clickhouse:22.2
+                podTemplate: clickhouse:23.3
               httpPort: 9000
               tcpPort: 9001
               interserverHTTPPort: 9002
             - templates:
-                podTemplate: clickhouse:22.3
+                podTemplate: clickhouse:23.8
               httpPort: 10000
               tcpPort: 10001
               interserverHTTPPort: 10002
@@ -28,20 +28,20 @@ spec:
   templates:
     podTemplates:
 
-      - name: clickhouse:22.1
+      - name: clickhouse:22.8
         spec:
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:22.8
 
-      - name: clickhouse:22.3
+      - name: clickhouse:23.3
         spec:
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:23.3
 
 
-      - name: clickhouse:22.3
+      - name: clickhouse:23.8
         spec:
           containers:
             - name: clickhouse-pod

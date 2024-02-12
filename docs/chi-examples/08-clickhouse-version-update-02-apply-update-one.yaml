@@ -7,7 +7,7 @@ spec:
     clusters:
       - name: update
         templates:
-          podTemplate: clickhouse:22.2
+          podTemplate: clickhouse:23.3
         layout:
           shards:
             - replicas:
@@ -15,17 +15,17 @@ spec:
                 - tcpPort: 9000
                 - tcpPort: 9000
                   templates:
-                    podTemplate: clickhouse:22.3
+                    podTemplate: clickhouse:23.8
 
   templates:
     podTemplates:
-      - name: clickhouse:22.2
+      - name: clickhouse:23.3
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:23.3
 
-      - name: clickhouse:22.3
+      - name: clickhouse:23.8
         spec:
           containers:
             - name: clickhouse-pod

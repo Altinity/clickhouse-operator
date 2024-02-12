@@ -21,7 +21,7 @@ spec:
               replicas:
                 - name: "1"
                   templates:
-                    podTemplate: pod-template-with-volume-22.3
+                    podTemplate: pod-template-with-volume-23.3
 
   templates:
     podTemplates:
@@ -40,7 +40,7 @@ spec:
                 - name: storage-vc-template
                   mountPath: /var/lib/clickhouse
 
-      - name: pod-template-with-volume-22.3
+      - name: pod-template-with-volume-23.3
         zone:
           key: "clickhouse"
           values:

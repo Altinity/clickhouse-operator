@@ -10,14 +10,14 @@ spec:
           shards:
             - replicas:
                 - templates:
-                    podTemplate: clickhouse:22.1
+                    podTemplate: clickhouse:23.8
                 - templates:
                     podTemplate: clickhouse:nonexist
 
   templates:
     podTemplates:
 
-      - name: clickhouse:22.1
+      - name: clickhouse:23.8
         spec:
           containers:
             - name: clickhouse-pod
