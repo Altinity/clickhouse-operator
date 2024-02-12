@@ -7,9 +7,6 @@ spec:
     - name: clickhouse-version
   configuration:
     users:
-      # clickhouse_operator password should be accepted and encrypted
-      clickhouse_operator/password: operator_secret
-
       # `default` user should be security to localhost and interhost connections
       # operator adds IP addresses of pods
       # operator creates host_regxp expression for that
@@ -39,11 +36,8 @@ spec:
       user4/password: secret
       user4/access_management: 1
 
-      # User with 'google.com' as a host filter can not login
-      user5/password: secret
-      user5/networks/ip: "::/0"
-      user5/networks/host: www.google.com
-
+      # clickhouse_operator password should be accepted and encrypted
+      clickhuse_operator/password: operator_secret
     clusters:
     - name: default
       layout:

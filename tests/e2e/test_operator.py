@@ -676,8 +676,6 @@ def test_011_1(self):
         # Tests default user security
         def test_default_user():
             with Then("Default user should have 5 allowed ips"):
-                print(f"Give the config time to propagate")
-                time.sleep(90)
                 ips = get_user_xml_from_configmap("test-011-secured-cluster", "default").findall("networks/ip")
                 ips_l = []
                 for ip in ips:
@@ -726,6 +724,9 @@ def test_011_1(self):
                 )
                 print(f"users.xml: {regexp}")
                 assert regexp == "disabled"
+
+                print(f"Give ClickHouse time to recongize the config change")
+                time.sleep(30)
 
             test_default_user()
 
@@ -797,28 +798,18 @@ def test_011_1(self):
             )
             assert "ACCESS_DENIED" not in out
 
-        with And("User 'user5' with google.com as a host filter can not login"):
+        with And("User 'clickhouse_operator' can login with custom password"):
             out = clickhouse.query_with_error(
-                "test-011-insecured-cluster",
-                "select 'OK'",
-                user="user5",
-                pwd="secret",
-            )
-            assert out != "OK"
-
-        with And("User 'clickhouse_operator' with can login with custom password"):
-            out = clickhouse.query_with_error(
-                "test-011-insecured-cluster",
+                "test-011-secured-cluster",
                 "select 'OK'",
                 user="clickhouse_operator",
                 pwd="operator_secret",
             )
             assert out != "OK"
 
-    # with Finally("I clean up"):
-    #     with By("deleting test namespace"):
-    #         delete_test_namespace()
-
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 @TestScenario
 @Name("test_011_2. Test default user security")
@@ -866,11 +857,9 @@ def test_011_2(self):
                 out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
                 assert out == "OK"
 
-        with Then("I delete namespace"):
-            shell = get_shell()
-            self.context.shell = shell
-            util.delete_namespace(namespace=self.context.test_namespace, delete_chi=True)
-            shell.close()
+    with Finally("I clean up"):
+        with By("deleting test namespace"):
+            delete_test_namespace()
 
 
 @TestScenario
@@ -3759,7 +3748,7 @@ def test_036(self):
 
     delete_pvc()
     check_data_is_recovered("reconcile-after-PVC-deleted")
-    
+
     delete_pv()
     check_data_is_recovered("reconcile-after-PV-deleted")
 

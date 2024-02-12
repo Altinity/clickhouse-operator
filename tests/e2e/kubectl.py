@@ -93,7 +93,10 @@ def delete_all_chi(ns=None):
         if "items" in chis:
             for chi in chis["items"]:
                 # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
-                delete_chi(chi["metadata"]["name"], ns)
+                delete_chi(chi["metadata"]["name"], ns, wait = False)
+            for chi in chis["items"]:
+                wait_object("chi", chi["metadata"]["name"], ns=ns, count=0)
+
 
 
 def delete_all_keeper(ns=None):
