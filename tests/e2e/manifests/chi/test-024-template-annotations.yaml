@@ -14,7 +14,7 @@ spec:
       spec:
         containers:
         - name: clickhouse-pod
-          image: clickhouse/clickhouse-server:22.8
+          image: clickhouse/clickhouse-server:23.8
     volumeClaimTemplates:
     - name: default-volumeclaim-template
       reclaimPolicy: Delete

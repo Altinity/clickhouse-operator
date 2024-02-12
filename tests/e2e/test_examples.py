@@ -55,7 +55,7 @@ def test_examples02_2(self):
         manifest="../../docs/chi-examples/03-persistent-volume-02-pod-template.yaml",
         check={
             "pod_count": 1,
-            "pod_image": "clickhouse/clickhouse-server:22.3",
+            "pod_image": "clickhouse/clickhouse-server:23.8",
             "pod_volumes": {
                 "/var/lib/clickhouse",
                 "/var/log/clickhouse-server",

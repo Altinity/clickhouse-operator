@@ -150,8 +150,8 @@ def test_005(self):
 def test_006(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:22.3"
-    new_version = "clickhouse/clickhouse-server:22.8"
+    old_version = "clickhouse/clickhouse-server:23.3"
+    new_version = "clickhouse/clickhouse-server:23.8"
     with Then("Create initial position"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
@@ -3998,7 +3998,7 @@ def test_040(self):
             "pod_volumes": {
                 "/var/lib/clickhouse",
             },
-            "pod_image": "clickhouse/clickhouse-server:22.8",
+            "pod_image": "clickhouse/clickhouse-server:23.8",
             "do_not_delete": 1,
             "chi_status": "InProgress",
         },

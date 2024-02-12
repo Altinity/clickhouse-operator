@@ -29,7 +29,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:23.8
               # Container has explicitly specified resource requests
               resources:
                 requests:

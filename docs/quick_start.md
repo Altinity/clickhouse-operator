@@ -285,7 +285,7 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:23.8
               volumeMounts:
                 - name: data-storage-vc-template
                   mountPath: /var/lib/clickhouse

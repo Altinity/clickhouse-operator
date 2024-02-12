@@ -46,7 +46,7 @@ spec:
               add: [ "CAP_NICE", "CAP_IPC_LOCK" ]
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:22.3
+              image: clickhouse/clickhouse-server:23.8
               imagePullPolicy: IfNotPresent
               volumeMounts:
                 - name: data-storage-vc-template-1
