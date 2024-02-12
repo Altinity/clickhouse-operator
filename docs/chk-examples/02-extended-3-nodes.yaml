@@ -23,43 +23,44 @@ spec:
       prometheus/events: "true"
       prometheus/asynchronous_metrics: "true"
       prometheus/status_info: "false"
-  podTemplates:
-    spec:
-      name: default
-      # affinity removed to allow use in single node test environment
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: "app"
-                    operator: In
-                    values:
-                      - clickhouse-keeper
-              topologyKey: "kubernetes.io/hostname"
-      containers:
-        - name: clickhouse-keeper
-          imagePullPolicy: IfNotPresent
-          image: "clickhouse/clickhouse-keeper:head-alpine"
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          # affinity removed to allow use in single node test environment
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: "app"
+                        operator: In
+                        values:
+                          - clickhouse-keeper
+                  topologyKey: "kubernetes.io/hostname"
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:head-alpine"
+              resources:
+                requests:
+                  memory: "256M"
+                  cpu: "1"
+                limits:
+                  memory: "4Gi"
+                  cpu: "2"
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
           resources:
             requests:
-              memory: "256M"
-              cpu: "1"
-            limits:
-              memory: "4Gi"
-              cpu: "2"
-  volumeClaimTemplates:
-    - name: default
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 10Gi
-    - name: snapshot-storage-path
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 10Gi
+              storage: 10Gi
+      - name: snapshot-storage-path
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
