@@ -6,7 +6,7 @@ type: Opaque
 stringData:
   password_plain: password
   password_sha256_hex: 65e84be33532fb784c48129675f9eff3a682b27168c0ea744b2cf58ee02337c5
-  password_double_sha1_hex: 8bd66e4932b4968ec111da24d7e42d399a05cb90bf96f587c3fa191c56c401f8
+  password_double_sha1_hex: c5bf7884d77d2294924d6dedcb60222f2730ff04
 ---
 apiVersion: "clickhouse.altinity.com/v1"
 kind: "ClickHouseInstallation"
