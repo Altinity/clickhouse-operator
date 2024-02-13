@@ -33,7 +33,7 @@ echo "  1 - new major version"
 echo "  2 - new minor version"
 echo "  3 - new patch version"
 echo "  x.y.z - in case you'd like to start something completely new just write your preferred version"
-echo -n "Enter new release: "
+echo -n "Enter command choice (1, 2, 3) or custom release (x.y.z): "
 read COMMAND
 # Trim EOL from the command received
 COMMAND=$(echo "${COMMAND}" | tr -d '\n\t\r ')
@@ -55,12 +55,11 @@ case "${COMMAND}" in
         ;;
     *)
         NEW_RELEASE="${COMMAND}"
-        echo "start new CUSTOM version: ${NEW_RELEASE}"
+        echo "start new CUSTOM release: ${NEW_RELEASE}"
         ;;
 esac
 
-read -p "Press enter to continue"
-
+read -p "Press enter to start new release"
 echo "Starting new release: ${NEW_RELEASE}"
 
 # Create release branch
