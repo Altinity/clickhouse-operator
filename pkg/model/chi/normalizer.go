@@ -1238,14 +1238,14 @@ func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
 }
 
 const (
-	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS_"
-	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS_"
+	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS"
+	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
 )
 
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
-	n.normalizeConfigurationUserEnsureMandatoryFields(user)
-	n.normalizeConfigurationUserPassword(user)
 	n.normalizeConfigurationUserSecretRef(user)
+	n.normalizeConfigurationUserPassword(user)
+	n.normalizeConfigurationUserEnsureMandatoryFields(user)
 }
 
 func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser) {
@@ -1331,9 +1331,9 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 	n.substSettingsFieldWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
 
 	// Values from the secret passed via ENV have even higher priority
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", user.Username(), true)
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", user.Username(), true)
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", user.Username(), true)
+	n.substSettingsFieldWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", envVarNamePrefixConfigurationUsers, true)
+	n.substSettingsFieldWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", envVarNamePrefixConfigurationUsers, true)
+	n.substSettingsFieldWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", envVarNamePrefixConfigurationUsers, true)
 
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 	if user.Has("password_double_sha1_hex") {
