@@ -985,7 +985,11 @@ func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
 }
 
 // substSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
-func (n *Normalizer) substSettingsFieldWithSecretFieldValue(settings SettingsSubstitution, dstField, srcSecretRefField string) bool {
+func (n *Normalizer) substSettingsFieldWithSecretFieldValue(
+	settings SettingsSubstitution,
+	dstField,
+	srcSecretRefField string,
+) bool {
 	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, true,
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			secretFieldValue, err := n.fetchSecretFieldValue(secretAddress)
@@ -1000,7 +1004,9 @@ func (n *Normalizer) substSettingsFieldWithSecretFieldValue(settings SettingsSub
 // substSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
 func (n *Normalizer) substSettingsFieldWithEnvRefToSecretField(
 	settings SettingsSubstitution,
-	dstField, srcSecretRefField, envVarNamePrefix string,
+	dstField,
+	srcSecretRefField,
+	envVarNamePrefix string,
 	parseScalarString bool,
 ) bool {
 	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, parseScalarString,
@@ -1232,25 +1238,25 @@ func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
 }
 
 const (
-	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS_VAR_%d"
-	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS_VAR_%d"
+	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS_"
+	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS_"
 )
 
 func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
-	i := 1
-	user.WalkSafe(func(name string, setting *api.Setting) {
+	n.normalizeConfigurationUserEnsureMandatoryFields(user)
+	n.normalizeConfigurationUserPassword(user)
+	n.normalizeConfigurationUserSecretRef(user)
+}
+
+func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser) {
+	user.WalkSafe(func(name string, _ *api.Setting) {
 		if strings.HasPrefix(name, "k8s_secret_") {
 			// TODO remove as obsoleted
 			// Skip this user field, it will be processed later
 		} else {
-			envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationUsers, i)
-			n.substSettingsFieldWithEnvRefToSecretField(user, name, name, envVarNamePrefix, false)
-			i = i + 1
+			n.substSettingsFieldWithEnvRefToSecretField(user, name, name, envVarNamePrefixConfigurationUsers, false)
 		}
 	})
-
-	n.normalizeConfigurationUserEnsureMandatoryFields(user)
-	n.normalizeConfigurationUserPassword(user)
 }
 
 func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.SettingsUser) {
@@ -1421,11 +1427,8 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api
 	}
 	settings.Normalize()
 
-	i := 1
 	settings.WalkSafe(func(name string, setting *api.Setting) {
-		envVarNamePrefix := fmt.Sprintf(envVarNamePrefixConfigurationSettings, i)
-		n.substSettingsFieldWithEnvRefToSecretField(settings, name, name, envVarNamePrefix, false)
-		i = i + 1
+		n.substSettingsFieldWithEnvRefToSecretField(settings, name, name, envVarNamePrefixConfigurationSettings, false)
 	})
 	return settings
 }
