@@ -900,12 +900,13 @@ def test_011_3(self):
             assert out == "OK"
 
         with And("Connection to localhost should succeed with user5/password defined in valueFrom/secretKeyRef"):
-            out = clickhouse.query_with_error(chi, "select 'OK'", user="user5", pwd="pwduser5")
-            assert out == "OK"
+           out = clickhouse.query_with_error(chi, "select 'OK'", user="user5", pwd="pwduser5")
+           assert out == "OK"
 
         with And("Settings should be securely populated from a secret"):
             pod = kubectl.get_pod_spec(chi)
             envs = pod["containers"][0]["env"]
+            user5_password_env = ""
             sasl_username_env = ""
             sasl_password_env = ""
             for e in envs:
@@ -913,17 +914,28 @@ def test_011_3(self):
                      sasl_username_env = e["name"]
                 if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
                      sasl_password_env = e["name"]
+                if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
+                     user5_password_env = e["name"]
 
             with By("Secrets are properly propagated to env variables"):
-                note(f"Found env variables: {sasl_username_env} {sasl_password_env}")
+                print(f"Found env variables: {sasl_username_env} {sasl_password_env} {user5_password_env}")
                 assert sasl_username_env != ""
                 assert sasl_password_env != ""
+                assert user5_password_env != ""
 
             with By("Secrets are properly referenced from settings.xml"):
                 cfm = kubectl.get("configmap", f"chi-{chi}-common-configd")
                 settings_xml = cfm["data"]["chop-generated-settings.xml"]
                 assert f"sasl_username from_env=\"{sasl_username_env}\"" in settings_xml
                 assert f"sasl_password from_env=\"{sasl_password_env}\"" in settings_xml
+
+            with By("Secrets are properly referenced from users.xml"):
+                cfm = kubectl.get("configmap", f"chi-{chi}-common-usersd")
+                users_xml = cfm["data"]["chop-generated-users.xml"]
+                env_matches = [from_env.strip() for from_env in users_xml.splitlines() if "from_env" in from_env]
+                print(f"Found env substitutions: {env_matches}")
+                time.sleep(5)
+                assert f"password from_env=\"{user5_password_env}\"" in users_xml
 
         kubectl.delete_chi(chi)
         kubectl.launch(
