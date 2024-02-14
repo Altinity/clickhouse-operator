@@ -2,11 +2,6 @@
 
 # Should be called from go_build_operator.sh or go_build_metrics_exporter.sh
 
-# Build clickhouse-operator install .yaml manifest
-source "${MANIFESTS_ROOT}/builder/build-clickhouse-operator-configs.sh"
-# Build clickhouse-operator install .yaml manifest
-source "${MANIFESTS_ROOT}/builder/build-clickhouse-operator-install-yaml.sh"
-
 # Prepare modules
 if [[ ! -d "${SRC_ROOT}/vendor" ]]; then
     export GO111MODULE=on

@@ -8,7 +8,7 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 # Externally configurable build-dependent options
-TAG="${TAG:-dev}"
+TAG="${TAG:-"dev"}"
 DOCKER_IMAGE="altinity/metrics-exporter:${TAG}"
 DOCKERHUB_LOGIN="${DOCKERHUB_LOGIN}"
 
