@@ -33,33 +33,31 @@ else
     echo "CUSTOM dir ${CODE_GENERATOR_DIR} is used to run code generator from"
 fi
 
-#bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
-#    all \
-#    github.com/altinity/clickhouse-operator/pkg/client \
-#    github.com/altinity/clickhouse-operator/pkg/apis \
-#    "clickhouse.altinity.com:v1" \
-#    -o "${SRC_ROOT}/generator"
+echo "Prepare local tmp folder for generator"
+mkdir -p "${GENERATOR_ROOT}"
 
 echo ""
-mkdir -p "${GENERATOR_ROOT}"
 echo "Generate code for clickhouse.altinity.com:v1 into ${GENERATOR_ROOT}"
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     client,deepcopy,informer,lister \
-    github.com/altinity/clickhouse-operator/pkg/client \
-    github.com/altinity/clickhouse-operator/pkg/apis \
+    "${REPO}/pkg/client" \
+    "${REPO}/pkg/apis" \
     "clickhouse.altinity.com:v1" \
     -o "${GENERATOR_ROOT}" \
-    --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
+    --go-header-file "${SRC_ROOT}/hack/boilerplate.go.txt"
 
 echo ""
 echo "Generate code for clickhouse-keeper.altinity.com:v1 into ${GENERATOR_ROOT}"
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     deepcopy \
-    github.com/altinity/clickhouse-operator/pkg/client \
-    github.com/altinity/clickhouse-operator/pkg/apis \
+    "${REPO}/pkg/client" \
+    "${REPO}/pkg/apis" \
     "clickhouse-keeper.altinity.com:v1" \
     -o "${GENERATOR_ROOT}" \
-    --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
+    --go-header-file "${SRC_ROOT}/hack/boilerplate.go.txt"
 
+echo "Copy generated sources into: ${PKG_ROOT}"
 cp -r "${GENERATOR_ROOT}/${REPO}/pkg/"* "${PKG_ROOT}"
+
+echo "Cleanup local tmp folder"
 rm -rf "${GENERATOR_ROOT}"
