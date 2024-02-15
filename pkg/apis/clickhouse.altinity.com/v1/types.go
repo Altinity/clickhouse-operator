@@ -44,7 +44,7 @@ type ClickHouseInstallation struct {
 
 	Attributes ComparableAttributes `json:"-" yaml:"-"`
 
-	statusCreatorMutex sync.Mutex
+	statusCreatorMutex sync.Mutex `json:"-" yaml:"-"`
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable

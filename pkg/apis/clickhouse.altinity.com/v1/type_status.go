@@ -75,7 +75,7 @@ type ChiStatus struct {
 	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
 	UsedTemplates          []*ChiUseTemplate       `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
 
-	mu sync.RWMutex
+	mu sync.RWMutex `json:"-" yaml:"-"`
 }
 
 // CopyCHIStatusOptions specifies what to copy in CHI status options

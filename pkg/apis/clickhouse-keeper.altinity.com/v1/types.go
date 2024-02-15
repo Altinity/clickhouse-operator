@@ -15,9 +15,10 @@
 package v1
 
 import (
+	"sync"
+
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/imdario/mergo"
-	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -32,7 +33,7 @@ type ClickHouseKeeperInstallation struct {
 	meta.ObjectMeta    `json:"metadata,omitempty"          yaml:"metadata,omitempty"`
 	Spec               ChkSpec    `json:"spec"             yaml:"spec"`
 	Status             *ChkStatus `json:"status,omitempty" yaml:"status,omitempty"`
-	statusCreatorMutex sync.Mutex
+	statusCreatorMutex sync.Mutex `json:"-" yaml:"-"`
 }
 
 // EnsureStatus ensures status

@@ -11,6 +11,10 @@ set -o pipefail
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
+cleanup() {
+    rm -rf ./tmp/"${REPO_ROOT}"
+}
+
 CODE_GENERATOR_DIR_INSIDE_MODULES="${SRC_ROOT}/vendor/k8s.io/code-generator"
 CODE_GENERATOR_DIR_INSIDE_GOPATH="${GOPATH}/src/k8s.io/code-generator"
 
@@ -47,7 +51,7 @@ bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     github.com/altinity/clickhouse-operator/pkg/client \
     github.com/altinity/clickhouse-operator/pkg/apis \
     "clickhouse.altinity.com:v1" \
-    -o "${SRC_ROOT}/generator" \
+    -o ./tmp \
     --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
 
 echo ""
@@ -57,5 +61,9 @@ bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     github.com/altinity/clickhouse-operator/pkg/client \
     github.com/altinity/clickhouse-operator/pkg/apis \
     "clickhouse-keeper.altinity.com:v1" \
-    -o "${SRC_ROOT}/generator" \
+    -o ./tmp \
     --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
+
+cp -r ./tmp/"${REPO}"/pkg/* "${PKG_ROOT}"
+
+cleanup
