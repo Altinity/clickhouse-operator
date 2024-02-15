@@ -11,10 +11,6 @@ set -o pipefail
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
-cleanup() {
-    rm -rf ./tmp/"${REPO_ROOT}"
-}
-
 CODE_GENERATOR_DIR_INSIDE_MODULES="${SRC_ROOT}/vendor/k8s.io/code-generator"
 CODE_GENERATOR_DIR_INSIDE_GOPATH="${GOPATH}/src/k8s.io/code-generator"
 
@@ -45,25 +41,25 @@ fi
 #    -o "${SRC_ROOT}/generator"
 
 echo ""
-echo "Generate code for clickhouse.altinity.com:v1"
+mkdir -p "${GENERATOR_ROOT}"
+echo "Generate code for clickhouse.altinity.com:v1 into ${GENERATOR_ROOT}"
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     client,deepcopy,informer,lister \
     github.com/altinity/clickhouse-operator/pkg/client \
     github.com/altinity/clickhouse-operator/pkg/apis \
     "clickhouse.altinity.com:v1" \
-    -o ./tmp \
+    -o "${GENERATOR_ROOT}" \
     --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
 
 echo ""
-echo "Generate code for clickhouse-keeper.altinity.com:v1"
+echo "Generate code for clickhouse-keeper.altinity.com:v1 into ${GENERATOR_ROOT}"
 bash "${CODE_GENERATOR_DIR}/generate-groups.sh" \
     deepcopy \
     github.com/altinity/clickhouse-operator/pkg/client \
     github.com/altinity/clickhouse-operator/pkg/apis \
     "clickhouse-keeper.altinity.com:v1" \
-    -o ./tmp \
+    -o "${GENERATOR_ROOT}" \
     --go-header-file ${SRC_ROOT}/hack/boilerplate.go.txt
 
-cp -r ./tmp/"${REPO}"/pkg/* "${PKG_ROOT}"
-
-cleanup
+cp -r "${GENERATOR_ROOT}/${REPO}/pkg/"* "${PKG_ROOT}"
+rm -rf "${GENERATOR_ROOT}"
