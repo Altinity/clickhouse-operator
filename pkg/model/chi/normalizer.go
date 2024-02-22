@@ -1571,62 +1571,66 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *a
 	// Layout.ShardsCount and
 	// Layout.ReplicasCount must represent max number of shards and replicas requested respectively
 
-	// Deal with ShardsCount
+	// Deal with unspecified ShardsCount
 	if layout.ShardsCount == 0 {
 		// No ShardsCount specified - need to figure out
 
 		// We need to have at least one Shard
 		layout.ShardsCount = 1
+	}
 
-		// Let's look for explicitly specified Shards in Layout.Shards
-		if len(layout.Shards) > layout.ShardsCount {
-			// We have some Shards specified explicitly
-			layout.ShardsCount = len(layout.Shards)
+	// Adjust layout.ShardsCount to max known count
+
+	// Let's look for explicitly specified Shards in Layout.Shards
+	if len(layout.Shards) > layout.ShardsCount {
+		// We have some Shards specified explicitly
+		layout.ShardsCount = len(layout.Shards)
+	}
+
+	// Let's look for explicitly specified Shards in Layout.Replicas
+	for i := range layout.Replicas {
+		replica := &layout.Replicas[i]
+
+		if replica.ShardsCount > layout.ShardsCount {
+			// We have Shards number specified explicitly in this replica
+			layout.ShardsCount = replica.ShardsCount
 		}
 
-		// Let's look for explicitly specified Shards in Layout.Replicas
-		for i := range layout.Replicas {
-			replica := &layout.Replicas[i]
-
-			if replica.ShardsCount > layout.ShardsCount {
-				// We have Shards number specified explicitly in this replica
-				layout.ShardsCount = replica.ShardsCount
-			}
-
-			if len(replica.Hosts) > layout.ShardsCount {
-				// We have some Shards specified explicitly
-				layout.ShardsCount = len(replica.Hosts)
-			}
+		if len(replica.Hosts) > layout.ShardsCount {
+			// We have some Shards specified explicitly
+			layout.ShardsCount = len(replica.Hosts)
 		}
 	}
 
-	// Deal with ReplicasCount
+	// Deal with unspecified ReplicasCount
 	if layout.ReplicasCount == 0 {
 		// No ReplicasCount specified - need to figure out
 
 		// We need to have at least one Replica
 		layout.ReplicasCount = 1
+	}
 
-		// Let's look for explicitly specified Replicas in Layout.Shards
-		for i := range layout.Shards {
-			shard := &layout.Shards[i]
+	// Adjust layout.ReplicasCount to max known count
 
-			if shard.ReplicasCount > layout.ReplicasCount {
-				// We have Replicas number specified explicitly in this shard
-				layout.ReplicasCount = shard.ReplicasCount
-			}
+	// Let's look for explicitly specified Replicas in Layout.Shards
+	for i := range layout.Shards {
+		shard := &layout.Shards[i]
 
-			if len(shard.Hosts) > layout.ReplicasCount {
-				// We have some Replicas specified explicitly
-				layout.ReplicasCount = len(shard.Hosts)
-			}
+		if shard.ReplicasCount > layout.ReplicasCount {
+			// We have Replicas number specified explicitly in this shard
+			layout.ReplicasCount = shard.ReplicasCount
 		}
 
-		// Let's look for explicitly specified Replicas in Layout.Replicas
-		if len(layout.Replicas) > layout.ReplicasCount {
+		if len(shard.Hosts) > layout.ReplicasCount {
 			// We have some Replicas specified explicitly
-			layout.ReplicasCount = len(layout.Replicas)
+			layout.ReplicasCount = len(shard.Hosts)
 		}
+	}
+
+	// Let's look for explicitly specified Replicas in Layout.Replicas
+	if len(layout.Replicas) > layout.ReplicasCount {
+		// We have some Replicas specified explicitly
+		layout.ReplicasCount = len(layout.Replicas)
 	}
 
 	return layout
@@ -1694,8 +1698,9 @@ func (n *Normalizer) normalizeShardReplicasCount(shard *api.ChiShard, layoutRepl
 		return
 	}
 
-	// Here we have shard.ReplicasCount = 0, meaning that
-	// shard does not have explicitly specified number of replicas - need to fill it
+	// Here we have shard.ReplicasCount = 0,
+	// meaning that shard does not have explicitly specified number of replicas.
+	// We need to fill it.
 
 	// Look for explicitly specified Replicas first
 	if len(shard.Hosts) > 0 {
@@ -1705,8 +1710,8 @@ func (n *Normalizer) normalizeShardReplicasCount(shard *api.ChiShard, layoutRepl
 		return
 	}
 
-	// No shard.ReplicasCount specified, no replicas explicitly provided, so we have to
-	// use ReplicasCount from layout
+	// No shard.ReplicasCount specified, no replicas explicitly provided,
+	// so we have to use ReplicasCount from layout
 	shard.ReplicasCount = layoutReplicasCount
 }
 
