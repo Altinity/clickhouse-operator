@@ -4512,13 +4512,19 @@ def test_048(self):
     with And("I insert data in the distributed table"):
         clickhouse.query(chi, f"INSERT INTO test_distr_048 select * from numbers({numbers})")
 
-    with Then("I check clickhouse-keeper properly works"):
+    with And("Give data some time to propagate among replicas"):
+        time.sleep(60)
+
+    with Then("Check local table on host 0 has 1/2 of all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
         assert out == f"{numbers // 2}", error()
+    with Then("Check local table on host 1 has 1/2 of all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
         assert out == f"{numbers // 2}", error()
+    with Then("Check dist table on host 0 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-0-0-0")
         assert out == f"{numbers}", error()
+    with Then("Check dist table on host 1 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-1-0-0")
         assert out == f"{numbers}", error()
 
