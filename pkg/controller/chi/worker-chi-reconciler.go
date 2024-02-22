@@ -940,9 +940,9 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 	} else {
 		w.a.V(1).Info(
 			"StatefulSet.Spec ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-			util.MessageDiffItemString("added .spec items", "", diff.Added),
-			util.MessageDiffItemString("modified .spec items", "", diff.Modified),
-			util.MessageDiffItemString("removed .spec items", "", diff.Removed),
+			util.MessageDiffItemString("added .spec items", "none", "", diff.Added),
+			util.MessageDiffItemString("modified .spec items", "none", "", diff.Modified),
+			util.MessageDiffItemString("removed .spec items", "none", "", diff.Removed),
 		)
 	}
 	if diff, equal := messagediff.DeepDiff(cur.Labels, new.Labels); equal {
@@ -951,9 +951,9 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 		if len(cur.Labels)+len(new.Labels) > 0 {
 			w.a.V(1).Info(
 				"StatefulSet.Labels ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-				util.MessageDiffItemString("added .labels items", "", diff.Added),
-				util.MessageDiffItemString("modified .labels items", "", diff.Modified),
-				util.MessageDiffItemString("removed .labels items", "", diff.Removed),
+				util.MessageDiffItemString("added .labels items", "none", "", diff.Added),
+				util.MessageDiffItemString("modified .labels items", "none", "", diff.Modified),
+				util.MessageDiffItemString("removed .labels items", "none", "", diff.Removed),
 			)
 		}
 	}
@@ -963,9 +963,9 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 		if len(cur.Annotations)+len(new.Annotations) > 0 {
 			w.a.V(1).Info(
 				"StatefulSet.Annotations ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-				util.MessageDiffItemString("added .annotations items", "", diff.Added),
-				util.MessageDiffItemString("modified .annotations items", "", diff.Modified),
-				util.MessageDiffItemString("removed .annotations items", "", diff.Removed),
+				util.MessageDiffItemString("added .annotations items", "none", "", diff.Added),
+				util.MessageDiffItemString("modified .annotations items", "none", "", diff.Modified),
+				util.MessageDiffItemString("removed .annotations items", "none", "", diff.Removed),
 			)
 		}
 	}

@@ -30,27 +30,32 @@ func MessageDiffString(diff *messagediff.Diff, equal bool) string {
 
 	if len(diff.Added) > 0 {
 		// Something added
-		str += MessageDiffItemString("added items", "", diff.Added)
+		str += MessageDiffItemString("added items", "none", "", diff.Added)
 	}
 
 	if len(diff.Removed) > 0 {
 		// Something removed
-		str += MessageDiffItemString("removed items", "", diff.Removed)
+		str += MessageDiffItemString("removed items", "none", "", diff.Removed)
 	}
 
 	if len(diff.Modified) > 0 {
 		// Something modified
-		str += MessageDiffItemString("modified spec items", "", diff.Modified)
+		str += MessageDiffItemString("modified spec items", "none", "", diff.Modified)
 	}
 
 	return str
 }
 
 // MessageDiffItemString stringifies one map[*messagediff.Path]interface{} item
-func MessageDiffItemString(banner, defaultPath string, items map[*messagediff.Path]interface{}) string {
-	var str string
-	str += fmt.Sprintf("Diff item start -------------------------\n")
-	str += fmt.Sprintf("%s: %d\n", banner, len(items))
+func MessageDiffItemString(bannerForDiff, bannerForNoDiff, defaultPath string, items map[*messagediff.Path]interface{}) (str string) {
+	if len(items) == 0 {
+		return bannerForNoDiff
+	}
+
+	// Have modified items
+	str += fmt.Sprintf("Diff start -------------------------\n")
+	str += fmt.Sprintf("%s num: %d\n", bannerForDiff, len(items))
+
 	i := 0
 	for pathPtr := range items {
 		path := ""
@@ -70,18 +75,24 @@ func MessageDiffItemString(banner, defaultPath string, items map[*messagediff.Pa
 		if path == "" {
 			path = defaultPath
 		}
-		str += fmt.Sprintf("diff item path [%d]:'%s'\n", i, path)
 
-		short := fmt.Sprintf("diff item value[%d]:'%+v'\n", i, items[pathPtr])
-		full := fmt.Sprintf("diff item value[%d]:'%s'\n", i, Dump(items[pathPtr]))
-		if len(full) < 300 {
-			str += full
+		valueShort := fmt.Sprintf("%+v", items[pathPtr])
+		valueFull := fmt.Sprintf("%s", Dump(items[pathPtr]))
+		value := ""
+		if len(valueFull) < 300 {
+			value = valueFull
 		} else {
-			str += short
+			value = valueShort
 		}
+
+		//str += fmt.Sprintf("diff item path [%d]:'%s'\n", i, path)
+		//str += fmt.Sprintf("diff item value[%d]:'%s'\n", i, value)
+
+		str += fmt.Sprintf("diff item [%d]:'%s' = '%s'\n", i, path, value)
+
 		i++
 	}
-	str += fmt.Sprintf("Diff item end -------------------------\n")
+	str += fmt.Sprintf("Diff end -------------------------\n")
 
 	return str
 }
