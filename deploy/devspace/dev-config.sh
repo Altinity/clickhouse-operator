@@ -4,7 +4,7 @@
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 PROJECT_ROOT="$(realpath "${CUR_DIR}/../..")"
-MANIFEST_ROOT="$(realpath ${PROJECT_ROOT}/deploy)"
+MANIFEST_ROOT="$(realpath "${PROJECT_ROOT}/deploy")"
 
 OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"dev"}"
 METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
@@ -13,8 +13,6 @@ METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 DEPLOY_OPERATOR="${DEPLOY_OPERATOR:-"no"}"
 CUR_RELEASE=$(cat "${PROJECT_ROOT}/release")
 MINIKUBE="${MINIKUBE:-"yes"}"
-
-echo "DEPLOY_OPERATOR=${DEPLOY_OPERATOR}"
 
 case "${DEPLOY_OPERATOR}" in
     "yes" | "release" | "prod" | "latest")
@@ -32,9 +30,10 @@ case "${DEPLOY_OPERATOR}" in
     "dev")
         # This would be dev operator
         OPERATOR_IMAGE="${OPERATOR_IMAGE:-"altinity/clickhouse-operator:dev"}"
+        OPERATOR_IMAGE_PULL_POLICY="${OPERATOR_IMAGE_PULL_POLICY:-"IfNotPresent"}"
         METRICS_EXPORTER_IMAGE="${METRICS_EXPORTER_IMAGE:-"altinity/metrics-exporter:dev"}"
+        METRICS_EXPORTER_IMAGE_PULL_POLICY="${METRICS_EXPORTER_IMAGE_PULL_POLICY:-"IfNotPresent"}"
         ;;
     *)
-        echo "No Operator would be installed"
         ;;
 esac
