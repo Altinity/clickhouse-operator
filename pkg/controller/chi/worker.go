@@ -122,7 +122,7 @@ func (w *worker) shouldForceRestartHost(host *api.ChiHost) bool {
 		return false
 	}
 
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame && !host.HasAncestor() {
+	if (host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame) && !host.HasAncestor() {
 		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
 	}
@@ -580,6 +580,10 @@ func (w *worker) logOldAndNew(name string, old, new *api.ClickHouseInstallation)
 func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
+		return
+	}
+	if chi.IsStopped() {
+		// No need to wait for stopped CHI
 		return
 	}
 	start := time.Now()

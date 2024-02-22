@@ -302,10 +302,32 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.ChiHost) 
 
 const unknownVersion = "failed to query"
 
+type versionOptions struct {
+	skipNew             bool
+	skipStopped         bool
+	skipStoppedAncestor bool
+}
+
+func (opts versionOptions) shouldSkip(host *api.ChiHost) (bool, string) {
+	if opts.skipNew && (host.IsNewOne()) {
+		return true, "host is a new one, version is not not applicable"
+	}
+
+	if opts.skipStopped && host.IsStopped() {
+		return true, "host is stopped, version is not applicable"
+	}
+
+	if opts.skipStoppedAncestor && host.GetAncestor().IsStopped() {
+		return true, "host ancestor is stopped, version is not applicable"
+	}
+
+	return false, ""
+}
+
 // getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost, skipNewHost bool) (string, error) {
-	if skipNewHost && (host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew) {
-		return "not applicable", nil
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost, opts versionOptions) (string, error) {
+	if skip, description := opts.shouldSkip(host); skip {
+		return description, nil
 	}
 
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
@@ -327,7 +349,7 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Chi
 		nil,
 		func(_ctx context.Context, _host *api.ChiHost) bool {
 			var e error
-			version, e = w.getHostClickHouseVersion(_ctx, _host, false)
+			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{skipStopped: true})
 			if e == nil {
 				return true
 			}
@@ -374,7 +396,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version, _ := w.getHostClickHouseVersion(ctx, host, true)
+	version, _ := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true})
 	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
 	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.GetName(), version)
@@ -636,7 +658,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	}
 
 	// Check whether ClickHouse is running and accessible and what version is available
-	if version, err := w.getHostClickHouseVersion(ctx, host, true); err == nil {
+	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
 		w.a.V(1).
 			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
 			WithStatusAction(host.GetCHI()).
