@@ -1573,8 +1573,6 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *a
 
 	// Deal with unspecified ShardsCount
 	if layout.ShardsCount == 0 {
-		// No ShardsCount specified - need to figure out
-
 		// We need to have at least one Shard
 		layout.ShardsCount = 1
 	}
@@ -1604,8 +1602,6 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *a
 
 	// Deal with unspecified ReplicasCount
 	if layout.ReplicasCount == 0 {
-		// No ReplicasCount specified - need to figure out
-
 		// We need to have at least one Replica
 		layout.ReplicasCount = 1
 	}
