@@ -1322,13 +1322,13 @@ func (w *worker) updateService(
 		return nil
 	}
 
-	newService := targetService.DeepCopy()
-
-	if curService.Spec.Type != newService.Spec.Type {
+	if curService.Spec.Type != targetService.Spec.Type {
 		return fmt.Errorf("just recreate the service in case of service type change")
 	}
 
 	// Updating a Service is a complicated business
+
+	newService := targetService.DeepCopy()
 
 	// spec.resourceVersion is required in order to update an object
 	newService.ResourceVersion = curService.ResourceVersion
@@ -1351,11 +1351,14 @@ func (w *worker) updateService(
 	// or else creation of the service will fail.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
-	if ((curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)) ||
-		((curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)) {
-		// !!! IMPORTANT !!!
-		// No changes in service type is allowed.
-		// Already exposed port details can not be changed.
+
+	// !!! IMPORTANT !!!
+	// No changes in service type is allowed.
+	// Already exposed port details can not be changed.
+
+	serviceTypeIsNodePort := (curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)
+	serviceTypeIsLoadBalancer := (curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)
+	if serviceTypeIsNodePort || serviceTypeIsLoadBalancer {
 		for i := range newService.Spec.Ports {
 			newPort := &newService.Spec.Ports[i]
 			for j := range curService.Spec.Ports {
@@ -1377,8 +1380,9 @@ func (w *worker) updateService(
 	// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
 	// In case ExternalTrafficPolicy is changed it seems to be irrelevant
 	// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-	if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
-		(newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
+	curExternalTrafficPolicyTypeLocal := curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal
+	newExternalTrafficPolicyTypeLocal := newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal
+	if curExternalTrafficPolicyTypeLocal && newExternalTrafficPolicyTypeLocal {
 		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
 	}
 
