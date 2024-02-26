@@ -2589,47 +2589,27 @@ def test_024(self):
         },
     )
 
-    with Then("Pod annotation should populated from a podTemplate"):
-        assert (
-            kubectl.get_field(
-                "pod",
-                "chi-test-024-default-0-0-0",
-                ".metadata.annotations.podtemplate/test",
-            )
-            == "test"
-        )
-    with And("Service annotation should be populated from a serviceTemplate"):
-        assert (
-            kubectl.get_field(
-                "service",
-                "clickhouse-test-024",
-                ".metadata.annotations.servicetemplate/test",
-            )
-            == "test"
-        )
-    with And("PVC annotation should be populated from a volumeTemplate"):
-        assert (
-            kubectl.get_field(
-                "pvc",
-                "-l clickhouse.altinity.com/chi=test-024",
-                ".metadata.annotations.pvc/test",
-            )
-            == "test"
-        )
+    def checkAnnotations(annotation, value):
 
-    with And("Pod annotation should populated from a CHI"):
-        assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.chi/test") == "test"
-    with And("Service annotation should be populated from a CHI"):
-        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.chi/test") == "test"
-    with And("PVC annotation should be populated from a CHI"):
-        assert (
-            kubectl.get_field(
-                "pvc",
-                "-l clickhouse.altinity.com/chi=test-024",
-                ".metadata.annotations.chi/test",
-            )
-            == "test"
-        )
+        with Then(f"Pod annotation {annotation}={value} should populated from a podTemplate"):
+            assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.podtemplate/{annotation}") == value
+
+        with And(f"Service annotation {annotation}={value} should be populated from a serviceTemplate"):
+            assert kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.servicetemplate/{annotation}") == value
+
+        with And(f"PVC annotation {annotation}={value} should be populated from a volumeTemplate"):
+            assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.pvc/{annotation}") == value
+
+        with And(f"Pod annotation {annotation}={value} should populated from a CHI"):
+            assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.chi/{annotation}") == value
+
+        with And(f"Service annotation {annotation}={value} should be populated from a CHI"):
+            assert kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.chi/{annotation}") == value
+
+        with And(f"PVC annotation {annotation}={value} should be populated from a CHI"):
+            assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.chi/{annotation}") == value
+
+    checkAnnotations("test", "test")
 
     with And("Service annotation macros should be resolved"):
         assert (
@@ -2648,6 +2628,30 @@ def test_024(self):
             )
             == "test-024-0-0.example.com"
         )
+
+    with When("Update template annotations"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-024-template-annotations-2.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        checkAnnotations("test", "test-2")
+        checkAnnotations("test-2", "test-2")
+
+    with When("Revert template annotations to original values"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-024-template-annotations.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        checkAnnotations("test", "test")
+        # with Then("Annotation test-2 should be removed"):
+        #    TODO. Does not work for services yet
+        #    checkAnnotations("test-2", "<none>")
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
