@@ -1563,73 +1563,77 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *api.SchemaPolicy) *api
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *api.ChiClusterLayout) *api.ChiClusterLayout {
-	if layout == nil {
-		layout = api.NewChiClusterLayout()
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *api.ChiClusterLayout) *api.ChiClusterLayout {
+	if clusterLayout == nil {
+		clusterLayout = api.NewChiClusterLayout()
 	}
 
-	// Layout.ShardsCount and
-	// Layout.ReplicasCount must represent max number of shards and replicas requested respectively
+	// ChiClusterLayout.ShardsCount
+	// and
+	// ChiClusterLayout.ReplicasCount
+	// must represent max number of shards and replicas requested respectively
 
 	// Deal with unspecified ShardsCount
-	if layout.ShardsCount == 0 {
+	if clusterLayout.ShardsCount == 0 {
 		// We need to have at least one Shard
-		layout.ShardsCount = 1
+		clusterLayout.ShardsCount = 1
 	}
 
 	// Adjust layout.ShardsCount to max known count
 
-	// Let's look for explicitly specified Shards in Layout.Shards
-	if len(layout.Shards) > layout.ShardsCount {
-		// We have some Shards specified explicitly
-		layout.ShardsCount = len(layout.Shards)
+	if len(clusterLayout.Shards) > clusterLayout.ShardsCount {
+		// We have more explicitly specified shards than count specified.
+		// Need to adjust.
+		clusterLayout.ShardsCount = len(clusterLayout.Shards)
 	}
 
 	// Let's look for explicitly specified Shards in Layout.Replicas
-	for i := range layout.Replicas {
-		replica := &layout.Replicas[i]
+	for i := range clusterLayout.Replicas {
+		replica := &clusterLayout.Replicas[i]
 
-		if replica.ShardsCount > layout.ShardsCount {
+		if replica.ShardsCount > clusterLayout.ShardsCount {
 			// We have Shards number specified explicitly in this replica
-			layout.ShardsCount = replica.ShardsCount
+			clusterLayout.ShardsCount = replica.ShardsCount
 		}
 
-		if len(replica.Hosts) > layout.ShardsCount {
-			// We have some Shards specified explicitly
-			layout.ShardsCount = len(replica.Hosts)
+		if len(replica.Hosts) > clusterLayout.ShardsCount {
+			// We have more explicitly specified shards than count specified.
+			// Need to adjust.
+			clusterLayout.ShardsCount = len(replica.Hosts)
 		}
 	}
 
 	// Deal with unspecified ReplicasCount
-	if layout.ReplicasCount == 0 {
+	if clusterLayout.ReplicasCount == 0 {
 		// We need to have at least one Replica
-		layout.ReplicasCount = 1
+		clusterLayout.ReplicasCount = 1
 	}
 
 	// Adjust layout.ReplicasCount to max known count
 
+	if len(clusterLayout.Replicas) > clusterLayout.ReplicasCount {
+		// We have more explicitly specified replicas than count specified.
+		// Need to adjust.
+		clusterLayout.ReplicasCount = len(clusterLayout.Replicas)
+	}
+
 	// Let's look for explicitly specified Replicas in Layout.Shards
-	for i := range layout.Shards {
-		shard := &layout.Shards[i]
+	for i := range clusterLayout.Shards {
+		shard := &clusterLayout.Shards[i]
 
-		if shard.ReplicasCount > layout.ReplicasCount {
+		if shard.ReplicasCount > clusterLayout.ReplicasCount {
 			// We have Replicas number specified explicitly in this shard
-			layout.ReplicasCount = shard.ReplicasCount
+			clusterLayout.ReplicasCount = shard.ReplicasCount
 		}
 
-		if len(shard.Hosts) > layout.ReplicasCount {
-			// We have some Replicas specified explicitly
-			layout.ReplicasCount = len(shard.Hosts)
+		if len(shard.Hosts) > clusterLayout.ReplicasCount {
+			// We have more explicitly specified replcas than count specified.
+			// Need to adjust.
+			clusterLayout.ReplicasCount = len(shard.Hosts)
 		}
 	}
 
-	// Let's look for explicitly specified Replicas in Layout.Replicas
-	if len(layout.Replicas) > layout.ReplicasCount {
-		// We have some Replicas specified explicitly
-		layout.ReplicasCount = len(layout.Replicas)
-	}
-
-	return layout
+	return clusterLayout
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
