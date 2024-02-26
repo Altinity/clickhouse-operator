@@ -35,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -49,7 +50,7 @@ type worker struct {
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
 	normalizer *model.Normalizer
-	schemer    *model.ClusterSchemer
+	schemer    *schemer.ClusterSchemer
 	start      time.Time
 	task       task
 }
@@ -86,7 +87,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
 		normalizer: model.NewNormalizer(c.kubeClient),
-		schemer:    nil, //
+		schemer:    nil,
 		start:      start,
 	}
 }
@@ -1785,7 +1786,7 @@ func (w *worker) applyResource(
 	return true
 }
 
-func (w *worker) ensureClusterSchemer(host *api.ChiHost) *model.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(host *api.ChiHost) *schemer.ClusterSchemer {
 	if w == nil {
 		return nil
 	}
@@ -1807,7 +1808,7 @@ func (w *worker) ensureClusterSchemer(host *api.ChiHost) *model.ClusterSchemer {
 	case api.ChSchemeHTTPS:
 		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
-	w.schemer = model.NewClusterSchemer(clusterConnectionParams)
+	w.schemer = schemer.NewClusterSchemer(clusterConnectionParams, host.Version)
 
 	return w.schemer
 }

@@ -26,13 +26,13 @@ import (
 
 const (
 	// Pattern for string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
-	distributedDDLPathPattern = "/clickhouse/%s/task_queue/ddl"
+	DistributedDDLPathPattern = "/clickhouse/%s/task_queue/ddl"
 
 	// Special auto-generated clusters. Each of these clusters lay over all replicas in CHI
 	// 1. Cluster with one shard and all replicas. Used to duplicate data over all replicas.
 	// 2. Cluster with all shards (1 replica). Used to gather/scatter data over all replicas.
-	oneShardAllReplicasClusterName = "all-replicated"
-	allShardsOneReplicaClusterName = "all-sharded"
+	OneShardAllReplicasClusterName = "all-replicated"
+	AllShardsOneReplicaClusterName = "all-sharded"
 )
 
 // ClickHouseConfigGenerator generates ClickHouse configuration files content for specified CHI
@@ -401,7 +401,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		// <my_cluster_name>
 		//     <shard>
 		//         <internal_replication>
-		clusterName := oneShardAllReplicasClusterName
+		clusterName := OneShardAllReplicasClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
 		util.Iline(b, 8, "    <shard>")
 		util.Iline(b, 8, "        <internal_replication>true</internal_replication>")
@@ -420,7 +420,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		// All Shards One Replica
 
 		// <my_cluster_name>
-		clusterName = allShardsOneReplicaClusterName
+		clusterName = AllShardsOneReplicaClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
 		c.chi.WalkHosts(func(host *api.ChiHost) error {
 			if options.Include(host) {
@@ -467,7 +467,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 
 	// All Shards One Replica ChkCluster
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster</CLUSTER_NAME-shard>
-	util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", allShardsOneReplicaClusterName, host.Address.CHIScopeIndex)
+	util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", AllShardsOneReplicaClusterName, host.Address.CHIScopeIndex)
 
 	// <cluster> and <shard> macros are applicable to main cluster only. All aux clusters do not have ambiguous macros
 	// <cluster></cluster> macro
@@ -542,7 +542,7 @@ func (c *ClickHouseConfigGenerator) generateXMLConfig(settings *api.Settings, pr
 
 // getDistributedDDLPath returns string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
 func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
-	return fmt.Sprintf(distributedDDLPathPattern, c.chi.Name)
+	return fmt.Sprintf(DistributedDDLPathPattern, c.chi.Name)
 }
 
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"

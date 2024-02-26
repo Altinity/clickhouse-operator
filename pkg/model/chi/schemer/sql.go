@@ -12,18 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package schemer
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-// getDropTablesSQLs returns set of 'DROP TABLE ...' SQLs
-func (s *ClusterSchemer) getDropTablesSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
+const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
+
+// sqlDropTable returns set of 'DROP TABLE ...' SQLs
+func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -46,12 +51,12 @@ func (s *ClusterSchemer) getDropTablesSQLs(ctx context.Context, host *api.ChiHos
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 
-// getSyncTablesSQLs returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
-func (s *ClusterSchemer) getSyncTablesSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+// sqlSyncTable returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
+func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
 	sql := heredoc.Doc(`
 		SELECT
 			DISTINCT name,
@@ -63,11 +68,11 @@ func (s *ClusterSchemer) getSyncTablesSQLs(ctx context.Context, host *api.ChiHos
 		`,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
 	return names, sqlStatements, nil
 }
 
-func createDatabaseDistributed(cluster string) string {
+func (s *ClusterSchemer) sqlCreateDatabaseDistributed(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
@@ -94,7 +99,7 @@ func createDatabaseDistributed(cluster string) string {
 	)
 }
 
-func createTableDistributed(cluster string) string {
+func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT concat(database, '.', name) AS name,
@@ -146,7 +151,7 @@ func createTableDistributed(cluster string) string {
 	)
 }
 
-func createDatabaseReplicated(cluster string) string {
+func (s *ClusterSchemer) sqlCreateDatabaseReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
@@ -162,7 +167,7 @@ func createDatabaseReplicated(cluster string) string {
 	)
 }
 
-func createTableReplicated(cluster string) string {
+func (s *ClusterSchemer) sqlCreateTableReplicated(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
@@ -185,7 +190,7 @@ func createTableReplicated(cluster string) string {
 	)
 }
 
-func createFunction(cluster string) string {
+func (s *ClusterSchemer) sqlCreateFunction(cluster string) string {
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
@@ -197,5 +202,28 @@ func createFunction(cluster string) string {
 		SETTINGS skip_unavailable_shards=1
 		`,
 		cluster,
+	)
+}
+
+func (s *ClusterSchemer) sqlDropReplica(name string) string {
+	return fmt.Sprintf("SYSTEM DROP REPLICA '%s'", name)
+}
+
+func (s *ClusterSchemer) sqlDropDNSCache() string {
+	return `SYSTEM DROP DNS CACHE`
+}
+
+func (s *ClusterSchemer) sqlActiveQueriesNum() string {
+	return `SELECT count() FROM system.processes`
+}
+
+func (s *ClusterSchemer) sqlVersion() string {
+	return `SELECT version()`
+}
+
+func (s *ClusterSchemer) sqlHostInCluster() string {
+	return heredoc.Docf(
+		`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
+		chi.AllShardsOneReplicaClusterName,
 	)
 }
