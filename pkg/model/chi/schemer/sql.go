@@ -73,10 +73,18 @@ func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([
 }
 
 func (s *ClusterSchemer) sqlCreateDatabaseDistributed(cluster string) string {
+	var createDatabaseStmt string
+	switch {
+	case s.version.Matches(">= 22.12"):
+		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine_full AS create_db_query'`
+	default:
+		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine      AS create_db_query'`
+	}
+
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
-			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine AS create_db_query
+			%s
 		FROM (
 			SELECT
 				*
@@ -94,6 +102,7 @@ func (s *ClusterSchemer) sqlCreateDatabaseDistributed(cluster string) string {
 			SETTINGS skip_unavailable_shards = 1
 		)
 		`,
+		createDatabaseStmt,
 		cluster,
 		cluster,
 	)
