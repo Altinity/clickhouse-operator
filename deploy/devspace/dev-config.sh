@@ -13,7 +13,7 @@ METRICS_EXPORTER_NAMESPACE="${OPERATOR_NAMESPACE}"
 DEPLOY_OPERATOR="${DEPLOY_OPERATOR:-"no"}"
 CUR_RELEASE=$(cat "${PROJECT_ROOT}/release")
 MINIKUBE="${MINIKUBE:-"yes"}"
-VERBOSITY="${VERBOSITY:-"1"}"
+VERBOSITY="${VERBOSITY:-"2"}"
 
 case "${DEPLOY_OPERATOR}" in
     "yes" | "release" | "prod" | "latest")
