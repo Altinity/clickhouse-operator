@@ -11,6 +11,7 @@ OPERATOR_NAMESPACE="${OPERATOR_NAMESPACE:-"test"}"
 OPERATOR_INSTALL="${OPERATOR_INSTALL:-"yes"}"
 ONLY="${ONLY:-"*"}"
 MINIKUBE_RESET="${MINIKUBE_RESET:-""}"
+VERBOSITY="${VERBOSITY:-"2"}"
 
 # replace | apply
 KUBECTL_MODE="${KUBECTL_MODE:-"replace"}"
@@ -47,7 +48,7 @@ if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
 fi
 
 echo "Build" && \
-VERBOSITY=2 ${CUR_DIR}/../../dev/image_build_all_dev.sh && \
+VERBOSITY="${VERBOSITY}" ${CUR_DIR}/../../dev/image_build_all_dev.sh && \
 echo "Load images" && \
 minikube image load "${OPERATOR_IMAGE}" && \
 minikube image load "${METRICS_EXPORTER_IMAGE}" && \
