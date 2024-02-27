@@ -146,4 +146,6 @@ func (c *Controller) emitEvent(
 	if err != nil {
 		log.M(chi).F().Error("Create Event failed: %v", err)
 	}
+
+	log.V(2).M(chi).Info("Wrote event at: %s type: %s action: %s reason: %s message: %s", now, _type, action, reason, message)
 }

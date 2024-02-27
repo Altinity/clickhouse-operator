@@ -774,11 +774,12 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 		hostsCount = host.CHI.Status.GetHostsCount()
 	}
 
+	now := time.Now()
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("%s: %d of %d", eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+		Info("[now: %s] %s: %d of %d", now, eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
 	metricsHostReconcilesCompleted(ctx)
 	metricsHostReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
