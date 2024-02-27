@@ -14,6 +14,7 @@ echo "METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE}"
 echo "METRICS_EXPORTER_IMAGE_PULL_POLICY=${METRICS_EXPORTER_IMAGE_PULL_POLICY}"
 echo "DEPLOY_OPERATOR=${DEPLOY_OPERATOR}"
 echo "MINIKUBE=${MINIKUBE}"
+echo "VERBOSITY=${VERBOSITY}"
 
 echo "Create namespace to deploy the operator into: ${OPERATOR_NAMESPACE}"
 kubectl create namespace "${OPERATOR_NAMESPACE}"
@@ -36,11 +37,13 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
             echo "Clean images in minikube"
             echo "  1. ${OPERATOR_IMAGE}"
             echo "  2. ${METRICS_EXPORTER_IMAGE}"
-            minikube image rm "${OPERATOR_IMAGE}"
-            minikube image rm "${METRICS_EXPORTER_IMAGE}"
+            echo "Remove errors will be ignored."
+            minikube image rm "${OPERATOR_IMAGE}" > /dev/null 2>&1
+            minikube image rm "${METRICS_EXPORTER_IMAGE}" > /dev/null 2>&1
 
             echo "Build images"                             && \
-            ${PROJECT_ROOT}/dev/image_build_all_dev.sh      && \
+            VERBOSITY="${VERBOSITY}"                           \
+                ${PROJECT_ROOT}/dev/image_build_all_dev.sh  && \
             echo "Load images into minikube:"               && \
             echo "  1. ${OPERATOR_IMAGE}"                   && \
             echo "  2. ${METRICS_EXPORTER_IMAGE}"           && \
