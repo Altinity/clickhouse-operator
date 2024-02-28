@@ -236,9 +236,8 @@ func (s *ClusterSchemer) sqlDropReplica(name string) []string {
 	if s.version.Matches(">= 23.1") {
 		return []string{dropReplica, dropDatabaseReplica}
 	}
-	else {
-		return []string{dropReplica}
-	}
+
+	return []string{dropReplica}
 }
 
 func (s *ClusterSchemer) sqlDropDNSCache() string {
