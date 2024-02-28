@@ -76,9 +76,9 @@ func (s *ClusterSchemer) sqlCreateDatabaseDistributed(cluster string) string {
 	var createDatabaseStmt string
 	switch {
 	case s.version.Matches(">= 22.12"):
-		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine_full AS create_db_query'`
+		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine_full AS create_db_query`
 	default:
-		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine      AS create_db_query'`
+		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine      AS create_db_query`
 	}
 
 	return heredoc.Docf(`
@@ -150,13 +150,11 @@ func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 				engine = 'Distributed' AND t.create_table_query != ''
 			SETTINGS skip_unavailable_shards = 1
 		) tables
-		WHERE has((select groupArray(name) from system.databases where engine in (%s)), database)
 		ORDER BY order
 		`,
 		cluster,
 		cluster,
 		cluster,
-		createTableDBEngines,
 	)
 }
 
