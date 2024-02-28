@@ -235,8 +235,7 @@ func (s *ClusterSchemer) sqlDropReplica(shard int, replica string) []string {
 	dropDatabaseReplica := fmt.Sprintf("SYSTEM DROP DATABASE REPLICA '%d|%s'", shard, replica)
 	if s.version.Matches(">= 23.1") {
 		return []string{dropReplica, dropDatabaseReplica}
-	}
-	else {
+	} else {
 		return []string{dropReplica}
 	}
 }
