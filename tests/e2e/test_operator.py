@@ -1412,7 +1412,7 @@ def test_014_0(self):
         "CREATE DATABASE test_s3_014 ON CLUSTER '{cluster}' Engine = S3('s3://aws-public-blockchain/v1.0/btc/', 'NOSIGN')",
     ]
 
-    test_replicated_db = 0
+    test_replicated_db = 1
     if test_replicated_db:
         schema_objects = schema_objects + [
             "test_replicated_014"
