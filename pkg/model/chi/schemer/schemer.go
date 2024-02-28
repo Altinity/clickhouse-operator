@@ -53,7 +53,7 @@ func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostT
 	replica := chi.CreateInstanceHostname(hostToDrop)
 	shard := hostToRunOn.Address.ShardIndex
 	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Address.HostName)
-	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica, clickhouse.NewQueryOptions().SetRetry(false))
+	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica), clickhouse.NewQueryOptions().SetRetry(false))
 }
 
 // createTablesSQLs makes all SQL for migrating tables
