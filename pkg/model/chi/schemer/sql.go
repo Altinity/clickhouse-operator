@@ -237,7 +237,7 @@ func (s *ClusterSchemer) sqlDropReplica(name string) []string {
 		return []string{dropReplica, dropDatabaseReplica}
 	}
 	else {
-		return []string{dropReplica)
+		return []string{dropReplica}
 	}
 }
 
