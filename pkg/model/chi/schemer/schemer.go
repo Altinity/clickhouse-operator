@@ -125,9 +125,7 @@ func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *api.ChiHost) 
 func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.ChiHost) bool {
 	inside := false
 	SQLs := []string{s.sqlHostInCluster()}
-	//TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
 	opts := clickhouse.NewQueryOptions().SetSilent(true)
-	//opts := clickhouse.NewQueryOptions()
 	err := s.ExecHost(ctx, host, SQLs, opts)
 	if err == nil {
 		log.V(1).M(host).F().Info("The host %s is inside the cluster", host.GetName())
@@ -165,7 +163,7 @@ func debugCreateSQLs(names, sqls []string, err error) ([]string, []string) {
 	for _, v := range names {
 		log.V(2).Info("name: %s", v)
 	}
-	log.V(2).Info("sqls:")
+	log.V(2).Info("sql(s):")
 	for _, v := range sqls {
 		log.V(2).Info("sql: %s", v)
 	}

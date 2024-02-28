@@ -121,8 +121,8 @@ func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 		SELECT
 			DISTINCT concat(database, '.', name) AS name,
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY)', 'CREATE \\1 IF NOT EXISTS'),
-			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
-			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
+			extract(create_table_query, 'UUID \'([^\(\']*)') AS uuid,
+			extract(create_table_query, 'INNER UUID \'([^\(\']*)') AS inner_uuid
 		FROM
 		(
 			SELECT
@@ -174,7 +174,6 @@ func (s *ClusterSchemer) sqlCreateDatabaseReplicated(cluster string) string {
 	default:
 		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine      AS create_db_query`
 	}
-
 
 	return heredoc.Docf(`
 		SELECT
@@ -253,8 +252,15 @@ func (s *ClusterSchemer) sqlVersion() string {
 }
 
 func (s *ClusterSchemer) sqlHostInCluster() string {
-	return heredoc.Docf(
-		`SELECT throwIf(count()=0) FROM system.clusters WHERE cluster='%s' AND is_local`,
+	// TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
+	return heredoc.Docf(`
+		SELECT 
+			throwIf(count()=0) 
+		FROM 
+			system.clusters 
+		WHERE 
+			cluster='%s' AND is_local
+		`,
 		chi.AllShardsOneReplicaClusterName,
 	)
 }
