@@ -565,7 +565,7 @@ def test_008_3(self):
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.22.2", version_to=None):
+def test_009_1(self, version_from="0.23.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -587,7 +587,7 @@ def test_009_1(self, version_from="0.22.2", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.22.2", version_to=None):
+def test_009_2(self, version_from="0.23.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -1408,15 +1408,30 @@ def test_014_0(self):
         "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
-        "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)"
+        "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)",
+        "CREATE DATABASE test_s3_014 ON CLUSTER '{cluster}' Engine = S3('s3://aws-public-blockchain/v1.0/btc/', 'NOSIGN')",
     ]
+
+    test_replicated_db = 0
+    if test_replicated_db:
+        schema_objects = schema_objects + [
+            "test_replicated_014"
+        ]
+        replicated_tables = replicated_tables + [
+            "test_replicated_014.test_replicated_014"
+        ]
+        create_ddls = create_ddls + [
+            "CREATE DATABASE test_replicated_014 ON CLUSTER '{cluster}' Engine = Replicated('clickhouse/replicated/test_replicated_014', '{shard}', '{replica}')",
+            "CREATE TABLE test_replicated_014.test_replicated_014 (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
+        ]
+
     wait_for_cluster(chi_name, cluster, n_shards)
 
     with Then("Create schema objects"):
         for q in create_ddls:
             clickhouse.query(chi_name, q, host=f"chi-{chi_name}-{cluster}-0-0")
 
-    with Given("Replicated table is created on a first replica and data is inserted"):
+    with Given("Replicated tables are created on a first replica and data is inserted"):
         for table in replicated_tables:
             if table != "test_atomic_014.test_mv2_014":
                 clickhouse.query(
@@ -1460,6 +1475,13 @@ def test_014_0(self):
                     host=host,
                 )
                 assert out == "Atomic"
+
+                out = clickhouse.query(
+                    chi_name,
+                    f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
+                    host=host,
+                )
+                assert out == "S3"
 
                 print("Checking functions")
                 out = clickhouse.query(
