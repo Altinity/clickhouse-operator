@@ -35,18 +35,18 @@ const (
 	queryMetricsSQL = `
     	SELECT
         	concat('metric.', metric) AS metric,
-        	toString(value)           AS value, 
-        	''                        AS description, 
+        	toString(value)           AS value,
+        	''                        AS description,
         	'gauge'                   AS type
     	FROM system.asynchronous_metrics
-    	UNION ALL 
-    	SELECT 
-	        concat('metric.', metric) AS metric, 
-	        toString(value)           AS value, 
-    	    ''                        AS description,       
-	        'gauge'                   AS type   
+    	UNION ALL
+    	SELECT
+	        concat('metric.', metric) AS metric,
+	        toString(value)           AS value,
+    	    ''                        AS description,
+	        'gauge'                   AS type
 	    FROM system.metrics
-	    UNION ALL 
+	    UNION ALL
 	    SELECT
 	        concat('event.', event)   AS metric,
 	        toString(value)           AS value,
@@ -54,7 +54,7 @@ const (
 	        'counter'                 AS type
 	    FROM system.events
 	    UNION ALL
-	    SELECT 
+	    SELECT
 	        'metric.MemoryDictionaryBytesAllocated'  AS metric,
 	        toString(sum(bytes_allocated))           AS value,
 	        'Memory size allocated for dictionaries' AS description,
@@ -75,7 +75,7 @@ const (
             'gauge'                                       AS type
 		FROM system.settings WHERE changed
 		UNION ALL
-		SELECT 
+		SELECT
 		    concat('metric.SystemErrors_',name) AS metric,
 		    toString(sum(value))                AS value,
 		    'Error counter from system.errors'  AS description,
@@ -88,10 +88,10 @@ const (
 			database,
 			table,
 			toString(active)                       AS active,
-			toString(uniq(partition))              AS partitions, 
-			toString(count())                      AS parts, 
-			toString(sum(bytes))                   AS bytes, 
-			toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes, 
+			toString(uniq(partition))              AS partitions,
+			toString(count())                      AS parts,
+			toString(sum(bytes))                   AS bytes,
+			toString(sum(data_uncompressed_bytes)) AS uncompressed_bytes,
 			toString(sum(rows))                    AS rows,
 	        toString(sum(bytes_on_disk))           AS metric_DiskDataBytes,
 	        toString(sum(primary_key_bytes_in_memory_allocated)) AS metric_MemoryPrimaryKeyBytesAllocated
@@ -104,22 +104,23 @@ const (
 			database,
 			table,
 			count()          AS mutations,
-			sum(parts_to_do) AS parts_to_do 
-		FROM system.mutations 
-		WHERE is_done = 0 
+			sum(parts_to_do) AS parts_to_do
+		FROM system.mutations
+		WHERE is_done = 0
 		GROUP BY database, table
 	`
 
 	querySystemDisksSQL = `
-	    SELECT 
+	    SELECT
 	        name,
             toString(free_space)  AS free_space,
-			toString(total_space) AS total_space			
+			toString(total_space) AS total_space
         FROM system.disks
+       WHERE type = 'local'
 	`
 
 	queryDetachedPartsSQL = `
-		SELECT 
+		SELECT
 			count() AS detached_parts,
 			database,
 			table,
