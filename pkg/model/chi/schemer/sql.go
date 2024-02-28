@@ -159,16 +159,26 @@ func (s *ClusterSchemer) sqlCreateTableDistributed(cluster string) string {
 }
 
 func (s *ClusterSchemer) sqlCreateDatabaseReplicated(cluster string) string {
+	var createDatabaseStmt string
+	switch {
+	case s.version.Matches(">= 22.12"):
+		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine_full AS create_db_query`
+	default:
+		createDatabaseStmt = `'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine      AS create_db_query`
+	}
+
+
 	return heredoc.Docf(`
 		SELECT
 			DISTINCT name,
-			'CREATE DATABASE IF NOT EXISTS "' || name || '" Engine = ' || engine  AS create_db_query
+			%s
 		FROM
 			clusterAllReplicas('%s', system.databases) databases
 		WHERE
 			name NOT IN (%s)
 		SETTINGS skip_unavailable_shards = 1
 		`,
+		createDatabaseStmt,
 		cluster,
 		ignoredDBs,
 	)
