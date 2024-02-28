@@ -50,7 +50,7 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 		UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP DATABASE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
+			concat('DROP DATABASE IF EXISTS "', name, '"') AS drop_table_query
 		FROM
 			system.databases
 		WHERE
@@ -231,7 +231,14 @@ func (s *ClusterSchemer) sqlCreateFunction(cluster string) string {
 }
 
 func (s *ClusterSchemer) sqlDropReplica(name string) []string {
-	return []string{fmt.Sprintf("SYSTEM DROP REPLICA '%s'", name), fmt.Sprintf("SYSTEM DROP DATABASE REPLICA '%s'", name)}
+	dropReplica := fmt.Sprintf("SYSTEM DROP REPLICA '%s'", name)
+	dropDatabaseReplica := fmt.Sprintf("SYSTEM DROP DATABASE REPLICA '%s'", name)
+	if s.version.Matches(">= 23.1") {
+		return []string{dropReplica, dropDatabaseReplica}
+	}
+	else {
+		return []string{dropReplica)
+	}
 }
 
 func (s *ClusterSchemer) sqlDropDNSCache() string {
