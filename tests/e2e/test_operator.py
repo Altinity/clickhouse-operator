@@ -565,7 +565,7 @@ def test_008_3(self):
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.22.2", version_to=None):
+def test_009_1(self, version_from="0.23.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -587,7 +587,7 @@ def test_009_1(self, version_from="0.22.2", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.22.2", version_to=None):
+def test_009_2(self, version_from="0.23.2", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -1408,15 +1408,32 @@ def test_014_0(self):
         "CREATE TABLE test_atomic_014.test_local_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/{database}/{table}/{uuid}', '{replica}') ORDER BY tuple()",
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
-        "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)"
+        "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)",
     ]
+
+    chi_version = clickhouse.query(chi_name, "select value from system.build_options where name='VERSION_INTEGER'")
+    print(f"ClickHouse version is {chi_version}")
+    if int(chi_version) > 23000000:
+        print("Adding more schema objects")
+        schema_objects = schema_objects + [
+            "test_replicated_014"
+        ]
+        replicated_tables = replicated_tables + [
+            "test_replicated_014.test_replicated_014"
+        ]
+        create_ddls = create_ddls + [
+            "CREATE DATABASE test_s3_014 ON CLUSTER '{cluster}' Engine = S3('s3://aws-public-blockchain/v1.0/btc/', 'NOSIGN')",
+            "CREATE DATABASE test_replicated_014 ON CLUSTER '{cluster}' Engine = Replicated('clickhouse/replicated/test_replicated_014', '{shard}', '{replica}')",
+            "CREATE TABLE test_replicated_014.test_replicated_014 (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
+        ]
+
     wait_for_cluster(chi_name, cluster, n_shards)
 
     with Then("Create schema objects"):
         for q in create_ddls:
             clickhouse.query(chi_name, q, host=f"chi-{chi_name}-{cluster}-0-0")
 
-    with Given("Replicated table is created on a first replica and data is inserted"):
+    with Given("Replicated tables are created on a first replica and data is inserted"):
         for table in replicated_tables:
             if table != "test_atomic_014.test_mv2_014":
                 clickhouse.query(
@@ -1460,6 +1477,14 @@ def test_014_0(self):
                     host=host,
                 )
                 assert out == "Atomic"
+
+                if "test_s3_014" in create_ddls:
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
+                        host=host,
+                        )
+                    assert out == "S3"
 
                 print("Checking functions")
                 out = clickhouse.query(
@@ -2589,47 +2614,27 @@ def test_024(self):
         },
     )
 
-    with Then("Pod annotation should populated from a podTemplate"):
-        assert (
-            kubectl.get_field(
-                "pod",
-                "chi-test-024-default-0-0-0",
-                ".metadata.annotations.podtemplate/test",
-            )
-            == "test"
-        )
-    with And("Service annotation should be populated from a serviceTemplate"):
-        assert (
-            kubectl.get_field(
-                "service",
-                "clickhouse-test-024",
-                ".metadata.annotations.servicetemplate/test",
-            )
-            == "test"
-        )
-    with And("PVC annotation should be populated from a volumeTemplate"):
-        assert (
-            kubectl.get_field(
-                "pvc",
-                "-l clickhouse.altinity.com/chi=test-024",
-                ".metadata.annotations.pvc/test",
-            )
-            == "test"
-        )
+    def checkAnnotations(annotation, value):
 
-    with And("Pod annotation should populated from a CHI"):
-        assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", ".metadata.annotations.chi/test") == "test"
-    with And("Service annotation should be populated from a CHI"):
-        assert kubectl.get_field("service", "clickhouse-test-024", ".metadata.annotations.chi/test") == "test"
-    with And("PVC annotation should be populated from a CHI"):
-        assert (
-            kubectl.get_field(
-                "pvc",
-                "-l clickhouse.altinity.com/chi=test-024",
-                ".metadata.annotations.chi/test",
-            )
-            == "test"
-        )
+        with Then(f"Pod annotation {annotation}={value} should populated from a podTemplate"):
+            assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.podtemplate/{annotation}") == value
+
+        with And(f"Service annotation {annotation}={value} should be populated from a serviceTemplate"):
+            assert kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.servicetemplate/{annotation}") == value
+
+        with And(f"PVC annotation {annotation}={value} should be populated from a volumeTemplate"):
+            assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.pvc/{annotation}") == value
+
+        with And(f"Pod annotation {annotation}={value} should populated from a CHI"):
+            assert kubectl.get_field("pod", "chi-test-024-default-0-0-0", f".metadata.annotations.chi/{annotation}") == value
+
+        with And(f"Service annotation {annotation}={value} should be populated from a CHI"):
+            assert kubectl.get_field("service", "clickhouse-test-024", f".metadata.annotations.chi/{annotation}") == value
+
+        with And(f"PVC annotation {annotation}={value} should be populated from a CHI"):
+            assert kubectl.get_field("pvc", "-l clickhouse.altinity.com/chi=test-024", f".metadata.annotations.chi/{annotation}") == value
+
+    checkAnnotations("test", "test")
 
     with And("Service annotation macros should be resolved"):
         assert (
@@ -2648,6 +2653,30 @@ def test_024(self):
             )
             == "test-024-0-0.example.com"
         )
+
+    with When("Update template annotations"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-024-template-annotations-2.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        checkAnnotations("test", "test-2")
+        checkAnnotations("test-2", "test-2")
+
+    with When("Revert template annotations to original values"):
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-024-template-annotations.yaml",
+            check={
+                "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+        checkAnnotations("test", "test")
+        # with Then("Annotation test-2 should be removed"):
+        #    TODO. Does not work for services yet
+        #    checkAnnotations("test-2", "<none>")
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
@@ -4509,16 +4538,23 @@ def test_048(self):
             "Engine = Distributed('default', default, test_local_048, a%2)",
         )
 
+    with And("Give CH some time to propagate new table"):
+        time.sleep(30)
     with And("I insert data in the distributed table"):
         clickhouse.query(chi, f"INSERT INTO test_distr_048 select * from numbers({numbers})")
+    with And("Give data some time to propagate among CH instances"):
+        time.sleep(30)
 
-    with Then("I check clickhouse-keeper properly works"):
+    with Then("Check local table on host 0 has 1/2 of all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
         assert out == f"{numbers // 2}", error()
+    with Then("Check local table on host 1 has 1/2 of all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
         assert out == f"{numbers // 2}", error()
+    with Then("Check dist table on host 0 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-0-0-0")
         assert out == f"{numbers}", error()
+    with Then("Check dist table on host 1 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-1-0-0")
         assert out == f"{numbers}", error()
 

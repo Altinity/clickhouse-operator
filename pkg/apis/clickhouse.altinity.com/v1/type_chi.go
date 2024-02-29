@@ -37,6 +37,7 @@ func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []str
 		TaskID:              chi.Spec.GetTaskID(),
 		HostsUpdatedCount:   0,
 		HostsAddedCount:     0,
+		HostsUnchangedCount: 0,
 		HostsCompletedCount: 0,
 		HostsDeleteCount:    0,
 		HostsDeletedCount:   0,

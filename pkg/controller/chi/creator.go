@@ -86,17 +86,17 @@ func (c *Controller) updateStatefulSet(
 
 		if len(diff.Added) > 0 {
 			// Something added
-			str += util.MessageDiffItemString("added spec items", "", diff.Added)
+			str += util.MessageDiffItemString("added spec items", "none", "", diff.Added)
 		}
 
 		if len(diff.Removed) > 0 {
 			// Something removed
-			str += util.MessageDiffItemString("removed spec items", "", diff.Removed)
+			str += util.MessageDiffItemString("removed spec items", "none", "", diff.Removed)
 		}
 
 		if len(diff.Modified) > 0 {
 			// Something modified
-			str += util.MessageDiffItemString("modified spec items", "", diff.Modified)
+			str += util.MessageDiffItemString("modified spec items", "none", "", diff.Modified)
 		}
 		log.V(1).M(host).F().Error("%s", str)
 

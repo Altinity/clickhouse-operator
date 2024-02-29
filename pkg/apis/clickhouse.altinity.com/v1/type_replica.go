@@ -39,6 +39,15 @@ func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 	return replica.CHI.GetServiceTemplate(name)
 }
 
+// HasShardsCount checks whether replica has shards count specified
+func (replica *ChiReplica) HasShardsCount() bool {
+	if replica == nil {
+		return false
+	}
+
+	return replica.ShardsCount > 0
+}
+
 // WalkHosts walks over hosts
 func (replica *ChiReplica) WalkHosts(f func(host *ChiHost) error) []error {
 	res := make([]error, 0)

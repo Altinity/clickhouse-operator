@@ -3,13 +3,22 @@
 # Build configuration options
 
 CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+# All sources root
 SRC_ROOT="$(realpath "${CUR_DIR}/..")"
 
+# Deploy manifests root
 MANIFESTS_ROOT="${SRC_ROOT}/deploy"
+# Executable commands sources root
 CMD_ROOT="${SRC_ROOT}/cmd"
+# Packages root
 PKG_ROOT="${SRC_ROOT}/pkg"
+# Local temp folder root
+LOCAL_TMP_ROOT="${SRC_ROOT}/tmp"
+# Place where generator should produce code. It will be copied afterwards
+GENERATOR_ROOT="${LOCAL_TMP_ROOT}/generator"
 
 REPO="github.com/altinity/clickhouse-operator"
+
 # 0.9.3
 VERSION=$(cd "${SRC_ROOT}"; cat release)
 # 885c3f7

@@ -128,9 +128,10 @@ func (m *macrosEngine) Map(_map map[string]string) map[string]string {
 		return m.newMapMacroReplacerShard().Replace(_map)
 	case m.host != nil:
 		return m.newMapMacroReplacerHost().Replace(_map)
-	}
-	return map[string]string{
-		"unknown scope": "unknown scope",
+	default:
+		return map[string]string{
+			"unknown scope": "unknown scope",
+		}
 	}
 }
 

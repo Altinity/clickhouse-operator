@@ -4,9 +4,6 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 source "${CUR_DIR}/dev-config.sh"
 
-echo "Create namespace to deploy the operator into: ${OPERATOR_NAMESPACE}"
-kubectl create namespace "${OPERATOR_NAMESPACE}"
-
 echo "Install operator requirements with the following options:"
 echo "OPERATOR_NAMESPACE=${OPERATOR_NAMESPACE}"
 echo "OPERATOR_VERSION=${OPERATOR_VERSION}"
@@ -17,6 +14,10 @@ echo "METRICS_EXPORTER_IMAGE=${METRICS_EXPORTER_IMAGE}"
 echo "METRICS_EXPORTER_IMAGE_PULL_POLICY=${METRICS_EXPORTER_IMAGE_PULL_POLICY}"
 echo "DEPLOY_OPERATOR=${DEPLOY_OPERATOR}"
 echo "MINIKUBE=${MINIKUBE}"
+echo "VERBOSITY=${VERBOSITY}"
+
+echo "Create namespace to deploy the operator into: ${OPERATOR_NAMESPACE}"
+kubectl create namespace "${OPERATOR_NAMESPACE}"
 
 echo "Deploy prerequisites - CRDs, RBACs, etc"
 kubectl -n "${OPERATOR_NAMESPACE}" apply -f <(                         \
@@ -30,18 +31,29 @@ kubectl -n "${OPERATOR_NAMESPACE}" apply -f <(                         \
 )
 
 if [[ "${MINIKUBE}" == "yes" ]]; then
+    echo "Preparing for minikube"
     case "${DEPLOY_OPERATOR}" in
         "dev")
-            echo "Build" && \
-            ${PROJECT_ROOT}/dev/image_build_all_dev.sh && \
-            echo "Load images into minikube" && \
-            minikube image load "${OPERATOR_IMAGE}" && \
-            minikube image load "${METRICS_EXPORTER_IMAGE}" && \
-            echo "Images prepared"
+            echo "Clean images in minikube"
+            echo "  1. ${OPERATOR_IMAGE}"
+            echo "  2. ${METRICS_EXPORTER_IMAGE}"
+            echo "Remove errors will be ignored."
+            minikube image rm "${OPERATOR_IMAGE}" > /dev/null 2>&1
+            minikube image rm "${METRICS_EXPORTER_IMAGE}" > /dev/null 2>&1
+
+            echo "Build images"
+            echo "VERBOSITY=${VERBOSITY} ${PROJECT_ROOT}/dev/image_build_all_dev.sh"
+            VERBOSITY="${VERBOSITY}" "${PROJECT_ROOT}/dev/image_build_all_dev.sh"
+            echo "Load images into minikube:"
+            echo "  1. ${OPERATOR_IMAGE}"
+            echo "  2. ${METRICS_EXPORTER_IMAGE}"
+            echo "Load images into minikube"
+            minikube image load "${OPERATOR_IMAGE}"
+            minikube image load "${METRICS_EXPORTER_IMAGE}"
+            echo "Images loaded"
             ;;
     esac
 fi
-
 
 echo "Deploy operator's deployment"
 case "${DEPLOY_OPERATOR}" in
@@ -60,7 +72,8 @@ case "${DEPLOY_OPERATOR}" in
             MANIFEST_PRINT_CRD="no"                                                    \
             MANIFEST_PRINT_RBAC_CLUSTERED="no"                                         \
             MANIFEST_PRINT_RBAC_NAMESPACED="no"                                        \
-            \
+            VERBOSITY="${VERBOSITY:-"1"}"                                              \
+                                                                                       \
             "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh"         \
         )
         ;;

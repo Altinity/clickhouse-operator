@@ -35,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -49,7 +50,7 @@ type worker struct {
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
 	normalizer *model.Normalizer
-	schemer    *model.ClusterSchemer
+	schemer    *schemer.ClusterSchemer
 	start      time.Time
 	task       task
 }
@@ -86,7 +87,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
 		normalizer: model.NewNormalizer(c.kubeClient),
-		schemer:    nil, //
+		schemer:    nil,
 		start:      start,
 	}
 }
@@ -122,7 +123,7 @@ func (w *worker) shouldForceRestartHost(host *api.ChiHost) bool {
 		return false
 	}
 
-	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame && !host.HasAncestor() {
+	if (host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame) && !host.HasAncestor() {
 		w.a.V(1).M(host).F().Info("Host already exists, but has no ancestor, no restart applicable. Host: %s", host.GetName())
 		return false
 	}
@@ -580,6 +581,10 @@ func (w *worker) logOldAndNew(name string, old, new *api.ClickHouseInstallation)
 func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInstallation) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
+		return
+	}
+	if chi.IsStopped() {
+		// No need to wait for stopped CHI
 		return
 	}
 	start := time.Now()
@@ -1318,13 +1323,13 @@ func (w *worker) updateService(
 		return nil
 	}
 
-	newService := targetService.DeepCopy()
-
-	if curService.Spec.Type != newService.Spec.Type {
+	if curService.Spec.Type != targetService.Spec.Type {
 		return fmt.Errorf("just recreate the service in case of service type change")
 	}
 
 	// Updating a Service is a complicated business
+
+	newService := targetService.DeepCopy()
 
 	// spec.resourceVersion is required in order to update an object
 	newService.ResourceVersion = curService.ResourceVersion
@@ -1347,11 +1352,14 @@ func (w *worker) updateService(
 	// or else creation of the service will fail.
 	// Default is to auto-allocate a port if the ServiceType of this Service requires one.
 	// More info: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
-	if ((curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)) ||
-		((curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)) {
-		// !!! IMPORTANT !!!
-		// No changes in service type is allowed.
-		// Already exposed port details can not be changed.
+
+	// !!! IMPORTANT !!!
+	// No changes in service type is allowed.
+	// Already exposed port details can not be changed.
+
+	serviceTypeIsNodePort := (curService.Spec.Type == core.ServiceTypeNodePort) && (newService.Spec.Type == core.ServiceTypeNodePort)
+	serviceTypeIsLoadBalancer := (curService.Spec.Type == core.ServiceTypeLoadBalancer) && (newService.Spec.Type == core.ServiceTypeLoadBalancer)
+	if serviceTypeIsNodePort || serviceTypeIsLoadBalancer {
 		for i := range newService.Spec.Ports {
 			newPort := &newService.Spec.Ports[i]
 			for j := range curService.Spec.Ports {
@@ -1373,8 +1381,9 @@ func (w *worker) updateService(
 	// spec.healthCheckNodePort field is used with ExternalTrafficPolicy=Local only and is immutable within ExternalTrafficPolicy=Local
 	// In case ExternalTrafficPolicy is changed it seems to be irrelevant
 	// https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/#preserving-the-client-source-ip
-	if (curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) &&
-		(newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal) {
+	curExternalTrafficPolicyTypeLocal := curService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal
+	newExternalTrafficPolicyTypeLocal := newService.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal
+	if curExternalTrafficPolicyTypeLocal && newExternalTrafficPolicyTypeLocal {
 		newService.Spec.HealthCheckNodePort = curService.Spec.HealthCheckNodePort
 	}
 
@@ -1483,7 +1492,7 @@ func (w *worker) getStatefulSetStatus(host *api.ChiHost) api.ObjectStatus {
 		// However, it may be just deleted
 		w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found. Either new one or deleted for %s/%s", meta.Namespace, meta.Name)
 		if host.IsNewOne() {
-			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is new one. New one for %s/%s", meta.Namespace, meta.Name)
+			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is a new one. New one for %s/%s", meta.Namespace, meta.Name)
 			return api.ObjectStatusNew
 		}
 		w.a.V(1).M(meta).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for %s/%s", meta.Namespace, meta.Name)
@@ -1530,7 +1539,7 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.ObjectMeta) api.
 }
 
 // createStatefulSet
-func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1549,12 +1558,14 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost) error
 
 	action := w.c.createStatefulSet(ctx, host)
 
-	host.CHI.EnsureStatus().HostAdded()
-	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
-			MainFields: true,
-		},
-	})
+	if register {
+		host.CHI.EnsureStatus().HostAdded()
+		_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+				MainFields: true,
+			},
+		})
+	}
 
 	switch action {
 	case nil:
@@ -1631,7 +1642,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.ChiHost
 }
 
 // updateStatefulSet
-func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1665,12 +1676,14 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error
 
 	switch action {
 	case nil:
-		host.CHI.EnsureStatus().HostUpdated()
-		_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
-				MainFields: true,
-			},
-		})
+		if register {
+			host.CHI.EnsureStatus().HostUpdated()
+			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+					MainFields: true,
+				},
+			})
+		}
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 			WithStatusAction(host.CHI).
@@ -1689,7 +1702,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
 		w.dumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
-		return w.recreateStatefulSet(ctx, host)
+		return w.recreateStatefulSet(ctx, host, register)
 	case errCRUDUnexpectedFlow:
 		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
 		return nil
@@ -1700,7 +1713,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error
 }
 
 // recreateStatefulSet
-func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1708,7 +1721,7 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost) err
 
 	_ = w.c.deleteStatefulSet(ctx, host)
 	_ = w.reconcilePVCs(ctx, host, api.DesiredStatefulSet)
-	return w.createStatefulSet(ctx, host)
+	return w.createStatefulSet(ctx, host, register)
 }
 
 // applyPVCResourcesRequests
@@ -1777,7 +1790,7 @@ func (w *worker) applyResource(
 	return true
 }
 
-func (w *worker) ensureClusterSchemer(host *api.ChiHost) *model.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(host *api.ChiHost) *schemer.ClusterSchemer {
 	if w == nil {
 		return nil
 	}
@@ -1799,7 +1812,7 @@ func (w *worker) ensureClusterSchemer(host *api.ChiHost) *model.ClusterSchemer {
 	case api.ChSchemeHTTPS:
 		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
-	w.schemer = model.NewClusterSchemer(clusterConnectionParams)
+	w.schemer = schemer.NewClusterSchemer(clusterConnectionParams, host.Version)
 
 	return w.schemer
 }

@@ -302,10 +302,32 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.ChiHost) 
 
 const unknownVersion = "failed to query"
 
+type versionOptions struct {
+	skipNew             bool
+	skipStopped         bool
+	skipStoppedAncestor bool
+}
+
+func (opts versionOptions) shouldSkip(host *api.ChiHost) (bool, string) {
+	if opts.skipNew && (host.IsNewOne()) {
+		return true, "host is a new one, version is not not applicable"
+	}
+
+	if opts.skipStopped && host.IsStopped() {
+		return true, "host is stopped, version is not applicable"
+	}
+
+	if opts.skipStoppedAncestor && host.GetAncestor().IsStopped() {
+		return true, "host ancestor is stopped, version is not applicable"
+	}
+
+	return false, ""
+}
+
 // getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost, skipNewHost bool) (string, error) {
-	if skipNewHost && (host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew) {
-		return "not applicable", nil
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost, opts versionOptions) (string, error) {
+	if skip, description := opts.shouldSkip(host); skip {
+		return description, nil
 	}
 
 	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
@@ -327,7 +349,7 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Chi
 		nil,
 		func(_ctx context.Context, _host *api.ChiHost) bool {
 			var e error
-			version, e = w.getHostClickHouseVersion(_ctx, _host, false)
+			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{skipStopped: true})
 			if e == nil {
 				return true
 			}
@@ -374,7 +396,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version, _ := w.getHostClickHouseVersion(ctx, host, true)
+	version, _ := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true})
 	host.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
 	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.GetName(), version)
@@ -383,7 +405,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	if w.shouldForceRestartHost(host) {
 		w.a.V(1).M(host).F().Info("Reconcile host %s. Shutting host down due to force restart", host.GetName())
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
-		_ = w.reconcileStatefulSet(ctx, host)
+		_ = w.reconcileStatefulSet(ctx, host, false)
 		metricsHostReconcilesRestart(ctx)
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
@@ -392,7 +414,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host %s. Reconcile StatefulSet", host.GetName())
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
-	err := w.reconcileStatefulSet(ctx, host, opts...)
+	err := w.reconcileStatefulSet(ctx, host, true, opts...)
 	if err == nil {
 		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
@@ -401,7 +423,15 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 			// Pretend nothing happened in case of ignore
 			err = nil
 		}
+
+		host.CHI.EnsureStatus().HostFailed()
+		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			M(host).F().
+			Error("FAILED to reconcile StatefulSet for host ", host.GetName())
 	}
+
 	return err
 }
 
@@ -636,7 +666,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	}
 
 	// Check whether ClickHouse is running and accessible and what version is available
-	if version, err := w.getHostClickHouseVersion(ctx, host, true); err == nil {
+	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
 		w.a.V(1).
 			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
 			WithStatusAction(host.GetCHI()).
@@ -742,21 +772,25 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
 
-	var (
-		hostsCompleted int
-		hostsCount     int
-	)
-
+	now := time.Now()
+	hostsCompleted := 0
+	hostsCount := 0
+	host.CHI.EnsureStatus().HostCompleted()
 	if host.CHI != nil && host.CHI.Status != nil {
 		hostsCompleted = host.CHI.Status.GetHostsCompletedCount()
 		hostsCount = host.CHI.Status.GetHostsCount()
 	}
-
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
 		WithStatusAction(host.CHI).
 		M(host).F().
-		Info("%s: %d of %d", eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+		Info("[now: %s] %s: %d of %d", now, eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+
+	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+			MainFields: true,
+		},
+	})
 
 	metricsHostReconcilesCompleted(ctx)
 	metricsHostReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
@@ -918,9 +952,9 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 	} else {
 		w.a.V(1).Info(
 			"StatefulSet.Spec ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-			util.MessageDiffItemString("added .spec items", "", diff.Added),
-			util.MessageDiffItemString("modified .spec items", "", diff.Modified),
-			util.MessageDiffItemString("removed .spec items", "", diff.Removed),
+			util.MessageDiffItemString("added .spec items", "none", "", diff.Added),
+			util.MessageDiffItemString("modified .spec items", "none", "", diff.Modified),
+			util.MessageDiffItemString("removed .spec items", "none", "", diff.Removed),
 		)
 	}
 	if diff, equal := messagediff.DeepDiff(cur.Labels, new.Labels); equal {
@@ -929,9 +963,9 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 		if len(cur.Labels)+len(new.Labels) > 0 {
 			w.a.V(1).Info(
 				"StatefulSet.Labels ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-				util.MessageDiffItemString("added .labels items", "", diff.Added),
-				util.MessageDiffItemString("modified .labels items", "", diff.Modified),
-				util.MessageDiffItemString("removed .labels items", "", diff.Removed),
+				util.MessageDiffItemString("added .labels items", "none", "", diff.Added),
+				util.MessageDiffItemString("modified .labels items", "none", "", diff.Modified),
+				util.MessageDiffItemString("removed .labels items", "none", "", diff.Removed),
 			)
 		}
 	}
@@ -941,16 +975,21 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 		if len(cur.Annotations)+len(new.Annotations) > 0 {
 			w.a.V(1).Info(
 				"StatefulSet.Annotations ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-				util.MessageDiffItemString("added .annotations items", "", diff.Added),
-				util.MessageDiffItemString("modified .annotations items", "", diff.Modified),
-				util.MessageDiffItemString("removed .annotations items", "", diff.Removed),
+				util.MessageDiffItemString("added .annotations items", "none", "", diff.Added),
+				util.MessageDiffItemString("modified .annotations items", "none", "", diff.Modified),
+				util.MessageDiffItemString("removed .annotations items", "none", "", diff.Removed),
 			)
 		}
 	}
 }
 
 // reconcileStatefulSet reconciles StatefulSet of a host
-func (w *worker) reconcileStatefulSet(ctx context.Context, host *api.ChiHost, opts ...*reconcileHostStatefulSetOptions) error {
+func (w *worker) reconcileStatefulSet(
+	ctx context.Context,
+	host *api.ChiHost,
+	register bool,
+	opts ...*reconcileHostStatefulSetOptions,
+) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -962,18 +1001,24 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *api.ChiHost, op
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
-		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
-		host.CHI.EnsureStatus().HostUnchanged()
+		w.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		if register {
+			host.CHI.EnsureStatus().HostUnchanged()
+			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+					MainFields: true,
+				},
+			})
+		}
 		return nil
 	}
 
 	// Check whether this object already exists in k8s
-	var err error
 	host.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	// Report diff to trace
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
-		w.a.V(1).M(host).F().Info("Modified StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		w.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
 		w.dumpStatefulSetDiff(host, host.CurStatefulSet, newStatefulSet)
 	}
 
@@ -981,24 +1026,15 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *api.ChiHost, op
 	switch {
 	case opt.ForceRecreate():
 		// Force recreate prevails over all other requests
-		w.recreateStatefulSet(ctx, host)
+		w.recreateStatefulSet(ctx, host, register)
 	default:
 		// We have (or had in the past) StatefulSet - try to update|recreate it
-		err = w.updateStatefulSet(ctx, host)
+		err = w.updateStatefulSet(ctx, host, register)
 	}
 
 	if apiErrors.IsNotFound(err) {
 		// StatefulSet not found - even during Update process - try to create it
-		err = w.createStatefulSet(ctx, host)
-	}
-
-	if err != nil {
-		host.CHI.EnsureStatus().HostFailed()
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			M(host).F().
-			Error("FAILED to reconcile StatefulSet: %s CHI: %s ", newStatefulSet.Name, host.CHI.Name)
+		err = w.createStatefulSet(ctx, host, register)
 	}
 
 	// Host has to know current StatefulSet and Pod

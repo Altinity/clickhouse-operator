@@ -50,14 +50,14 @@ EOF
         echo -n "" > "${dst}"
     fi
     # Render file body
-    cat "${src}" | \
-        WATCH_NAMESPACES="${WATCH_NAMESPACES:-""}" \
-        CH_USERNAME_PLAIN="${CH_USERNAME_PLAIN:-""}" \
-        CH_PASSWORD_PLAIN="${CH_PASSWORD_PLAIN:-""}" \
-        CH_CREDENTIALS_SECRET_NAMESPACE="${CH_CREDENTIALS_SECRET_NAMESPACE:-""}" \
+    cat "${src}" |                                                                        \
+        WATCH_NAMESPACES="${WATCH_NAMESPACES:-""}"                                        \
+        CH_USERNAME_PLAIN="${CH_USERNAME_PLAIN:-""}"                                      \
+        CH_PASSWORD_PLAIN="${CH_PASSWORD_PLAIN:-""}"                                      \
+        CH_CREDENTIALS_SECRET_NAMESPACE="${CH_CREDENTIALS_SECRET_NAMESPACE:-""}"          \
         CH_CREDENTIALS_SECRET_NAME="${CH_CREDENTIALS_SECRET_NAME:-"clickhouse-operator"}" \
-        VERBOSITY="${VERBOSITY:-"1"}" \
-        envsubst \
+        VERBOSITY="${VERBOSITY:-"1"}"                                                     \
+        envsubst                                                                          \
         >> "${dst}"
 }
 

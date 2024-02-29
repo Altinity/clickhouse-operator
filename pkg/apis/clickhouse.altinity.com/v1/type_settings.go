@@ -50,7 +50,7 @@ type Settings struct {
 	m map[string]*Setting
 	// converter is an interface to describe different converters.
 	// Implements 'Strategy' pattern.
-	converter SettingsName2KeyConverter
+	converter SettingsName2KeyConverter `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // NewSettings creates new settings
