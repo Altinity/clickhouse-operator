@@ -405,7 +405,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	if w.shouldForceRestartHost(host) {
 		w.a.V(1).M(host).F().Info("Reconcile host %s. Shutting host down due to force restart", host.GetName())
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
-		_ = w.reconcileStatefulSet(ctx, host)
+		_ = w.reconcileStatefulSet(ctx, host, false)
 		metricsHostReconcilesRestart(ctx)
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
@@ -414,7 +414,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host %s. Reconcile StatefulSet", host.GetName())
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
-	err := w.reconcileStatefulSet(ctx, host, opts...)
+	err := w.reconcileStatefulSet(ctx, host, true, opts...)
 	if err == nil {
 		w.task.registryReconciled.RegisterStatefulSet(host.DesiredStatefulSet.ObjectMeta)
 	} else {
@@ -423,7 +423,15 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 			// Pretend nothing happened in case of ignore
 			err = nil
 		}
+
+		host.CHI.EnsureStatus().HostFailed()
+		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.CHI).
+			WithStatusError(host.CHI).
+			M(host).F().
+			Error("FAILED to reconcile StatefulSet for host ", host.GetName())
 	}
+
 	return err
 }
 
@@ -764,22 +772,25 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
 
-	var (
-		hostsCompleted int
-		hostsCount     int
-	)
-
+	now := time.Now()
+	hostsCompleted := 0
+	hostsCount := 0
+	host.CHI.EnsureStatus().HostCompleted()
 	if host.CHI != nil && host.CHI.Status != nil {
 		hostsCompleted = host.CHI.Status.GetHostsCompletedCount()
 		hostsCount = host.CHI.Status.GetHostsCount()
 	}
-
-	now := time.Now()
 	w.a.V(1).
 		WithEvent(host.CHI, eventActionProgress, eventReasonProgressHostsCompleted).
 		WithStatusAction(host.CHI).
 		M(host).F().
 		Info("[now: %s] %s: %d of %d", now, eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+
+	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+			MainFields: true,
+		},
+	})
 
 	metricsHostReconcilesCompleted(ctx)
 	metricsHostReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
@@ -973,7 +984,12 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 }
 
 // reconcileStatefulSet reconciles StatefulSet of a host
-func (w *worker) reconcileStatefulSet(ctx context.Context, host *api.ChiHost, opts ...*reconcileHostStatefulSetOptions) error {
+func (w *worker) reconcileStatefulSet(
+	ctx context.Context,
+	host *api.ChiHost,
+	register bool,
+	opts ...*reconcileHostStatefulSetOptions,
+) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -985,18 +1001,24 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *api.ChiHost, op
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
 
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
-		defer w.a.V(2).M(host).F().Info("no need to reconcile the same StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
-		host.CHI.EnsureStatus().HostUnchanged()
+		w.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		if register {
+			host.CHI.EnsureStatus().HostUnchanged()
+			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+					MainFields: true,
+				},
+			})
+		}
 		return nil
 	}
 
 	// Check whether this object already exists in k8s
-	var err error
 	host.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
 
 	// Report diff to trace
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
-		w.a.V(1).M(host).F().Info("Modified StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		w.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
 		w.dumpStatefulSetDiff(host, host.CurStatefulSet, newStatefulSet)
 	}
 
@@ -1004,24 +1026,15 @@ func (w *worker) reconcileStatefulSet(ctx context.Context, host *api.ChiHost, op
 	switch {
 	case opt.ForceRecreate():
 		// Force recreate prevails over all other requests
-		w.recreateStatefulSet(ctx, host)
+		w.recreateStatefulSet(ctx, host, register)
 	default:
 		// We have (or had in the past) StatefulSet - try to update|recreate it
-		err = w.updateStatefulSet(ctx, host)
+		err = w.updateStatefulSet(ctx, host, register)
 	}
 
 	if apiErrors.IsNotFound(err) {
 		// StatefulSet not found - even during Update process - try to create it
-		err = w.createStatefulSet(ctx, host)
-	}
-
-	if err != nil {
-		host.CHI.EnsureStatus().HostFailed()
-		w.a.WithEvent(host.CHI, eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.CHI).
-			WithStatusError(host.CHI).
-			M(host).F().
-			Error("FAILED to reconcile StatefulSet: %s CHI: %s ", newStatefulSet.Name, host.CHI.Name)
+		err = w.createStatefulSet(ctx, host, register)
 	}
 
 	// Host has to know current StatefulSet and Pod

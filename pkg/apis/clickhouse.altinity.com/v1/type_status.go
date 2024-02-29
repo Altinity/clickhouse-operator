@@ -97,6 +97,7 @@ type FillStatusParams struct {
 	TaskID              string
 	HostsUpdatedCount   int
 	HostsAddedCount     int
+	HostsUnchangedCount int
 	HostsCompletedCount int
 	HostsDeleteCount    int
 	HostsDeletedCount   int
@@ -124,6 +125,7 @@ func (s *ChiStatus) Fill(params *FillStatusParams) {
 		s.TaskID = params.TaskID
 		s.HostsUpdatedCount = params.HostsUpdatedCount
 		s.HostsAddedCount = params.HostsAddedCount
+		s.HostsUnchangedCount = params.HostsUnchangedCount
 		s.HostsCompletedCount = params.HostsCompletedCount
 		s.HostsDeleteCount = params.HostsDeleteCount
 		s.HostsDeletedCount = params.HostsDeletedCount
@@ -239,7 +241,6 @@ func (s *ChiStatus) HostDeleted() {
 func (s *ChiStatus) HostUpdated() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsUpdatedCount++
-		s.HostsCompletedCount++
 	})
 }
 
@@ -247,7 +248,6 @@ func (s *ChiStatus) HostUpdated() {
 func (s *ChiStatus) HostAdded() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsAddedCount++
-		s.HostsCompletedCount++
 	})
 }
 
@@ -255,7 +255,6 @@ func (s *ChiStatus) HostAdded() {
 func (s *ChiStatus) HostUnchanged() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsUnchangedCount++
-		s.HostsCompletedCount++
 	})
 }
 
@@ -263,6 +262,12 @@ func (s *ChiStatus) HostUnchanged() {
 func (s *ChiStatus) HostFailed() {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsFailedCount++
+	})
+}
+
+// HostCompleted increments completed hosts counter
+func (s *ChiStatus) HostCompleted() {
+	doWithWriteLock(s, func(s *ChiStatus) {
 		s.HostsCompletedCount++
 	})
 }
@@ -276,6 +281,7 @@ func (s *ChiStatus) ReconcileStart(deleteHostsCount int) {
 		s.Status = StatusInProgress
 		s.HostsUpdatedCount = 0
 		s.HostsAddedCount = 0
+		s.HostsUnchangedCount = 0
 		s.HostsCompletedCount = 0
 		s.HostsDeletedCount = 0
 		s.HostsDeleteCount = deleteHostsCount
@@ -316,6 +322,7 @@ func (s *ChiStatus) DeleteStart() {
 		s.Status = StatusTerminating
 		s.HostsUpdatedCount = 0
 		s.HostsAddedCount = 0
+		s.HostsUnchangedCount = 0
 		s.HostsCompletedCount = 0
 		s.HostsDeletedCount = 0
 		s.HostsDeleteCount = 0
@@ -377,6 +384,7 @@ func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyCHIStatusOptions) {
 				s.Errors = from.Errors
 				s.HostsUpdatedCount = from.HostsUpdatedCount
 				s.HostsAddedCount = from.HostsAddedCount
+				s.HostsUnchangedCount = from.HostsUnchangedCount
 				s.HostsCompletedCount = from.HostsCompletedCount
 				s.HostsDeletedCount = from.HostsDeletedCount
 				s.HostsDeleteCount = from.HostsDeleteCount
@@ -410,6 +418,7 @@ func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyCHIStatusOptions) {
 				s.Errors = from.Errors
 				s.HostsUpdatedCount = from.HostsUpdatedCount
 				s.HostsAddedCount = from.HostsAddedCount
+				s.HostsUnchangedCount = from.HostsUnchangedCount
 				s.HostsCompletedCount = from.HostsCompletedCount
 				s.HostsDeletedCount = from.HostsDeletedCount
 				s.HostsDeleteCount = from.HostsDeleteCount

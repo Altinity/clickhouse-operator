@@ -1492,7 +1492,7 @@ func (w *worker) getStatefulSetStatus(host *api.ChiHost) api.ObjectStatus {
 		// However, it may be just deleted
 		w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found. Either new one or deleted for %s/%s", meta.Namespace, meta.Name)
 		if host.IsNewOne() {
-			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is new one. New one for %s/%s", meta.Namespace, meta.Name)
+			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is a new one. New one for %s/%s", meta.Namespace, meta.Name)
 			return api.ObjectStatusNew
 		}
 		w.a.V(1).M(meta).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for %s/%s", meta.Namespace, meta.Name)
@@ -1539,7 +1539,7 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.ObjectMeta) api.
 }
 
 // createStatefulSet
-func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1558,12 +1558,14 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost) error
 
 	action := w.c.createStatefulSet(ctx, host)
 
-	host.CHI.EnsureStatus().HostAdded()
-	_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
-			MainFields: true,
-		},
-	})
+	if register {
+		host.CHI.EnsureStatus().HostAdded()
+		_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+				MainFields: true,
+			},
+		})
+	}
 
 	switch action {
 	case nil:
@@ -1640,7 +1642,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.ChiHost
 }
 
 // updateStatefulSet
-func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1674,12 +1676,14 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error
 
 	switch action {
 	case nil:
-		host.CHI.EnsureStatus().HostUpdated()
-		_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
-			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
-				MainFields: true,
-			},
-		})
+		if register {
+			host.CHI.EnsureStatus().HostUpdated()
+			_ = w.c.updateCHIObjectStatus(ctx, host.CHI, UpdateCHIStatusOptions{
+				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+					MainFields: true,
+				},
+			})
+		}
 		w.a.V(1).
 			WithEvent(host.CHI, eventActionUpdate, eventReasonUpdateCompleted).
 			WithStatusAction(host.CHI).
@@ -1698,7 +1702,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
 		w.dumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
-		return w.recreateStatefulSet(ctx, host)
+		return w.recreateStatefulSet(ctx, host, register)
 	case errCRUDUnexpectedFlow:
 		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
 		return nil
@@ -1709,7 +1713,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost) error
 }
 
 // recreateStatefulSet
-func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1717,7 +1721,7 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost) err
 
 	_ = w.c.deleteStatefulSet(ctx, host)
 	_ = w.reconcilePVCs(ctx, host, api.DesiredStatefulSet)
-	return w.createStatefulSet(ctx, host)
+	return w.createStatefulSet(ctx, host, register)
 }
 
 // applyPVCResourcesRequests
