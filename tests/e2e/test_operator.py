@@ -1409,11 +1409,12 @@ def test_014_0(self):
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)",
-        "CREATE DATABASE test_s3_014 ON CLUSTER '{cluster}' Engine = S3('s3://aws-public-blockchain/v1.0/btc/', 'NOSIGN')",
     ]
 
-    test_replicated_db = 0
-    if test_replicated_db:
+    chi_version = clickhouse.query(chi_name, "select value from system.build_options where name='VERSION_INTEGER'")
+    print(f"ClickHouse version is {chi_version}")
+    if int(chi_version) > 23000000:
+        print("Adding more schema objects")
         schema_objects = schema_objects + [
             "test_replicated_014"
         ]
@@ -1421,6 +1422,7 @@ def test_014_0(self):
             "test_replicated_014.test_replicated_014"
         ]
         create_ddls = create_ddls + [
+            "CREATE DATABASE test_s3_014 ON CLUSTER '{cluster}' Engine = S3('s3://aws-public-blockchain/v1.0/btc/', 'NOSIGN')",
             "CREATE DATABASE test_replicated_014 ON CLUSTER '{cluster}' Engine = Replicated('clickhouse/replicated/test_replicated_014', '{shard}', '{replica}')",
             "CREATE TABLE test_replicated_014.test_replicated_014 (a Int8) Engine = ReplicatedMergeTree ORDER BY tuple()",
         ]
@@ -1476,12 +1478,13 @@ def test_014_0(self):
                 )
                 assert out == "Atomic"
 
-                out = clickhouse.query(
-                    chi_name,
-                    f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
-                    host=host,
-                )
-                assert out == "S3"
+                if "test_s3_014" in create_ddls:
+                    out = clickhouse.query(
+                        chi_name,
+                        f"SELECT engine FROM system.databases WHERE name = 'test_s3_014'",
+                        host=host,
+                        )
+                    assert out == "S3"
 
                 print("Checking functions")
                 out = clickhouse.query(

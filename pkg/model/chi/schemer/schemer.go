@@ -50,8 +50,10 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.ChiHost) 
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.ChiHost) error {
-	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", chi.CreateInstanceHostname(hostToDrop), hostToRunOn.Address.HostName)
-	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(chi.CreateInstanceHostname(hostToDrop)), clickhouse.NewQueryOptions().SetRetry(false))
+	replica := chi.CreateInstanceHostname(hostToDrop)
+	shard := hostToRunOn.Address.ShardIndex
+	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Address.HostName)
+	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica), clickhouse.NewQueryOptions().SetRetry(false))
 }
 
 // createTablesSQLs makes all SQL for migrating tables

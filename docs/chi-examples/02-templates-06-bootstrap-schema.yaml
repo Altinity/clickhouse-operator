@@ -7,15 +7,15 @@ data:
     #!/bin/bash
     set -e
     clickhouse client -n <<-EOSQL
-      CREATE DATABASE users;
-      CREATE DATABASE analytics;
-      CREATE DATABASE flowers;
+      CREATE DATABASE IF NOT EXISTS users;
+      CREATE DATABASE IF NOT EXISTS analytics;
+      CREATE DATABASE  IF NOT EXISTS flowers;
     EOSQL
   02_create_table.sh: |
     #!/bin/bash
     set -e
     clickhouse client -n <<-EOSQL
-      CREATE TABLE users.logs (x Int32) ENGINE = Log;
+      CREATE TABLE IF NOT EXISTS users.logs (x Int32) ENGINE = MergeTree() ORDER BY tuple();
     EOSQL
 ---
 apiVersion: "clickhouse.altinity.com/v1"
@@ -41,7 +41,10 @@ spec:
         spec:
           containers:
             - name: clickhouse
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:latest
+              env:
+                - name: CLICKHOUSE_ALWAYS_RUN_INITDB_SCRIPTS
+                  value: "true"
               volumeMounts:
                 - name: bootstrap-configmap-volume
                   mountPath: /docker-entrypoint-initdb.d
