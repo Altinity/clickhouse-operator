@@ -27,11 +27,14 @@ ARCHITECTURE=$(uname -m)
 # Do nothing if architecture is arm，such as MacOS M1/M2
 
 # We may need to install qemu
-if [[ ! "${ARCHITECTURE}" =~ "arm" ]]; then
+if [[ "${ARCHITECTURE}" =~ "arm" ]]; then
+    echo "arm host does not need qemu to be installed"
+else
+    echo "need qemu to be installed"
     if docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
         echo "qemu is in place, continue."
     else
-        echo "qemu is not available, nee to install."
+        echo "qemu is not available, need to install."
         sudo apt-get install -y qemu binfmt-support qemu-user-static
         if docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
             echo "qemu installed and available, continue."
@@ -44,11 +47,11 @@ if [[ ! "${ARCHITECTURE}" =~ "arm" ]]; then
 fi
 
 if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive') ]]; then
-    echo "Looks like there is no appropriate builderx instance available."
-    echo "Create a new builder instance."
+    echo "Looks like there is no appropriate buildx instance available."
+    echo "Create a new buildx instance."
     docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
 else
-    echo "Looks like there is an appropriate builderx instance available."
+    echo "Looks like there is an appropriate buildx instance available."
 fi
 
 #
@@ -57,7 +60,6 @@ fi
 
 # Base docker build command
 DOCKER_CMD="docker buildx build --progress plain"
-
 
 # Append arch
 if [[ "${DOCKER_IMAGE}" =~ ":dev" || "${MINIKUBE}" == "yes" ]]; then
