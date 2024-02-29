@@ -230,14 +230,10 @@ func (s *ClusterSchemer) sqlCreateFunction(cluster string) string {
 }
 
 func (s *ClusterSchemer) sqlDropReplica(shard int, replica string) []string {
-	dropReplica := fmt.Sprintf("SYSTEM DROP REPLICA '%s'", replica)
-	dropDatabaseReplica := fmt.Sprintf("SYSTEM DROP DATABASE REPLICA '%d|%s'", shard, replica)
-	return []string{dropReplica, dropDatabaseReplica}
-	/* if s.version.Matches(">= 23.1") {
-		return []string{dropReplica, dropDatabaseReplica}
-	} else {
-		return []string{dropReplica}
-	}*/
+	return []string{
+		fmt.Sprintf("SYSTEM DROP REPLICA '%s'", replica),
+		fmt.Sprintf("SYSTEM DROP DATABASE REPLICA '%d|%s'", shard, replica),
+	}
 }
 
 func (s *ClusterSchemer) sqlDropDNSCache() string {
