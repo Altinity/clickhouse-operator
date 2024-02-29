@@ -60,6 +60,11 @@ spec:
           type: string
           description: CHI status
           jsonPath: .status.status
+        - name: hosts-unchanged
+          type: integer
+          description: Unchanged hosts count
+          priority: 1 # show in wide view
+          jsonPath: .status.hostsUnchanged
         - name: hosts-updated
           type: integer
           description: Updated hosts count
@@ -183,6 +188,10 @@ spec:
                   nullable: true
                   items:
                     type: string
+                hostsUnchanged:
+                  type: integer
+                  minimum: 0
+                  description: "Unchanged Hosts count"
                 hostsUpdated:
                   type: integer
                   minimum: 0
@@ -1277,6 +1286,11 @@ spec:
           type: string
           description: CHI status
           jsonPath: .status.status
+        - name: hosts-unchanged
+          type: integer
+          description: Unchanged hosts count
+          priority: 1 # show in wide view
+          jsonPath: .status.hostsUnchanged
         - name: hosts-updated
           type: integer
           description: Updated hosts count
@@ -1400,6 +1414,10 @@ spec:
                   nullable: true
                   items:
                     type: string
+                hostsUnchanged:
+                  type: integer
+                  minimum: 0
+                  description: "Unchanged Hosts count"
                 hostsUpdated:
                   type: integer
                   minimum: 0
