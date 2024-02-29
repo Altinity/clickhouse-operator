@@ -196,8 +196,8 @@ func (s *ClusterSchemer) sqlCreateTableReplicated(cluster string) string {
 		SELECT
 			DISTINCT name,
 			replaceRegexpOne(create_table_query, 'CREATE (TABLE|VIEW|MATERIALIZED VIEW|DICTIONARY|LIVE VIEW|WINDOW VIEW)', 'CREATE \\1 IF NOT EXISTS'),
-			extract(create_table_query, 'UUID \'([^\(\']*)') as uuid,
-			extract(create_table_query, 'INNER UUID \'([^\(\']*)') as inner_uuid
+			extract(create_table_query, 'UUID \'([^\(\']*)') AS uuid,
+			extract(create_table_query, 'INNER UUID \'([^\(\']*)') AS inner_uuid
 		FROM
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
