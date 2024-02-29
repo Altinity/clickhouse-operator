@@ -41,15 +41,15 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
             minikube image rm "${OPERATOR_IMAGE}" > /dev/null 2>&1
             minikube image rm "${METRICS_EXPORTER_IMAGE}" > /dev/null 2>&1
 
-            echo "Build images"                             && \
-            VERBOSITY="${VERBOSITY}"                           \
-                ${PROJECT_ROOT}/dev/image_build_all_dev.sh  && \
-            echo "Load images into minikube:"               && \
-            echo "  1. ${OPERATOR_IMAGE}"                   && \
-            echo "  2. ${METRICS_EXPORTER_IMAGE}"           && \
-            echo "Load images into minikube"                && \
-            minikube image load "${OPERATOR_IMAGE}"         && \
-            minikube image load "${METRICS_EXPORTER_IMAGE}" && \
+            echo "Build images"
+            echo "VERBOSITY=${VERBOSITY} ${PROJECT_ROOT}/dev/image_build_all_dev.sh"
+            VERBOSITY="${VERBOSITY}" "${PROJECT_ROOT}/dev/image_build_all_dev.sh"
+            echo "Load images into minikube:"
+            echo "  1. ${OPERATOR_IMAGE}"
+            echo "  2. ${METRICS_EXPORTER_IMAGE}"
+            echo "Load images into minikube"
+            minikube image load "${OPERATOR_IMAGE}"
+            minikube image load "${METRICS_EXPORTER_IMAGE}"
             echo "Images loaded"
             ;;
     esac
@@ -72,6 +72,7 @@ case "${DEPLOY_OPERATOR}" in
             MANIFEST_PRINT_CRD="no"                                                    \
             MANIFEST_PRINT_RBAC_CLUSTERED="no"                                         \
             MANIFEST_PRINT_RBAC_NAMESPACED="no"                                        \
+            VERBOSITY="${VERBOSITY:-"1"}"                                              \
                                                                                        \
             "${MANIFEST_ROOT}/builder/cat-clickhouse-operator-install-yaml.sh"         \
         )
