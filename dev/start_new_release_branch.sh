@@ -16,9 +16,9 @@ increment_version() {
     local array=($(echo "${version}" | tr "${delimiter}" '\n'))
 
     array[${what}]=$((array[${what}]+1))
-    if [ ${what} -lt 2 ]; then array[2]=0; fi
-    if [ ${what} -lt 1 ]; then array[1]=0; fi
-    echo $(local IFS=${delimiter} ; echo "${array[*]}")
+    if [[ ${what} -lt 2 ]]; then array[2]=0; fi
+    if [[ ${what} -lt 1 ]]; then array[1]=0; fi
+    echo $(local IFS=${delimiter}; echo "${array[*]}")
 }
 
 # Source configuration
@@ -26,13 +26,16 @@ CUR_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source "${CUR_DIR}/go_build_config.sh"
 
 CUR_RELEASE=$(cat "${SRC_ROOT}/release")
+NEW_RELEASE_MAJOR=$(increment_version "${CUR_RELEASE}" 0)
+NEW_RELEASE_MINOR=$(increment_version "${CUR_RELEASE}" 1)
+NEW_RELEASE_PATCH=$(increment_version "${CUR_RELEASE}" 2)
 echo "Starting new release."
 echo "Current release: ${CUR_RELEASE}"
 echo "What would you like to start. Possible options:"
-echo "  1 - new major version"
-echo "  2 - new minor version"
-echo "  3 - new patch version"
-echo "  x.y.z - in case you'd like to start something completely new just write your preferred version"
+echo "  1     - new MAJOR version: ${NEW_RELEASE_MAJOR}"
+echo "  2     - new MINOR version: ${NEW_RELEASE_MINOR}"
+echo "  3     - new PATCH version: ${NEW_RELEASE_PATCH}"
+echo "  x.y.z - in case you'd like to start something completely different just write required version"
 echo -n "Enter command choice (1, 2, 3) or custom release (x.y.z): "
 read COMMAND
 # Trim EOL from the command received
@@ -42,15 +45,15 @@ echo -n "Which means we are going to "
 
 case "${COMMAND}" in
     "1")
-        NEW_RELEASE=$(increment_version "${CUR_RELEASE}" 0)
+        NEW_RELEASE="${NEW_RELEASE_MAJOR}"
         echo "start new MAJOR release: ${NEW_RELEASE}"
         ;;
     "2")
-        NEW_RELEASE=$(increment_version "${CUR_RELEASE}" 1)
+        NEW_RELEASE="${NEW_RELEASE_MINOR}"
         echo "start new MINOR release: ${NEW_RELEASE}"
         ;;
     "3")
-        NEW_RELEASE=$(increment_version "${CUR_RELEASE}" 2)
+        NEW_RELEASE="${NEW_RELEASE_PATCH}"
         echo "start new PATCH release: ${NEW_RELEASE}"
         ;;
     *)
