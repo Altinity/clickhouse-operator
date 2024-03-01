@@ -8,16 +8,19 @@
 # $1: version itself
 # $2: number of part: 0 – major, 1 – minor, 2 – patch
 #
-increment_version() {
+function increment_version() {
     local version="${1}"
     local what="${2}"
 
     local delimiter="."
     local array=($(echo "${version}" | tr "${delimiter}" '\n'))
 
+    # Increment desired part
     array[${what}]=$((array[${what}]+1))
+    # Zero all following parts
     if [[ ${what} -lt 2 ]]; then array[2]=0; fi
     if [[ ${what} -lt 1 ]]; then array[1]=0; fi
+    # Provide result
     echo $(local IFS=${delimiter}; echo "${array[*]}")
 }
 
