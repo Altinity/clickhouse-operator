@@ -2102,7 +2102,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "rate(chi_clickhouse_event_Merge{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}[1m])",
+          "expr": "chi_clickhouse_metric_Merge{exported_namespace=~\"$exported_namespace\",chi=~\"$chi\",hostname=~\"$hostname\"}",
           "intervalFactor": 2,
           "legendFormat": "merges {{hostname}}",
           "refId": "A",
@@ -2118,7 +2118,7 @@
         "msResolution": false,
         "shared": true,
         "sort": 2,
-        "value_type": "cumulative"
+        "value_type": "individual"
       },
       "type": "graph",
       "xaxis": {
