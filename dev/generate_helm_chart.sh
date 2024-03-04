@@ -182,7 +182,7 @@ function update_deployment_resource() {
   a_data="${annotations}" yq e -i '.podAnnotations |= env(a_data)' "${values_yaml}"
   yq e -i '.spec.template.metadata.annotations = {}' "${file}"
 
-  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.selectorLabels\" . | nindent 8 }}"' "${file}"
+  yq e -i '.spec.template.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.metadata.annotations += {"{{ toYaml .Values.podAnnotations | nindent 8 }}": null}' "${file}"
   yq e -i '.spec.template.spec.imagePullSecrets |= "{{ toYaml .Values.imagePullSecrets | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.serviceAccountName |= "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}"' "${file}"
