@@ -2,9 +2,9 @@
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.23.3
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.23.4
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.23.3
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.23.4
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
