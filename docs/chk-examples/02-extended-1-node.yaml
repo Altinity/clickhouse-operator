@@ -38,9 +38,12 @@ spec:
                 limits:
                   memory: "4Gi"
                   cpu: "2"
+          securityContext:
+            fsGroup: 101
     volumeClaimTemplates:
       - name: default
         metadata:
+          # NOTE: one volume that will be used for both coordination/snapshots/ and logs/
           name: both-paths
         spec:
           accessModes:
