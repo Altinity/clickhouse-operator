@@ -45,6 +45,8 @@ metrics:
 #  possible value format [{"name":"your-secret-name"}]
 #  look `kubectl explain pod.spec.imagePullSecrets` for details
 imagePullSecrets: []
+# podLabels -- labels to add to the clickhouse-operator pod
+podLabels: {}
 # podAnnotations -- annotations to add to the clickhouse-operator pod, look `kubectl explain pod.spec.annotations` for details
 podAnnotations:
   prometheus.io/port: '8888'

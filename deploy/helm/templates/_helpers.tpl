@@ -40,6 +40,9 @@ helm.sh/chart: {{ include "altinity-clickhouse-operator.chart" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
+{{- if .Values.podLabels }}
+{{ toYaml .Values.podLabels }}
+{{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
