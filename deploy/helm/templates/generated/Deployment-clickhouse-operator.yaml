@@ -21,7 +21,7 @@ spec:
     matchLabels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 8 }}
+      labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 8 }}
       annotations:
         {{ toYaml .Values.podAnnotations | nindent 8 }}
         checksum/files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") . | sha256sum }}
