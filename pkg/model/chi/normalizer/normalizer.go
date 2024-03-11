@@ -40,39 +40,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// Context specifies CHI-related normalization context
-type Context struct {
-	// start specifies start CHI from which normalization has started
-	start *api.ClickHouseInstallation
-	// chi specifies current CHI being normalized
-	chi *api.ClickHouseInstallation
-	// options specifies normalization options
-	options *Options
-}
-
-// NewContext creates new Context
-func NewContext(options *Options) *Context {
-	return &Context{
-		options: options,
-	}
-}
-
-// Options specifies normalization options
-type Options struct {
-	// WithDefaultCluster specifies whether to insert default cluster in case no cluster specified
-	WithDefaultCluster bool
-	// DefaultUserAdditionalIPs specifies set of additional IPs applied to default user
-	DefaultUserAdditionalIPs   []string
-	DefaultUserInsertHostRegex bool
-}
-
-// NewOptions creates new Options
-func NewOptions() *Options {
-	return &Options{
-		DefaultUserInsertHostRegex: true,
-	}
-}
-
 // Normalizer specifies structures normalizer
 type Normalizer struct {
 	kubeClient kube.Interface
