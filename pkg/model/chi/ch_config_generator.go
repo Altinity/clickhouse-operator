@@ -352,7 +352,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret.Value)
 		case api.ClusterSecretSourceSecretRef, api.ClusterSecretSourceAuto:
 			// Use secret via ENV var from secret
-			util.Iline(b, 12, `<secret from_env="%s" />`, internodeClusterSecretEnvName)
+			util.Iline(b, 12, `<secret from_env="%s" />`, InternodeClusterSecretEnvName)
 		}
 
 		// Build each shard XML
@@ -494,22 +494,22 @@ func (c *ClickHouseConfigGenerator) GetHostHostnameAndPorts(host *api.ChiHost) s
 	// <yandex>
 	util.Iline(b, 0, "<"+xmlTagYandex+">")
 
-	if host.TCPPort != chDefaultTCPPortNumber {
+	if host.TCPPort != ChDefaultTCPPortNumber {
 		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort)
 	}
-	if host.TLSPort != chDefaultTLSPortNumber {
+	if host.TLSPort != ChDefaultTLSPortNumber {
 		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort)
 	}
-	if host.HTTPPort != chDefaultHTTPPortNumber {
+	if host.HTTPPort != ChDefaultHTTPPortNumber {
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
 	}
-	if host.HTTPSPort != chDefaultHTTPSPortNumber {
+	if host.HTTPSPort != ChDefaultHTTPSPortNumber {
 		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort)
 	}
 
 	// Interserver host and port
 	util.Iline(b, 4, "<interserver_http_host>%s</interserver_http_host>", c.getRemoteServersReplicaHostname(host))
-	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
+	if host.InterserverHTTPPort != ChDefaultInterserverHTTPPortNumber {
 		util.Iline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort)
 	}
 

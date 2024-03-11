@@ -16,6 +16,7 @@ package schemer
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -28,7 +29,7 @@ func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
 	shard := chi.CreateFQDNs(host, api.ChiShard{}, false)
 	cluster := chi.CreateFQDNs(host, api.Cluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == chi.SchemaPolicyShardAll {
+	if host.GetCluster().SchemaPolicy.Shard == normalizer.SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard
 		// However, it is reasonable to have at least two instances in a cluster
 		if len(cluster) >= 2 {
@@ -37,7 +38,7 @@ func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
 		}
 	}
 
-	if host.GetCluster().SchemaPolicy.Replica == chi.SchemaPolicyReplicaNone {
+	if host.GetCluster().SchemaPolicy.Replica == normalizer.SchemaPolicyReplicaNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
 		return false
 	}

@@ -16,6 +16,7 @@ package schemer
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -27,7 +28,7 @@ import (
 func shouldCreateDistributedObjects(host *api.ChiHost) bool {
 	hosts := chi.CreateFQDNs(host, api.Cluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == chi.SchemaPolicyShardNone {
+	if host.GetCluster().SchemaPolicy.Shard == normalizer.SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
 		return false
 	}

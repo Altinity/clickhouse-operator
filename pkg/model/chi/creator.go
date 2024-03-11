@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/gosimple/slug"
+
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
@@ -87,13 +88,13 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 				{
 					Name:       chDefaultHTTPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       chDefaultHTTPPortNumber,
+					Port:       ChDefaultHTTPPortNumber,
 					TargetPort: intstr.FromString(chDefaultHTTPPortName),
 				},
 				{
 					Name:       chDefaultTCPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       chDefaultTCPPortNumber,
+					Port:       ChDefaultTCPPortNumber,
 					TargetPort: intstr.FromString(chDefaultTCPPortName),
 				},
 			},
@@ -1152,8 +1153,8 @@ func (c *Creator) CreateClusterSecret(name string) *core.Secret {
 	}
 }
 
-// newDefaultHostTemplate returns default Host Template to be used with StatefulSet
-func newDefaultHostTemplate(name string) *api.ChiHostTemplate {
+// NewDefaultHostTemplate returns default Host Template to be used with StatefulSet
+func NewDefaultHostTemplate(name string) *api.ChiHostTemplate {
 	return &api.ChiHostTemplate{
 		Name: name,
 		PortDistribution: []api.ChiPortDistribution{
@@ -1173,8 +1174,8 @@ func newDefaultHostTemplate(name string) *api.ChiHostTemplate {
 	}
 }
 
-// newDefaultHostTemplateForHostNetwork
-func newDefaultHostTemplateForHostNetwork(name string) *api.ChiHostTemplate {
+// NewDefaultHostTemplateForHostNetwork
+func NewDefaultHostTemplateForHostNetwork(name string) *api.ChiHostTemplate {
 	return &api.ChiHostTemplate{
 		Name: name,
 		PortDistribution: []api.ChiPortDistribution{

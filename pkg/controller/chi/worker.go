@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -49,7 +50,7 @@ type worker struct {
 	a Announcer
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
-	normalizer *model.Normalizer
+	normalizer *normalizer.Normalizer
 	schemer    *schemer.ClusterSchemer
 	start      time.Time
 	task       task
@@ -86,7 +87,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		c:          c,
 		a:          NewAnnouncer().WithController(c),
 		queue:      q,
-		normalizer: model.NewNormalizer(c.kubeClient),
+		normalizer: normalizer.NewNormalizer(c.kubeClient),
 		schemer:    nil,
 		start:      start,
 	}
@@ -279,7 +280,7 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *ReconcilePod) err
 }
 
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
-	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, model.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, normalizer.NewOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
@@ -322,7 +323,7 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 // normalize
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 
-	chi, err := w.normalizer.CreateTemplatedCHI(c, model.NewNormalizerOptions())
+	chi, err := w.normalizer.CreateTemplatedCHI(c, normalizer.NewOptions())
 	if err != nil {
 		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -332,7 +333,7 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-	opts := model.NewNormalizerOptions()
+	opts := normalizer.NewOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
 	chi, err = w.normalizer.CreateTemplatedCHI(c, opts)
@@ -378,11 +379,11 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 
-	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, model.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, normalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := model.NewNormalizerOptions()
+		opts := normalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
@@ -665,11 +666,11 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	}
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, model.NewNormalizerOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, normalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := model.NewNormalizerOptions()
+		opts := normalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
@@ -1241,7 +1242,7 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.ChiHost)
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool, options *model.NormalizerOptions) (*api.ClickHouseInstallation, error) {
+func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool, options *normalizer.Options) (*api.ClickHouseInstallation, error) {
 	w.a.V(3).M(objectMeta).S().P()
 	defer w.a.V(3).M(objectMeta).E().P()
 

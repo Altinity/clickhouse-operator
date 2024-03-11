@@ -55,7 +55,7 @@ const (
 	// 5. operator-provided additional config files
 	dirPathHostConfig = "/etc/clickhouse-server/" + api.HostConfigDir + "/"
 
-	dirPathSecretFilesConfig = "/etc/clickhouse-server/secrets.d/"
+	DirPathSecretFilesConfig = "/etc/clickhouse-server/secrets.d/"
 
 	// dirPathClickHouseData specifies full path of data folder where ClickHouse would place its data storage
 	dirPathClickHouseData = "/var/lib/clickhouse"
@@ -90,20 +90,20 @@ const (
 const (
 	// ClickHouse open ports names and values
 	chDefaultTCPPortName               = "tcp"
-	chDefaultTCPPortNumber             = int32(9000)
+	ChDefaultTCPPortNumber             = int32(9000)
 	chDefaultTLSPortName               = "secureclient"
-	chDefaultTLSPortNumber             = int32(9440)
+	ChDefaultTLSPortNumber             = int32(9440)
 	chDefaultHTTPPortName              = "http"
-	chDefaultHTTPPortNumber            = int32(8123)
+	ChDefaultHTTPPortNumber            = int32(8123)
 	chDefaultHTTPSPortName             = "https"
-	chDefaultHTTPSPortNumber           = int32(8443)
+	ChDefaultHTTPSPortNumber           = int32(8443)
 	chDefaultInterserverHTTPPortName   = "interserver"
-	chDefaultInterserverHTTPPortNumber = int32(9009)
+	ChDefaultInterserverHTTPPortNumber = int32(9009)
 )
 
 const (
-	// zkDefaultPort specifies Zookeeper default port
-	zkDefaultPort = 2181
+	// ZkDefaultPort specifies Zookeeper default port
+	ZkDefaultPort = 2181
 	// zkDefaultRootTemplate specifies default ZK root - /clickhouse/{namespace}/{chi name}
 	zkDefaultRootTemplate = "/clickhouse/%s/%s"
 )

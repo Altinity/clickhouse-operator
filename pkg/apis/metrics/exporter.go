@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
-	chiv1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopAPI "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
 
@@ -148,18 +148,18 @@ func (e *Exporter) newHostFetcher(host *WatchedHost) *ClickHouseMetricsFetcher {
 	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
 	// Adjust base cluster connection params with per-host props
 	switch clusterConnectionParams.Scheme {
-	case chiv1.ChSchemeAuto:
+	case api.ChSchemeAuto:
 		switch {
-		case chiv1.IsPortAssigned(host.HTTPPort):
+		case api.IsPortAssigned(host.HTTPPort):
 			clusterConnectionParams.Scheme = "http"
 			clusterConnectionParams.Port = int(host.HTTPPort)
-		case chiv1.IsPortAssigned(host.HTTPSPort):
+		case api.IsPortAssigned(host.HTTPSPort):
 			clusterConnectionParams.Scheme = "https"
 			clusterConnectionParams.Port = int(host.HTTPSPort)
 		}
-	case chiv1.ChSchemeHTTP:
+	case api.ChSchemeHTTP:
 		clusterConnectionParams.Port = int(host.HTTPPort)
-	case chiv1.ChSchemeHTTPS:
+	case api.ChSchemeHTTPS:
 		clusterConnectionParams.Port = int(host.HTTPSPort)
 	}
 
@@ -396,8 +396,9 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		}
 
 		log.V(1).Infof("CHI %s/%s is completed, add it", chi.Namespace, chi.Name)
-		normalizer := model.NewNormalizer(kubeClient)
-		normalized, _ := normalizer.CreateTemplatedCHI(chi, model.NewNormalizerOptions())
+		normalizer := chiNormalizer.NewNormalizer(kubeClient)
+		normalized, _ := normalizer.CreateTemplatedCHI(chi, chiNormalizer.NewOptions())
+
 		watchedCHI := NewWatchedCHI(normalized)
 		e.updateWatched(watchedCHI)
 	}

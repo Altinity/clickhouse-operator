@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -266,7 +267,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	defer w.a.V(2).M(chi).E().P()
 
 	var err error
-	chi, err = w.normalizer.CreateTemplatedCHI(chi, model.NewNormalizerOptions())
+	chi, err = w.normalizer.CreateTemplatedCHI(chi, normalizer.NewOptions())
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(chi).

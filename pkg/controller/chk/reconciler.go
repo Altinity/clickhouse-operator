@@ -32,6 +32,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	//	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -304,7 +305,7 @@ func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInsta
 
 // normalize
 func (r *ChkReconciler) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := model.NewNormalizer().CreateTemplatedCHK(c, model.NewNormalizerOptions())
+	chk, err := model.NewNormalizer().CreateTemplatedCHK(c, normalizer.NewOptions())
 	if err != nil {
 		log.V(1).
 			M(chk).F().
