@@ -86,11 +86,11 @@ type ChiSpec struct {
 	Defaults               *ChiDefaults     `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration   `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *ChiTemplates    `json:"templates,omitempty"              yaml:"templates,omitempty"`
-	UseTemplates           []ChiUseTemplate `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
+	UseTemplates           []ChiTemplateRef `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
-// ChiUseTemplate defines UseTemplate section of ClickHouseInstallation resource
-type ChiUseTemplate struct {
+// ChiTemplateRef defines UseTemplate section of ClickHouseInstallation resource
+type ChiTemplateRef struct {
 	Name      string `json:"name,omitempty"      yaml:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	UseType   string `json:"useType,omitempty"   yaml:"useType,omitempty"`

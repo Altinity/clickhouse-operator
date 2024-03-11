@@ -272,6 +272,7 @@ func (c *ChkClusterLayout) GetReplicasCount() int {
 
 // ChkTemplates defines templates section of .spec
 type ChkTemplates struct {
+	// Templates
 	PodTemplates         []apiChi.ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
 	VolumeClaimTemplates []apiChi.ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
 	ServiceTemplates     []apiChi.ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`

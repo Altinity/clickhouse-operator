@@ -139,17 +139,16 @@ func (n *Normalizer) createBaseCHI() *api.ClickHouseInstallation {
 	}
 }
 
-// prepareListOfCHITemplates prepares list of CHI templates to be used by CHI
-func (n *Normalizer) prepareListOfCHITemplates(chi *api.ClickHouseInstallation) []api.ChiUseTemplate {
-	// useTemplates specifies list of templates to be applied to the CHI
-	var useTemplates []api.ChiUseTemplate
-
+// prepareListOfCHITemplates prepares list of CHI templates to be used by the CHI
+func (n *Normalizer) prepareListOfCHITemplates(chi *api.ClickHouseInstallation) (useTemplates []api.ChiTemplateRef) {
 	// 1. Get list of auto templates available
 	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
-			log.V(1).M(chi).F().Info("Adding auto-template to list of applicable templates: %s/%s ", template.Namespace, template.Name)
-			useTemplates = append(useTemplates, api.ChiUseTemplate{
+			log.V(1).M(chi).F().Info(
+				"Adding auto-template to list of applicable templates: %s/%s ",
+				template.Namespace, template.Name)
+			useTemplates = append(useTemplates, api.ChiTemplateRef{
 				Name:      template.Name,
 				Namespace: template.Namespace,
 				UseType:   useTypeMerge,
@@ -157,18 +156,15 @@ func (n *Normalizer) prepareListOfCHITemplates(chi *api.ClickHouseInstallation) 
 		}
 	}
 
-	// 2. Append templates, explicitly requested by the CHI
+	// 2. Append templates which are explicitly requested by the CHI
 	if len(chi.Spec.UseTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found manual-templates num: %d", len(chi.Spec.UseTemplates))
 		useTemplates = append(useTemplates, chi.Spec.UseTemplates...)
 	}
 
-	// In case useTemplates must contain reasonable data, thus has to be normalized
-	if len(useTemplates) > 0 {
-		log.V(1).M(chi).F().Info("Found applicable templates num: %d", len(useTemplates))
-		n.normalizeUseTemplates(useTemplates)
-	}
+	n.normalizeUseTemplates(useTemplates)
 
+	log.V(1).M(chi).F().Info("Found applicable templates num: %d", len(useTemplates))
 	return useTemplates
 }
 
@@ -181,38 +177,43 @@ func (n *Normalizer) applyCHITemplates(chi *api.ClickHouseInstallation) {
 
 	// Apply templates - both auto and explicitly requested
 	for i := range useTemplates {
-		// Convenience wrapper
-		useTemplate := &useTemplates[i]
-		template := chop.Config().FindTemplate(useTemplate, chi.Namespace)
-
-		if template == nil {
-			log.V(1).M(chi).F().Warning("Skip template: %s/%s UNABLE to find listed template. ", useTemplate.Namespace, useTemplate.Name)
-			continue // skip to the next template
-		}
-
-		// What CHI this template wants to be applied to?
-		// This is determined by matching selector of the template and CHI's labels
-		selector := template.Spec.Templating.GetCHISelector()
-		labels := chi.Labels
-
-		if !selector.Matches(labels) {
-			// This template does not want to be applied to this CHI
-			log.V(1).M(chi).F().Info("Skip template: %s/%s. Selector: %v does not match labels: %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
-			continue // skip to the next template
-		}
-
-		//
-		// Template is found and matches, let's apply template
-		//
-
-		log.V(1).M(chi).F().Info("Apply template: %s/%s. Selector: %v matches labels: %v", useTemplate.Namespace, useTemplate.Name, selector, labels)
-		n.ctx.chi = n.mergeCHIFromTemplate(n.ctx.chi, template)
-
-		// And append used template to the list of used templates
-		n.ctx.chi.EnsureStatus().PushUsedTemplate(useTemplate)
-	} // list of templates
+		n.applyCHITemplate(&useTemplates[i], chi)
+	}
 
 	log.V(1).M(chi).F().Info("Used templates count: %d", n.ctx.chi.EnsureStatus().GetUsedTemplatesCount())
+}
+
+func (n *Normalizer) applyCHITemplate(useTemplate *api.ChiTemplateRef, chi *api.ClickHouseInstallation) {
+	// What template are we going to apply?
+	template := chop.Config().FindTemplate(useTemplate, chi.Namespace)
+
+	if template == nil {
+		log.V(1).M(chi).F().Warning(
+			"Skip template: %s/%s UNABLE to find listed template. ",
+			useTemplate.Namespace, useTemplate.Name)
+		return
+	}
+
+	// What CHI this template wants to be applied to?
+	// This is determined by matching selector of the template and CHI's labels
+	// Convenience wrapper
+	if selector := template.Spec.Templating.GetCHISelector(); selector.Matches(chi.Labels) {
+		log.V(1).M(chi).F().Info(
+			"Apply template: %s/%s. Selector: %v matches labels: %v",
+			useTemplate.Namespace, useTemplate.Name, selector, chi.Labels)
+	} else {
+		// This template does not want to be applied to this CHI
+		log.V(1).M(chi).F().Info(
+			"Skip template: %s/%s. Selector: %v does not match labels: %v",
+			useTemplate.Namespace, useTemplate.Name, selector, chi.Labels)
+		return
+	}
+
+	//
+	// Template is found and matches, let's apply template and append used template to the list of used templates
+	//
+	n.ctx.chi = n.mergeCHIFromTemplate(n.ctx.chi, template)
+	n.ctx.chi.EnsureStatus().PushUsedTemplate(useTemplate)
 }
 
 func (n *Normalizer) mergeCHIFromTemplate(chi, template *api.ClickHouseInstallation) *api.ClickHouseInstallation {
@@ -849,7 +850,7 @@ func (n *Normalizer) normalizeServiceTemplate(template *api.ChiServiceTemplate) 
 }
 
 // normalizeUseTemplates normalizes list of templates use specifications
-func (n *Normalizer) normalizeUseTemplates(useTemplates []api.ChiUseTemplate) []api.ChiUseTemplate {
+func (n *Normalizer) normalizeUseTemplates(useTemplates []api.ChiTemplateRef) []api.ChiTemplateRef {
 	for i := range useTemplates {
 		useTemplate := &useTemplates[i]
 		n.normalizeUseTemplate(useTemplate)
@@ -857,8 +858,8 @@ func (n *Normalizer) normalizeUseTemplates(useTemplates []api.ChiUseTemplate) []
 	return useTemplates
 }
 
-// normalizeUseTemplate normalizes ChiUseTemplate
-func (n *Normalizer) normalizeUseTemplate(useTemplate *api.ChiUseTemplate) {
+// normalizeUseTemplate normalizes ChiTemplateRef
+func (n *Normalizer) normalizeUseTemplate(useTemplate *api.ChiTemplateRef) {
 	// Check Name
 	if useTemplate.Name == "" {
 		// This is strange
