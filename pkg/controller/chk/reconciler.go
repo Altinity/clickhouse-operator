@@ -60,12 +60,13 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	new = &apiChk.ClickHouseKeeperInstallation{}
 	if err := r.Get(ctx, req.NamespacedName, new); err != nil {
 		if apiErrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile
-			// request. Owned objects are automatically garbage collected. For
-			// additional cleanup logic use finalizers.
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected.
+			// For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			return ctrl.Result{}, nil
 		}
+		// Return and requeue
 		return ctrl.Result{}, err
 	}
 
@@ -108,12 +109,13 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	dummy := &apiChk.ClickHouseKeeperInstallation{}
 	if err := r.Get(ctx, req.NamespacedName, dummy); err != nil {
 		if apiErrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile
-			// request. Owned objects are automatically garbage collected. For
-			// additional cleanup logic use finalizers.
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected.
+			// For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			return ctrl.Result{}, nil
 		}
+		// Return and requeue
 		return ctrl.Result{}, err
 	}
 

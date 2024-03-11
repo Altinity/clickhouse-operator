@@ -177,9 +177,12 @@ func createInitContainers(chk *api.ClickHouseKeeperInstallation) []core.Containe
 	}
 	if len(initContainers[0].Command) == 0 {
 		initContainers[0].Command = []string{
-			"bash",
-			"-xc",
-			"export KEEPER_ID=${HOSTNAME##*-}; sed \"s/KEEPER_ID/$KEEPER_ID/g\" /tmp/clickhouse-keeper/keeper_config.xml > /etc/clickhouse-keeper/keeper_config.xml; cat /etc/clickhouse-keeper/keeper_config.xml",
+			`bash`,
+			`-xc`,
+			// Build keeper config
+			`export KEEPER_ID=${HOSTNAME##*-}; ` +
+			`sed "s/KEEPER_ID/${KEEPER_ID}/g" /tmp/clickhouse-keeper/keeper_config.xml > /etc/clickhouse-keeper/keeper_config.xml; ` +
+			`cat /etc/clickhouse-keeper/keeper_config.xml`,
 		}
 	}
 	initContainers[0].VolumeMounts = append(initContainers[0].VolumeMounts,
@@ -215,7 +218,9 @@ func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 	}
 	if containers[0].LivenessProbe == nil {
 		probeScript := fmt.Sprintf(
-			"date && OK=$(exec 3<>/dev/tcp/127.0.0.1/%d ; printf 'ruok' >&3 ; IFS=; tee <&3; exec 3<&- ;); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi",
+			`date && ` +
+				`OK=$(exec 3<>/dev/tcp/127.0.0.1/%d; printf 'ruok' >&3; IFS=; tee <&3; exec 3<&-;);`+
+				`if [[ "${OK}" == "imok" ]]; then exit 0; else exit 1; fi`,
 			chk.Spec.GetClientPort())
 		containers[0].LivenessProbe = &core.Probe{
 			ProbeHandler: core.ProbeHandler{
