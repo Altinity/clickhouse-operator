@@ -159,7 +159,11 @@ func (n *Normalizer) normalizeTemplates(templates *apiChk.ChkTemplates) *apiChk.
 // normalizePodTemplate normalizes .spec.templates.podTemplates
 func (n *Normalizer) normalizePodTemplate(template *apiChi.ChiPodTemplate) {
 	// TODO need to support multi-cluster
-	templatesNormalizer.NormalizePodTemplate(n.ctx.chk.Spec.Configuration.Clusters[0].Layout.ReplicasCount, template)
+	replicasCount := 1
+	if len(n.ctx.chk.Spec.Configuration.Clusters) > 0 {
+		replicasCount = n.ctx.chk.Spec.Configuration.Clusters[0].Layout.ReplicasCount
+	}
+	templatesNormalizer.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }

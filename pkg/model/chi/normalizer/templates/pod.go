@@ -45,9 +45,11 @@ func NormalizePodTemplate(replicasCount int, template *api.ChiPodTemplate) {
 const defaultTopologyKey = core.LabelHostname
 
 func normalizePodDistribution(replicasCount int, podDistribution *api.ChiPodDistribution) []api.ChiPodDistribution {
+	// Ensure topology key
 	if podDistribution.TopologyKey == "" {
 		podDistribution.TopologyKey = defaultTopologyKey
 	}
+
 	switch podDistribution.Type {
 	case
 		deployment.PodDistributionUnspecified,
