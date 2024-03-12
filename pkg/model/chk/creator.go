@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
@@ -60,15 +61,12 @@ func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet 
 			Labels:    labels,
 		},
 		Spec: apps.StatefulSetSpec{
-			ServiceName: getHeadlessServiceName(chk),
 			Replicas:    &replicas,
+			ServiceName: getHeadlessServiceName(chk),
 			Selector: &meta.LabelSelector{
 				MatchLabels: labels,
 			},
-			UpdateStrategy: apps.StatefulSetUpdateStrategy{
-				Type: apps.RollingUpdateStatefulSetStrategyType,
-			},
-			PodManagementPolicy: apps.OrderedReadyPodManagement,
+
 			Template: core.PodTemplateSpec{
 				ObjectMeta: meta.ObjectMeta{
 					GenerateName: chk.GetName(),
@@ -78,6 +76,12 @@ func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet 
 				Spec: createPodTemplateSpec(chk),
 			},
 			VolumeClaimTemplates: getVolumeClaimTemplates(chk),
+
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
+			},
+			RevisionHistoryLimit: chop.Config().GetRevisionHistoryLimit(),
 		},
 	}
 }

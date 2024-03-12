@@ -399,10 +399,8 @@ func (c *Creator) CreateStatefulSet(host *api.ChiHost, shutdown bool) *apps.Stat
 
 			// IMPORTANT
 			// Template is to be setup later
-			Template: core.PodTemplateSpec{},
-
-			// IMPORTANT
 			// VolumeClaimTemplates are to be setup later
+			Template: core.PodTemplateSpec{},
 			VolumeClaimTemplates: nil,
 
 			PodManagementPolicy: apps.OrderedReadyPodManagement,
@@ -582,7 +580,7 @@ func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *api.Chi
 func (c *Creator) getPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
 	statefulSetName := CreateStatefulSetName(host)
 
-	// Which pod template would be used - either explicitly defined in or a default one
+	// Which pod template should be used - either explicitly defined or a default one
 	podTemplate, ok := host.GetPodTemplate()
 	if ok {
 		// Host references known PodTemplate
