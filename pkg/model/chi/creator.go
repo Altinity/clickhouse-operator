@@ -83,7 +83,7 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 			OwnerReferences: ownerReferences,
 		},
 		Spec: core.ServiceSpec{
-			// ClusterIP: templateDefaultsServiceClusterIP,
+			ClusterIP: templateDefaultsServiceClusterIP,
 			Ports: []core.ServicePort{
 				{
 					Name:       chDefaultHTTPPortName,
@@ -99,8 +99,8 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 				},
 			},
 			Selector:              c.labels.getSelectorCHIScopeReady(),
-			Type:                  core.ServiceTypeLoadBalancer,
-			ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal,
+			Type:                  core.ServiceTypeClusterIP,
+			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
 	MakeObjectVersion(&svc.ObjectMeta, svc)
