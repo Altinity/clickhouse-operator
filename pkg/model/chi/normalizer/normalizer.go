@@ -23,11 +23,11 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/google/uuid"
+
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
-
-	"github.com/google/uuid"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -35,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	entitiesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/entities"
 	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -281,13 +282,13 @@ func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
 	if ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = model.NewDefaultHostTemplateForHostNetwork(statefulSetName)
+			hostTemplate = creator.NewDefaultHostTemplateForHostNetwork(statefulSetName)
 		}
 	}
 
 	// In case hostTemplate still is not assigned - use default one
 	if hostTemplate == nil {
-		hostTemplate = model.NewDefaultHostTemplate(statefulSetName)
+		hostTemplate = creator.NewDefaultHostTemplate(statefulSetName)
 	}
 
 	log.V(3).M(host).F().Info("StatefulSet %s use default hostTemplate", statefulSetName)

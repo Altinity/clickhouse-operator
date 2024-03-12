@@ -76,8 +76,8 @@ const (
 	macrosClusterScopeCycleHeadPointsToPreviousCycleTail = "{clusterScopeCycleHeadPointsToPreviousCycleTail}"
 )
 
-// macrosEngine
-type macrosEngine struct {
+// MacrosEngine
+type MacrosEngine struct {
 	names   *namer
 	chi     *api.ClickHouseInstallation
 	cluster *api.Cluster
@@ -85,9 +85,9 @@ type macrosEngine struct {
 	host    *api.ChiHost
 }
 
-// macro
-func macro(scope interface{}) *macrosEngine {
-	m := new(macrosEngine)
+// Macro
+func Macro(scope interface{}) *MacrosEngine {
+	m := new(MacrosEngine)
 	m.names = newNamer(namerContextNames)
 	switch t := scope.(type) {
 	case *api.ClickHouseInstallation:
@@ -103,7 +103,7 @@ func macro(scope interface{}) *macrosEngine {
 }
 
 // Line expands line with macros(es)
-func (m *macrosEngine) Line(line string) string {
+func (m *MacrosEngine) Line(line string) string {
 	switch {
 	case m.chi != nil:
 		return m.newLineMacroReplacerChi().Replace(line)
@@ -118,7 +118,7 @@ func (m *macrosEngine) Line(line string) string {
 }
 
 // Map expands map with macros(es)
-func (m *macrosEngine) Map(_map map[string]string) map[string]string {
+func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 	switch {
 	case m.chi != nil:
 		return m.newMapMacroReplacerChi().Replace(_map)
@@ -136,7 +136,7 @@ func (m *macrosEngine) Map(_map map[string]string) map[string]string {
 }
 
 // newLineMacroReplacerChi
-func (m *macrosEngine) newLineMacroReplacerChi() *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerChi() *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(m.chi.Namespace),
 		macrosChiName, m.names.namePartChiName(m.chi.Name),
@@ -145,12 +145,12 @@ func (m *macrosEngine) newLineMacroReplacerChi() *strings.Replacer {
 }
 
 // newMapMacroReplacerChi
-func (m *macrosEngine) newMapMacroReplacerChi() *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerChi() *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerChi())
 }
 
 // newLineMacroReplacerCluster
-func (m *macrosEngine) newLineMacroReplacerCluster() *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerCluster() *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(m.cluster.Address.Namespace),
 		macrosChiName, m.names.namePartChiName(m.cluster.Address.CHIName),
@@ -162,12 +162,12 @@ func (m *macrosEngine) newLineMacroReplacerCluster() *strings.Replacer {
 }
 
 // newMapMacroReplacerCluster
-func (m *macrosEngine) newMapMacroReplacerCluster() *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerCluster() *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerCluster())
 }
 
 // newLineMacroReplacerShard
-func (m *macrosEngine) newLineMacroReplacerShard() *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerShard() *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(m.shard.Address.Namespace),
 		macrosChiName, m.names.namePartChiName(m.shard.Address.CHIName),
@@ -182,7 +182,7 @@ func (m *macrosEngine) newLineMacroReplacerShard() *strings.Replacer {
 }
 
 // newMapMacroReplacerShard
-func (m *macrosEngine) newMapMacroReplacerShard() *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerShard() *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerShard())
 }
 
@@ -209,7 +209,7 @@ func clusterScopeIndexOfPreviousCycleTail(host *api.ChiHost) int {
 }
 
 // newLineMacroReplacerHost
-func (m *macrosEngine) newLineMacroReplacerHost() *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerHost() *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(m.host.Address.Namespace),
 		macrosChiName, m.names.namePartChiName(m.host.Address.CHIName),
@@ -238,6 +238,6 @@ func (m *macrosEngine) newLineMacroReplacerHost() *strings.Replacer {
 }
 
 // newMapMacroReplacerHost
-func (m *macrosEngine) newMapMacroReplacerHost() *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerHost() *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerHost())
 }

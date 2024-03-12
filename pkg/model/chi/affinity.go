@@ -822,8 +822,8 @@ func newWeightedPodAffinityTermWithMatchLabels(
 	}
 }
 
-// prepareAffinity
-func prepareAffinity(podTemplate *api.ChiPodTemplate, host *api.ChiHost) {
+// PrepareAffinity
+func PrepareAffinity(podTemplate *api.ChiPodTemplate, host *api.ChiHost) {
 	switch {
 	case podTemplate == nil:
 		return
@@ -886,10 +886,10 @@ func processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequ
 	if nodeSelectorRequirement == nil {
 		return
 	}
-	nodeSelectorRequirement.Key = macro(host).Line(nodeSelectorRequirement.Key)
+	nodeSelectorRequirement.Key = Macro(host).Line(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range nodeSelectorRequirement.Values {
-		nodeSelectorRequirement.Values[i] = macro(host).Line(nodeSelectorRequirement.Values[i])
+		nodeSelectorRequirement.Values[i] = Macro(host).Line(nodeSelectorRequirement.Values[i])
 	}
 }
 
@@ -915,7 +915,7 @@ func processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *api.ChiHo
 		return
 	}
 	processLabelSelector(podAffinityTerm.LabelSelector, host)
-	podAffinityTerm.TopologyKey = macro(host).Line(podAffinityTerm.TopologyKey)
+	podAffinityTerm.TopologyKey = Macro(host).Line(podAffinityTerm.TopologyKey)
 }
 
 // processLabelSelector
@@ -925,7 +925,7 @@ func processLabelSelector(labelSelector *meta.LabelSelector, host *api.ChiHost) 
 	}
 
 	for k := range labelSelector.MatchLabels {
-		labelSelector.MatchLabels[k] = macro(host).Line(labelSelector.MatchLabels[k])
+		labelSelector.MatchLabels[k] = Macro(host).Line(labelSelector.MatchLabels[k])
 	}
 	for j := range labelSelector.MatchExpressions {
 		labelSelectorRequirement := &labelSelector.MatchExpressions[j]
@@ -938,9 +938,9 @@ func processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelecto
 	if labelSelectorRequirement == nil {
 		return
 	}
-	labelSelectorRequirement.Key = macro(host).Line(labelSelectorRequirement.Key)
+	labelSelectorRequirement.Key = Macro(host).Line(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range labelSelectorRequirement.Values {
-		labelSelectorRequirement.Values[i] = macro(host).Line(labelSelectorRequirement.Values[i])
+		labelSelectorRequirement.Values[i] = Macro(host).Line(labelSelectorRequirement.Values[i])
 	}
 }

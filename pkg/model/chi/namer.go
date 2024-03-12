@@ -368,7 +368,7 @@ func getNamePartReplicaScopeIndex(host *api.ChiHost) string {
 
 // CreateConfigMapHostName returns a name for a ConfigMap for replica's personal config
 func CreateConfigMapHostName(host *api.ChiHost) string {
-	return macro(host).Line(configMapHostNamePattern)
+	return Macro(host).Line(configMapHostNamePattern)
 }
 
 // CreateConfigMapHostMigrationName returns a name for a ConfigMap for replica's personal config
@@ -378,12 +378,12 @@ func CreateConfigMapHostName(host *api.ChiHost) string {
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
 func CreateConfigMapCommonName(chi *api.ClickHouseInstallation) string {
-	return macro(chi).Line(configMapCommonNamePattern)
+	return Macro(chi).Line(configMapCommonNamePattern)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common users config
 func CreateConfigMapCommonUsersName(chi *api.ClickHouseInstallation) string {
-	return macro(chi).Line(configMapCommonUsersNamePattern)
+	return Macro(chi).Line(configMapCommonUsersNamePattern)
 }
 
 // CreateCHIServiceName creates a name of a root ClickHouseInstallation Service resource
@@ -404,7 +404,7 @@ func CreateCHIServiceName(chi *api.ClickHouseInstallation) string {
 	}
 
 	// Create Service name based on name pattern available
-	return macro(chi).Line(pattern)
+	return Macro(chi).Line(pattern)
 }
 
 // CreateCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
@@ -446,7 +446,7 @@ func CreateClusterServiceName(cluster *api.Cluster) string {
 	}
 
 	// Create Service name based on name pattern available
-	return macro(cluster).Line(pattern)
+	return Macro(cluster).Line(pattern)
 }
 
 // CreateShardServiceName returns a name of a shard's Service
@@ -467,7 +467,7 @@ func CreateShardServiceName(shard *api.ChiShard) string {
 	}
 
 	// Create Service name based on name pattern available
-	return macro(shard).Line(pattern)
+	return Macro(shard).Line(pattern)
 }
 
 // CreateShardName returns a name of a shard
@@ -565,7 +565,7 @@ func CreateStatefulSetName(host *api.ChiHost) string {
 	}
 
 	// Create StatefulSet name based on name pattern available
-	return macro(host).Line(pattern)
+	return Macro(host).Line(pattern)
 }
 
 // CreateStatefulSetServiceName returns a name of a StatefulSet-related Service for ClickHouse instance
@@ -586,7 +586,7 @@ func CreateStatefulSetServiceName(host *api.ChiHost) string {
 	}
 
 	// Create Service name based on name pattern available
-	return macro(host).Line(pattern)
+	return Macro(host).Line(pattern)
 }
 
 // CreatePodHostname returns a hostname of a Pod of a ClickHouse instance.
@@ -686,7 +686,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 // For example, `template` can be defined in operator config:
 // HostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
 func CreatePodHostnameRegexp(chi *api.ClickHouseInstallation, template string) string {
-	return macro(chi).Line(template)
+	return Macro(chi).Line(template)
 }
 
 // CreatePodName creates Pod name based on specified StatefulSet or Host

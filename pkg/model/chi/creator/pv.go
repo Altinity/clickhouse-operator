@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package normalizer
+package creator
 
-// Options specifies normalization options
-type Options struct {
-	// WithDefaultCluster specifies whether to insert default cluster in case no cluster specified
-	WithDefaultCluster bool
-	// DefaultUserAdditionalIPs specifies set of additional IPs applied to default user
-	DefaultUserAdditionalIPs   []string
-	DefaultUserInsertHostRegex bool
-}
+import (
+	core "k8s.io/api/core/v1"
 
-// NewOptions creates new Options
-func NewOptions() *Options {
-	return &Options{
-		DefaultUserInsertHostRegex: true,
-	}
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+)
+
+// PreparePersistentVolume prepares PV labels
+func (c *Creator) PreparePersistentVolume(pv *core.PersistentVolume, host *api.ChiHost) *core.PersistentVolume {
+	pv.Labels = model.Macro(host).Map(c.labels.GetPV(pv, host))
+	pv.Annotations = model.Macro(host).Map(c.annotations.GetPV(pv, host))
+	// And after the object is ready we can put version label
+	model.MakeObjectVersion(&pv.ObjectMeta, pv)
+	return pv
 }

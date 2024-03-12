@@ -12,20 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package normalizer
+package creator
 
-// Options specifies normalization options
-type Options struct {
-	// WithDefaultCluster specifies whether to insert default cluster in case no cluster specified
-	WithDefaultCluster bool
-	// DefaultUserAdditionalIPs specifies set of additional IPs applied to default user
-	DefaultUserAdditionalIPs   []string
-	DefaultUserInsertHostRegex bool
-}
+import (
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// NewOptions creates new Options
-func NewOptions() *Options {
-	return &Options{
-		DefaultUserInsertHostRegex: true,
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
+func getOwnerReferences(chi *api.ClickHouseInstallation) []meta.OwnerReference {
+	if chi.Attributes.SkipOwnerRef {
+		return nil
+	}
+	controller := true
+	block := true
+	return []meta.OwnerReference{
+		{
+			APIVersion:         api.SchemeGroupVersion.String(),
+			Kind:               api.ClickHouseInstallationCRDResourceKind,
+			Name:               chi.Name,
+			UID:                chi.UID,
+			Controller:         &controller,
+			BlockOwnerDeletion: &block,
+		},
 	}
 }

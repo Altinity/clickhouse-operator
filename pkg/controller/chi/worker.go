@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -36,6 +35,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -58,7 +59,7 @@ type worker struct {
 
 // task represents context of a worker. This also can be called "a reconcile task"
 type task struct {
-	creator            *model.Creator
+	creator            *chiCreator.Creator
 	registryReconciled *model.Registry
 	registryFailed     *model.Registry
 	cmUpdate           time.Time
@@ -66,7 +67,7 @@ type task struct {
 }
 
 // newTask creates new context
-func newTask(creator *model.Creator) task {
+func newTask(creator *chiCreator.Creator) task {
 	return task{
 		creator:            creator,
 		registryReconciled: model.NewRegistry(),
@@ -95,7 +96,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *api.ClickHouseInstallation) {
-	w.task = newTask(model.NewCreator(chi))
+	w.task = newTask(chiCreator.NewCreator(chi))
 }
 
 // timeToStart specifies time that operator does not accept changes
@@ -1671,7 +1672,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost, regis
 	}
 
 	action := errCRUDRecreate
-	if model.IsStatefulSetReady(curStatefulSet) {
+	if chiCreator.IsStatefulSetReady(curStatefulSet) {
 		action = w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 	}
 

@@ -16,7 +16,7 @@ package chi
 
 const (
 	// Default value for ClusterIP service
-	templateDefaultsServiceClusterIP = "None"
+	TemplateDefaultsServiceClusterIP = "None"
 )
 
 const (

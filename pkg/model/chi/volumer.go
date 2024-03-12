@@ -20,14 +20,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func (c *Creator) getVolumeClaimTemplate(volumeMount *core.VolumeMount) (*api.ChiVolumeClaimTemplate, bool) {
-	volumeClaimTemplateName := volumeMount.Name
-	volumeClaimTemplate, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName)
-	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
-	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
-	return volumeClaimTemplate, ok
-}
-
 func GetVolumeClaimTemplate(host *api.ChiHost, volumeMount *core.VolumeMount) (*api.ChiVolumeClaimTemplate, bool) {
 	volumeClaimTemplateName := volumeMount.Name
 	volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
@@ -52,7 +44,7 @@ func getPVCReclaimPolicy(host *api.ChiHost, template *api.ChiVolumeClaimTemplate
 	return api.PVCReclaimPolicyDelete
 }
 
-func getPVCProvisioner(host *api.ChiHost, template *api.ChiVolumeClaimTemplate) api.PVCProvisioner {
+func GetPVCProvisioner(host *api.ChiHost, template *api.ChiVolumeClaimTemplate) api.PVCProvisioner {
 	// Order by priority
 
 	// VolumeClaimTemplate.PVCProvisioner, in case specified

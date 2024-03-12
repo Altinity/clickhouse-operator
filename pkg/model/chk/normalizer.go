@@ -27,8 +27,6 @@ import (
 
 // NormalizerContext specifies CHI-related normalization context
 type NormalizerContext struct {
-	// start specifies start CHK from which normalization has started
-	start *apiChk.ClickHouseKeeperInstallation
 	// chk specifies current CHK being normalized
 	chk *apiChk.ClickHouseKeeperInstallation
 	// options specifies normalization options

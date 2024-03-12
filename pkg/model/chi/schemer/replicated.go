@@ -16,11 +16,11 @@ package schemer
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
