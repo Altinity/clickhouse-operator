@@ -175,9 +175,9 @@ func (s *ChiStatus) SyncHostTablesCreated() {
 }
 
 // PushUsedTemplate pushes used template to the list of used templates
-func (s *ChiStatus) PushUsedTemplate(usedTemplate *ChiTemplateRef) {
+func (s *ChiStatus) PushUsedTemplate(templateRef *ChiTemplateRef) {
 	doWithWriteLock(s, func(s *ChiStatus) {
-		s.UsedTemplates = append(s.UsedTemplates, usedTemplate)
+		s.UsedTemplates = append(s.UsedTemplates, templateRef)
 	})
 }
 
