@@ -5,6 +5,11 @@ metadata:
   labels:
     test: test
 spec:
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: default
+      podTemplate: default
+      serviceTemplate: chi-service-template
   useTemplates:
     - name: clickhouse-version
   configuration:
@@ -15,11 +20,19 @@ spec:
     users:
       test_009/password: test_009
       test_009/networks/ip: 0.0.0.0/0
-  defaults:
-    templates:
-      dataVolumeClaimTemplate: default
-      podTemplate: default
   templates:
+    serviceTemplates:
+      - name: chi-service-template
+        generateName: "clickhouse-{chi}"
+        spec:
+          ports:
+            - name: http
+              port: 8123
+              targetPort: 8123
+            - name: client
+              port: 9000
+              targetPort: 9000
+          type: LoadBalancer
     volumeClaimTemplates:
       - name: default
         spec:
