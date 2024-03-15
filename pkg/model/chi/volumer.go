@@ -22,7 +22,7 @@ import (
 
 func GetVolumeClaimTemplate(host *api.ChiHost, volumeMount *core.VolumeMount) (*api.ChiVolumeClaimTemplate, bool) {
 	volumeClaimTemplateName := volumeMount.Name
-	volumeClaimTemplate, ok := host.CHI.GetVolumeClaimTemplate(volumeClaimTemplateName)
+	volumeClaimTemplate, ok := host.GetCHI().GetVolumeClaimTemplate(volumeClaimTemplateName)
 	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
 	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
 	return volumeClaimTemplate, ok
@@ -36,8 +36,8 @@ func getPVCReclaimPolicy(host *api.ChiHost, template *api.ChiVolumeClaimTemplate
 		return template.PVCReclaimPolicy
 	}
 
-	if host.CHI.Spec.Defaults.StorageManagement.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
-		return host.CHI.Spec.Defaults.StorageManagement.PVCReclaimPolicy
+	if host.GetCHI().Spec.Defaults.StorageManagement.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
+		return host.GetCHI().Spec.Defaults.StorageManagement.PVCReclaimPolicy
 	}
 
 	// Default value
@@ -52,8 +52,8 @@ func GetPVCProvisioner(host *api.ChiHost, template *api.ChiVolumeClaimTemplate) 
 		return template.PVCProvisioner
 	}
 
-	if host.CHI.Spec.Defaults.StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
-		return host.CHI.Spec.Defaults.StorageManagement.PVCProvisioner
+	if host.GetCHI().Spec.Defaults.StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
+		return host.GetCHI().Spec.Defaults.StorageManagement.PVCProvisioner
 	}
 
 	// Default value

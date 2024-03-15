@@ -114,125 +114,93 @@ func newNamer(ctx namerContext) *namer {
 	}
 }
 
+func (n *namer) lenCHI() int {
+	if n.ctx == namerContextLabels {
+		return namePartChiMaxLenLabelsCtx
+	} else {
+		return namePartChiMaxLenNamesCtx
+	}
+}
+
 // namePartNamespace
 func (n *namer) namePartNamespace(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartChiMaxLenLabelsCtx
-	} else {
-		_len = namePartChiMaxLenNamesCtx
-	}
-	return sanitize(util.StringHead(name, _len))
+	return sanitize(util.StringHead(name, n.lenCHI()))
 }
 
 // namePartChiName
 func (n *namer) namePartChiName(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartChiMaxLenLabelsCtx
-	} else {
-		_len = namePartChiMaxLenNamesCtx
-	}
-	return sanitize(util.StringHead(name, _len))
+	return sanitize(util.StringHead(name, n.lenCHI()))
 }
 
 // namePartChiNameID
 func (n *namer) namePartChiNameID(name string) string {
-	var _len int
+	return util.CreateStringID(name, n.lenCHI())
+}
+
+func (n *namer) lenCluster() int {
 	if n.ctx == namerContextLabels {
-		_len = namePartChiMaxLenLabelsCtx
+		return namePartClusterMaxLenLabelsCtx
 	} else {
-		_len = namePartChiMaxLenNamesCtx
+		return namePartClusterMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, _len)
 }
 
 // namePartClusterName
 func (n *namer) namePartClusterName(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartClusterMaxLenLabelsCtx
-	} else {
-		_len = namePartClusterMaxLenNamesCtx
-	}
-	return sanitize(util.StringHead(name, _len))
+	return sanitize(util.StringHead(name, n.lenCluster()))
 }
 
 // namePartClusterNameID
 func (n *namer) namePartClusterNameID(name string) string {
-	var _len int
+	return util.CreateStringID(name, n.lenCluster())
+}
+
+func (n *namer) lenShard() int {
 	if n.ctx == namerContextLabels {
-		_len = namePartClusterMaxLenLabelsCtx
+		return namePartShardMaxLenLabelsCtx
 	} else {
-		_len = namePartClusterMaxLenNamesCtx
+		return namePartShardMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, _len)
+
 }
 
 // namePartShardName
 func (n *namer) namePartShardName(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartShardMaxLenLabelsCtx
-	} else {
-		_len = namePartShardMaxLenNamesCtx
-	}
-	return sanitize(util.StringHead(name, _len))
+	return sanitize(util.StringHead(name, n.lenShard()))
 }
 
 // namePartShardNameID
 func (n *namer) namePartShardNameID(name string) string {
-	var _len int
+	return util.CreateStringID(name, n.lenShard())
+}
+
+func (n *namer) lenReplica() int {
 	if n.ctx == namerContextLabels {
-		_len = namePartShardMaxLenLabelsCtx
+		return namePartReplicaMaxLenLabelsCtx
 	} else {
-		_len = namePartShardMaxLenNamesCtx
+		return namePartReplicaMaxLenNamesCtx
 	}
-	return util.CreateStringID(name, _len)
+
 }
 
 // namePartReplicaName
 func (n *namer) namePartReplicaName(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartReplicaMaxLenLabelsCtx
-	} else {
-		_len = namePartReplicaMaxLenNamesCtx
-	}
-	return sanitize(util.StringHead(name, _len))
+	return sanitize(util.StringHead(name, n.lenReplica()))
 }
 
 // namePartReplicaNameID
 func (n *namer) namePartReplicaNameID(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartReplicaMaxLenLabelsCtx
-	} else {
-		_len = namePartReplicaMaxLenNamesCtx
-	}
-	return util.CreateStringID(name, _len)
+	return util.CreateStringID(name, n.lenReplica())
 }
 
 // namePartHostName
 func (n *namer) namePartHostName(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartReplicaMaxLenLabelsCtx
-	} else {
-		_len = namePartReplicaMaxLenNamesCtx
-	}
-	return sanitize(util.StringHead(name, _len))
+	return sanitize(util.StringHead(name, n.lenReplica()))
 }
 
 // namePartHostNameID
 func (n *namer) namePartHostNameID(name string) string {
-	var _len int
-	if n.ctx == namerContextLabels {
-		_len = namePartReplicaMaxLenLabelsCtx
-	} else {
-		_len = namePartReplicaMaxLenNamesCtx
-	}
-	return util.CreateStringID(name, _len)
+	return util.CreateStringID(name, n.lenReplica())
 }
 
 // getNamePartNamespace
@@ -249,7 +217,7 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 		return n.namePartChiName(shard.Address.Namespace)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
-		return n.namePartChiName(host.Address.Namespace)
+		return n.namePartChiName(host.Runtime.Address.Namespace)
 	}
 
 	return "ERROR"
@@ -269,7 +237,7 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 		return n.namePartChiName(shard.Address.CHIName)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
-		return n.namePartChiName(host.Address.CHIName)
+		return n.namePartChiName(host.Runtime.Address.CHIName)
 	}
 
 	return "ERROR"
@@ -286,7 +254,7 @@ func (n *namer) getNamePartClusterName(obj interface{}) string {
 		return n.namePartClusterName(shard.Address.ClusterName)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
-		return n.namePartClusterName(host.Address.ClusterName)
+		return n.namePartClusterName(host.Runtime.Address.ClusterName)
 	}
 
 	return "ERROR"
@@ -300,7 +268,7 @@ func (n *namer) getNamePartShardName(obj interface{}) string {
 		return n.namePartShardName(shard.Address.ShardName)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
-		return n.namePartShardName(host.Address.ShardName)
+		return n.namePartShardName(host.Runtime.Address.ShardName)
 	}
 
 	return "ERROR"
@@ -308,62 +276,62 @@ func (n *namer) getNamePartShardName(obj interface{}) string {
 
 // getNamePartReplicaName
 func (n *namer) getNamePartReplicaName(host *api.ChiHost) string {
-	return n.namePartReplicaName(host.Address.ReplicaName)
+	return n.namePartReplicaName(host.Runtime.Address.ReplicaName)
 }
 
 // getNamePartHostName
 func (n *namer) getNamePartHostName(host *api.ChiHost) string {
-	return n.namePartHostName(host.Address.HostName)
+	return n.namePartHostName(host.Runtime.Address.HostName)
 }
 
 // getNamePartCHIScopeCycleSize
 func getNamePartCHIScopeCycleSize(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.CHIScopeCycleSize)
+	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleSize)
 }
 
 // getNamePartCHIScopeCycleIndex
 func getNamePartCHIScopeCycleIndex(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.CHIScopeCycleIndex)
+	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleIndex)
 }
 
 // getNamePartCHIScopeCycleOffset
 func getNamePartCHIScopeCycleOffset(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.CHIScopeCycleOffset)
+	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleOffset)
 }
 
 // getNamePartClusterScopeCycleSize
 func getNamePartClusterScopeCycleSize(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.ClusterScopeCycleSize)
+	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleSize)
 }
 
 // getNamePartClusterScopeCycleIndex
 func getNamePartClusterScopeCycleIndex(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.ClusterScopeCycleIndex)
+	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleIndex)
 }
 
 // getNamePartClusterScopeCycleOffset
 func getNamePartClusterScopeCycleOffset(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.ClusterScopeCycleOffset)
+	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleOffset)
 }
 
 // getNamePartCHIScopeIndex
 func getNamePartCHIScopeIndex(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.CHIScopeIndex)
+	return strconv.Itoa(host.Runtime.Address.CHIScopeIndex)
 }
 
 // getNamePartClusterScopeIndex
 func getNamePartClusterScopeIndex(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.ClusterScopeIndex)
+	return strconv.Itoa(host.Runtime.Address.ClusterScopeIndex)
 }
 
 // getNamePartShardScopeIndex
 func getNamePartShardScopeIndex(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.ShardScopeIndex)
+	return strconv.Itoa(host.Runtime.Address.ShardScopeIndex)
 }
 
 // getNamePartReplicaScopeIndex
 func getNamePartReplicaScopeIndex(host *api.ChiHost) string {
-	return strconv.Itoa(host.Address.ReplicaScopeIndex)
+	return strconv.Itoa(host.Runtime.Address.ReplicaScopeIndex)
 }
 
 // CreateConfigMapHostName returns a name for a ConfigMap for replica's personal config
@@ -606,16 +574,16 @@ func createPodFQDN(host *api.ChiHost) string {
 	// Start with default pattern
 	pattern := podFQDNPattern
 
-	if host.CHI.Spec.NamespaceDomainPattern != "" {
+	if host.GetCHI().Spec.NamespaceDomainPattern != "" {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + host.CHI.Spec.NamespaceDomainPattern
+		pattern = "%s." + host.GetCHI().Spec.NamespaceDomainPattern
 	}
 
 	// Create FQDN based on pattern available
 	return fmt.Sprintf(
 		pattern,
 		CreatePodHostname(host),
-		host.Address.Namespace,
+		host.Runtime.Address.Namespace,
 	)
 }
 

@@ -42,9 +42,12 @@ type ClickHouseInstallation struct {
 	Spec            ChiSpec    `json:"spec"               yaml:"spec"`
 	Status          *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
-	Attributes ComparableAttributes `json:"-" yaml:"-"`
+	Runtime ClickHouseInstallationRuntime `json:"-" yaml:"-"`
+}
 
-	statusCreatorMutex sync.Mutex `json:"-" yaml:"-"`
+type ClickHouseInstallationRuntime struct {
+	Attributes         ComparableAttributes `json:"-" yaml:"-"`
+	statusCreatorMutex sync.Mutex           `json:"-" yaml:"-"`
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable

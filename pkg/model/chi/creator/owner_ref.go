@@ -21,17 +21,21 @@ import (
 )
 
 func getOwnerReferences(chi *api.ClickHouseInstallation) []meta.OwnerReference {
-	if chi.Attributes.SkipOwnerRef {
+	if chi.Runtime.Attributes.SkipOwnerRef {
 		return nil
 	}
+	return _getOwnerReference(&chi.ObjectMeta)
+}
+
+func _getOwnerReference(objectMeta *meta.ObjectMeta) []meta.OwnerReference {
 	controller := true
 	block := true
 	return []meta.OwnerReference{
 		{
 			APIVersion:         api.SchemeGroupVersion.String(),
 			Kind:               api.ClickHouseInstallationCRDResourceKind,
-			Name:               chi.Name,
-			UID:                chi.UID,
+			Name:               objectMeta.GetName(),
+			UID:                objectMeta.GetUID(),
 			Controller:         &controller,
 			BlockOwnerDeletion: &block,
 		},

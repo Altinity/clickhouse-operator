@@ -18,32 +18,33 @@ import "fmt"
 
 // ChiHostAddress defines address of a host within ClickHouseInstallation
 type ChiHostAddress struct {
-	Namespace               string `json:"namespace"               yaml:"namespace"`
-	StatefulSet             string `json:"statefulSet"             yaml:"statefulSet"`
-	FQDN                    string `json:"fqdn"                    yaml:"fqdn"`
-	CHIName                 string `json:"chiName"                 yaml:"chiName"`
-	ClusterName             string `json:"clusterName"             yaml:"clusterName"`
-	ClusterIndex            int    `json:"clusterIndex"            yaml:"clusterIndex"`
-	ShardName               string `json:"shardName"               yaml:"shardName"`
-	ShardIndex              int    `json:"shardIndex"              yaml:"shardIndex"`
-	ShardScopeIndex         int    `json:"shardScopeIndex"         yaml:"shardScopeIndex"`
-	ReplicaName             string `json:"replicaName"             yaml:"replicaName"`
-	ReplicaIndex            int    `json:"replicaIndex"            yaml:"replicaIndex"`
-	ReplicaScopeIndex       int    `json:"replicaScopeIndex"       yaml:"replicaScopeIndex"`
-	HostName                string `json:"hostName"                yaml:"hostName"`
-	CHIScopeIndex           int    `json:"chiScopeIndex"           yaml:"chiScopeIndex"`
-	CHIScopeCycleSize       int    `json:"chiScopeCycleSize"       yaml:"chiScopeCycleSize"`
-	CHIScopeCycleIndex      int    `json:"chiScopeCycleIndex"      yaml:"chiScopeCycleIndex"`
-	CHIScopeCycleOffset     int    `json:"chiScopeCycleOffset"     yaml:"chiScopeCycleOffset"`
-	ClusterScopeIndex       int    `json:"clusterScopeIndex"       yaml:"clusterScopeIndex"`
-	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize"   yaml:"clusterScopeCycleSize"`
-	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex"  yaml:"clusterScopeCycleIndex"`
-	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset" yaml:"clusterScopeCycleOffset"`
+	Namespace               string `json:"namespace,omitempty"               yaml:"namespace,omitempty"`
+	StatefulSet             string `json:"statefulSet,omitempty"             yaml:"statefulSet,omitempty"`
+	FQDN                    string `json:"fqdn,omitempty"                    yaml:"fqdn,omitempty"`
+	CHIName                 string `json:"chiName,omitempty"                 yaml:"chiName,omitempty"`
+	ClusterName             string `json:"clusterName,omitempty"             yaml:"clusterName,omitempty"`
+	ClusterIndex            int    `json:"clusterIndex,omitempty"            yaml:"clusterIndex,omitempty"`
+	ShardName               string `json:"shardName,omitempty"               yaml:"shardName,omitempty"`
+	ShardIndex              int    `json:"shardIndex,omitempty"              yaml:"shardIndex,omitempty"`
+	ShardScopeIndex         int    `json:"shardScopeIndex,omitempty"         yaml:"shardScopeIndex,omitempty"`
+	ReplicaName             string `json:"replicaName,omitempty"             yaml:"replicaName,omitempty"`
+	ReplicaIndex            int    `json:"replicaIndex,omitempty"            yaml:"replicaIndex,omitempty"`
+	ReplicaScopeIndex       int    `json:"replicaScopeIndex,omitempty"       yaml:"replicaScopeIndex,omitempty"`
+	HostName                string `json:"hostName,omitempty"                yaml:"hostName,omitempty"`
+	CHIScopeIndex           int    `json:"chiScopeIndex,omitempty"           yaml:"chiScopeIndex,omitempty"`
+	CHIScopeCycleSize       int    `json:"chiScopeCycleSize,omitempty"       yaml:"chiScopeCycleSize,omitempty"`
+	CHIScopeCycleIndex      int    `json:"chiScopeCycleIndex,omitempty"      yaml:"chiScopeCycleIndex,omitempty"`
+	CHIScopeCycleOffset     int    `json:"chiScopeCycleOffset,omitempty"     yaml:"chiScopeCycleOffset,omitempty"`
+	ClusterScopeIndex       int    `json:"clusterScopeIndex,omitempty"       yaml:"clusterScopeIndex,omitempty"`
+	ClusterScopeCycleSize   int    `json:"clusterScopeCycleSize,omitempty"   yaml:"clusterScopeCycleSize,omitempty"`
+	ClusterScopeCycleIndex  int    `json:"clusterScopeCycleIndex,omitempty"  yaml:"clusterScopeCycleIndex,omitempty"`
+	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset,omitempty" yaml:"clusterScopeCycleOffset,omitempty"`
 }
 
 // CompactString creates compact string representation
 func (a ChiHostAddress) CompactString() string {
-	return fmt.Sprintf("ns:%s|chi:%s|clu:%s|sha:%s|rep:%s|host:%s", a.Namespace, a.CHIName, a.ClusterName, a.ShardName, a.ReplicaName, a.HostName)
+	return fmt.Sprintf("ns:%s|chi:%s|clu:%s|sha:%s|rep:%s|host:%s",
+		a.Namespace, a.CHIName, a.ClusterName, a.ShardName, a.ReplicaName, a.HostName)
 }
 
 // ClusterNameString creates cluster+host pair

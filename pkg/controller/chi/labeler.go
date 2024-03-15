@@ -257,7 +257,7 @@ func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.ChiHos
 
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
 	}
 
@@ -265,7 +265,7 @@ func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.ChiHos
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, controller.NewUpdateOptions())
 		if err != nil {
-			log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Address.NamespaceNameString(), err)
+			log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 			return err
 		}
 	}
@@ -291,7 +291,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *api.ChiHost)
 	}
 
 	if err != nil {
-		log.V(1).M(host).F().Info("FAIL get pod for host '%s' err: %v", host.Address.NamespaceNameString(), err)
+		log.V(1).M(host).F().Info("FAIL get pod for host '%s' err: %v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
 	}
 
@@ -313,7 +313,7 @@ func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *a
 
 	svc, err := c.getService(host)
 	if err != nil {
-		log.M(host).F().Error("FAIL get service for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL get service for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
 	}
 
@@ -321,7 +321,7 @@ func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *a
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 		if err != nil {
-			log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Address.NamespaceNameString(), err)
+			log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 			return err
 		}
 	}
@@ -347,7 +347,7 @@ func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *api
 		return nil
 	}
 	if err != nil {
-		log.V(1).M(host).F().Info("FAIL get service for host '%s' err: %v", host.Address.NamespaceNameString(), err)
+		log.V(1).M(host).F().Info("FAIL get service for host '%s' err: %v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
 	}
 

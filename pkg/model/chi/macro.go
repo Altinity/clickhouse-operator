@@ -89,15 +89,15 @@ type MacrosEngine struct {
 func Macro(scope interface{}) *MacrosEngine {
 	m := new(MacrosEngine)
 	m.names = newNamer(namerContextNames)
-	switch t := scope.(type) {
+	switch typed := scope.(type) {
 	case *api.ClickHouseInstallation:
-		m.chi = t
+		m.chi = typed
 	case *api.Cluster:
-		m.cluster = t
+		m.cluster = typed
 	case *api.ChiShard:
-		m.shard = t
+		m.shard = typed
 	case *api.ChiHost:
-		m.host = t
+		m.host = typed
 	}
 	return m
 }
@@ -188,51 +188,51 @@ func (m *MacrosEngine) newMapMacroReplacerShard() *util.MapReplacer {
 
 // clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
 func clusterScopeIndexOfPreviousCycleTail(host *api.ChiHost) int {
-	if host.Address.ClusterScopeCycleOffset == 0 {
+	if host.Runtime.Address.ClusterScopeCycleOffset == 0 {
 		// This is the cycle head - the first host of the cycle
 		// We need to point to previous host in this cluster - which would be previous cycle tail
 
-		if host.Address.ClusterScopeIndex == 0 {
+		if host.Runtime.Address.ClusterScopeIndex == 0 {
 			// This is the very first host in the cluster - head of the first cycle
 			// No previous host available, so just point to the same host, mainly because label must be an empty string
 			// or consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character
 			// So we can't set it to "-1"
-			return host.Address.ClusterScopeIndex
+			return host.Runtime.Address.ClusterScopeIndex
 		}
 
 		// This is head of non-first cycle, point to previous host in the cluster - which would be previous cycle tail
-		return host.Address.ClusterScopeIndex - 1
+		return host.Runtime.Address.ClusterScopeIndex - 1
 	}
 
 	// This is not cycle head - just point to the same host
-	return host.Address.ClusterScopeIndex
+	return host.Runtime.Address.ClusterScopeIndex
 }
 
 // newLineMacroReplacerHost
 func (m *MacrosEngine) newLineMacroReplacerHost() *strings.Replacer {
 	return strings.NewReplacer(
-		macrosNamespace, m.names.namePartNamespace(m.host.Address.Namespace),
-		macrosChiName, m.names.namePartChiName(m.host.Address.CHIName),
-		macrosChiID, m.names.namePartChiNameID(m.host.Address.CHIName),
-		macrosClusterName, m.names.namePartClusterName(m.host.Address.ClusterName),
-		macrosClusterID, m.names.namePartClusterNameID(m.host.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(m.host.Address.ClusterIndex),
-		macrosShardName, m.names.namePartShardName(m.host.Address.ShardName),
-		macrosShardID, m.names.namePartShardNameID(m.host.Address.ShardName),
-		macrosShardIndex, strconv.Itoa(m.host.Address.ShardIndex),
-		macrosShardScopeIndex, strconv.Itoa(m.host.Address.ShardScopeIndex), // TODO use appropriate namePart function
-		macrosReplicaName, m.names.namePartReplicaName(m.host.Address.ReplicaName),
-		macrosReplicaID, m.names.namePartReplicaNameID(m.host.Address.ReplicaName),
-		macrosReplicaIndex, strconv.Itoa(m.host.Address.ReplicaIndex),
-		macrosReplicaScopeIndex, strconv.Itoa(m.host.Address.ReplicaScopeIndex), // TODO use appropriate namePart function
-		macrosHostName, m.names.namePartHostName(m.host.Address.HostName),
-		macrosHostID, m.names.namePartHostNameID(m.host.Address.HostName),
-		macrosChiScopeIndex, strconv.Itoa(m.host.Address.CHIScopeIndex), // TODO use appropriate namePart function
-		macrosChiScopeCycleIndex, strconv.Itoa(m.host.Address.CHIScopeCycleIndex), // TODO use appropriate namePart function
-		macrosChiScopeCycleOffset, strconv.Itoa(m.host.Address.CHIScopeCycleOffset), // TODO use appropriate namePart function
-		macrosClusterScopeIndex, strconv.Itoa(m.host.Address.ClusterScopeIndex), // TODO use appropriate namePart function
-		macrosClusterScopeCycleIndex, strconv.Itoa(m.host.Address.ClusterScopeCycleIndex), // TODO use appropriate namePart function
-		macrosClusterScopeCycleOffset, strconv.Itoa(m.host.Address.ClusterScopeCycleOffset), // TODO use appropriate namePart function
+		macrosNamespace, m.names.namePartNamespace(m.host.Runtime.Address.Namespace),
+		macrosChiName, m.names.namePartChiName(m.host.Runtime.Address.CHIName),
+		macrosChiID, m.names.namePartChiNameID(m.host.Runtime.Address.CHIName),
+		macrosClusterName, m.names.namePartClusterName(m.host.Runtime.Address.ClusterName),
+		macrosClusterID, m.names.namePartClusterNameID(m.host.Runtime.Address.ClusterName),
+		macrosClusterIndex, strconv.Itoa(m.host.Runtime.Address.ClusterIndex),
+		macrosShardName, m.names.namePartShardName(m.host.Runtime.Address.ShardName),
+		macrosShardID, m.names.namePartShardNameID(m.host.Runtime.Address.ShardName),
+		macrosShardIndex, strconv.Itoa(m.host.Runtime.Address.ShardIndex),
+		macrosShardScopeIndex, strconv.Itoa(m.host.Runtime.Address.ShardScopeIndex), // TODO use appropriate namePart function
+		macrosReplicaName, m.names.namePartReplicaName(m.host.Runtime.Address.ReplicaName),
+		macrosReplicaID, m.names.namePartReplicaNameID(m.host.Runtime.Address.ReplicaName),
+		macrosReplicaIndex, strconv.Itoa(m.host.Runtime.Address.ReplicaIndex),
+		macrosReplicaScopeIndex, strconv.Itoa(m.host.Runtime.Address.ReplicaScopeIndex), // TODO use appropriate namePart function
+		macrosHostName, m.names.namePartHostName(m.host.Runtime.Address.HostName),
+		macrosHostID, m.names.namePartHostNameID(m.host.Runtime.Address.HostName),
+		macrosChiScopeIndex, strconv.Itoa(m.host.Runtime.Address.CHIScopeIndex), // TODO use appropriate namePart function
+		macrosChiScopeCycleIndex, strconv.Itoa(m.host.Runtime.Address.CHIScopeCycleIndex), // TODO use appropriate namePart function
+		macrosChiScopeCycleOffset, strconv.Itoa(m.host.Runtime.Address.CHIScopeCycleOffset), // TODO use appropriate namePart function
+		macrosClusterScopeIndex, strconv.Itoa(m.host.Runtime.Address.ClusterScopeIndex), // TODO use appropriate namePart function
+		macrosClusterScopeCycleIndex, strconv.Itoa(m.host.Runtime.Address.ClusterScopeCycleIndex), // TODO use appropriate namePart function
+		macrosClusterScopeCycleOffset, strconv.Itoa(m.host.Runtime.Address.ClusterScopeCycleOffset), // TODO use appropriate namePart function
 		macrosClusterScopeCycleHeadPointsToPreviousCycleTail, strconv.Itoa(clusterScopeIndexOfPreviousCycleTail(m.host)),
 	)
 }

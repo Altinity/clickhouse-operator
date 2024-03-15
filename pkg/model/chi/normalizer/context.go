@@ -18,8 +18,6 @@ import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity
 
 // Context specifies CHI-related normalization context
 type Context struct {
-	// start specifies start CHI from which normalization has started
-	start *api.ClickHouseInstallation
 	// chi specifies current CHI being normalized
 	chi *api.ClickHouseInstallation
 	// options specifies normalization options

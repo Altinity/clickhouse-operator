@@ -36,6 +36,10 @@ type ChiHost struct {
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
+	Runtime ChiHostRuntime `json:"-" yaml:"-"`
+}
+
+type ChiHostRuntime struct {
 	// Internal data
 	Address             ChiHostAddress              `json:"-" yaml:"-"`
 	Config              ChiHostConfig               `json:"-" yaml:"-"`
@@ -53,10 +57,10 @@ func (host *ChiHost) GetReconcileAttributes() *ChiHostReconcileAttributes {
 	if host == nil {
 		return nil
 	}
-	if host.reconcileAttributes == nil {
-		host.reconcileAttributes = NewChiHostReconcileAttributes()
+	if host.Runtime.reconcileAttributes == nil {
+		host.Runtime.reconcileAttributes = NewChiHostReconcileAttributes()
 	}
-	return host.reconcileAttributes
+	return host.Runtime.reconcileAttributes
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
@@ -138,7 +142,7 @@ func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetHostTemplate()
-	return host.CHI.GetHostTemplate(name)
+	return host.Runtime.CHI.GetHostTemplate(name)
 }
 
 // GetPodTemplate gets pod template
@@ -147,7 +151,7 @@ func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetPodTemplate()
-	return host.CHI.GetPodTemplate(name)
+	return host.Runtime.CHI.GetPodTemplate(name)
 }
 
 // GetServiceTemplate gets service template
@@ -156,7 +160,7 @@ func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetReplicaServiceTemplate()
-	return host.CHI.GetServiceTemplate(name)
+	return host.Runtime.CHI.GetServiceTemplate(name)
 }
 
 // GetStatefulSetReplicasNum gets stateful set replica num
@@ -165,7 +169,7 @@ func (host *ChiHost) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 	switch {
 	case shutdown:
 		num = 0
-	case host.CHI.IsStopped():
+	case host.IsStopped():
 		num = 0
 	default:
 		num = 1
@@ -197,7 +201,7 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 	if host == nil {
 		return nil
 	}
-	return host.CHI
+	return host.Runtime.CHI
 }
 
 // HasCHI checks whether host has CHI
@@ -208,18 +212,22 @@ func (host *ChiHost) HasCHI() bool {
 // GetCluster gets cluster
 func (host *ChiHost) GetCluster() *Cluster {
 	// Host has to have filled Address
-	return host.GetCHI().FindCluster(host.Address.ClusterName)
+	return host.GetCHI().FindCluster(host.Runtime.Address.ClusterName)
 }
 
 // GetShard gets shard
 func (host *ChiHost) GetShard() *ChiShard {
 	// Host has to have filled Address
-	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
+	return host.GetCHI().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
 }
 
 // GetAncestor gets ancestor of a host
 func (host *ChiHost) GetAncestor() *ChiHost {
-	return host.GetCHI().GetAncestor().FindHost(host.Address.ClusterName, host.Address.ShardName, host.Address.HostName)
+	return host.GetCHI().GetAncestor().FindHost(
+		host.Runtime.Address.ClusterName,
+		host.Runtime.Address.ShardName,
+		host.Runtime.Address.HostName,
+	)
 }
 
 // HasAncestor checks whether host has an ancestor
@@ -285,12 +293,12 @@ func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount
 		if !host.HasDesiredStatefulSet() {
 			return
 		}
-		sts = host.DesiredStatefulSet
+		sts = host.Runtime.DesiredStatefulSet
 	case which.CurStatefulSet():
 		if !host.HasCurStatefulSet() {
 			return
 		}
-		sts = host.CurStatefulSet
+		sts = host.Runtime.CurStatefulSet
 	default:
 		return
 	}
@@ -363,7 +371,7 @@ func (host *ChiHost) IsFirst() bool {
 		return false
 	}
 
-	return host.Address.CHIScopeIndex == 0
+	return host.Runtime.Address.CHIScopeIndex == 0
 }
 
 // HasCurStatefulSet checks whether host has CurStatefulSet
@@ -372,7 +380,7 @@ func (host *ChiHost) HasCurStatefulSet() bool {
 		return false
 	}
 
-	return host.CurStatefulSet != nil
+	return host.Runtime.CurStatefulSet != nil
 }
 
 // HasDesiredStatefulSet checks whether host has DesiredStatefulSet
@@ -381,5 +389,5 @@ func (host *ChiHost) HasDesiredStatefulSet() bool {
 		return false
 	}
 
-	return host.DesiredStatefulSet != nil
+	return host.Runtime.DesiredStatefulSet != nil
 }

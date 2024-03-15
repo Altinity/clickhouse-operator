@@ -24,7 +24,7 @@ import (
 )
 
 func (c *Controller) walkPVCs(host *api.ChiHost, f func(pvc *core.PersistentVolumeClaim)) {
-	namespace := host.Address.Namespace
+	namespace := host.Runtime.Address.Namespace
 	name := model.CreatePodName(host)
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 	if err != nil {
@@ -50,7 +50,7 @@ func (c *Controller) walkPVCs(host *api.ChiHost, f func(pvc *core.PersistentVolu
 }
 
 func (c *Controller) walkDiscoveredPVCs(host *api.ChiHost, f func(pvc *core.PersistentVolumeClaim)) {
-	namespace := host.Address.Namespace
+	namespace := host.Runtime.Address.Namespace
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(controller.NewContext(), controller.NewListOptions(model.GetSelectorHostScope(host)))
 	if err != nil {

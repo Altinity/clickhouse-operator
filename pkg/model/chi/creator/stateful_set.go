@@ -32,7 +32,7 @@ func (c *Creator) CreateStatefulSet(host *api.ChiHost, shutdown bool) *apps.Stat
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateStatefulSetName(host),
-			Namespace:       host.Address.Namespace,
+			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          model.Macro(host).Map(c.labels.GetHostScope(host, true)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetHostScope(host)),
 			OwnerReferences: getOwnerReferences(c.chi),
@@ -91,7 +91,7 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 		return
 	}
 
-	container.Env = append(container.Env, host.GetCHI().Attributes.AdditionalEnvVars...)
+	container.Env = append(container.Env, host.GetCHI().Runtime.Attributes.AdditionalEnvVars...)
 }
 
 // ensureClickHouseContainerSpecified
@@ -267,7 +267,7 @@ func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSe
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	c.statefulSetAppendVolumes(
 		statefulSet,
-		host.GetCHI().Attributes.AdditionalVolumes...,
+		host.GetCHI().Runtime.Attributes.AdditionalVolumes...,
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
@@ -277,7 +277,7 @@ func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSe
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
 		c.containerAppendVolumeMounts(
 			container,
-			host.GetCHI().Attributes.AdditionalVolumeMounts...,
+			host.GetCHI().Runtime.Attributes.AdditionalVolumeMounts...,
 		)
 	}
 }

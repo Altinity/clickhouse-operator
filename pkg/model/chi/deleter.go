@@ -15,7 +15,7 @@
 package chi
 
 import (
-	"k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
@@ -26,7 +26,7 @@ func HostCanDeletePVC(host *api.ChiHost, pvcName string) bool {
 	policy := api.PVCReclaimPolicyDelete
 
 	// What host, VolumeMount and VolumeClaimTemplate this PVC is made from?
-	host.WalkVolumeMounts(api.CurStatefulSet, func(volumeMount *v1.VolumeMount) {
+	host.WalkVolumeMounts(api.CurStatefulSet, func(volumeMount *core.VolumeMount) {
 		volumeClaimTemplate, ok := GetVolumeClaimTemplate(host, volumeMount)
 		if !ok {
 			// No this is not a reference to VolumeClaimTemplate
@@ -48,7 +48,7 @@ func HostCanDeletePVC(host *api.ChiHost, pvcName string) bool {
 // HostCanDeleteAllPVCs checks whether all PVCs can be deleted
 func HostCanDeleteAllPVCs(host *api.ChiHost) bool {
 	canDeleteAllPVCs := true
-	host.CHI.WalkVolumeClaimTemplates(func(template *api.ChiVolumeClaimTemplate) {
+	host.GetCHI().WalkVolumeClaimTemplates(func(template *api.ChiVolumeClaimTemplate) {
 		if getPVCReclaimPolicy(host, template) == api.PVCReclaimPolicyRetain {
 			// At least one template wants to keep its PVC
 			canDeleteAllPVCs = false

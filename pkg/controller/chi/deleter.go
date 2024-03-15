@@ -31,7 +31,7 @@ import (
 
 // deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
 func (c *Controller) deleteHost(ctx context.Context, host *api.ChiHost) error {
-	log.V(1).M(host).S().Info(host.Address.ClusterNameString())
+	log.V(1).M(host).S().Info(host.Runtime.Address.ClusterNameString())
 
 	// Each host consists of:
 	_ = c.deleteStatefulSet(ctx, host)
@@ -39,7 +39,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *api.ChiHost) error {
 	_ = c.deleteConfigMap(ctx, host)
 	_ = c.deleteServiceHost(ctx, host)
 
-	log.V(1).M(host).E().Info(host.Address.ClusterNameString())
+	log.V(1).M(host).E().Info(host.Runtime.Address.ClusterNameString())
 
 	return nil
 }
@@ -123,11 +123,11 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.ChiHost) e
 
 	// Namespaced name
 	name := model.CreateStatefulSetName(host)
-	namespace := host.Address.Namespace
+	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
 	var err error
-	host.CurStatefulSet, err = c.getStatefulSet(host)
+	host.Runtime.CurStatefulSet, err = c.getStatefulSet(host)
 	if err != nil {
 		// Unable to fetch cur StatefulSet, but this is not necessarily an error yet
 		if apiErrors.IsNotFound(err) {
@@ -141,8 +141,8 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.ChiHost) e
 	// Scale StatefulSet down to 0 pods count.
 	// This is the proper and graceful way to delete StatefulSet
 	var zero int32 = 0
-	host.CurStatefulSet.Spec.Replicas = &zero
-	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, host.CurStatefulSet, controller.NewUpdateOptions()); err != nil {
+	host.Runtime.CurStatefulSet.Spec.Replicas = &zero
+	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, host.Runtime.CurStatefulSet, controller.NewUpdateOptions()); err != nil {
 		log.V(1).M(host).Error("UNABLE to update StatefulSet %s/%s", namespace, name)
 		return err
 	}
@@ -192,7 +192,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *api.ChiHost) error {
 	log.V(2).M(host).S().P()
 	defer log.V(2).M(host).E().P()
 
-	namespace := host.Address.Namespace
+	namespace := host.Runtime.Address.Namespace
 	c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("task is done")
@@ -229,7 +229,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *api.ChiHost) err
 	}
 
 	name := model.CreateConfigMapHostName(host)
-	namespace := host.Address.Namespace
+	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
 	if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions()); err == nil {
@@ -263,7 +263,7 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *api.ChiHost) e
 	}
 
 	serviceName := model.CreateStatefulSetServiceName(host)
-	namespace := host.Address.Namespace
+	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
@@ -319,15 +319,16 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 
 	if err != nil {
 		// No such a service, nothing to delete
+		log.V(1).M(namespace, name).F().Info("Not Found Service: %s/%s err: %v", namespace, name, err)
 		return nil
 	}
 
 	// Delete service
 	err = c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	if err == nil {
-		log.V(1).M(namespace, name).Info("OK delete Service %s/%s", namespace, name)
+		log.V(1).M(namespace, name).F().Info("OK delete Service: %s/%s", namespace, name)
 	} else {
-		log.V(1).M(namespace, name).F().Error("FAIL delete Service %s/%s err:%v", namespace, name, err)
+		log.V(1).M(namespace, name).F().Error("FAIL delete Service: %s/%s err:%v", namespace, name, err)
 	}
 
 	return err

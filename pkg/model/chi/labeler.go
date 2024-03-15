@@ -246,10 +246,10 @@ func (l *Labeler) GetHostScope(host *api.ChiHost, applySupplementaryServiceLabel
 
 func appendConfigLabels(host *api.ChiHost, labels map[string]string) map[string]string {
 	if host.HasCurStatefulSet() {
-		if val, exists := host.CurStatefulSet.Labels[LabelZookeeperConfigVersion]; exists {
+		if val, exists := host.Runtime.CurStatefulSet.Labels[LabelZookeeperConfigVersion]; exists {
 			labels[LabelZookeeperConfigVersion] = val
 		}
-		if val, exists := host.CurStatefulSet.Labels[LabelSettingsConfigVersion]; exists {
+		if val, exists := host.Runtime.CurStatefulSet.Labels[LabelSettingsConfigVersion]; exists {
 			labels[LabelSettingsConfigVersion] = val
 		}
 	}

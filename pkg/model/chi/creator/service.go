@@ -133,12 +133,12 @@ func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
 	statefulSetName := model.CreateStatefulSetName(host)
 	ownerReferences := getOwnerReferences(c.chi)
 
-	c.a.V(1).F().Info("%s/%s for Set %s", host.Address.Namespace, serviceName, statefulSetName)
+	c.a.V(1).F().Info("%s/%s for Set %s", host.Runtime.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
-			host.Address.Namespace,
+			host.Runtime.Address.Namespace,
 			serviceName,
 			c.labels.GetServiceHost(host),
 			c.annotations.GetServiceHost(host),
@@ -153,7 +153,7 @@ func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            serviceName,
-			Namespace:       host.Address.Namespace,
+			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          model.Macro(host).Map(c.labels.GetServiceHost(host)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetServiceHost(host)),
 			OwnerReferences: ownerReferences,

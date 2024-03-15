@@ -19,17 +19,16 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
 func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
-	shard := chi.CreateFQDNs(host, api.ChiShard{}, false)
-	cluster := chi.CreateFQDNs(host, api.Cluster{}, false)
+	shard := model.CreateFQDNs(host, api.ChiShard{}, false)
+	cluster := model.CreateFQDNs(host, api.Cluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == normalizer.SchemaPolicyShardAll {
+	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard
 		// However, it is reasonable to have at least two instances in a cluster
 		if len(cluster) >= 2 {
@@ -38,7 +37,7 @@ func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
 		}
 	}
 
-	if host.GetCluster().SchemaPolicy.Replica == normalizer.SchemaPolicyReplicaNone {
+	if host.GetCluster().SchemaPolicy.Replica == model.SchemaPolicyReplicaNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
 		return false
 	}
@@ -67,22 +66,22 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			chi.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
-			s.sqlCreateDatabaseReplicated(host.Address.ClusterName),
+			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.sqlCreateDatabaseReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			chi.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
-			s.sqlCreateTableReplicated(host.Address.ClusterName),
+			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.sqlCreateTableReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			chi.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
-			s.sqlCreateFunction(host.Address.ClusterName),
+			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)
 	return util.ConcatSlices([][]string{databaseNames, tableNames, functionNames}),

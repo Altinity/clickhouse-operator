@@ -70,11 +70,11 @@ func (shard *ChiShard) FindHost(needle interface{}) (res *ChiHost) {
 	shard.WalkHosts(func(host *ChiHost) error {
 		switch v := needle.(type) {
 		case string:
-			if host.Address.HostName == v {
+			if host.Runtime.Address.HostName == v {
 				res = host
 			}
 		case int:
-			if host.Address.ShardScopeIndex == v {
+			if host.Runtime.Address.ShardScopeIndex == v {
 				res = host
 			}
 		}

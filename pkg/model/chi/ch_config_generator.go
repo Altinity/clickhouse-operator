@@ -458,7 +458,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 	util.Iline(b, 0, "    <macros>")
 
 	// <installation>CHI-name-macros-value</installation>
-	util.Iline(b, 8, "<installation>%s</installation>", host.Address.CHIName)
+	util.Iline(b, 8, "<installation>%s</installation>", host.Runtime.Address.CHIName)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
 	// util.Iline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
@@ -467,13 +467,13 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 
 	// All Shards One Replica ChkCluster
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster</CLUSTER_NAME-shard>
-	util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", AllShardsOneReplicaClusterName, host.Address.CHIScopeIndex)
+	util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", AllShardsOneReplicaClusterName, host.Runtime.Address.CHIScopeIndex)
 
 	// <cluster> and <shard> macros are applicable to main cluster only. All aux clusters do not have ambiguous macros
 	// <cluster></cluster> macro
-	util.Iline(b, 8, "<cluster>%s</cluster>", host.Address.ClusterName)
+	util.Iline(b, 8, "<cluster>%s</cluster>", host.Runtime.Address.ClusterName)
 	// <shard></shard> macro
-	util.Iline(b, 8, "<shard>%s</shard>", host.Address.ShardName)
+	util.Iline(b, 8, "<shard>%s</shard>", host.Runtime.Address.ShardName)
 	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
 	util.Iline(b, 8, "<replica>%s</replica>", CreatePodHostname(host))

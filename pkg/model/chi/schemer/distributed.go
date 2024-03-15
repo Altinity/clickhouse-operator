@@ -19,16 +19,15 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // shouldCreateDistributedObjects determines whether distributed objects should be created
 func shouldCreateDistributedObjects(host *api.ChiHost) bool {
-	hosts := chi.CreateFQDNs(host, api.Cluster{}, false)
+	hosts := model.CreateFQDNs(host, api.Cluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == normalizer.SchemaPolicyShardNone {
+	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
 		return false
 	}
@@ -57,22 +56,22 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ap
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			chi.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
-			s.sqlCreateDatabaseDistributed(host.Address.ClusterName),
+			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.sqlCreateDatabaseDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			chi.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
-			s.sqlCreateTableDistributed(host.Address.ClusterName),
+			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.sqlCreateTableDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			chi.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
-			s.sqlCreateFunction(host.Address.ClusterName),
+			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)
 	return util.ConcatSlices([][]string{databaseNames, tableNames, functionNames}),

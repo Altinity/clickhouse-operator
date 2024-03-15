@@ -120,7 +120,7 @@ func (host *WatchedHost) readFrom(h *api.ChiHost) {
 		return
 	}
 	host.Name = h.Name
-	host.Hostname = h.Address.FQDN
+	host.Hostname = h.Runtime.Address.FQDN
 	host.TCPPort = h.TCPPort
 	host.TLSPort = h.TLSPort
 	host.HTTPPort = h.HTTPPort

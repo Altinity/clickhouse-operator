@@ -67,7 +67,7 @@ func (c *Creator) createConfigMapHost(host *api.ChiHost, name string, data map[s
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            name,
-			Namespace:       host.Address.Namespace,
+			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          model.Macro(host).Map(c.labels.GetConfigMapHost(host)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetConfigMapHost(host)),
 			OwnerReferences: getOwnerReferences(c.chi),

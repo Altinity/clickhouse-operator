@@ -27,3 +27,12 @@ const (
 const (
 	InternodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
 )
+
+// Values for Schema Policy
+const (
+	SchemaPolicyReplicaNone                = "None"
+	SchemaPolicyReplicaAll                 = "All"
+	SchemaPolicyShardNone                  = "None"
+	SchemaPolicyShardAll                   = "All"
+	SchemaPolicyShardDistributedTablesOnly = "DistributedTablesOnly"
+)

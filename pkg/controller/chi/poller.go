@@ -124,8 +124,8 @@ func (c *Controller) pollHost(
 	}
 
 	opts = opts.Ensure().FromConfig(chop.Config())
-	namespace := host.Address.Namespace
-	name := host.Address.HostName
+	namespace := host.Runtime.Address.Namespace
+	name := host.Runtime.Address.HostName
 
 	return controller.Poll(
 		ctx,
@@ -157,8 +157,8 @@ func (c *Controller) pollHostStatefulSet(
 		opts = controller.NewPollerOptions().FromConfig(chop.Config())
 	}
 
-	namespace := host.Address.Namespace
-	name := host.Address.StatefulSet
+	namespace := host.Runtime.Address.Namespace
+	name := host.Runtime.Address.StatefulSet
 
 	return controller.Poll(
 		ctx,

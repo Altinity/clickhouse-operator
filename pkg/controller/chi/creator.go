@@ -39,7 +39,7 @@ func (c *Controller) createStatefulSet(ctx context.Context, host *api.ChiHost) E
 		return nil
 	}
 
-	statefulSet := host.DesiredStatefulSet
+	statefulSet := host.Runtime.DesiredStatefulSet
 
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if _, err := c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions()); err != nil {
@@ -198,17 +198,23 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *api.Ch
 
 	case api.OnStatefulSetCreateFailureActionDelete:
 		// Delete gracefully failed StatefulSet
-		log.V(1).M(host).F().Info("going to DELETE FAILED StatefulSet %s", util.NamespaceNameString(host.DesiredStatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info(
+			"going to DELETE FAILED StatefulSet %s",
+			util.NamespaceNameString(host.Runtime.DesiredStatefulSet.ObjectMeta))
 		_ = c.deleteHost(ctx, host)
 		return c.shouldContinueOnCreateFailed()
 
 	case api.OnStatefulSetCreateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(host.DesiredStatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info(
+			"going to ignore error %s",
+			util.NamespaceNameString(host.Runtime.DesiredStatefulSet.ObjectMeta))
 		return errCRUDIgnore
 
 	default:
-		log.V(1).M(host).F().Error("Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s", chop.Config().Reconcile.StatefulSet.Create.OnFailure)
+		log.V(1).M(host).F().Error(
+			"Unknown c.chop.Config().OnStatefulSetCreateFailureAction=%s",
+			chop.Config().Reconcile.StatefulSet.Create.OnFailure)
 		return errCRUDIgnore
 	}
 

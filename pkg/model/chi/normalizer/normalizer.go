@@ -256,8 +256,8 @@ func (n *Normalizer) finalizeCHI() {
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.ctx.chi.WalkHosts(func(host *api.ChiHost) error {
-		host.Address.StatefulSet = model.CreateStatefulSetName(host)
-		host.Address.FQDN = model.CreateFQDN(host)
+		host.Runtime.Address.StatefulSet = model.CreateStatefulSetName(host)
+		host.Runtime.Address.FQDN = model.CreateFQDN(host)
 		return nil
 	})
 }
@@ -329,35 +329,35 @@ func hostApplyHostTemplate(host *api.ChiHost, template *api.ChiHostTemplate) {
 				if api.IsPortAssigned(template.Spec.TCPPort) {
 					base = template.Spec.TCPPort
 				}
-				host.TCPPort = base + int32(host.Address.ClusterScopeIndex)
+				host.TCPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.TLSPort) {
 				base := model.ChDefaultTLSPortNumber
 				if api.IsPortAssigned(template.Spec.TLSPort) {
 					base = template.Spec.TLSPort
 				}
-				host.TLSPort = base + int32(host.Address.ClusterScopeIndex)
+				host.TLSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.HTTPPort) {
 				base := model.ChDefaultHTTPPortNumber
 				if api.IsPortAssigned(template.Spec.HTTPPort) {
 					base = template.Spec.HTTPPort
 				}
-				host.HTTPPort = base + int32(host.Address.ClusterScopeIndex)
+				host.HTTPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.HTTPSPort) {
 				base := model.ChDefaultHTTPSPortNumber
 				if api.IsPortAssigned(template.Spec.HTTPSPort) {
 					base = template.Spec.HTTPSPort
 				}
-				host.HTTPSPort = base + int32(host.Address.ClusterScopeIndex)
+				host.HTTPSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.InterserverHTTPPort) {
 				base := model.ChDefaultInterserverHTTPPortNumber
 				if api.IsPortAssigned(template.Spec.InterserverHTTPPort) {
 					base = template.Spec.InterserverHTTPPort
 				}
-				host.InterserverHTTPPort = base + int32(host.Address.ClusterScopeIndex)
+				host.InterserverHTTPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 		}
 	}
@@ -925,14 +925,14 @@ func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
 		return
 	}
 
-	for _, existingEnvVar := range n.ctx.chi.Attributes.AdditionalEnvVars {
+	for _, existingEnvVar := range n.ctx.chi.Runtime.Attributes.AdditionalEnvVars {
 		if existingEnvVar.Name == envVar.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Attributes.AdditionalEnvVars = append(n.ctx.chi.Attributes.AdditionalEnvVars, envVar)
+	n.ctx.chi.Runtime.Attributes.AdditionalEnvVars = append(n.ctx.chi.Runtime.Attributes.AdditionalEnvVars, envVar)
 }
 
 func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
@@ -941,14 +941,14 @@ func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
 		return
 	}
 
-	for _, existingVolume := range n.ctx.chi.Attributes.AdditionalVolumes {
+	for _, existingVolume := range n.ctx.chi.Runtime.Attributes.AdditionalVolumes {
 		if existingVolume.Name == volume.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Attributes.AdditionalVolumes = append(n.ctx.chi.Attributes.AdditionalVolumes, volume)
+	n.ctx.chi.Runtime.Attributes.AdditionalVolumes = append(n.ctx.chi.Runtime.Attributes.AdditionalVolumes, volume)
 }
 
 func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
@@ -957,14 +957,14 @@ func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 		return
 	}
 
-	for _, existingVolumeMount := range n.ctx.chi.Attributes.AdditionalVolumeMounts {
+	for _, existingVolumeMount := range n.ctx.chi.Runtime.Attributes.AdditionalVolumeMounts {
 		if existingVolumeMount.Name == volumeMount.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Attributes.AdditionalVolumeMounts = append(n.ctx.chi.Attributes.AdditionalVolumeMounts, volumeMount)
+	n.ctx.chi.Runtime.Attributes.AdditionalVolumeMounts = append(n.ctx.chi.Runtime.Attributes.AdditionalVolumeMounts, volumeMount)
 }
 
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
@@ -1325,15 +1325,6 @@ func (n *Normalizer) createHostsField(cluster *api.Cluster) {
 	cluster.WalkHostsByReplicas(hostMergeFunc)
 }
 
-// Values for Schema Policy
-const (
-	SchemaPolicyReplicaNone                = "None"
-	SchemaPolicyReplicaAll                 = "All"
-	SchemaPolicyShardNone                  = "None"
-	SchemaPolicyShardAll                   = "All"
-	SchemaPolicyShardDistributedTablesOnly = "DistributedTablesOnly"
-)
-
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
 func (n *Normalizer) normalizeClusterSchemaPolicy(policy *api.SchemaPolicy) *api.SchemaPolicy {
 	if policy == nil {
@@ -1341,30 +1332,30 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *api.SchemaPolicy) *api
 	}
 
 	switch strings.ToLower(policy.Replica) {
-	case strings.ToLower(SchemaPolicyReplicaNone):
+	case strings.ToLower(model.SchemaPolicyReplicaNone):
 		// Known value, overwrite it to ensure case-ness
-		policy.Replica = SchemaPolicyReplicaNone
-	case strings.ToLower(SchemaPolicyReplicaAll):
+		policy.Replica = model.SchemaPolicyReplicaNone
+	case strings.ToLower(model.SchemaPolicyReplicaAll):
 		// Known value, overwrite it to ensure case-ness
-		policy.Replica = SchemaPolicyReplicaAll
+		policy.Replica = model.SchemaPolicyReplicaAll
 	default:
 		// Unknown value, fallback to default
-		policy.Replica = SchemaPolicyReplicaAll
+		policy.Replica = model.SchemaPolicyReplicaAll
 	}
 
 	switch strings.ToLower(policy.Shard) {
-	case strings.ToLower(SchemaPolicyShardNone):
+	case strings.ToLower(model.SchemaPolicyShardNone):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = SchemaPolicyShardNone
-	case strings.ToLower(SchemaPolicyShardAll):
+		policy.Shard = model.SchemaPolicyShardNone
+	case strings.ToLower(model.SchemaPolicyShardAll):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = SchemaPolicyShardAll
-	case strings.ToLower(SchemaPolicyShardDistributedTablesOnly):
+		policy.Shard = model.SchemaPolicyShardAll
+	case strings.ToLower(model.SchemaPolicyShardDistributedTablesOnly):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = SchemaPolicyShardDistributedTablesOnly
+		policy.Shard = model.SchemaPolicyShardDistributedTablesOnly
 	default:
 		// unknown value, fallback to default
-		policy.Shard = SchemaPolicyShardAll
+		policy.Shard = model.SchemaPolicyShardAll
 	}
 
 	return policy
