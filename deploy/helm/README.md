@@ -54,6 +54,7 @@ For upgrade please install CRDs separately:
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |
 | podSecurityContext | object | `{}` |  |
 | rbac.create | bool | `true` | specifies whether cluster roles and cluster role bindings should be created |
+| rbac.operatorNamespaceOnly | bool | `false` | specifies whether roles and role bindings should be created. |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
 | secret.username | string | `"clickhouse_operator"` | operator credentials username |

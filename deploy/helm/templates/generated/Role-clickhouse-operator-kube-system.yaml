@@ -1,11 +1,11 @@
-{{- if and .Values.rbac.create (not .Values.rbac.operatorNamespaceOnly) -}}
+{{- if and .Values.rbac.create .Values.rbac.operatorNamespaceOnly -}}
 # Template Parameters:
 #
 # NAMESPACE=kube-system
 # COMMENT=#
-# ROLE_KIND=ClusterRole
+# ROLE_KIND=Role
 # ROLE_NAME=clickhouse-operator-kube-system
-# ROLE_BINDING_KIND=ClusterRoleBinding
+# ROLE_BINDING_KIND=RoleBinding
 # ROLE_BINDING_NAME=clickhouse-operator-kube-system
 #
 # Specifies either
@@ -16,12 +16,11 @@
 # ClusterRole is namespace-less and must have unique name
 # Role is namespace-bound
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}
-  #namespace: kube-system
-  labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
   namespace: {{ .Release.Namespace }}
+  labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 4 }}
 rules:
   #
   # Core API group

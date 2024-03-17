@@ -67,6 +67,8 @@ serviceAccount:
 rbac:
   # rbac.create -- specifies whether cluster roles and cluster role bindings should be created
   create: true
+  # rbac.operatorNamespaceOnly -- specifies whether roles and role bindings should be created.
+  operatorNamespaceOnly: false
 secret:
   # secret.create -- create a secret with operator credentials
   create: true
