@@ -28,20 +28,16 @@ import (
 
 // CreateServiceCHI creates new core.Service for specified CHI
 func (c *Creator) CreateServiceCHI() *core.Service {
-	serviceName := model.CreateCHIServiceName(c.chi)
-	ownerReferences := getOwnerReferences(c.chi)
-
-	c.a.V(1).F().Info("%s/%s", c.chi.Namespace, serviceName)
 	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
 			c.chi.Namespace,
-			serviceName,
+			model.CreateCHIServiceName(c.chi),
 			c.labels.GetServiceCHI(c.chi),
 			c.annotations.GetServiceCHI(c.chi),
 			c.labels.GetSelectorCHIScopeReady(),
-			ownerReferences,
+			getOwnerReferences(c.chi),
 			model.Macro(c.chi),
 		)
 	}
@@ -50,11 +46,11 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            serviceName,
+			Name:            model.CreateCHIServiceName(c.chi),
 			Namespace:       c.chi.Namespace,
 			Labels:          model.Macro(c.chi).Map(c.labels.GetServiceCHI(c.chi)),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetServiceCHI(c.chi)),
-			OwnerReferences: ownerReferences,
+			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		Spec: core.ServiceSpec{
 			ClusterIP: model.TemplateDefaultsServiceClusterIP,
@@ -106,20 +102,16 @@ func (c *Creator) CreateServiceCluster(cluster *api.Cluster) *core.Service {
 
 // CreateServiceShard creates new core.Service for specified Shard
 func (c *Creator) CreateServiceShard(shard *api.ChiShard) *core.Service {
-	serviceName := model.CreateShardServiceName(shard)
-	ownerReferences := getOwnerReferences(c.chi)
-
-	c.a.V(1).F().Info("%s/%s", shard.Address.Namespace, serviceName)
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
 			shard.Address.Namespace,
-			serviceName,
+			model.CreateShardServiceName(shard),
 			c.labels.GetServiceShard(shard),
 			c.annotations.GetServiceShard(shard),
 			model.GetSelectorShardScopeReady(shard),
-			ownerReferences,
+			getOwnerReferences(c.chi),
 			model.Macro(shard),
 		)
 	}
@@ -129,21 +121,16 @@ func (c *Creator) CreateServiceShard(shard *api.ChiShard) *core.Service {
 
 // CreateServiceHost creates new core.Service for specified host
 func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
-	serviceName := model.CreateStatefulSetServiceName(host)
-	statefulSetName := model.CreateStatefulSetName(host)
-	ownerReferences := getOwnerReferences(c.chi)
-
-	c.a.V(1).F().Info("%s/%s for Set %s", host.Runtime.Address.Namespace, serviceName, statefulSetName)
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
 			host.Runtime.Address.Namespace,
-			serviceName,
+			model.CreateStatefulSetServiceName(host),
 			c.labels.GetServiceHost(host),
 			c.annotations.GetServiceHost(host),
 			model.GetSelectorHostScope(host),
-			ownerReferences,
+			getOwnerReferences(c.chi),
 			model.Macro(host),
 		)
 	}
@@ -152,11 +139,11 @@ func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            serviceName,
+			Name:            model.CreateStatefulSetServiceName(host),
 			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          model.Macro(host).Map(c.labels.GetServiceHost(host)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetServiceHost(host)),
-			OwnerReferences: ownerReferences,
+			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		Spec: core.ServiceSpec{
 			Selector:                 model.GetSelectorHostScope(host),

@@ -27,14 +27,13 @@ import (
 
 // NewPodDisruptionBudget creates new PodDisruptionBudget
 func (c *Creator) NewPodDisruptionBudget(cluster *api.Cluster) *policy.PodDisruptionBudget {
-	ownerReferences := getOwnerReferences(c.chi)
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", cluster.Address.CHIName, cluster.Address.ClusterName),
 			Namespace:       c.chi.Namespace,
 			Labels:          model.Macro(c.chi).Map(c.labels.GetClusterScope(cluster)),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetClusterScope(cluster)),
-			OwnerReferences: ownerReferences,
+			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector: &meta.LabelSelector{
