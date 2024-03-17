@@ -115,8 +115,14 @@ function process() {
   ClusterRoleBinding)
     update_clusterrolebinding_resource "${processed_file}"
     ;;
+  RoleBinding)
+    update_rolebinding_resource "${processed_file}"
+    ;;
   ClusterRole)
     update_clusterrole_resource "${processed_file}"
+    ;;
+  Role)
+    update_role_resource "${processed_file}"
     ;;
   ServiceAccount)
     update_serviceaccount_resource "${processed_file}"
@@ -271,7 +277,28 @@ function update_clusterrolebinding_resource() {
   yq e -i '.roleRef.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
   yq e -i '(.subjects[] | select(.kind == "ServiceAccount")) |= with(. ; .name = "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}" | .namespace = "{{ .Release.Namespace }}")' "${file}"
 
-  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' '{{- if and .Values.rbac.create (not .Values.rbac.operatorNamespaceOnly) -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
+
+  perl -pi -e "s/'//g" "${file}"
+}
+
+function update_rolebinding_resource() {
+  readonly file="${1}"
+  readonly name=$(yq e '.metadata.name' "${file}")
+
+  if [ "${name}" != 'clickhouse-operator-kube-system' ]; then
+    echo "do not know how to process ${name} cluster role binding"
+    exit 1
+  fi
+
+  yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
+  yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+  yq e -i '.roleRef.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
+  yq e -i '(.subjects[] | select(.kind == "ServiceAccount")) |= with(. ; .name = "{{ include \"altinity-clickhouse-operator.serviceAccountName\" . }}" | .namespace = "{{ .Release.Namespace }}")' "${file}"
+
+  printf '%s\n%s\n' '{{- if and .Values.rbac.create .Values.rbac.operatorNamespaceOnly -}}' "$(cat "${file}")" >"${file}"
   printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
 
   perl -pi -e "s/'//g" "${file}"
@@ -292,7 +319,28 @@ function update_clusterrole_resource() {
 
   yq e -i '(.rules[] | select(.resourceNames | contains(["clickhouse-operator"])) | .resourceNames) = ["{{ include \"altinity-clickhouse-operator.fullname\" . }}"]' "${file}"
 
-  printf '%s\n%s\n' '{{- if .Values.rbac.create -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' '{{- if and .Values.rbac.create (not .Values.rbac.operatorNamespaceOnly) -}}' "$(cat "${file}")" >"${file}"
+  printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
+
+  perl -pi -e "s/'//g" "${file}"
+}
+
+function update_role_resource() {
+  readonly file="${1}"
+  readonly name=$(yq e '.metadata.name' "${file}")
+
+  if [ "${name}" != 'clickhouse-operator-kube-system' ]; then
+    echo "do not know how to process ${name} cluster role"
+    exit 1
+  fi
+
+  yq e -i '.metadata.name |= "{{ include \"altinity-clickhouse-operator.fullname\" . }}"' "${file}"
+  yq e -i '.metadata.namespace |= "{{ .Release.Namespace }}"' "${file}"
+  yq e -i '.metadata.labels |= "{{ include \"altinity-clickhouse-operator.labels\" . | nindent 4 }}"' "${file}"
+
+  yq e -i '(.rules[] | select(.resourceNames | contains(["clickhouse-operator"])) | .resourceNames) = ["{{ include \"altinity-clickhouse-operator.fullname\" . }}"]' "${file}"
+
+  printf '%s\n%s\n' '{{- if and .Values.rbac.create .Values.rbac.operatorNamespaceOnly -}}' "$(cat "${file}")" >"${file}"
   printf '%s\n%s\n' "$(cat "${file}")" '{{- end }}' >"${file}"
 
   perl -pi -e "s/'//g" "${file}"
