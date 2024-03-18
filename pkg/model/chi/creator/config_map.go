@@ -15,10 +15,6 @@
 package creator
 
 import (
-	"fmt"
-
-	"github.com/gosimple/slug"
-
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -62,43 +58,20 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *core.ConfigMap {
 	return cm
 }
 
-// createConfigMapHost creates new core.ConfigMap
-func (c *Creator) createConfigMapHost(host *api.ChiHost, name string, data map[string]string) *core.ConfigMap {
+// CreateConfigMapHost creates new core.ConfigMap
+func (c *Creator) CreateConfigMapHost(host *api.ChiHost) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            name,
+			Name:            model.CreateConfigMapHostName(host),
 			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          model.Macro(host).Map(c.labels.GetConfigMapHost(host)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetConfigMapHost(host)),
 			OwnerReferences: getOwnerReferences(c.chi),
 		},
-		Data: data,
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
 	// And after the object is ready we can put version label
 	model.MakeObjectVersion(&cm.ObjectMeta, cm)
 	return cm
-}
-
-// CreateConfigMapHost creates new core.ConfigMap
-func (c *Creator) CreateConfigMapHost(host *api.ChiHost) *core.ConfigMap {
-	return c.createConfigMapHost(host, model.CreateConfigMapHostName(host), c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host))
-}
-
-// CreateConfigMapHostMigration creates new core.ConfigMap
-//func (c *Creator) CreateConfigMapHostMigration(host *api.ChiHost, data map[string]string) *core.ConfigMap {
-//	return c.createConfigMapHost(host, CreateConfigMapHostMigrationName(host), data)
-//}
-
-// MakeConfigMapData makes data for a config mao
-func (c *Creator) MakeConfigMapData(names, files []string) map[string]string {
-	if len(names) < 1 {
-		return nil
-	}
-	res := make(map[string]string)
-	for i := range names {
-		name := fmt.Sprintf("%08d_%s.sql", i+1, slug.Make(names[i]))
-		file := files[i]
-		res[name] = file
-	}
-	return res
 }
