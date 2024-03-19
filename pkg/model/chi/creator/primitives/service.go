@@ -12,24 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package entities
+package primitives
 
 import (
+	"fmt"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-// NormalizeHostPorts ensures api.ChiReplica.Port is reasonable
-func NormalizeHostPorts(host *api.ChiHost) {
-	// Walk over all assigned ports of the host and append each port to the list of service's ports
-	model.HostWalkInvalidPorts(
-		host,
-		func(name string, port *int32, protocol core.Protocol) bool {
-			*port = api.PortUnassigned()
-			// Do not abort, continue iterating
-			return false
-		},
-	)
+// ServiceSpecVerifyPorts verifies core.ServiceSpec to have reasonable ports specified
+func ServiceSpecVerifyPorts(spec *core.ServiceSpec) error {
+	for i := range spec.Ports {
+		servicePort := &spec.Ports[i]
+		if api.IsPortInvalid(servicePort.Port) {
+			return fmt.Errorf(fmt.Sprintf("incorrect port :%d", servicePort.Port))
+		}
+	}
+	return nil
 }

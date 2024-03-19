@@ -15,8 +15,8 @@
 package v1
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 )
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
@@ -46,9 +46,9 @@ type ChiHostRuntime struct {
 	Version             *CHVersion                  `json:"-" yaml:"-"`
 	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	// CurStatefulSet is a current stateful set, fetched from k8s
-	CurStatefulSet *appsv1.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
+	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
-	DesiredStatefulSet *appsv1.StatefulSet     `json:"-" yaml:"-" testdiff:"ignore"`
+	DesiredStatefulSet *apps.StatefulSet       `json:"-" yaml:"-" testdiff:"ignore"`
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
@@ -110,9 +110,6 @@ func isUnassigned(port int32) bool {
 func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if (host == nil) || (from == nil) {
 		return
-	}
-	if isUnassigned(host.Port) {
-		host.Port = from.Port
 	}
 
 	host.Insecure = host.Insecure.MergeFrom(from.Insecure)
@@ -282,12 +279,12 @@ func (w WhichStatefulSet) DesiredStatefulSet() bool {
 }
 
 // WalkVolumeMounts walks VolumeMount(s)
-func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *corev1.VolumeMount)) {
+func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *core.VolumeMount)) {
 	if host == nil {
 		return
 	}
 
-	var sts *appsv1.StatefulSet
+	var sts *apps.StatefulSet
 	switch {
 	case which.DesiredStatefulSet():
 		if !host.HasDesiredStatefulSet() {

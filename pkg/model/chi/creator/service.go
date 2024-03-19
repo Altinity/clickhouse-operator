@@ -23,6 +23,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator/primitives"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -158,69 +159,23 @@ func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
 }
 
 func appendServicePorts(service *core.Service, host *api.ChiHost) {
-	if api.IsPortAssigned(host.TCPPort) {
-		service.Spec.Ports = append(service.Spec.Ports,
-			core.ServicePort{
-				Name:       model.ChDefaultTCPPortName,
-				Protocol:   core.ProtocolTCP,
-				Port:       host.TCPPort,
-				TargetPort: intstr.FromInt(int(host.TCPPort)),
-			},
-		)
-	}
-	if api.IsPortAssigned(host.TLSPort) {
-		service.Spec.Ports = append(service.Spec.Ports,
-			core.ServicePort{
-				Name:       model.ChDefaultTLSPortName,
-				Protocol:   core.ProtocolTCP,
-				Port:       host.TLSPort,
-				TargetPort: intstr.FromInt(int(host.TLSPort)),
-			},
-		)
-	}
-	if api.IsPortAssigned(host.HTTPPort) {
-		service.Spec.Ports = append(service.Spec.Ports,
-			core.ServicePort{
-				Name:       model.ChDefaultHTTPPortName,
-				Protocol:   core.ProtocolTCP,
-				Port:       host.HTTPPort,
-				TargetPort: intstr.FromInt(int(host.HTTPPort)),
-			},
-		)
-	}
-	if api.IsPortAssigned(host.HTTPSPort) {
-		service.Spec.Ports = append(service.Spec.Ports,
-			core.ServicePort{
-				Name:       model.ChDefaultHTTPSPortName,
-				Protocol:   core.ProtocolTCP,
-				Port:       host.HTTPSPort,
-				TargetPort: intstr.FromInt(int(host.HTTPSPort)),
-			},
-		)
-	}
-	if api.IsPortAssigned(host.InterserverHTTPPort) {
-		service.Spec.Ports = append(service.Spec.Ports,
-			core.ServicePort{
-				Name:       model.ChDefaultInterserverHTTPPortName,
-				Protocol:   core.ProtocolTCP,
-				Port:       host.InterserverHTTPPort,
-				TargetPort: intstr.FromInt(int(host.InterserverHTTPPort)),
-			},
-		)
-	}
-}
-
-// verifyServiceTemplatePorts verifies ChiServiceTemplate to have reasonable ports specified
-func (c *Creator) verifyServiceTemplatePorts(template *api.ChiServiceTemplate) error {
-	for i := range template.Spec.Ports {
-		servicePort := &template.Spec.Ports[i]
-		if api.IsPortInvalid(servicePort.Port) {
-			msg := fmt.Sprintf("template:%s INCORRECT PORT:%d", template.Name, servicePort.Port)
-			c.a.V(1).F().Warning(msg)
-			return fmt.Errorf(msg)
-		}
-	}
-	return nil
+	// Walk over all assigned ports of the host and append each port to the list of service's ports
+	model.HostWalkAssignedPorts(
+		host,
+		func(name string, port *int32, protocol core.Protocol) bool {
+			// Append assigned port to the list of service's ports
+			service.Spec.Ports = append(service.Spec.Ports,
+				core.ServicePort{
+					Name:       name,
+					Protocol:   protocol,
+					Port:       *port,
+					TargetPort: intstr.FromInt(int(*port)),
+				},
+			)
+			// Do not abort, continue iterating
+			return false
+		},
+	)
 }
 
 // createServiceFromTemplate create Service from ChiServiceTemplate and additional info
@@ -236,7 +191,8 @@ func (c *Creator) createServiceFromTemplate(
 ) *core.Service {
 
 	// Verify Ports
-	if err := c.verifyServiceTemplatePorts(template); err != nil {
+	if err := primitives.ServiceSpecVerifyPorts(&template.Spec); err != nil {
+		c.a.V(1).F().Warning(fmt.Sprintf("template: %s err: %s", template.Name, err))
 		return nil
 	}
 

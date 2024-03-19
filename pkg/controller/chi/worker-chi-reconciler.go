@@ -33,6 +33,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -1226,7 +1227,7 @@ func (w *worker) fetchPVC(
 	// This is not an error per se, means PVC is not created (yet)?
 	w.a.V(2).M(host).Info("PVC (%s/%s/%s/%s) not found", namespace, host.GetName(), volumeMount.Name, pvcName)
 
-	if w.task.creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+	if creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		// Operator is in charge of PVCs
 		// Create PVC model.
 		pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)

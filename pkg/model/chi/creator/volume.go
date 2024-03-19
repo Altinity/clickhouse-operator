@@ -57,9 +57,10 @@ func newVolumeMount(name, mountPath string) core.VolumeMount {
 	}
 }
 
-func (c *Creator) getVolumeClaimTemplate(volumeMount *core.VolumeMount) (*api.ChiVolumeClaimTemplate, bool) {
+func getVolumeClaimTemplate(volumeMount *core.VolumeMount, host *api.ChiHost) (*api.ChiVolumeClaimTemplate, bool) {
 	volumeClaimTemplateName := volumeMount.Name
-	volumeClaimTemplate, ok := c.chi.GetVolumeClaimTemplate(volumeClaimTemplateName)
+
+	volumeClaimTemplate, ok := host.GetCHI().GetVolumeClaimTemplate(volumeClaimTemplateName)
 	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
 	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
 	return volumeClaimTemplate, ok

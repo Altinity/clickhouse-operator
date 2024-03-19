@@ -77,6 +77,6 @@ func (c *Creator) CreatePVC(name string, host *api.ChiHost, spec *core.Persisten
 }
 
 // OperatorShouldCreatePVC checks whether operator should create PVC for specified volumeCLimaTemplate
-func (c *Creator) OperatorShouldCreatePVC(host *api.ChiHost, volumeClaimTemplate *api.ChiVolumeClaimTemplate) bool {
+func OperatorShouldCreatePVC(host *api.ChiHost, volumeClaimTemplate *api.ChiVolumeClaimTemplate) bool {
 	return model.GetPVCProvisioner(host, volumeClaimTemplate) == api.PVCProvisionerOperator
 }

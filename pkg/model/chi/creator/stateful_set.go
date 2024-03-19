@@ -15,8 +15,6 @@
 package creator
 
 import (
-	"fmt"
-
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +22,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator/primitives"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -79,7 +78,7 @@ func (c *Creator) setupStatefulSetPodTemplate(statefulSet *apps.StatefulSet, hos
 
 // ensureStatefulSetTemplateIntegrity
 func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *api.ChiHost) {
-	ensureClickHouseContainerSpecified(statefulSet, host)
+	ensureMainContainerSpecified(statefulSet, host)
 	ensureProbesSpecified(statefulSet, host)
 	ensureNamedPortsSpecified(statefulSet, host)
 }
@@ -94,6 +93,16 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 	container.Env = append(container.Env, host.GetCHI().Runtime.Attributes.AdditionalEnvVars...)
 }
 
+// ensureMainContainerSpecified is a unification wrapper
+func ensureMainContainerSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost) {
+	ensureClickHouseContainerSpecified(statefulSet, host)
+}
+
+// ensureLogContainerSpecified is a unification wrapper
+func ensureLogContainerSpecified(statefulSet *apps.StatefulSet) {
+	ensureClickHouseLogContainerSpecified(statefulSet)
+}
+
 // ensureClickHouseContainerSpecified
 func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 	_, ok := getClickHouseContainer(statefulSet)
@@ -102,7 +111,7 @@ func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api
 	}
 
 	// No ClickHouse container available, let's add one
-	addContainer(
+	primitives.PodSpecAddContainer(
 		&statefulSet.Spec.Template.Spec,
 		newDefaultClickHouseContainer(host),
 	)
@@ -117,7 +126,7 @@ func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
 
 	// No ClickHouse Log container available, let's add one
 
-	addContainer(
+	primitives.PodSpecAddContainer(
 		&statefulSet.Spec.Template.Spec,
 		newDefaultLogContainer(),
 	)
@@ -150,14 +159,14 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 	// Setup volumes
 	c.statefulSetSetupVolumes(statefulSet, host)
 	// Setup statefulSet according to troubleshoot mode (if any)
-	c.setupTroubleshoot(statefulSet)
+	c.setupTroubleshootingMode(statefulSet, host)
 	// Setup dedicated log container
 	c.setupLogContainer(statefulSet, host)
 }
 
-// setupTroubleshoot
-func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
-	if !c.chi.IsTroubleshoot() {
+// setupTroubleshootingMode
+func (c *Creator) setupTroubleshootingMode(statefulSet *apps.StatefulSet, host *api.ChiHost) {
+	if !host.GetCHI().IsTroubleshoot() {
 		// We are not troubleshooting
 		return
 	}
@@ -184,7 +193,7 @@ func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
 			"/entrypoint.sh" + sleep,
 		}
 	}
-	// Appended `sleep` command makes Pod unable to respond to probes, and probes would cause unexpected restart.
+	// Appended `sleep` command makes Pod unable to respond to probes and probes would fail, causing unexpected restart.
 	// Thus we need to disable all probes in troubleshooting mode.
 	container.LivenessProbe = nil
 	container.ReadinessProbe = nil
@@ -192,30 +201,26 @@ func (c *Creator) setupTroubleshoot(statefulSet *apps.StatefulSet) {
 
 // setupLogContainer
 func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *api.ChiHost) {
-	statefulSetName := model.CreateStatefulSetName(host)
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
-		ensureClickHouseLogContainerSpecified(statefulSet)
-
-		c.a.V(1).F().Info("add log container for statefulSet %s", statefulSetName)
+		ensureLogContainerSpecified(statefulSet)
+		c.a.V(1).F().Info("add log container for host: %s", host.Runtime.Address.HostName)
 	}
 }
 
 // getPodTemplate gets Pod Template to be used to create StatefulSet
 func (c *Creator) getPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
-	statefulSetName := model.CreateStatefulSetName(host)
-
 	// Which pod template should be used - either explicitly defined or a default one
 	podTemplate, ok := host.GetPodTemplate()
 	if ok {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()
-		c.a.V(3).F().Info("statefulSet %s use custom template: %s", statefulSetName, podTemplate.Name)
+		c.a.V(3).F().Info("host: %s StatefulSet - use custom template: %s", host.Runtime.Address.HostName, podTemplate.Name)
 	} else {
 		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = newDefaultPodTemplate(statefulSetName, host)
-		c.a.V(3).F().Info("statefulSet %s use default generated template", statefulSetName)
+		podTemplate = newDefaultPodTemplate(host)
+		c.a.V(3).F().Info("host: %s StatefulSet - use default generated template", host.Runtime.Address.HostName)
 	}
 
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
@@ -239,7 +244,7 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 	configMapCommonUsersName := model.CreateConfigMapCommonUsersName(c.chi)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
-	c.statefulSetAppendVolumes(
+	primitives.StatefulSetAppendVolumes(
 		statefulSet,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
@@ -249,37 +254,28 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have ConfigMaps mounted as Volumes
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		c.containerAppendVolumeMounts(
-			container,
-			newVolumeMount(configMapCommonName, model.DirPathCommonConfig),
-			newVolumeMount(configMapCommonUsersName, model.DirPathUsersConfig),
-			newVolumeMount(configMapHostName, model.DirPathHostConfig),
-		)
-	}
+	primitives.StatefulSetAppendVolumeMounts(
+		statefulSet,
+		newVolumeMount(configMapCommonName, model.DirPathCommonConfig),
+		newVolumeMount(configMapCommonUsersName, model.DirPathUsersConfig),
+		newVolumeMount(configMapHostName, model.DirPathHostConfig),
+	)
 }
 
 // statefulSetSetupVolumesForSecrets adds to each container in the Pod VolumeMount objects
 func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSet, host *api.ChiHost) {
-
-	// Add all ConfigMap objects as Volume objects of type ConfigMap
-	c.statefulSetAppendVolumes(
+	// Add all additional Volumes
+	primitives.StatefulSetAppendVolumes(
 		statefulSet,
 		host.GetCHI().Runtime.Attributes.AdditionalVolumes...,
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
-	// So Pod will have Secrets mounted as Volumes
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		c.containerAppendVolumeMounts(
-			container,
-			host.GetCHI().Runtime.Attributes.AdditionalVolumeMounts...,
-		)
-	}
+	// So Pod will have additional volumes mounted as Volumes
+	primitives.StatefulSetAppendVolumeMounts(
+		statefulSet,
+		host.GetCHI().Runtime.Attributes.AdditionalVolumeMounts...,
+	)
 }
 
 // statefulSetAppendUsedPVCTemplates appends all PVC templates which are used (referenced by name) by containers
@@ -294,7 +290,9 @@ func (c *Creator) statefulSetAppendUsedPVCTemplates(statefulSet *apps.StatefulSe
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
 		for j := range container.VolumeMounts {
-			if volumeClaimTemplate, ok := c.getVolumeClaimTemplate(&container.VolumeMounts[j]); ok {
+			// Convenience wrapper
+			volumeMount := &container.VolumeMounts[j]
+			if volumeClaimTemplate, ok := getVolumeClaimTemplate(volumeMount, host); ok {
 				c.statefulSetAppendPVCTemplate(statefulSet, host, volumeClaimTemplate)
 			}
 		}
@@ -309,11 +307,11 @@ func (c *Creator) statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		c.containerAppendVolumeMounts(
+		primitives.ContainerAppendVolumeMounts(
 			container,
 			newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), model.DirPathClickHouseData),
 		)
-		c.containerAppendVolumeMounts(
+		primitives.ContainerAppendVolumeMounts(
 			container,
 			newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), model.DirPathClickHouseLog),
 		)
@@ -354,90 +352,14 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
-// getContainer gets container from the StatefulSet either by name or by index
-func getContainer(statefulSet *apps.StatefulSet, name string, index int) (*core.Container, bool) {
-	if len(name) > 0 {
-		// Find by name
-		for i := range statefulSet.Spec.Template.Spec.Containers {
-			container := &statefulSet.Spec.Template.Spec.Containers[i]
-			if container.Name == name {
-				return container, true
-			}
-		}
-	}
-
-	if index >= 0 {
-		// Find by index
-		if len(statefulSet.Spec.Template.Spec.Containers) > index {
-			return &statefulSet.Spec.Template.Spec.Containers[index], true
-		}
-	}
-
-	return nil, false
-}
-
 // getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return getContainer(statefulSet, model.ClickHouseContainerName, 0)
+	return primitives.StatefulSetContainerGet(statefulSet, model.ClickHouseContainerName, 0)
 }
 
 // getClickHouseLogContainer
 func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return getContainer(statefulSet, model.ClickHouseLogContainerName, -1)
-}
-
-// IsStatefulSetGeneration returns whether StatefulSet has requested generation or not
-func IsStatefulSetGeneration(statefulSet *apps.StatefulSet, generation int64) bool {
-	if statefulSet == nil {
-		return false
-	}
-
-	// StatefulSet has .spec generation we are looking for
-	return (statefulSet.Generation == generation) &&
-		// and this .spec generation is being applied to replicas - it is observed right now
-		(statefulSet.Status.ObservedGeneration == statefulSet.Generation) &&
-		// and all replicas are of expected generation
-		(statefulSet.Status.CurrentReplicas == *statefulSet.Spec.Replicas) &&
-		// and all replicas are updated - meaning rolling update completed over all replicas
-		(statefulSet.Status.UpdatedReplicas == *statefulSet.Spec.Replicas) &&
-		// and current revision is an updated one - meaning rolling update completed over all replicas
-		(statefulSet.Status.CurrentRevision == statefulSet.Status.UpdateRevision)
-}
-
-// IsStatefulSetReady returns whether StatefulSet is ready
-func IsStatefulSetReady(statefulSet *apps.StatefulSet) bool {
-	if statefulSet == nil {
-		return false
-	}
-
-	if statefulSet.Spec.Replicas == nil {
-		return false
-	}
-	// All replicas are in "Ready" status - meaning ready to be used - no failure inside
-	return statefulSet.Status.ReadyReplicas == *statefulSet.Spec.Replicas
-}
-
-// IsStatefulSetNotReady returns whether StatefulSet is not ready
-func IsStatefulSetNotReady(statefulSet *apps.StatefulSet) bool {
-	if statefulSet == nil {
-		return false
-	}
-
-	return !IsStatefulSetReady(statefulSet)
-}
-
-// StrStatefulSetStatus returns human-friendly string representation of StatefulSet status
-func StrStatefulSetStatus(status *apps.StatefulSetStatus) string {
-	return fmt.Sprintf(
-		"ObservedGeneration:%d Replicas:%d ReadyReplicas:%d CurrentReplicas:%d UpdatedReplicas:%d CurrentRevision:%s UpdateRevision:%s",
-		status.ObservedGeneration,
-		status.Replicas,
-		status.ReadyReplicas,
-		status.CurrentReplicas,
-		status.UpdatedReplicas,
-		status.CurrentRevision,
-		status.UpdateRevision,
-	)
+	return primitives.StatefulSetContainerGet(statefulSet, model.ClickHouseLogContainerName, -1)
 }
 
 // ensureNamedPortsSpecified
@@ -447,198 +369,15 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost)
 	if !ok {
 		return
 	}
-	ensurePortByName(container, model.ChDefaultTCPPortName, host.TCPPort)
-	ensurePortByName(container, model.ChDefaultTLSPortName, host.TLSPort)
-	ensurePortByName(container, model.ChDefaultHTTPPortName, host.HTTPPort)
-	ensurePortByName(container, model.ChDefaultHTTPSPortName, host.HTTPSPort)
-	ensurePortByName(container, model.ChDefaultInterserverHTTPPortName, host.InterserverHTTPPort)
-}
-
-// ensurePortByName
-func ensurePortByName(container *core.Container, name string, port int32) {
-	if api.IsPortUnassigned(port) {
-		return
-	}
-
-	// Find port with specified name
-	for i := range container.Ports {
-		containerPort := &container.Ports[i]
-		if containerPort.Name == name {
-			// Assign value to existing port
-			containerPort.HostPort = 0
-			containerPort.ContainerPort = port
-			return
-		}
-	}
-
-	// Port with specified name not found. Need to append
-	container.Ports = append(container.Ports, core.ContainerPort{
-		Name:          name,
-		ContainerPort: port,
-	})
-}
-
-// setupStatefulSetApplyVolumeMount applies .templates.volumeClaimTemplates.* to a StatefulSet
-func (c *Creator) setupStatefulSetApplyVolumeMount(
-	host *api.ChiHost,
-	statefulSet *apps.StatefulSet,
-	containerName string,
-	volumeMount core.VolumeMount,
-) error {
-	//
-	// Sanity checks
-	//
-
-	// Specified (referenced from volumeMount) VolumeClaimTemplate has to be available as well
-	if _, ok := c.getVolumeClaimTemplate(&volumeMount); !ok {
-		// Incorrect/unknown .templates.VolumeClaimTemplate specified
-		c.a.V(1).F().Warning("Can not find VolumeClaimTemplate for VolumeMount: %s. Volume claim can not be mounted", volumeMount.Name)
-		return nil
-	}
-
-	// Specified container has to be available
-	container := getContainerByName(statefulSet, containerName)
-	if container == nil {
-		c.a.V(1).F().Warning("Can not find container: %s. Volume claim can not be mounted", containerName)
-		return nil
-	}
-
-	// Looks like all components are in place
-
-	// Mount specified (by volumeMount.Name) VolumeClaimTemplate into volumeMount.Path (say into '/var/lib/clickhouse')
-	//
-	// A container wants to have this VolumeClaimTemplate mounted into `mountPath` in case:
-	// 1. This VolumeClaimTemplate is NOT already mounted in the container with any VolumeMount (to avoid double-mount of a VolumeClaimTemplate)
-	// 2. And specified `mountPath` (say '/var/lib/clickhouse') is NOT already mounted with any VolumeMount (to avoid double-mount/rewrite into single `mountPath`)
-
-	for i := range container.VolumeMounts {
-		// Convenience wrapper
-		existingVolumeMount := &container.VolumeMounts[i]
-
-		// 1. Check whether this VolumeClaimTemplate is already listed in VolumeMount of this container
-		if volumeMount.Name == existingVolumeMount.Name {
-			// This .templates.VolumeClaimTemplate is already used in VolumeMount
-			c.a.V(1).F().Warning(
-				"StatefulSet:%s container:%s volumeClaimTemplateName:%s already used. Skip it and all the rest.",
-				statefulSet.Name,
-				container.Name,
-				volumeMount.Name,
-			)
-			return nil
-		}
-
-		// 2. Check whether `mountPath` (say '/var/lib/clickhouse') is already mounted
-		if volumeMount.MountPath == existingVolumeMount.MountPath {
-			// `mountPath` (say /var/lib/clickhouse) is already mounted
-			c.a.V(1).F().Warning(
-				"StatefulSet:%s container:%s mountPath:%s already used. Skip it and all the rest.",
-				statefulSet.Name,
-				container.Name,
-				volumeMount.MountPath,
-			)
-			return nil
-		}
-	}
-
-	// This VolumeClaimTemplate is not used explicitly by name and `mountPath` (say /var/lib/clickhouse) is not used also.
-	// Let's mount this VolumeClaimTemplate into `mountPath` (say '/var/lib/clickhouse') of a container
-	if volumeClaimTemplate, ok := c.getVolumeClaimTemplate(&volumeMount); ok {
-		// Add VolumeClaimTemplate to StatefulSet
-		c.statefulSetAppendPVCTemplate(statefulSet, host, volumeClaimTemplate)
-		// Add VolumeMount to ClickHouse container to `mountPath` point
-		c.containerAppendVolumeMounts(
-			container,
-			volumeMount,
-		)
-	}
-
-	c.a.V(1).F().Info(
-		"StatefulSet: %s container: %s mounted VolumeMount: %s onto path: %s",
-		statefulSet.Name,
-		container.Name,
-		volumeMount.Name,
-		volumeMount.MountPath,
+	// Walk over all assigned ports of the host and ensure each port in container
+	model.HostWalkAssignedPorts(
+		host,
+		func(name string, port *int32, protocol core.Protocol) bool {
+			primitives.ContainerEnsurePortByName(container, name, *port)
+			// Do not abort, continue iterating
+			return false
+		},
 	)
-
-	return nil
-}
-
-// statefulSetAppendVolumes appends multiple Volume(s) to the specified StatefulSet
-func (c *Creator) statefulSetAppendVolumes(statefulSet *apps.StatefulSet, volumes ...core.Volume) {
-	statefulSet.Spec.Template.Spec.Volumes = append(
-		statefulSet.Spec.Template.Spec.Volumes,
-		volumes...,
-	)
-}
-
-// containerAppendVolumeMounts appends multiple VolumeMount(s) to the specified container
-func (c *Creator) containerAppendVolumeMounts(container *core.Container, volumeMounts ...core.VolumeMount) {
-	for _, volumeMount := range volumeMounts {
-		c.containerAppendVolumeMount(container, volumeMount)
-	}
-}
-
-// containerAppendVolumeMount appends one VolumeMount to the specified container
-func (c *Creator) containerAppendVolumeMount(container *core.Container, volumeMount core.VolumeMount) {
-	//
-	// Sanity checks
-	//
-
-	if container == nil {
-		return
-	}
-
-	// VolumeMount has to have reasonable data - Name and MountPath
-	if (volumeMount.Name == "") || (volumeMount.MountPath == "") {
-		return
-	}
-
-	// Check that:
-	// 1. Mountable item (VolumeClaimTemplate or Volume) specified in this VolumeMount is NOT already mounted
-	//    in this container by any other VolumeMount (to avoid double-mount of a mountable item)
-	// 2. And specified `mountPath` (say '/var/lib/clickhouse') is NOT already mounted in this container
-	//    by any VolumeMount (to avoid double-mount/rewrite into single `mountPath`)
-	for i := range container.VolumeMounts {
-		// Convenience wrapper
-		existingVolumeMount := &container.VolumeMounts[i]
-
-		// 1. Check whether this mountable item is already listed in VolumeMount of this container
-		if volumeMount.Name == existingVolumeMount.Name {
-			// This .templates.VolumeClaimTemplate is already used in VolumeMount
-			c.a.V(1).F().Warning(
-				"container.Name:%s volumeMount.Name:%s already used",
-				container.Name,
-				volumeMount.Name,
-			)
-			return
-		}
-
-		// 2. Check whether `mountPath` (say '/var/lib/clickhouse') is already mounted
-		if volumeMount.MountPath == existingVolumeMount.MountPath {
-			// `mountPath` (say /var/lib/clickhouse) is already mounted
-			c.a.V(1).F().Warning(
-				"container.Name:%s volumeMount.MountPath:%s already used",
-				container.Name,
-				volumeMount.MountPath,
-			)
-			return
-		}
-	}
-
-	// Add VolumeMount to ClickHouse container to `mountPath` point
-	container.VolumeMounts = append(
-		container.VolumeMounts,
-		volumeMount,
-	)
-
-	c.a.V(3).F().Info(
-		"container:%s volumeMount added: %s on %s",
-		container.Name,
-		volumeMount.Name,
-		volumeMount.MountPath,
-	)
-
-	return
 }
 
 // statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
@@ -651,25 +390,17 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	// we need to check naming for all of them
 
 	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
-	for i := range statefulSet.Spec.VolumeClaimTemplates {
-		// Convenience wrapper
-		_volumeClaimTemplate := &statefulSet.Spec.VolumeClaimTemplates[i]
-		if _volumeClaimTemplate.Name == volumeClaimTemplate.Name {
-			// This VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
-			// No need to add it second time
-			return
-		}
+	if primitives.StatefulSetHasVolumeClaimTemplateByName(statefulSet, volumeClaimTemplate.Name) {
+		// This VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
+		// No need to add it second time
+		return
 	}
 
 	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.Template.Spec.Volumes
-	for i := range statefulSet.Spec.Template.Spec.Volumes {
-		// Convenience wrapper
-		_volume := &statefulSet.Spec.Template.Spec.Volumes[i]
-		if _volume.Name == volumeClaimTemplate.Name {
-			// This VolumeClaimTemplate is already listed in statefulSet.Spec.Template.Spec.Volumes
-			// No need to add it second time
-			return
-		}
+	if primitives.StatefulSetHasVolumeByName(statefulSet, volumeClaimTemplate.Name) {
+		// This VolumeClaimTemplate is already listed in statefulSet.Spec.Template.Spec.Volumes
+		// No need to add it second time
+		return
 	}
 
 	// Provided VolumeClaimTemplate is not listed neither in
@@ -678,7 +409,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	// statefulSet.Spec.VolumeClaimTemplates
 	// so, let's add it
 
-	if c.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+	if OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		claimName := model.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
 		statefulSet.Spec.Template.Spec.Volumes = append(
 			statefulSet.Spec.Template.Spec.Volumes,
@@ -694,66 +425,38 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 }
 
 // newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
-func newDefaultPodTemplate(name string, host *api.ChiHost) *api.ChiPodTemplate {
+func newDefaultPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
 	podTemplate := &api.ChiPodTemplate{
-		Name: name,
+		Name: model.CreateStatefulSetName(host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
 			Volumes:    []core.Volume{},
 		},
 	}
 
-	addContainer(&podTemplate.Spec, newDefaultClickHouseContainer(host))
+	// Pod has to have main container.
+	primitives.PodSpecAddContainer(&podTemplate.Spec, newDefaultClickHouseContainer(host))
 
 	return podTemplate
 }
 
 func appendContainerPorts(container *core.Container, host *api.ChiHost) {
-	if api.IsPortAssigned(host.TCPPort) {
-		container.Ports = append(container.Ports,
-			core.ContainerPort{
-				Name:          model.ChDefaultTCPPortName,
-				ContainerPort: host.TCPPort,
-				Protocol:      core.ProtocolTCP,
-			},
-		)
-	}
-	if api.IsPortAssigned(host.TLSPort) {
-		container.Ports = append(container.Ports,
-			core.ContainerPort{
-				Name:          model.ChDefaultTLSPortName,
-				ContainerPort: host.TLSPort,
-				Protocol:      core.ProtocolTCP,
-			},
-		)
-	}
-	if api.IsPortAssigned(host.HTTPPort) {
-		container.Ports = append(container.Ports,
-			core.ContainerPort{
-				Name:          model.ChDefaultHTTPPortName,
-				ContainerPort: host.HTTPPort,
-				Protocol:      core.ProtocolTCP,
-			},
-		)
-	}
-	if api.IsPortAssigned(host.HTTPSPort) {
-		container.Ports = append(container.Ports,
-			core.ContainerPort{
-				Name:          model.ChDefaultHTTPSPortName,
-				ContainerPort: host.HTTPSPort,
-				Protocol:      core.ProtocolTCP,
-			},
-		)
-	}
-	if api.IsPortAssigned(host.InterserverHTTPPort) {
-		container.Ports = append(container.Ports,
-			core.ContainerPort{
-				Name:          model.ChDefaultInterserverHTTPPortName,
-				ContainerPort: host.InterserverHTTPPort,
-				Protocol:      core.ProtocolTCP,
-			},
-		)
-	}
+	// Walk over all assigned ports of the host and append each port to the list of container's ports
+	model.HostWalkAssignedPorts(
+		host,
+		func(name string, port *int32, protocol core.Protocol) bool {
+			// Append assigned port to the list of container's ports
+			container.Ports = append(container.Ports,
+				core.ContainerPort{
+					Name:          name,
+					ContainerPort: *port,
+					Protocol:      protocol,
+				},
+			)
+			// Do not abort, continue iterating
+			return false
+		},
+	)
 }
 
 // newDefaultClickHouseContainer returns default ClickHouse Container
@@ -768,7 +471,7 @@ func newDefaultClickHouseContainer(host *api.ChiHost) core.Container {
 	return container
 }
 
-// newDefaultLogContainer returns default Log Container
+// newDefaultLogContainer returns default ClickHouse Log Container
 func newDefaultLogContainer() core.Container {
 	return core.Container{
 		Name:  model.ClickHouseLogContainerName,
@@ -780,22 +483,4 @@ func newDefaultLogContainer() core.Container {
 			"while true; do sleep 30; done;",
 		},
 	}
-}
-
-// addContainer adds container to ChiPodTemplate
-func addContainer(podSpec *core.PodSpec, container core.Container) {
-	podSpec.Containers = append(podSpec.Containers, container)
-}
-
-// getContainerByName finds Container with specified name among all containers of Pod Template in StatefulSet
-func getContainerByName(statefulSet *apps.StatefulSet, name string) *core.Container {
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		if container.Name == name {
-			return container
-		}
-	}
-
-	return nil
 }

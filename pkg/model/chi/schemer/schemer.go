@@ -27,14 +27,14 @@ import (
 
 // ClusterSchemer specifies cluster schema manager
 type ClusterSchemer struct {
-	*model.Cluster
+	*Cluster
 	version *api.CHVersion
 }
 
 // NewClusterSchemer creates new Schemer object
 func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *api.CHVersion) *ClusterSchemer {
 	return &ClusterSchemer{
-		Cluster: model.NewCluster().SetClusterConnectionParams(clusterConnectionParams),
+		Cluster: NewCluster().SetClusterConnectionParams(clusterConnectionParams),
 		version: version,
 	}
 }

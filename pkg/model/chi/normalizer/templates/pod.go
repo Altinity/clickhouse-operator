@@ -27,21 +27,22 @@ func NormalizePodTemplate(replicasCount int, template *api.ChiPodTemplate) {
 	// Name
 
 	// Zone
-	if len(template.Zone.Values) == 0 {
+	switch {
+	case len(template.Zone.Values) == 0:
 		// In case no values specified - no key is reasonable
 		template.Zone.Key = ""
-	} else if template.Zone.Key == "" {
+	case template.Zone.Key == "":
 		// We have values specified, but no key
 		// Use default zone key in this case
 		template.Zone.Key = core.LabelTopologyZone
-	} else {
+	default:
 		// We have both key and value(s) specified explicitly
 	}
 
 	// PodDistribution
 	for i := range template.PodDistribution {
-		if additionalPoDistributions := normalizePodDistribution(replicasCount, &template.PodDistribution[i]); additionalPoDistributions != nil {
-			template.PodDistribution = append(template.PodDistribution, additionalPoDistributions...)
+		if additionalPodDistributions := normalizePodDistribution(replicasCount, &template.PodDistribution[i]); additionalPodDistributions != nil {
+			template.PodDistribution = append(template.PodDistribution, additionalPodDistributions...)
 		}
 	}
 

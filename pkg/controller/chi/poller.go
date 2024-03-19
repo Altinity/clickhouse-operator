@@ -26,7 +26,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator/primitives"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -42,7 +42,7 @@ func (c *Controller) waitHostNotReady(ctx context.Context, host *api.ChiHost) er
 			FromConfig(chop.Config()).
 			SetGetErrorTimeout(0),
 		func(_ context.Context, sts *apps.StatefulSet) bool {
-			return creator.IsStatefulSetNotReady(sts)
+			return primitives.IsStatefulSetNotReady(sts)
 		},
 		nil,
 	)
@@ -66,7 +66,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 			}
 			_ = c.deleteLabelReadyPod(_ctx, host)
 			_ = c.deleteAnnotationReadyService(_ctx, host)
-			return creator.IsStatefulSetGeneration(sts, sts.Generation)
+			return primitives.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func(_ctx context.Context) {
 			_ = c.deleteLabelReadyPod(_ctx, host)
@@ -85,7 +85,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
 			_ = c.deleteLabelReadyPod(_ctx, host)
 			_ = c.deleteAnnotationReadyService(_ctx, host)
-			return creator.IsStatefulSetReady(sts)
+			return primitives.IsStatefulSetReady(sts)
 		},
 		func(_ctx context.Context) {
 			_ = c.deleteLabelReadyPod(_ctx, host)

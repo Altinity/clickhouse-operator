@@ -36,6 +36,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator/primitives"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
@@ -1700,7 +1701,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost, regis
 	}
 
 	action := errCRUDRecreate
-	if chiCreator.IsStatefulSetReady(curStatefulSet) {
+	if primitives.IsStatefulSetReady(curStatefulSet) {
 		action = w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 	}
 
