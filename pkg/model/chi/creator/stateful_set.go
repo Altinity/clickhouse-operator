@@ -22,7 +22,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/primitives"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -111,7 +111,7 @@ func ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api
 	}
 
 	// No ClickHouse container available, let's add one
-	primitives.PodSpecAddContainer(
+	k8s.PodSpecAddContainer(
 		&statefulSet.Spec.Template.Spec,
 		newDefaultClickHouseContainer(host),
 	)
@@ -126,7 +126,7 @@ func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
 
 	// No ClickHouse Log container available, let's add one
 
-	primitives.PodSpecAddContainer(
+	k8s.PodSpecAddContainer(
 		&statefulSet.Spec.Template.Spec,
 		newDefaultLogContainer(),
 	)
@@ -244,7 +244,7 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 	configMapCommonUsersName := model.CreateConfigMapCommonUsersName(c.chi)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
-	primitives.StatefulSetAppendVolumes(
+	k8s.StatefulSetAppendVolumes(
 		statefulSet,
 		newVolumeForConfigMap(configMapCommonName),
 		newVolumeForConfigMap(configMapCommonUsersName),
@@ -254,7 +254,7 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have ConfigMaps mounted as Volumes
-	primitives.StatefulSetAppendVolumeMounts(
+	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
 		newVolumeMount(configMapCommonName, model.DirPathCommonConfig),
 		newVolumeMount(configMapCommonUsersName, model.DirPathUsersConfig),
@@ -265,14 +265,14 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 // statefulSetSetupVolumesForSecrets adds to each container in the Pod VolumeMount objects
 func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 	// Add all additional Volumes
-	primitives.StatefulSetAppendVolumes(
+	k8s.StatefulSetAppendVolumes(
 		statefulSet,
 		host.GetCHI().Runtime.Attributes.AdditionalVolumes...,
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have additional volumes mounted as Volumes
-	primitives.StatefulSetAppendVolumeMounts(
+	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
 		host.GetCHI().Runtime.Attributes.AdditionalVolumeMounts...,
 	)
@@ -307,11 +307,11 @@ func (c *Creator) statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates
 	for i := range statefulSet.Spec.Template.Spec.Containers {
 		// Convenience wrapper
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		primitives.ContainerAppendVolumeMounts(
+		k8s.ContainerAppendVolumeMounts(
 			container,
 			newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), model.DirPathClickHouseData),
 		)
-		primitives.ContainerAppendVolumeMounts(
+		k8s.ContainerAppendVolumeMounts(
 			container,
 			newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), model.DirPathClickHouseLog),
 		)
@@ -354,12 +354,12 @@ func (c *Creator) statefulSetApplyPodTemplate(
 
 // getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return primitives.StatefulSetContainerGet(statefulSet, model.ClickHouseContainerName, 0)
+	return k8s.StatefulSetContainerGet(statefulSet, model.ClickHouseContainerName, 0)
 }
 
 // getClickHouseLogContainer
 func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return primitives.StatefulSetContainerGet(statefulSet, model.ClickHouseLogContainerName, -1)
+	return k8s.StatefulSetContainerGet(statefulSet, model.ClickHouseLogContainerName, -1)
 }
 
 // ensureNamedPortsSpecified
@@ -373,7 +373,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost)
 	model.HostWalkAssignedPorts(
 		host,
 		func(name string, port *int32, protocol core.Protocol) bool {
-			primitives.ContainerEnsurePortByName(container, name, *port)
+			k8s.ContainerEnsurePortByName(container, name, *port)
 			// Do not abort, continue iterating
 			return false
 		},
@@ -390,14 +390,14 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	// we need to check naming for all of them
 
 	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
-	if primitives.StatefulSetHasVolumeClaimTemplateByName(statefulSet, volumeClaimTemplate.Name) {
+	if k8s.StatefulSetHasVolumeClaimTemplateByName(statefulSet, volumeClaimTemplate.Name) {
 		// This VolumeClaimTemplate is already listed in statefulSet.Spec.VolumeClaimTemplates
 		// No need to add it second time
 		return
 	}
 
 	// Check whether provided VolumeClaimTemplate is already listed in statefulSet.Spec.Template.Spec.Volumes
-	if primitives.StatefulSetHasVolumeByName(statefulSet, volumeClaimTemplate.Name) {
+	if k8s.StatefulSetHasVolumeByName(statefulSet, volumeClaimTemplate.Name) {
 		// This VolumeClaimTemplate is already listed in statefulSet.Spec.Template.Spec.Volumes
 		// No need to add it second time
 		return
@@ -435,7 +435,7 @@ func newDefaultPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
 	}
 
 	// Pod has to have main container.
-	primitives.PodSpecAddContainer(&podTemplate.Spec, newDefaultClickHouseContainer(host))
+	k8s.PodSpecAddContainer(&podTemplate.Spec, newDefaultClickHouseContainer(host))
 
 	return podTemplate
 }

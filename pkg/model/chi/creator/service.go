@@ -23,7 +23,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/primitives"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -191,7 +191,7 @@ func (c *Creator) createServiceFromTemplate(
 ) *core.Service {
 
 	// Verify Ports
-	if err := primitives.ServiceSpecVerifyPorts(&template.Spec); err != nil {
+	if err := k8s.ServiceSpecVerifyPorts(&template.Spec); err != nil {
 		c.a.V(1).F().Warning(fmt.Sprintf("template: %s err: %s", template.Name, err))
 		return nil
 	}
