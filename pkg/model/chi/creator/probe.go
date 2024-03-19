@@ -22,8 +22,18 @@ import (
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-// newDefaultLivenessProbe returns default liveness probe
+// newDefaultLivenessProbe is a unification wrapper
 func newDefaultLivenessProbe(host *api.ChiHost) *core.Probe {
+	return newDefaultClickHouseLivenessProbe(host)
+}
+
+// newDefaultReadinessProbe is a unification wrapper
+func newDefaultReadinessProbe(host *api.ChiHost) *core.Probe {
+	return newDefaultClickHouseReadinessProbe(host)
+}
+
+// newDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
+func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if api.IsPortAssigned(host.HTTPPort) {
 		return &core.Probe{
@@ -59,8 +69,8 @@ func newDefaultLivenessProbe(host *api.ChiHost) *core.Probe {
 	return nil
 }
 
-// newDefaultReadinessProbe returns default readiness probe
-func newDefaultReadinessProbe(host *api.ChiHost) *core.Probe {
+// newDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
+func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if api.IsPortAssigned(host.HTTPPort) {
 		return &core.Probe{

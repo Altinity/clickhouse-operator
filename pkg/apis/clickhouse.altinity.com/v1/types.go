@@ -610,7 +610,6 @@ type ChiReplica struct {
 	Hosts []*ChiHost `json:"shards,omitempty" yaml:"shards,omitempty"`
 
 	Runtime ChiReplicaRuntime `json:"-" yaml:"-"`
-
 }
 
 type ChiReplicaRuntime struct {

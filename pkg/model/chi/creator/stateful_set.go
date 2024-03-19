@@ -85,7 +85,7 @@ func ensureStatefulSetTemplateIntegrity(statefulSet *apps.StatefulSet, host *api
 
 // setupEnvVars setup ENV vars for clickhouse container
 func setupEnvVars(statefulSet *apps.StatefulSet, host *api.ChiHost) {
-	container, ok := getClickHouseContainer(statefulSet)
+	container, ok := getMainContainer(statefulSet)
 	if !ok {
 		return
 	}
@@ -134,7 +134,7 @@ func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
 
 // ensureProbesSpecified
 func ensureProbesSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost) {
-	container, ok := getClickHouseContainer(statefulSet)
+	container, ok := getMainContainer(statefulSet)
 	if !ok {
 		return
 	}
@@ -151,8 +151,10 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 	// Ensure pod created by this StatefulSet has alias 127.0.0.1
 	statefulSet.Spec.Template.Spec.HostAliases = []core.HostAlias{
 		{
-			IP:        "127.0.0.1",
-			Hostnames: []string{model.CreatePodHostname(host)},
+			IP: "127.0.0.1",
+			Hostnames: []string{
+				model.CreatePodHostname(host),
+			},
 		},
 	}
 
@@ -171,7 +173,7 @@ func (c *Creator) setupTroubleshootingMode(statefulSet *apps.StatefulSet, host *
 		return
 	}
 
-	container, ok := getClickHouseContainer(statefulSet)
+	container, ok := getMainContainer(statefulSet)
 	if !ok {
 		// Unable to locate ClickHouse container
 		return
@@ -352,6 +354,11 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	}
 }
 
+// getMainContainer is a unification wrapper
+func getMainContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+	return getClickHouseContainer(statefulSet)
+}
+
 // getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, model.ClickHouseContainerName, 0)
@@ -365,7 +372,7 @@ func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, 
 // ensureNamedPortsSpecified
 func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 	// Ensure ClickHouse container has all named ports specified
-	container, ok := getClickHouseContainer(statefulSet)
+	container, ok := getMainContainer(statefulSet)
 	if !ok {
 		return
 	}
@@ -424,8 +431,13 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	}
 }
 
-// newDefaultPodTemplate returns default Pod Template to be used with StatefulSet
+// newDefaultPodTemplate is a unification wrapper
 func newDefaultPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
+	return newDefaultClickHousePodTemplate(host)
+}
+
+// newDefaultClickHousePodTemplate returns default Pod Template to be used with StatefulSet
+func newDefaultClickHousePodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
 	podTemplate := &api.ChiPodTemplate{
 		Name: model.CreateStatefulSetName(host),
 		Spec: core.PodSpec{
@@ -464,8 +476,8 @@ func newDefaultClickHouseContainer(host *api.ChiHost) core.Container {
 	container := core.Container{
 		Name:           model.ClickHouseContainerName,
 		Image:          model.DefaultClickHouseDockerImage,
-		LivenessProbe:  newDefaultLivenessProbe(host),
-		ReadinessProbe: newDefaultReadinessProbe(host),
+		LivenessProbe:  newDefaultClickHouseLivenessProbe(host),
+		ReadinessProbe: newDefaultClickHouseReadinessProbe(host),
 	}
 	appendContainerPorts(&container, host)
 	return container

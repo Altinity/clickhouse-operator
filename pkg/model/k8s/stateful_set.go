@@ -19,21 +19,6 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-// TODO UNIFY!!!
-// StatefulSetGetContainerByName finds Container with specified name among all containers of Pod Template in StatefulSet
-func StatefulSetGetContainerByName(statefulSet *apps.StatefulSet, name string) *core.Container {
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		if container.Name == name {
-			return container
-		}
-	}
-
-	return nil
-}
-
-// TODO UNIFY!!!
 // StatefulSetContainerGet gets container from the StatefulSet either by name or by index
 func StatefulSetContainerGet(statefulSet *apps.StatefulSet, name string, index int) (*core.Container, bool) {
 	// Find by name

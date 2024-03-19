@@ -29,10 +29,16 @@ import (
 
 // ClickHouseKeeperInstallation defines a ClickHouse Keeper ChkCluster
 type ClickHouseKeeperInstallation struct {
-	meta.TypeMeta      `json:",inline"                     yaml:",inline"`
-	meta.ObjectMeta    `json:"metadata,omitempty"          yaml:"metadata,omitempty"`
-	Spec               ChkSpec    `json:"spec"             yaml:"spec"`
-	Status             *ChkStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	meta.TypeMeta   `json:",inline"                     yaml:",inline"`
+	meta.ObjectMeta `json:"metadata,omitempty"          yaml:"metadata,omitempty"`
+
+	Spec   ChkSpec    `json:"spec"             yaml:"spec"`
+	Status *ChkStatus `json:"status,omitempty" yaml:"status,omitempty"`
+
+	Runtime ClickHouseKeeperInstallationRuntime `json:"-" yaml:"-"`
+}
+
+type ClickHouseKeeperInstallationRuntime struct {
 	statusCreatorMutex sync.Mutex `json:"-" yaml:"-"`
 }
 
@@ -48,8 +54,8 @@ func (chk *ClickHouseKeeperInstallation) EnsureStatus() *ChkStatus {
 	}
 
 	// Otherwise, we need to acquire a lock to initialize the field.
-	chk.statusCreatorMutex.Lock()
-	defer chk.statusCreatorMutex.Unlock()
+	chk.Runtime.statusCreatorMutex.Lock()
+	defer chk.Runtime.statusCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
 	if chk.Status == nil {
 		chk.Status = &ChkStatus{}
