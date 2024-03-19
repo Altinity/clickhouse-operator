@@ -152,12 +152,12 @@ func (m *MacrosEngine) newMapMacroReplacerChi() *util.MapReplacer {
 // newLineMacroReplacerCluster
 func (m *MacrosEngine) newLineMacroReplacerCluster() *strings.Replacer {
 	return strings.NewReplacer(
-		macrosNamespace, m.names.namePartNamespace(m.cluster.Address.Namespace),
-		macrosChiName, m.names.namePartChiName(m.cluster.Address.CHIName),
-		macrosChiID, m.names.namePartChiNameID(m.cluster.Address.CHIName),
-		macrosClusterName, m.names.namePartClusterName(m.cluster.Address.ClusterName),
-		macrosClusterID, m.names.namePartClusterNameID(m.cluster.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(m.cluster.Address.ClusterIndex),
+		macrosNamespace, m.names.namePartNamespace(m.cluster.Runtime.Address.Namespace),
+		macrosChiName, m.names.namePartChiName(m.cluster.Runtime.Address.CHIName),
+		macrosChiID, m.names.namePartChiNameID(m.cluster.Runtime.Address.CHIName),
+		macrosClusterName, m.names.namePartClusterName(m.cluster.Runtime.Address.ClusterName),
+		macrosClusterID, m.names.namePartClusterNameID(m.cluster.Runtime.Address.ClusterName),
+		macrosClusterIndex, strconv.Itoa(m.cluster.Runtime.Address.ClusterIndex),
 	)
 }
 
@@ -169,15 +169,15 @@ func (m *MacrosEngine) newMapMacroReplacerCluster() *util.MapReplacer {
 // newLineMacroReplacerShard
 func (m *MacrosEngine) newLineMacroReplacerShard() *strings.Replacer {
 	return strings.NewReplacer(
-		macrosNamespace, m.names.namePartNamespace(m.shard.Address.Namespace),
-		macrosChiName, m.names.namePartChiName(m.shard.Address.CHIName),
-		macrosChiID, m.names.namePartChiNameID(m.shard.Address.CHIName),
-		macrosClusterName, m.names.namePartClusterName(m.shard.Address.ClusterName),
-		macrosClusterID, m.names.namePartClusterNameID(m.shard.Address.ClusterName),
-		macrosClusterIndex, strconv.Itoa(m.shard.Address.ClusterIndex),
-		macrosShardName, m.names.namePartShardName(m.shard.Address.ShardName),
-		macrosShardID, m.names.namePartShardNameID(m.shard.Address.ShardName),
-		macrosShardIndex, strconv.Itoa(m.shard.Address.ShardIndex),
+		macrosNamespace, m.names.namePartNamespace(m.shard.Runtime.Address.Namespace),
+		macrosChiName, m.names.namePartChiName(m.shard.Runtime.Address.CHIName),
+		macrosChiID, m.names.namePartChiNameID(m.shard.Runtime.Address.CHIName),
+		macrosClusterName, m.names.namePartClusterName(m.shard.Runtime.Address.ClusterName),
+		macrosClusterID, m.names.namePartClusterNameID(m.shard.Runtime.Address.ClusterName),
+		macrosClusterIndex, strconv.Itoa(m.shard.Runtime.Address.ClusterIndex),
+		macrosShardName, m.names.namePartShardName(m.shard.Runtime.Address.ShardName),
+		macrosShardID, m.names.namePartShardNameID(m.shard.Runtime.Address.ShardName),
+		macrosShardIndex, strconv.Itoa(m.shard.Runtime.Address.ShardIndex),
 	)
 }
 

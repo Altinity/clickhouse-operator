@@ -27,7 +27,10 @@ type Cluster struct {
 	Secret       *ClusterSecret      `json:"secret,omitempty"       yaml:"secret,omitempty"`
 	Layout       *ChiClusterLayout   `json:"layout,omitempty"       yaml:"layout,omitempty"`
 
-	// Internal data
+	Runtime ClusterRuntime `json:"-" yaml:"-"`
+}
+
+type ClusterRuntime struct {
 	Address ChiClusterAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
@@ -157,12 +160,12 @@ func (cluster *Cluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 		return nil, false
 	}
 	name := cluster.Templates.GetClusterServiceTemplate()
-	return cluster.CHI.GetServiceTemplate(name)
+	return cluster.Runtime.CHI.GetServiceTemplate(name)
 }
 
 // GetCHI gets parent CHI
 func (cluster *Cluster) GetCHI() *ClickHouseInstallation {
-	return cluster.CHI
+	return cluster.Runtime.CHI
 }
 
 // GetShard gets shard with specified index

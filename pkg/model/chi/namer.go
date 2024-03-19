@@ -211,10 +211,10 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 		return n.namePartChiName(chi.Namespace)
 	case *api.Cluster:
 		cluster := obj.(*api.Cluster)
-		return n.namePartChiName(cluster.Address.Namespace)
+		return n.namePartChiName(cluster.Runtime.Address.Namespace)
 	case *api.ChiShard:
 		shard := obj.(*api.ChiShard)
-		return n.namePartChiName(shard.Address.Namespace)
+		return n.namePartChiName(shard.Runtime.Address.Namespace)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
 		return n.namePartChiName(host.Runtime.Address.Namespace)
@@ -231,10 +231,10 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 		return n.namePartChiName(chi.Name)
 	case *api.Cluster:
 		cluster := obj.(*api.Cluster)
-		return n.namePartChiName(cluster.Address.CHIName)
+		return n.namePartChiName(cluster.Runtime.Address.CHIName)
 	case *api.ChiShard:
 		shard := obj.(*api.ChiShard)
-		return n.namePartChiName(shard.Address.CHIName)
+		return n.namePartChiName(shard.Runtime.Address.CHIName)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
 		return n.namePartChiName(host.Runtime.Address.CHIName)
@@ -248,10 +248,10 @@ func (n *namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.Cluster:
 		cluster := obj.(*api.Cluster)
-		return n.namePartClusterName(cluster.Address.ClusterName)
+		return n.namePartClusterName(cluster.Runtime.Address.ClusterName)
 	case *api.ChiShard:
 		shard := obj.(*api.ChiShard)
-		return n.namePartClusterName(shard.Address.ClusterName)
+		return n.namePartClusterName(shard.Runtime.Address.ClusterName)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
 		return n.namePartClusterName(host.Runtime.Address.ClusterName)
@@ -265,7 +265,7 @@ func (n *namer) getNamePartShardName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.ChiShard:
 		shard := obj.(*api.ChiShard)
-		return n.namePartShardName(shard.Address.ShardName)
+		return n.namePartShardName(shard.Runtime.Address.ShardName)
 	case *api.ChiHost:
 		host := obj.(*api.ChiHost)
 		return n.namePartShardName(host.Runtime.Address.ShardName)
@@ -743,13 +743,13 @@ func CreateClusterAutoSecretName(cluster *api.Cluster) string {
 	if cluster.Name == "" {
 		return fmt.Sprintf(
 			"%s-auto-secret",
-			cluster.CHI.Name,
+			cluster.Runtime.CHI.Name,
 		)
 	}
 
 	return fmt.Sprintf(
 		"%s-%s-auto-secret",
-		cluster.CHI.Name,
+		cluster.Runtime.CHI.Name,
 		cluster.Name,
 	)
 }

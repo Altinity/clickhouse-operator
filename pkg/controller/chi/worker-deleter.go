@@ -525,10 +525,10 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 	defer w.a.V(2).M(shard).E().P()
 
 	w.a.V(1).
-		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(shard.CHI).
+		WithEvent(shard.Runtime.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(shard.Runtime.CHI).
 		M(shard).F().
-		Info("Delete shard %s/%s - started", shard.Address.Namespace, shard.Name)
+		Info("Delete shard %s/%s - started", shard.Runtime.Address.Namespace, shard.Name)
 
 	// Delete Shard Service
 	_ = w.c.deleteServiceShard(ctx, shard)
@@ -539,10 +539,10 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 	})
 
 	w.a.V(1).
-		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteCompleted).
-		WithStatusAction(shard.CHI).
+		WithEvent(shard.Runtime.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(shard.Runtime.CHI).
 		M(shard).F().
-		Info("Delete shard %s/%s - completed", shard.Address.Namespace, shard.Name)
+		Info("Delete shard %s/%s - completed", shard.Runtime.Address.Namespace, shard.Name)
 
 	return nil
 }
@@ -559,10 +559,10 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 	defer w.a.V(2).M(cluster).E().P()
 
 	w.a.V(1).
-		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(cluster.CHI).
+		WithEvent(cluster.Runtime.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(cluster.Runtime.CHI).
 		M(cluster).F().
-		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
+		Info("Delete cluster %s/%s - started", cluster.Runtime.Address.Namespace, cluster.Name)
 
 	// Delete ChkCluster Service
 	_ = w.c.deleteServiceCluster(ctx, cluster)
@@ -579,10 +579,10 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 	})
 
 	w.a.V(1).
-		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteCompleted).
-		WithStatusAction(cluster.CHI).
+		WithEvent(cluster.Runtime.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(cluster.Runtime.CHI).
 		M(cluster).F().
-		Info("Delete cluster %s/%s - completed", cluster.Address.Namespace, cluster.Name)
+		Info("Delete cluster %s/%s - completed", cluster.Runtime.Address.Namespace, cluster.Name)
 
 	return nil
 }

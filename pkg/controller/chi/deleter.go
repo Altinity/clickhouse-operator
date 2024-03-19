@@ -276,7 +276,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *api.ChiShard
 	}
 
 	serviceName := model.CreateShardServiceName(shard)
-	namespace := shard.Address.Namespace
+	namespace := shard.Runtime.Address.Namespace
 	log.V(1).M(shard).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
@@ -289,7 +289,7 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *api.Clus
 	}
 
 	serviceName := model.CreateClusterServiceName(cluster)
-	namespace := cluster.Address.Namespace
+	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
@@ -342,7 +342,7 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *api.Clust
 	}
 
 	secretName := model.CreateClusterAutoSecretName(cluster)
-	namespace := cluster.Address.Namespace
+	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, secretName)
 	return c.deleteSecretIfExists(ctx, namespace, secretName)
 }

@@ -39,8 +39,9 @@ const (
 type ClickHouseInstallation struct {
 	meta.TypeMeta   `json:",inline"            yaml:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec            ChiSpec    `json:"spec"               yaml:"spec"`
-	Status          *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
+
+	Spec   ChiSpec    `json:"spec"               yaml:"spec"`
+	Status *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
 	Runtime ClickHouseInstallationRuntime `json:"-" yaml:"-"`
 }
@@ -586,13 +587,15 @@ type ChiShard struct {
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
-	// Internal data
-
-	Address ChiShardAddress         `json:"-" yaml:"-"`
-	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+	Runtime ChiShardRuntime `json:"-" yaml:"-"`
 
 	// DefinitionType is DEPRECATED - to be removed soon
 	DefinitionType string `json:"definitionType,omitempty" yaml:"definitionType,omitempty"`
+}
+
+type ChiShardRuntime struct {
+	Address ChiShardAddress         `json:"-" yaml:"-"`
+	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
@@ -606,8 +609,11 @@ type ChiReplica struct {
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"shards,omitempty" yaml:"shards,omitempty"`
 
-	// Internal data
+	Runtime ChiReplicaRuntime `json:"-" yaml:"-"`
 
+}
+
+type ChiReplicaRuntime struct {
 	Address ChiReplicaAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }

@@ -113,24 +113,24 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			host *ChiHost,
 			address *HostAddress,
 		) error {
-			cluster.Address.Namespace = chi.Namespace
-			cluster.Address.CHIName = chi.Name
-			cluster.Address.ClusterName = cluster.Name
-			cluster.Address.ClusterIndex = address.ClusterIndex
+			cluster.Runtime.Address.Namespace = chi.Namespace
+			cluster.Runtime.Address.CHIName = chi.Name
+			cluster.Runtime.Address.ClusterName = cluster.Name
+			cluster.Runtime.Address.ClusterIndex = address.ClusterIndex
 
-			shard.Address.Namespace = chi.Namespace
-			shard.Address.CHIName = chi.Name
-			shard.Address.ClusterName = cluster.Name
-			shard.Address.ClusterIndex = address.ClusterIndex
-			shard.Address.ShardName = shard.Name
-			shard.Address.ShardIndex = address.ShardIndex
+			shard.Runtime.Address.Namespace = chi.Namespace
+			shard.Runtime.Address.CHIName = chi.Name
+			shard.Runtime.Address.ClusterName = cluster.Name
+			shard.Runtime.Address.ClusterIndex = address.ClusterIndex
+			shard.Runtime.Address.ShardName = shard.Name
+			shard.Runtime.Address.ShardIndex = address.ShardIndex
 
-			replica.Address.Namespace = chi.Namespace
-			replica.Address.CHIName = chi.Name
-			replica.Address.ClusterName = cluster.Name
-			replica.Address.ClusterIndex = address.ClusterIndex
-			replica.Address.ReplicaName = replica.Name
-			replica.Address.ReplicaIndex = address.ReplicaIndex
+			replica.Runtime.Address.Namespace = chi.Namespace
+			replica.Runtime.Address.CHIName = chi.Name
+			replica.Runtime.Address.ClusterName = cluster.Name
+			replica.Runtime.Address.ClusterIndex = address.ClusterIndex
+			replica.Runtime.Address.ReplicaName = replica.Name
+			replica.Runtime.Address.ReplicaIndex = address.ReplicaIndex
 
 			host.Runtime.Address.Namespace = chi.Namespace
 			// Skip StatefulSet as impossible to self-calculate
@@ -170,9 +170,9 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 			host *ChiHost,
 			address *HostAddress,
 		) error {
-			cluster.CHI = chi
-			shard.CHI = chi
-			replica.CHI = chi
+			cluster.Runtime.CHI = chi
+			shard.Runtime.CHI = chi
+			replica.Runtime.CHI = chi
 			host.Runtime.CHI = chi
 			return nil
 		},

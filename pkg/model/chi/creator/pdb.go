@@ -29,7 +29,7 @@ import (
 func (c *Creator) NewPodDisruptionBudget(cluster *api.Cluster) *policy.PodDisruptionBudget {
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            fmt.Sprintf("%s-%s", cluster.Address.CHIName, cluster.Address.ClusterName),
+			Name:            fmt.Sprintf("%s-%s", cluster.Runtime.Address.CHIName, cluster.Runtime.Address.ClusterName),
 			Namespace:       c.chi.Namespace,
 			Labels:          model.Macro(c.chi).Map(c.labels.GetClusterScope(cluster)),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetClusterScope(cluster)),

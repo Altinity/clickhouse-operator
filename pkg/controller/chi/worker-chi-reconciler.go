@@ -467,7 +467,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 
 	// Add ChkCluster's Service
 	if service := w.task.creator.CreateServiceCluster(cluster); service != nil {
-		if err := w.reconcileService(ctx, cluster.CHI, service); err == nil {
+		if err := w.reconcileService(ctx, cluster.Runtime.CHI, service); err == nil {
 			w.task.registryReconciled.RegisterService(service.ObjectMeta)
 		} else {
 			w.task.registryFailed.RegisterService(service.ObjectMeta)
@@ -477,7 +477,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	// Add ChkCluster's Auto Secret
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
 		if secret := w.task.creator.CreateClusterSecret(model.CreateClusterAutoSecretName(cluster)); secret != nil {
-			if err := w.reconcileSecret(ctx, cluster.CHI, secret); err == nil {
+			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
 				w.task.registryReconciled.RegisterSecret(secret.ObjectMeta)
 			} else {
 				w.task.registryFailed.RegisterSecret(secret.ObjectMeta)
@@ -631,7 +631,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 		// This is not a problem, ServiceShard may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, shard.CHI, service)
+	err := w.reconcileService(ctx, shard.Runtime.CHI, service)
 	if err == nil {
 		w.task.registryReconciled.RegisterService(service.ObjectMeta)
 	} else {

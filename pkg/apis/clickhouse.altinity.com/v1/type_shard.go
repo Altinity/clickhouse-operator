@@ -36,7 +36,7 @@ func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 		return nil, false
 	}
 	name := shard.Templates.GetShardServiceTemplate()
-	return shard.CHI.GetServiceTemplate(name)
+	return shard.Runtime.CHI.GetServiceTemplate(name)
 }
 
 // HasReplicasCount checks whether shard has replicas count specified
@@ -107,12 +107,12 @@ func (shard *ChiShard) HostsCount() int {
 
 // GetCHI gets CHI of the shard
 func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
-	return shard.CHI
+	return shard.Runtime.CHI
 }
 
 // GetCluster gets cluster of the shard
 func (shard *ChiShard) GetCluster() *Cluster {
-	return shard.CHI.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
+	return shard.Runtime.CHI.Spec.Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 
 // HasWeight checks whether shard has applicable weight value specified

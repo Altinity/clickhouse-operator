@@ -83,12 +83,12 @@ func (c *Creator) CreateServiceCluster(cluster *api.Cluster) *core.Service {
 	serviceName := model.CreateClusterServiceName(cluster)
 	ownerReferences := getOwnerReferences(c.chi)
 
-	c.a.V(1).F().Info("%s/%s", cluster.Address.Namespace, serviceName)
+	c.a.V(1).F().Info("%s/%s", cluster.Runtime.Address.Namespace, serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
-			cluster.Address.Namespace,
+			cluster.Runtime.Address.Namespace,
 			serviceName,
 			c.labels.GetServiceCluster(cluster),
 			c.annotations.GetServiceCluster(cluster),
@@ -107,7 +107,7 @@ func (c *Creator) CreateServiceShard(shard *api.ChiShard) *core.Service {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
-			shard.Address.Namespace,
+			shard.Runtime.Address.Namespace,
 			model.CreateShardServiceName(shard),
 			c.labels.GetServiceShard(shard),
 			c.annotations.GetServiceShard(shard),

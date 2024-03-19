@@ -465,12 +465,21 @@ func (n *Normalizer) normalizeTroubleshoot(troubleshoot *api.StringBool) *api.St
 	return api.NewStringBool(false)
 }
 
+func isNamespaceDomainPatternValid(namespaceDomainPattern string) bool {
+	if strings.Count(namespaceDomainPattern, "%s") > 1 {
+		return false
+	} else {
+		return true
+	}
+}
+
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
 func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern string) string {
-	if strings.Count(namespaceDomainPattern, "%s") > 1 {
-		return ""
+	if isNamespaceDomainPatternValid(namespaceDomainPattern) {
+		return namespaceDomainPattern
 	}
-	return namespaceDomainPattern
+	// In case namespaceDomainPattern is not valid - do not use it
+	return ""
 }
 
 // normalizeDefaults normalizes .spec.defaults
@@ -702,13 +711,6 @@ func (n *Normalizer) normalizeClusters(clusters []*api.Cluster) []*api.Cluster {
 	return clusters
 }
 
-// newDefaultCluster
-func (n *Normalizer) newDefaultCluster() *api.Cluster {
-	return &api.Cluster{
-		Name: "cluster",
-	}
-}
-
 // ensureClusters
 func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 	if len(clusters) > 0 {
@@ -717,7 +719,7 @@ func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 
 	if n.ctx.options.WithDefaultCluster {
 		return []*api.Cluster{
-			n.newDefaultCluster(),
+			creator.NewDefaultCluster(),
 		}
 	}
 
@@ -1037,10 +1039,10 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 }
 
 func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
+	// If user has any of encrypted password(s) specified, we need to delete existing plaintext password.
+	// Set `remove` flag for user's plaintext `password`, which is specified as empty in stock ClickHouse users.xml,
+	// thus we need to overwrite it.
 	if user.Has("password_double_sha1_hex") || user.Has("password_sha256_hex") {
-		// If user has encrypted password specified, we need to delete existing plaintext password.
-		// Set "remove" flag for user's "password", which is specified as empty in stock ClickHouse users.xml,
-		// thus we need to overwrite it.
 		user.Set("password", api.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
 }
@@ -1191,7 +1193,7 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 	}
 
 	// It may come that plaintext password is still empty.
-	// For example, "default" quite often has empty password.
+	// For example, user `default` quite often has empty password.
 	if passwordPlaintext == "" {
 		// This is fine
 		// This is all for this user
@@ -1259,10 +1261,10 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	if cluster == nil {
-		cluster = n.newDefaultCluster()
+		cluster = creator.NewDefaultCluster()
 	}
 
-	cluster.CHI = n.ctx.chi
+	cluster.Runtime.CHI = n.ctx.chi
 
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.ctx.chi)
