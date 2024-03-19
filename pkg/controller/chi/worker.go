@@ -36,10 +36,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator/primitives"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/primitives"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 

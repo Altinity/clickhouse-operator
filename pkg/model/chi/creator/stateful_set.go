@@ -22,7 +22,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator/primitives"
+	"github.com/altinity/clickhouse-operator/pkg/model/primitives"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
