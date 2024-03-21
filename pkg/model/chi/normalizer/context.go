@@ -30,3 +30,25 @@ func NewContext(options *Options) *Context {
 		options: options,
 	}
 }
+
+func (c *Context) GetTarget() *api.ClickHouseInstallation {
+	if c == nil {
+		return nil
+	}
+	return c.chi
+}
+
+func (c *Context) SetTarget(chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	if c == nil {
+		return nil
+	}
+	c.chi = chi
+	return c.chi
+}
+
+func (c *Context) Options() *Options {
+	if c == nil {
+		return nil
+	}
+	return c.options
+}

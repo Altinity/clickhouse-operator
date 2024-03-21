@@ -64,16 +64,16 @@ func (n *Normalizer) CreateTemplatedCHI(
 	// Ensure normalization entity present
 	chi = n.ensureNormalizationEntity(chi)
 
-	// Create new chi that will be populated with data during normalization process
-	n.ctx.chi = n.createBaseResultEntity()
+	// Create new target that will be populated with data during normalization process
+	n.ctx.SetTarget(n.createTarget())
 
-	// At this moment context chi is either newly created 'empty' CHI or a system-wide template
+	// At this moment target is either newly created 'empty' CHI or a system-wide template
 
-	// Apply templates - both auto and explicitly requested - on top of context chi
+	// Apply templates - both auto and explicitly requested - on top of context target
 	n.applyTemplates(chi)
 
-	// After all templates applied, place provided CHI on top of the whole stack
-	n.ctx.chi.MergeFrom(chi, api.MergeTypeOverrideByNonEmptyValues)
+	// After all templates applied, place provided CHI on top of the whole stack (target)
+	n.ctx.GetTarget().MergeFrom(chi, api.MergeTypeOverrideByNonEmptyValues)
 
 	return n.normalize()
 }
@@ -82,15 +82,15 @@ func (n *Normalizer) ensureNormalizationEntity(chi *api.ClickHouseInstallation) 
 	if chi == nil {
 		// No CHI specified - meaning we are building over provided 'empty' CHI with no clusters inside
 		chi = creator.NewCHI()
-		n.ctx.options.WithDefaultCluster = false
+		n.ctx.Options().WithDefaultCluster = false
 	} else {
 		// Even in case having CHI provided, we need to insert default cluster in case no clusters specified
-		n.ctx.options.WithDefaultCluster = true
+		n.ctx.Options().WithDefaultCluster = true
 	}
 	return chi
 }
 
-func (n *Normalizer) createBaseResultEntity() *api.ClickHouseInstallation {
+func (n *Normalizer) createTarget() *api.ClickHouseInstallation {
 	// What base should be used to create CHI
 	if chop.Config().Template.CHI.Runtime.Template == nil {
 		// No template specified - start with clear page
@@ -101,156 +101,34 @@ func (n *Normalizer) createBaseResultEntity() *api.ClickHouseInstallation {
 	}
 }
 
-// prepareListOfTemplates prepares list of CHI templates to be used by the CHI
-func (n *Normalizer) prepareListOfTemplates(chi *api.ClickHouseInstallation) (templates []api.ChiTemplateRef) {
-	// 1. Get list of auto templates available
-	templates = append(templates, n.prepareListOfAutoTemplates(chi)...)
-	// 2. Append templates which are explicitly requested by the CHI
-	templates = append(templates, n.prepareListOfManualTemplates(chi)...)
-	// 3 Normalize list of templates
-	templates = n.normalizeTemplatesList(templates)
-
-	log.V(1).M(chi).F().Info("Found applicable templates num: %d", len(templates))
-	return templates
-}
-
-func (n *Normalizer) prepareListOfAutoTemplates(chi *api.ClickHouseInstallation) (templates []api.ChiTemplateRef) {
-	// 1. Get list of auto templates available
-	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
-		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
-		for _, template := range autoTemplates {
-			log.V(1).M(chi).F().Info(
-				"Adding auto-template to the list of applicable templates: %s/%s ",
-				template.Namespace, template.Name)
-			templates = append(templates, api.ChiTemplateRef{
-				Name:      template.Name,
-				Namespace: template.Namespace,
-				UseType:   model.UseTypeMerge,
-			})
-		}
-	}
-
-	return templates
-}
-
-func (n *Normalizer) prepareListOfManualTemplates(chi *api.ClickHouseInstallation) (templates []api.ChiTemplateRef) {
-	if len(chi.Spec.UseTemplates) > 0 {
-		log.V(1).M(chi).F().Info("Found manual-templates num: %d", len(chi.Spec.UseTemplates))
-		templates = append(templates, chi.Spec.UseTemplates...)
-	}
-
-	return templates
-}
-
-// applyTemplates applies templates over target n.ctx.chi
-func (n *Normalizer) applyTemplates(chi *api.ClickHouseInstallation) {
-	// Prepare list of templates to be applied to the CHI
-	templates := n.prepareListOfTemplates(chi)
-
-	// Apply templates from the list
-	for i := range templates {
-		n.applyTemplate(&templates[i], chi)
-	}
-
-	log.V(1).M(chi).F().Info("Used templates count: %d", n.ctx.chi.EnsureStatus().GetUsedTemplatesCount())
-}
-
-// applyTemplate applies a template over target n.ctx.chi
-// `chi *api.ClickHouseInstallation` is used to determine whether the template should be applied or not only
-func (n *Normalizer) applyTemplate(templateRef *api.ChiTemplateRef, chi *api.ClickHouseInstallation) {
-	if templateRef == nil {
-		log.Warning("unable to apply template - nil templateRef provided")
-		return
-	}
-
-	// What template are we going to apply?
-	template := chop.Config().FindTemplate(templateRef, chi.Namespace)
-	if template == nil {
-		log.V(1).M(templateRef.Namespace, templateRef.Name).F().Warning(
-			"skip template - UNABLE to find by templateRef: %s/%s",
-			templateRef.Namespace, templateRef.Name)
-		return
-	}
-
-	// What target(s) this template wants to be applied to?
-	// This is determined by matching selector of the template and target's labels
-	// Convenience wrapper
-	selector := template.Spec.Templating.GetCHISelector()
-	if !selector.Matches(chi.Labels) {
-		// This template does not want to be applied to this CHI
-		log.V(1).M(templateRef.Namespace, templateRef.Name).F().Info(
-			"Skip template: %s/%s. Selector: %v does not match labels: %v",
-			templateRef.Namespace, templateRef.Name, selector, chi.Labels)
-		return
-	}
-
-	//
-	// Template is found and wants to be applied on the target
-	//
-
-	log.V(1).M(templateRef.Namespace, templateRef.Name).F().Info(
-		"Apply template: %s/%s. Selector: %v matches labels: %v",
-		templateRef.Namespace, templateRef.Name, selector, chi.Labels)
-
-	//  Let's apply template and append used template to the list of used templates
-	n.ctx.chi = n.mergeFromTemplate(n.ctx.chi, template)
-	n.ctx.chi.EnsureStatus().PushUsedTemplate(templateRef)
-}
-
-func (n *Normalizer) mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	// Merge template's Labels over target's Labels
-	target.Labels = util.MergeStringMapsOverwrite(
-		target.Labels,
-		util.CopyMapFilter(
-			template.Labels,
-			chop.Config().Label.Include,
-			chop.Config().Label.Exclude,
-		),
-	)
-
-	// Merge template's Annotations over target's Annotations
-	target.Annotations = util.MergeStringMapsOverwrite(
-		target.Annotations, util.CopyMapFilter(
-			template.Annotations,
-			chop.Config().Annotation.Include,
-			append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
-		),
-	)
-
-	// Merge template's Spec over target's Spec
-	(&target.Spec).MergeFrom(&template.Spec, api.MergeTypeOverrideByNonEmptyValues)
-
-	return target
-}
-
 // normalize normalizes whole CHI.
 // Returns normalized CHI
 func (n *Normalizer) normalize() (*api.ClickHouseInstallation, error) {
 	// Walk over ChiSpec datatype fields
-	n.ctx.chi.Spec.TaskID = n.normalizeTaskID(n.ctx.chi.Spec.TaskID)
-	n.ctx.chi.Spec.UseTemplates = n.normalizeTemplatesList(n.ctx.chi.Spec.UseTemplates)
-	n.ctx.chi.Spec.Stop = n.normalizeStop(n.ctx.chi.Spec.Stop)
-	n.ctx.chi.Spec.Restart = n.normalizeRestart(n.ctx.chi.Spec.Restart)
-	n.ctx.chi.Spec.Troubleshoot = n.normalizeTroubleshoot(n.ctx.chi.Spec.Troubleshoot)
-	n.ctx.chi.Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.chi.Spec.NamespaceDomainPattern)
-	n.ctx.chi.Spec.Templating = n.normalizeTemplating(n.ctx.chi.Spec.Templating)
-	n.ctx.chi.Spec.Reconciling = n.normalizeReconciling(n.ctx.chi.Spec.Reconciling)
-	n.ctx.chi.Spec.Defaults = n.normalizeDefaults(n.ctx.chi.Spec.Defaults)
-	n.ctx.chi.Spec.Configuration = n.normalizeConfiguration(n.ctx.chi.Spec.Configuration)
-	n.ctx.chi.Spec.Templates = n.normalizeTemplates(n.ctx.chi.Spec.Templates)
+	n.ctx.GetTarget().Spec.TaskID = n.normalizeTaskID(n.ctx.GetTarget().Spec.TaskID)
+	n.ctx.GetTarget().Spec.UseTemplates = n.normalizeUseTemplates(n.ctx.GetTarget().Spec.UseTemplates)
+	n.ctx.GetTarget().Spec.Stop = n.normalizeStop(n.ctx.GetTarget().Spec.Stop)
+	n.ctx.GetTarget().Spec.Restart = n.normalizeRestart(n.ctx.GetTarget().Spec.Restart)
+	n.ctx.GetTarget().Spec.Troubleshoot = n.normalizeTroubleshoot(n.ctx.GetTarget().Spec.Troubleshoot)
+	n.ctx.GetTarget().Spec.NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().Spec.NamespaceDomainPattern)
+	n.ctx.GetTarget().Spec.Templating = n.normalizeTemplating(n.ctx.GetTarget().Spec.Templating)
+	n.ctx.GetTarget().Spec.Reconciling = n.normalizeReconciling(n.ctx.GetTarget().Spec.Reconciling)
+	n.ctx.GetTarget().Spec.Defaults = n.normalizeDefaults(n.ctx.GetTarget().Spec.Defaults)
+	n.ctx.GetTarget().Spec.Configuration = n.normalizeConfiguration(n.ctx.GetTarget().Spec.Configuration)
+	n.ctx.GetTarget().Spec.Templates = n.normalizeTemplates(n.ctx.GetTarget().Spec.Templates)
 	// UseTemplates already done
 
 	n.finalizeCHI()
 	n.fillStatus()
 
-	return n.ctx.chi, nil
+	return n.ctx.GetTarget(), nil
 }
 
 // finalizeCHI performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalizeCHI() {
-	n.ctx.chi.FillSelfCalculatedAddressInfo()
-	n.ctx.chi.FillCHIPointer()
-	n.ctx.chi.WalkHosts(func(host *api.ChiHost) error {
+	n.ctx.GetTarget().FillSelfCalculatedAddressInfo()
+	n.ctx.GetTarget().FillCHIPointer()
+	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
 		hostTemplate := n.getHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
@@ -260,7 +138,7 @@ func (n *Normalizer) finalizeCHI() {
 
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
-	n.ctx.chi.WalkHosts(func(host *api.ChiHost) error {
+	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
 		host.Runtime.Address.StatefulSet = model.CreateStatefulSetName(host)
 		host.Runtime.Address.FQDN = model.CreateFQDN(host)
 		return nil
@@ -269,13 +147,11 @@ func (n *Normalizer) fillCHIAddressInfo() {
 
 // getHostTemplate gets Host Template to be used to normalize Host
 func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
-	statefulSetName := model.CreateStatefulSetName(host)
-
 	// Which host template would be used - either explicitly defined in or a default one
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
-		// Host references known HostTemplate
-		log.V(2).M(host).F().Info("StatefulSet %s uses custom hostTemplate %s", statefulSetName, hostTemplate.Name)
+		// Host explicitly references known HostTemplate
+		log.V(2).M(host).F().Info("host: %s uses custom hostTemplate %s", host.Name, hostTemplate.Name)
 		return hostTemplate
 	}
 
@@ -283,20 +159,19 @@ func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
 	// However, with default template there is a nuance - hostNetwork requires different default host template
 
 	// Check hostNetwork case at first
-	podTemplate, ok := host.GetPodTemplate()
-	if ok {
+	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = creator.NewDefaultHostTemplateForHostNetwork(statefulSetName)
+			hostTemplate = creator.NewDefaultHostTemplateForHostNetwork(creator.HostTemplateName(host))
 		}
 	}
 
-	// In case hostTemplate still is not assigned - use default one
+	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = creator.NewDefaultHostTemplate(statefulSetName)
+		hostTemplate = creator.NewDefaultHostTemplate(creator.HostTemplateName(host))
 	}
 
-	log.V(3).M(host).F().Info("StatefulSet %s use default hostTemplate", statefulSetName)
+	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
 
 	return hostTemplate
 }
@@ -412,16 +287,16 @@ func ensurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, fin
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := model.CreateCHIServiceFQDN(n.ctx.chi)
+	endpoint := model.CreateCHIServiceFQDN(n.ctx.GetTarget())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
-	n.ctx.chi.WalkHosts(func(host *api.ChiHost) error {
+	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
 		pods = append(pods, model.CreatePodName(host))
 		fqdns = append(fqdns, model.CreateFQDN(host))
 		return nil
 	})
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-	n.ctx.chi.FillStatus(endpoint, pods, fqdns, ip)
+	n.ctx.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
 }
 
 // normalizeTaskID normalizes .spec.taskID
@@ -516,13 +391,13 @@ func (n *Normalizer) normalizeConfiguration(conf *api.Configuration) *api.Config
 		conf = api.NewConfiguration()
 	}
 	conf.Zookeeper = n.normalizeConfigurationZookeeper(conf.Zookeeper)
-	n.normalizeConfigurationSettingsBased(conf)
+	n.normalizeConfigurationAllSettingsBasedSections(conf)
 	conf.Clusters = n.normalizeClusters(conf.Clusters)
 	return conf
 }
 
-// normalizeConfigurationSettingsBased normalizes Settings-based configuration
-func (n *Normalizer) normalizeConfigurationSettingsBased(conf *api.Configuration) {
+// normalizeConfigurationAllSettingsBasedSections normalizes Settings-based configuration
+func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *api.Configuration) {
 	conf.Users = n.normalizeConfigurationUsers(conf.Users)
 	conf.Profiles = n.normalizeConfigurationProfiles(conf.Profiles)
 	conf.Quotas = n.normalizeConfigurationQuotas(conf.Quotas)
@@ -537,26 +412,10 @@ func (n *Normalizer) normalizeTemplates(templates *api.ChiTemplates) *api.ChiTem
 		return nil
 	}
 
-	for i := range templates.HostTemplates {
-		hostTemplate := &templates.HostTemplates[i]
-		n.normalizeHostTemplate(hostTemplate)
-	}
-
-	for i := range templates.PodTemplates {
-		podTemplate := &templates.PodTemplates[i]
-		n.normalizePodTemplate(podTemplate)
-	}
-
-	for i := range templates.VolumeClaimTemplates {
-		vcTemplate := &templates.VolumeClaimTemplates[i]
-		n.normalizeVolumeClaimTemplate(vcTemplate)
-	}
-
-	for i := range templates.ServiceTemplates {
-		serviceTemplate := &templates.ServiceTemplates[i]
-		n.normalizeServiceTemplate(serviceTemplate)
-	}
-
+	n.normalizeHostTemplates(templates)
+	n.normalizePodTemplates(templates)
+	n.normalizeVolumeClaimTemplates(templates)
+	n.normalizeServiceTemplates(templates)
 	return templates
 }
 
@@ -639,96 +498,95 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 	}
 }
 
+func (n *Normalizer) normalizeHostTemplates(templates *api.ChiTemplates) {
+	for i := range templates.HostTemplates {
+		n.normalizeHostTemplate(&templates.HostTemplates[i])
+	}
+}
+
+func (n *Normalizer) normalizePodTemplates(templates *api.ChiTemplates) {
+	for i := range templates.PodTemplates {
+		n.normalizePodTemplate(&templates.PodTemplates[i])
+	}
+}
+
+func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.ChiTemplates) {
+	for i := range templates.VolumeClaimTemplates {
+		n.normalizeVolumeClaimTemplate(&templates.VolumeClaimTemplates[i])
+	}
+}
+
+func (n *Normalizer) normalizeServiceTemplates(templates *api.ChiTemplates) {
+	for i := range templates.ServiceTemplates {
+		n.normalizeServiceTemplate(&templates.ServiceTemplates[i])
+	}
+}
+
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
 func (n *Normalizer) normalizeHostTemplate(template *api.ChiHostTemplate) {
 	templatesNormalizer.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
-	n.ctx.chi.Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
 func (n *Normalizer) normalizePodTemplate(template *api.ChiPodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
-	if len(n.ctx.chi.Spec.Configuration.Clusters) > 0 {
-		replicasCount = n.ctx.chi.Spec.Configuration.Clusters[0].Layout.ReplicasCount
+	if len(n.ctx.GetTarget().Spec.Configuration.Clusters) > 0 {
+		replicasCount = n.ctx.GetTarget().Spec.Configuration.Clusters[0].Layout.ReplicasCount
 	}
 	templatesNormalizer.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
-	n.ctx.chi.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.ChiVolumeClaimTemplate) {
 	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
-	n.ctx.chi.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *api.ChiServiceTemplate) {
 	templatesNormalizer.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
-	n.ctx.chi.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
-// normalizeTemplatesList normalizes list of templates use specifications
-func (n *Normalizer) normalizeTemplatesList(templates []api.ChiTemplateRef) []api.ChiTemplateRef {
-	for i := range templates {
-		template := &templates[i]
-		n.normalizeTemplateRef(template)
-	}
-	return templates
-}
-
-// normalizeTemplateRef normalizes ChiTemplateRef
-func (n *Normalizer) normalizeTemplateRef(templateRef *api.ChiTemplateRef) {
-	// Check Name
-	if templateRef.Name == "" {
-		// This is strange
-	}
-
-	// Check Namespace
-	if templateRef.Namespace == "" {
-		// So far do nothing with empty namespace
-	}
-
-	// Ensure UseType
-	switch templateRef.UseType {
-	case model.UseTypeMerge:
-		// Known use type, all is fine, do nothing
-	default:
-		// Unknown use type - overwrite with default value
-		templateRef.UseType = model.UseTypeMerge
-	}
+// normalizeUseTemplates is a wrapper to hold the name of normalized section
+func (n *Normalizer) normalizeUseTemplates(templates []api.ChiTemplateRef) []api.ChiTemplateRef {
+	return n.normalizeTemplatesList(templates)
 }
 
 // normalizeClusters normalizes clusters
 func (n *Normalizer) normalizeClusters(clusters []*api.Cluster) []*api.Cluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
-
 	// Normalize all clusters
 	for i := range clusters {
 		clusters[i] = n.normalizeCluster(clusters[i])
 	}
-
 	return clusters
 }
 
 // ensureClusters
 func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
+	// May be we have cluster(s) available
 	if len(clusters) > 0 {
 		return clusters
 	}
 
-	if n.ctx.options.WithDefaultCluster {
+	// In case no clusters available, we may want to create a default one
+	if n.ctx.Options().WithDefaultCluster {
 		return []*api.Cluster{
 			creator.NewDefaultCluster(),
 		}
 	}
 
-	return []*api.Cluster{}
+	// Nope, no clusters expected
+	return nil
 }
 
 // normalizeConfigurationZookeeper normalizes .spec.configuration.zookeeper
@@ -777,7 +635,7 @@ func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
 
 	// Fetch data source address from the source setting field
 	setting := settings.Get(srcSecretRefField)
-	secretAddress, err := setting.FetchDataSourceAddress(n.ctx.chi.Namespace, parseScalarString)
+	secretAddress, err := setting.FetchDataSourceAddress(n.ctx.GetTarget().Namespace, parseScalarString)
 	if err != nil {
 		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
 		return false
@@ -932,14 +790,14 @@ func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
 		return
 	}
 
-	for _, existingEnvVar := range n.ctx.chi.Runtime.Attributes.AdditionalEnvVars {
+	for _, existingEnvVar := range n.ctx.GetTarget().Runtime.Attributes.AdditionalEnvVars {
 		if existingEnvVar.Name == envVar.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Runtime.Attributes.AdditionalEnvVars = append(n.ctx.chi.Runtime.Attributes.AdditionalEnvVars, envVar)
+	n.ctx.GetTarget().Runtime.Attributes.AdditionalEnvVars = append(n.ctx.GetTarget().Runtime.Attributes.AdditionalEnvVars, envVar)
 }
 
 func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
@@ -948,14 +806,14 @@ func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
 		return
 	}
 
-	for _, existingVolume := range n.ctx.chi.Runtime.Attributes.AdditionalVolumes {
+	for _, existingVolume := range n.ctx.GetTarget().Runtime.Attributes.AdditionalVolumes {
 		if existingVolume.Name == volume.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Runtime.Attributes.AdditionalVolumes = append(n.ctx.chi.Runtime.Attributes.AdditionalVolumes, volume)
+	n.ctx.GetTarget().Runtime.Attributes.AdditionalVolumes = append(n.ctx.GetTarget().Runtime.Attributes.AdditionalVolumes, volume)
 }
 
 func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
@@ -964,14 +822,14 @@ func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 		return
 	}
 
-	for _, existingVolumeMount := range n.ctx.chi.Runtime.Attributes.AdditionalVolumeMounts {
+	for _, existingVolumeMount := range n.ctx.GetTarget().Runtime.Attributes.AdditionalVolumeMounts {
 		if existingVolumeMount.Name == volumeMount.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.chi.Runtime.Attributes.AdditionalVolumeMounts = append(n.ctx.chi.Runtime.Attributes.AdditionalVolumeMounts, volumeMount)
+	n.ctx.GetTarget().Runtime.Attributes.AdditionalVolumeMounts = append(n.ctx.GetTarget().Runtime.Attributes.AdditionalVolumeMounts, volumeMount)
 }
 
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
@@ -1085,14 +943,14 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 	profile := chop.Config().ClickHouse.Config.User.Default.Profile
 	quota := chop.Config().ClickHouse.Config.User.Default.Quota
 	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	hostRegexp := model.CreatePodHostnameRegexp(n.ctx.chi, chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+	hostRegexp := model.CreatePodHostnameRegexp(n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
 	// Some users may have special options for mandatory fields
 	switch user.Username() {
 	case defaultUsername:
 		// "default" user
-		ips = append(ips, n.ctx.options.DefaultUserAdditionalIPs...)
-		if !n.ctx.options.DefaultUserInsertHostRegex {
+		ips = append(ips, n.ctx.Options().DefaultUserAdditionalIPs...)
+		if !n.ctx.Options().DefaultUserInsertHostRegex {
 			hostRegexp = ""
 		}
 	case chop.Config().ClickHouse.Access.Username:
@@ -1269,14 +1127,14 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 		cluster = creator.NewDefaultCluster()
 	}
 
-	cluster.Runtime.CHI = n.ctx.chi
+	cluster.Runtime.CHI = n.ctx.GetTarget()
 
 	// Inherit from .spec.configuration.zookeeper
-	cluster.InheritZookeeperFrom(n.ctx.chi)
+	cluster.InheritZookeeperFrom(n.ctx.GetTarget())
 	// Inherit from .spec.configuration.files
-	cluster.InheritFilesFrom(n.ctx.chi)
+	cluster.InheritFilesFrom(n.ctx.GetTarget())
 	// Inherit from .spec.defaults
-	cluster.InheritTemplatesFrom(n.ctx.chi)
+	cluster.InheritTemplatesFrom(n.ctx.GetTarget())
 
 	cluster.Zookeeper = n.normalizeConfigurationZookeeper(cluster.Zookeeper)
 	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)

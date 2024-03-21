@@ -156,8 +156,8 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
-// GetCHISelector gets CHI selector
-func (t *ChiTemplating) GetCHISelector() CHISelector {
+// GetSelector gets CHI selector
+func (t *ChiTemplating) GetSelector() CHISelector {
 	if t == nil {
 		return nil
 	}
