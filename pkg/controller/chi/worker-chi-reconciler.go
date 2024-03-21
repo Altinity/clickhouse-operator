@@ -30,6 +30,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
@@ -335,7 +336,7 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost
 	}
 
 	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
-	host.Runtime.Version = api.NewCHVersion(version)
+	host.Runtime.Version = swversion.NewSoftWareVersion(version)
 
 	return version, nil
 }

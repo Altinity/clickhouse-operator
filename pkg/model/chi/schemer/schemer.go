@@ -20,6 +20,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -28,11 +29,11 @@ import (
 // ClusterSchemer specifies cluster schema manager
 type ClusterSchemer struct {
 	*Cluster
-	version *api.CHVersion
+	version *swversion.SoftWareVersion
 }
 
 // NewClusterSchemer creates new Schemer object
-func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *api.CHVersion) *ClusterSchemer {
+func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *swversion.SoftWareVersion) *ClusterSchemer {
 	return &ClusterSchemer{
 		Cluster: NewCluster().SetClusterConnectionParams(clusterConnectionParams),
 		version: version,

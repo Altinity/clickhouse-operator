@@ -17,6 +17,8 @@ package v1
 import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 )
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
@@ -43,7 +45,7 @@ type ChiHostRuntime struct {
 	// Internal data
 	Address             ChiHostAddress              `json:"-" yaml:"-"`
 	Config              ChiHostConfig               `json:"-" yaml:"-"`
-	Version             *CHVersion                  `json:"-" yaml:"-"`
+	Version             *swversion.SoftWareVersion  `json:"-" yaml:"-"`
 	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
