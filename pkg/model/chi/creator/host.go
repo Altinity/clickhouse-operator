@@ -60,7 +60,3 @@ func NewDefaultHostTemplateForHostNetwork(name string) *api.ChiHostTemplate {
 		},
 	}
 }
-
-func HostTemplateName(host *api.ChiHost) string {
-	return "HostTemplate" + host.Name
-}

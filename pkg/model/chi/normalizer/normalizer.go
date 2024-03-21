@@ -162,13 +162,13 @@ func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = creator.NewDefaultHostTemplateForHostNetwork(creator.HostTemplateName(host))
+			hostTemplate = creator.NewDefaultHostTemplateForHostNetwork(model.CreateHostTemplateName(host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = creator.NewDefaultHostTemplate(creator.HostTemplateName(host))
+		hostTemplate = creator.NewDefaultHostTemplate(model.CreateHostTemplateName(host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
@@ -257,6 +257,9 @@ func hostApplyPortsFromSettings(host *api.ChiHost) {
 
 // ensurePortValuesFromSettings fetches port spec from settings, if any provided
 func ensurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, final bool) {
+	//
+	// 1. Setup fallback/default ports
+	//
 	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
 	// because this is not final setup (just intermittent) and all these ports may be overwritten later
 	fallbackTCPPort := api.PortUnassigned()
@@ -265,8 +268,8 @@ func ensurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, fin
 	fallbackHTTPSPort := api.PortUnassigned()
 	fallbackInterserverHTTPPort := api.PortUnassigned()
 
+	// On the other hand, for final setup we need to assign real numbers to ports
 	if final {
-		// This is final setup and we need to assign real numbers to ports
 		if host.IsInsecure() {
 			fallbackTCPPort = model.ChDefaultTCPPortNumber
 			fallbackHTTPPort = model.ChDefaultHTTPPortNumber
@@ -278,6 +281,9 @@ func ensurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, fin
 		fallbackInterserverHTTPPort = model.ChDefaultInterserverHTTPPortNumber
 	}
 
+	//
+	// 2. Setup ports
+	//
 	host.TCPPort = api.EnsurePortValue(host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
 	host.TLSPort = api.EnsurePortValue(host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
 	host.HTTPPort = api.EnsurePortValue(host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
@@ -630,6 +636,7 @@ func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
 ) bool {
 	// Has to have source field specified
 	if !settings.Has(srcSecretRefField) {
+		// No substitution done
 		return false
 	}
 
@@ -638,6 +645,7 @@ func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
 	secretAddress, err := setting.FetchDataSourceAddress(n.ctx.GetTarget().Namespace, parseScalarString)
 	if err != nil {
 		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
+		// No substitution done
 		return false
 	}
 
@@ -649,13 +657,13 @@ func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
 	}
 
 	// In case we are NOT replacing the same field with its new value, then remove the source field.
-	// Typically non-replaced source field is not expected to be included into the final ClickHouse config,
-	// mainly because very often these source fields are synthetic ones (clickhouse does not know them).
+	// Typically non-replaced source field is not expected to be included into the final config,
+	// mainly because very often these source fields are synthetic ones (do not exist in config fields list).
 	if dstField != srcSecretRefField {
 		settings.Delete(srcSecretRefField)
 	}
 
-	// All is done
+	// Substitution done
 	return true
 }
 
@@ -671,7 +679,7 @@ func (n *Normalizer) substSettingsFieldWithSecretFieldValue(
 			if err != nil {
 				return nil, err
 			}
-
+			// Create new setting with the value
 			return api.NewSettingScalar(secretFieldValue), nil
 		})
 }
@@ -702,7 +710,7 @@ func (n *Normalizer) substSettingsFieldWithEnvRefToSecretField(
 					},
 				},
 			)
-
+			// Create new setting w/o value but with attribute to read from ENV var
 			return api.NewSettingScalar("").SetAttribute("from_env", envVarName), nil
 		})
 }
@@ -750,6 +758,7 @@ func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, s
 				SubPath:   subPath,
 			})
 
+			// Do not create new setting, but old setting would be deleted
 			return nil, fmt.Errorf("no need to create a new setting")
 		})
 }
@@ -835,7 +844,7 @@ func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
 
 // fetchSecretFieldValue fetches the value of the specified field in the specified secret
-// TODO this is the only useage of k8s API in the normalizer. How to remove it?
+// TODO this is the only usage of k8s API in the normalizer. How to remove it?
 func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (string, error) {
 
 	// Fetch the secret
@@ -846,8 +855,9 @@ func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (str
 	}
 
 	// Find the field within the secret
-	for k, value := range secret.Data {
-		if secretAddress.Key == k {
+	for key, value := range secret.Data {
+		if secretAddress.Key == key {
+			// The field found!
 			return string(value), nil
 		}
 	}
