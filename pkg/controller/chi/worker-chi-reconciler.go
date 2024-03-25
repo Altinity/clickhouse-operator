@@ -400,7 +400,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	version, _ := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true})
 	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
 
-	w.a.V(1).M(host).F().Info("Reconcile host %s. ClickHouse version: %s", host.GetName(), version)
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. ClickHouse version: %s", host.GetName(), version)
 	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
 	if w.shouldForceRestartHost(host) {
@@ -704,7 +704,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 
 	w.a.V(1).
 		M(host).F().
-		Info("Reconcile PVCs and check possible data loss for host %s", host.GetName())
+		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
 	if errIsDataLoss(w.reconcilePVCs(ctx, host, api.DesiredStatefulSet)) {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
@@ -718,7 +718,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 		}
 		w.a.V(1).
 			M(host).F().
-			Info("Data loss detected for host %s. Will do force migrate", host.GetName())
+			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())
 	}
 
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
@@ -807,9 +807,9 @@ func (w *worker) reconcilePDB(ctx context.Context, cluster *api.Cluster, pdb *po
 		pdb.ResourceVersion = cur.ResourceVersion
 		_, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Update(ctx, pdb, controller.NewUpdateOptions())
 		if err == nil {
-			log.V(1).Info("PDB updated %s/%s", pdb.Namespace, pdb.Name)
+			log.V(1).Info("PDB updated: %s/%s", pdb.Namespace, pdb.Name)
 		} else {
-			log.Error("FAILED to update PDB %s/%s err: %v", pdb.Namespace, pdb.Name, err)
+			log.Error("FAILED to update PDB: %s/%s err: %v", pdb.Namespace, pdb.Name, err)
 			return nil
 		}
 	case apiErrors.IsNotFound(err):
@@ -895,7 +895,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *api.ClickHouseInstal
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.V(1).M(chi).F().Info("Service %s/%s not found. err: %v", service.Namespace, service.Name, err)
+			w.a.V(1).M(chi).F().Info("Service: %s/%s not found. err: %v", service.Namespace, service.Name, err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
 			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
