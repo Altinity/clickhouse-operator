@@ -80,17 +80,17 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	TaskID                 *string          `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	Stop                   *StringBool      `json:"stop,omitempty"                   yaml:"stop,omitempty"`
-	Restart                string           `json:"restart,omitempty"                yaml:"restart,omitempty"`
-	Troubleshoot           *StringBool      `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
-	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
-	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
-	Defaults               *ChiDefaults     `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
-	Configuration          *Configuration   `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates              *ChiTemplates    `json:"templates,omitempty"              yaml:"templates,omitempty"`
-	UseTemplates           []ChiTemplateRef `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
+	TaskID                 *string           `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	Stop                   *StringBool       `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Restart                string            `json:"restart,omitempty"                yaml:"restart,omitempty"`
+	Troubleshoot           *StringBool       `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	NamespaceDomainPattern string            `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
+	Reconciling            *ChiReconciling   `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Defaults               *ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates              *ChiTemplates     `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	UseTemplates           []*ChiTemplateRef `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
 // ChiTemplateRef defines UseTemplate section of ClickHouseInstallation resource

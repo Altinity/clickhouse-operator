@@ -20,11 +20,6 @@ const (
 )
 
 const (
-	// .spec.useTemplate.useType
-	UseTypeMerge = "merge"
-)
-
-const (
 	InternodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
 )
 

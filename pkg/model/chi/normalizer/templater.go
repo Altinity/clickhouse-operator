@@ -18,12 +18,16 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+const (
+	// .spec.useTemplate.useType
+	UseTypeMerge = "merge"
+)
+
 // prepareListOfTemplates prepares list of CHI templates to be used by the CHI
-func (n *Normalizer) prepareListOfTemplates(chi *api.ClickHouseInstallation) (templates []api.ChiTemplateRef) {
+func (n *Normalizer) prepareListOfTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
 	// 1. Get list of auto templates available
 	templates = append(templates, n.prepareListOfAutoTemplates(chi)...)
 	// 2. Append templates which are explicitly requested by the CHI
@@ -35,7 +39,7 @@ func (n *Normalizer) prepareListOfTemplates(chi *api.ClickHouseInstallation) (te
 	return templates
 }
 
-func (n *Normalizer) prepareListOfAutoTemplates(chi *api.ClickHouseInstallation) (templates []api.ChiTemplateRef) {
+func (n *Normalizer) prepareListOfAutoTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
 	// 1. Get list of auto templates available
 	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
@@ -43,10 +47,10 @@ func (n *Normalizer) prepareListOfAutoTemplates(chi *api.ClickHouseInstallation)
 			log.V(1).M(chi).F().Info(
 				"Adding auto-template to the list of applicable templates: %s/%s ",
 				template.Namespace, template.Name)
-			templates = append(templates, api.ChiTemplateRef{
+			templates = append(templates, &api.ChiTemplateRef{
 				Name:      template.Name,
 				Namespace: template.Namespace,
-				UseType:   model.UseTypeMerge,
+				UseType:   UseTypeMerge,
 			})
 		}
 	}
@@ -54,7 +58,7 @@ func (n *Normalizer) prepareListOfAutoTemplates(chi *api.ClickHouseInstallation)
 	return templates
 }
 
-func (n *Normalizer) prepareListOfManualTemplates(chi *api.ClickHouseInstallation) (templates []api.ChiTemplateRef) {
+func (n *Normalizer) prepareListOfManualTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
 	if len(chi.Spec.UseTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found manual-templates num: %d", len(chi.Spec.UseTemplates))
 		templates = append(templates, chi.Spec.UseTemplates...)
@@ -68,10 +72,10 @@ func (n *Normalizer) applyTemplates(chi *api.ClickHouseInstallation) {
 	// Prepare list of templates to be applied to the CHI
 	templates := n.prepareListOfTemplates(chi)
 
-	// Apply templates from the list
+	// Apply templates from the list and count applied templates - just to make nice log entry
 	appliedTemplatesNum := 0
 	for i := range templates {
-		if n.applyTemplate(&templates[i], chi) {
+		if n.applyTemplate(templates[i], chi) {
 			appliedTemplatesNum += 1
 		}
 	}
@@ -154,16 +158,15 @@ func (n *Normalizer) mergeFromTemplate(target, template *api.ClickHouseInstallat
 }
 
 // normalizeTemplatesList normalizes list of templates use specifications
-func (n *Normalizer) normalizeTemplatesList(templates []api.ChiTemplateRef) []api.ChiTemplateRef {
+func (n *Normalizer) normalizeTemplatesList(templates []*api.ChiTemplateRef) []*api.ChiTemplateRef {
 	for i := range templates {
-		template := &templates[i]
-		n.normalizeTemplateRef(template)
+		templates[i] = n.normalizeTemplateRef(templates[i])
 	}
 	return templates
 }
 
 // normalizeTemplateRef normalizes ChiTemplateRef
-func (n *Normalizer) normalizeTemplateRef(templateRef *api.ChiTemplateRef) {
+func (n *Normalizer) normalizeTemplateRef(templateRef *api.ChiTemplateRef) *api.ChiTemplateRef {
 	// Check Name
 	if templateRef.Name == "" {
 		// This is strange
@@ -176,10 +179,12 @@ func (n *Normalizer) normalizeTemplateRef(templateRef *api.ChiTemplateRef) {
 
 	// Ensure UseType
 	switch templateRef.UseType {
-	case model.UseTypeMerge:
+	case UseTypeMerge:
 		// Known use type, all is fine, do nothing
 	default:
 		// Unknown use type - overwrite with default value
-		templateRef.UseType = model.UseTypeMerge
+		templateRef.UseType = UseTypeMerge
 	}
+
+	return templateRef
 }

@@ -706,8 +706,14 @@ func (in *ChiSpec) DeepCopyInto(out *ChiSpec) {
 	}
 	if in.UseTemplates != nil {
 		in, out := &in.UseTemplates, &out.UseTemplates
-		*out = make([]ChiTemplateRef, len(*in))
-		copy(*out, *in)
+		*out = make([]*ChiTemplateRef, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ChiTemplateRef)
+				**out = **in
+			}
+		}
 	}
 	return
 }

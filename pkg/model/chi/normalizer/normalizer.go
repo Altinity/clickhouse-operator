@@ -250,13 +250,13 @@ func hostApplyHostTemplate(host *api.ChiHost, template *api.ChiHostTemplate) {
 // hostApplyPortsFromSettings
 func hostApplyPortsFromSettings(host *api.ChiHost) {
 	// Use host personal settings at first
-	ensurePortValuesFromSettings(host, host.GetSettings(), false)
+	hostEnsurePortValuesFromSettings(host, host.GetSettings(), false)
 	// Fallback to common settings
-	ensurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
+	hostEnsurePortValuesFromSettings(host, host.GetCHI().Spec.Configuration.Settings, true)
 }
 
-// ensurePortValuesFromSettings fetches port spec from settings, if any provided
-func ensurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, final bool) {
+// hostEnsurePortValuesFromSettings fetches port spec from settings, if any provided
+func hostEnsurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, final bool) {
 	//
 	// 1. Setup fallback/default ports
 	//
@@ -562,7 +562,7 @@ func (n *Normalizer) normalizeServiceTemplate(template *api.ChiServiceTemplate) 
 }
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
-func (n *Normalizer) normalizeUseTemplates(templates []api.ChiTemplateRef) []api.ChiTemplateRef {
+func (n *Normalizer) normalizeUseTemplates(templates []*api.ChiTemplateRef) []*api.ChiTemplateRef {
 	return n.normalizeTemplatesList(templates)
 }
 
