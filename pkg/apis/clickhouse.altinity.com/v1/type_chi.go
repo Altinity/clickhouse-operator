@@ -346,7 +346,7 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	(&chi.Spec).MergeFrom(&from.Spec, _type)
 
 	// Copy service attributes
-	chi.Runtime.Attributes = from.Runtime.Attributes
+	chi.EnsureRuntime().attributes = from.EnsureRuntime().attributes
 
 	chi.EnsureStatus().CopyFrom(from.Status, CopyCHIStatusOptions{
 		InheritableFields: true,
@@ -707,6 +707,26 @@ func (chi *ClickHouseInstallation) YAML(opts CopyCHIOptions) string {
 	return string(yamlBytes)
 }
 
+func (chi *ClickHouseInstallation) EnsureRuntime() *ClickHouseInstallationRuntime {
+	if chi == nil {
+		return nil
+	}
+
+	// Assume that most of the time, we'll see a non-nil value.
+	if chi.runtime != nil {
+		return chi.runtime
+	}
+
+	// Otherwise, we need to acquire a lock to initialize the field.
+	chi.runtimeCreatorMutex.Lock()
+	defer chi.runtimeCreatorMutex.Unlock()
+	// Note that we have to check this property again to avoid a TOCTOU bug.
+	if chi.runtime == nil {
+		chi.runtime = &ClickHouseInstallationRuntime{}
+	}
+	return chi.runtime
+}
+
 // EnsureStatus ensures status
 func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	if chi == nil {
@@ -719,8 +739,8 @@ func (chi *ClickHouseInstallation) EnsureStatus() *ChiStatus {
 	}
 
 	// Otherwise, we need to acquire a lock to initialize the field.
-	chi.Runtime.statusCreatorMutex.Lock()
-	defer chi.Runtime.statusCreatorMutex.Unlock()
+	chi.statusCreatorMutex.Lock()
+	defer chi.statusCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
 	if chi.Status == nil {
 		chi.Status = &ChiStatus{}

@@ -43,12 +43,30 @@ type ClickHouseInstallation struct {
 	Spec   ChiSpec    `json:"spec"               yaml:"spec"`
 	Status *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
-	Runtime ClickHouseInstallationRuntime `json:"-" yaml:"-"`
+	runtime             *ClickHouseInstallationRuntime `json:"-" yaml:"-"`
+	statusCreatorMutex  sync.Mutex                     `json:"-" yaml:"-"`
+	runtimeCreatorMutex sync.Mutex                     `json:"-" yaml:"-"`
 }
 
 type ClickHouseInstallationRuntime struct {
-	Attributes         ComparableAttributes `json:"-" yaml:"-"`
-	statusCreatorMutex sync.Mutex           `json:"-" yaml:"-"`
+	attributes *ComparableAttributes `json:"-" yaml:"-"`
+}
+
+func (runtime *ClickHouseInstallationRuntime) EnsureAttributes() *ComparableAttributes {
+	if runtime == nil {
+		return nil
+	}
+
+	// Assume that most of the time, we'll see a non-nil value.
+	if runtime.attributes != nil {
+		return runtime.attributes
+	}
+
+	// Note that we have to check this property again to avoid a TOCTOU bug.
+	if runtime.attributes == nil {
+		runtime.attributes = &ComparableAttributes{}
+	}
+	return runtime.attributes
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable

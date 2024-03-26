@@ -648,7 +648,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 		_ = w.deleteCHIProtocol(ctx, new)
 	} else {
-		new.Runtime.Attributes.SkipOwnerRef = true
+		new.EnsureRuntime().EnsureAttributes().SkipOwnerRef = true
 		_ = w.reconcileCHI(ctx, old, new)
 	}
 

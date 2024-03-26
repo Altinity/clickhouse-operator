@@ -130,7 +130,7 @@ func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiC
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *apiChk.ChkTemplates) *apiChk.ChkTemplates {
+func (n *Normalizer) normalizeTemplates(templates *apiChi.ChiTemplates) *apiChi.ChiTemplates {
 	if templates == nil {
 		//templates = apiChi.NewChiTemplates()
 		return nil
