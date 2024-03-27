@@ -25,8 +25,27 @@ import (
 // NormalizePodTemplate normalizes .spec.templates.podTemplates
 func NormalizePodTemplate(replicasCount int, template *api.ChiPodTemplate) {
 	// Name
+	// GenerateName
+	// No normalization so far for these
 
 	// Zone
+	normalizePodTemplateZone(template)
+
+	// PodDistribution
+	normalizePodTemplateDistribution(replicasCount, template)
+
+	// Spec
+	template.Spec.Affinity = model.MergeAffinity(template.Spec.Affinity, model.NewAffinity(template))
+
+	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
+	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+	// which tells:  For Pods running with hostNetwork, you should explicitly set its DNS policy “ClusterFirstWithHostNet”.
+	if template.Spec.HostNetwork {
+		template.Spec.DNSPolicy = core.DNSClusterFirstWithHostNet
+	}
+}
+
+func normalizePodTemplateZone(template *api.ChiPodTemplate) {
 	switch {
 	case len(template.Zone.Values) == 0:
 		// In case no values specified - no key is reasonable
@@ -37,23 +56,15 @@ func NormalizePodTemplate(replicasCount int, template *api.ChiPodTemplate) {
 		template.Zone.Key = core.LabelTopologyZone
 	default:
 		// We have both key and value(s) specified explicitly
+		// No need to do anything, all params are set
 	}
+}
 
-	// PodDistribution
+func normalizePodTemplateDistribution(replicasCount int, template *api.ChiPodTemplate) {
 	for i := range template.PodDistribution {
 		if additionalPodDistributions := normalizePodDistribution(replicasCount, &template.PodDistribution[i]); additionalPodDistributions != nil {
 			template.PodDistribution = append(template.PodDistribution, additionalPodDistributions...)
 		}
-	}
-
-	// Spec
-	template.Spec.Affinity = model.MergeAffinity(template.Spec.Affinity, model.NewAffinity(template))
-
-	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
-	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
-	// which tells:  For Pods running with hostNetwork, you should explicitly set its DNS policy “ClusterFirstWithHostNet”.
-	if template.Spec.HostNetwork {
-		template.Spec.DNSPolicy = core.DNSClusterFirstWithHostNet
 	}
 }
 
