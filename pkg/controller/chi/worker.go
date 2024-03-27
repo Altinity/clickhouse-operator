@@ -86,12 +86,14 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		start = start.Add(api.DefaultReconcileThreadsWarmup)
 	}
 	return &worker{
-		c:          c,
-		a:          NewAnnouncer().WithController(c),
-		queue:      q,
-		normalizer: normalizer.NewNormalizer(c.kubeClient),
-		schemer:    nil,
-		start:      start,
+		c:     c,
+		a:     NewAnnouncer().WithController(c),
+		queue: q,
+		normalizer: normalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
+			return c.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+		}),
+		schemer: nil,
+		start:   start,
 	}
 }
 

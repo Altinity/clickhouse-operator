@@ -15,7 +15,6 @@
 package normalizer
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -26,13 +25,11 @@ import (
 	"github.com/google/uuid"
 
 	core "k8s.io/api/core/v1"
-	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	entitiesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/entities"
@@ -40,16 +37,18 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+type secretGet func(namespace, name string) (*core.Secret, error)
+
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	kubeClient kube.Interface
-	ctx        *Context
+	secretGet secretGet
+	ctx       *Context
 }
 
 // NewNormalizer creates new normalizer
-func NewNormalizer(kubeClient kube.Interface) *Normalizer {
+func NewNormalizer(secretGet secretGet) *Normalizer {
 	return &Normalizer{
-		kubeClient: kubeClient,
+		secretGet: secretGet,
 	}
 }
 
@@ -848,7 +847,7 @@ var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
 func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (string, error) {
 
 	// Fetch the secret
-	secret, err := n.kubeClient.CoreV1().Secrets(secretAddress.Namespace).Get(context.TODO(), secretAddress.Name, controller.NewGetOptions())
+	secret, err := n.secretGet(secretAddress.Namespace, secretAddress.Name)
 	if err != nil {
 		log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().Info("unable to read secret %s %v", secretAddress, err)
 		return "", ErrSecretValueNotFound

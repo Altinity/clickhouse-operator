@@ -25,12 +25,14 @@ import (
 	log "github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 
+	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopAPI "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 )
@@ -396,7 +398,9 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		}
 
 		log.V(1).Infof("CHI %s/%s is completed, add it", chi.Namespace, chi.Name)
-		normalizer := chiNormalizer.NewNormalizer(kubeClient)
+		normalizer := chiNormalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
+			return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+		})
 		normalized, _ := normalizer.CreateTemplatedCHI(chi, chiNormalizer.NewOptions())
 
 		watchedCHI := NewWatchedCHI(normalized)
