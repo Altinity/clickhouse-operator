@@ -27,19 +27,19 @@ const (
 )
 
 // prepareListOfTemplates prepares list of CHI templates to be used by the CHI
-func (n *Normalizer) prepareListOfTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
+func prepareListOfTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
 	// 1. Get list of auto templates available
-	templates = append(templates, n.prepareListOfAutoTemplates(chi)...)
+	templates = append(templates, prepareListOfAutoTemplates(chi)...)
 	// 2. Append templates which are explicitly requested by the CHI
-	templates = append(templates, n.prepareListOfManualTemplates(chi)...)
+	templates = append(templates, prepareListOfManualTemplates(chi)...)
 	// 3 Normalize list of templates
-	templates = n.normalizeTemplatesList(templates)
+	templates = NormalizeTemplatesList(templates)
 
 	log.V(1).M(chi).F().Info("Found applicable templates num: %d", len(templates))
 	return templates
 }
 
-func (n *Normalizer) prepareListOfAutoTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
+func prepareListOfAutoTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
 	// 1. Get list of auto templates available
 	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found auto-templates num: %d", len(autoTemplates))
@@ -58,7 +58,7 @@ func (n *Normalizer) prepareListOfAutoTemplates(chi *api.ClickHouseInstallation)
 	return templates
 }
 
-func (n *Normalizer) prepareListOfManualTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
+func prepareListOfManualTemplates(chi *api.ClickHouseInstallation) (templates []*api.ChiTemplateRef) {
 	if len(chi.Spec.UseTemplates) > 0 {
 		log.V(1).M(chi).F().Info("Found manual-templates num: %d", len(chi.Spec.UseTemplates))
 		templates = append(templates, chi.Spec.UseTemplates...)
@@ -67,25 +67,26 @@ func (n *Normalizer) prepareListOfManualTemplates(chi *api.ClickHouseInstallatio
 	return templates
 }
 
-// applyTemplates applies templates over target n.ctx.chi
-func (n *Normalizer) applyTemplates(chi *api.ClickHouseInstallation) {
+// ApplyCHITemplates applies templates over target n.ctx.chi
+func ApplyCHITemplates(target, chi *api.ClickHouseInstallation) (appliedTemplates []*api.ChiTemplateRef) {
 	// Prepare list of templates to be applied to the CHI
-	templates := n.prepareListOfTemplates(chi)
+	templates := prepareListOfTemplates(chi)
 
 	// Apply templates from the list and count applied templates - just to make nice log entry
-	appliedTemplatesNum := 0
 	for i := range templates {
-		if n.applyTemplate(templates[i], chi) {
-			appliedTemplatesNum += 1
+		template := templates[i]
+		if applyTemplate(target, template, chi) {
+			appliedTemplates = append(appliedTemplates, template)
 		}
 	}
 
-	log.V(1).M(chi).F().Info("Applied templates num: %d", appliedTemplatesNum)
+	log.V(1).M(chi).F().Info("Applied templates num: %d", len(appliedTemplates))
+	return appliedTemplates
 }
 
 // applyTemplate applies a template over target n.ctx.chi
 // `chi *api.ClickHouseInstallation` is used to determine whether the template should be applied or not only
-func (n *Normalizer) applyTemplate(templateRef *api.ChiTemplateRef, chi *api.ClickHouseInstallation) bool {
+func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.ChiTemplateRef, chi *api.ClickHouseInstallation) bool {
 	if templateRef == nil {
 		log.Warning("unable to apply template - nil templateRef provided")
 		// Template is not applied
@@ -93,7 +94,8 @@ func (n *Normalizer) applyTemplate(templateRef *api.ChiTemplateRef, chi *api.Cli
 	}
 
 	// What template are we going to apply?
-	template := chop.Config().FindTemplate(templateRef, chi.Namespace)
+	defaultNamespace := chi.Namespace
+	template := chop.Config().FindTemplate(templateRef, defaultNamespace)
 	if template == nil {
 		log.V(1).M(templateRef.Namespace, templateRef.Name).F().Warning(
 			"skip template - UNABLE to find by templateRef: %s/%s",
@@ -124,14 +126,13 @@ func (n *Normalizer) applyTemplate(templateRef *api.ChiTemplateRef, chi *api.Cli
 		templateRef.Namespace, templateRef.Name, selector, chi.Labels)
 
 	//  Let's apply template and append used template to the list of used templates
-	n.ctx.SetTarget(n.mergeFromTemplate(n.ctx.GetTarget(), template))
-	n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(templateRef)
+	mergeFromTemplate(target, template)
 
 	// Template is applied
 	return true
 }
 
-func (n *Normalizer) mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+func mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	// Merge template's Labels over target's Labels
 	target.Labels = util.MergeStringMapsOverwrite(
 		target.Labels,
@@ -157,16 +158,16 @@ func (n *Normalizer) mergeFromTemplate(target, template *api.ClickHouseInstallat
 	return target
 }
 
-// normalizeTemplatesList normalizes list of templates use specifications
-func (n *Normalizer) normalizeTemplatesList(templates []*api.ChiTemplateRef) []*api.ChiTemplateRef {
+// NormalizeTemplatesList normalizes list of templates use specifications
+func NormalizeTemplatesList(templates []*api.ChiTemplateRef) []*api.ChiTemplateRef {
 	for i := range templates {
-		templates[i] = n.normalizeTemplateRef(templates[i])
+		templates[i] = normalizeTemplateRef(templates[i])
 	}
 	return templates
 }
 
 // normalizeTemplateRef normalizes ChiTemplateRef
-func (n *Normalizer) normalizeTemplateRef(templateRef *api.ChiTemplateRef) *api.ChiTemplateRef {
+func normalizeTemplateRef(templateRef *api.ChiTemplateRef) *api.ChiTemplateRef {
 	// Check Name
 	if templateRef.Name == "" {
 		// This is strange
