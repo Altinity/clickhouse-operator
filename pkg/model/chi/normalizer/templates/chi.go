@@ -73,8 +73,7 @@ func ApplyCHITemplates(target, chi *api.ClickHouseInstallation) (appliedTemplate
 	templates := prepareListOfTemplates(chi)
 
 	// Apply templates from the list and count applied templates - just to make nice log entry
-	for i := range templates {
-		template := templates[i]
+	for _, template := range templates {
 		if applyTemplate(target, template, chi) {
 			appliedTemplates = append(appliedTemplates, template)
 		}

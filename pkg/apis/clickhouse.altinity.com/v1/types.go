@@ -144,6 +144,10 @@ func (s CHISelector) Matches(labels map[string]string) bool {
 			// Labels have the key specified in selector, but selector value is not the same as labels value
 			// Selector does not match the labels
 			return false
+		} else {
+			// Selector value and label value are equal
+			// So far label matches selector
+			// Continue iteration to next value
 		}
 	}
 
