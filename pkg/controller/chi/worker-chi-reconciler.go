@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -110,6 +111,9 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 			M(new).F().
 			Error("FAILED to reconcile CHI err: %v", err)
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
+		if errors.Is(err, errCRUDAbort) {
+			metricsCHIReconcilesAborted(ctx)
+		}
 	} else {
 		// Reconcile successful
 		// Post-process added items
