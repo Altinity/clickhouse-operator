@@ -69,7 +69,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 	// At this moment target is either newly created 'empty' CHI or a system-wide template
 
 	// Apply templates - both auto and explicitly requested - on top of context target
-	for _, template := range ApplyCHITemplates(n.ctx.GetTarget(), chi) {
+	for _, template := range templatesNormalizer.ApplyCHITemplates(n.ctx.GetTarget(), chi) {
 		n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	}
 
@@ -564,7 +564,7 @@ func (n *Normalizer) normalizeServiceTemplate(template *api.ChiServiceTemplate) 
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
 func (n *Normalizer) normalizeUseTemplates(templates []*api.ChiTemplateRef) []*api.ChiTemplateRef {
-	return NormalizeTemplatesList(templates)
+	return templatesNormalizer.NormalizeTemplatesList(templates)
 }
 
 // normalizeClusters normalizes clusters
