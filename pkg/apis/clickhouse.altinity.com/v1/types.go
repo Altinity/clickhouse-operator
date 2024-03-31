@@ -39,12 +39,34 @@ const (
 type ClickHouseInstallation struct {
 	meta.TypeMeta   `json:",inline"            yaml:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	Spec            ChiSpec    `json:"spec"               yaml:"spec"`
-	Status          *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
-	Attributes ComparableAttributes `json:"-" yaml:"-"`
+	Spec   ChiSpec    `json:"spec"               yaml:"spec"`
+	Status *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
 
-	statusCreatorMutex sync.Mutex `json:"-" yaml:"-"`
+	runtime             *ClickHouseInstallationRuntime `json:"-" yaml:"-"`
+	statusCreatorMutex  sync.Mutex                     `json:"-" yaml:"-"`
+	runtimeCreatorMutex sync.Mutex                     `json:"-" yaml:"-"`
+}
+
+type ClickHouseInstallationRuntime struct {
+	attributes *ComparableAttributes `json:"-" yaml:"-"`
+}
+
+func (runtime *ClickHouseInstallationRuntime) EnsureAttributes() *ComparableAttributes {
+	if runtime == nil {
+		return nil
+	}
+
+	// Assume that most of the time, we'll see a non-nil value.
+	if runtime.attributes != nil {
+		return runtime.attributes
+	}
+
+	// Note that we have to check this property again to avoid a TOCTOU bug.
+	if runtime.attributes == nil {
+		runtime.attributes = &ComparableAttributes{}
+	}
+	return runtime.attributes
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable
@@ -76,21 +98,21 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	TaskID                 *string          `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	Stop                   *StringBool      `json:"stop,omitempty"                   yaml:"stop,omitempty"`
-	Restart                string           `json:"restart,omitempty"                yaml:"restart,omitempty"`
-	Troubleshoot           *StringBool      `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
-	NamespaceDomainPattern string           `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
-	Templating             *ChiTemplating   `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconciling            *ChiReconciling  `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
-	Defaults               *ChiDefaults     `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
-	Configuration          *Configuration   `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates              *ChiTemplates    `json:"templates,omitempty"              yaml:"templates,omitempty"`
-	UseTemplates           []ChiUseTemplate `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
+	TaskID                 *string           `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	Stop                   *StringBool       `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Restart                string            `json:"restart,omitempty"                yaml:"restart,omitempty"`
+	Troubleshoot           *StringBool       `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	NamespaceDomainPattern string            `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
+	Reconciling            *ChiReconciling   `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Defaults               *ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates              *ChiTemplates     `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	UseTemplates           []*ChiTemplateRef `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
-// ChiUseTemplate defines UseTemplate section of ClickHouseInstallation resource
-type ChiUseTemplate struct {
+// ChiTemplateRef defines UseTemplate section of ClickHouseInstallation resource
+type ChiTemplateRef struct {
 	Name      string `json:"name,omitempty"      yaml:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	UseType   string `json:"useType,omitempty"   yaml:"useType,omitempty"`
@@ -122,6 +144,10 @@ func (s CHISelector) Matches(labels map[string]string) bool {
 			// Labels have the key specified in selector, but selector value is not the same as labels value
 			// Selector does not match the labels
 			return false
+		} else {
+			// Selector value and label value are equal
+			// So far label matches selector
+			// Continue iteration to next value
 		}
 	}
 
@@ -152,8 +178,8 @@ func (t *ChiTemplating) SetPolicy(p string) {
 	t.Policy = p
 }
 
-// GetCHISelector gets CHI selector
-func (t *ChiTemplating) GetCHISelector() CHISelector {
+// GetSelector gets CHI selector
+func (t *ChiTemplating) GetSelector() CHISelector {
 	if t == nil {
 		return nil
 	}
@@ -583,13 +609,15 @@ type ChiShard struct {
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
-	// Internal data
-
-	Address ChiShardAddress         `json:"-" yaml:"-"`
-	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+	Runtime ChiShardRuntime `json:"-" yaml:"-"`
 
 	// DefinitionType is DEPRECATED - to be removed soon
 	DefinitionType string `json:"definitionType,omitempty" yaml:"definitionType,omitempty"`
+}
+
+type ChiShardRuntime struct {
+	Address ChiShardAddress         `json:"-" yaml:"-"`
+	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
@@ -603,8 +631,10 @@ type ChiReplica struct {
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"shards,omitempty" yaml:"shards,omitempty"`
 
-	// Internal data
+	Runtime ChiReplicaRuntime `json:"-" yaml:"-"`
+}
 
+type ChiReplicaRuntime struct {
 	Address ChiReplicaAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }

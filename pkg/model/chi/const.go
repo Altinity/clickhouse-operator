@@ -16,10 +16,18 @@ package chi
 
 const (
 	// Default value for ClusterIP service
-	templateDefaultsServiceClusterIP = "None"
+	TemplateDefaultsServiceClusterIP = "None"
 )
 
 const (
-	// .spec.useTemplate.useType
-	useTypeMerge = "merge"
+	InternodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
+)
+
+// Values for Schema Policy
+const (
+	SchemaPolicyReplicaNone                = "None"
+	SchemaPolicyReplicaAll                 = "All"
+	SchemaPolicyShardNone                  = "None"
+	SchemaPolicyShardAll                   = "All"
+	SchemaPolicyShardDistributedTablesOnly = "DistributedTablesOnly"
 )

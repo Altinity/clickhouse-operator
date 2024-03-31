@@ -36,7 +36,7 @@ func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 		return nil, false
 	}
 	name := replica.Templates.GetReplicaServiceTemplate()
-	return replica.CHI.GetServiceTemplate(name)
+	return replica.Runtime.CHI.GetServiceTemplate(name)
 }
 
 // HasShardsCount checks whether replica has shards count specified

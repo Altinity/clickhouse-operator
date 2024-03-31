@@ -113,46 +113,46 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			host *ChiHost,
 			address *HostAddress,
 		) error {
-			cluster.Address.Namespace = chi.Namespace
-			cluster.Address.CHIName = chi.Name
-			cluster.Address.ClusterName = cluster.Name
-			cluster.Address.ClusterIndex = address.ClusterIndex
+			cluster.Runtime.Address.Namespace = chi.Namespace
+			cluster.Runtime.Address.CHIName = chi.Name
+			cluster.Runtime.Address.ClusterName = cluster.Name
+			cluster.Runtime.Address.ClusterIndex = address.ClusterIndex
 
-			shard.Address.Namespace = chi.Namespace
-			shard.Address.CHIName = chi.Name
-			shard.Address.ClusterName = cluster.Name
-			shard.Address.ClusterIndex = address.ClusterIndex
-			shard.Address.ShardName = shard.Name
-			shard.Address.ShardIndex = address.ShardIndex
+			shard.Runtime.Address.Namespace = chi.Namespace
+			shard.Runtime.Address.CHIName = chi.Name
+			shard.Runtime.Address.ClusterName = cluster.Name
+			shard.Runtime.Address.ClusterIndex = address.ClusterIndex
+			shard.Runtime.Address.ShardName = shard.Name
+			shard.Runtime.Address.ShardIndex = address.ShardIndex
 
-			replica.Address.Namespace = chi.Namespace
-			replica.Address.CHIName = chi.Name
-			replica.Address.ClusterName = cluster.Name
-			replica.Address.ClusterIndex = address.ClusterIndex
-			replica.Address.ReplicaName = replica.Name
-			replica.Address.ReplicaIndex = address.ReplicaIndex
+			replica.Runtime.Address.Namespace = chi.Namespace
+			replica.Runtime.Address.CHIName = chi.Name
+			replica.Runtime.Address.ClusterName = cluster.Name
+			replica.Runtime.Address.ClusterIndex = address.ClusterIndex
+			replica.Runtime.Address.ReplicaName = replica.Name
+			replica.Runtime.Address.ReplicaIndex = address.ReplicaIndex
 
-			host.Address.Namespace = chi.Namespace
+			host.Runtime.Address.Namespace = chi.Namespace
 			// Skip StatefulSet as impossible to self-calculate
 			// host.Address.StatefulSet = CreateStatefulSetName(host)
-			host.Address.CHIName = chi.Name
-			host.Address.ClusterName = cluster.Name
-			host.Address.ClusterIndex = address.ClusterIndex
-			host.Address.ShardName = shard.Name
-			host.Address.ShardIndex = address.ShardIndex
-			host.Address.ReplicaName = replica.Name
-			host.Address.ReplicaIndex = address.ReplicaIndex
-			host.Address.HostName = host.Name
-			host.Address.CHIScopeIndex = address.CHIScopeAddress.Index
-			host.Address.CHIScopeCycleSize = address.CHIScopeAddress.CycleSpec.Size
-			host.Address.CHIScopeCycleIndex = address.CHIScopeAddress.CycleAddress.CycleIndex
-			host.Address.CHIScopeCycleOffset = address.CHIScopeAddress.CycleAddress.Index
-			host.Address.ClusterScopeIndex = address.ClusterScopeAddress.Index
-			host.Address.ClusterScopeCycleSize = address.ClusterScopeAddress.CycleSpec.Size
-			host.Address.ClusterScopeCycleIndex = address.ClusterScopeAddress.CycleAddress.CycleIndex
-			host.Address.ClusterScopeCycleOffset = address.ClusterScopeAddress.CycleAddress.Index
-			host.Address.ShardScopeIndex = address.ReplicaIndex
-			host.Address.ReplicaScopeIndex = address.ShardIndex
+			host.Runtime.Address.CHIName = chi.Name
+			host.Runtime.Address.ClusterName = cluster.Name
+			host.Runtime.Address.ClusterIndex = address.ClusterIndex
+			host.Runtime.Address.ShardName = shard.Name
+			host.Runtime.Address.ShardIndex = address.ShardIndex
+			host.Runtime.Address.ReplicaName = replica.Name
+			host.Runtime.Address.ReplicaIndex = address.ReplicaIndex
+			host.Runtime.Address.HostName = host.Name
+			host.Runtime.Address.CHIScopeIndex = address.CHIScopeAddress.Index
+			host.Runtime.Address.CHIScopeCycleSize = address.CHIScopeAddress.CycleSpec.Size
+			host.Runtime.Address.CHIScopeCycleIndex = address.CHIScopeAddress.CycleAddress.CycleIndex
+			host.Runtime.Address.CHIScopeCycleOffset = address.CHIScopeAddress.CycleAddress.Index
+			host.Runtime.Address.ClusterScopeIndex = address.ClusterScopeAddress.Index
+			host.Runtime.Address.ClusterScopeCycleSize = address.ClusterScopeAddress.CycleSpec.Size
+			host.Runtime.Address.ClusterScopeCycleIndex = address.ClusterScopeAddress.CycleAddress.CycleIndex
+			host.Runtime.Address.ClusterScopeCycleOffset = address.ClusterScopeAddress.CycleAddress.Index
+			host.Runtime.Address.ShardScopeIndex = address.ReplicaIndex
+			host.Runtime.Address.ReplicaScopeIndex = address.ShardIndex
 
 			return nil
 		},
@@ -170,10 +170,10 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 			host *ChiHost,
 			address *HostAddress,
 		) error {
-			cluster.CHI = chi
-			shard.CHI = chi
-			replica.CHI = chi
-			host.CHI = chi
+			cluster.Runtime.CHI = chi
+			shard.Runtime.CHI = chi
+			replica.Runtime.CHI = chi
+			host.Runtime.CHI = chi
 			return nil
 		},
 	)
@@ -346,7 +346,7 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	(&chi.Spec).MergeFrom(&from.Spec, _type)
 
 	// Copy service attributes
-	chi.Attributes = from.Attributes
+	chi.EnsureRuntime().attributes = from.EnsureRuntime().attributes
 
 	chi.EnsureStatus().CopyFrom(from.Status, CopyCHIStatusOptions{
 		InheritableFields: true,
@@ -705,6 +705,26 @@ func (chi *ClickHouseInstallation) YAML(opts CopyCHIOptions) string {
 		return fmt.Sprintf("unable to parse. err: %v", err)
 	}
 	return string(yamlBytes)
+}
+
+func (chi *ClickHouseInstallation) EnsureRuntime() *ClickHouseInstallationRuntime {
+	if chi == nil {
+		return nil
+	}
+
+	// Assume that most of the time, we'll see a non-nil value.
+	if chi.runtime != nil {
+		return chi.runtime
+	}
+
+	// Otherwise, we need to acquire a lock to initialize the field.
+	chi.runtimeCreatorMutex.Lock()
+	defer chi.runtimeCreatorMutex.Unlock()
+	// Note that we have to check this property again to avoid a TOCTOU bug.
+	if chi.runtime == nil {
+		chi.runtime = &ClickHouseInstallationRuntime{}
+	}
+	return chi.runtime
 }
 
 // EnsureStatus ensures status

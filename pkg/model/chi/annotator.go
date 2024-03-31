@@ -34,58 +34,58 @@ func NewAnnotator(chi *api.ClickHouseInstallation) *Annotator {
 	}
 }
 
-// getConfigMapCHICommon
-func (a *Annotator) getConfigMapCHICommon() map[string]string {
+// GetConfigMapCHICommon
+func (a *Annotator) GetConfigMapCHICommon() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getCHIScope(),
 		nil,
 	)
 }
 
-// getConfigMapCHICommonUsers
-func (a *Annotator) getConfigMapCHICommonUsers() map[string]string {
+// GetConfigMapCHICommonUsers
+func (a *Annotator) GetConfigMapCHICommonUsers() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getCHIScope(),
 		nil,
 	)
 }
 
-// getConfigMapHost
-func (a *Annotator) getConfigMapHost(host *api.ChiHost) map[string]string {
+// GetConfigMapHost
+func (a *Annotator) GetConfigMapHost(host *api.ChiHost) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		a.getHostScope(host),
+		a.GetHostScope(host),
 		nil,
 	)
 }
 
-// getServiceCHI
-func (a *Annotator) getServiceCHI(chi *api.ClickHouseInstallation) map[string]string {
+// GetServiceCHI
+func (a *Annotator) GetServiceCHI(chi *api.ClickHouseInstallation) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getCHIScope(),
 		nil,
 	)
 }
 
-// getServiceCluster
-func (a *Annotator) getServiceCluster(cluster *api.Cluster) map[string]string {
+// GetServiceCluster
+func (a *Annotator) GetServiceCluster(cluster *api.Cluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		a.getClusterScope(cluster),
+		a.GetClusterScope(cluster),
 		nil,
 	)
 }
 
-// getServiceShard
-func (a *Annotator) getServiceShard(shard *api.ChiShard) map[string]string {
+// GetServiceShard
+func (a *Annotator) GetServiceShard(shard *api.ChiShard) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getShardScope(shard),
 		nil,
 	)
 }
 
-// getServiceHost
-func (a *Annotator) getServiceHost(host *api.ChiHost) map[string]string {
+// GetServiceHost
+func (a *Annotator) GetServiceHost(host *api.ChiHost) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		a.getHostScope(host),
+		a.GetHostScope(host),
 		nil,
 	)
 }
@@ -96,8 +96,8 @@ func (a *Annotator) getCHIScope() map[string]string {
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
-// getClusterScope gets annotations for Cluster-scoped object
-func (a *Annotator) getClusterScope(cluster *api.Cluster) map[string]string {
+// GetClusterScope gets annotations for Cluster-scoped object
+func (a *Annotator) GetClusterScope(cluster *api.Cluster) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
@@ -108,8 +108,8 @@ func (a *Annotator) getShardScope(shard *api.ChiShard) map[string]string {
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
-// getHostScope gets annotations for Host-scoped object
-func (a *Annotator) getHostScope(host *api.ChiHost) map[string]string {
+// GetHostScope gets annotations for Host-scoped object
+func (a *Annotator) GetHostScope(host *api.ChiHost) map[string]string {
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
@@ -124,17 +124,17 @@ func (a *Annotator) appendCHIProvidedTo(dst map[string]string) map[string]string
 	return util.MergeStringMapsOverwrite(dst, source)
 }
 
-// getPV
-func (a *Annotator) getPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string {
-	return util.MergeStringMapsOverwrite(pv.Annotations, a.getHostScope(host))
+// GetPV
+func (a *Annotator) GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string {
+	return util.MergeStringMapsOverwrite(pv.Annotations, a.GetHostScope(host))
 }
 
-// getPVC
-func (a *Annotator) getPVC(
+// GetPVC
+func (a *Annotator) GetPVC(
 	pvc *core.PersistentVolumeClaim,
 	host *api.ChiHost,
 	template *api.ChiVolumeClaimTemplate,
 ) map[string]string {
 	annotations := util.MergeStringMapsOverwrite(pvc.Annotations, template.ObjectMeta.Annotations)
-	return util.MergeStringMapsOverwrite(annotations, a.getHostScope(host))
+	return util.MergeStringMapsOverwrite(annotations, a.GetHostScope(host))
 }

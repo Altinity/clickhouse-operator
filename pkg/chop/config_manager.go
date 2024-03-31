@@ -423,22 +423,22 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 	secret, err := cm.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 	if err != nil {
 		cm.config.ClickHouse.Access.Secret.Runtime.Error = err.Error()
-		log.V(1).Warning("Unable to fetch secret '%s/%s'", namespace, name)
+		log.V(1).Warning("Unable to fetch secret: '%s/%s'", namespace, name)
 		return
 	}
 
 	cm.config.ClickHouse.Access.Secret.Runtime.Fetched = true
-	log.V(1).Info("Secret fetched %s/%s :", namespace, name)
+	log.V(1).Info("Secret fetched: '%s/%s'", namespace, name)
 
 	// Find username and password from credentials
 	for key, value := range secret.Data {
 		switch key {
 		case "username":
 			cm.config.ClickHouse.Access.Secret.Runtime.Username = string(value)
-			log.V(1).Info("Username read from the secret '%s/%s'", namespace, name)
+			log.V(1).Info("Username read from the secret: '%s/%s'", namespace, name)
 		case "password":
 			cm.config.ClickHouse.Access.Secret.Runtime.Password = string(value)
-			log.V(1).Info("Password read from the secret '%s/%s'", namespace, name)
+			log.V(1).Info("Password read from the secret: '%s/%s'", namespace, name)
 		}
 	}
 }

@@ -25,7 +25,7 @@ import (
 func (c *Controller) walkContainers(host *api.ChiHost, f func(container *v1.Container)) {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host).F().Error("FAIL get pod for host '%s' err: %v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL get pod for host '%s' err: %v", host.Runtime.Address.NamespaceNameString(), err)
 		return
 	}
 
@@ -39,7 +39,7 @@ func (c *Controller) walkContainers(host *api.ChiHost, f func(container *v1.Cont
 func (c *Controller) walkContainerStatuses(host *api.ChiHost, f func(status *v1.ContainerStatus)) {
 	pod, err := c.getPod(host)
 	if err != nil {
-		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Address.NamespaceNameString(), err)
+		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return
 	}
 

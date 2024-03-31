@@ -26,6 +26,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -35,9 +36,15 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 		return
 	}
 
+	w.a.V(1).
+		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+		WithStatusAction(chi).
+		M(chi).F().
+		Info("remove items scheduled for deletion")
+
 	// Remove deleted items
-	w.a.V(1).M(chi).F().Info("Failed to reconcile objects:\n%s", w.task.registryFailed)
-	w.a.V(1).M(chi).F().Info("Reconciled objects:\n%s", w.task.registryReconciled)
+	w.a.V(1).M(chi).F().Info("List of objects which have failed to reconcile:\n%s", w.task.registryFailed)
+	w.a.V(1).M(chi).F().Info("List of successfully reconciled objects:\n%s", w.task.registryReconciled)
 	objs := w.c.discovery(ctx, chi)
 	need := w.task.registryReconciled
 	w.a.V(1).M(chi).F().Info("Existing objects:\n%s", objs)
@@ -47,12 +54,6 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 		w.c.enqueueObject(NewDropDns(&chi.ObjectMeta))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
-
-	w.a.V(1).
-		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
-		WithStatusAction(chi).
-		M(chi).F().
-		Info("remove items scheduled for deletion")
 
 	chi.EnsureStatus().SyncHostTablesCreated()
 }
@@ -125,9 +126,9 @@ func (w *worker) purgeStatefulSet(
 	m meta.ObjectMeta,
 ) int {
 	if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete StatefulSet %s/%s", m.Namespace, m.Name)
+		w.a.V(1).M(m).F().Info("Delete StatefulSet: %s/%s", m.Namespace, m.Name)
 		if err := w.c.kubeClient.AppsV1().StatefulSets(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet %s/%s, err: %v", m.Namespace, m.Name, err)
+			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet: %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 		return 1
 	}
@@ -142,9 +143,9 @@ func (w *worker) purgePVC(
 ) {
 	if shouldPurgePVC(chi, reconcileFailedObjs, m) {
 		if model.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
-			w.a.V(1).M(m).F().Info("Delete PVC %s/%s", m.Namespace, m.Name)
+			w.a.V(1).M(m).F().Info("Delete PVC: %s/%s", m.Namespace, m.Name)
 			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
-				w.a.V(1).M(m).F().Error("FAILED to delete PVC %s/%s, err: %v", m.Namespace, m.Name, err)
+				w.a.V(1).M(m).F().Error("FAILED to delete PVC: %s/%s, err: %v", m.Namespace, m.Name, err)
 			}
 		}
 	}
@@ -157,9 +158,9 @@ func (w *worker) purgeConfigMap(
 	m meta.ObjectMeta,
 ) {
 	if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete ConfigMap %s/%s", m.Namespace, m.Name)
+		w.a.V(1).M(m).F().Info("Delete ConfigMap: %s/%s", m.Namespace, m.Name)
 		if err := w.c.kubeClient.CoreV1().ConfigMaps(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap %s/%s, err: %v", m.Namespace, m.Name, err)
+			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap: %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
 }
@@ -171,9 +172,9 @@ func (w *worker) purgeService(
 	m meta.ObjectMeta,
 ) {
 	if shouldPurgeService(chi, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete Service %s/%s", m.Namespace, m.Name)
+		w.a.V(1).M(m).F().Info("Delete Service: %s/%s", m.Namespace, m.Name)
 		if err := w.c.kubeClient.CoreV1().Services(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete Service %s/%s, err: %v", m.Namespace, m.Name, err)
+			w.a.V(1).M(m).F().Error("FAILED to delete Service: %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
 }
@@ -185,9 +186,9 @@ func (w *worker) purgeSecret(
 	m meta.ObjectMeta,
 ) {
 	if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete Secret %s/%s", m.Namespace, m.Name)
+		w.a.V(1).M(m).F().Info("Delete Secret: %s/%s", m.Namespace, m.Name)
 		if err := w.c.kubeClient.CoreV1().Secrets(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete Secret %s/%s, err: %v", m.Namespace, m.Name, err)
+			w.a.V(1).M(m).F().Error("FAILED to delete Secret: %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
 }
@@ -199,9 +200,9 @@ func (w *worker) purgePDB(
 	m meta.ObjectMeta,
 ) {
 	if shouldPurgePDB(chi, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete PDB %s/%s", m.Namespace, m.Name)
+		w.a.V(1).M(m).F().Info("Delete PDB: %s/%s", m.Namespace, m.Name)
 		if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.Namespace).Delete(ctx, m.Name, controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete PDB %s/%s, err: %v", m.Namespace, m.Name, err)
+			w.a.V(1).M(m).F().Error("FAILED to delete PDB: %s/%s, err: %v", m.Namespace, m.Name, err)
 		}
 	}
 }
@@ -266,7 +267,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	defer w.a.V(2).M(chi).E().P()
 
 	var err error
-	chi, err = w.normalizer.CreateTemplatedCHI(chi, model.NewNormalizerOptions())
+	chi, err = w.normalizer.CreateTemplatedCHI(chi, normalizer.NewOptions())
 	if err != nil {
 		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
 			WithStatusError(chi).
@@ -289,7 +290,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 			MainFields: true,
 		},
 	}); err != nil {
-		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err:%q", err)
+		w.a.V(1).M(chi).F().Error("UNABLE to write normalized CHI. err: %q", err)
 		return nil
 	}
 
@@ -341,7 +342,7 @@ func (w *worker) canDropReplica(host *api.ChiHost, opts ...*dropReplicaOptions) 
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if model.GetReclaimPolicy(pvc.ObjectMeta) == api.PVCReclaimPolicyRetain {
-			w.a.V(1).F().Info("PVC %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
+			w.a.V(1).F().Info("PVC: %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
 			can = false
 		}
 	})
@@ -383,12 +384,12 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.ChiHost, opts 
 	}
 
 	if hostToDrop == nil {
-		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop:%s", hostToDrop.GetName())
+		w.a.V(1).F().Error("FAILED to drop replica. Need to have host to drop. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
 	if !w.canDropReplica(hostToDrop, opts...) {
-		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop:%s", hostToDrop.GetName())
+		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}
 
@@ -399,7 +400,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.ChiHost, opts 
 	}
 
 	if hostToRunOn == nil {
-		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn:%s, hostToDrop:%s", hostToRunOn.GetName(), hostToDrop.GetName())
+		w.a.V(1).F().Error("FAILED to drop replica. hostToRunOn: %s, hostToDrop: %s", hostToRunOn.GetName(), hostToDrop.GetName())
 		return nil
 	}
 
@@ -407,15 +408,15 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.ChiHost, opts 
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(hostToRunOn.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(hostToRunOn.CHI).
+			WithEvent(hostToRunOn.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(hostToRunOn.GetCHI()).
 			M(hostToRunOn).F().
-			Info("Drop replica host %s in cluster %s", hostToDrop.GetName(), hostToDrop.Address.ClusterName)
+			Info("Drop replica host: %s in cluster: %s", hostToDrop.GetName(), hostToDrop.Runtime.Address.ClusterName)
 	} else {
-		w.a.WithEvent(hostToRunOn.CHI, eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(hostToRunOn.CHI).
+		w.a.WithEvent(hostToRunOn.GetCHI(), eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(hostToRunOn.GetCHI()).
 			M(hostToRunOn).F().
-			Error("FAILED to drop replica on host %s with error %v", hostToDrop.GetName(), err)
+			Error("FAILED to drop replica on host: %s with error: %v", hostToDrop.GetName(), err)
 	}
 
 	return err
@@ -435,16 +436,16 @@ func (w *worker) deleteTables(ctx context.Context, host *api.ChiHost) error {
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.CHI).
+			WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.GetCHI()).
 			M(host).F().
-			Info("Deleted tables on host %s replica %d to shard %d in cluster %s",
-				host.GetName(), host.Address.ReplicaIndex, host.Address.ShardIndex, host.Address.ClusterName)
+			Info("Deleted tables on host: %s replica: %d to shard: %d in cluster: %s",
+				host.GetName(), host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 	} else {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(host.CHI).
+		w.a.WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.GetCHI()).
 			M(host).F().
-			Error("FAILED to delete tables on host %s with error %v", host.GetName(), err)
+			Error("FAILED to delete tables on host: %s with error: %v", host.GetName(), err)
 	}
 
 	return err
@@ -458,22 +459,22 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 		return nil
 	}
 
-	w.a.V(2).M(host).S().Info(host.Address.HostName)
-	defer w.a.V(2).M(host).E().Info(host.Address.HostName)
+	w.a.V(2).M(host).S().Info(host.Runtime.Address.HostName)
+	defer w.a.V(2).M(host).E().Info(host.Runtime.Address.HostName)
 
 	w.a.V(1).
-		WithEvent(host.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(host.CHI).
+		WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(host.GetCHI()).
 		M(host).F().
-		Info("Delete host %s/%s - started", host.Address.ClusterName, host.GetName())
+		Info("Delete host: %s/%s - started", host.Runtime.Address.ClusterName, host.GetName())
 
 	var err error
-	if host.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.CHI).
+	if host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
+		w.a.WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.GetCHI()).
 			M(host).F().
-			Info("Delete host %s/%s - completed StatefulSet not found - already deleted? err: %v",
-				host.Address.ClusterName, host.GetName(), err)
+			Info("Delete host: %s/%s - completed StatefulSet not found - already deleted? err: %v",
+				host.Runtime.Address.ClusterName, host.GetName(), err)
 		return nil
 	}
 
@@ -498,15 +499,15 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.CHI, eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.CHI).
+			WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.GetCHI()).
 			M(host).F().
-			Info("Delete host %s/%s - completed", host.Address.ClusterName, host.GetName())
+			Info("Delete host: %s/%s - completed", host.Runtime.Address.ClusterName, host.GetName())
 	} else {
-		w.a.WithEvent(host.CHI, eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(host.CHI).
+		w.a.WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.GetCHI()).
 			M(host).F().
-			Error("FAILED Delete host %s/%s - completed", host.Address.ClusterName, host.GetName())
+			Error("FAILED Delete host: %s/%s - completed", host.Runtime.Address.ClusterName, host.GetName())
 	}
 
 	return err
@@ -524,10 +525,10 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 	defer w.a.V(2).M(shard).E().P()
 
 	w.a.V(1).
-		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(shard.CHI).
+		WithEvent(shard.Runtime.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(shard.Runtime.CHI).
 		M(shard).F().
-		Info("Delete shard %s/%s - started", shard.Address.Namespace, shard.Name)
+		Info("Delete shard: %s/%s - started", shard.Runtime.Address.Namespace, shard.Name)
 
 	// Delete Shard Service
 	_ = w.c.deleteServiceShard(ctx, shard)
@@ -538,10 +539,10 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 	})
 
 	w.a.V(1).
-		WithEvent(shard.CHI, eventActionDelete, eventReasonDeleteCompleted).
-		WithStatusAction(shard.CHI).
+		WithEvent(shard.Runtime.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(shard.Runtime.CHI).
 		M(shard).F().
-		Info("Delete shard %s/%s - completed", shard.Address.Namespace, shard.Name)
+		Info("Delete shard: %s/%s - completed", shard.Runtime.Address.Namespace, shard.Name)
 
 	return nil
 }
@@ -558,10 +559,10 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 	defer w.a.V(2).M(cluster).E().P()
 
 	w.a.V(1).
-		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(cluster.CHI).
+		WithEvent(cluster.Runtime.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(cluster.Runtime.CHI).
 		M(cluster).F().
-		Info("Delete cluster %s/%s - started", cluster.Address.Namespace, cluster.Name)
+		Info("Delete cluster: %s/%s - started", cluster.Runtime.Address.Namespace, cluster.Name)
 
 	// Delete ChkCluster Service
 	_ = w.c.deleteServiceCluster(ctx, cluster)
@@ -578,10 +579,10 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 	})
 
 	w.a.V(1).
-		WithEvent(cluster.CHI, eventActionDelete, eventReasonDeleteCompleted).
-		WithStatusAction(cluster.CHI).
+		WithEvent(cluster.Runtime.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithStatusAction(cluster.Runtime.CHI).
 		M(cluster).F().
-		Info("Delete cluster %s/%s - completed", cluster.Address.Namespace, cluster.Name)
+		Info("Delete cluster: %s/%s - completed", cluster.Runtime.Address.Namespace, cluster.Name)
 
 	return nil
 }
@@ -608,25 +609,30 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	// described by CRD being deleted. This is may be unexpected and very painful situation,
 	// so in this case we should agree to delete CHI itself, but has to keep all CHI's child resources.
 
-	var clear bool
+	var purge bool
 	crd, err := w.c.extClient.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, "clickhouseinstallations.clickhouse.altinity.com", controller.NewGetOptions())
 	if err == nil {
+		// CRD is in place
 		if crd.ObjectMeta.DeletionTimestamp.IsZero() {
-			// CRD is not being deleted and operator can delete all child resources.
-			w.a.V(1).M(new).F().Info("CRD %s/%s is not being deleted, operator will delete child resources", crd.Namespace, crd.Name)
-			clear = true
+			// CRD is not being deleted. It is standard request to delete a CHI.
+			// Operator can delete all child resources.
+			w.a.V(1).M(new).F().Info("CRD: %s/%s is not being deleted, operator will delete child resources", crd.Namespace, crd.Name)
+			purge = true
 		} else {
-			// CRD is being deleted. This may be a mistake, operator should not delete data
-			w.a.V(1).M(new).F().Info("CRD %s/%s BEING DELETED, operator will NOT delete child resources", crd.Namespace, crd.Name)
-			clear = false
+			// CRD is being deleted.
+			// In most cases, users do not expect to delete all CHIs with all their resources as along with CRD.
+			// Operator should not delete child resources - especially storage, such as PVCs and PVs
+			w.a.V(1).M(new).F().Info("CRD: %s/%s BEING DELETED, operator will NOT delete child resources", crd.Namespace, crd.Name)
+			purge = false
 		}
 	} else {
+		// No CRD is available
 		w.a.V(1).M(new).F().Error("unable to get CRD, got error: %v ", err)
-		w.a.V(1).M(new).F().Info("will delete chi %s/%s", new.Namespace, new.Name)
-		clear = true
+		w.a.V(1).M(new).F().Info("will delete chi with all resources: %s/%s", new.Namespace, new.Name)
+		purge = true
 	}
 
-	if clear {
+	if purge {
 		cur, err := w.c.chopClient.ClickhouseV1().ClickHouseInstallations(new.Namespace).Get(ctx, new.Name, controller.NewGetOptions())
 		if cur == nil {
 			return false
@@ -642,17 +648,17 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 		_ = w.deleteCHIProtocol(ctx, new)
 	} else {
-		new.Attributes.SkipOwnerRef = true
+		new.EnsureRuntime().EnsureAttributes().SkipOwnerRef = true
 		_ = w.reconcileCHI(ctx, old, new)
 	}
 
 	// We need to uninstall finalizer in order to allow k8s to delete CHI resource
 	w.a.V(2).M(new).F().Info("uninstall finalizer")
 	if err := w.c.uninstallFinalizer(ctx, new); err != nil {
-		w.a.V(1).M(new).F().Error("unable to uninstall finalizer: err:%v", err)
+		w.a.V(1).M(new).F().Error("unable to uninstall finalizer. err: %v", err)
 	}
 
-	// CHI's child resources were deleted
+	// CHI delete completed
 	return true
 }
 

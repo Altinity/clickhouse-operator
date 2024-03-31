@@ -23,6 +23,34 @@ func NewChiTemplates() *ChiTemplates {
 	return new(ChiTemplates)
 }
 
+func (templates *ChiTemplates) GetHostTemplates() []ChiHostTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.HostTemplates
+}
+
+func (templates *ChiTemplates) GetPodTemplates() []ChiPodTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.PodTemplates
+}
+
+func (templates *ChiTemplates) GetVolumeClaimTemplates() []ChiVolumeClaimTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.VolumeClaimTemplates
+}
+
+func (templates *ChiTemplates) GetServiceTemplates() []ChiServiceTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.ServiceTemplates
+}
+
 // Len returns accumulated len of all templates
 func (templates *ChiTemplates) Len() int {
 	if templates == nil {
@@ -37,7 +65,20 @@ func (templates *ChiTemplates) Len() int {
 }
 
 // MergeFrom merges from specified object
-func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *ChiTemplates {
+func (templates *ChiTemplates) MergeFrom(_from any, _type MergeType) *ChiTemplates {
+	// Typed from
+	var from *ChiTemplates
+
+	// Ensure type
+	switch typed := _from.(type) {
+	case *ChiTemplates:
+		from = typed
+	default:
+		return templates
+	}
+
+	// Sanity check
+
 	if from.Len() == 0 {
 		return templates
 	}

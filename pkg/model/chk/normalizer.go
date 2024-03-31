@@ -17,42 +17,26 @@ package chk
 import (
 	"strings"
 
-	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 )
 
 // NormalizerContext specifies CHI-related normalization context
 type NormalizerContext struct {
-	// start specifies start CHK from which normalization has started
-	start *apiChk.ClickHouseKeeperInstallation
 	// chk specifies current CHK being normalized
 	chk *apiChk.ClickHouseKeeperInstallation
 	// options specifies normalization options
-	options *NormalizerOptions
+	options *normalizer.Options
 }
 
 // NewNormalizerContext creates new NormalizerContext
-func NewNormalizerContext(options *NormalizerOptions) *NormalizerContext {
+func NewNormalizerContext(options *normalizer.Options) *NormalizerContext {
 	return &NormalizerContext{
 		options: options,
-	}
-}
-
-// NormalizerOptions specifies normalization options
-type NormalizerOptions struct {
-	// WithDefaultCluster specifies whether to insert default cluster in case no cluster specified
-	WithDefaultCluster bool
-}
-
-// NewNormalizerOptions creates new NormalizerOptions
-func NewNormalizerOptions() *NormalizerOptions {
-	return &NormalizerOptions{
-		WithDefaultCluster: true,
 	}
 }
 
@@ -78,7 +62,7 @@ func newCHK() *apiChk.ClickHouseKeeperInstallation {
 // CreateTemplatedCHK produces ready-to-use CHK object
 func (n *Normalizer) CreateTemplatedCHK(
 	chk *apiChk.ClickHouseKeeperInstallation,
-	options *NormalizerOptions,
+	options *normalizer.Options,
 ) (*apiChk.ClickHouseKeeperInstallation, error) {
 	// New CHI starts with new context
 	n.ctx = NewNormalizerContext(options)
@@ -146,7 +130,7 @@ func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiC
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *apiChk.ChkTemplates) *apiChk.ChkTemplates {
+func (n *Normalizer) normalizeTemplates(templates *apiChi.ChiTemplates) *apiChi.ChiTemplates {
 	if templates == nil {
 		//templates = apiChi.NewChiTemplates()
 		return nil
@@ -172,167 +156,26 @@ func (n *Normalizer) normalizeTemplates(templates *apiChk.ChkTemplates) *apiChk.
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
 func (n *Normalizer) normalizePodTemplate(template *apiChi.ChiPodTemplate) {
-	// Name
-
-	// Zone
-	if len(template.Zone.Values) == 0 {
-		// In case no values specified - no key is reasonable
-		template.Zone.Key = ""
-	} else if template.Zone.Key == "" {
-		// We have values specified, but no key
-		// Use default zone key in this case
-		template.Zone.Key = core.LabelTopologyZone
-	} else {
-		// We have both key and value(s) specified explicitly
+	// TODO need to support multi-cluster
+	replicasCount := 1
+	if len(n.ctx.chk.Spec.Configuration.Clusters) > 0 {
+		replicasCount = n.ctx.chk.Spec.Configuration.Clusters[0].Layout.ReplicasCount
 	}
-
-	// PodDistribution
-	for i := range template.PodDistribution {
-		if additionalPoDistributions := n.normalizePodDistribution(&template.PodDistribution[i]); additionalPoDistributions != nil {
-			template.PodDistribution = append(template.PodDistribution, additionalPoDistributions...)
-		}
-	}
-
-	// Spec
-	template.Spec.Affinity = chi.MergeAffinity(template.Spec.Affinity, chi.NewAffinity(template))
-
-	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
-	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
-	// which tells:  For Pods running with hostNetwork, you should explicitly set its DNS policy “ClusterFirstWithHostNet”.
-	if template.Spec.HostNetwork {
-		template.Spec.DNSPolicy = core.DNSClusterFirstWithHostNet
-	}
-
+	templatesNormalizer.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
-const defaultTopologyKey = core.LabelHostname
-
-func (n *Normalizer) normalizePodDistribution(podDistribution *apiChi.ChiPodDistribution) []apiChi.ChiPodDistribution {
-	if podDistribution.TopologyKey == "" {
-		podDistribution.TopologyKey = defaultTopologyKey
-	}
-	switch podDistribution.Type {
-	case
-		deployment.PodDistributionUnspecified,
-		// AntiAffinity section
-		deployment.PodDistributionClickHouseAntiAffinity,
-		deployment.PodDistributionShardAntiAffinity,
-		deployment.PodDistributionReplicaAntiAffinity:
-		// PodDistribution is known
-		if podDistribution.Scope == "" {
-			podDistribution.Scope = deployment.PodDistributionScopeCluster
-		}
-		return nil
-	case
-		deployment.PodDistributionAnotherNamespaceAntiAffinity,
-		deployment.PodDistributionAnotherClickHouseInstallationAntiAffinity,
-		deployment.PodDistributionAnotherClusterAntiAffinity:
-		// PodDistribution is known
-		return nil
-	case
-		deployment.PodDistributionMaxNumberPerNode:
-		// PodDistribution is known
-		if podDistribution.Number < 0 {
-			podDistribution.Number = 0
-		}
-		return nil
-	case
-		// Affinity section
-		deployment.PodDistributionNamespaceAffinity,
-		deployment.PodDistributionClickHouseInstallationAffinity,
-		deployment.PodDistributionClusterAffinity,
-		deployment.PodDistributionShardAffinity,
-		deployment.PodDistributionReplicaAffinity,
-		deployment.PodDistributionPreviousTailAffinity:
-		// PodDistribution is known
-		return nil
-
-	case deployment.PodDistributionCircularReplication:
-		// PodDistribution is known
-		// PodDistributionCircularReplication is a shortcut to simplify complex set of other distributions
-		// All shortcuts have to be expanded
-
-		if podDistribution.Scope == "" {
-			podDistribution.Scope = deployment.PodDistributionScopeCluster
-		}
-
-		// TODO need to support multi-cluster
-		cluster := n.ctx.chk.Spec.Configuration.Clusters[0]
-
-		// Expand shortcut
-		return []apiChi.ChiPodDistribution{
-			{
-				Type:  deployment.PodDistributionShardAntiAffinity,
-				Scope: podDistribution.Scope,
-			},
-			{
-				Type:  deployment.PodDistributionReplicaAntiAffinity,
-				Scope: podDistribution.Scope,
-			},
-			{
-				Type:   deployment.PodDistributionMaxNumberPerNode,
-				Scope:  podDistribution.Scope,
-				Number: cluster.Layout.ReplicasCount,
-			},
-
-			{
-				Type: deployment.PodDistributionPreviousTailAffinity,
-			},
-
-			{
-				Type: deployment.PodDistributionNamespaceAffinity,
-			},
-			{
-				Type: deployment.PodDistributionClickHouseInstallationAffinity,
-			},
-			{
-				Type: deployment.PodDistributionClusterAffinity,
-			},
-		}
-	}
-
-	// PodDistribution is not known
-	podDistribution.Type = deployment.PodDistributionUnspecified
-	return nil
-}
-
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.ChiVolumeClaimTemplate) {
-	// Check name
-	// Skip for now
-
-	// StorageManagement
-	n.normalizeStorageManagement(&template.StorageManagement)
-
-	// Check Spec
-	// Skip for now
-
+	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
-// normalizeStorageManagement normalizes StorageManagement
-func (n *Normalizer) normalizeStorageManagement(storage *apiChi.StorageManagement) {
-	// Check PVCProvisioner
-	if !storage.PVCProvisioner.IsValid() {
-		storage.PVCProvisioner = apiChi.PVCProvisionerUnspecified
-	}
-
-	// Check PVCReclaimPolicy
-	if !storage.PVCReclaimPolicy.IsValid() {
-		storage.PVCReclaimPolicy = apiChi.PVCReclaimPolicyUnspecified
-	}
-}
-
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ChiServiceTemplate) {
-	// Check name
-	// Check GenerateName
-	// Check ObjectMeta
-	// Check Spec
-
+	templatesNormalizer.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }

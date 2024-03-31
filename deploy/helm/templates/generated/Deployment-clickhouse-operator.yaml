@@ -2,9 +2,9 @@
 #
 # NAMESPACE=kube-system
 # COMMENT=
-# OPERATOR_IMAGE=altinity/clickhouse-operator:0.23.3
+# OPERATOR_IMAGE=altinity/clickhouse-operator:0.23.4
 # OPERATOR_IMAGE_PULL_POLICY=Always
-# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.23.3
+# METRICS_EXPORTER_IMAGE=altinity/metrics-exporter:0.23.4
 # METRICS_EXPORTER_IMAGE_PULL_POLICY=Always
 #
 # Setup Deployment for clickhouse-operator
@@ -21,7 +21,7 @@ spec:
     matchLabels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      labels: {{ include "altinity-clickhouse-operator.selectorLabels" . | nindent 8 }}
+      labels: {{ include "altinity-clickhouse-operator.labels" . | nindent 8 }}
       annotations:
         {{ toYaml .Values.podAnnotations | nindent 8 }}
         checksum/files: {{ include (print $.Template.BasePath "/generated/ConfigMap-etc-clickhouse-operator-files.yaml") . | sha256sum }}

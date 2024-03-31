@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 )
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
@@ -60,15 +61,12 @@ func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet 
 			Labels:    labels,
 		},
 		Spec: apps.StatefulSetSpec{
-			ServiceName: getHeadlessServiceName(chk),
 			Replicas:    &replicas,
+			ServiceName: getHeadlessServiceName(chk),
 			Selector: &meta.LabelSelector{
 				MatchLabels: labels,
 			},
-			UpdateStrategy: apps.StatefulSetUpdateStrategy{
-				Type: apps.RollingUpdateStatefulSetStrategyType,
-			},
-			PodManagementPolicy: apps.OrderedReadyPodManagement,
+
 			Template: core.PodTemplateSpec{
 				ObjectMeta: meta.ObjectMeta{
 					GenerateName: chk.GetName(),
@@ -78,6 +76,12 @@ func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet 
 				Spec: createPodTemplateSpec(chk),
 			},
 			VolumeClaimTemplates: getVolumeClaimTemplates(chk),
+
+			PodManagementPolicy: apps.OrderedReadyPodManagement,
+			UpdateStrategy: apps.StatefulSetUpdateStrategy{
+				Type: apps.RollingUpdateStatefulSetStrategyType,
+			},
+			RevisionHistoryLimit: chop.Config().GetRevisionHistoryLimit(),
 		},
 	}
 }
@@ -177,9 +181,12 @@ func createInitContainers(chk *api.ClickHouseKeeperInstallation) []core.Containe
 	}
 	if len(initContainers[0].Command) == 0 {
 		initContainers[0].Command = []string{
-			"bash",
-			"-xc",
-			"export KEEPER_ID=${HOSTNAME##*-}; sed \"s/KEEPER_ID/$KEEPER_ID/g\" /tmp/clickhouse-keeper/keeper_config.xml > /etc/clickhouse-keeper/keeper_config.xml; cat /etc/clickhouse-keeper/keeper_config.xml",
+			`bash`,
+			`-xc`,
+			// Build keeper config
+			`export KEEPER_ID=${HOSTNAME##*-}; ` +
+				`sed "s/KEEPER_ID/${KEEPER_ID}/g" /tmp/clickhouse-keeper/keeper_config.xml > /etc/clickhouse-keeper/keeper_config.xml; ` +
+				`cat /etc/clickhouse-keeper/keeper_config.xml`,
 		}
 	}
 	initContainers[0].VolumeMounts = append(initContainers[0].VolumeMounts,
@@ -215,7 +222,9 @@ func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 	}
 	if containers[0].LivenessProbe == nil {
 		probeScript := fmt.Sprintf(
-			"date && OK=$(exec 3<>/dev/tcp/127.0.0.1/%d ; printf 'ruok' >&3 ; IFS=; tee <&3; exec 3<&- ;); if [[ \"$OK\" == \"imok\" ]]; then exit 0; else exit 1; fi",
+			`date && `+
+				`OK=$(exec 3<>/dev/tcp/127.0.0.1/%d; printf 'ruok' >&3; IFS=; tee <&3; exec 3<&-;);`+
+				`if [[ "${OK}" == "imok" ]]; then exit 0; else exit 1; fi`,
 			chk.Spec.GetClientPort())
 		containers[0].LivenessProbe = &core.Probe{
 			ProbeHandler: core.ProbeHandler{

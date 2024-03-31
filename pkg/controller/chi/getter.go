@@ -90,7 +90,7 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 		namespace = typedObj.Namespace
 	case *api.ChiHost:
 		name = model.CreateStatefulSetServiceName(typedObj)
-		namespace = typedObj.Address.Namespace
+		namespace = typedObj.Runtime.Address.Namespace
 	}
 	return c.serviceLister.Services(namespace).Get(name)
 	//return c.kubeClient.CoreV1().Services(namespace).Get(newTask(), name, newGetOptions())
@@ -165,7 +165,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 func (c *Controller) getStatefulSetByHost(host *api.ChiHost) (*apps.StatefulSet, error) {
 	// Namespaced name
 	name := model.CreateStatefulSetName(host)
-	namespace := host.Address.Namespace
+	namespace := host.Runtime.Address.Namespace
 
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
@@ -186,7 +186,7 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 		namespace = typedObj.Namespace
 	case *api.ChiHost:
 		name = model.CreatePodName(obj)
-		namespace = typedObj.Address.Namespace
+		namespace = typedObj.Runtime.Address.Namespace
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }

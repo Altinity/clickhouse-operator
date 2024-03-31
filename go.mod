@@ -32,7 +32,6 @@ require (
 	github.com/go-logr/logr v1.2.4
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.4.0
-	github.com/gosimple/slug v1.12.0
 	github.com/imdario/mergo v0.3.15
 	github.com/juliangruber/go-intersect v1.0.0
 	github.com/kubernetes-sigs/yaml v1.1.0
@@ -73,7 +72,6 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/gookit/color v1.4.2 // indirect
-	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -103,7 +101,7 @@ require (
 	golang.org/x/tools v0.9.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/component-base v0.27.2 // indirect

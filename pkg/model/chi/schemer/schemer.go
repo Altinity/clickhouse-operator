@@ -20,21 +20,22 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // ClusterSchemer specifies cluster schema manager
 type ClusterSchemer struct {
-	*chi.Cluster
-	version *api.CHVersion
+	*Cluster
+	version *swversion.SoftWareVersion
 }
 
 // NewClusterSchemer creates new Schemer object
-func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *api.CHVersion) *ClusterSchemer {
+func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *swversion.SoftWareVersion) *ClusterSchemer {
 	return &ClusterSchemer{
-		Cluster: chi.NewCluster().SetClusterConnectionParams(clusterConnectionParams),
+		Cluster: NewCluster().SetClusterConnectionParams(clusterConnectionParams),
 		version: version,
 	}
 }
@@ -50,9 +51,9 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.ChiHost) 
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.ChiHost) error {
-	replica := chi.CreateInstanceHostname(hostToDrop)
-	shard := hostToRunOn.Address.ShardIndex
-	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Address.HostName)
+	replica := model.CreateInstanceHostname(hostToDrop)
+	shard := hostToRunOn.Runtime.Address.ShardIndex
+	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
 	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica), clickhouse.NewQueryOptions().SetRetry(false))
 }
 
@@ -84,8 +85,8 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.ChiHost
 		return nil
 	}
 
-	log.V(1).M(host).F().S().Info("Migrating schema objects to host %s", host.Address.HostName)
-	defer log.V(1).M(host).F().E().Info("Migrating schema objects to host %s", host.Address.HostName)
+	log.V(1).M(host).F().S().Info("Migrating schema objects to host %s", host.Runtime.Address.HostName)
+	defer log.V(1).M(host).F().E().Info("Migrating schema objects to host %s", host.Runtime.Address.HostName)
 
 	replicatedObjectNames,
 		replicatedCreateSQLs,
@@ -94,14 +95,14 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.ChiHost
 
 	var err1 error
 	if len(replicatedCreateSQLs) > 0 {
-		log.V(1).M(host).F().Info("Creating replicated objects at %s: %v", host.Address.HostName, replicatedObjectNames)
+		log.V(1).M(host).F().Info("Creating replicated objects at %s: %v", host.Runtime.Address.HostName, replicatedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", replicatedCreateSQLs)
 		err1 = s.ExecHost(ctx, host, replicatedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 	}
 
 	var err2 error
 	if len(distributedCreateSQLs) > 0 {
-		log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Address.HostName, distributedObjectNames)
+		log.V(1).M(host).F().Info("Creating distributed objects at %s: %v", host.Runtime.Address.HostName, distributedObjectNames)
 		log.V(2).M(host).F().Info("\n%v", distributedCreateSQLs)
 		err2 = s.ExecHost(ctx, host, distributedCreateSQLs, clickhouse.NewQueryOptions().SetRetry(true))
 	}
