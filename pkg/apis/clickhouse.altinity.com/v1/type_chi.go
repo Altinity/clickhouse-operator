@@ -502,8 +502,8 @@ func (chi *ClickHouseInstallation) HostsCountAttributes(a *ChiHostReconcileAttri
 	return count
 }
 
-// GetHostTemplate gets ChiHostTemplate by name
-func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplate, bool) {
+// GetHostTemplate gets HostTemplate by name
+func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*HostTemplate, bool) {
 	if !chi.Spec.Templates.GetHostTemplatesIndex().Has(name) {
 		return nil, false
 	}

@@ -147,7 +147,7 @@ func (n *Normalizer) fillCHIAddressInfo() {
 }
 
 // getHostTemplate gets Host Template to be used to normalize Host
-func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
+func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.HostTemplate {
 	// Which host template would be used - either explicitly defined in or a default one
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
@@ -178,7 +178,7 @@ func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
 }
 
 // hostApplyHostTemplate
-func hostApplyHostTemplate(host *api.ChiHost, template *api.ChiHostTemplate) {
+func hostApplyHostTemplate(host *api.ChiHost, template *api.HostTemplate) {
 	if host.GetName() == "" {
 		host.Name = template.Spec.Name
 	}
@@ -530,7 +530,7 @@ func (n *Normalizer) normalizeServiceTemplates(templates *api.ChiTemplates) {
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
-func (n *Normalizer) normalizeHostTemplate(template *api.ChiHostTemplate) {
+func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
 	templatesNormalizer.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
 	n.ctx.GetTarget().Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)

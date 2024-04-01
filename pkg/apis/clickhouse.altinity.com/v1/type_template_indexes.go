@@ -17,13 +17,13 @@ package v1
 // HostTemplatesIndex describes index of host templates
 type HostTemplatesIndex struct {
 	// templates maps 'name of the template' -> 'template itself'
-	templates map[string]*ChiHostTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	templates map[string]*HostTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // NewHostTemplatesIndex creates new HostTemplatesIndex object
 func NewHostTemplatesIndex() *HostTemplatesIndex {
 	return &HostTemplatesIndex{
-		templates: make(map[string]*ChiHostTemplate),
+		templates: make(map[string]*HostTemplate),
 	}
 }
 
@@ -40,7 +40,7 @@ func (i *HostTemplatesIndex) Has(name string) bool {
 }
 
 // Get returns entity `name` from the index
-func (i *HostTemplatesIndex) Get(name string) *ChiHostTemplate {
+func (i *HostTemplatesIndex) Get(name string) *HostTemplate {
 	if !i.Has(name) {
 		return nil
 	}
@@ -48,7 +48,7 @@ func (i *HostTemplatesIndex) Get(name string) *ChiHostTemplate {
 }
 
 // Set sets named template into index
-func (i *HostTemplatesIndex) Set(name string, entry *ChiHostTemplate) {
+func (i *HostTemplatesIndex) Set(name string, entry *HostTemplate) {
 	if i == nil {
 		return
 	}
@@ -59,7 +59,7 @@ func (i *HostTemplatesIndex) Set(name string, entry *ChiHostTemplate) {
 }
 
 // Walk calls specified function over each entry in the index
-func (i *HostTemplatesIndex) Walk(f func(template *ChiHostTemplate)) {
+func (i *HostTemplatesIndex) Walk(f func(template *HostTemplate)) {
 	if i == nil {
 		return
 	}

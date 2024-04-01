@@ -88,7 +88,7 @@ func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 }
 
 // InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
+func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
 	if shard != nil {
 		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
 	}
@@ -136,7 +136,7 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 }
 
 // GetHostTemplate gets host template
-func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
+func (host *ChiHost) GetHostTemplate() (*HostTemplate, bool) {
 	if !host.Templates.HasHostTemplate() {
 		return nil, false
 	}

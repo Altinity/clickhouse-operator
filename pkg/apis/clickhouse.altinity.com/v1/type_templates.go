@@ -23,7 +23,7 @@ func NewChiTemplates() *ChiTemplates {
 	return new(ChiTemplates)
 }
 
-func (templates *ChiTemplates) GetHostTemplates() []ChiHostTemplate {
+func (templates *ChiTemplates) GetHostTemplates() []HostTemplate {
 	if templates == nil {
 		return nil
 	}

@@ -21,7 +21,7 @@ import (
 )
 
 // NormalizeHostTemplate normalizes .spec.templates.hostTemplates
-func NormalizeHostTemplate(template *api.ChiHostTemplate) {
+func NormalizeHostTemplate(template *api.HostTemplate) {
 	// Name
 
 	// PortDistribution

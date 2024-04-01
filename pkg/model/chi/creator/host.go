@@ -20,8 +20,8 @@ import (
 )
 
 // NewDefaultHostTemplate returns default Host Template to be used with StatefulSet
-func NewDefaultHostTemplate(name string) *api.ChiHostTemplate {
-	return &api.ChiHostTemplate{
+func NewDefaultHostTemplate(name string) *api.HostTemplate {
+	return &api.HostTemplate{
 		Name: name,
 		PortDistribution: []api.PortDistribution{
 			{
@@ -41,8 +41,8 @@ func NewDefaultHostTemplate(name string) *api.ChiHostTemplate {
 }
 
 // NewDefaultHostTemplateForHostNetwork
-func NewDefaultHostTemplateForHostNetwork(name string) *api.ChiHostTemplate {
-	return &api.ChiHostTemplate{
+func NewDefaultHostTemplateForHostNetwork(name string) *api.HostTemplate {
+	return &api.HostTemplate{
 		Name: name,
 		PortDistribution: []api.PortDistribution{
 			{

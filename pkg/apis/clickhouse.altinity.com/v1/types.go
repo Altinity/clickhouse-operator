@@ -659,8 +659,8 @@ type ChiReplicaAddress struct {
 	ReplicaIndex int    `json:"replicaIndex,omitempty" yaml:"replicaIndex,omitempty"`
 }
 
-// ChiHostTemplate defines full Host Template
-type ChiHostTemplate struct {
+// HostTemplate defines full Host Template
+type HostTemplate struct {
 	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
 	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
 	Spec             ChiHost            `json:"spec,omitempty"             yaml:"spec,omitempty"`
@@ -681,7 +681,7 @@ type ChiHostConfig struct {
 // ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
 	// Templates
-	HostTemplates        []ChiHostTemplate     `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
+	HostTemplates        []HostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
 	PodTemplates         []PodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
 	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
 	ServiceTemplates     []ServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
