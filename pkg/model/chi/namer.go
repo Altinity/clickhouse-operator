@@ -718,7 +718,7 @@ func createPodNamesOfCHI(chi *api.ClickHouseInstallation) (names []string) {
 }
 
 // CreatePVCNameByVolumeClaimTemplate creates PVC name
-func CreatePVCNameByVolumeClaimTemplate(host *api.ChiHost, volumeClaimTemplate *api.ChiVolumeClaimTemplate) string {
+func CreatePVCNameByVolumeClaimTemplate(host *api.ChiHost, volumeClaimTemplate *api.VolumeClaimTemplate) string {
 	return createPVCName(host, volumeClaimTemplate.Name)
 }
 

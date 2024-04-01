@@ -57,7 +57,7 @@ func newVolumeMount(name, mountPath string) core.VolumeMount {
 	}
 }
 
-func getVolumeClaimTemplate(volumeMount *core.VolumeMount, host *api.ChiHost) (*api.ChiVolumeClaimTemplate, bool) {
+func getVolumeClaimTemplate(volumeMount *core.VolumeMount, host *api.ChiHost) (*api.VolumeClaimTemplate, bool) {
 	volumeClaimTemplateName := volumeMount.Name
 
 	volumeClaimTemplate, ok := host.GetCHI().GetVolumeClaimTemplate(volumeClaimTemplateName)

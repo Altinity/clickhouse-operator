@@ -1194,7 +1194,7 @@ func (w *worker) fetchPVC(
 	volumeMount *core.VolumeMount,
 ) (
 	pvc *core.PersistentVolumeClaim,
-	vct *api.ChiVolumeClaimTemplate,
+	vct *api.VolumeClaimTemplate,
 	isModelCreated bool,
 	err error,
 ) {
@@ -1254,7 +1254,7 @@ func (w *worker) reconcilePVC(
 	ctx context.Context,
 	pvc *core.PersistentVolumeClaim,
 	host *api.ChiHost,
-	template *api.ChiVolumeClaimTemplate,
+	template *api.VolumeClaimTemplate,
 ) (*core.PersistentVolumeClaim, error) {
 	if pvc == nil {
 		w.a.V(2).M(host).F().Info("nil PVC, nothing to reconcile")

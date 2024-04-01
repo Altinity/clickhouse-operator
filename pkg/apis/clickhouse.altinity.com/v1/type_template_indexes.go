@@ -125,13 +125,13 @@ func (i *PodTemplatesIndex) Walk(f func(template *ChiPodTemplate)) {
 // VolumeClaimTemplatesIndex describes index of volume claim templates
 type VolumeClaimTemplatesIndex struct {
 	// templates maps 'name of the template' -> 'template itself'
-	templates map[string]*ChiVolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	templates map[string]*VolumeClaimTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // NewVolumeClaimTemplatesIndex creates new VolumeClaimTemplatesIndex object
 func NewVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	return &VolumeClaimTemplatesIndex{
-		templates: make(map[string]*ChiVolumeClaimTemplate),
+		templates: make(map[string]*VolumeClaimTemplate),
 	}
 }
 
@@ -148,7 +148,7 @@ func (i *VolumeClaimTemplatesIndex) Has(name string) bool {
 }
 
 // Get returns entity `name` from the index
-func (i *VolumeClaimTemplatesIndex) Get(name string) *ChiVolumeClaimTemplate {
+func (i *VolumeClaimTemplatesIndex) Get(name string) *VolumeClaimTemplate {
 	if !i.Has(name) {
 		return nil
 	}
@@ -156,7 +156,7 @@ func (i *VolumeClaimTemplatesIndex) Get(name string) *ChiVolumeClaimTemplate {
 }
 
 // Set sets named template into index
-func (i *VolumeClaimTemplatesIndex) Set(name string, entry *ChiVolumeClaimTemplate) {
+func (i *VolumeClaimTemplatesIndex) Set(name string, entry *VolumeClaimTemplate) {
 	if i == nil {
 		return
 	}
@@ -167,7 +167,7 @@ func (i *VolumeClaimTemplatesIndex) Set(name string, entry *ChiVolumeClaimTempla
 }
 
 // Walk calls specified function over each entry in the index
-func (i *VolumeClaimTemplatesIndex) Walk(f func(template *ChiVolumeClaimTemplate)) {
+func (i *VolumeClaimTemplatesIndex) Walk(f func(template *VolumeClaimTemplate)) {
 	if i == nil {
 		return
 	}

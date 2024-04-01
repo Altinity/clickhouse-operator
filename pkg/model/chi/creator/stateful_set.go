@@ -387,11 +387,11 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost)
 	)
 }
 
-// statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
+// statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' VolumeClaimTemplate
 func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet *apps.StatefulSet,
 	host *api.ChiHost,
-	volumeClaimTemplate *api.ChiVolumeClaimTemplate,
+	volumeClaimTemplate *api.VolumeClaimTemplate,
 ) {
 	// Since we have the same names for PVs produced from both VolumeClaimTemplates and Volumes,
 	// we need to check naming for all of them

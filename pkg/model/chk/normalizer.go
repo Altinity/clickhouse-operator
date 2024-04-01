@@ -167,7 +167,7 @@ func (n *Normalizer) normalizePodTemplate(template *apiChi.ChiPodTemplate) {
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.ChiVolumeClaimTemplate) {
+func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTemplate) {
 	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)

@@ -1760,7 +1760,7 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost, reg
 // applyPVCResourcesRequests
 func (w *worker) applyPVCResourcesRequests(
 	pvc *core.PersistentVolumeClaim,
-	template *api.ChiVolumeClaimTemplate,
+	template *api.VolumeClaimTemplate,
 ) bool {
 	return w.applyResourcesList(pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
 }

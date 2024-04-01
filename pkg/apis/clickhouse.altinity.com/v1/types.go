@@ -681,10 +681,10 @@ type ChiHostConfig struct {
 // ChiTemplates defines templates section of .spec
 type ChiTemplates struct {
 	// Templates
-	HostTemplates        []ChiHostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
-	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
-	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
-	ServiceTemplates     []ServiceTemplate        `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
+	HostTemplates        []ChiHostTemplate     `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
+	PodTemplates         []ChiPodTemplate      `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
+	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
+	ServiceTemplates     []ServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
 
 	// Index maps template name to template itself
 	HostTemplatesIndex        *HostTemplatesIndex        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`

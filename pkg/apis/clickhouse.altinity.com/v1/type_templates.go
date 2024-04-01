@@ -37,7 +37,7 @@ func (templates *ChiTemplates) GetPodTemplates() []ChiPodTemplate {
 	return templates.PodTemplates
 }
 
-func (templates *ChiTemplates) GetVolumeClaimTemplates() []ChiVolumeClaimTemplate {
+func (templates *ChiTemplates) GetVolumeClaimTemplates() []VolumeClaimTemplate {
 	if templates == nil {
 		return nil
 	}

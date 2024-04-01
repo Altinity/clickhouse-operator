@@ -523,8 +523,8 @@ func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *ChiPodTempl
 	chi.Spec.Templates.GetPodTemplatesIndex().Walk(f)
 }
 
-// GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
-func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
+// GetVolumeClaimTemplate gets VolumeClaimTemplate by name
+func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*VolumeClaimTemplate, bool) {
 	if chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Has(name) {
 		return chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Get(name), true
 	}
@@ -532,7 +532,7 @@ func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolu
 }
 
 // WalkVolumeClaimTemplates walks over all VolumeClaimTemplates
-func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
+func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
 	if chi == nil {
 		return
 	}

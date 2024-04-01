@@ -19,8 +19,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ChiVolumeClaimTemplate defines PersistentVolumeClaim Template
-type ChiVolumeClaimTemplate struct {
+// VolumeClaimTemplate defines PersistentVolumeClaim Template
+type VolumeClaimTemplate struct {
 	Name string `json:"name"                    yaml:"name"`
 	StorageManagement
 	ObjectMeta metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
