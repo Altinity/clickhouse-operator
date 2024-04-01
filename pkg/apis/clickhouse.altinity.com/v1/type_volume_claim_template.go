@@ -15,16 +15,16 @@
 package v1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // VolumeClaimTemplate defines PersistentVolumeClaim Template
 type VolumeClaimTemplate struct {
 	Name string `json:"name"                    yaml:"name"`
 	StorageManagement
-	ObjectMeta metav1.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
-	Spec       corev1.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
+	ObjectMeta meta.ObjectMeta                `json:"metadata,omitempty"      yaml:"metadata,omitempty"`
+	Spec       core.PersistentVolumeClaimSpec `json:"spec,omitempty"          yaml:"spec,omitempty"`
 }
 
 // PVCProvisioner defines PVC provisioner
