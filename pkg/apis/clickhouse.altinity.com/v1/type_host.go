@@ -154,7 +154,7 @@ func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 }
 
 // GetServiceTemplate gets service template
-func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+func (host *ChiHost) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !host.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}

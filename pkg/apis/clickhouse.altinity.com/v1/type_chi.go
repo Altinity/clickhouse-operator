@@ -539,16 +539,16 @@ func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *Chi
 	chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Walk(f)
 }
 
-// GetServiceTemplate gets ChiServiceTemplate by name
-func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
+// GetServiceTemplate gets ServiceTemplate by name
+func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ServiceTemplate, bool) {
 	if !chi.Spec.Templates.GetServiceTemplatesIndex().Has(name) {
 		return nil, false
 	}
 	return chi.Spec.Templates.GetServiceTemplatesIndex().Get(name), true
 }
 
-// GetCHIServiceTemplate gets ChiServiceTemplate of a CHI
-func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate, bool) {
+// GetCHIServiceTemplate gets ServiceTemplate of a CHI
+func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ServiceTemplate, bool) {
 	if !chi.Spec.Defaults.Templates.HasServiceTemplate() {
 		return nil, false
 	}

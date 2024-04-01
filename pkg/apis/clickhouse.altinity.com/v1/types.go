@@ -684,7 +684,7 @@ type ChiTemplates struct {
 	HostTemplates        []ChiHostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
 	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
 	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
-	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
+	ServiceTemplates     []ServiceTemplate        `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
 
 	// Index maps template name to template itself
 	HostTemplatesIndex        *HostTemplatesIndex        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
@@ -717,8 +717,8 @@ type ChiPodDistribution struct {
 	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
 }
 
-// ChiServiceTemplate defines CHI service template
-type ChiServiceTemplate struct {
+// ServiceTemplate defines CHI service template
+type ServiceTemplate struct {
 	Name         string           `json:"name"                   yaml:"name"`
 	GenerateName string           `json:"generateName,omitempty" yaml:"generateName,omitempty"`
 	ObjectMeta   meta.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`

@@ -31,7 +31,7 @@ func (replica *ChiReplica) InheritTemplatesFrom(cluster *Cluster) {
 }
 
 // GetServiceTemplate gets service template
-func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+func (replica *ChiReplica) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !replica.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}

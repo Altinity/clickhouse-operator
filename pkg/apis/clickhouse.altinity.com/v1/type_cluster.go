@@ -155,7 +155,7 @@ func (cluster *Cluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
 }
 
 // GetServiceTemplate returns service template, if exists
-func (cluster *Cluster) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+func (cluster *Cluster) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !cluster.Templates.HasClusterServiceTemplate() {
 		return nil, false
 	}

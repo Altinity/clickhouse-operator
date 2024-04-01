@@ -44,7 +44,7 @@ func (templates *ChiTemplates) GetVolumeClaimTemplates() []ChiVolumeClaimTemplat
 	return templates.VolumeClaimTemplates
 }
 
-func (templates *ChiTemplates) GetServiceTemplates() []ChiServiceTemplate {
+func (templates *ChiTemplates) GetServiceTemplates() []ServiceTemplate {
 	if templates == nil {
 		return nil
 	}
