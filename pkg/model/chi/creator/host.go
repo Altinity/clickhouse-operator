@@ -23,7 +23,7 @@ import (
 func NewDefaultHostTemplate(name string) *api.ChiHostTemplate {
 	return &api.ChiHostTemplate{
 		Name: name,
-		PortDistribution: []api.ChiPortDistribution{
+		PortDistribution: []api.PortDistribution{
 			{
 				Type: deployment.PortDistributionUnspecified,
 			},
@@ -44,7 +44,7 @@ func NewDefaultHostTemplate(name string) *api.ChiHostTemplate {
 func NewDefaultHostTemplateForHostNetwork(name string) *api.ChiHostTemplate {
 	return &api.ChiHostTemplate{
 		Name: name,
-		PortDistribution: []api.ChiPortDistribution{
+		PortDistribution: []api.PortDistribution{
 			{
 				Type: deployment.PortDistributionClusterScopeIndex,
 			},

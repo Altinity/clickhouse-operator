@@ -661,13 +661,13 @@ type ChiReplicaAddress struct {
 
 // ChiHostTemplate defines full Host Template
 type ChiHostTemplate struct {
-	Name             string                `json:"name,omitempty"             yaml:"name,omitempty"`
-	PortDistribution []ChiPortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
-	Spec             ChiHost               `json:"spec,omitempty"             yaml:"spec,omitempty"`
+	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
+	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
+	Spec             ChiHost            `json:"spec,omitempty"             yaml:"spec,omitempty"`
 }
 
-// ChiPortDistribution defines port distribution
-type ChiPortDistribution struct {
+// PortDistribution defines port distribution
+type PortDistribution struct {
 	Type string `json:"type,omitempty"   yaml:"type,omitempty"`
 }
 

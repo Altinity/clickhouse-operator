@@ -28,7 +28,7 @@ func NormalizeHostTemplate(template *api.ChiHostTemplate) {
 
 	if template.PortDistribution == nil {
 		// In case no PortDistribution provided - setup default one
-		template.PortDistribution = []api.ChiPortDistribution{
+		template.PortDistribution = []api.PortDistribution{
 			{
 				Type: deployment.PortDistributionUnspecified,
 			},
