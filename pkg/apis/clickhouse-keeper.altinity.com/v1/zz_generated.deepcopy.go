@@ -105,7 +105,7 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 	}
 	if in.Templates != nil {
 		in, out := &in.Templates, &out.Templates
-		*out = new(clickhousealtinitycomv1.ChiTemplates)
+		*out = new(clickhousealtinitycomv1.Templates)
 		(*in).DeepCopyInto(*out)
 	}
 	return

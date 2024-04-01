@@ -413,7 +413,7 @@ func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *api.Co
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *api.ChiTemplates) *api.ChiTemplates {
+func (n *Normalizer) normalizeTemplates(templates *api.Templates) *api.Templates {
 	if templates == nil {
 		//templates = api.NewChiTemplates()
 		return nil
@@ -505,25 +505,25 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 	}
 }
 
-func (n *Normalizer) normalizeHostTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizeHostTemplates(templates *api.Templates) {
 	for i := range templates.HostTemplates {
 		n.normalizeHostTemplate(&templates.HostTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizePodTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizePodTemplates(templates *api.Templates) {
 	for i := range templates.PodTemplates {
 		n.normalizePodTemplate(&templates.PodTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.Templates) {
 	for i := range templates.VolumeClaimTemplates {
 		n.normalizeVolumeClaimTemplate(&templates.VolumeClaimTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeServiceTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
 	for i := range templates.ServiceTemplates {
 		n.normalizeServiceTemplate(&templates.ServiceTemplates[i])
 	}

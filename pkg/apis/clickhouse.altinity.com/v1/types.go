@@ -107,7 +107,7 @@ type ChiSpec struct {
 	Reconciling            *ChiReconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
 	Defaults               *ChiDefaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration  `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates              *ChiTemplates   `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	Templates              *Templates      `json:"templates,omitempty"              yaml:"templates,omitempty"`
 	UseTemplates           []*TemplateRef  `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
@@ -678,8 +678,8 @@ type ChiHostConfig struct {
 	FilesFingerprint     string `json:"filesfingerprint"     yaml:"filesfingerprint"`
 }
 
-// ChiTemplates defines templates section of .spec
-type ChiTemplates struct {
+// Templates defines templates section of .spec
+type Templates struct {
 	// Templates
 	HostTemplates        []HostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
 	PodTemplates         []PodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
