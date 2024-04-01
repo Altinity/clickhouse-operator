@@ -594,7 +594,7 @@ func (c *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
 }
 
 // FindTemplate finds specified template within possibly specified namespace
-func (c *OperatorConfig) FindTemplate(templateRef *ChiTemplateRef, fallbackNamespace string) *ClickHouseInstallation {
+func (c *OperatorConfig) FindTemplate(templateRef *TemplateRef, fallbackNamespace string) *ClickHouseInstallation {
 	c.Template.CHI.Runtime.mutex.RLock()
 	defer c.Template.CHI.Runtime.mutex.RUnlock()
 

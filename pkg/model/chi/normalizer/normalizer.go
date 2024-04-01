@@ -563,7 +563,7 @@ func (n *Normalizer) normalizeServiceTemplate(template *api.ChiServiceTemplate) 
 }
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
-func (n *Normalizer) normalizeUseTemplates(templates []*api.ChiTemplateRef) []*api.ChiTemplateRef {
+func (n *Normalizer) normalizeUseTemplates(templates []*api.TemplateRef) []*api.TemplateRef {
 	return templatesNormalizer.NormalizeTemplatesList(templates)
 }
 
