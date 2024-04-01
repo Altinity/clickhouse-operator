@@ -695,12 +695,12 @@ type ChiTemplates struct {
 
 // PodTemplate defines full Pod Template, directly used by StatefulSet
 type PodTemplate struct {
-	Name            string               `json:"name"                      yaml:"name"`
-	GenerateName    string               `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
-	Zone            PodTemplateZone      `json:"zone,omitempty"            yaml:"zone,omitempty"`
-	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
-	ObjectMeta      meta.ObjectMeta      `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
-	Spec            core.PodSpec         `json:"spec,omitempty"            yaml:"spec,omitempty"`
+	Name            string            `json:"name"                      yaml:"name"`
+	GenerateName    string            `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
+	Zone            PodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
+	PodDistribution []PodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
+	ObjectMeta      meta.ObjectMeta   `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
+	Spec            core.PodSpec      `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
 // PodTemplateZone defines pod template zone
@@ -709,8 +709,8 @@ type PodTemplateZone struct {
 	Values []string `json:"values,omitempty" yaml:"values,omitempty"`
 }
 
-// ChiPodDistribution defines pod distribution
-type ChiPodDistribution struct {
+// PodDistribution defines pod distribution
+type PodDistribution struct {
 	Type        string `json:"type,omitempty"        yaml:"type,omitempty"`
 	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
 	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`

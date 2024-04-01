@@ -450,7 +450,7 @@ func mergePodAffinity(dst *core.PodAffinity, src *core.PodAffinity) *core.PodAff
 
 // newMatchLabels
 func newMatchLabels(
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchLabels map[string]string,
 ) map[string]string {
 	var scopeLabels map[string]string
@@ -740,7 +740,7 @@ func mergePodAntiAffinity(dst *core.PodAntiAffinity, src *core.PodAntiAffinity) 
 
 // newPodAffinityTermWithMatchLabels
 func newPodAffinityTermWithMatchLabels(
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchLabels map[string]string,
 ) core.PodAffinityTerm {
 	return core.PodAffinityTerm{
@@ -767,7 +767,7 @@ func newPodAffinityTermWithMatchLabels(
 
 // newPodAffinityTermWithMatchExpressions
 func newPodAffinityTermWithMatchExpressions(
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchExpressions []meta.LabelSelectorRequirement,
 ) core.PodAffinityTerm {
 	return core.PodAffinityTerm{
@@ -794,7 +794,7 @@ func newPodAffinityTermWithMatchExpressions(
 // newWeightedPodAffinityTermWithMatchLabels is an enhanced append()
 func newWeightedPodAffinityTermWithMatchLabels(
 	weight int32,
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchLabels map[string]string,
 ) core.WeightedPodAffinityTerm {
 	return core.WeightedPodAffinityTerm{

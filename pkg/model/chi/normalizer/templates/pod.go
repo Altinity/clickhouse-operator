@@ -70,7 +70,7 @@ func normalizePodTemplateDistribution(replicasCount int, template *api.PodTempla
 
 const defaultTopologyKey = core.LabelHostname
 
-func normalizePodDistribution(replicasCount int, podDistribution *api.ChiPodDistribution) []api.ChiPodDistribution {
+func normalizePodDistribution(replicasCount int, podDistribution *api.PodDistribution) []api.PodDistribution {
 	// Ensure topology key
 	if podDistribution.TopologyKey == "" {
 		podDistribution.TopologyKey = defaultTopologyKey
@@ -122,7 +122,7 @@ func normalizePodDistribution(replicasCount int, podDistribution *api.ChiPodDist
 		}
 
 		// Expand shortcut
-		return []api.ChiPodDistribution{
+		return []api.PodDistribution{
 			{
 				Type:  deployment.PodDistributionShardAntiAffinity,
 				Scope: podDistribution.Scope,
