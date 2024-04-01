@@ -697,14 +697,14 @@ type ChiTemplates struct {
 type PodTemplate struct {
 	Name            string               `json:"name"                      yaml:"name"`
 	GenerateName    string               `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
-	Zone            ChiPodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
+	Zone            PodTemplateZone      `json:"zone,omitempty"            yaml:"zone,omitempty"`
 	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
 	ObjectMeta      meta.ObjectMeta      `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
 	Spec            core.PodSpec         `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
-// ChiPodTemplateZone defines pod template zone
-type ChiPodTemplateZone struct {
+// PodTemplateZone defines pod template zone
+type PodTemplateZone struct {
 	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
 	Values []string `json:"values,omitempty" yaml:"values,omitempty"`
 }
