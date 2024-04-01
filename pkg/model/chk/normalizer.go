@@ -155,7 +155,7 @@ func (n *Normalizer) normalizeTemplates(templates *apiChi.ChiTemplates) *apiChi.
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
-func (n *Normalizer) normalizePodTemplate(template *apiChi.ChiPodTemplate) {
+func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
 	if len(n.ctx.chk.Spec.Configuration.Clusters) > 0 {

@@ -56,7 +56,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	// What is the max number of Pods allowed per Node
 	// TODO need to support multi-cluster
 	maxNumberOfPodsPerNode := 0
-	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
+	chi.WalkPodTemplates(func(template *PodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
 			if podDistribution.Type == deployment.PodDistributionMaxNumberPerNode {
@@ -510,8 +510,8 @@ func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplat
 	return chi.Spec.Templates.GetHostTemplatesIndex().Get(name), true
 }
 
-// GetPodTemplate gets ChiPodTemplate by name
-func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
+// GetPodTemplate gets PodTemplate by name
+func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*PodTemplate, bool) {
 	if !chi.Spec.Templates.GetPodTemplatesIndex().Has(name) {
 		return nil, false
 	}
@@ -519,7 +519,7 @@ func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate,
 }
 
 // WalkPodTemplates walks over all PodTemplates
-func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *ChiPodTemplate)) {
+func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *PodTemplate)) {
 	chi.Spec.Templates.GetPodTemplatesIndex().Walk(f)
 }
 

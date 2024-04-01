@@ -71,13 +71,13 @@ func (i *HostTemplatesIndex) Walk(f func(template *ChiHostTemplate)) {
 // PodTemplatesIndex describes index of pod templates
 type PodTemplatesIndex struct {
 	// templates maps 'name of the template' -> 'template itself'
-	templates map[string]*ChiPodTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	templates map[string]*PodTemplate `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
 // NewPodTemplatesIndex creates new PodTemplatesIndex object
 func NewPodTemplatesIndex() *PodTemplatesIndex {
 	return &PodTemplatesIndex{
-		templates: make(map[string]*ChiPodTemplate),
+		templates: make(map[string]*PodTemplate),
 	}
 }
 
@@ -94,7 +94,7 @@ func (i *PodTemplatesIndex) Has(name string) bool {
 }
 
 // Get returns entity `name` from the index
-func (i *PodTemplatesIndex) Get(name string) *ChiPodTemplate {
+func (i *PodTemplatesIndex) Get(name string) *PodTemplate {
 	if !i.Has(name) {
 		return nil
 	}
@@ -102,7 +102,7 @@ func (i *PodTemplatesIndex) Get(name string) *ChiPodTemplate {
 }
 
 // Set sets named template into index
-func (i *PodTemplatesIndex) Set(name string, entry *ChiPodTemplate) {
+func (i *PodTemplatesIndex) Set(name string, entry *PodTemplate) {
 	if i == nil {
 		return
 	}
@@ -113,7 +113,7 @@ func (i *PodTemplatesIndex) Set(name string, entry *ChiPodTemplate) {
 }
 
 // Walk calls specified function over each entry in the index
-func (i *PodTemplatesIndex) Walk(f func(template *ChiPodTemplate)) {
+func (i *PodTemplatesIndex) Walk(f func(template *PodTemplate)) {
 	if i == nil {
 		return
 	}

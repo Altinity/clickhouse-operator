@@ -145,7 +145,7 @@ func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
 }
 
 // GetPodTemplate gets pod template
-func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
+func (host *ChiHost) GetPodTemplate() (*PodTemplate, bool) {
 	if !host.Templates.HasPodTemplate() {
 		return nil, false
 	}

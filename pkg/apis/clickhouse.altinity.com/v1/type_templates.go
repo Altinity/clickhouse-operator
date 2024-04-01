@@ -30,7 +30,7 @@ func (templates *ChiTemplates) GetHostTemplates() []ChiHostTemplate {
 	return templates.HostTemplates
 }
 
-func (templates *ChiTemplates) GetPodTemplates() []ChiPodTemplate {
+func (templates *ChiTemplates) GetPodTemplates() []PodTemplate {
 	if templates == nil {
 		return nil
 	}

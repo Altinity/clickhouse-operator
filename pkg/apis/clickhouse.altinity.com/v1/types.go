@@ -682,7 +682,7 @@ type ChiHostConfig struct {
 type ChiTemplates struct {
 	// Templates
 	HostTemplates        []ChiHostTemplate     `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
-	PodTemplates         []ChiPodTemplate      `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
+	PodTemplates         []PodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
 	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
 	ServiceTemplates     []ServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
 
@@ -693,8 +693,8 @@ type ChiTemplates struct {
 	ServiceTemplatesIndex     *ServiceTemplatesIndex     `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
-// ChiPodTemplate defines full Pod Template, directly used by StatefulSet
-type ChiPodTemplate struct {
+// PodTemplate defines full Pod Template, directly used by StatefulSet
+type PodTemplate struct {
 	Name            string               `json:"name"                      yaml:"name"`
 	GenerateName    string               `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
 	Zone            ChiPodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`

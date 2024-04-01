@@ -211,7 +211,7 @@ func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *api.Chi
 }
 
 // getPodTemplate gets Pod Template to be used to create StatefulSet
-func (c *Creator) getPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
+func (c *Creator) getPodTemplate(host *api.ChiHost) *api.PodTemplate {
 	// Which pod template should be used - either explicitly defined or a default one
 	podTemplate, ok := host.GetPodTemplate()
 	if ok {
@@ -326,14 +326,14 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.statefulSetAppendUsedPVCTemplates(statefulSet, host)
 }
 
-// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided ChiPodTemplate
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided PodTemplate
 func (c *Creator) statefulSetApplyPodTemplate(
 	statefulSet *apps.StatefulSet,
-	template *api.ChiPodTemplate,
+	template *api.PodTemplate,
 	host *api.ChiHost,
 ) {
-	// StatefulSet's pod template is not directly compatible with ChiPodTemplate,
-	// we need to extract some fields from ChiPodTemplate and apply on StatefulSet
+	// StatefulSet's pod template is not directly compatible with PodTemplate,
+	// we need to extract some fields from PodTemplate and apply on StatefulSet
 	statefulSet.Spec.Template = core.PodTemplateSpec{
 		ObjectMeta: meta.ObjectMeta{
 			Name: template.Name,
@@ -432,13 +432,13 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 }
 
 // newDefaultPodTemplate is a unification wrapper
-func newDefaultPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
+func newDefaultPodTemplate(host *api.ChiHost) *api.PodTemplate {
 	return newDefaultClickHousePodTemplate(host)
 }
 
 // newDefaultClickHousePodTemplate returns default Pod Template to be used with StatefulSet
-func newDefaultClickHousePodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
-	podTemplate := &api.ChiPodTemplate{
+func newDefaultClickHousePodTemplate(host *api.ChiHost) *api.PodTemplate {
+	podTemplate := &api.PodTemplate{
 		Name: model.CreateStatefulSetName(host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},

@@ -26,7 +26,7 @@ import (
 )
 
 // NewAffinity creates new Affinity struct
-func NewAffinity(template *api.ChiPodTemplate) *core.Affinity {
+func NewAffinity(template *api.PodTemplate) *core.Affinity {
 	// Pod node affinity scheduling rules.
 	nodeAffinity := newNodeAffinity(template)
 	// Pod affinity scheduling rules. Ex.: co-locate this pod in the same node, zone, etc
@@ -75,7 +75,7 @@ func MergeAffinity(dst *core.Affinity, src *core.Affinity) *core.Affinity {
 }
 
 // newNodeAffinity
-func newNodeAffinity(template *api.ChiPodTemplate) *core.NodeAffinity {
+func newNodeAffinity(template *api.PodTemplate) *core.NodeAffinity {
 	if template.Zone.Key == "" {
 		return nil
 	}
@@ -229,7 +229,7 @@ func mergeNodeAffinity(dst *core.NodeAffinity, src *core.NodeAffinity) *core.Nod
 }
 
 // newPodAffinity
-func newPodAffinity(template *api.ChiPodTemplate) *core.PodAffinity {
+func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 	// Return podAffinity only in case something was added into it
 	added := false
 	podAffinity := &core.PodAffinity{}
@@ -493,7 +493,7 @@ func newMatchLabels(
 }
 
 // newPodAntiAffinity
-func newPodAntiAffinity(template *api.ChiPodTemplate) *core.PodAntiAffinity {
+func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 	// Return podAntiAffinity only in case something was added into it
 	added := false
 	podAntiAffinity := &core.PodAntiAffinity{}
@@ -823,7 +823,7 @@ func newWeightedPodAffinityTermWithMatchLabels(
 }
 
 // PrepareAffinity
-func PrepareAffinity(podTemplate *api.ChiPodTemplate, host *api.ChiHost) {
+func PrepareAffinity(podTemplate *api.PodTemplate, host *api.ChiHost) {
 	switch {
 	case podTemplate == nil:
 		return

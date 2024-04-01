@@ -21,9 +21,9 @@ import (
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func getPodTemplate(chk *apiChk.ClickHouseKeeperInstallation) apiChi.ChiPodTemplate {
+func getPodTemplate(chk *apiChk.ClickHouseKeeperInstallation) apiChi.PodTemplate {
 	if len(chk.Spec.GetTemplates().GetPodTemplates()) < 1 {
-		return apiChi.ChiPodTemplate{}
+		return apiChi.PodTemplate{}
 	}
 	return chk.Spec.GetTemplates().GetPodTemplates()[0]
 }
