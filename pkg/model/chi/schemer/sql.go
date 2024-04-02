@@ -202,7 +202,7 @@ func (s *ClusterSchemer) sqlCreateTableReplicated(cluster string) string {
 			clusterAllReplicas('%s', system.tables) tables
 		WHERE
 			database NOT IN (%s) AND
-			has((select groupArray(name) from system.databases where engine in (%s)), database) AND
+			has((SELECT groupArray(name) FROM system.databases WHERE engine IN (%s)), database) AND
 			create_table_query != '' AND
 			name NOT LIKE '.inner.%%' AND
 			name NOT LIKE '.inner_id.%%'

@@ -2,13 +2,11 @@ package app
 
 import (
 	"context"
-	"os"
 
 	"github.com/go-logr/logr"
 
 	apps "k8s.io/api/apps/v1"
 	apiMachineryRuntime "k8s.io/apimachinery/pkg/runtime"
-	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientGoScheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	ctrlRuntime "sigs.k8s.io/controller-runtime"
@@ -22,24 +20,28 @@ import (
 	controller "github.com/altinity/clickhouse-operator/pkg/controller/chk"
 )
 
-var scheme = apiMachineryRuntime.NewScheme()
-
-func init() {
-	utilRuntime.Must(clientGoScheme.AddToScheme(scheme))
-	utilRuntime.Must(api.AddToScheme(scheme))
-}
-
 var (
+	scheme  *apiMachineryRuntime.Scheme
 	manager ctrlRuntime.Manager
 	logger  logr.Logger
 )
 
-func initKeeper(ctx context.Context) {
+func initKeeper(ctx context.Context) error {
+	var err error
+
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 
 	logger = ctrl.Log.WithName("keeper-runner")
 
-	var err error
+	scheme = apiMachineryRuntime.NewScheme()
+	if err = clientGoScheme.AddToScheme(scheme); err != nil {
+		logger.Error(err, "init keeper - unable to clientGoScheme.AddToScheme")
+		return err
+	}
+	if err = api.AddToScheme(scheme); err != nil {
+		logger.Error(err, "init keeper - unable to api.AddToScheme")
+		return err
+	}
 
 	manager, err = ctrlRuntime.NewManager(ctrlRuntime.GetConfigOrDie(), ctrlRuntime.Options{
 		Scheme: scheme,
@@ -48,7 +50,8 @@ func initKeeper(ctx context.Context) {
 		},
 	})
 	if err != nil {
-		os.Exit(1)
+		logger.Error(err, "init keeper - unable to ctrlRuntime.NewManager")
+		return err
 	}
 
 	err = ctrlRuntime.
@@ -62,12 +65,19 @@ func initKeeper(ctx context.Context) {
 			},
 		)
 	if err != nil {
-		os.Exit(1)
+		logger.Error(err, "init keeper - unable to ctrlRuntime.NewControllerManagedBy")
+		return err
 	}
+
+	// Initialization successful
+	return nil
 }
 
-func runKeeper(ctx context.Context) {
+func runKeeper(ctx context.Context) error {
 	if err := manager.Start(ctx); err != nil {
-		os.Exit(1)
+		logger.Error(err, "run keeper - unable to manager.Start")
+		return err
 	}
+	// Run successful
+	return nil
 }

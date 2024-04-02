@@ -15,6 +15,7 @@ from testflows.connect import Shell
 from testflows.asserts import error
 from testflows.core import *
 from e2e.steps import *
+from datetime import datetime
 
 
 @TestScenario
@@ -212,6 +213,8 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         version_to = current().context.operator_version
     with Given(f"clickhouse-operator from {version_from}"):
         util.install_operator_version(version_from)
+        time.sleep(15)
+
         chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
         cluster = chi
 
@@ -565,7 +568,7 @@ def test_008_3(self):
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.23.2", version_to=None):
+def test_009_1(self, version_from="0.23.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -587,7 +590,7 @@ def test_009_1(self, version_from="0.23.2", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.23.2", version_to=None):
+def test_009_2(self, version_from="0.23.3", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -1917,6 +1920,22 @@ def test_016(self):
                 sql="select substitution from system.macros where macro='test'",
             )
             assert out == "test-changed"
+
+    # test-016-settings-06.yaml
+    with When("Add I change a number of settings that does not requre a restart"):
+        start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+        kubectl.create_and_check(
+            manifest="manifests/chi/test-016-settings-06.yaml",
+            check={
+                "do_not_delete": 1,
+            },
+        )
+
+        with And("ClickHouse SHOULD NOT BE restarted"):
+            new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
+            assert start_time == new_start_time
+
+
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
@@ -3255,21 +3274,36 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
         ok = 0
         partial = 0
         errors = 0
+        run = 0
+        partial_runs = []
+        error_runs = []
 
         cmd = f'exec -n {self.context.test_namespace} {client_pod} -- clickhouse-client --user={user} --password={password} -h {host} -q "{query}"'
         while not trigger_event.is_set():
+            run += 1
+            # Adjust time to glog's format
+            now = datetime.utcnow().strftime("%H:%M:%S.%f")
             cnt_test = kubectl.launch(cmd, ok_to_fail=True, shell=shell)
             if cnt_test == res1:
                 ok += 1
             if cnt_test == res2:
                 partial += 1
+                partial_runs.append(run)
+                partial_runs.append(now)
             if cnt_test != res1 and cnt_test != res2:
                 errors += 1
+                error_runs.append(run)
+                error_runs.append(now)
                 print("*** RUN_QUERY ERROR ***")
                 print(cnt_test)
             time.sleep(0.5)
         with By(
-            f"{ok} queries have been executed with no errors, {partial} queries returned incomplete results. {errors} queries have failed"
+            f"{run} queries have been executed, of which: " +
+            f"{ok} queries have been executed with no errors, " +
+            f"{partial} queries returned incomplete results, " +
+            f"{errors} queries have failed. " +
+            f"incomplete results runs: {partial_runs} " +
+            f"error runs: {error_runs}"
         ):
             assert errors == 0
             if partial > 0:

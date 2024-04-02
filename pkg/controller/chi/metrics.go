@@ -29,6 +29,9 @@ type Metrics struct {
 	// CHIReconcilesCompleted is a number (counter) of completed CHI reconciles.
 	// In ideal world number of completed reconciles should be equal to CHIReconcilesStarted
 	CHIReconcilesCompleted otelApi.Int64Counter
+	// CHIReconcilesAborted is a number (counter) of explicitly aborted CHI reconciles.
+	// This counter does not includes reconciles that we not completed due to external rasons, such as operator restart
+	CHIReconcilesAborted otelApi.Int64Counter
 	// CHIReconcilesTimings is a histogram of durations of successfully completed CHI reconciles
 	CHIReconcilesTimings otelApi.Float64Histogram
 
@@ -61,6 +64,11 @@ func createMetrics() *Metrics {
 	CHIReconcilesCompleted, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_completed",
 		otelApi.WithDescription("number of CHI reconciles completed successfully"),
+		otelApi.WithUnit("items"),
+	)
+	CHIReconcilesAborted, _ := metrics.Meter().Int64Counter(
+		"clickhouse_operator_chi_reconciles_aborted",
+		otelApi.WithDescription("number of CHI reconciles aborted"),
 		otelApi.WithUnit("items"),
 	)
 	CHIReconcilesTimings, _ := metrics.Meter().Float64Histogram(
@@ -114,6 +122,7 @@ func createMetrics() *Metrics {
 	return &Metrics{
 		CHIReconcilesStarted:   CHIReconcilesStarted,
 		CHIReconcilesCompleted: CHIReconcilesCompleted,
+		CHIReconcilesAborted:   CHIReconcilesAborted,
 		CHIReconcilesTimings:   CHIReconcilesTimings,
 
 		HostReconcilesStarted:   HostReconcilesStarted,
@@ -140,6 +149,9 @@ func metricsCHIReconcilesStarted(ctx context.Context) {
 }
 func metricsCHIReconcilesCompleted(ctx context.Context) {
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 1)
+}
+func metricsCHIReconcilesAborted(ctx context.Context) {
+	ensureMetrics().CHIReconcilesAborted.Add(ctx, 1)
 }
 func metricsCHIReconcilesTimings(ctx context.Context, seconds float64) {
 	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds)

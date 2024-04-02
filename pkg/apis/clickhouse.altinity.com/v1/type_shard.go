@@ -36,7 +36,7 @@ func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
 		return nil, false
 	}
 	name := shard.Templates.GetShardServiceTemplate()
-	return shard.CHI.GetServiceTemplate(name)
+	return shard.Runtime.CHI.GetServiceTemplate(name)
 }
 
 // HasReplicasCount checks whether shard has replicas count specified
@@ -70,11 +70,11 @@ func (shard *ChiShard) FindHost(needle interface{}) (res *ChiHost) {
 	shard.WalkHosts(func(host *ChiHost) error {
 		switch v := needle.(type) {
 		case string:
-			if host.Address.HostName == v {
+			if host.Runtime.Address.HostName == v {
 				res = host
 			}
 		case int:
-			if host.Address.ShardScopeIndex == v {
+			if host.Runtime.Address.ShardScopeIndex == v {
 				res = host
 			}
 		}
@@ -107,12 +107,12 @@ func (shard *ChiShard) HostsCount() int {
 
 // GetCHI gets CHI of the shard
 func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
-	return shard.CHI
+	return shard.Runtime.CHI
 }
 
 // GetCluster gets cluster of the shard
 func (shard *ChiShard) GetCluster() *Cluster {
-	return shard.CHI.Spec.Configuration.Clusters[shard.Address.ClusterIndex]
+	return shard.Runtime.CHI.Spec.Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 
 // HasWeight checks whether shard has applicable weight value specified

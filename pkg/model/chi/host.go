@@ -15,6 +15,8 @@
 package chi
 
 import (
+	core "k8s.io/api/core/v1"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -29,4 +31,57 @@ func HostIsNewOne(host *api.ChiHost) bool {
 // HostHasTablesCreated checks whether host has tables listed as already created
 func HostHasTablesCreated(host *api.ChiHost) bool {
 	return util.InArray(CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated())
+}
+
+func HostWalkPorts(host *api.ChiHost, f func(name string, port *int32, protocol core.Protocol) bool) {
+	if host == nil {
+		return
+	}
+	if f(ChDefaultTCPPortName, &host.TCPPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultTLSPortName, &host.TLSPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultHTTPPortName, &host.HTTPPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultHTTPSPortName, &host.HTTPSPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultInterserverHTTPPortName, &host.InterserverHTTPPort, core.ProtocolTCP) {
+		return
+	}
+}
+
+func HostWalkAssignedPorts(host *api.ChiHost, f func(name string, port *int32, protocol core.Protocol) bool) {
+	if host == nil {
+		return
+	}
+	HostWalkPorts(
+		host,
+		func(_name string, _port *int32, _protocol core.Protocol) bool {
+			if api.IsPortAssigned(*_port) {
+				return f(_name, _port, _protocol)
+			}
+			// Do not break, continue iterating
+			return false
+		},
+	)
+}
+
+func HostWalkInvalidPorts(host *api.ChiHost, f func(name string, port *int32, protocol core.Protocol) bool) {
+	if host == nil {
+		return
+	}
+	HostWalkPorts(
+		host,
+		func(_name string, _port *int32, _protocol core.Protocol) bool {
+			if api.IsPortInvalid(*_port) {
+				return f(_name, _port, _protocol)
+			}
+			// Do not break, continue iterating
+			return false
+		},
+	)
 }

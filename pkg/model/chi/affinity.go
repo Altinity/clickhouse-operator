@@ -17,7 +17,7 @@ package chi
 import (
 	"gopkg.in/d4l3k/messagediff.v1"
 
-	"k8s.io/api/core/v1"
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -26,7 +26,7 @@ import (
 )
 
 // NewAffinity creates new Affinity struct
-func NewAffinity(template *api.ChiPodTemplate) *v1.Affinity {
+func NewAffinity(template *api.ChiPodTemplate) *core.Affinity {
 	// Pod node affinity scheduling rules.
 	nodeAffinity := newNodeAffinity(template)
 	// Pod affinity scheduling rules. Ex.: co-locate this pod in the same node, zone, etc
@@ -40,7 +40,7 @@ func NewAffinity(template *api.ChiPodTemplate) *v1.Affinity {
 		return nil
 	}
 
-	return &v1.Affinity{
+	return &core.Affinity{
 		NodeAffinity:    nodeAffinity,
 		PodAffinity:     podAffinity,
 		PodAntiAffinity: podAntiAffinity,
@@ -48,7 +48,7 @@ func NewAffinity(template *api.ChiPodTemplate) *v1.Affinity {
 }
 
 // MergeAffinity merges from src into dst and returns dst
-func MergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
+func MergeAffinity(dst *core.Affinity, src *core.Affinity) *core.Affinity {
 	if src == nil {
 		// Nothing to merge from
 		return dst
@@ -57,7 +57,7 @@ func MergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
 	created := false
 	if dst == nil {
 		// No receiver specified, allocate a new one
-		dst = &v1.Affinity{}
+		dst = &core.Affinity{}
 		created = true
 	}
 
@@ -75,36 +75,36 @@ func MergeAffinity(dst *v1.Affinity, src *v1.Affinity) *v1.Affinity {
 }
 
 // newNodeAffinity
-func newNodeAffinity(template *api.ChiPodTemplate) *v1.NodeAffinity {
+func newNodeAffinity(template *api.ChiPodTemplate) *core.NodeAffinity {
 	if template.Zone.Key == "" {
 		return nil
 	}
 
-	return &v1.NodeAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-			NodeSelectorTerms: []v1.NodeSelectorTerm{
+	return &core.NodeAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: &core.NodeSelector{
+			NodeSelectorTerms: []core.NodeSelectorTerm{
 				{
 					// A list of node selector requirements by node's labels.
-					MatchExpressions: []v1.NodeSelectorRequirement{
+					MatchExpressions: []core.NodeSelectorRequirement{
 						{
 							Key:      template.Zone.Key,
-							Operator: v1.NodeSelectorOpIn,
+							Operator: core.NodeSelectorOpIn,
 							Values:   template.Zone.Values,
 						},
 					},
 					// A list of node selector requirements by node's fields.
-					//MatchFields: []v1.NodeSelectorRequirement{
-					//	v1.NodeSelectorRequirement{},
+					//MatchFields: []core.NodeSelectorRequirement{
+					//	core.NodeSelectorRequirement{},
 					//},
 				},
 			},
 		},
 
-		// PreferredDuringSchedulingIgnoredDuringExecution: []v1.PreferredSchedulingTerm{},
+		// PreferredDuringSchedulingIgnoredDuringExecution: []core.PreferredSchedulingTerm{},
 	}
 }
 
-func getNodeSelectorTerms(affinity *v1.NodeAffinity) []v1.NodeSelectorTerm {
+func getNodeSelectorTerms(affinity *core.NodeAffinity) []core.NodeSelectorTerm {
 	if affinity == nil {
 		return nil
 	}
@@ -115,7 +115,7 @@ func getNodeSelectorTerms(affinity *v1.NodeAffinity) []v1.NodeSelectorTerm {
 	return affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
 }
 
-func getNodeSelectorTerm(affinity *v1.NodeAffinity, i int) *v1.NodeSelectorTerm {
+func getNodeSelectorTerm(affinity *core.NodeAffinity, i int) *core.NodeSelectorTerm {
 	terms := getNodeSelectorTerms(affinity)
 	if terms == nil {
 		return nil
@@ -126,17 +126,17 @@ func getNodeSelectorTerm(affinity *v1.NodeAffinity, i int) *v1.NodeSelectorTerm 
 	return &terms[i]
 }
 
-func appendNodeSelectorTerm(affinity *v1.NodeAffinity, term *v1.NodeSelectorTerm) *v1.NodeAffinity {
+func appendNodeSelectorTerm(affinity *core.NodeAffinity, term *core.NodeSelectorTerm) *core.NodeAffinity {
 	if term == nil {
 		return affinity
 	}
 
 	// Ensure path to terms exists
 	if affinity == nil {
-		affinity = &v1.NodeAffinity{}
+		affinity = &core.NodeAffinity{}
 	}
 	if affinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
-		affinity.RequiredDuringSchedulingIgnoredDuringExecution = &v1.NodeSelector{}
+		affinity.RequiredDuringSchedulingIgnoredDuringExecution = &core.NodeSelector{}
 	}
 
 	affinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
@@ -147,7 +147,7 @@ func appendNodeSelectorTerm(affinity *v1.NodeAffinity, term *v1.NodeSelectorTerm
 	return affinity
 }
 
-func getPreferredSchedulingTerms(affinity *v1.NodeAffinity) []v1.PreferredSchedulingTerm {
+func getPreferredSchedulingTerms(affinity *core.NodeAffinity) []core.PreferredSchedulingTerm {
 	if affinity == nil {
 		return nil
 	}
@@ -155,7 +155,7 @@ func getPreferredSchedulingTerms(affinity *v1.NodeAffinity) []v1.PreferredSchedu
 	return affinity.PreferredDuringSchedulingIgnoredDuringExecution
 }
 
-func getPreferredSchedulingTerm(affinity *v1.NodeAffinity, i int) *v1.PreferredSchedulingTerm {
+func getPreferredSchedulingTerm(affinity *core.NodeAffinity, i int) *core.PreferredSchedulingTerm {
 	terms := getPreferredSchedulingTerms(affinity)
 	if terms == nil {
 		return nil
@@ -166,14 +166,14 @@ func getPreferredSchedulingTerm(affinity *v1.NodeAffinity, i int) *v1.PreferredS
 	return &terms[i]
 }
 
-func appendPreferredSchedulingTerm(affinity *v1.NodeAffinity, term *v1.PreferredSchedulingTerm) *v1.NodeAffinity {
+func appendPreferredSchedulingTerm(affinity *core.NodeAffinity, term *core.PreferredSchedulingTerm) *core.NodeAffinity {
 	if term == nil {
 		return affinity
 	}
 
 	// Ensure path to terms exists
 	if affinity == nil {
-		affinity = &v1.NodeAffinity{}
+		affinity = &core.NodeAffinity{}
 	}
 
 	affinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
@@ -185,7 +185,7 @@ func appendPreferredSchedulingTerm(affinity *v1.NodeAffinity, term *v1.Preferred
 }
 
 // mergeNodeAffinity
-func mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffinity {
+func mergeNodeAffinity(dst *core.NodeAffinity, src *core.NodeAffinity) *core.NodeAffinity {
 	if src == nil {
 		// Nothing to merge from
 		return dst
@@ -229,10 +229,10 @@ func mergeNodeAffinity(dst *v1.NodeAffinity, src *v1.NodeAffinity) *v1.NodeAffin
 }
 
 // newPodAffinity
-func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
+func newPodAffinity(template *api.ChiPodTemplate) *core.PodAffinity {
 	// Return podAffinity only in case something was added into it
 	added := false
-	podAffinity := &v1.PodAffinity{}
+	podAffinity := &core.PodAffinity{}
 
 	for i := range template.PodDistribution {
 		podDistribution := &template.PodDistribution[i]
@@ -330,7 +330,7 @@ func newPodAffinity(template *api.ChiPodTemplate) *v1.PodAffinity {
 	return nil
 }
 
-func getPodAffinityTerms(affinity *v1.PodAffinity) []v1.PodAffinityTerm {
+func getPodAffinityTerms(affinity *core.PodAffinity) []core.PodAffinityTerm {
 	if affinity == nil {
 		return nil
 	}
@@ -338,7 +338,7 @@ func getPodAffinityTerms(affinity *v1.PodAffinity) []v1.PodAffinityTerm {
 	return affinity.RequiredDuringSchedulingIgnoredDuringExecution
 }
 
-func getPodAffinityTerm(affinity *v1.PodAffinity, i int) *v1.PodAffinityTerm {
+func getPodAffinityTerm(affinity *core.PodAffinity, i int) *core.PodAffinityTerm {
 	terms := getPodAffinityTerms(affinity)
 	if terms == nil {
 		return nil
@@ -349,14 +349,14 @@ func getPodAffinityTerm(affinity *v1.PodAffinity, i int) *v1.PodAffinityTerm {
 	return &terms[i]
 }
 
-func appendPodAffinityTerm(affinity *v1.PodAffinity, term *v1.PodAffinityTerm) *v1.PodAffinity {
+func appendPodAffinityTerm(affinity *core.PodAffinity, term *core.PodAffinityTerm) *core.PodAffinity {
 	if term == nil {
 		return affinity
 	}
 
 	// Ensure path to terms exists
 	if affinity == nil {
-		affinity = &v1.PodAffinity{}
+		affinity = &core.PodAffinity{}
 	}
 
 	affinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
@@ -367,7 +367,7 @@ func appendPodAffinityTerm(affinity *v1.PodAffinity, term *v1.PodAffinityTerm) *
 	return affinity
 }
 
-func getWeightedPodAffinityTerms(affinity *v1.PodAffinity) []v1.WeightedPodAffinityTerm {
+func getWeightedPodAffinityTerms(affinity *core.PodAffinity) []core.WeightedPodAffinityTerm {
 	if affinity == nil {
 		return nil
 	}
@@ -375,7 +375,7 @@ func getWeightedPodAffinityTerms(affinity *v1.PodAffinity) []v1.WeightedPodAffin
 	return affinity.PreferredDuringSchedulingIgnoredDuringExecution
 }
 
-func getWeightedPodAffinityTerm(affinity *v1.PodAffinity, i int) *v1.WeightedPodAffinityTerm {
+func getWeightedPodAffinityTerm(affinity *core.PodAffinity, i int) *core.WeightedPodAffinityTerm {
 	terms := getWeightedPodAffinityTerms(affinity)
 	if terms == nil {
 		return nil
@@ -386,14 +386,14 @@ func getWeightedPodAffinityTerm(affinity *v1.PodAffinity, i int) *v1.WeightedPod
 	return &terms[i]
 }
 
-func appendWeightedPodAffinityTerm(affinity *v1.PodAffinity, term *v1.WeightedPodAffinityTerm) *v1.PodAffinity {
+func appendWeightedPodAffinityTerm(affinity *core.PodAffinity, term *core.WeightedPodAffinityTerm) *core.PodAffinity {
 	if term == nil {
 		return affinity
 	}
 
 	// Ensure path to terms exists
 	if affinity == nil {
-		affinity = &v1.PodAffinity{}
+		affinity = &core.PodAffinity{}
 	}
 
 	affinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
@@ -405,7 +405,7 @@ func appendWeightedPodAffinityTerm(affinity *v1.PodAffinity, term *v1.WeightedPo
 }
 
 // mergePodAffinity
-func mergePodAffinity(dst *v1.PodAffinity, src *v1.PodAffinity) *v1.PodAffinity {
+func mergePodAffinity(dst *core.PodAffinity, src *core.PodAffinity) *core.PodAffinity {
 	if src == nil {
 		// Nothing to merge from
 		return dst
@@ -493,10 +493,10 @@ func newMatchLabels(
 }
 
 // newPodAntiAffinity
-func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
+func newPodAntiAffinity(template *api.ChiPodTemplate) *core.PodAntiAffinity {
 	// Return podAntiAffinity only in case something was added into it
 	added := false
-	podAntiAffinity := &v1.PodAntiAffinity{}
+	podAntiAffinity := &core.PodAntiAffinity{}
 
 	// PodDistribution
 	for i := range template.PodDistribution {
@@ -620,7 +620,7 @@ func newPodAntiAffinity(template *api.ChiPodTemplate) *v1.PodAntiAffinity {
 	return nil
 }
 
-func getPodAntiAffinityTerms(affinity *v1.PodAntiAffinity) []v1.PodAffinityTerm {
+func getPodAntiAffinityTerms(affinity *core.PodAntiAffinity) []core.PodAffinityTerm {
 	if affinity == nil {
 		return nil
 	}
@@ -628,7 +628,7 @@ func getPodAntiAffinityTerms(affinity *v1.PodAntiAffinity) []v1.PodAffinityTerm 
 	return affinity.RequiredDuringSchedulingIgnoredDuringExecution
 }
 
-func getPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, i int) *v1.PodAffinityTerm {
+func getPodAntiAffinityTerm(affinity *core.PodAntiAffinity, i int) *core.PodAffinityTerm {
 	terms := getPodAntiAffinityTerms(affinity)
 	if terms == nil {
 		return nil
@@ -639,14 +639,14 @@ func getPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, i int) *v1.PodAffinity
 	return &terms[i]
 }
 
-func appendPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, term *v1.PodAffinityTerm) *v1.PodAntiAffinity {
+func appendPodAntiAffinityTerm(affinity *core.PodAntiAffinity, term *core.PodAffinityTerm) *core.PodAntiAffinity {
 	if term == nil {
 		return affinity
 	}
 
 	// Ensure path to terms exists
 	if affinity == nil {
-		affinity = &v1.PodAntiAffinity{}
+		affinity = &core.PodAntiAffinity{}
 	}
 
 	affinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
@@ -657,7 +657,7 @@ func appendPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, term *v1.PodAffinit
 	return affinity
 }
 
-func getWeightedPodAntiAffinityTerms(affinity *v1.PodAntiAffinity) []v1.WeightedPodAffinityTerm {
+func getWeightedPodAntiAffinityTerms(affinity *core.PodAntiAffinity) []core.WeightedPodAffinityTerm {
 	if affinity == nil {
 		return nil
 	}
@@ -665,7 +665,7 @@ func getWeightedPodAntiAffinityTerms(affinity *v1.PodAntiAffinity) []v1.Weighted
 	return affinity.PreferredDuringSchedulingIgnoredDuringExecution
 }
 
-func getWeightedPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, i int) *v1.WeightedPodAffinityTerm {
+func getWeightedPodAntiAffinityTerm(affinity *core.PodAntiAffinity, i int) *core.WeightedPodAffinityTerm {
 	terms := getWeightedPodAntiAffinityTerms(affinity)
 	if terms == nil {
 		return nil
@@ -676,14 +676,14 @@ func getWeightedPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, i int) *v1.Wei
 	return &terms[i]
 }
 
-func appendWeightedPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, term *v1.WeightedPodAffinityTerm) *v1.PodAntiAffinity {
+func appendWeightedPodAntiAffinityTerm(affinity *core.PodAntiAffinity, term *core.WeightedPodAffinityTerm) *core.PodAntiAffinity {
 	if term == nil {
 		return affinity
 	}
 
 	// Ensure path to terms exists
 	if affinity == nil {
-		affinity = &v1.PodAntiAffinity{}
+		affinity = &core.PodAntiAffinity{}
 	}
 
 	affinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
@@ -695,7 +695,7 @@ func appendWeightedPodAntiAffinityTerm(affinity *v1.PodAntiAffinity, term *v1.We
 }
 
 // mergePodAntiAffinity
-func mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.PodAntiAffinity {
+func mergePodAntiAffinity(dst *core.PodAntiAffinity, src *core.PodAntiAffinity) *core.PodAntiAffinity {
 	if src == nil {
 		// Nothing to merge from
 		return dst
@@ -742,8 +742,8 @@ func mergePodAntiAffinity(dst *v1.PodAntiAffinity, src *v1.PodAntiAffinity) *v1.
 func newPodAffinityTermWithMatchLabels(
 	podDistribution *api.ChiPodDistribution,
 	matchLabels map[string]string,
-) v1.PodAffinityTerm {
-	return v1.PodAffinityTerm{
+) core.PodAffinityTerm {
+	return core.PodAffinityTerm{
 		LabelSelector: &meta.LabelSelector{
 			// A list of node selector requirements by node's labels.
 			//MatchLabels: map[string]string{
@@ -769,8 +769,8 @@ func newPodAffinityTermWithMatchLabels(
 func newPodAffinityTermWithMatchExpressions(
 	podDistribution *api.ChiPodDistribution,
 	matchExpressions []meta.LabelSelectorRequirement,
-) v1.PodAffinityTerm {
-	return v1.PodAffinityTerm{
+) core.PodAffinityTerm {
+	return core.PodAffinityTerm{
 		LabelSelector: &meta.LabelSelector{
 			// A list of node selector requirements by node's labels.
 			//MatchLabels: map[string]string{
@@ -796,10 +796,10 @@ func newWeightedPodAffinityTermWithMatchLabels(
 	weight int32,
 	podDistribution *api.ChiPodDistribution,
 	matchLabels map[string]string,
-) v1.WeightedPodAffinityTerm {
-	return v1.WeightedPodAffinityTerm{
+) core.WeightedPodAffinityTerm {
+	return core.WeightedPodAffinityTerm{
 		Weight: weight,
-		PodAffinityTerm: v1.PodAffinityTerm{
+		PodAffinityTerm: core.PodAffinityTerm{
 			LabelSelector: &meta.LabelSelector{
 				// A list of node selector requirements by node's labels.
 				//MatchLabels: map[string]string{
@@ -822,8 +822,8 @@ func newWeightedPodAffinityTermWithMatchLabels(
 	}
 }
 
-// prepareAffinity
-func prepareAffinity(podTemplate *api.ChiPodTemplate, host *api.ChiHost) {
+// PrepareAffinity
+func PrepareAffinity(podTemplate *api.ChiPodTemplate, host *api.ChiHost) {
 	switch {
 	case podTemplate == nil:
 		return
@@ -850,7 +850,7 @@ func prepareAffinity(podTemplate *api.ChiPodTemplate, host *api.ChiHost) {
 }
 
 // processNodeSelector
-func processNodeSelector(nodeSelector *v1.NodeSelector, host *api.ChiHost) {
+func processNodeSelector(nodeSelector *core.NodeSelector, host *api.ChiHost) {
 	if nodeSelector == nil {
 		return
 	}
@@ -861,7 +861,7 @@ func processNodeSelector(nodeSelector *v1.NodeSelector, host *api.ChiHost) {
 }
 
 // processPreferredSchedulingTerms
-func processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSchedulingTerm, host *api.ChiHost) {
+func processPreferredSchedulingTerms(preferredSchedulingTerms []core.PreferredSchedulingTerm, host *api.ChiHost) {
 	for i := range preferredSchedulingTerms {
 		nodeSelectorTerm := &preferredSchedulingTerms[i].Preference
 		processNodeSelectorTerm(nodeSelectorTerm, host)
@@ -869,7 +869,7 @@ func processPreferredSchedulingTerms(preferredSchedulingTerms []v1.PreferredSche
 }
 
 // processNodeSelectorTerm
-func processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *api.ChiHost) {
+func processNodeSelectorTerm(nodeSelectorTerm *core.NodeSelectorTerm, host *api.ChiHost) {
 	for i := range nodeSelectorTerm.MatchExpressions {
 		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[i]
 		processNodeSelectorRequirement(nodeSelectorRequirement, host)
@@ -882,19 +882,19 @@ func processNodeSelectorTerm(nodeSelectorTerm *v1.NodeSelectorTerm, host *api.Ch
 }
 
 // processNodeSelectorRequirement
-func processNodeSelectorRequirement(nodeSelectorRequirement *v1.NodeSelectorRequirement, host *api.ChiHost) {
+func processNodeSelectorRequirement(nodeSelectorRequirement *core.NodeSelectorRequirement, host *api.ChiHost) {
 	if nodeSelectorRequirement == nil {
 		return
 	}
-	nodeSelectorRequirement.Key = macro(host).Line(nodeSelectorRequirement.Key)
+	nodeSelectorRequirement.Key = Macro(host).Line(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range nodeSelectorRequirement.Values {
-		nodeSelectorRequirement.Values[i] = macro(host).Line(nodeSelectorRequirement.Values[i])
+		nodeSelectorRequirement.Values[i] = Macro(host).Line(nodeSelectorRequirement.Values[i])
 	}
 }
 
 // processPodAffinityTerms
-func processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *api.ChiHost) {
+func processPodAffinityTerms(podAffinityTerms []core.PodAffinityTerm, host *api.ChiHost) {
 	for i := range podAffinityTerms {
 		podAffinityTerm := &podAffinityTerms[i]
 		processPodAffinityTerm(podAffinityTerm, host)
@@ -902,7 +902,7 @@ func processPodAffinityTerms(podAffinityTerms []v1.PodAffinityTerm, host *api.Ch
 }
 
 // processWeightedPodAffinityTerms
-func processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAffinityTerm, host *api.ChiHost) {
+func processWeightedPodAffinityTerms(weightedPodAffinityTerms []core.WeightedPodAffinityTerm, host *api.ChiHost) {
 	for i := range weightedPodAffinityTerms {
 		podAffinityTerm := &weightedPodAffinityTerms[i].PodAffinityTerm
 		processPodAffinityTerm(podAffinityTerm, host)
@@ -910,12 +910,12 @@ func processWeightedPodAffinityTerms(weightedPodAffinityTerms []v1.WeightedPodAf
 }
 
 // processPodAffinityTerm
-func processPodAffinityTerm(podAffinityTerm *v1.PodAffinityTerm, host *api.ChiHost) {
+func processPodAffinityTerm(podAffinityTerm *core.PodAffinityTerm, host *api.ChiHost) {
 	if podAffinityTerm == nil {
 		return
 	}
 	processLabelSelector(podAffinityTerm.LabelSelector, host)
-	podAffinityTerm.TopologyKey = macro(host).Line(podAffinityTerm.TopologyKey)
+	podAffinityTerm.TopologyKey = Macro(host).Line(podAffinityTerm.TopologyKey)
 }
 
 // processLabelSelector
@@ -925,7 +925,7 @@ func processLabelSelector(labelSelector *meta.LabelSelector, host *api.ChiHost) 
 	}
 
 	for k := range labelSelector.MatchLabels {
-		labelSelector.MatchLabels[k] = macro(host).Line(labelSelector.MatchLabels[k])
+		labelSelector.MatchLabels[k] = Macro(host).Line(labelSelector.MatchLabels[k])
 	}
 	for j := range labelSelector.MatchExpressions {
 		labelSelectorRequirement := &labelSelector.MatchExpressions[j]
@@ -938,9 +938,9 @@ func processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelecto
 	if labelSelectorRequirement == nil {
 		return
 	}
-	labelSelectorRequirement.Key = macro(host).Line(labelSelectorRequirement.Key)
+	labelSelectorRequirement.Key = Macro(host).Line(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range labelSelectorRequirement.Values {
-		labelSelectorRequirement.Values[i] = macro(host).Line(labelSelectorRequirement.Values[i])
+		labelSelectorRequirement.Values[i] = Macro(host).Line(labelSelectorRequirement.Values[i])
 	}
 }

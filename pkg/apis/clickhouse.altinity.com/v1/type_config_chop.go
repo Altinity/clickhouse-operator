@@ -594,33 +594,33 @@ func (c *OperatorConfig) unlistCHITemplate(template *ClickHouseInstallation) {
 }
 
 // FindTemplate finds specified template within possibly specified namespace
-func (c *OperatorConfig) FindTemplate(use *ChiUseTemplate, fallbackNamespace string) *ClickHouseInstallation {
+func (c *OperatorConfig) FindTemplate(templateRef *ChiTemplateRef, fallbackNamespace string) *ClickHouseInstallation {
 	c.Template.CHI.Runtime.mutex.RLock()
 	defer c.Template.CHI.Runtime.mutex.RUnlock()
 
 	// Try to find direct match
-	for _, _template := range c.Template.CHI.Runtime.Templates {
-		if _template.MatchFullName(use.Namespace, use.Name) {
-			// Direct match, found result
-			return _template
+	for _, template := range c.Template.CHI.Runtime.Templates {
+		if template.MatchFullName(templateRef.Namespace, templateRef.Name) {
+			// Exact match, found the result
+			return template
 		}
 	}
 
-	// Direct match is not possible.
-	// Let's try to find by name only
+	// Exact match is not possible.
+	// Let's try to find by name only in "predefined" namespace
 
-	if use.Namespace != "" {
-		// With fully-specified template namespace+name pair direct (full name) only match is applicable
+	if templateRef.Namespace != "" {
+		// With fully-specified template namespace+name pair exact match is applicable only
 		// This is strange situation, however
 		return nil
 	}
 
-	// Look for templates with specified name in explicitly specified namespace
+	// Look for templates with specified name in "predefined" namespace
 
-	for _, _template := range c.Template.CHI.Runtime.Templates {
-		if _template.MatchFullName(fallbackNamespace, use.Name) {
-			// Found template with searched name in specified namespace
-			return _template
+	for _, template := range c.Template.CHI.Runtime.Templates {
+		if template.MatchFullName(fallbackNamespace, templateRef.Name) {
+			// Found template with searched name in "predefined" namespace
+			return template
 		}
 	}
 

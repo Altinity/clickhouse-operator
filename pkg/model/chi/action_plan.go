@@ -19,14 +19,14 @@ import (
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // ActionPlan is an action plan with list of differences between two CHIs
 type ActionPlan struct {
-	old *v1.ClickHouseInstallation
-	new *v1.ClickHouseInstallation
+	old *api.ClickHouseInstallation
+	new *api.ClickHouseInstallation
 
 	specDiff  *messagediff.Diff
 	specEqual bool
@@ -45,7 +45,7 @@ type ActionPlan struct {
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
-func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
+func NewActionPlan(old, new *api.ClickHouseInstallation) *ActionPlan {
 	ap := &ActionPlan{
 		old: old,
 		new: new,
@@ -57,21 +57,21 @@ func NewActionPlan(old, new *v1.ClickHouseInstallation) *ActionPlan {
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, ap.new.Finalizers)
-		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.Attributes, ap.new.Attributes)
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.EnsureRuntime().EnsureAttributes(), ap.new.EnsureRuntime().EnsureAttributes())
 	} else if old == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.Spec)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.Labels)
 		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.DeletionTimestamp)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(nil, ap.new.DeletionTimestamp)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.Finalizers)
-		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(nil, ap.new.Attributes)
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(nil, ap.new.EnsureRuntime().EnsureAttributes())
 	} else if new == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.Spec, nil)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, nil)
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, nil)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, nil)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, nil)
-		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.Attributes, nil)
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.EnsureRuntime().EnsureAttributes(), nil)
 	} else {
 		// Both are nil
 		ap.specDiff = nil
@@ -243,13 +243,13 @@ func (ap *ActionPlan) GetNewHostsNum() int {
 func (ap *ActionPlan) GetRemovedHostsNum() int {
 	var count int
 	ap.WalkRemoved(
-		func(cluster *v1.Cluster) {
+		func(cluster *api.Cluster) {
 			count += cluster.HostsCount()
 		},
-		func(shard *v1.ChiShard) {
+		func(shard *api.ChiShard) {
 			count += shard.HostsCount()
 		},
-		func(host *v1.ChiHost) {
+		func(host *api.ChiHost) {
 			count++
 		},
 	)
@@ -258,30 +258,30 @@ func (ap *ActionPlan) GetRemovedHostsNum() int {
 
 // WalkRemoved walk removed cluster items
 func (ap *ActionPlan) WalkRemoved(
-	clusterFunc func(cluster *v1.Cluster),
-	shardFunc func(shard *v1.ChiShard),
-	hostFunc func(host *v1.ChiHost),
+	clusterFunc func(cluster *api.Cluster),
+	shardFunc func(shard *api.ChiShard),
+	hostFunc func(host *api.ChiHost),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Removed {
 		switch ap.specDiff.Removed[path].(type) {
-		case v1.Cluster:
-			cluster := ap.specDiff.Removed[path].(v1.Cluster)
+		case api.Cluster:
+			cluster := ap.specDiff.Removed[path].(api.Cluster)
 			clusterFunc(&cluster)
-		case v1.ChiShard:
-			shard := ap.specDiff.Removed[path].(v1.ChiShard)
+		case api.ChiShard:
+			shard := ap.specDiff.Removed[path].(api.ChiShard)
 			shardFunc(&shard)
-		case v1.ChiHost:
-			host := ap.specDiff.Removed[path].(v1.ChiHost)
+		case api.ChiHost:
+			host := ap.specDiff.Removed[path].(api.ChiHost)
 			hostFunc(&host)
-		case *v1.Cluster:
-			cluster := ap.specDiff.Removed[path].(*v1.Cluster)
+		case *api.Cluster:
+			cluster := ap.specDiff.Removed[path].(*api.Cluster)
 			clusterFunc(cluster)
-		case *v1.ChiShard:
-			shard := ap.specDiff.Removed[path].(*v1.ChiShard)
+		case *api.ChiShard:
+			shard := ap.specDiff.Removed[path].(*api.ChiShard)
 			shardFunc(shard)
-		case *v1.ChiHost:
-			host := ap.specDiff.Removed[path].(*v1.ChiHost)
+		case *api.ChiHost:
+			host := ap.specDiff.Removed[path].(*api.ChiHost)
 			hostFunc(host)
 		}
 	}
@@ -289,30 +289,30 @@ func (ap *ActionPlan) WalkRemoved(
 
 // WalkAdded walk added cluster items
 func (ap *ActionPlan) WalkAdded(
-	clusterFunc func(cluster *v1.Cluster),
-	shardFunc func(shard *v1.ChiShard),
-	hostFunc func(host *v1.ChiHost),
+	clusterFunc func(cluster *api.Cluster),
+	shardFunc func(shard *api.ChiShard),
+	hostFunc func(host *api.ChiHost),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Added {
 		switch ap.specDiff.Added[path].(type) {
-		case v1.Cluster:
-			cluster := ap.specDiff.Added[path].(v1.Cluster)
+		case api.Cluster:
+			cluster := ap.specDiff.Added[path].(api.Cluster)
 			clusterFunc(&cluster)
-		case v1.ChiShard:
-			shard := ap.specDiff.Added[path].(v1.ChiShard)
+		case api.ChiShard:
+			shard := ap.specDiff.Added[path].(api.ChiShard)
 			shardFunc(&shard)
-		case v1.ChiHost:
-			host := ap.specDiff.Added[path].(v1.ChiHost)
+		case api.ChiHost:
+			host := ap.specDiff.Added[path].(api.ChiHost)
 			hostFunc(&host)
-		case *v1.Cluster:
-			cluster := ap.specDiff.Added[path].(*v1.Cluster)
+		case *api.Cluster:
+			cluster := ap.specDiff.Added[path].(*api.Cluster)
 			clusterFunc(cluster)
-		case *v1.ChiShard:
-			shard := ap.specDiff.Added[path].(*v1.ChiShard)
+		case *api.ChiShard:
+			shard := ap.specDiff.Added[path].(*api.ChiShard)
 			shardFunc(shard)
-		case *v1.ChiHost:
-			host := ap.specDiff.Added[path].(*v1.ChiHost)
+		case *api.ChiHost:
+			host := ap.specDiff.Added[path].(*api.ChiHost)
 			hostFunc(host)
 		}
 	}
@@ -320,30 +320,30 @@ func (ap *ActionPlan) WalkAdded(
 
 // WalkModified walk modified cluster items
 func (ap *ActionPlan) WalkModified(
-	clusterFunc func(cluster *v1.Cluster),
-	shardFunc func(shard *v1.ChiShard),
-	hostFunc func(host *v1.ChiHost),
+	clusterFunc func(cluster *api.Cluster),
+	shardFunc func(shard *api.ChiShard),
+	hostFunc func(host *api.ChiHost),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Modified {
 		switch ap.specDiff.Modified[path].(type) {
-		case v1.Cluster:
-			cluster := ap.specDiff.Modified[path].(v1.Cluster)
+		case api.Cluster:
+			cluster := ap.specDiff.Modified[path].(api.Cluster)
 			clusterFunc(&cluster)
-		case v1.ChiShard:
-			shard := ap.specDiff.Modified[path].(v1.ChiShard)
+		case api.ChiShard:
+			shard := ap.specDiff.Modified[path].(api.ChiShard)
 			shardFunc(&shard)
-		case v1.ChiHost:
-			host := ap.specDiff.Modified[path].(v1.ChiHost)
+		case api.ChiHost:
+			host := ap.specDiff.Modified[path].(api.ChiHost)
 			hostFunc(&host)
-		case *v1.Cluster:
-			cluster := ap.specDiff.Modified[path].(*v1.Cluster)
+		case *api.Cluster:
+			cluster := ap.specDiff.Modified[path].(*api.Cluster)
 			clusterFunc(cluster)
-		case *v1.ChiShard:
-			shard := ap.specDiff.Modified[path].(*v1.ChiShard)
+		case *api.ChiShard:
+			shard := ap.specDiff.Modified[path].(*api.ChiShard)
 			shardFunc(shard)
-		case *v1.ChiHost:
-			host := ap.specDiff.Modified[path].(*v1.ChiHost)
+		case *api.ChiHost:
+			host := ap.specDiff.Modified[path].(*api.ChiHost)
 			hostFunc(host)
 		}
 	}

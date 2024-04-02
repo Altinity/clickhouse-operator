@@ -73,7 +73,7 @@ type ChiStatus struct {
 	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
 	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
 	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
-	UsedTemplates          []*ChiUseTemplate       `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
+	UsedTemplates          []*ChiTemplateRef       `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
 
 	mu sync.RWMutex `json:"-" yaml:"-"`
 }
@@ -175,9 +175,9 @@ func (s *ChiStatus) SyncHostTablesCreated() {
 }
 
 // PushUsedTemplate pushes used template to the list of used templates
-func (s *ChiStatus) PushUsedTemplate(usedTemplate *ChiUseTemplate) {
+func (s *ChiStatus) PushUsedTemplate(templateRef *ChiTemplateRef) {
 	doWithWriteLock(s, func(s *ChiStatus) {
-		s.UsedTemplates = append(s.UsedTemplates, usedTemplate)
+		s.UsedTemplates = append(s.UsedTemplates, templateRef)
 	})
 }
 
