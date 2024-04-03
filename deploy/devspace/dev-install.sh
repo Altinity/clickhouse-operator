@@ -31,7 +31,7 @@ kubectl -n "${OPERATOR_NAMESPACE}" apply -f <(                         \
 )
 
 if [[ "${MINIKUBE}" == "yes" ]]; then
-    echo "Preparing for minikube"
+    echo "Building in minikube"
     case "${DEPLOY_OPERATOR}" in
         "dev")
             echo "Clean images in minikube"
@@ -40,17 +40,9 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
             echo "Remove errors will be ignored."
             minikube image rm "${OPERATOR_IMAGE}" > /dev/null 2>&1
             minikube image rm "${METRICS_EXPORTER_IMAGE}" > /dev/null 2>&1
-
-            echo "Build images"
-            echo "VERBOSITY=${VERBOSITY} ${PROJECT_ROOT}/dev/image_build_all_dev.sh"
-            VERBOSITY="${VERBOSITY}" "${PROJECT_ROOT}/dev/image_build_all_dev.sh"
-            echo "Load images into minikube:"
-            echo "  1. ${OPERATOR_IMAGE}"
-            echo "  2. ${METRICS_EXPORTER_IMAGE}"
-            echo "Load images into minikube"
-            minikube image load "${OPERATOR_IMAGE}"
-            minikube image load "${METRICS_EXPORTER_IMAGE}"
-            echo "Images loaded"
+            echo "Build images in minikube"
+            echo "VERBOSITY=${VERBOSITY} MINIKUBE=yes ${PROJECT_ROOT}/dev/image_build_all_dev.sh"
+            VERBOSITY="${VERBOSITY}" MINIKUBE=yes "${PROJECT_ROOT}/dev/image_build_all_dev.sh"
             ;;
     esac
 fi
