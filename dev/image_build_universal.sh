@@ -17,20 +17,28 @@ source "${CUR_DIR}/go_build_config.sh"
 
 source "${CUR_DIR}/build_manifests.sh"
 
-# Build image with Docker
+cat << EOF
+########################################
+Build vars:
+DOCKERHUB_LOGIN=${DOCKERHUB_LOGIN}
+DOCKERHUB_PUBLISH=${DOCKERHUB_PUBLISH}
+MINIKUBE=${MINIKUBE}
+EOF
+
 if [[ "${MINIKUBE}" == "yes" ]]; then
-    # We'd like to build for minikube
+    echo "Going to build on minikube, not on the build host itself."
+    echo "Minikube is expected to be run on build host, though"
     eval "$(minikube docker-env)"
 fi
 
+# In case architecture of the host we are building on is arm，such as MacOS M1/M2, no need to install qemu
+# We may need to install qemu otherwise
 ARCHITECTURE=$(uname -m)
-# Do nothing if architecture is arm，such as MacOS M1/M2
-
-# We may need to install qemu
 if [[ "${ARCHITECTURE}" =~ "arm" ]]; then
-    echo "arm host does not need qemu to be installed"
+    echo "Build host is arm and does not need qemu to be installed"
 else
-    echo "need qemu to be installed"
+    echo "Need qemu to be installed on build host"
+    echo "Check whether qemu is available"
     if docker run --rm --privileged multiarch/qemu-user-static --reset -p yes; then
         echo "qemu is in place, continue."
     else
@@ -63,10 +71,10 @@ DOCKER_CMD="docker buildx build --progress plain"
 
 # Append arch
 if [[ "${DOCKER_IMAGE}" =~ ":dev" || "${MINIKUBE}" == "yes" ]]; then
-    echo "Building dev images, skip arm arch."
+    echo "Building dev images for amd64 only, skip arm arch."
     DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64 --output type=image,name=${DOCKER_IMAGE}"
 else
-    echo "Going to build for amd64 and arm64."
+    echo "Going to build for both amd64 and arm64."
     DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64,linux/arm64"
 fi
 
@@ -93,9 +101,15 @@ if [[ "${DOCKERHUB_PUBLISH}" == "yes" ]]; then
     fi
 fi
 
+echo "Docker build command ready:"
+echo "${DOCKER_CMD}"
+echo "Starting build."
+echo "Please, wait..."
+
 if ${DOCKER_CMD}; then
     echo "OK. Build successful."
 else
+    echo "########################"
     echo "ERROR. Build has failed."
     echo "Abort"
     exit 1
