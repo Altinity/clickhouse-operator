@@ -23,11 +23,12 @@ import (
 	otelApi "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	otelResource "go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
@@ -96,11 +97,53 @@ func Meter() otelApi.Meter {
 }
 
 func serveMetrics(addr, path string) {
-	fmt.Printf("serving metrics at %s%s", addr, path)
+	fmt.Printf("start serving metrics at: %s%s\n", addr, path)
 	http.Handle(path, promhttp.Handler())
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {
 		fmt.Printf("error serving http: %v", err)
-		return
 	}
+	fmt.Printf("end serving metrics at: %s%s\n", addr, path)
+}
+
+type BaseInfoGetter interface {
+	GetName() string
+	GetNamespace() string
+	GetLabels() map[string]string
+	GetAnnotations() map[string]string
+}
+
+func getLabelsFromName(chi BaseInfoGetter) (labels []string, values []string) {
+	return []string{"chi", "namespace"}, []string{chi.GetName(), chi.GetNamespace()}
+}
+
+func getLabelsFromLabels(chi BaseInfoGetter) (labels []string, values []string) {
+	return util.MapGetSortedKeysAndValues(chi.GetLabels())
+}
+
+func getLabelsFromAnnotations(chi BaseInfoGetter) (labels []string, values []string) {
+	return util.MapGetSortedKeysAndValues(
+		// Exclude skipped annotations
+		util.CopyMapFilter(
+			chi.GetAnnotations(),
+			nil,
+			util.ListSkippedAnnotations(),
+		),
+	)
+}
+
+func GetMandatoryLabelsAndValues(chi BaseInfoGetter) (labels []string, values []string) {
+	labelsFromNames, valuesFromNames := getLabelsFromName(chi)
+	labels = append(labels, labelsFromNames...)
+	values = append(values, valuesFromNames...)
+
+	labelsFromLabels, valuesFromLabels := getLabelsFromLabels(chi)
+	labels = append(labels, labelsFromLabels...)
+	values = append(values, valuesFromLabels...)
+
+	labelsFromAnnotations, valuesFromAnnotations := getLabelsFromAnnotations(chi)
+	labels = append(labels, labelsFromAnnotations...)
+	values = append(values, valuesFromAnnotations...)
+
+	return labels, values
 }
