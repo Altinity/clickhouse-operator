@@ -823,3 +823,31 @@ func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
 	})
 	return result
 }
+
+func (chi *ClickHouseInstallation) GetName() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Name
+}
+
+func (chi *ClickHouseInstallation) GetNamespace() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Namespace
+}
+
+func (chi *ClickHouseInstallation) GetLabels() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Labels
+}
+
+func (chi *ClickHouseInstallation) GetAnnotations() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Annotations
+}

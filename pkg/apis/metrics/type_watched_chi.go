@@ -92,6 +92,34 @@ func (chi *WatchedCHI) walkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHo
 	}
 }
 
+func (chi *WatchedCHI) GetName() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Name
+}
+
+func (chi *WatchedCHI) GetNamespace() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Namespace
+}
+
+func (chi *WatchedCHI) GetLabels() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Labels
+}
+
+func (chi *WatchedCHI) GetAnnotations() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Annotations
+}
+
 // String is a stringifier
 func (chi *WatchedCHI) String() string {
 	if chi == nil {
