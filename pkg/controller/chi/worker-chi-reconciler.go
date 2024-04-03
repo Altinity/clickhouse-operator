@@ -59,7 +59,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
-	metricsCHIReconcilesStarted(ctx)
+	metricsCHIReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
 	w.a.M(new).F().Info("Changing OLD to Normalized COMPLETED: %s/%s", new.Namespace, new.Name)
@@ -112,7 +112,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 			Error("FAILED to reconcile CHI err: %v", err)
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, errCRUDAbort) {
-			metricsCHIReconcilesAborted(ctx)
+			metricsCHIReconcilesAborted(ctx, new)
 		}
 	} else {
 		// Reconcile successful
@@ -127,8 +127,8 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
-		metricsCHIReconcilesCompleted(ctx)
-		metricsCHIReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
+		metricsCHIReconcilesCompleted(ctx, new)
+		metricsCHIReconcilesTimings(ctx, new, time.Now().Sub(startTime).Seconds())
 	}
 
 	return nil
@@ -411,7 +411,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host, false)
-		metricsHostReconcilesRestart(ctx)
+		metricsHostReconcilesRestart(ctx, host.GetCHI())
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
 	}
@@ -662,7 +662,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 
-	metricsHostReconcilesStarted(ctx)
+	metricsHostReconcilesStarted(ctx, host.GetCHI())
 	startTime := time.Now()
 
 	if host.IsFirst() {
@@ -689,7 +689,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if err := w.excludeHost(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx)
+		metricsHostReconcilesErrors(ctx, host.GetCHI())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
@@ -699,7 +699,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	_ = w.completeQueries(ctx, host)
 
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx)
+		metricsHostReconcilesErrors(ctx, host.GetCHI())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
@@ -726,7 +726,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	}
 
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
-		metricsHostReconcilesErrors(ctx)
+		metricsHostReconcilesErrors(ctx, host.GetCHI())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
@@ -754,7 +754,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx)
+		metricsHostReconcilesErrors(ctx, host.GetCHI())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
@@ -797,8 +797,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 		},
 	})
 
-	metricsHostReconcilesCompleted(ctx)
-	metricsHostReconcilesTimings(ctx, time.Now().Sub(startTime).Seconds())
+	metricsHostReconcilesCompleted(ctx, host.GetCHI())
+	metricsHostReconcilesTimings(ctx, host.GetCHI(), time.Now().Sub(startTime).Seconds())
 
 	return nil
 }
