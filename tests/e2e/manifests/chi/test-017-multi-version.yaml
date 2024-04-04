@@ -3,7 +3,9 @@ kind: ClickHouseInstallation
 metadata:
   name: test-017-multi-version
   labels:
-    clickhouse.altinity.com/chi: test-017-multi-version  
+    clickhouse.altinity.com/chi: test-017-multi-version
+  annotations:
+    clickhouse.altinity.com/email: "myname@mydomain.com, yourname@yourdoman.com"
 spec:
   templates:
     podTemplates:
