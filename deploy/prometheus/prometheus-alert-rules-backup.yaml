@@ -232,7 +232,7 @@ spec:
 
               Check clickhouse-backup logs
               ```kubectl logs -n {{ $labels.namespace }} pods/{{ $labels.pod_name }} -c {{ $labels.container_name }} --since=48h```
-
+        # https://github.com/Altinity/clickhouse-backup/issues/836
         - alert: ClickHouseBackupLocalBackupUnexpectedPresent
           expr: |-
             in_progress_commands == 0 and clickhouse_backup_number_backups_local > clickhouse_backup_number_backups_expected
