@@ -3496,8 +3496,8 @@ def test_034(self):
         out = kubectl.launch("get pods -l app=clickhouse-operator", ns=operator_namespace).splitlines()[1]
         operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
         check_metrics_monitoring(
-            operator_namespace = operator_namespace,
-            operator_pod = operator_pod,
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
@@ -3511,8 +3511,8 @@ def test_034(self):
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` is not zero"):
         check_metrics_monitoring(
-            operator_namespace = operator_namespace,
-            operator_pod = operator_pod,
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 1$",
         )
 
@@ -3526,8 +3526,8 @@ def test_034(self):
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` is zero [2]"):
         check_metrics_monitoring(
-            operator_namespace = operator_namespace,
-            operator_pod = operator_pod,
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
@@ -3588,8 +3588,8 @@ def test_034(self):
 
     with Then("check for `chi_clickhouse_metric_fetch_errors` is zero [3]"):
         check_metrics_monitoring(
-            operator_namespace = operator_namespace,
-            operator_pod = operator_pod,
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
@@ -3604,8 +3604,8 @@ def test_034(self):
     # 0.21.2+
     with Then("check for `chi_clickhouse_metric_fetch_errors` is zero [4]"):
         check_metrics_monitoring(
-            operator_namespace = operator_namespace,
-            operator_pod = operator_pod,
+            operator_namespace=operator_namespace,
+            operator_pod=operator_pod,
             expect_pattern="^chi_clickhouse_metric_fetch_errors{(.*?)} 0$",
         )
 
