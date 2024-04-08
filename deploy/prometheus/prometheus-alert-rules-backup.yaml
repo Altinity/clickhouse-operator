@@ -235,7 +235,11 @@ spec:
         # https://github.com/Altinity/clickhouse-backup/issues/836
         - alert: ClickHouseBackupLocalBackupUnexpectedPresent
           expr: |-
-            in_progress_commands == 0 and clickhouse_backup_number_backups_local > clickhouse_backup_number_backups_expected
+            in_progress_commands == 0 and (
+              (clickhouse_backup_number_backups_expected == -1 and clickhouse_backup_number_backups_local > 0)
+              or
+              (clickhouse_backup_number_backups_expected > 0 and clickhouse_backup_number_backups_local > clickhouse_backup_number_backups_expected)
+            )
           for: "4h"
           annotations:
             identifier: "{{ $labels.pod_name }}"
