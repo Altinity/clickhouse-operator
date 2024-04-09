@@ -30,7 +30,7 @@ readonly script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pw
 readonly manifest_file_path="${script_dir}/../deploy/operator/clickhouse-operator-install-bundle.yaml"
 readonly release_file_path="${script_dir}/../release"
 readonly dashboards_path="${script_dir}/../grafana-dashboard"
-readonly chart_path="${script_dir}/../deploy/helm"
+readonly chart_path="${script_dir}/../deploy/helm/clickhouse-operator"
 readonly values_yaml="${chart_path}/values.yaml"
 
 function main() {
