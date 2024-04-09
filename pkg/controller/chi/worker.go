@@ -1098,19 +1098,20 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 		return
 	}
 
-	// Remove host from cluster config and wait for ClickHouse to pick-up the change
-	if w.shouldWaitExcludeHost(host) {
-		w.a.V(1).
-			M(host).F().
-			Info("going to exclude host %d shard %d cluster %s",
-				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+	w.a.V(1).
+		M(host).F().
+		Info("going to exclude host %d shard %d cluster %s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-		// Specify in options to exclude host from ClickHouse config file
-		options := w.options(host)
-		_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
-		// Wait for ClickHouse to pick-up the change
-		_ = w.waitHostNotInCluster(ctx, host)
+	// Specify in options to exclude this host from ClickHouse config file
+	options := w.options(host)
+	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
+
+	if !w.shouldWaitExcludeHost(host) {
+		return
 	}
+	// Wait for ClickHouse to pick-up the change
+	_ = w.waitHostNotInCluster(ctx, host)
 }
 
 // includeHostIntoClickHouseCluster includes host into ClickHouse configuration
@@ -1120,7 +1121,12 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 		return
 	}
 
-	// Add host to the cluster config
+	w.a.V(1).
+		M(host).F().
+		Info("going to include host %d shard %d cluster %s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	// Specify in options to add this host into ClickHouse config file
 	options := w.options()
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
 
@@ -1181,20 +1187,20 @@ func (w *worker) shouldWaitExcludeHost(host *api.ChiHost) bool {
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
-			Info("IsReconcilingPolicyWait() need to exclude host %d shard %d cluster %s",
+			Info("IsReconcilingPolicyWait() need to wait to exclude host %d shard %d cluster %s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyNoWait():
 		w.a.V(1).
 			M(host).F().
-			Info("IsReconcilingPolicyNoWait() need NOT to exclude host %d shard %d cluster %s",
+			Info("IsReconcilingPolicyNoWait() need NOT to wait to exclude host %d shard %d cluster %s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return false
 	}
 
 	w.a.V(1).
 		M(host).F().
-		Info("fallback to operator's settings. host %d shard %d cluster %s",
+		Info("wait to exclude host fallback to operator's settings. host %d shard %d cluster %s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 	return chop.Config().Reconcile.Host.Wait.Exclude.Value()
 }
