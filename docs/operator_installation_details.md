@@ -68,7 +68,7 @@ helm repo upgrade clickhouse-operator
 helm upgrade clickhouse-operator clickhouse-operator/altinity-clickhouse-operator
 ```
 
-Look https://github.com/Altinity/clickhouse-operator/tree/master/deploy/helm/ for details 
+Look https://github.com/Altinity/clickhouse-operator/tree/master/deploy/helm/clickhouse-operator/ for details 
 
 ## Resources Description
 
