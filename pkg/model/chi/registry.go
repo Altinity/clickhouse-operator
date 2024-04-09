@@ -58,6 +58,14 @@ type objectMetaIdentity struct {
 	namespace string
 }
 
+// newObjectMetaIdentity creates new objectMetaIdentity from an ObjectMeta
+func newObjectMetaIdentity(obj *meta.ObjectMeta) objectMetaIdentity {
+	return objectMetaIdentity{
+		name:      obj.Name,
+		namespace: obj.Namespace,
+	}
+}
+
 // objectMetaSet is an internal collections type used for efficient lookups of object metadata by identity,
 // defined in this context as the combination of namespace and name. A set is expected to correspond to a single
 // entity type, but set additions to not validate this property to avoid the introduction of error results onto
@@ -69,6 +77,14 @@ type objectMetaSet struct {
 	sync.RWMutex
 }
 
+// newObjectMetaSet constructor for a set holding ObjectMeta with reader/writer synchronization
+func newObjectMetaSet(entityType EntityType) *objectMetaSet {
+	return &objectMetaSet{
+		entityType: entityType,
+		contents:   make(map[objectMetaIdentity]meta.ObjectMeta),
+	}
+}
+
 // NewRegistry creates new registry
 func NewRegistry() *Registry {
 	return &Registry{
@@ -78,23 +94,23 @@ func NewRegistry() *Registry {
 
 // Len return len of the whole registry or specified entity types
 // Note that this is unsafe to call recursively, including in calls to other synchronized Registry functions
-// like Walk (and therefore in the "work" function passed into iterators like Walk and WalkEntityType).
-func (r *Registry) Len(_what ...EntityType) int {
+// like Walk (and therefore in the "work" function passed into iterators like Walk and walkEntityType).
+func (r *Registry) Len(what ...EntityType) int {
 	if r == nil {
 		return 0
 	}
 
 	// Avoid coarse grained locking when we will just return the number of entity types in the registry.
-	if len(_what) == 0 {
+	if len(what) == 0 {
 		r.mu.RLock()
 		defer r.mu.RUnlock()
 		return len(r.r)
 	}
 
 	result := 0
-	for _, entityType := range _what {
-		os := r.ensureObjectSetForType(entityType)
-		result += os.len()
+	for _, entityType := range what {
+		set := r.ensureObjectSetForType(entityType)
+		result += set.len()
 	}
 	return result
 }
@@ -110,15 +126,15 @@ func (r *Registry) Walk(f func(entityType EntityType, meta meta.ObjectMeta)) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for et, os := range r.r {
-		os.walk(func(meta meta.ObjectMeta) {
-			f(et, meta)
+	for _type, set := range r.r {
+		set.walk(func(meta meta.ObjectMeta) {
+			f(_type, meta)
 		})
 	}
 }
 
-// WalkEntityType walks over registry
-func (r *Registry) WalkEntityType(entityType EntityType, f func(meta meta.ObjectMeta)) {
+// walkEntityType walks over registry
+func (r *Registry) walkEntityType(entityType EntityType, f func(meta meta.ObjectMeta)) {
 	if r == nil {
 		return
 	}
@@ -132,11 +148,11 @@ func (r *Registry) String() string {
 	if r == nil {
 		return ""
 	}
-	s := ""
+	str := ""
 	r.Walk(func(entityType EntityType, meta meta.ObjectMeta) {
-		s += fmt.Sprintf("%s: %s/%s\n", entityType, meta.Namespace, meta.Name)
+		str += fmt.Sprintf("%s: %s/%s\n", entityType, meta.Namespace, meta.Name)
 	})
-	return s
+	return str
 }
 
 // registerEntity register entity
@@ -178,7 +194,7 @@ func (r *Registry) NumStatefulSet() int {
 
 // WalkStatefulSet walk over specified entity types
 func (r *Registry) WalkStatefulSet(f func(meta meta.ObjectMeta)) {
-	r.WalkEntityType(StatefulSet, f)
+	r.walkEntityType(StatefulSet, f)
 }
 
 // RegisterConfigMap register ConfigMap
@@ -198,7 +214,7 @@ func (r *Registry) NumConfigMap() int {
 
 // WalkConfigMap walk over specified entity types
 func (r *Registry) WalkConfigMap(f func(meta meta.ObjectMeta)) {
-	r.WalkEntityType(ConfigMap, f)
+	r.walkEntityType(ConfigMap, f)
 }
 
 // RegisterService register Service
@@ -218,7 +234,7 @@ func (r *Registry) NumService() int {
 
 // WalkService walk over specified entity types
 func (r *Registry) WalkService(f func(meta meta.ObjectMeta)) {
-	r.WalkEntityType(Service, f)
+	r.walkEntityType(Service, f)
 }
 
 // RegisterSecret register Secret
@@ -238,7 +254,7 @@ func (r *Registry) NumSecret() int {
 
 // WalkSecret walk over specified entity types
 func (r *Registry) WalkSecret(f func(meta meta.ObjectMeta)) {
-	r.WalkEntityType(Secret, f)
+	r.walkEntityType(Secret, f)
 }
 
 // RegisterPVC register PVC
@@ -258,7 +274,7 @@ func (r *Registry) NumPVC() int {
 
 // WalkPVC walk over specified entity types
 func (r *Registry) WalkPVC(f func(meta meta.ObjectMeta)) {
-	r.WalkEntityType(PVC, f)
+	r.walkEntityType(PVC, f)
 }
 
 // Comment out PV
@@ -279,7 +295,7 @@ func (r *Registry) WalkPVC(f func(meta meta.ObjectMeta)) {
 //
 //// WalkPV walk over specified entity types
 //func (r *Registry) WalkPV(f func(meta meta.ObjectMeta)) {
-//	r.WalkEntityType(PV, f)
+//	r.walkEntityType(PV, f)
 //}
 
 // RegisterPDB register PDB
@@ -299,7 +315,7 @@ func (r *Registry) NumPDB() int {
 
 // WalkPDB walk over specified entity types
 func (r *Registry) WalkPDB(f func(meta meta.ObjectMeta)) {
-	r.WalkEntityType(PDB, f)
+	r.walkEntityType(PDB, f)
 }
 
 // Subtract subtracts specified registry from main
@@ -328,11 +344,6 @@ func (r *Registry) hasEntity(entityType EntityType, meta meta.ObjectMeta) bool {
 
 	// Having acquired the type-specific ObjectMeta set, return the result of a membership check.
 	return setForType.contains(&meta)
-}
-
-// isEqual
-func (r *Registry) isEqual(a, b meta.ObjectMeta) bool {
-	return (a.Namespace == b.Namespace) && (a.Name == b.Name)
 }
 
 // deleteEntity
@@ -372,41 +383,33 @@ func (r *Registry) ensureObjectSetForType(entityType EntityType) *objectMetaSet 
 	return newSet
 }
 
-// objIdentity derives a objectMetaIdentity from an ObjectMeta
-func (s *objectMetaSet) objIdentity(obj *meta.ObjectMeta) objectMetaIdentity {
-	return objectMetaIdentity{
-		name:      obj.Name,
-		namespace: obj.Namespace,
-	}
-}
-
 // maybeAdd adds an ObjectMeta to the set if an object with an equivalent identity is not already present
-func (s *objectMetaSet) maybeAdd(o *meta.ObjectMeta) bool {
+func (s *objectMetaSet) maybeAdd(meta *meta.ObjectMeta) bool {
 	s.Lock()
 	defer s.Unlock()
-	if _, ok := s.contents[s.objIdentity(o)]; ok {
+	if _, ok := s.contents[newObjectMetaIdentity(meta)]; ok {
 		return false
 	}
-	s.contents[s.objIdentity(o)] = *o
+	s.contents[newObjectMetaIdentity(meta)] = *meta
 	return true
 }
 
 // remove deletes an ObjectMeta from the set, matching only on identity
-func (s *objectMetaSet) remove(o *meta.ObjectMeta) bool {
+func (s *objectMetaSet) remove(meta *meta.ObjectMeta) bool {
 	s.Lock()
 	defer s.Unlock()
-	if _, ok := s.contents[s.objIdentity(o)]; !ok {
+	if _, ok := s.contents[newObjectMetaIdentity(meta)]; !ok {
 		return false
 	}
-	delete(s.contents, s.objIdentity(o))
+	delete(s.contents, newObjectMetaIdentity(meta))
 	return true
 }
 
 // contains determines if an ObjectMeta exists in the set (based on identity only)
-func (s *objectMetaSet) contains(o *meta.ObjectMeta) bool {
+func (s *objectMetaSet) contains(meta *meta.ObjectMeta) bool {
 	s.RLock()
 	defer s.RUnlock()
-	_, ok := s.contents[s.objIdentity(o)]
+	_, ok := s.contents[newObjectMetaIdentity(meta)]
 	return ok
 }
 
@@ -428,12 +431,4 @@ func (s *objectMetaSet) len() int {
 	defer s.RUnlock()
 
 	return len(s.contents)
-}
-
-// newObjectMetaSet constructor for a set holding ObjectMeta with reader/writer synchronization
-func newObjectMetaSet(entityType EntityType) *objectMetaSet {
-	return &objectMetaSet{
-		entityType: entityType,
-		contents:   make(map[objectMetaIdentity]meta.ObjectMeta),
-	}
 }
