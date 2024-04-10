@@ -39,6 +39,8 @@ type HostReconcileAttributes struct {
 	remove bool
 	modify bool
 	found  bool
+
+	exclude bool
 }
 
 // NewChiHostReconcileAttributes creates new reconcile attributes
@@ -55,7 +57,8 @@ func (s *HostReconcileAttributes) Equal(to HostReconcileAttributes) bool {
 		(s.add == to.add) &&
 		(s.remove == to.remove) &&
 		(s.modify == to.modify) &&
-		(s.found == to.found)
+		(s.found == to.found) &&
+		(s.exclude == to.exclude)
 }
 
 // Any checks whether any of the attributes is set
@@ -70,7 +73,8 @@ func (s *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
 		(s.add && of.add) ||
 		(s.remove && of.remove) ||
 		(s.modify && of.modify) ||
-		(s.found && of.found)
+		(s.found && of.found) ||
+		(s.exclude && of.exclude)
 }
 
 // SetStatus sets status
@@ -108,6 +112,14 @@ func (s *HostReconcileAttributes) UnsetAdd() *HostReconcileAttributes {
 	return s
 }
 
+// IsAdd checks whether 'add' attribute is set
+func (s *HostReconcileAttributes) IsAdd() bool {
+	if s == nil {
+		return false
+	}
+	return s.add
+}
+
 // SetRemove sets 'remove' attribute
 func (s *HostReconcileAttributes) SetRemove() *HostReconcileAttributes {
 	if s == nil {
@@ -115,6 +127,14 @@ func (s *HostReconcileAttributes) SetRemove() *HostReconcileAttributes {
 	}
 	s.remove = true
 	return s
+}
+
+// IsRemove checks whether 'remove' attribute is set
+func (s *HostReconcileAttributes) IsRemove() bool {
+	if s == nil {
+		return false
+	}
+	return s.remove
 }
 
 // SetModify sets 'modify' attribute
@@ -126,6 +146,14 @@ func (s *HostReconcileAttributes) SetModify() *HostReconcileAttributes {
 	return s
 }
 
+// IsModify checks whether 'modify' attribute is set
+func (s *HostReconcileAttributes) IsModify() bool {
+	if s == nil {
+		return false
+	}
+	return s.modify
+}
+
 // SetFound sets 'found' attribute
 func (s *HostReconcileAttributes) SetFound() *HostReconcileAttributes {
 	if s == nil {
@@ -135,36 +163,37 @@ func (s *HostReconcileAttributes) SetFound() *HostReconcileAttributes {
 	return s
 }
 
-// IsAdd checks whether 'add' attribute is set
-func (s *HostReconcileAttributes) IsAdd() bool {
-	if s == nil {
-		return false
-	}
-	return s.add
-}
-
-// IsRemove checks whether 'remove' attribute is set
-func (s *HostReconcileAttributes) IsRemove() bool {
-	if s == nil {
-		return false
-	}
-	return s.remove
-}
-
-// IsModify checks whether 'modify' attribute is set
-func (s *HostReconcileAttributes) IsModify() bool {
-	if s == nil {
-		return false
-	}
-	return s.modify
-}
-
 // IsFound checks whether 'found' attribute is set
 func (s *HostReconcileAttributes) IsFound() bool {
 	if s == nil {
 		return false
 	}
 	return s.found
+}
+// SetExclude sets 'exclude' attribute
+func (s *HostReconcileAttributes) SetExclude() *HostReconcileAttributes {
+	if s == nil {
+		return s
+	}
+	s.exclude = true
+	return s
+}
+
+// UnsetExclude unsets 'exclude' attribute
+func (s *HostReconcileAttributes) UnsetExclude() *HostReconcileAttributes {
+	if s == nil {
+		return s
+	}
+	s.exclude = false
+	return s
+}
+
+// IsExclude checks whether 'exclude' attribute is set
+func (s *HostReconcileAttributes) IsExclude() bool {
+	if s == nil {
+		return false
+	}
+	return s.exclude
 }
 
 // String returns string form
@@ -174,12 +203,13 @@ func (s *HostReconcileAttributes) String() string {
 	}
 
 	return fmt.Sprintf(
-		"status: %s, add: %t, remove: %t, modify: %t, found: %t",
+		"status: %s, add: %t, remove: %t, modify: %t, found: %t, exclude: %t",
 		s.status,
 		s.add,
 		s.remove,
 		s.modify,
 		s.found,
+		s.exclude,
 	)
 }
 
@@ -193,6 +223,8 @@ type ChiHostReconcileAttributesCounters struct {
 	remove int
 	modify int
 	found  int
+
+	exclude int
 }
 
 // NewChiHostReconcileAttributesCounters creates new reconcile attributes
@@ -228,6 +260,9 @@ func (s *ChiHostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
 	if a.IsFound() {
 		s.found++
 	}
+	if a.IsExclude() {
+		s.exclude++
+	}
 }
 
 // GetAdd gets added
@@ -260,4 +295,12 @@ func (s *ChiHostReconcileAttributesCounters) GetFound() int {
 		return 0
 	}
 	return s.found
+}
+
+// GetExclude gets exclude
+func (s *ChiHostReconcileAttributesCounters) GetExclude() int {
+	if s == nil {
+		return 0
+	}
+	return s.exclude
 }
