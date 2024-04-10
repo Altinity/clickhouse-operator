@@ -838,7 +838,7 @@ func (w *worker) baseRemoteServersGeneratorOptions() *model.RemoteServersGenerat
 
 // options build ClickHouseConfigFilesGeneratorOptions
 func (w *worker) options(excludeHosts ...*api.ChiHost) *model.ClickHouseConfigFilesGeneratorOptions {
-	// Stringify
+	// Stringify for log
 	str := ""
 	for _, host := range excludeHosts {
 		str += fmt.Sprintf("name: '%s' sts: '%s'", host.GetName(), host.Runtime.Address.StatefulSet)
