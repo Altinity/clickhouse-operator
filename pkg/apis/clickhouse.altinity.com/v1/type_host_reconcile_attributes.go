@@ -170,6 +170,7 @@ func (s *HostReconcileAttributes) IsFound() bool {
 	}
 	return s.found
 }
+
 // SetExclude sets 'exclude' attribute
 func (s *HostReconcileAttributes) SetExclude() *HostReconcileAttributes {
 	if s == nil {
