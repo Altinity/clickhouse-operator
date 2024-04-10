@@ -43,10 +43,10 @@ type ChiHost struct {
 
 type ChiHostRuntime struct {
 	// Internal data
-	Address             ChiHostAddress              `json:"-" yaml:"-"`
-	Config              ChiHostConfig               `json:"-" yaml:"-"`
-	Version             *swversion.SoftWareVersion  `json:"-" yaml:"-"`
-	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	Address             ChiHostAddress             `json:"-" yaml:"-"`
+	Config              ChiHostConfig              `json:"-" yaml:"-"`
+	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
+	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
@@ -55,7 +55,7 @@ type ChiHostRuntime struct {
 }
 
 // GetReconcileAttributes is an ensurer getter
-func (host *ChiHost) GetReconcileAttributes() *ChiHostReconcileAttributes {
+func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
 	if host == nil {
 		return nil
 	}

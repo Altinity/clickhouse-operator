@@ -29,8 +29,8 @@ const (
 	ObjectStatusUnknown  ObjectStatus = "unknown"
 )
 
-// ChiHostReconcileAttributes defines host reconcile status and attributes
-type ChiHostReconcileAttributes struct {
+// HostReconcileAttributes defines host reconcile status and attributes
+type HostReconcileAttributes struct {
 	status ObjectStatus
 
 	// Attributes are used by config generator
@@ -42,12 +42,12 @@ type ChiHostReconcileAttributes struct {
 }
 
 // NewChiHostReconcileAttributes creates new reconcile attributes
-func NewChiHostReconcileAttributes() *ChiHostReconcileAttributes {
-	return &ChiHostReconcileAttributes{}
+func NewChiHostReconcileAttributes() *HostReconcileAttributes {
+	return &HostReconcileAttributes{}
 }
 
 // Equal checks whether reconcile attributes are equal
-func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
+func (s *HostReconcileAttributes) Equal(to HostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
@@ -59,7 +59,7 @@ func (s *ChiHostReconcileAttributes) Equal(to ChiHostReconcileAttributes) bool {
 }
 
 // Any checks whether any of the attributes is set
-func (s *ChiHostReconcileAttributes) Any(of *ChiHostReconcileAttributes) bool {
+func (s *HostReconcileAttributes) Any(of *HostReconcileAttributes) bool {
 	if s == nil {
 		return false
 	}
@@ -74,7 +74,7 @@ func (s *ChiHostReconcileAttributes) Any(of *ChiHostReconcileAttributes) bool {
 }
 
 // SetStatus sets status
-func (s *ChiHostReconcileAttributes) SetStatus(status ObjectStatus) *ChiHostReconcileAttributes {
+func (s *HostReconcileAttributes) SetStatus(status ObjectStatus) *HostReconcileAttributes {
 	if s == nil {
 		return s
 	}
@@ -83,7 +83,7 @@ func (s *ChiHostReconcileAttributes) SetStatus(status ObjectStatus) *ChiHostReco
 }
 
 // GetStatus gets status
-func (s *ChiHostReconcileAttributes) GetStatus() ObjectStatus {
+func (s *HostReconcileAttributes) GetStatus() ObjectStatus {
 	if s == nil {
 		return ObjectStatus("")
 	}
@@ -91,7 +91,7 @@ func (s *ChiHostReconcileAttributes) GetStatus() ObjectStatus {
 }
 
 // SetAdd sets 'add' attribute
-func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
+func (s *HostReconcileAttributes) SetAdd() *HostReconcileAttributes {
 	if s == nil {
 		return s
 	}
@@ -100,7 +100,7 @@ func (s *ChiHostReconcileAttributes) SetAdd() *ChiHostReconcileAttributes {
 }
 
 // UnsetAdd unsets 'add' attribute
-func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
+func (s *HostReconcileAttributes) UnsetAdd() *HostReconcileAttributes {
 	if s == nil {
 		return s
 	}
@@ -109,7 +109,7 @@ func (s *ChiHostReconcileAttributes) UnsetAdd() *ChiHostReconcileAttributes {
 }
 
 // SetRemove sets 'remove' attribute
-func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
+func (s *HostReconcileAttributes) SetRemove() *HostReconcileAttributes {
 	if s == nil {
 		return s
 	}
@@ -118,7 +118,7 @@ func (s *ChiHostReconcileAttributes) SetRemove() *ChiHostReconcileAttributes {
 }
 
 // SetModify sets 'modify' attribute
-func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
+func (s *HostReconcileAttributes) SetModify() *HostReconcileAttributes {
 	if s == nil {
 		return s
 	}
@@ -127,7 +127,7 @@ func (s *ChiHostReconcileAttributes) SetModify() *ChiHostReconcileAttributes {
 }
 
 // SetFound sets 'found' attribute
-func (s *ChiHostReconcileAttributes) SetFound() *ChiHostReconcileAttributes {
+func (s *HostReconcileAttributes) SetFound() *HostReconcileAttributes {
 	if s == nil {
 		return s
 	}
@@ -136,7 +136,7 @@ func (s *ChiHostReconcileAttributes) SetFound() *ChiHostReconcileAttributes {
 }
 
 // IsAdd checks whether 'add' attribute is set
-func (s *ChiHostReconcileAttributes) IsAdd() bool {
+func (s *HostReconcileAttributes) IsAdd() bool {
 	if s == nil {
 		return false
 	}
@@ -144,7 +144,7 @@ func (s *ChiHostReconcileAttributes) IsAdd() bool {
 }
 
 // IsRemove checks whether 'remove' attribute is set
-func (s *ChiHostReconcileAttributes) IsRemove() bool {
+func (s *HostReconcileAttributes) IsRemove() bool {
 	if s == nil {
 		return false
 	}
@@ -152,7 +152,7 @@ func (s *ChiHostReconcileAttributes) IsRemove() bool {
 }
 
 // IsModify checks whether 'modify' attribute is set
-func (s *ChiHostReconcileAttributes) IsModify() bool {
+func (s *HostReconcileAttributes) IsModify() bool {
 	if s == nil {
 		return false
 	}
@@ -160,7 +160,7 @@ func (s *ChiHostReconcileAttributes) IsModify() bool {
 }
 
 // IsFound checks whether 'found' attribute is set
-func (s *ChiHostReconcileAttributes) IsFound() bool {
+func (s *HostReconcileAttributes) IsFound() bool {
 	if s == nil {
 		return false
 	}
@@ -168,7 +168,7 @@ func (s *ChiHostReconcileAttributes) IsFound() bool {
 }
 
 // String returns string form
-func (s *ChiHostReconcileAttributes) String() string {
+func (s *HostReconcileAttributes) String() string {
 	if s == nil {
 		return "(nil)"
 	}
@@ -202,8 +202,8 @@ func NewChiHostReconcileAttributesCounters() *ChiHostReconcileAttributesCounters
 	}
 }
 
-// Add adds to counters provided ChiHostReconcileAttributes
-func (s *ChiHostReconcileAttributesCounters) Add(a *ChiHostReconcileAttributes) {
+// Add adds to counters provided HostReconcileAttributes
+func (s *ChiHostReconcileAttributesCounters) Add(a *HostReconcileAttributes) {
 	if s == nil {
 		return
 	}
