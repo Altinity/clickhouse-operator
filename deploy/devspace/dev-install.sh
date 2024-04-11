@@ -42,7 +42,15 @@ if [[ "${MINIKUBE}" == "yes" ]]; then
             minikube image rm "${METRICS_EXPORTER_IMAGE}" > /dev/null 2>&1
             echo "Build images in minikube"
             echo "VERBOSITY=${VERBOSITY} MINIKUBE=yes ${PROJECT_ROOT}/dev/image_build_all_dev.sh"
-            VERBOSITY="${VERBOSITY}" MINIKUBE=yes "${PROJECT_ROOT}/dev/image_build_all_dev.sh"
+            if VERBOSITY="${VERBOSITY}" MINIKUBE=yes "${PROJECT_ROOT}/dev/image_build_all_dev.sh"; then
+                echo "OK. MINIKUBE build successful."
+            else
+                echo "########################"
+                echo "ERROR."
+                echo "MINIKUBE build has failed."
+                echo "Abort."
+                exit 1
+            fi
             ;;
     esac
 fi

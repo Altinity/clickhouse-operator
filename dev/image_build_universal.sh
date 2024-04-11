@@ -103,14 +103,15 @@ fi
 
 echo "Docker build command ready:"
 echo "${DOCKER_CMD}"
-echo "Starting build."
+echo "Starting docker image build."
 echo "Please, wait..."
 
 if ${DOCKER_CMD}; then
     echo "OK. Build successful."
 else
     echo "########################"
-    echo "ERROR. Build has failed."
+    echo "ERROR."
+    echo "Docker image build has failed."
     echo "Abort"
     exit 1
 fi
