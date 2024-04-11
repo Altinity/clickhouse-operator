@@ -187,10 +187,12 @@ func (w *worker) reconcileCHIAuxObjectsPreliminary(ctx context.Context, chi *api
 	defer w.a.V(2).M(chi).E().P()
 
 	// CHI common ConfigMap without added hosts
-	options := w.options()
-	if err := w.reconcileCHIConfigMapCommon(ctx, chi, options); err != nil {
+	chi.EnsureRuntime().LockCommonConfig()
+	if err := w.reconcileCHIConfigMapCommon(ctx, chi, w.options()); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
 	}
+	chi.EnsureRuntime().UnlockCommonConfig()
+
 	// 3. CHI users ConfigMap
 	if err := w.reconcileCHIConfigMapUsers(ctx, chi); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
@@ -229,7 +231,7 @@ func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *api.ClickHou
 }
 
 // reconcileCHIAuxObjectsFinal reconciles CHI global objects
-func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *api.ClickHouseInstallation) error {
+func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *api.ClickHouseInstallation) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -239,7 +241,10 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *api.Click
 	defer w.a.V(2).M(chi).E().P()
 
 	// CHI ConfigMaps with update
-	return w.reconcileCHIConfigMapCommon(ctx, chi, nil)
+	chi.EnsureRuntime().LockCommonConfig()
+	err = w.reconcileCHIConfigMapCommon(ctx, chi, nil)
+	chi.EnsureRuntime().UnlockCommonConfig()
+	return err
 }
 
 // reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap

@@ -825,27 +825,23 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 	})
 }
 
-// baseRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
+// getRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
 // which are applied on each of `remote_servers` reconfiguration during reconcile cycle
-func (w *worker) baseRemoteServersGeneratorOptions() *model.RemoteServersGeneratorOptions {
-	opts := model.NewRemoteServersGeneratorOptions()
-	opts.ExcludeReconcileAttributes(
-		api.NewChiHostReconcileAttributes().SetAdd(),
+func (w *worker) getRemoteServersGeneratorOptions() *model.RemoteServersGeneratorOptions {
+	// Base model.RemoteServersGeneratorOptions specifies to exclude:
+	// 1. all newly added hosts
+	// 2. all explicitly excluded hosts
+	return model.NewRemoteServersGeneratorOptions().ExcludeReconcileAttributes(
+		api.NewChiHostReconcileAttributes().
+			SetAdd().
+			SetExclude(),
 	)
-
-	return opts
 }
 
 // options build ClickHouseConfigFilesGeneratorOptions
-func (w *worker) options(excludeHosts ...*api.ChiHost) *model.ClickHouseConfigFilesGeneratorOptions {
-	// Stringify for log
-	str := ""
-	for _, host := range excludeHosts {
-		str += fmt.Sprintf("name: '%s' sts: '%s'", host.GetName(), host.Runtime.Address.StatefulSet)
-	}
-
-	opts := w.baseRemoteServersGeneratorOptions().ExcludeHosts(excludeHosts...)
-	w.a.Info("RemoteServersGeneratorOptions: %s, excluded host(s): %s", opts, str)
+func (w *worker) options() *model.ClickHouseConfigFilesGeneratorOptions {
+	opts := w.getRemoteServersGeneratorOptions()
+	w.a.Info("RemoteServersGeneratorOptions: %s", opts)
 	return model.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
 }
 
@@ -1103,11 +1099,11 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 		Info("going to exclude host %d shard %d cluster %s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	host.GetReconcileAttributes().SetExclude()
-
 	// Specify in options to exclude this host from ClickHouse config file
-	options := w.options(host)
-	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
+	host.GetCHI().EnsureRuntime().LockCommonConfig()
+	host.GetReconcileAttributes().SetExclude()
+	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), w.options())
+	host.GetCHI().EnsureRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitExcludeHost(host) {
 		return
@@ -1128,11 +1124,11 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 		Info("going to include host %d shard %d cluster %s",
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
-	host.GetReconcileAttributes().UnsetExclude()
-
 	// Specify in options to add this host into ClickHouse config file
-	options := w.options()
-	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), options)
+	host.GetCHI().EnsureRuntime().LockCommonConfig()
+	host.GetReconcileAttributes().UnsetExclude()
+	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), w.options())
+	host.GetCHI().EnsureRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitIncludeHost(host) {
 		return
