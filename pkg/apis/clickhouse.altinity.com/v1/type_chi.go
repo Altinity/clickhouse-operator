@@ -722,7 +722,7 @@ func (chi *ClickHouseInstallation) EnsureRuntime() *ClickHouseInstallationRuntim
 	defer chi.runtimeCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
 	if chi.runtime == nil {
-		chi.runtime = &ClickHouseInstallationRuntime{}
+		chi.runtime = newClickHouseInstallationRuntime()
 	}
 	return chi.runtime
 }
