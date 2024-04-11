@@ -49,24 +49,26 @@ type ClickHouseInstallation struct {
 }
 
 type ClickHouseInstallationRuntime struct {
-	attributes *ComparableAttributes `json:"-" yaml:"-"`
+	attributes        *ComparableAttributes `json:"-" yaml:"-"`
+	commonConfigMutex sync.Mutex            `json:"-" yaml:"-"`
 }
 
-func (runtime *ClickHouseInstallationRuntime) EnsureAttributes() *ComparableAttributes {
-	if runtime == nil {
-		return nil
+func newClickHouseInstallationRuntime() *ClickHouseInstallationRuntime {
+	return &ClickHouseInstallationRuntime{
+		attributes: &ComparableAttributes{},
 	}
+}
 
-	// Assume that most of the time, we'll see a non-nil value.
-	if runtime.attributes != nil {
-		return runtime.attributes
-	}
-
-	// Note that we have to check this property again to avoid a TOCTOU bug.
-	if runtime.attributes == nil {
-		runtime.attributes = &ComparableAttributes{}
-	}
+func (runtime *ClickHouseInstallationRuntime) GetAttributes() *ComparableAttributes {
 	return runtime.attributes
+}
+
+func (runtime *ClickHouseInstallationRuntime) LockCommonConfig() {
+	runtime.commonConfigMutex.Lock()
+}
+
+func (runtime *ClickHouseInstallationRuntime) UnlockCommonConfig() {
+	runtime.commonConfigMutex.Unlock()
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable
