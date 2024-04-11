@@ -836,6 +836,7 @@ func (in *ClickHouseInstallationRuntime) DeepCopyInto(out *ClickHouseInstallatio
 		*out = new(ComparableAttributes)
 		(*in).DeepCopyInto(*out)
 	}
+	out.commonConfigMutex = in.commonConfigMutex
 	return
 }
 
