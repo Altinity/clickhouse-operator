@@ -90,7 +90,7 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 		return
 	}
 
-	container.Env = append(container.Env, host.GetCHI().EnsureRuntime().EnsureAttributes().AdditionalEnvVars...)
+	container.Env = append(container.Env, host.GetCHI().EnsureRuntime().GetAttributes().AdditionalEnvVars...)
 }
 
 // ensureMainContainerSpecified is a unification wrapper
@@ -269,14 +269,14 @@ func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSe
 	// Add all additional Volumes
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		host.GetCHI().EnsureRuntime().EnsureAttributes().AdditionalVolumes...,
+		host.GetCHI().EnsureRuntime().GetAttributes().AdditionalVolumes...,
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have additional volumes mounted as Volumes
 	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
-		host.GetCHI().EnsureRuntime().EnsureAttributes().AdditionalVolumeMounts...,
+		host.GetCHI().EnsureRuntime().GetAttributes().AdditionalVolumeMounts...,
 	)
 }
 
