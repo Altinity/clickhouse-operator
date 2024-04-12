@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 function usage() {
-cat << EOT
+  cat << EOT
  Script splits clickhouse-operator-install-bundle.yaml to separate files and adjusts them to conform the helm standards
  NOTE script requires some pre-installed tools:
  - yq ( https://mikefarah.gitbook.io/yq/ ) > v4.14.x. Do not use brew install yq in MacOS，Version is lower than it.
@@ -13,13 +13,14 @@ cat << EOT
 EOT
 }
 
-for cmd in yq jq helm-docs perl; do
-  if ! command -v ${cmd} &> /dev/null; then
-    usage
-    exit 1
-  fi
-done
-
+function check_required_tools() {
+  for cmd in yq jq helm-docs perl; do
+    if ! command -v "${cmd}" &> /dev/null; then
+      usage
+      exit 1
+    fi
+  done
+}
 
 set -o errexit
 set -o nounset
@@ -29,7 +30,7 @@ readonly script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pw
 readonly manifest_file_path="${script_dir}/../deploy/operator/clickhouse-operator-install-bundle.yaml"
 readonly release_file_path="${script_dir}/../release"
 readonly dashboards_path="${script_dir}/../grafana-dashboard"
-readonly chart_path="${script_dir}/../deploy/helm"
+readonly chart_path="${script_dir}/../deploy/helm/clickhouse-operator"
 readonly values_yaml="${chart_path}/values.yaml"
 
 function main() {
@@ -45,7 +46,7 @@ function main() {
   done
 
   # update version in Chart.yaml
-  readonly detected_version=$(cat ${release_file_path})
+  readonly detected_version=$(cat "${release_file_path}")
   readonly chart_yaml="${chart_path}/Chart.yaml"
   yq e '.version = "'"${detected_version}"'"' -i "${chart_yaml}"
   yq e '.appVersion = "'"${detected_version}"'"' -i "${chart_yaml}"
@@ -73,10 +74,8 @@ function main() {
 
 function process() {
   local file="${1}"
-  local kind
-  kind=$(yq e '.kind' "${file}")
-  local name
-  name=$(yq e '.metadata.name' "${file}")
+  local kind=$(yq e '.kind' "${file}")
+  local name=$(yq e '.metadata.name' "${file}")
 
   local processed_file="${kind}-${name}.yaml"
   local copied_file="${processed_file}"
@@ -127,7 +126,8 @@ function process() {
   CustomResourceDefinition) ;;
 
   *)
-    echo "do not know how to process ${kind}"
+    echo "Do not know how to process resource kind: ${kind}"
+    echo "Abort."
     exit 1
     ;;
   esac
@@ -354,7 +354,9 @@ function to_camel_case() {
 }
 
 function get_abs_filename() {
-  echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  readonly filename="${1}"
+  echo "$(cd "$(dirname "${filename}")" && pwd)/$(basename "${filename}")"
 }
 
+check_required_tools
 main

@@ -178,9 +178,9 @@ func appendServicePorts(service *core.Service, host *api.ChiHost) {
 	)
 }
 
-// createServiceFromTemplate create Service from ChiServiceTemplate and additional info
+// createServiceFromTemplate create Service from ServiceTemplate and additional info
 func (c *Creator) createServiceFromTemplate(
-	template *api.ChiServiceTemplate,
+	template *api.ServiceTemplate,
 	namespace string,
 	name string,
 	labels map[string]string,

@@ -167,7 +167,7 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *api.ChiHost) string {
 // RemoteServersGeneratorOptions specifies options for remote-servers generator
 type RemoteServersGeneratorOptions struct {
 	exclude struct {
-		attributes *api.ChiHostReconcileAttributes
+		attributes *api.HostReconcileAttributes
 		hosts      []*api.ChiHost
 	}
 }
@@ -198,7 +198,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeHosts(hosts ...*api.ChiHost) *Rem
 }
 
 // ExcludeReconcileAttributes specifies to exclude reconcile attributes
-func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *api.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
+func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *api.HostReconcileAttributes) *RemoteServersGeneratorOptions {
 	if (o == nil) || (attrs == nil) {
 		return o
 	}

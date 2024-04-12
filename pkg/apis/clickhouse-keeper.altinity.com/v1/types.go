@@ -159,8 +159,8 @@ func (chk *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstall
 
 // ChkSpec defines spec section of ClickHouseKeeper resource
 type ChkSpec struct {
-	Configuration *ChkConfiguration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates     *apiChi.ChiTemplates `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	Configuration *ChkConfiguration `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates     *apiChi.Templates `json:"templates,omitempty"              yaml:"templates,omitempty"`
 }
 
 func (spec ChkSpec) GetConfiguration() *ChkConfiguration {
@@ -174,7 +174,7 @@ func (spec ChkSpec) EnsureConfiguration() *ChkConfiguration {
 	return spec.Configuration
 }
 
-func (spec ChkSpec) GetTemplates() *apiChi.ChiTemplates {
+func (spec ChkSpec) GetTemplates() *apiChi.Templates {
 	return spec.Templates
 }
 

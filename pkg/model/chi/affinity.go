@@ -26,7 +26,7 @@ import (
 )
 
 // NewAffinity creates new Affinity struct
-func NewAffinity(template *api.ChiPodTemplate) *core.Affinity {
+func NewAffinity(template *api.PodTemplate) *core.Affinity {
 	// Pod node affinity scheduling rules.
 	nodeAffinity := newNodeAffinity(template)
 	// Pod affinity scheduling rules. Ex.: co-locate this pod in the same node, zone, etc
@@ -75,7 +75,7 @@ func MergeAffinity(dst *core.Affinity, src *core.Affinity) *core.Affinity {
 }
 
 // newNodeAffinity
-func newNodeAffinity(template *api.ChiPodTemplate) *core.NodeAffinity {
+func newNodeAffinity(template *api.PodTemplate) *core.NodeAffinity {
 	if template.Zone.Key == "" {
 		return nil
 	}
@@ -229,7 +229,7 @@ func mergeNodeAffinity(dst *core.NodeAffinity, src *core.NodeAffinity) *core.Nod
 }
 
 // newPodAffinity
-func newPodAffinity(template *api.ChiPodTemplate) *core.PodAffinity {
+func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 	// Return podAffinity only in case something was added into it
 	added := false
 	podAffinity := &core.PodAffinity{}
@@ -450,7 +450,7 @@ func mergePodAffinity(dst *core.PodAffinity, src *core.PodAffinity) *core.PodAff
 
 // newMatchLabels
 func newMatchLabels(
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchLabels map[string]string,
 ) map[string]string {
 	var scopeLabels map[string]string
@@ -493,7 +493,7 @@ func newMatchLabels(
 }
 
 // newPodAntiAffinity
-func newPodAntiAffinity(template *api.ChiPodTemplate) *core.PodAntiAffinity {
+func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 	// Return podAntiAffinity only in case something was added into it
 	added := false
 	podAntiAffinity := &core.PodAntiAffinity{}
@@ -740,7 +740,7 @@ func mergePodAntiAffinity(dst *core.PodAntiAffinity, src *core.PodAntiAffinity) 
 
 // newPodAffinityTermWithMatchLabels
 func newPodAffinityTermWithMatchLabels(
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchLabels map[string]string,
 ) core.PodAffinityTerm {
 	return core.PodAffinityTerm{
@@ -767,7 +767,7 @@ func newPodAffinityTermWithMatchLabels(
 
 // newPodAffinityTermWithMatchExpressions
 func newPodAffinityTermWithMatchExpressions(
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchExpressions []meta.LabelSelectorRequirement,
 ) core.PodAffinityTerm {
 	return core.PodAffinityTerm{
@@ -794,7 +794,7 @@ func newPodAffinityTermWithMatchExpressions(
 // newWeightedPodAffinityTermWithMatchLabels is an enhanced append()
 func newWeightedPodAffinityTermWithMatchLabels(
 	weight int32,
-	podDistribution *api.ChiPodDistribution,
+	podDistribution *api.PodDistribution,
 	matchLabels map[string]string,
 ) core.WeightedPodAffinityTerm {
 	return core.WeightedPodAffinityTerm{
@@ -823,7 +823,7 @@ func newWeightedPodAffinityTermWithMatchLabels(
 }
 
 // PrepareAffinity
-func PrepareAffinity(podTemplate *api.ChiPodTemplate, host *api.ChiHost) {
+func PrepareAffinity(podTemplate *api.PodTemplate, host *api.ChiHost) {
 	switch {
 	case podTemplate == nil:
 		return

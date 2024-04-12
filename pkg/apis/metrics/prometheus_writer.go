@@ -16,7 +16,7 @@ package metrics
 
 import (
 	"fmt"
-	"sort"
+	"github.com/altinity/clickhouse-operator/pkg/metrics"
 	"strconv"
 	"time"
 
@@ -221,50 +221,17 @@ func (w *CHIPrometheusWriter) WriteOKFetch(fetchType string) {
 		labelNames, labelValues)
 }
 
-func (w *CHIPrometheusWriter) getCHILabels() (labels []string) {
-	for label := range w.chi.Labels {
-		labels = append(labels, label)
-	}
-	sort.Strings(labels)
-	return labels
+func (w *CHIPrometheusWriter) appendHostLabel(labels, values []string) ([]string, []string) {
+	return append(labels, "hostname"), append(values, w.host.Hostname)
 }
 
-func (w *CHIPrometheusWriter) getCHILabelValue(label string) (string, bool) {
-	value, ok := w.chi.Labels[label]
-	return value, ok
-}
+func (w *CHIPrometheusWriter) getMandatoryLabelsAndValues() (labelNames []string, labelValues []string) {
+	// Prepare mandatory set of labels
+	labelNames, labelValues = metrics.GetMandatoryLabelsAndValues(w.chi)
+	// Append current host label
+	labelNames, labelValues = w.appendHostLabel(labelNames, labelValues)
 
-func (w *CHIPrometheusWriter) getCHILabelValues() []string {
-	var labelValues []string
-	labels := w.getCHILabels()
-	for _, label := range labels {
-		if labelValue, ok := w.getCHILabelValue(label); ok {
-			labelValues = append(labelValues, labelValue)
-		}
-	}
-	return labelValues
-}
-
-func (w *CHIPrometheusWriter) getMandatoryLabels() (mandatoryLabels []string) {
-	mandatoryLabels = append(mandatoryLabels, "chi", "namespace", "hostname")
-	mandatoryLabels = append(mandatoryLabels, w.getCHILabels()...)
-	return mandatoryLabels
-}
-
-func (w *CHIPrometheusWriter) getMandatoryLabelValues() (mandatoryLabelValues []string) {
-	mandatoryLabelValues = append(mandatoryLabelValues, w.chi.Name, w.chi.Namespace, w.host.Hostname)
-	mandatoryLabelValues = append(mandatoryLabelValues, w.getCHILabelValues()...)
-	return mandatoryLabelValues
-}
-
-func (w *CHIPrometheusWriter) getMandatoryLabelsAndValues() (mandatoryLabels []string, mandatoryLabelValues []string) {
-	mandatoryLabels = w.getMandatoryLabels()
-	mandatoryLabelValues = w.getMandatoryLabelValues()
-	if len(mandatoryLabels) == len(mandatoryLabelValues) {
-		return mandatoryLabels, mandatoryLabelValues
-	}
-	log.Warningf("Unequal number of labels and values for %s/%s/%s", w.chi.Namespace, w.chi.Name, w.host.Hostname)
-	return nil, nil
+	return labelNames, labelValues
 }
 
 func (w *CHIPrometheusWriter) writeSingleMetricToPrometheus(

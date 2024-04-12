@@ -17,7 +17,7 @@ package templates
 import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
 // NormalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func NormalizeVolumeClaimTemplate(template *api.ChiVolumeClaimTemplate) {
+func NormalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
 	// Check name
 	// Skip for now
 

@@ -43,10 +43,10 @@ type ChiHost struct {
 
 type ChiHostRuntime struct {
 	// Internal data
-	Address             ChiHostAddress              `json:"-" yaml:"-"`
-	Config              ChiHostConfig               `json:"-" yaml:"-"`
-	Version             *swversion.SoftWareVersion  `json:"-" yaml:"-"`
-	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	Address             ChiHostAddress             `json:"-" yaml:"-"`
+	Config              ChiHostConfig              `json:"-" yaml:"-"`
+	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
+	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
@@ -55,7 +55,7 @@ type ChiHostRuntime struct {
 }
 
 // GetReconcileAttributes is an ensurer getter
-func (host *ChiHost) GetReconcileAttributes() *ChiHostReconcileAttributes {
+func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
 	if host == nil {
 		return nil
 	}
@@ -88,7 +88,7 @@ func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 }
 
 // InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
+func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
 	if shard != nil {
 		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
 	}
@@ -136,7 +136,7 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 }
 
 // GetHostTemplate gets host template
-func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
+func (host *ChiHost) GetHostTemplate() (*HostTemplate, bool) {
 	if !host.Templates.HasHostTemplate() {
 		return nil, false
 	}
@@ -145,7 +145,7 @@ func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
 }
 
 // GetPodTemplate gets pod template
-func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
+func (host *ChiHost) GetPodTemplate() (*PodTemplate, bool) {
 	if !host.Templates.HasPodTemplate() {
 		return nil, false
 	}
@@ -154,7 +154,7 @@ func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
 }
 
 // GetServiceTemplate gets service template
-func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+func (host *ChiHost) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !host.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}
@@ -245,7 +245,7 @@ func (host *ChiHost) HasAncestorCHI() bool {
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
-func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
+func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
 	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 

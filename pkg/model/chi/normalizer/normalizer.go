@@ -147,7 +147,7 @@ func (n *Normalizer) fillCHIAddressInfo() {
 }
 
 // getHostTemplate gets Host Template to be used to normalize Host
-func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
+func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.HostTemplate {
 	// Which host template would be used - either explicitly defined in or a default one
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
@@ -178,7 +178,7 @@ func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.ChiHostTemplate {
 }
 
 // hostApplyHostTemplate
-func hostApplyHostTemplate(host *api.ChiHost, template *api.ChiHostTemplate) {
+func hostApplyHostTemplate(host *api.ChiHost, template *api.HostTemplate) {
 	if host.GetName() == "" {
 		host.Name = template.Spec.Name
 	}
@@ -413,7 +413,7 @@ func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *api.Co
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *api.ChiTemplates) *api.ChiTemplates {
+func (n *Normalizer) normalizeTemplates(templates *api.Templates) *api.Templates {
 	if templates == nil {
 		//templates = api.NewChiTemplates()
 		return nil
@@ -505,39 +505,39 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 	}
 }
 
-func (n *Normalizer) normalizeHostTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizeHostTemplates(templates *api.Templates) {
 	for i := range templates.HostTemplates {
 		n.normalizeHostTemplate(&templates.HostTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizePodTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizePodTemplates(templates *api.Templates) {
 	for i := range templates.PodTemplates {
 		n.normalizePodTemplate(&templates.PodTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.Templates) {
 	for i := range templates.VolumeClaimTemplates {
 		n.normalizeVolumeClaimTemplate(&templates.VolumeClaimTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeServiceTemplates(templates *api.ChiTemplates) {
+func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
 	for i := range templates.ServiceTemplates {
 		n.normalizeServiceTemplate(&templates.ServiceTemplates[i])
 	}
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
-func (n *Normalizer) normalizeHostTemplate(template *api.ChiHostTemplate) {
+func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
 	templatesNormalizer.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
 	n.ctx.GetTarget().Spec.Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
-func (n *Normalizer) normalizePodTemplate(template *api.ChiPodTemplate) {
+func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
 	if len(n.ctx.GetTarget().Spec.Configuration.Clusters) > 0 {
@@ -549,21 +549,21 @@ func (n *Normalizer) normalizePodTemplate(template *api.ChiPodTemplate) {
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.ChiVolumeClaimTemplate) {
+func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
 	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.GetTarget().Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
-func (n *Normalizer) normalizeServiceTemplate(template *api.ChiServiceTemplate) {
+func (n *Normalizer) normalizeServiceTemplate(template *api.ServiceTemplate) {
 	templatesNormalizer.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
 	n.ctx.GetTarget().Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
-func (n *Normalizer) normalizeUseTemplates(templates []*api.ChiTemplateRef) []*api.ChiTemplateRef {
+func (n *Normalizer) normalizeUseTemplates(templates []*api.TemplateRef) []*api.TemplateRef {
 	return templatesNormalizer.NormalizeTemplatesList(templates)
 }
 
@@ -800,14 +800,14 @@ func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
 		return
 	}
 
-	for _, existingEnvVar := range n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalEnvVars {
+	for _, existingEnvVar := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars {
 		if existingEnvVar.Name == envVar.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalEnvVars = append(n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalEnvVars, envVar)
+	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars, envVar)
 }
 
 func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
@@ -816,14 +816,14 @@ func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
 		return
 	}
 
-	for _, existingVolume := range n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalVolumes {
+	for _, existingVolume := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes {
 		if existingVolume.Name == volume.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalVolumes = append(n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalVolumes, volume)
+	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes, volume)
 }
 
 func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
@@ -832,14 +832,14 @@ func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 		return
 	}
 
-	for _, existingVolumeMount := range n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalVolumeMounts {
+	for _, existingVolumeMount := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts {
 		if existingVolumeMount.Name == volumeMount.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalVolumeMounts = append(n.ctx.GetTarget().EnsureRuntime().EnsureAttributes().AdditionalVolumeMounts, volumeMount)
+	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts, volumeMount)
 }
 
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")

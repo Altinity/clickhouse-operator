@@ -133,7 +133,7 @@ func (a *Annotator) GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[stri
 func (a *Annotator) GetPVC(
 	pvc *core.PersistentVolumeClaim,
 	host *api.ChiHost,
-	template *api.ChiVolumeClaimTemplate,
+	template *api.VolumeClaimTemplate,
 ) map[string]string {
 	annotations := util.MergeStringMapsOverwrite(pvc.Annotations, template.ObjectMeta.Annotations)
 	return util.MergeStringMapsOverwrite(annotations, a.GetHostScope(host))

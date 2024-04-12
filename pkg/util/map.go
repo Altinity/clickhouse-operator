@@ -240,3 +240,27 @@ func Map2String(name string, m map[string]string) string {
 
 	return b.String()
 }
+
+func MapGetSortedKeys(m map[string]string) (keys []string) {
+	if m == nil {
+		return nil
+	}
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func MapGetSortedKeysAndValues(m map[string]string) (keys []string, values []string) {
+	if m == nil {
+		return nil, nil
+	}
+	keys = MapGetSortedKeys(m)
+	for _, key := range keys {
+		if value, ok := m[key]; ok {
+			values = append(values, value)
+		}
+	}
+	return keys, values
+}

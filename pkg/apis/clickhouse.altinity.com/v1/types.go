@@ -49,24 +49,26 @@ type ClickHouseInstallation struct {
 }
 
 type ClickHouseInstallationRuntime struct {
-	attributes *ComparableAttributes `json:"-" yaml:"-"`
+	attributes        *ComparableAttributes `json:"-" yaml:"-"`
+	commonConfigMutex sync.Mutex            `json:"-" yaml:"-"`
 }
 
-func (runtime *ClickHouseInstallationRuntime) EnsureAttributes() *ComparableAttributes {
-	if runtime == nil {
-		return nil
+func newClickHouseInstallationRuntime() *ClickHouseInstallationRuntime {
+	return &ClickHouseInstallationRuntime{
+		attributes: &ComparableAttributes{},
 	}
+}
 
-	// Assume that most of the time, we'll see a non-nil value.
-	if runtime.attributes != nil {
-		return runtime.attributes
-	}
-
-	// Note that we have to check this property again to avoid a TOCTOU bug.
-	if runtime.attributes == nil {
-		runtime.attributes = &ComparableAttributes{}
-	}
+func (runtime *ClickHouseInstallationRuntime) GetAttributes() *ComparableAttributes {
 	return runtime.attributes
+}
+
+func (runtime *ClickHouseInstallationRuntime) LockCommonConfig() {
+	runtime.commonConfigMutex.Lock()
+}
+
+func (runtime *ClickHouseInstallationRuntime) UnlockCommonConfig() {
+	runtime.commonConfigMutex.Unlock()
 }
 
 // ComparableAttributes specifies CHI attributes that are comparable
@@ -98,21 +100,21 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	TaskID                 *string           `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	Stop                   *StringBool       `json:"stop,omitempty"                   yaml:"stop,omitempty"`
-	Restart                string            `json:"restart,omitempty"                yaml:"restart,omitempty"`
-	Troubleshoot           *StringBool       `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
-	NamespaceDomainPattern string            `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
-	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconciling            *ChiReconciling   `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
-	Defaults               *ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
-	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates              *ChiTemplates     `json:"templates,omitempty"              yaml:"templates,omitempty"`
-	UseTemplates           []*ChiTemplateRef `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
+	TaskID                 *string         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	Stop                   *StringBool     `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Restart                string          `json:"restart,omitempty"                yaml:"restart,omitempty"`
+	Troubleshoot           *StringBool     `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	NamespaceDomainPattern string          `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Templating             *ChiTemplating  `json:"templating,omitempty"             yaml:"templating,omitempty"`
+	Reconciling            *ChiReconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Defaults               *ChiDefaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Configuration          *Configuration  `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates              *Templates      `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	UseTemplates           []*TemplateRef  `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
-// ChiTemplateRef defines UseTemplate section of ClickHouseInstallation resource
-type ChiTemplateRef struct {
+// TemplateRef defines UseTemplate section of ClickHouseInstallation resource
+type TemplateRef struct {
 	Name      string `json:"name,omitempty"      yaml:"name,omitempty"`
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	UseType   string `json:"useType,omitempty"   yaml:"useType,omitempty"`
@@ -659,15 +661,15 @@ type ChiReplicaAddress struct {
 	ReplicaIndex int    `json:"replicaIndex,omitempty" yaml:"replicaIndex,omitempty"`
 }
 
-// ChiHostTemplate defines full Host Template
-type ChiHostTemplate struct {
-	Name             string                `json:"name,omitempty"             yaml:"name,omitempty"`
-	PortDistribution []ChiPortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
-	Spec             ChiHost               `json:"spec,omitempty"             yaml:"spec,omitempty"`
+// HostTemplate defines full Host Template
+type HostTemplate struct {
+	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
+	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
+	Spec             ChiHost            `json:"spec,omitempty"             yaml:"spec,omitempty"`
 }
 
-// ChiPortDistribution defines port distribution
-type ChiPortDistribution struct {
+// PortDistribution defines port distribution
+type PortDistribution struct {
 	Type string `json:"type,omitempty"   yaml:"type,omitempty"`
 }
 
@@ -678,13 +680,13 @@ type ChiHostConfig struct {
 	FilesFingerprint     string `json:"filesfingerprint"     yaml:"filesfingerprint"`
 }
 
-// ChiTemplates defines templates section of .spec
-type ChiTemplates struct {
+// Templates defines templates section of .spec
+type Templates struct {
 	// Templates
-	HostTemplates        []ChiHostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
-	PodTemplates         []ChiPodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
-	VolumeClaimTemplates []ChiVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
-	ServiceTemplates     []ChiServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
+	HostTemplates        []HostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
+	PodTemplates         []PodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
+	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
+	ServiceTemplates     []ServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
 
 	// Index maps template name to template itself
 	HostTemplatesIndex        *HostTemplatesIndex        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
@@ -693,32 +695,32 @@ type ChiTemplates struct {
 	ServiceTemplatesIndex     *ServiceTemplatesIndex     `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
 }
 
-// ChiPodTemplate defines full Pod Template, directly used by StatefulSet
-type ChiPodTemplate struct {
-	Name            string               `json:"name"                      yaml:"name"`
-	GenerateName    string               `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
-	Zone            ChiPodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
-	PodDistribution []ChiPodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
-	ObjectMeta      meta.ObjectMeta      `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
-	Spec            core.PodSpec         `json:"spec,omitempty"            yaml:"spec,omitempty"`
+// PodTemplate defines full Pod Template, directly used by StatefulSet
+type PodTemplate struct {
+	Name            string            `json:"name"                      yaml:"name"`
+	GenerateName    string            `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
+	Zone            PodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
+	PodDistribution []PodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
+	ObjectMeta      meta.ObjectMeta   `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
+	Spec            core.PodSpec      `json:"spec,omitempty"            yaml:"spec,omitempty"`
 }
 
-// ChiPodTemplateZone defines pod template zone
-type ChiPodTemplateZone struct {
+// PodTemplateZone defines pod template zone
+type PodTemplateZone struct {
 	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
 	Values []string `json:"values,omitempty" yaml:"values,omitempty"`
 }
 
-// ChiPodDistribution defines pod distribution
-type ChiPodDistribution struct {
+// PodDistribution defines pod distribution
+type PodDistribution struct {
 	Type        string `json:"type,omitempty"        yaml:"type,omitempty"`
 	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
 	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`
 	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
 }
 
-// ChiServiceTemplate defines CHI service template
-type ChiServiceTemplate struct {
+// ServiceTemplate defines CHI service template
+type ServiceTemplate struct {
 	Name         string           `json:"name"                   yaml:"name"`
 	GenerateName string           `json:"generateName,omitempty" yaml:"generateName,omitempty"`
 	ObjectMeta   meta.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`

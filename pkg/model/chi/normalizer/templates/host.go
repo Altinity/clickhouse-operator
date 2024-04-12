@@ -21,14 +21,14 @@ import (
 )
 
 // NormalizeHostTemplate normalizes .spec.templates.hostTemplates
-func NormalizeHostTemplate(template *api.ChiHostTemplate) {
+func NormalizeHostTemplate(template *api.HostTemplate) {
 	// Name
 
 	// PortDistribution
 
 	if template.PortDistribution == nil {
 		// In case no PortDistribution provided - setup default one
-		template.PortDistribution = []api.ChiPortDistribution{
+		template.PortDistribution = []api.PortDistribution{
 			{
 				Type: deployment.PortDistributionUnspecified,
 			},

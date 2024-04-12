@@ -31,7 +31,7 @@ func (shard *ChiShard) InheritTemplatesFrom(cluster *Cluster) {
 }
 
 // GetServiceTemplate gets service template
-func (shard *ChiShard) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+func (shard *ChiShard) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !shard.Templates.HasShardServiceTemplate() {
 		return nil, false
 	}

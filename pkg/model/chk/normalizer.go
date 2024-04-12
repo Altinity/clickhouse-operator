@@ -130,7 +130,7 @@ func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiC
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *apiChi.ChiTemplates) *apiChi.ChiTemplates {
+func (n *Normalizer) normalizeTemplates(templates *apiChi.Templates) *apiChi.Templates {
 	if templates == nil {
 		//templates = apiChi.NewChiTemplates()
 		return nil
@@ -155,7 +155,7 @@ func (n *Normalizer) normalizeTemplates(templates *apiChi.ChiTemplates) *apiChi.
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
-func (n *Normalizer) normalizePodTemplate(template *apiChi.ChiPodTemplate) {
+func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
 	if len(n.ctx.chk.Spec.Configuration.Clusters) > 0 {
@@ -167,14 +167,14 @@ func (n *Normalizer) normalizePodTemplate(template *apiChi.ChiPodTemplate) {
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.ChiVolumeClaimTemplate) {
+func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTemplate) {
 	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
-func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ChiServiceTemplate) {
+func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ServiceTemplate) {
 	templatesNormalizer.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)

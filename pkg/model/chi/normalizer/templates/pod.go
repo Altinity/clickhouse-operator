@@ -23,7 +23,7 @@ import (
 )
 
 // NormalizePodTemplate normalizes .spec.templates.podTemplates
-func NormalizePodTemplate(replicasCount int, template *api.ChiPodTemplate) {
+func NormalizePodTemplate(replicasCount int, template *api.PodTemplate) {
 	// Name
 	// GenerateName
 	// No normalization so far for these
@@ -45,7 +45,7 @@ func NormalizePodTemplate(replicasCount int, template *api.ChiPodTemplate) {
 	}
 }
 
-func normalizePodTemplateZone(template *api.ChiPodTemplate) {
+func normalizePodTemplateZone(template *api.PodTemplate) {
 	switch {
 	case len(template.Zone.Values) == 0:
 		// In case no values specified - no key is reasonable
@@ -60,7 +60,7 @@ func normalizePodTemplateZone(template *api.ChiPodTemplate) {
 	}
 }
 
-func normalizePodTemplateDistribution(replicasCount int, template *api.ChiPodTemplate) {
+func normalizePodTemplateDistribution(replicasCount int, template *api.PodTemplate) {
 	for i := range template.PodDistribution {
 		if additionalPodDistributions := normalizePodDistribution(replicasCount, &template.PodDistribution[i]); additionalPodDistributions != nil {
 			template.PodDistribution = append(template.PodDistribution, additionalPodDistributions...)
@@ -70,7 +70,7 @@ func normalizePodTemplateDistribution(replicasCount int, template *api.ChiPodTem
 
 const defaultTopologyKey = core.LabelHostname
 
-func normalizePodDistribution(replicasCount int, podDistribution *api.ChiPodDistribution) []api.ChiPodDistribution {
+func normalizePodDistribution(replicasCount int, podDistribution *api.PodDistribution) []api.PodDistribution {
 	// Ensure topology key
 	if podDistribution.TopologyKey == "" {
 		podDistribution.TopologyKey = defaultTopologyKey
@@ -122,7 +122,7 @@ func normalizePodDistribution(replicasCount int, podDistribution *api.ChiPodDist
 		}
 
 		// Expand shortcut
-		return []api.ChiPodDistribution{
+		return []api.PodDistribution{
 			{
 				Type:  deployment.PodDistributionShardAntiAffinity,
 				Scope: podDistribution.Scope,

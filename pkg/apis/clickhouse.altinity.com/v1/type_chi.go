@@ -56,7 +56,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 	// What is the max number of Pods allowed per Node
 	// TODO need to support multi-cluster
 	maxNumberOfPodsPerNode := 0
-	chi.WalkPodTemplates(func(template *ChiPodTemplate) {
+	chi.WalkPodTemplates(func(template *PodTemplate) {
 		for i := range template.PodDistribution {
 			podDistribution := &template.PodDistribution[i]
 			if podDistribution.Type == deployment.PodDistributionMaxNumberPerNode {
@@ -491,7 +491,7 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 }
 
 // HostsCountAttributes counts hosts by attributes
-func (chi *ClickHouseInstallation) HostsCountAttributes(a *ChiHostReconcileAttributes) int {
+func (chi *ClickHouseInstallation) HostsCountAttributes(a *HostReconcileAttributes) int {
 	count := 0
 	chi.WalkHosts(func(host *ChiHost) error {
 		if host.GetReconcileAttributes().Any(a) {
@@ -502,16 +502,16 @@ func (chi *ClickHouseInstallation) HostsCountAttributes(a *ChiHostReconcileAttri
 	return count
 }
 
-// GetHostTemplate gets ChiHostTemplate by name
-func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*ChiHostTemplate, bool) {
+// GetHostTemplate gets HostTemplate by name
+func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*HostTemplate, bool) {
 	if !chi.Spec.Templates.GetHostTemplatesIndex().Has(name) {
 		return nil, false
 	}
 	return chi.Spec.Templates.GetHostTemplatesIndex().Get(name), true
 }
 
-// GetPodTemplate gets ChiPodTemplate by name
-func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate, bool) {
+// GetPodTemplate gets PodTemplate by name
+func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*PodTemplate, bool) {
 	if !chi.Spec.Templates.GetPodTemplatesIndex().Has(name) {
 		return nil, false
 	}
@@ -519,12 +519,12 @@ func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*ChiPodTemplate,
 }
 
 // WalkPodTemplates walks over all PodTemplates
-func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *ChiPodTemplate)) {
+func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *PodTemplate)) {
 	chi.Spec.Templates.GetPodTemplatesIndex().Walk(f)
 }
 
-// GetVolumeClaimTemplate gets ChiVolumeClaimTemplate by name
-func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolumeClaimTemplate, bool) {
+// GetVolumeClaimTemplate gets VolumeClaimTemplate by name
+func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*VolumeClaimTemplate, bool) {
 	if chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Has(name) {
 		return chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Get(name), true
 	}
@@ -532,23 +532,23 @@ func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*ChiVolu
 }
 
 // WalkVolumeClaimTemplates walks over all VolumeClaimTemplates
-func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
+func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
 	if chi == nil {
 		return
 	}
 	chi.Spec.Templates.GetVolumeClaimTemplatesIndex().Walk(f)
 }
 
-// GetServiceTemplate gets ChiServiceTemplate by name
-func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ChiServiceTemplate, bool) {
+// GetServiceTemplate gets ServiceTemplate by name
+func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ServiceTemplate, bool) {
 	if !chi.Spec.Templates.GetServiceTemplatesIndex().Has(name) {
 		return nil, false
 	}
 	return chi.Spec.Templates.GetServiceTemplatesIndex().Get(name), true
 }
 
-// GetCHIServiceTemplate gets ChiServiceTemplate of a CHI
-func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ChiServiceTemplate, bool) {
+// GetCHIServiceTemplate gets ServiceTemplate of a CHI
+func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ServiceTemplate, bool) {
 	if !chi.Spec.Defaults.Templates.HasServiceTemplate() {
 		return nil, false
 	}
@@ -722,7 +722,7 @@ func (chi *ClickHouseInstallation) EnsureRuntime() *ClickHouseInstallationRuntim
 	defer chi.runtimeCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
 	if chi.runtime == nil {
-		chi.runtime = &ClickHouseInstallationRuntime{}
+		chi.runtime = newClickHouseInstallationRuntime()
 	}
 	return chi.runtime
 }
@@ -822,4 +822,32 @@ func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
 		return nil
 	})
 	return result
+}
+
+func (chi *ClickHouseInstallation) GetName() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Name
+}
+
+func (chi *ClickHouseInstallation) GetNamespace() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Namespace
+}
+
+func (chi *ClickHouseInstallation) GetLabels() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Labels
+}
+
+func (chi *ClickHouseInstallation) GetAnnotations() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Annotations
 }

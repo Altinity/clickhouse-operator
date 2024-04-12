@@ -264,7 +264,7 @@ func (l *Labeler) GetHostScopeReady(host *api.ChiHost, applySupplementaryService
 }
 
 // getHostScopeReclaimPolicy gets host scope labels with PVCReclaimPolicy from template
-func (l *Labeler) getHostScopeReclaimPolicy(host *api.ChiHost, template *api.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
+func (l *Labeler) getHostScopeReclaimPolicy(host *api.ChiHost, template *api.VolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
 	return util.MergeStringMapsOverwrite(l.GetHostScope(host, applySupplementaryServiceLabels), map[string]string{
 		LabelPVCReclaimPolicyName: getPVCReclaimPolicy(host, template).String(),
 	})
@@ -279,7 +279,7 @@ func (l *Labeler) GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string
 func (l *Labeler) GetPVC(
 	pvc *core.PersistentVolumeClaim,
 	host *api.ChiHost,
-	template *api.ChiVolumeClaimTemplate,
+	template *api.VolumeClaimTemplate,
 ) map[string]string {
 	// Prepare main labels based on template
 	labels := util.MergeStringMapsOverwrite(pvc.Labels, template.ObjectMeta.Labels)

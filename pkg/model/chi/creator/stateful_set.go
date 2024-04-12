@@ -90,7 +90,7 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *api.ChiHost) {
 		return
 	}
 
-	container.Env = append(container.Env, host.GetCHI().EnsureRuntime().EnsureAttributes().AdditionalEnvVars...)
+	container.Env = append(container.Env, host.GetCHI().EnsureRuntime().GetAttributes().AdditionalEnvVars...)
 }
 
 // ensureMainContainerSpecified is a unification wrapper
@@ -211,7 +211,7 @@ func (c *Creator) setupLogContainer(statefulSet *apps.StatefulSet, host *api.Chi
 }
 
 // getPodTemplate gets Pod Template to be used to create StatefulSet
-func (c *Creator) getPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
+func (c *Creator) getPodTemplate(host *api.ChiHost) *api.PodTemplate {
 	// Which pod template should be used - either explicitly defined or a default one
 	podTemplate, ok := host.GetPodTemplate()
 	if ok {
@@ -269,14 +269,14 @@ func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSe
 	// Add all additional Volumes
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		host.GetCHI().EnsureRuntime().EnsureAttributes().AdditionalVolumes...,
+		host.GetCHI().EnsureRuntime().GetAttributes().AdditionalVolumes...,
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have additional volumes mounted as Volumes
 	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
-		host.GetCHI().EnsureRuntime().EnsureAttributes().AdditionalVolumeMounts...,
+		host.GetCHI().EnsureRuntime().GetAttributes().AdditionalVolumeMounts...,
 	)
 }
 
@@ -326,14 +326,14 @@ func (c *Creator) setupStatefulSetVolumeClaimTemplates(statefulSet *apps.Statefu
 	c.statefulSetAppendUsedPVCTemplates(statefulSet, host)
 }
 
-// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided ChiPodTemplate
+// statefulSetApplyPodTemplate fills StatefulSet.Spec.Template with data from provided PodTemplate
 func (c *Creator) statefulSetApplyPodTemplate(
 	statefulSet *apps.StatefulSet,
-	template *api.ChiPodTemplate,
+	template *api.PodTemplate,
 	host *api.ChiHost,
 ) {
-	// StatefulSet's pod template is not directly compatible with ChiPodTemplate,
-	// we need to extract some fields from ChiPodTemplate and apply on StatefulSet
+	// StatefulSet's pod template is not directly compatible with PodTemplate,
+	// we need to extract some fields from PodTemplate and apply on StatefulSet
 	statefulSet.Spec.Template = core.PodTemplateSpec{
 		ObjectMeta: meta.ObjectMeta{
 			Name: template.Name,
@@ -387,11 +387,11 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost)
 	)
 }
 
-// statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' ChiVolumeClaimTemplate
+// statefulSetAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' VolumeClaimTemplate
 func (c *Creator) statefulSetAppendPVCTemplate(
 	statefulSet *apps.StatefulSet,
 	host *api.ChiHost,
-	volumeClaimTemplate *api.ChiVolumeClaimTemplate,
+	volumeClaimTemplate *api.VolumeClaimTemplate,
 ) {
 	// Since we have the same names for PVs produced from both VolumeClaimTemplates and Volumes,
 	// we need to check naming for all of them
@@ -432,13 +432,13 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 }
 
 // newDefaultPodTemplate is a unification wrapper
-func newDefaultPodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
+func newDefaultPodTemplate(host *api.ChiHost) *api.PodTemplate {
 	return newDefaultClickHousePodTemplate(host)
 }
 
 // newDefaultClickHousePodTemplate returns default Pod Template to be used with StatefulSet
-func newDefaultClickHousePodTemplate(host *api.ChiHost) *api.ChiPodTemplate {
-	podTemplate := &api.ChiPodTemplate{
+func newDefaultClickHousePodTemplate(host *api.ChiHost) *api.PodTemplate {
+	podTemplate := &api.PodTemplate{
 		Name: model.CreateStatefulSetName(host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
