@@ -17,36 +17,41 @@ package chi
 import (
 	"context"
 
-	otelApi "go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/metrics"
 )
 
 // Metrics is a set of metrics that are tracked by the operator
 type Metrics struct {
 	// CHIReconcilesStarted is a number (counter) of started CHI reconciles
-	CHIReconcilesStarted otelApi.Int64Counter
+	CHIReconcilesStarted metric.Int64Counter
 	// CHIReconcilesCompleted is a number (counter) of completed CHI reconciles.
 	// In ideal world number of completed reconciles should be equal to CHIReconcilesStarted
-	CHIReconcilesCompleted otelApi.Int64Counter
+	CHIReconcilesCompleted metric.Int64Counter
+	// CHIReconcilesAborted is a number (counter) of explicitly aborted CHI reconciles.
+	// This counter does not includes reconciles that we not completed due to external rasons, such as operator restart
+	CHIReconcilesAborted metric.Int64Counter
 	// CHIReconcilesTimings is a histogram of durations of successfully completed CHI reconciles
-	CHIReconcilesTimings otelApi.Float64Histogram
+	CHIReconcilesTimings metric.Float64Histogram
 
 	// HostReconcilesStarted is a number (counter) of started host reconciles
-	HostReconcilesStarted otelApi.Int64Counter
+	HostReconcilesStarted metric.Int64Counter
 	// HostReconcilesCompleted is a number (counter) of completed host reconciles.
 	// In ideal world number of completed reconciles should be equal to HostReconcilesStarted
-	HostReconcilesCompleted otelApi.Int64Counter
+	HostReconcilesCompleted metric.Int64Counter
 	// HostReconcilesRestarts is a number (counter) of host restarts during reconcile
-	HostReconcilesRestarts otelApi.Int64Counter
+	HostReconcilesRestarts metric.Int64Counter
 	// HostReconcilesErrors is a number (counter) of failed (non-completed) host reconciles.
-	HostReconcilesErrors otelApi.Int64Counter
+	HostReconcilesErrors metric.Int64Counter
 	// HostReconcilesTimings is a histogram of durations of successfully completed host reconciles
-	HostReconcilesTimings otelApi.Float64Histogram
+	HostReconcilesTimings metric.Float64Histogram
 
-	PodAddEvents    otelApi.Int64Counter
-	PodUpdateEvents otelApi.Int64Counter
-	PodDeleteEvents otelApi.Int64Counter
+	PodAddEvents    metric.Int64Counter
+	PodUpdateEvents metric.Int64Counter
+	PodDeleteEvents metric.Int64Counter
 }
 
 var m *Metrics
@@ -55,65 +60,71 @@ func createMetrics() *Metrics {
 	// The unit u should be defined using the appropriate [UCUM](https://ucum.org) case-sensitive code.
 	CHIReconcilesStarted, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_started",
-		otelApi.WithDescription("number of CHI reconciles started"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number of CHI reconciles started"),
+		metric.WithUnit("items"),
 	)
 	CHIReconcilesCompleted, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_completed",
-		otelApi.WithDescription("number of CHI reconciles completed successfully"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number of CHI reconciles completed successfully"),
+		metric.WithUnit("items"),
+	)
+	CHIReconcilesAborted, _ := metrics.Meter().Int64Counter(
+		"clickhouse_operator_chi_reconciles_aborted",
+		metric.WithDescription("number of CHI reconciles aborted"),
+		metric.WithUnit("items"),
 	)
 	CHIReconcilesTimings, _ := metrics.Meter().Float64Histogram(
 		"clickhouse_operator_chi_reconciles_timings",
-		otelApi.WithDescription("timings of CHI reconciles completed successfully"),
-		otelApi.WithUnit("s"),
+		metric.WithDescription("timings of CHI reconciles completed successfully"),
+		metric.WithUnit("s"),
 	)
 
 	HostReconcilesStarted, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_started",
-		otelApi.WithDescription("number of host reconciles started"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number of host reconciles started"),
+		metric.WithUnit("items"),
 	)
 	HostReconcilesCompleted, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_completed",
-		otelApi.WithDescription("number of host reconciles completed successfully"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number of host reconciles completed successfully"),
+		metric.WithUnit("items"),
 	)
 	HostReconcilesRestarts, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_restarts",
-		otelApi.WithDescription("number of host restarts during reconciles"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number of host restarts during reconciles"),
+		metric.WithUnit("items"),
 	)
 	HostReconcilesErrors, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_errors",
-		otelApi.WithDescription("number of host reconciles errors"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number of host reconciles errors"),
+		metric.WithUnit("items"),
 	)
 	HostReconcilesTimings, _ := metrics.Meter().Float64Histogram(
 		"clickhouse_operator_host_reconciles_timings",
-		otelApi.WithDescription("timings of host reconciles completed successfully"),
-		otelApi.WithUnit("s"),
+		metric.WithDescription("timings of host reconciles completed successfully"),
+		metric.WithUnit("s"),
 	)
 
 	PodAddEvents, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_pod_add_events",
-		otelApi.WithDescription("number PodAdd events"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number PodAdd events"),
+		metric.WithUnit("items"),
 	)
 	PodUpdateEvents, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_pod_update_events",
-		otelApi.WithDescription("number PodUpdate events"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number PodUpdate events"),
+		metric.WithUnit("items"),
 	)
 	PodDeleteEvents, _ := metrics.Meter().Int64Counter(
 		"clickhouse_operator_pod_delete_events",
-		otelApi.WithDescription("number PodDelete events"),
-		otelApi.WithUnit("items"),
+		metric.WithDescription("number PodDelete events"),
+		metric.WithUnit("items"),
 	)
 
 	return &Metrics{
 		CHIReconcilesStarted:   CHIReconcilesStarted,
 		CHIReconcilesCompleted: CHIReconcilesCompleted,
+		CHIReconcilesAborted:   CHIReconcilesAborted,
 		CHIReconcilesTimings:   CHIReconcilesTimings,
 
 		HostReconcilesStarted:   HostReconcilesStarted,
@@ -135,30 +146,44 @@ func ensureMetrics() *Metrics {
 	return m
 }
 
-func metricsCHIReconcilesStarted(ctx context.Context) {
-	ensureMetrics().CHIReconcilesStarted.Add(ctx, 1)
-}
-func metricsCHIReconcilesCompleted(ctx context.Context) {
-	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 1)
-}
-func metricsCHIReconcilesTimings(ctx context.Context, seconds float64) {
-	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds)
+func prepareLabels(chi *api.ClickHouseInstallation) (attributes []attribute.KeyValue) {
+	labels, values := metrics.GetMandatoryLabelsAndValues(chi)
+	for i := range labels {
+		label := labels[i]
+		value := values[i]
+		attributes = append(attributes, attribute.String(label, value))
+	}
+
+	return attributes
 }
 
-func metricsHostReconcilesStarted(ctx context.Context) {
-	ensureMetrics().HostReconcilesStarted.Add(ctx, 1)
+func metricsCHIReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().CHIReconcilesStarted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesCompleted(ctx context.Context) {
-	ensureMetrics().HostReconcilesCompleted.Add(ctx, 1)
+func metricsCHIReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesRestart(ctx context.Context) {
-	ensureMetrics().HostReconcilesRestarts.Add(ctx, 1)
+func metricsCHIReconcilesAborted(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().CHIReconcilesAborted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesErrors(ctx context.Context) {
-	ensureMetrics().HostReconcilesErrors.Add(ctx, 1)
+func metricsCHIReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
+	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesTimings(ctx context.Context, seconds float64) {
-	ensureMetrics().HostReconcilesTimings.Record(ctx, seconds)
+
+func metricsHostReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().HostReconcilesStarted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
+}
+func metricsHostReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().HostReconcilesCompleted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
+}
+func metricsHostReconcilesRestart(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().HostReconcilesRestarts.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
+}
+func metricsHostReconcilesErrors(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().HostReconcilesErrors.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
+}
+func metricsHostReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
+	ensureMetrics().HostReconcilesTimings.Record(ctx, seconds, metric.WithAttributes(prepareLabels(chi)...))
 }
 
 func metricsPodAdd(ctx context.Context) {

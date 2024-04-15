@@ -15,15 +15,17 @@
 package v1
 
 import (
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 )
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type ChiHost struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	// DEPRECATED - to be removed soon
-	Port int32 `json:"port,omitempty"                yaml:"port,omitempty"`
+	Port int32 `json:"port,omitempty"  yaml:"port,omitempty"`
 
 	Insecure            *StringBool       `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
 	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
@@ -36,27 +38,31 @@ type ChiHost struct {
 	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
+	Runtime ChiHostRuntime `json:"-" yaml:"-"`
+}
+
+type ChiHostRuntime struct {
 	// Internal data
-	Address             ChiHostAddress              `json:"-" yaml:"-"`
-	Config              ChiHostConfig               `json:"-" yaml:"-"`
-	Version             *CHVersion                  `json:"-" yaml:"-"`
-	reconcileAttributes *ChiHostReconcileAttributes `json:"-" yaml:"-" testdiff:"ignore"`
+	Address             ChiHostAddress             `json:"-" yaml:"-"`
+	Config              ChiHostConfig              `json:"-" yaml:"-"`
+	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
+	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
 	// CurStatefulSet is a current stateful set, fetched from k8s
-	CurStatefulSet *appsv1.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
+	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
-	DesiredStatefulSet *appsv1.StatefulSet     `json:"-" yaml:"-" testdiff:"ignore"`
+	DesiredStatefulSet *apps.StatefulSet       `json:"-" yaml:"-" testdiff:"ignore"`
 	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // GetReconcileAttributes is an ensurer getter
-func (host *ChiHost) GetReconcileAttributes() *ChiHostReconcileAttributes {
+func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
 	if host == nil {
 		return nil
 	}
-	if host.reconcileAttributes == nil {
-		host.reconcileAttributes = NewChiHostReconcileAttributes()
+	if host.Runtime.reconcileAttributes == nil {
+		host.Runtime.reconcileAttributes = NewChiHostReconcileAttributes()
 	}
-	return host.reconcileAttributes
+	return host.Runtime.reconcileAttributes
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
@@ -82,7 +88,7 @@ func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 }
 
 // InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *ChiHostTemplate) {
+func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
 	if shard != nil {
 		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
 	}
@@ -107,9 +113,6 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if (host == nil) || (from == nil) {
 		return
 	}
-	if isUnassigned(host.Port) {
-		host.Port = from.Port
-	}
 
 	host.Insecure = host.Insecure.MergeFrom(from.Insecure)
 	host.Secure = host.Secure.MergeFrom(from.Secure)
@@ -133,30 +136,30 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 }
 
 // GetHostTemplate gets host template
-func (host *ChiHost) GetHostTemplate() (*ChiHostTemplate, bool) {
+func (host *ChiHost) GetHostTemplate() (*HostTemplate, bool) {
 	if !host.Templates.HasHostTemplate() {
 		return nil, false
 	}
 	name := host.Templates.GetHostTemplate()
-	return host.CHI.GetHostTemplate(name)
+	return host.Runtime.CHI.GetHostTemplate(name)
 }
 
 // GetPodTemplate gets pod template
-func (host *ChiHost) GetPodTemplate() (*ChiPodTemplate, bool) {
+func (host *ChiHost) GetPodTemplate() (*PodTemplate, bool) {
 	if !host.Templates.HasPodTemplate() {
 		return nil, false
 	}
 	name := host.Templates.GetPodTemplate()
-	return host.CHI.GetPodTemplate(name)
+	return host.Runtime.CHI.GetPodTemplate(name)
 }
 
 // GetServiceTemplate gets service template
-func (host *ChiHost) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+func (host *ChiHost) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !host.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}
 	name := host.Templates.GetReplicaServiceTemplate()
-	return host.CHI.GetServiceTemplate(name)
+	return host.Runtime.CHI.GetServiceTemplate(name)
 }
 
 // GetStatefulSetReplicasNum gets stateful set replica num
@@ -165,7 +168,7 @@ func (host *ChiHost) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 	switch {
 	case shutdown:
 		num = 0
-	case host.CHI.IsStopped():
+	case host.IsStopped():
 		num = 0
 	default:
 		num = 1
@@ -197,7 +200,7 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 	if host == nil {
 		return nil
 	}
-	return host.CHI
+	return host.Runtime.CHI
 }
 
 // HasCHI checks whether host has CHI
@@ -208,18 +211,22 @@ func (host *ChiHost) HasCHI() bool {
 // GetCluster gets cluster
 func (host *ChiHost) GetCluster() *Cluster {
 	// Host has to have filled Address
-	return host.GetCHI().FindCluster(host.Address.ClusterName)
+	return host.GetCHI().FindCluster(host.Runtime.Address.ClusterName)
 }
 
 // GetShard gets shard
 func (host *ChiHost) GetShard() *ChiShard {
 	// Host has to have filled Address
-	return host.GetCHI().FindShard(host.Address.ClusterName, host.Address.ShardName)
+	return host.GetCHI().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
 }
 
 // GetAncestor gets ancestor of a host
 func (host *ChiHost) GetAncestor() *ChiHost {
-	return host.GetCHI().GetAncestor().FindHost(host.Address.ClusterName, host.Address.ShardName, host.Address.HostName)
+	return host.GetCHI().GetAncestor().FindHost(
+		host.Runtime.Address.ClusterName,
+		host.Runtime.Address.ShardName,
+		host.Runtime.Address.HostName,
+	)
 }
 
 // HasAncestor checks whether host has an ancestor
@@ -238,7 +245,7 @@ func (host *ChiHost) HasAncestorCHI() bool {
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
-func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *ChiVolumeClaimTemplate)) {
+func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
 	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 
@@ -274,23 +281,23 @@ func (w WhichStatefulSet) DesiredStatefulSet() bool {
 }
 
 // WalkVolumeMounts walks VolumeMount(s)
-func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *corev1.VolumeMount)) {
+func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *core.VolumeMount)) {
 	if host == nil {
 		return
 	}
 
-	var sts *appsv1.StatefulSet
+	var sts *apps.StatefulSet
 	switch {
 	case which.DesiredStatefulSet():
 		if !host.HasDesiredStatefulSet() {
 			return
 		}
-		sts = host.DesiredStatefulSet
+		sts = host.Runtime.DesiredStatefulSet
 	case which.CurStatefulSet():
 		if !host.HasCurStatefulSet() {
 			return
 		}
-		sts = host.CurStatefulSet
+		sts = host.Runtime.CurStatefulSet
 	default:
 		return
 	}
@@ -363,7 +370,7 @@ func (host *ChiHost) IsFirst() bool {
 		return false
 	}
 
-	return host.Address.CHIScopeIndex == 0
+	return host.Runtime.Address.CHIScopeIndex == 0
 }
 
 // HasCurStatefulSet checks whether host has CurStatefulSet
@@ -372,7 +379,7 @@ func (host *ChiHost) HasCurStatefulSet() bool {
 		return false
 	}
 
-	return host.CurStatefulSet != nil
+	return host.Runtime.CurStatefulSet != nil
 }
 
 // HasDesiredStatefulSet checks whether host has DesiredStatefulSet
@@ -381,5 +388,5 @@ func (host *ChiHost) HasDesiredStatefulSet() bool {
 		return false
 	}
 
-	return host.DesiredStatefulSet != nil
+	return host.Runtime.DesiredStatefulSet != nil
 }

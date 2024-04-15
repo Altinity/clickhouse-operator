@@ -26,7 +26,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -42,7 +42,7 @@ func (c *Controller) waitHostNotReady(ctx context.Context, host *api.ChiHost) er
 			FromConfig(chop.Config()).
 			SetGetErrorTimeout(0),
 		func(_ context.Context, sts *apps.StatefulSet) bool {
-			return model.IsStatefulSetNotReady(sts)
+			return k8s.IsStatefulSetNotReady(sts)
 		},
 		nil,
 	)
@@ -66,7 +66,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 			}
 			_ = c.deleteLabelReadyPod(_ctx, host)
 			_ = c.deleteAnnotationReadyService(_ctx, host)
-			return model.IsStatefulSetGeneration(sts, sts.Generation)
+			return k8s.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func(_ctx context.Context) {
 			_ = c.deleteLabelReadyPod(_ctx, host)
@@ -85,7 +85,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
 			_ = c.deleteLabelReadyPod(_ctx, host)
 			_ = c.deleteAnnotationReadyService(_ctx, host)
-			return model.IsStatefulSetReady(sts)
+			return k8s.IsStatefulSetReady(sts)
 		},
 		func(_ctx context.Context) {
 			_ = c.deleteLabelReadyPod(_ctx, host)
@@ -124,8 +124,8 @@ func (c *Controller) pollHost(
 	}
 
 	opts = opts.Ensure().FromConfig(chop.Config())
-	namespace := host.Address.Namespace
-	name := host.Address.HostName
+	namespace := host.Runtime.Address.Namespace
+	name := host.Runtime.Address.HostName
 
 	return controller.Poll(
 		ctx,
@@ -157,8 +157,8 @@ func (c *Controller) pollHostStatefulSet(
 		opts = controller.NewPollerOptions().FromConfig(chop.Config())
 	}
 
-	namespace := host.Address.Namespace
-	name := host.Address.StatefulSet
+	namespace := host.Runtime.Address.Namespace
+	name := host.Runtime.Address.StatefulSet
 
 	return controller.Poll(
 		ctx,

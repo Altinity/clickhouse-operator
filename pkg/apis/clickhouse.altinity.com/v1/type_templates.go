@@ -18,13 +18,41 @@ import (
 	"github.com/imdario/mergo"
 )
 
-// NewChiTemplates creates new ChiTemplates object
-func NewChiTemplates() *ChiTemplates {
-	return new(ChiTemplates)
+// NewChiTemplates creates new Templates object
+func NewChiTemplates() *Templates {
+	return new(Templates)
+}
+
+func (templates *Templates) GetHostTemplates() []HostTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.HostTemplates
+}
+
+func (templates *Templates) GetPodTemplates() []PodTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.PodTemplates
+}
+
+func (templates *Templates) GetVolumeClaimTemplates() []VolumeClaimTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.VolumeClaimTemplates
+}
+
+func (templates *Templates) GetServiceTemplates() []ServiceTemplate {
+	if templates == nil {
+		return nil
+	}
+	return templates.ServiceTemplates
 }
 
 // Len returns accumulated len of all templates
-func (templates *ChiTemplates) Len() int {
+func (templates *Templates) Len() int {
 	if templates == nil {
 		return 0
 	}
@@ -37,7 +65,20 @@ func (templates *ChiTemplates) Len() int {
 }
 
 // MergeFrom merges from specified object
-func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *ChiTemplates {
+func (templates *Templates) MergeFrom(_from any, _type MergeType) *Templates {
+	// Typed from
+	var from *Templates
+
+	// Ensure type
+	switch typed := _from.(type) {
+	case *Templates:
+		from = typed
+	default:
+		return templates
+	}
+
+	// Sanity check
+
 	if from.Len() == 0 {
 		return templates
 	}
@@ -57,7 +98,7 @@ func (templates *ChiTemplates) MergeFrom(from *ChiTemplates, _type MergeType) *C
 }
 
 // mergeHostTemplates merges host templates section
-func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
+func (templates *Templates) mergeHostTemplates(from *Templates) {
 	if len(from.HostTemplates) == 0 {
 		return
 	}
@@ -90,7 +131,7 @@ func (templates *ChiTemplates) mergeHostTemplates(from *ChiTemplates) {
 }
 
 // mergePodTemplates merges pod templates section
-func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
+func (templates *Templates) mergePodTemplates(from *Templates) {
 	if len(from.PodTemplates) == 0 {
 		return
 	}
@@ -128,7 +169,7 @@ func (templates *ChiTemplates) mergePodTemplates(from *ChiTemplates) {
 }
 
 // mergeVolumeClaimTemplates merges volume claim templates section
-func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
+func (templates *Templates) mergeVolumeClaimTemplates(from *Templates) {
 	if len(from.VolumeClaimTemplates) == 0 {
 		return
 	}
@@ -161,7 +202,7 @@ func (templates *ChiTemplates) mergeVolumeClaimTemplates(from *ChiTemplates) {
 }
 
 // mergeServiceTemplates merges service templates section
-func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
+func (templates *Templates) mergeServiceTemplates(from *Templates) {
 	if len(from.ServiceTemplates) == 0 {
 		return
 	}
@@ -194,7 +235,7 @@ func (templates *ChiTemplates) mergeServiceTemplates(from *ChiTemplates) {
 }
 
 // GetHostTemplatesIndex returns index of host templates
-func (templates *ChiTemplates) GetHostTemplatesIndex() *HostTemplatesIndex {
+func (templates *Templates) GetHostTemplatesIndex() *HostTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -202,7 +243,7 @@ func (templates *ChiTemplates) GetHostTemplatesIndex() *HostTemplatesIndex {
 }
 
 // EnsureHostTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
+func (templates *Templates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -214,7 +255,7 @@ func (templates *ChiTemplates) EnsureHostTemplatesIndex() *HostTemplatesIndex {
 }
 
 // GetPodTemplatesIndex returns index of pod templates
-func (templates *ChiTemplates) GetPodTemplatesIndex() *PodTemplatesIndex {
+func (templates *Templates) GetPodTemplatesIndex() *PodTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -222,7 +263,7 @@ func (templates *ChiTemplates) GetPodTemplatesIndex() *PodTemplatesIndex {
 }
 
 // EnsurePodTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
+func (templates *Templates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -234,7 +275,7 @@ func (templates *ChiTemplates) EnsurePodTemplatesIndex() *PodTemplatesIndex {
 }
 
 // GetVolumeClaimTemplatesIndex returns index of VolumeClaim templates
-func (templates *ChiTemplates) GetVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
+func (templates *Templates) GetVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -242,7 +283,7 @@ func (templates *ChiTemplates) GetVolumeClaimTemplatesIndex() *VolumeClaimTempla
 }
 
 // EnsureVolumeClaimTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
+func (templates *Templates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -254,7 +295,7 @@ func (templates *ChiTemplates) EnsureVolumeClaimTemplatesIndex() *VolumeClaimTem
 }
 
 // GetServiceTemplatesIndex returns index of Service templates
-func (templates *ChiTemplates) GetServiceTemplatesIndex() *ServiceTemplatesIndex {
+func (templates *Templates) GetServiceTemplatesIndex() *ServiceTemplatesIndex {
 	if templates == nil {
 		return nil
 	}
@@ -262,7 +303,7 @@ func (templates *ChiTemplates) GetServiceTemplatesIndex() *ServiceTemplatesIndex
 }
 
 // EnsureServiceTemplatesIndex ensures index exists
-func (templates *ChiTemplates) EnsureServiceTemplatesIndex() *ServiceTemplatesIndex {
+func (templates *Templates) EnsureServiceTemplatesIndex() *ServiceTemplatesIndex {
 	if templates == nil {
 		return nil
 	}

@@ -45,7 +45,7 @@ func hostVersionMatches(host *api.ChiHost, versionConstraint string) bool {
 	// Default version will also be used in case ClickHouse version is unknown.
 	// ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
 	// ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
-	return (versionConstraint == "*") || host.Version.Matches(versionConstraint)
+	return (versionConstraint == "*") || host.Runtime.Version.Matches(versionConstraint)
 }
 
 // ruleMatches checks whether provided rule (rule set) matches specified `path`

@@ -167,7 +167,7 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *api.ChiHost) string {
 // RemoteServersGeneratorOptions specifies options for remote-servers generator
 type RemoteServersGeneratorOptions struct {
 	exclude struct {
-		attributes *api.ChiHostReconcileAttributes
+		attributes *api.HostReconcileAttributes
 		hosts      []*api.ChiHost
 	}
 }
@@ -198,7 +198,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeHosts(hosts ...*api.ChiHost) *Rem
 }
 
 // ExcludeReconcileAttributes specifies to exclude reconcile attributes
-func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *api.ChiHostReconcileAttributes) *RemoteServersGeneratorOptions {
+func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *api.HostReconcileAttributes) *RemoteServersGeneratorOptions {
 	if (o == nil) || (attrs == nil) {
 		return o
 	}
@@ -352,7 +352,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret.Value)
 		case api.ClusterSecretSourceSecretRef, api.ClusterSecretSourceAuto:
 			// Use secret via ENV var from secret
-			util.Iline(b, 12, `<secret from_env="%s" />`, internodeClusterSecretEnvName)
+			util.Iline(b, 12, `<secret from_env="%s" />`, InternodeClusterSecretEnvName)
 		}
 
 		// Build each shard XML
@@ -458,7 +458,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 	util.Iline(b, 0, "    <macros>")
 
 	// <installation>CHI-name-macros-value</installation>
-	util.Iline(b, 8, "<installation>%s</installation>", host.Address.CHIName)
+	util.Iline(b, 8, "<installation>%s</installation>", host.Runtime.Address.CHIName)
 
 	// <CLUSTER_NAME>cluster-name-macros-value</CLUSTER_NAME>
 	// util.Iline(b, 8, "<%s>%[2]s</%[1]s>", replica.Address.ClusterName, c.getMacrosCluster(replica.Address.ClusterName))
@@ -467,13 +467,13 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 
 	// All Shards One Replica ChkCluster
 	// <CLUSTER_NAME-shard>0-based shard index within all-shards-one-replica-cluster</CLUSTER_NAME-shard>
-	util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", AllShardsOneReplicaClusterName, host.Address.CHIScopeIndex)
+	util.Iline(b, 8, "<%s-shard>%d</%[1]s-shard>", AllShardsOneReplicaClusterName, host.Runtime.Address.CHIScopeIndex)
 
 	// <cluster> and <shard> macros are applicable to main cluster only. All aux clusters do not have ambiguous macros
 	// <cluster></cluster> macro
-	util.Iline(b, 8, "<cluster>%s</cluster>", host.Address.ClusterName)
+	util.Iline(b, 8, "<cluster>%s</cluster>", host.Runtime.Address.ClusterName)
 	// <shard></shard> macro
-	util.Iline(b, 8, "<shard>%s</shard>", host.Address.ShardName)
+	util.Iline(b, 8, "<shard>%s</shard>", host.Runtime.Address.ShardName)
 	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
 	util.Iline(b, 8, "<replica>%s</replica>", CreatePodHostname(host))
@@ -494,22 +494,22 @@ func (c *ClickHouseConfigGenerator) GetHostHostnameAndPorts(host *api.ChiHost) s
 	// <yandex>
 	util.Iline(b, 0, "<"+xmlTagYandex+">")
 
-	if host.TCPPort != chDefaultTCPPortNumber {
+	if host.TCPPort != ChDefaultTCPPortNumber {
 		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort)
 	}
-	if host.TLSPort != chDefaultTLSPortNumber {
+	if host.TLSPort != ChDefaultTLSPortNumber {
 		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort)
 	}
-	if host.HTTPPort != chDefaultHTTPPortNumber {
+	if host.HTTPPort != ChDefaultHTTPPortNumber {
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
 	}
-	if host.HTTPSPort != chDefaultHTTPSPortNumber {
+	if host.HTTPSPort != ChDefaultHTTPSPortNumber {
 		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort)
 	}
 
 	// Interserver host and port
 	util.Iline(b, 4, "<interserver_http_host>%s</interserver_http_host>", c.getRemoteServersReplicaHostname(host))
-	if host.InterserverHTTPPort != chDefaultInterserverHTTPPortNumber {
+	if host.InterserverHTTPPort != ChDefaultInterserverHTTPPortNumber {
 		util.Iline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort)
 	}
 

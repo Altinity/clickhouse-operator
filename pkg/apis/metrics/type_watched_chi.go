@@ -16,7 +16,8 @@ package metrics
 
 import (
 	"encoding/json"
-	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // WatchedCHI specifies watched ClickHouseInstallation
@@ -45,13 +46,13 @@ type WatchedHost struct {
 }
 
 // NewWatchedCHI creates new watched CHI
-func NewWatchedCHI(c *v1.ClickHouseInstallation) *WatchedCHI {
+func NewWatchedCHI(c *api.ClickHouseInstallation) *WatchedCHI {
 	chi := &WatchedCHI{}
 	chi.readFrom(c)
 	return chi
 }
 
-func (chi *WatchedCHI) readFrom(c *v1.ClickHouseInstallation) {
+func (chi *WatchedCHI) readFrom(c *api.ClickHouseInstallation) {
 	if chi == nil {
 		return
 	}
@@ -60,7 +61,7 @@ func (chi *WatchedCHI) readFrom(c *v1.ClickHouseInstallation) {
 	chi.Labels = c.Labels
 	chi.Annotations = c.Annotations
 
-	c.WalkClusters(func(cl *v1.Cluster) error {
+	c.WalkClusters(func(cl *api.Cluster) error {
 		cluster := &WatchedCluster{}
 		cluster.readFrom(cl)
 		chi.Clusters = append(chi.Clusters, cluster)
@@ -91,6 +92,34 @@ func (chi *WatchedCHI) walkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHo
 	}
 }
 
+func (chi *WatchedCHI) GetName() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Name
+}
+
+func (chi *WatchedCHI) GetNamespace() string {
+	if chi == nil {
+		return ""
+	}
+	return chi.Namespace
+}
+
+func (chi *WatchedCHI) GetLabels() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Labels
+}
+
+func (chi *WatchedCHI) GetAnnotations() map[string]string {
+	if chi == nil {
+		return nil
+	}
+	return chi.Annotations
+}
+
 // String is a stringifier
 func (chi *WatchedCHI) String() string {
 	if chi == nil {
@@ -100,13 +129,13 @@ func (chi *WatchedCHI) String() string {
 	return string(bytes)
 }
 
-func (cluster *WatchedCluster) readFrom(c *v1.Cluster) {
+func (cluster *WatchedCluster) readFrom(c *api.Cluster) {
 	if cluster == nil {
 		return
 	}
 	cluster.Name = c.Name
 
-	c.WalkHosts(func(h *v1.ChiHost) error {
+	c.WalkHosts(func(h *api.ChiHost) error {
 		host := &WatchedHost{}
 		host.readFrom(h)
 		cluster.Hosts = append(cluster.Hosts, host)
@@ -114,12 +143,12 @@ func (cluster *WatchedCluster) readFrom(c *v1.Cluster) {
 	})
 }
 
-func (host *WatchedHost) readFrom(h *v1.ChiHost) {
+func (host *WatchedHost) readFrom(h *api.ChiHost) {
 	if host == nil {
 		return
 	}
 	host.Name = h.Name
-	host.Hostname = h.Address.FQDN
+	host.Hostname = h.Runtime.Address.FQDN
 	host.TCPPort = h.TCPPort
 	host.TLSPort = h.TLSPort
 	host.HTTPPort = h.HTTPPort

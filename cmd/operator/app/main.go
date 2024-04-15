@@ -73,7 +73,7 @@ func Run() {
 
 	initClickHouse(ctx)
 	initClickHouseReconcilerMetricsExporter(ctx)
-	initKeeper(ctx)
+	keeperErr := initKeeper(ctx)
 
 	var wg sync.WaitGroup
 	wg.Add(3)
@@ -88,7 +88,17 @@ func Run() {
 	}()
 	go func() {
 		defer wg.Done()
-		runKeeper(ctx)
+		if keeperErr == nil {
+			log.Info("Starting keeper")
+			keeperErr = runKeeper(ctx)
+			if keeperErr == nil {
+				log.Info("Starting keeper OK")
+			} else {
+				log.Warning("Starting keeper FAILED with err: %v", keeperErr)
+			}
+		} else {
+			log.Warning("Starting keeper skipped due to failed initialization with err: %v", keeperErr)
+		}
 	}()
 
 	// Wait for completion

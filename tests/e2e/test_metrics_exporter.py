@@ -98,7 +98,7 @@ def test_metrics_exporter_chi(self):
                     "namespace": "test",
                     "name": "test-017-multi-version",
                     "labels": {"clickhouse.altinity.com/chi": "test-017-multi-version"},
-                    "annotations": {},
+                    "annotations": {"clickhouse.altinity.com/email": "myname@mydomain.com, yourname@yourdoman.com"},
                     "clusters": [
                         {
                             "name": "default",
@@ -122,6 +122,11 @@ def test_metrics_exporter_chi(self):
             ]
         with Then("Check both pods are monitored"):
             check_monitoring_chi(self.context.operator_namespace, operator_pod, expected_chi)
+        labels = ','.join([
+                  'chi="test-017-multi-version"',
+                  'clickhouse_altinity_com_chi="test-017-multi-version"',
+                  'clickhouse_altinity_com_email="myname@mydomain.com, yourname@yourdoman.com"'
+                  ])
         with Then("Check not empty /metrics"):
                 check_monitoring_metrics(
                     self.context.operator_namespace,
@@ -129,8 +134,8 @@ def test_metrics_exporter_chi(self):
                     expect_result={
                         "# HELP chi_clickhouse_metric_VersionInteger": True,
                         "# TYPE chi_clickhouse_metric_VersionInteger gauge": True,
-                        'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",clickhouse_altinity_com_chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-0-0': True,
-                        'chi_clickhouse_metric_VersionInteger{chi="test-017-multi-version",clickhouse_altinity_com_chi="test-017-multi-version",hostname="chi-test-017-multi-version-default-1-0': True,
+                        "chi_clickhouse_metric_VersionInteger{" + labels +",hostname=\"chi-test-017-multi-version-default-0-0": True,
+                        "chi_clickhouse_metric_VersionInteger{" + labels +",hostname=\"chi-test-017-multi-version-default-1-0": True,
                     },
                 )
 

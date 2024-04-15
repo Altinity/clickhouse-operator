@@ -16,8 +16,8 @@ package chi
 
 import (
 	"fmt"
-	core "k8s.io/api/core/v1"
 
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
 
@@ -87,8 +87,8 @@ func NewLabeler(chi *api.ClickHouseInstallation) *Labeler {
 	}
 }
 
-// getConfigMapCHICommon
-func (l *Labeler) getConfigMapCHICommon() map[string]string {
+// GetConfigMapCHICommon
+func (l *Labeler) GetConfigMapCHICommon() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getCHIScope(),
 		map[string]string{
@@ -96,8 +96,8 @@ func (l *Labeler) getConfigMapCHICommon() map[string]string {
 		})
 }
 
-// getConfigMapCHICommonUsers
-func (l *Labeler) getConfigMapCHICommonUsers() map[string]string {
+// GetConfigMapCHICommonUsers
+func (l *Labeler) GetConfigMapCHICommonUsers() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getCHIScope(),
 		map[string]string{
@@ -105,17 +105,17 @@ func (l *Labeler) getConfigMapCHICommonUsers() map[string]string {
 		})
 }
 
-// getConfigMapHost
-func (l *Labeler) getConfigMapHost(host *api.ChiHost) map[string]string {
+// GetConfigMapHost
+func (l *Labeler) GetConfigMapHost(host *api.ChiHost) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getHostScope(host, false),
+		l.GetHostScope(host, false),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueHost,
 		})
 }
 
-// getServiceCHI
-func (l *Labeler) getServiceCHI(chi *api.ClickHouseInstallation) map[string]string {
+// GetServiceCHI
+func (l *Labeler) GetServiceCHI(chi *api.ClickHouseInstallation) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getCHIScope(),
 		map[string]string{
@@ -123,17 +123,17 @@ func (l *Labeler) getServiceCHI(chi *api.ClickHouseInstallation) map[string]stri
 		})
 }
 
-// getServiceCluster
-func (l *Labeler) getServiceCluster(cluster *api.Cluster) map[string]string {
+// GetServiceCluster
+func (l *Labeler) GetServiceCluster(cluster *api.Cluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getClusterScope(cluster),
+		l.GetClusterScope(cluster),
 		map[string]string{
 			LabelService: labelServiceValueCluster,
 		})
 }
 
-// getServiceShard
-func (l *Labeler) getServiceShard(shard *api.ChiShard) map[string]string {
+// GetServiceShard
+func (l *Labeler) GetServiceShard(shard *api.ChiShard) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getShardScope(shard),
 		map[string]string{
@@ -141,10 +141,10 @@ func (l *Labeler) getServiceShard(shard *api.ChiShard) map[string]string {
 		})
 }
 
-// getServiceHost
-func (l *Labeler) getServiceHost(host *api.ChiHost) map[string]string {
+// GetServiceHost
+func (l *Labeler) GetServiceHost(host *api.ChiHost) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getHostScope(host, false),
+		l.GetHostScope(host, false),
 		map[string]string{
 			LabelService: labelServiceValueHost,
 		})
@@ -168,19 +168,19 @@ func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	}
 }
 
-// getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
-func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
+// GetSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
+func (l *Labeler) GetSelectorCHIScopeReady() map[string]string {
 	return appendKeyReady(l.GetSelectorCHIScope())
 }
 
-// getClusterScope gets labels for Cluster-scoped object
-func (l *Labeler) getClusterScope(cluster *api.Cluster) map[string]string {
+// GetClusterScope gets labels for Cluster-scoped object
+func (l *Labeler) GetClusterScope(cluster *api.Cluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorClusterScope(cluster)))
+	return l.filterOutPredefined(l.appendCHIProvidedTo(GetSelectorClusterScope(cluster)))
 }
 
-// getSelectorClusterScope gets labels to select a Cluster-scoped object
-func getSelectorClusterScope(cluster *api.Cluster) map[string]string {
+// GetSelectorClusterScope gets labels to select a Cluster-scoped object
+func GetSelectorClusterScope(cluster *api.Cluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   labelsNamer.getNamePartNamespace(cluster),
@@ -190,9 +190,9 @@ func getSelectorClusterScope(cluster *api.Cluster) map[string]string {
 	}
 }
 
-// getSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
-func getSelectorClusterScopeReady(cluster *api.Cluster) map[string]string {
-	return appendKeyReady(getSelectorClusterScope(cluster))
+// GetSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
+func GetSelectorClusterScopeReady(cluster *api.Cluster) map[string]string {
+	return appendKeyReady(GetSelectorClusterScope(cluster))
 }
 
 // getShardScope gets labels for Shard-scoped object
@@ -213,13 +213,13 @@ func getSelectorShardScope(shard *api.ChiShard) map[string]string {
 	}
 }
 
-// getSelectorShardScope gets labels to select a ready-labelled Shard-scoped object
-func getSelectorShardScopeReady(shard *api.ChiShard) map[string]string {
+// GetSelectorShardScopeReady gets labels to select a ready-labelled Shard-scoped object
+func GetSelectorShardScopeReady(shard *api.ChiShard) map[string]string {
 	return appendKeyReady(getSelectorShardScope(shard))
 }
 
-// getHostScope gets labels for Host-scoped object
-func (l *Labeler) getHostScope(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
+// GetHostScope gets labels for Host-scoped object
+func (l *Labeler) GetHostScope(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := GetSelectorHostScope(host)
 	if chop.Config().Label.Runtime.AppendScope {
@@ -246,10 +246,10 @@ func (l *Labeler) getHostScope(host *api.ChiHost, applySupplementaryServiceLabel
 
 func appendConfigLabels(host *api.ChiHost, labels map[string]string) map[string]string {
 	if host.HasCurStatefulSet() {
-		if val, exists := host.CurStatefulSet.Labels[LabelZookeeperConfigVersion]; exists {
+		if val, exists := host.Runtime.CurStatefulSet.Labels[LabelZookeeperConfigVersion]; exists {
 			labels[LabelZookeeperConfigVersion] = val
 		}
-		if val, exists := host.CurStatefulSet.Labels[LabelSettingsConfigVersion]; exists {
+		if val, exists := host.Runtime.CurStatefulSet.Labels[LabelSettingsConfigVersion]; exists {
 			labels[LabelSettingsConfigVersion] = val
 		}
 	}
@@ -258,28 +258,28 @@ func appendConfigLabels(host *api.ChiHost, labels map[string]string) map[string]
 	return labels
 }
 
-// getHostScopeReady gets labels for Host-scoped object including Ready label
-func (l *Labeler) getHostScopeReady(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
-	return appendKeyReady(l.getHostScope(host, applySupplementaryServiceLabels))
+// GetHostScopeReady gets labels for Host-scoped object including Ready label
+func (l *Labeler) GetHostScopeReady(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
+	return appendKeyReady(l.GetHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getHostScopeReclaimPolicy gets host scope labels with PVCReclaimPolicy from template
-func (l *Labeler) getHostScopeReclaimPolicy(host *api.ChiHost, template *api.ChiVolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
-	return util.MergeStringMapsOverwrite(l.getHostScope(host, applySupplementaryServiceLabels), map[string]string{
+func (l *Labeler) getHostScopeReclaimPolicy(host *api.ChiHost, template *api.VolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
+	return util.MergeStringMapsOverwrite(l.GetHostScope(host, applySupplementaryServiceLabels), map[string]string{
 		LabelPVCReclaimPolicyName: getPVCReclaimPolicy(host, template).String(),
 	})
 }
 
-// getPV
-func (l *Labeler) getPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string {
-	return util.MergeStringMapsOverwrite(pv.Labels, l.getHostScope(host, false))
+// GetPV
+func (l *Labeler) GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string {
+	return util.MergeStringMapsOverwrite(pv.Labels, l.GetHostScope(host, false))
 }
 
-// getPVC
-func (l *Labeler) getPVC(
+// GetPVC
+func (l *Labeler) GetPVC(
 	pvc *core.PersistentVolumeClaim,
 	host *api.ChiHost,
-	template *api.ChiVolumeClaimTemplate,
+	template *api.VolumeClaimTemplate,
 ) map[string]string {
 	// Prepare main labels based on template
 	labels := util.MergeStringMapsOverwrite(pvc.Labels, template.ObjectMeta.Labels)

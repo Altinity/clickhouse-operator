@@ -22,7 +22,7 @@ jobs:
           sudo install cr /usr/local/bin/
           rm -f cr chart-releaser_1.4.1_linux_amd64.tar.gz
       - name: Package Chart
-        run: cr package deploy/helm
+        run: cr package deploy/helm/clickhouse-operator
       - name: Upload Release Artifacts
         run: |
           CHART_PATH=$(ls .cr-release-packages/altinity-clickhouse-operator-*.tgz)

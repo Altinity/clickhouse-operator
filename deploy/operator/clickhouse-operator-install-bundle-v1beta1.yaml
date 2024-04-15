@@ -3478,15 +3478,25 @@ data:
           # ClickHouse is not willing to start in case incorrect/unknown settings are provided in config file.
           - version: "*"
             rules:
+              # see https://kb.altinity.com/altinity-kb-setup-and-maintenance/altinity-kb-server-config-files/#server-config-configxml-sections-which-dont-require-restart
+              # to be replaced with "select * from system.server_settings where changeable_without_restart = 'No'"
+
               - settings/*: "yes"
+
+              # single values
+              - settings/access_control_path: "no"
               - settings/dictionaries_config: "no"
-              - settings/logger: "no"
-              - settings/macros/*: "no"
               - settings/max_server_memory_*: "no"
               - settings/max_*_to_drop: "no"
               - settings/max_concurrent_queries: "no"
               - settings/models_config: "no"
               - settings/user_defined_executable_functions_config: "no"
+
+              # structured XML
+              - settings/logger/*: "no"
+              - settings/macros/*: "no"
+              - settings/remote_servers/*: "no"
+              - settings/user_directories/*: "no"
 
               - zookeeper/*: "yes"
 
@@ -3494,6 +3504,7 @@ data:
               - files/config.d/*.xml: "yes"
               - files/config.d/*dict*.xml: "no"
 
+              # exceptions in default profile
               - profiles/default/background_*_pool_size: "yes"
               - profiles/default/max_*_for_server: "yes"
           - version: "21.*"

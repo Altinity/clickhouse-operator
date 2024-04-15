@@ -31,12 +31,12 @@ func (replica *ChiReplica) InheritTemplatesFrom(cluster *Cluster) {
 }
 
 // GetServiceTemplate gets service template
-func (replica *ChiReplica) GetServiceTemplate() (*ChiServiceTemplate, bool) {
+func (replica *ChiReplica) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !replica.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}
 	name := replica.Templates.GetReplicaServiceTemplate()
-	return replica.CHI.GetServiceTemplate(name)
+	return replica.Runtime.CHI.GetServiceTemplate(name)
 }
 
 // HasShardsCount checks whether replica has shards count specified
