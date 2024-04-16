@@ -56,8 +56,3 @@ func (a ChiHostAddress) ClusterNameString() string {
 func (a ChiHostAddress) NamespaceNameString() string {
 	return fmt.Sprintf("%s/%s", a.Namespace, a.HostName)
 }
-
-// NamespaceCHINameString creates namespace+CHI pair
-func (a ChiHostAddress) NamespaceCHINameString() string {
-	return fmt.Sprintf("%s/%s", a.Namespace, a.CHIName)
-}
