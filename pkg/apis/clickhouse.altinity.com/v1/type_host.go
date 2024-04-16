@@ -44,7 +44,6 @@ type ChiHost struct {
 type ChiHostRuntime struct {
 	// Internal data
 	Address             ChiHostAddress             `json:"-" yaml:"-"`
-	Config              ChiHostConfig              `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
 	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
 	// CurStatefulSet is a current stateful set, fetched from k8s
