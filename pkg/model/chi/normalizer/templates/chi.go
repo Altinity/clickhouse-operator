@@ -84,8 +84,8 @@ func ApplyCHITemplates(target, chi *api.ClickHouseInstallation) (appliedTemplate
 }
 
 // applyTemplate applies a template over target n.ctx.chi
-// `chi *api.ClickHouseInstallation` is used to determine whether the template should be applied or not only
-func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.TemplateRef, chi *api.ClickHouseInstallation) bool {
+// `initiator` is used to determine whether the template should be applied or not
+func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.TemplateRef, initiator *api.ClickHouseInstallation) bool {
 	if templateRef == nil {
 		log.Warning("unable to apply template - nil templateRef provided")
 		// Template is not applied
@@ -93,10 +93,10 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 	}
 
 	// What template are we going to apply?
-	defaultNamespace := chi.Namespace
+	defaultNamespace := initiator.Namespace
 	template := chop.Config().FindTemplate(templateRef, defaultNamespace)
 	if template == nil {
-		log.V(1).M(templateRef.Namespace, templateRef.Name).F().Warning(
+		log.V(1).M(templateRef).F().Warning(
 			"skip template - UNABLE to find by templateRef: %s/%s",
 			templateRef.Namespace, templateRef.Name)
 		// Template is not applied
@@ -107,11 +107,11 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 	// This is determined by matching selector of the template and target's labels
 	// Convenience wrapper
 	selector := template.Spec.Templating.GetSelector()
-	if !selector.Matches(chi.Labels) {
+	if !selector.Matches(initiator.Labels) {
 		// This template does not want to be applied to this CHI
-		log.V(1).M(templateRef.Namespace, templateRef.Name).F().Info(
+		log.V(1).M(templateRef).F().Info(
 			"Skip template: %s/%s. Selector: %v does not match labels: %v",
-			templateRef.Namespace, templateRef.Name, selector, chi.Labels)
+			templateRef.Namespace, templateRef.Name, selector, initiator.Labels)
 		// Template is not applied
 		return false
 	}
@@ -120,9 +120,9 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 	// Template is found and wants to be applied on the target
 	//
 
-	log.V(1).M(templateRef.Namespace, templateRef.Name).F().Info(
+	log.V(1).M(templateRef).F().Info(
 		"Apply template: %s/%s. Selector: %v matches labels: %v",
-		templateRef.Namespace, templateRef.Name, selector, chi.Labels)
+		templateRef.Namespace, templateRef.Name, selector, initiator.Labels)
 
 	//  Let's apply template and append used template to the list of used templates
 	mergeFromTemplate(target, template)
@@ -169,7 +169,7 @@ func NormalizeTemplatesList(templates []*api.TemplateRef) []*api.TemplateRef {
 func normalizeTemplateRef(templateRef *api.TemplateRef) *api.TemplateRef {
 	// Check Name
 	if templateRef.Name == "" {
-		// This is strange
+		// This is strange, don't know what to do in this case
 	}
 
 	// Check Namespace
