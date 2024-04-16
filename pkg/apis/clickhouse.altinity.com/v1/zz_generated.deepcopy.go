@@ -280,7 +280,6 @@ func (in *ChiHostReconcileAttributesCounters) DeepCopy() *ChiHostReconcileAttrib
 func (in *ChiHostRuntime) DeepCopyInto(out *ChiHostRuntime) {
 	*out = *in
 	out.Address = in.Address
-	out.Config = in.Config
 	if in.Version != nil {
 		in, out := &in.Version, &out.Version
 		*out = new(swversion.SoftWareVersion)
