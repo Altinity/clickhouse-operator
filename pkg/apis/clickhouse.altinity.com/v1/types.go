@@ -582,8 +582,8 @@ func (t *ChiReconciling) GetCleanup() *ChiCleanup {
 	return t.Cleanup
 }
 
-// ChiTemplateNames defines references to .spec.templates to be used on current level of cluster
-type ChiTemplateNames struct {
+// TemplatesList defines references to .spec.templates to be used
+type TemplatesList struct {
 	HostTemplate            string `json:"hostTemplate,omitempty"            yaml:"hostTemplate,omitempty"`
 	PodTemplate             string `json:"podTemplate,omitempty"             yaml:"podTemplate,omitempty"`
 	DataVolumeClaimTemplate string `json:"dataVolumeClaimTemplate,omitempty" yaml:"dataVolumeClaimTemplate,omitempty"`
@@ -601,13 +601,13 @@ type ChiTemplateNames struct {
 // ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
 // TODO unify with ChiReplica based on HostsSet
 type ChiShard struct {
-	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
-	Weight              *int              `json:"weight,omitempty"              yaml:"weight,omitempty"`
-	InternalReplication *StringBool       `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
-	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
-	ReplicasCount       int               `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
+	Name                string         `json:"name,omitempty"                yaml:"name,omitempty"`
+	Weight              *int           `json:"weight,omitempty"              yaml:"weight,omitempty"`
+	InternalReplication *StringBool    `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
+	Settings            *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files               *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates           *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
+	ReplicasCount       int            `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
@@ -625,11 +625,11 @@ type ChiShardRuntime struct {
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
 // TODO unify with ChiShard based on HostsSet
 type ChiReplica struct {
-	Name        string            `json:"name,omitempty"        yaml:"name,omitempty"`
-	Settings    *Settings         `json:"settings,omitempty"    yaml:"settings,omitempty"`
-	Files       *Settings         `json:"files,omitempty"       yaml:"files,omitempty"`
-	Templates   *ChiTemplateNames `json:"templates,omitempty"   yaml:"templates,omitempty"`
-	ShardsCount int               `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
+	Name        string         `json:"name,omitempty"        yaml:"name,omitempty"`
+	Settings    *Settings      `json:"settings,omitempty"    yaml:"settings,omitempty"`
+	Files       *Settings      `json:"files,omitempty"       yaml:"files,omitempty"`
+	Templates   *TemplatesList `json:"templates,omitempty"   yaml:"templates,omitempty"`
+	ShardsCount int            `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
 	// TODO refactor into map[string]ChiHost
 	Hosts []*ChiHost `json:"shards,omitempty" yaml:"shards,omitempty"`
 

@@ -19,7 +19,7 @@ type ChiDefaults struct {
 	ReplicasUseFQDN   *StringBool        `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
 	DistributedDDL    *ChiDistributedDDL `json:"distributedDDL,omitempty"     yaml:"distributedDDL,omitempty"`
 	StorageManagement *StorageManagement `json:"storageManagement,omitempty"  yaml:"storageManagement,omitempty"`
-	Templates         *ChiTemplateNames  `json:"templates,omitempty"          yaml:"templates,omitempty"`
+	Templates         *TemplatesList     `json:"templates,omitempty"          yaml:"templates,omitempty"`
 }
 
 // NewChiDefaults creates new ChiDefaults object

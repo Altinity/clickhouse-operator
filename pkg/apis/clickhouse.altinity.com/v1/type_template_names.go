@@ -14,13 +14,13 @@
 
 package v1
 
-// NewChiTemplateNames creates new ChiTemplateNames object
-func NewChiTemplateNames() *ChiTemplateNames {
-	return new(ChiTemplateNames)
+// NewChiTemplateNames creates new TemplatesList object
+func NewChiTemplateNames() *TemplatesList {
+	return new(TemplatesList)
 }
 
 // HasHostTemplate checks whether host template is specified
-func (templateNames *ChiTemplateNames) HasHostTemplate() bool {
+func (templateNames *TemplatesList) HasHostTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -28,7 +28,7 @@ func (templateNames *ChiTemplateNames) HasHostTemplate() bool {
 }
 
 // GetHostTemplate gets host template
-func (templateNames *ChiTemplateNames) GetHostTemplate() string {
+func (templateNames *TemplatesList) GetHostTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -36,7 +36,7 @@ func (templateNames *ChiTemplateNames) GetHostTemplate() string {
 }
 
 // HasPodTemplate checks whether pod template is specified
-func (templateNames *ChiTemplateNames) HasPodTemplate() bool {
+func (templateNames *TemplatesList) HasPodTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -44,7 +44,7 @@ func (templateNames *ChiTemplateNames) HasPodTemplate() bool {
 }
 
 // GetPodTemplate gets pod template
-func (templateNames *ChiTemplateNames) GetPodTemplate() string {
+func (templateNames *TemplatesList) GetPodTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -52,7 +52,7 @@ func (templateNames *ChiTemplateNames) GetPodTemplate() string {
 }
 
 // HasDataVolumeClaimTemplate checks whether data volume claim template is specified
-func (templateNames *ChiTemplateNames) HasDataVolumeClaimTemplate() bool {
+func (templateNames *TemplatesList) HasDataVolumeClaimTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -60,7 +60,7 @@ func (templateNames *ChiTemplateNames) HasDataVolumeClaimTemplate() bool {
 }
 
 // GetDataVolumeClaimTemplate gets data volume claim template
-func (templateNames *ChiTemplateNames) GetDataVolumeClaimTemplate() string {
+func (templateNames *TemplatesList) GetDataVolumeClaimTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -68,7 +68,7 @@ func (templateNames *ChiTemplateNames) GetDataVolumeClaimTemplate() string {
 }
 
 // HasLogVolumeClaimTemplate checks whether log volume claim template is specified
-func (templateNames *ChiTemplateNames) HasLogVolumeClaimTemplate() bool {
+func (templateNames *TemplatesList) HasLogVolumeClaimTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -76,7 +76,7 @@ func (templateNames *ChiTemplateNames) HasLogVolumeClaimTemplate() bool {
 }
 
 // GetLogVolumeClaimTemplate gets log volume claim template
-func (templateNames *ChiTemplateNames) GetLogVolumeClaimTemplate() string {
+func (templateNames *TemplatesList) GetLogVolumeClaimTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -84,7 +84,7 @@ func (templateNames *ChiTemplateNames) GetLogVolumeClaimTemplate() string {
 }
 
 // HasServiceTemplate checks whether service template is specified
-func (templateNames *ChiTemplateNames) HasServiceTemplate() bool {
+func (templateNames *TemplatesList) HasServiceTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -92,7 +92,7 @@ func (templateNames *ChiTemplateNames) HasServiceTemplate() bool {
 }
 
 // GetServiceTemplate gets service template
-func (templateNames *ChiTemplateNames) GetServiceTemplate() string {
+func (templateNames *TemplatesList) GetServiceTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -100,7 +100,7 @@ func (templateNames *ChiTemplateNames) GetServiceTemplate() string {
 }
 
 // HasClusterServiceTemplate checks whether cluster service template is specified
-func (templateNames *ChiTemplateNames) HasClusterServiceTemplate() bool {
+func (templateNames *TemplatesList) HasClusterServiceTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -108,7 +108,7 @@ func (templateNames *ChiTemplateNames) HasClusterServiceTemplate() bool {
 }
 
 // GetClusterServiceTemplate gets cluster service template
-func (templateNames *ChiTemplateNames) GetClusterServiceTemplate() string {
+func (templateNames *TemplatesList) GetClusterServiceTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -116,7 +116,7 @@ func (templateNames *ChiTemplateNames) GetClusterServiceTemplate() string {
 }
 
 // HasShardServiceTemplate checks whether shard service template is specified
-func (templateNames *ChiTemplateNames) HasShardServiceTemplate() bool {
+func (templateNames *TemplatesList) HasShardServiceTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -124,7 +124,7 @@ func (templateNames *ChiTemplateNames) HasShardServiceTemplate() bool {
 }
 
 // GetShardServiceTemplate gets shard service template
-func (templateNames *ChiTemplateNames) GetShardServiceTemplate() string {
+func (templateNames *TemplatesList) GetShardServiceTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -132,7 +132,7 @@ func (templateNames *ChiTemplateNames) GetShardServiceTemplate() string {
 }
 
 // HasReplicaServiceTemplate checks whether replica service template is specified
-func (templateNames *ChiTemplateNames) HasReplicaServiceTemplate() bool {
+func (templateNames *TemplatesList) HasReplicaServiceTemplate() bool {
 	if templateNames == nil {
 		return false
 	}
@@ -140,7 +140,7 @@ func (templateNames *ChiTemplateNames) HasReplicaServiceTemplate() bool {
 }
 
 // GetReplicaServiceTemplate gets replica service template
-func (templateNames *ChiTemplateNames) GetReplicaServiceTemplate() string {
+func (templateNames *TemplatesList) GetReplicaServiceTemplate() string {
 	if templateNames == nil {
 		return ""
 	}
@@ -148,7 +148,7 @@ func (templateNames *ChiTemplateNames) GetReplicaServiceTemplate() string {
 }
 
 // HandleDeprecatedFields helps to deal with deprecated fields
-func (templateNames *ChiTemplateNames) HandleDeprecatedFields() {
+func (templateNames *TemplatesList) HandleDeprecatedFields() {
 	if templateNames == nil {
 		return
 	}
@@ -158,7 +158,7 @@ func (templateNames *ChiTemplateNames) HandleDeprecatedFields() {
 }
 
 // MergeFrom merges from specified object
-func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type MergeType) *ChiTemplateNames {
+func (templateNames *TemplatesList) MergeFrom(from *TemplatesList, _type MergeType) *TemplatesList {
 	if from == nil {
 		return templateNames
 	}
@@ -178,7 +178,7 @@ func (templateNames *ChiTemplateNames) MergeFrom(from *ChiTemplateNames, _type M
 }
 
 // mergeFromFillEmptyValues fills empty values
-func (templateNames *ChiTemplateNames) mergeFromFillEmptyValues(from *ChiTemplateNames) *ChiTemplateNames {
+func (templateNames *TemplatesList) mergeFromFillEmptyValues(from *TemplatesList) *TemplatesList {
 	if templateNames.HostTemplate == "" {
 		templateNames.HostTemplate = from.HostTemplate
 	}
@@ -210,7 +210,7 @@ func (templateNames *ChiTemplateNames) mergeFromFillEmptyValues(from *ChiTemplat
 }
 
 // mergeFromOverwriteByNonEmptyValues overwrites by non-empty values
-func (templateNames *ChiTemplateNames) mergeFromOverwriteByNonEmptyValues(from *ChiTemplateNames) *ChiTemplateNames {
+func (templateNames *TemplatesList) mergeFromOverwriteByNonEmptyValues(from *TemplatesList) *TemplatesList {
 	if from.HostTemplate != "" {
 		templateNames.HostTemplate = from.HostTemplate
 	}

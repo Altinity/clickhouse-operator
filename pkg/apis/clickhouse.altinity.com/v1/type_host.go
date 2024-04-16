@@ -27,16 +27,16 @@ type ChiHost struct {
 	// DEPRECATED - to be removed soon
 	Port int32 `json:"port,omitempty"  yaml:"port,omitempty"`
 
-	Insecure            *StringBool       `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
-	Secure              *StringBool       `json:"secure,omitempty"              yaml:"secure,omitempty"`
-	TCPPort             int32             `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
-	TLSPort             int32             `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
-	HTTPPort            int32             `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
-	HTTPSPort           int32             `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
-	InterserverHTTPPort int32             `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
-	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates           *ChiTemplateNames `json:"templates,omitempty"           yaml:"templates,omitempty"`
+	Insecure            *StringBool    `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
+	Secure              *StringBool    `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	TCPPort             int32          `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	TLSPort             int32          `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
+	HTTPPort            int32          `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	HTTPSPort           int32          `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
+	InterserverHTTPPort int32          `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	Settings            *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files               *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates           *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
 	Runtime ChiHostRuntime `json:"-" yaml:"-"`
 }
@@ -49,8 +49,9 @@ type ChiHostRuntime struct {
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
-	DesiredStatefulSet *apps.StatefulSet       `json:"-" yaml:"-" testdiff:"ignore"`
-	CHI                *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+	DesiredStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
+
+	CHI *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 // GetReconcileAttributes is an ensurer getter

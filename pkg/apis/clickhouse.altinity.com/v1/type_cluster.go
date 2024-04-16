@@ -20,7 +20,7 @@ type Cluster struct {
 	Zookeeper    *ChiZookeeperConfig `json:"zookeeper,omitempty"    yaml:"zookeeper,omitempty"`
 	Settings     *Settings           `json:"settings,omitempty"     yaml:"settings,omitempty"`
 	Files        *Settings           `json:"files,omitempty"        yaml:"files,omitempty"`
-	Templates    *ChiTemplateNames   `json:"templates,omitempty"    yaml:"templates,omitempty"`
+	Templates    *TemplatesList      `json:"templates,omitempty"    yaml:"templates,omitempty"`
 	SchemaPolicy *SchemaPolicy       `json:"schemaPolicy,omitempty" yaml:"schemaPolicy,omitempty"`
 	Insecure     *StringBool         `json:"insecure,omitempty"     yaml:"insecure,omitempty"`
 	Secure       *StringBool         `json:"secure,omitempty"       yaml:"secure,omitempty"`
