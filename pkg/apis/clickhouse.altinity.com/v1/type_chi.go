@@ -115,7 +115,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			shard *ChiShard,
 			replica *ChiReplica,
 			host *ChiHost,
-			address *HostAddress,
+			address *HostScopeAddress,
 		) error {
 			cluster.Runtime.Address.Namespace = chi.Namespace
 			cluster.Runtime.Address.CHIName = chi.Name
@@ -172,7 +172,7 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 			shard *ChiShard,
 			replica *ChiReplica,
 			host *ChiHost,
-			address *HostAddress,
+			address *HostScopeAddress,
 		) error {
 			cluster.Runtime.CHI = chi
 			shard.Runtime.CHI = chi
@@ -244,7 +244,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPathAndScope(
 	if chi == nil {
 		return nil
 	}
-	address := NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize)
+	address := NewHostScopeAddress(chiScopeCycleSize, clusterScopeCycleSize)
 	for clusterIndex := range chi.GetSpec().Configuration.Clusters {
 		cluster := chi.GetSpec().Configuration.Clusters[clusterIndex]
 		address.ClusterScopeAddress.Init()

@@ -108,8 +108,8 @@ func (s *ScopeAddress) Inc() {
 	s.Index++
 }
 
-// HostAddress specifies address of a host
-type HostAddress struct {
+// HostScopeAddress specifies address of a host
+type HostScopeAddress struct {
 	// CHIScopeAddress specifies address of a host within CHI scope
 	CHIScopeAddress *ScopeAddress
 	// ClusterScopeAddress specifies address of a host within cluster scope
@@ -122,9 +122,9 @@ type HostAddress struct {
 	ReplicaIndex int
 }
 
-// NewHostAddress creates new HostAddress
-func NewHostAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostAddress) {
-	a = &HostAddress{
+// NewHostScopeAddress creates new HostScopeAddress
+func NewHostScopeAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostScopeAddress) {
+	a = &HostScopeAddress{
 		CHIScopeAddress:     NewScopeAddress(chiScopeCycleSize),
 		ClusterScopeAddress: NewScopeAddress(clusterScopeCycleSize),
 	}
@@ -138,5 +138,5 @@ type WalkHostsAddressFn func(
 	shard *ChiShard,
 	replica *ChiReplica,
 	host *ChiHost,
-	address *HostAddress,
+	address *HostScopeAddress,
 ) error

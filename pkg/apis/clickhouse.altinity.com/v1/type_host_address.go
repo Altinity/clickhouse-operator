@@ -16,8 +16,8 @@ package v1
 
 import "fmt"
 
-// ChiHostAddress defines address of a host within ClickHouseInstallation
-type ChiHostAddress struct {
+// HostAddress defines address of a host within ClickHouseInstallation
+type HostAddress struct {
 	Namespace               string `json:"namespace,omitempty"               yaml:"namespace,omitempty"`
 	StatefulSet             string `json:"statefulSet,omitempty"             yaml:"statefulSet,omitempty"`
 	FQDN                    string `json:"fqdn,omitempty"                    yaml:"fqdn,omitempty"`
@@ -42,17 +42,17 @@ type ChiHostAddress struct {
 }
 
 // CompactString creates compact string representation
-func (a ChiHostAddress) CompactString() string {
+func (a HostAddress) CompactString() string {
 	return fmt.Sprintf("ns:%s|chi:%s|clu:%s|sha:%s|rep:%s|host:%s",
 		a.Namespace, a.CHIName, a.ClusterName, a.ShardName, a.ReplicaName, a.HostName)
 }
 
 // ClusterNameString creates cluster+host pair
-func (a ChiHostAddress) ClusterNameString() string {
+func (a HostAddress) ClusterNameString() string {
 	return fmt.Sprintf("%s/%s", a.ClusterName, a.HostName)
 }
 
 // NamespaceNameString creates namespace+name pair
-func (a ChiHostAddress) NamespaceNameString() string {
+func (a HostAddress) NamespaceNameString() string {
 	return fmt.Sprintf("%s/%s", a.Namespace, a.HostName)
 }
