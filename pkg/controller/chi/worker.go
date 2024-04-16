@@ -660,7 +660,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInst
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
-		Info("reconcile started, task id: %s", chi.Spec.GetTaskID())
+		Info("reconcile started, task id: %s", chi.GetSpec().GetTaskID())
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
@@ -704,7 +704,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
-		Info("reconcile completed successfully, task id: %s", _chi.Spec.GetTaskID())
+		Info("reconcile completed successfully, task id: %s", _chi.GetSpec().GetTaskID())
 }
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *api.ClickHouseInstallation, err error) {
@@ -730,7 +730,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
-		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.Spec.GetTaskID())
+		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpec().GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation, ap *model.ActionPlan) {

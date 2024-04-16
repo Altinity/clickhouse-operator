@@ -36,8 +36,8 @@ func getPVCReclaimPolicy(host *api.ChiHost, template *api.VolumeClaimTemplate) a
 		return template.PVCReclaimPolicy
 	}
 
-	if host.GetCHI().Spec.Defaults.StorageManagement.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
-		return host.GetCHI().Spec.Defaults.StorageManagement.PVCReclaimPolicy
+	if host.GetCHI().GetSpec().Defaults.StorageManagement.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
+		return host.GetCHI().GetSpec().Defaults.StorageManagement.PVCReclaimPolicy
 	}
 
 	// Default value
@@ -52,8 +52,8 @@ func GetPVCProvisioner(host *api.ChiHost, template *api.VolumeClaimTemplate) api
 		return template.PVCProvisioner
 	}
 
-	if host.GetCHI().Spec.Defaults.StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
-		return host.GetCHI().Spec.Defaults.StorageManagement.PVCProvisioner
+	if host.GetCHI().GetSpec().Defaults.StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
+		return host.GetCHI().GetSpec().Defaults.StorageManagement.PVCProvisioner
 	}
 
 	// Default value

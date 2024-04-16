@@ -383,9 +383,9 @@ func CreateCHIServiceFQDN(chi *api.ClickHouseInstallation) string {
 	// Start with default pattern
 	pattern := serviceFQDNPattern
 
-	if chi.Spec.NamespaceDomainPattern != "" {
+	if chi.GetSpec().NamespaceDomainPattern != "" {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + chi.Spec.NamespaceDomainPattern
+		pattern = "%s." + chi.GetSpec().NamespaceDomainPattern
 	}
 
 	// Create FQDN based on pattern available
@@ -478,7 +478,7 @@ func CreateHostTemplateName(host *api.ChiHost) string {
 // any other places
 // Function operations are based on .Spec.Defaults.ReplicasUseFQDN
 func CreateInstanceHostname(host *api.ChiHost) string {
-	if host.GetCHI().Spec.Defaults.ReplicasUseFQDN.IsTrue() {
+	if host.GetCHI().GetSpec().Defaults.ReplicasUseFQDN.IsTrue() {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
@@ -574,9 +574,9 @@ func createPodFQDN(host *api.ChiHost) string {
 	// Start with default pattern
 	pattern := podFQDNPattern
 
-	if host.GetCHI().Spec.NamespaceDomainPattern != "" {
+	if host.GetCHI().GetSpec().NamespaceDomainPattern != "" {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + host.GetCHI().Spec.NamespaceDomainPattern
+		pattern = "%s." + host.GetCHI().GetSpec().NamespaceDomainPattern
 	}
 
 	// Create FQDN based on pattern available

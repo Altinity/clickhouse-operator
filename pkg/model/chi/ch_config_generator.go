@@ -51,23 +51,23 @@ func NewClickHouseConfigGenerator(chi *api.ClickHouseInstallation) *ClickHouseCo
 
 // GetUsers creates data for users section. Used as "users.xml"
 func (c *ClickHouseConfigGenerator) GetUsers() string {
-	return c.generateXMLConfig(c.chi.Spec.Configuration.Users, configUsers)
+	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Users, configUsers)
 }
 
 // GetProfiles creates data for profiles section. Used as "profiles.xml"
 func (c *ClickHouseConfigGenerator) GetProfiles() string {
-	return c.generateXMLConfig(c.chi.Spec.Configuration.Profiles, configProfiles)
+	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Profiles, configProfiles)
 }
 
 // GetQuotas creates data for "quotas.xml"
 func (c *ClickHouseConfigGenerator) GetQuotas() string {
-	return c.generateXMLConfig(c.chi.Spec.Configuration.Quotas, configQuotas)
+	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Quotas, configQuotas)
 }
 
 // GetSettingsGlobal creates data for "settings.xml"
 func (c *ClickHouseConfigGenerator) GetSettingsGlobal() string {
 	// No host specified means request to generate common config
-	return c.generateXMLConfig(c.chi.Spec.Configuration.Settings, "")
+	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Settings, "")
 }
 
 // GetSettings creates data for "settings.xml"
@@ -81,7 +81,7 @@ func (c *ClickHouseConfigGenerator) GetSectionFromFiles(section api.SettingsSect
 	var files *api.Settings
 	if host == nil {
 		// We are looking into Common files
-		files = c.chi.Spec.Configuration.Files
+		files = c.chi.GetSpec().Configuration.Files
 	} else {
 		// We are looking into host's personal files
 		files = host.Files
@@ -153,8 +153,8 @@ func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *api.ChiHost) string {
 	//      <profile>X</profile>
 	util.Iline(b, 4, "<distributed_ddl>")
 	util.Iline(b, 4, "    <path>%s</path>", c.getDistributedDDLPath())
-	if c.chi.Spec.Defaults.DistributedDDL.HasProfile() {
-		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.Spec.Defaults.DistributedDDL.GetProfile())
+	if c.chi.GetSpec().Defaults.DistributedDDL.HasProfile() {
+		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.GetSpec().Defaults.DistributedDDL.GetProfile())
 	}
 	//		</distributed_ddl>
 	// </yandex>

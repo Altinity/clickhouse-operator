@@ -59,9 +59,9 @@ func prepareListOfAutoTemplates(chi *api.ClickHouseInstallation) (templates []*a
 }
 
 func prepareListOfManualTemplates(chi *api.ClickHouseInstallation) (templates []*api.TemplateRef) {
-	if len(chi.Spec.UseTemplates) > 0 {
-		log.V(1).M(chi).F().Info("Found manual-templates num: %d", len(chi.Spec.UseTemplates))
-		templates = append(templates, chi.Spec.UseTemplates...)
+	if len(chi.GetSpec().UseTemplates) > 0 {
+		log.V(1).M(chi).F().Info("Found manual-templates num: %d", len(chi.GetSpec().UseTemplates))
+		templates = append(templates, chi.GetSpec().UseTemplates...)
 	}
 
 	return templates
@@ -106,7 +106,7 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 	// What target(s) this template wants to be applied to?
 	// This is determined by matching selector of the template and target's labels
 	// Convenience wrapper
-	selector := template.Spec.Templating.GetSelector()
+	selector := template.GetSpec().Templating.GetSelector()
 	if !selector.Matches(initiator.Labels) {
 		// This template does not want to be applied to this CHI
 		log.V(1).M(templateRef).F().Info(
@@ -152,7 +152,7 @@ func mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickH
 	)
 
 	// Merge template's Spec over target's Spec
-	(&target.Spec).MergeFrom(&template.Spec, api.MergeTypeOverrideByNonEmptyValues)
+	target.GetSpec().MergeFrom(template.GetSpec(), api.MergeTypeOverrideByNonEmptyValues)
 
 	return target
 }

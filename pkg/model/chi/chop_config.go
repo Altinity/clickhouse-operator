@@ -164,10 +164,10 @@ func IsConfigurationChangeRequiresReboot(host *api.ChiHost) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().Spec.Configuration.Profiles
+			old = host.GetAncestorCHI().GetSpec().Configuration.Profiles
 		}
 		if host.HasCHI() {
-			new = host.GetCHI().Spec.Configuration.Profiles
+			new = host.GetCHI().GetSpec().Configuration.Profiles
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionProfiles, old, new) {
 			return true
@@ -177,10 +177,10 @@ func IsConfigurationChangeRequiresReboot(host *api.ChiHost) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().Spec.Configuration.Quotas
+			old = host.GetAncestorCHI().GetSpec().Configuration.Quotas
 		}
 		if host.HasCHI() {
-			new = host.GetCHI().Spec.Configuration.Quotas
+			new = host.GetCHI().GetSpec().Configuration.Quotas
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionQuotas, old, new) {
 			return true
@@ -190,10 +190,10 @@ func IsConfigurationChangeRequiresReboot(host *api.ChiHost) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().Spec.Configuration.Settings
+			old = host.GetAncestorCHI().GetSpec().Configuration.Settings
 		}
 		if host.HasCHI() {
-			new = host.GetCHI().Spec.Configuration.Settings
+			new = host.GetCHI().GetSpec().Configuration.Settings
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new) {
 			return true
@@ -214,14 +214,14 @@ func IsConfigurationChangeRequiresReboot(host *api.ChiHost) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().Spec.Configuration.Files.Filter(
+			old = host.GetAncestorCHI().GetSpec().Configuration.Files.Filter(
 				nil,
 				[]api.SettingsSection{api.SectionUsers},
 				true,
 			)
 		}
 		if host.HasCHI() {
-			new = host.GetCHI().Spec.Configuration.Files.Filter(
+			new = host.GetCHI().GetSpec().Configuration.Files.Filter(
 				nil,
 				[]api.SettingsSection{api.SectionUsers},
 				true,

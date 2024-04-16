@@ -111,27 +111,27 @@ func (cluster *Cluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 		// Has zk config explicitly specified alread
 		return
 	}
-	if chi.Spec.Configuration == nil {
+	if chi.GetSpec().Configuration == nil {
 		return
 	}
-	if chi.Spec.Configuration.Zookeeper == nil {
+	if chi.GetSpec().Configuration.Zookeeper == nil {
 		return
 	}
 
-	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.Spec.Configuration.Zookeeper, MergeTypeFillEmptyValues)
+	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.GetSpec().Configuration.Zookeeper, MergeTypeFillEmptyValues)
 }
 
 // InheritFilesFrom inherits files from CHI
 func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
-	if chi.Spec.Configuration == nil {
+	if chi.GetSpec().Configuration == nil {
 		return
 	}
-	if chi.Spec.Configuration.Files == nil {
+	if chi.GetSpec().Configuration.Files == nil {
 		return
 	}
 
 	// Propagate host section only
-	cluster.Files = cluster.Files.MergeFromCB(chi.Spec.Configuration.Files, func(path string, _ *Setting) bool {
+	cluster.Files = cluster.Files.MergeFromCB(chi.GetSpec().Configuration.Files, func(path string, _ *Setting) bool {
 		if section, err := getSectionFromPath(path); err == nil {
 			if section.Equal(SectionHost) {
 				return true
@@ -144,13 +144,13 @@ func (cluster *Cluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 
 // InheritTemplatesFrom inherits templates from CHI
 func (cluster *Cluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
-	if chi.Spec.Defaults == nil {
+	if chi.GetSpec().Defaults == nil {
 		return
 	}
-	if chi.Spec.Defaults.Templates == nil {
+	if chi.GetSpec().Defaults.Templates == nil {
 		return
 	}
-	cluster.Templates = cluster.Templates.MergeFrom(chi.Spec.Defaults.Templates, MergeTypeFillEmptyValues)
+	cluster.Templates = cluster.Templates.MergeFrom(chi.GetSpec().Defaults.Templates, MergeTypeFillEmptyValues)
 	cluster.Templates.HandleDeprecatedFields()
 }
 

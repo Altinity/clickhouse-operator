@@ -112,7 +112,7 @@ func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 
 // GetCluster gets cluster of the shard
 func (shard *ChiShard) GetCluster() *Cluster {
-	return shard.Runtime.CHI.Spec.Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
+	return shard.Runtime.CHI.GetSpec().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 
 // HasWeight checks whether shard has applicable weight value specified
