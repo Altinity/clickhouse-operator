@@ -105,6 +105,14 @@ func (n *Normalizer) createTarget() *api.ClickHouseInstallation {
 // normalize normalizes whole CHI.
 // Returns normalized CHI
 func (n *Normalizer) normalize() (*api.ClickHouseInstallation, error) {
+	n.normalizeSpec()
+	n.finalize()
+	n.fillStatus()
+
+	return n.ctx.GetTarget(), nil
+}
+
+func (n *Normalizer) normalizeSpec() {
 	// Walk over ChiSpec datatype fields
 	n.ctx.GetTarget().GetSpec().TaskID = n.normalizeTaskID(n.ctx.GetTarget().GetSpec().TaskID)
 	n.ctx.GetTarget().GetSpec().UseTemplates = n.normalizeUseTemplates(n.ctx.GetTarget().GetSpec().UseTemplates)
@@ -118,15 +126,10 @@ func (n *Normalizer) normalize() (*api.ClickHouseInstallation, error) {
 	n.ctx.GetTarget().GetSpec().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpec().Configuration)
 	n.ctx.GetTarget().GetSpec().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpec().Templates)
 	// UseTemplates already done
-
-	n.finalizeCHI()
-	n.fillStatus()
-
-	return n.ctx.GetTarget(), nil
 }
 
-// finalizeCHI performs some finalization tasks, which should be done after CHI is normalized
-func (n *Normalizer) finalizeCHI() {
+// finalize performs some finalization tasks, which should be done after CHI is normalized
+func (n *Normalizer) finalize() {
 	n.ctx.GetTarget().FillSelfCalculatedAddressInfo()
 	n.ctx.GetTarget().FillCHIPointer()
 	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
