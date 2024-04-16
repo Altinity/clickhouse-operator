@@ -60,8 +60,8 @@ func (n *Normalizer) CreateTemplatedCHI(
 	// New CHI starts with new context
 	n.ctx = NewContext(options)
 
-	// Ensure normalization entity present
-	chi = n.ensureNormalizationEntity(chi)
+	// Ensure normalization subject present
+	chi = n.ensureNormalizationSubject(chi)
 
 	// Create new target that will be populated with data during normalization process
 	n.ctx.SetTarget(n.createTarget())
@@ -69,9 +69,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 	// At this moment target is either newly created 'empty' CHI or a system-wide template
 
 	// Apply templates - both auto and explicitly requested - on top of context target
-	for _, template := range templatesNormalizer.ApplyCHITemplates(n.ctx.GetTarget(), chi) {
-		n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
-	}
+	n.applyTemplates(chi)
 
 	// After all templates applied, place provided CHI on top of the whole stack (target)
 	n.ctx.GetTarget().MergeFrom(chi, api.MergeTypeOverrideByNonEmptyValues)
@@ -79,7 +77,13 @@ func (n *Normalizer) CreateTemplatedCHI(
 	return n.normalize()
 }
 
-func (n *Normalizer) ensureNormalizationEntity(chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+func (n *Normalizer) applyTemplates(chi *api.ClickHouseInstallation) {
+	for _, template := range templatesNormalizer.ApplyCHITemplates(n.ctx.GetTarget(), chi) {
+		n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
+	}
+}
+
+func (n *Normalizer) ensureNormalizationSubject(chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	if chi == nil {
 		// No CHI specified - meaning we are building over provided 'empty' CHI with no clusters inside
 		chi = creator.NewCHI()
