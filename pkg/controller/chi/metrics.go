@@ -157,6 +157,21 @@ func prepareLabels(chi *api.ClickHouseInstallation) (attributes []attribute.KeyV
 	return attributes
 }
 
+// metricsCHIInitZeroValues initializes all metrics for CHI to zero values if not already present with appropriate labels
+//
+// This is due to `rate` prometheus function limitation where it expects the metric to be 0-initialized with all possible labels
+// and doesn't default to 0 if the metric is not present.
+func metricsCHIInitZeroValues(ctx context.Context, chi *api.ClickHouseInstallation) {
+	ensureMetrics().CHIReconcilesStarted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
+	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
+	ensureMetrics().CHIReconcilesAborted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
+
+	ensureMetrics().HostReconcilesStarted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
+	ensureMetrics().HostReconcilesCompleted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
+	ensureMetrics().HostReconcilesRestarts.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
+	ensureMetrics().HostReconcilesErrors.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
+}
+
 func metricsCHIReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
