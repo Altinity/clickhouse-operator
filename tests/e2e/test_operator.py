@@ -2974,9 +2974,9 @@ def test_028(self):
                 "manifests/chit/tpl-persistent-volume-100Mi.yaml",
             },
             "object_counts": {
-                "statefulset": 2,
-                "pod": 2,
-                "service": 3,
+                "statefulset": 4,
+                "pod": 4,
+                "service": 5,
             },
             "do_not_delete": 1,
         },
@@ -3061,7 +3061,11 @@ def test_028(self):
         with Then("Restart operator. CHI should not be restarted"):
             check_operator_restart(
                 chi=chi,
-                wait_objects={"statefulset": 2, "pod": 2, "service": 3},
+                wait_objects={
+                    "statefulset": 4,
+                    "pod": 4,
+                    "service": 5,
+                },
                 pod=f"chi-{chi}-default-0-0-0",
             )
 
@@ -3077,7 +3081,11 @@ def test_028(self):
         kubectl.launch(cmd)
         kubectl.wait_chi_status(chi, "Completed")
         with Then("Stateful sets should be there but no running pods"):
-            kubectl.wait_objects(chi, {"statefulset": 2, "pod": 0, "service": 2})
+            kubectl.wait_objects(chi, {
+                "statefulset": 4,
+                "pod": 0,
+                "service": 4,
+            })
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
