@@ -63,7 +63,10 @@ function check_envsubst_available() {
 function get_file() {
     local url="$1"
 
-    if curl --version > /dev/null; then
+    if [ -f "$url" ]; then
+        # local file is available - use it
+        cat "$url"
+    elif curl --version > /dev/null; then
         # curl is available - use it
         curl -s "${url}"
     elif wget --version > /dev/null; then
