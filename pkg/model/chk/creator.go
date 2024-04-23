@@ -218,7 +218,7 @@ func createContainers(chk *api.ClickHouseKeeperInstallation) []core.Container {
 		containers[0].Name = "clickhouse-keeper"
 	}
 	if containers[0].Image == "" {
-		containers[0].Image = "clickhouse/clickhouse-keeper:head-alpine"
+		containers[0].Image = "clickhouse/clickhouse-keeper:latest"
 	}
 	if containers[0].LivenessProbe == nil {
 		probeScript := fmt.Sprintf(
