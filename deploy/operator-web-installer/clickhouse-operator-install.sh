@@ -78,6 +78,10 @@ function get_file() {
     fi
 }
 
+#
+# Ensures specified namespace exists in k8s.
+# If namespace does not exist - will be created.
+#
 function ensure_namespace() {
     local namespace="${1}"
     if kubectl get namespace "${namespace}" 1>/dev/null 2>/dev/null; then
@@ -88,6 +92,9 @@ function ensure_namespace() {
     fi
 }
 
+#
+# Checks whether clickhouse-operator deployment is already deployed
+#
 function check_deployment() {
     local namespace="${1}"
     local update=""${2}
@@ -110,6 +117,10 @@ function check_deployment() {
     fi
 }
 
+#
+# Checks whether specified string starts with "http" (return 0 in this case) or "https".
+# Case-insensitive.
+#
 function check_http() {
     # ${1,,} converts $1 to lowercase
     if [[ ${1,,} =~ ^https?:// ]]; then
