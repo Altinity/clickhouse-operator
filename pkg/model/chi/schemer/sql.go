@@ -41,16 +41,16 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 	    UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '" SYNC') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
 			database NOT IN (%s) AND
-			(engine like 'Replicated%%' OR engine like '%%View%%')
+			(engine like '%%MergeTree%%' OR engine like '%%View%%')
 		UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP DATABASE IF EXISTS "', name, '"') AS drop_table_query
+			concat('DROP DATABASE IF EXISTS "', name, '" SYNC') AS drop_table_query
 		FROM
 			system.databases
 		WHERE
