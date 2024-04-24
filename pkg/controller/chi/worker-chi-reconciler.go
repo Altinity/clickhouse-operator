@@ -59,6 +59,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
+	metricsCHIInitZeroValues(ctx, new)
 	metricsCHIReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
