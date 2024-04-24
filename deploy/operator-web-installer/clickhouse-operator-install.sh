@@ -73,7 +73,7 @@ function get_file() {
         # wget is available - use it
         wget -qO- "${url}"
     else
-        echo "neither curl nor wget is available, can not continue"
+        echo "neither local file nor curl nor wget is available, can not continue"
         exit 1
     fi
 }
@@ -198,5 +198,5 @@ elif [[ ! -z "${TEMPLATE}" ]]; then
             envsubst \
     )
 else
-    echo "Neither manifest not template available. Abort."
+    echo "Neither manifest nor template available. Abort."
 fi
