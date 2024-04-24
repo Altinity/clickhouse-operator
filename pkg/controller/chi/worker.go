@@ -992,10 +992,10 @@ func (w *worker) shouldDropReplica(host *api.ChiHost, opts ...*migrateTableOptio
 }
 
 // excludeHost excludes host from ClickHouse clusters if required
-func (w *worker) excludeHost(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) excludeHost(ctx context.Context, host *api.ChiHost) bool {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
-		return nil
+		return false
 	}
 
 	log.V(1).M(host).F().S().Info("exclude host start")
@@ -1006,7 +1006,7 @@ func (w *worker) excludeHost(ctx context.Context, host *api.ChiHost) error {
 			M(host).F().
 			Info("No need to exclude host from cluster. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
-		return nil
+		return false
 	}
 
 	w.a.V(1).
@@ -1016,7 +1016,7 @@ func (w *worker) excludeHost(ctx context.Context, host *api.ChiHost) error {
 
 	_ = w.excludeHostFromService(ctx, host)
 	w.excludeHostFromClickHouseCluster(ctx, host)
-	return nil
+	return true
 }
 
 // completeQueries wait for running queries to complete

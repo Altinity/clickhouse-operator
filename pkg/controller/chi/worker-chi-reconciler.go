@@ -693,15 +693,12 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
 	// Create artifacts
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 
-	if err := w.excludeHost(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx, host.GetCHI())
-		w.a.V(1).
-			M(host).F().
-			Warning("Reconcile Host interrupted with an error 1. Host: %s Err: %v", host.GetName(), err)
-		return err
+	if w.excludeHost(ctx, host) {
+		// Need to wait to complete queries only in case host is excluded from the cluster
+		// In case host is not excluded from the cluster queries would continue to be started on the host
+		// and there is no reason to wait for queries to complete. We may wait endlessly.
+		_ = w.completeQueries(ctx, host)
 	}
-
-	_ = w.completeQueries(ctx, host)
 
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
 		metricsHostReconcilesErrors(ctx, host.GetCHI())
