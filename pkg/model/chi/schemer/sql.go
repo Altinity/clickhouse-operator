@@ -41,16 +41,16 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 	    UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '" SYNC') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
 			database NOT IN (%s) AND
-			(engine like 'Replicated%%' OR engine like '%%View%%')
+			(engine like '%%MergeTree%%' OR engine like '%%View%%')
 		UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP DATABASE IF EXISTS "', name, '"') AS drop_table_query
+			concat('DROP DATABASE IF EXISTS "', name, '" SYNC') AS drop_table_query
 		FROM
 			system.databases
 		WHERE
@@ -251,11 +251,11 @@ func (s *ClusterSchemer) sqlVersion() string {
 func (s *ClusterSchemer) sqlHostInCluster() string {
 	// TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
 	return heredoc.Docf(`
-		SELECT 
-			throwIf(count()=0) 
-		FROM 
-			system.clusters 
-		WHERE 
+		SELECT
+			throwIf(count()=0)
+		FROM
+			system.clusters
+		WHERE
 			cluster='%s' AND is_local
 		`,
 		chi.AllShardsOneReplicaClusterName,
