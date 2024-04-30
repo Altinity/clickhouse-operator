@@ -687,6 +687,14 @@ spec:
                                     required:
                                       - name
                                       - key
+                          pdbMaxUnavailable:
+                            type: integer
+                            description: |
+                              Pod eviction is allowed if at most "pdbMaxUnavailable" pods are unavailable after the eviction,
+                              i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions
+                              by specifying 0. This is a mutually exclusive setting with "minAvailable".
+                            minimum: 0
+                            maximum: 65535
                           layout:
                             type: object
                             description: |
@@ -1913,6 +1921,14 @@ spec:
                                     required:
                                       - name
                                       - key
+                          pdbMaxUnavailable:
+                            type: integer
+                            description: |
+                              Pod eviction is allowed if at most "pdbMaxUnavailable" pods are unavailable after the eviction,
+                              i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions
+                              by specifying 0. This is a mutually exclusive setting with "minAvailable".
+                            minimum: 0
+                            maximum: 65535
                           layout:
                             type: object
                             description: |
