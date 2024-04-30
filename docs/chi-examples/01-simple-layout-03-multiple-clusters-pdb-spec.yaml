@@ -1,0 +1,12 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: "simple-03"
+spec:
+  configuration:
+    clusters:
+      - name: "max-un-0"
+        pdbMaxUnavailable: 0
+      - name: "max-un-1"
+      - name: "max-un-2"
+        pdbMaxUnavailable: 2
