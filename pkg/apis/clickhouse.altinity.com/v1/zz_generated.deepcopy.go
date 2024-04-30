@@ -992,6 +992,11 @@ func (in *Cluster) DeepCopyInto(out *Cluster) {
 		*out = new(ClusterSecret)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PDBMaxUnavailable != nil {
+		in, out := &in.PDBMaxUnavailable, &out.PDBMaxUnavailable
+		*out = new(Int32)
+		**out = **in
+	}
 	if in.Layout != nil {
 		in, out := &in.Layout, &out.Layout
 		*out = new(ChiClusterLayout)
