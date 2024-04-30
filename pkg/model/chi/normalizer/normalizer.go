@@ -1145,8 +1145,10 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 		cluster = creator.NewDefaultCluster()
 	}
 
+	// Runtime has to be prepared first
 	cluster.Runtime.CHI = n.ctx.GetTarget()
 
+	// Then we need to inherit values from the parent
 	// Inherit from .spec.configuration.zookeeper
 	cluster.InheritZookeeperFrom(n.ctx.GetTarget())
 	// Inherit from .spec.configuration.files
@@ -1159,6 +1161,7 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	cluster.Files = n.normalizeConfigurationFiles(cluster.Files)
 
 	cluster.SchemaPolicy = n.normalizeClusterSchemaPolicy(cluster.SchemaPolicy)
+	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
 
 	if cluster.Layout == nil {
 		cluster.Layout = api.NewChiClusterLayout()
@@ -1242,6 +1245,11 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *api.SchemaPolicy) *api
 	}
 
 	return policy
+}
+
+// normalizePDBMaxUnavailable normalizes PDBMaxUnavailable
+func (n *Normalizer) normalizePDBMaxUnavailable(value *api.Int32) *api.Int32 {
+	return value.Normalize(1)
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
