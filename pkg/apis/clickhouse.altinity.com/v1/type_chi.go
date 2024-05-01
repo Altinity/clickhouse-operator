@@ -31,6 +31,10 @@ func (chi *ClickHouseInstallation) GetSpec() *ChiSpec {
 	return &chi.Spec
 }
 
+func (chi *ClickHouseInstallation) GetUsedTemplates() []*TemplateRef {
+	return chi.GetSpec().UseTemplates
+}
+
 // FillStatus fills .Status
 func (chi *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []string, ip string) {
 	chi.EnsureStatus().Fill(&FillStatusParams{
