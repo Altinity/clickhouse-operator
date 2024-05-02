@@ -317,15 +317,12 @@ func (n *Normalizer) fillStatus() {
 }
 
 // normalizeTaskID normalizes .spec.taskID
-func (n *Normalizer) normalizeTaskID(taskID *string) *string {
-	if taskID != nil {
-		if len(*taskID) > 0 {
-			return taskID
-		}
+func (n *Normalizer) normalizeTaskID(taskID *api.String) *api.String {
+	if len(taskID.Value()) > 0 {
+		return taskID
 	}
 
-	id := uuid.New().String()
-	return &id
+	return api.NewString(uuid.New().String())
 }
 
 // normalizeStop normalizes .spec.stop
