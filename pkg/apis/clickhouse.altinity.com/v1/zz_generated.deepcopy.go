@@ -524,6 +524,11 @@ func (in *ChiSpec) DeepCopyInto(out *ChiSpec) {
 		*out = new(StringBool)
 		**out = **in
 	}
+	if in.Restart != nil {
+		in, out := &in.Restart, &out.Restart
+		*out = new(String)
+		**out = **in
+	}
 	if in.Troubleshoot != nil {
 		in, out := &in.Troubleshoot, &out.Troubleshoot
 		*out = new(StringBool)

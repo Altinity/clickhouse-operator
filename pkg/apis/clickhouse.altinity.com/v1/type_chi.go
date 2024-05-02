@@ -380,13 +380,13 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if !spec.HasTaskID() {
-			spec.TaskID.MergeFrom(from.TaskID)
+			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
 		}
 		if !spec.Stop.HasValue() {
 			spec.Stop = spec.Stop.MergeFrom(from.Stop)
 		}
-		if spec.Restart == "" {
-			spec.Restart = from.Restart
+		if !spec.Restart.HasValue() {
+			spec.Restart = spec.Restart.MergeFrom(from.Restart)
 		}
 		if !spec.Troubleshoot.HasValue() {
 			spec.Troubleshoot = spec.Troubleshoot.MergeFrom(from.Troubleshoot)
@@ -396,15 +396,15 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.HasTaskID() {
-			spec.TaskID.MergeFrom(from.TaskID)
+			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
 		}
 		if from.Stop.HasValue() {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
 		}
-		if from.Restart != "" {
+		if from.Restart.HasValue() {
 			// Override by non-empty values only
-			spec.Restart = from.Restart
+			spec.Restart = spec.Restart.MergeFrom(from.Restart)
 		}
 		if from.Troubleshoot.HasValue() {
 			// Override by non-empty values only
@@ -621,7 +621,7 @@ func (chi *ClickHouseInstallation) IsRollingUpdate() bool {
 	if chi == nil {
 		return false
 	}
-	return chi.GetSpec().Restart == RestartRollingUpdate
+	return chi.GetSpec().Restart.Value() == RestartRollingUpdate
 }
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode

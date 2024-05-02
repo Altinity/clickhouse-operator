@@ -102,7 +102,7 @@ type ClickHouseOperatorConfiguration struct {
 type ChiSpec struct {
 	TaskID                 *String         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	Stop                   *StringBool     `json:"stop,omitempty"                   yaml:"stop,omitempty"`
-	Restart                string          `json:"restart,omitempty"                yaml:"restart,omitempty"`
+	Restart                *String         `json:"restart,omitempty"                yaml:"restart,omitempty"`
 	Troubleshoot           *StringBool     `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	NamespaceDomainPattern string          `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating  `json:"templating,omitempty"             yaml:"templating,omitempty"`

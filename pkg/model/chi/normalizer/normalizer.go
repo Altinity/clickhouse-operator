@@ -337,15 +337,15 @@ func (n *Normalizer) normalizeStop(stop *api.StringBool) *api.StringBool {
 }
 
 // normalizeRestart normalizes .spec.restart
-func (n *Normalizer) normalizeRestart(restart string) string {
-	switch strings.ToLower(restart) {
+func (n *Normalizer) normalizeRestart(restart *api.String) *api.String {
+	switch strings.ToLower(restart.Value()) {
 	case strings.ToLower(api.RestartRollingUpdate):
 		// Known value, overwrite it to ensure case-ness
-		return api.RestartRollingUpdate
+		return api.NewString(api.RestartRollingUpdate)
 	}
 
 	// In case it is unknown value - just use empty
-	return ""
+	return nil
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
