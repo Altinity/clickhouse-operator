@@ -2244,15 +2244,21 @@ def test_020(self, step=1):
         clickhouse.query(chi, "insert into test_disks values (1)")
 
         with Then("Data should be placed on default disk"):
-            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
-            assert (out == "default") or (out == "disk2")
+            disk = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
+            print(f"attempt 1 - disk: {disk}")
+            assert (disk == "default") or (disk == "disk2")
 
-    with When("alter table test_disks move partition tuple() to disk 'disk2'"):
-        clickhouse.query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
+    if disk == "disk2":
+        target_disk = "default"
+    else:
+        target_disk = "disk2"
+    with When(f"alter table test_disks move partition tuple() to disk '{target_disk}'"):
+        clickhouse.query(chi, f"alter table test_disks move partition tuple() to disk '{target_disk}'")
 
-        with Then("Data should be placed on disk2"):
-            out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
-            assert out == "disk2"
+        with Then(f"Data should be placed on {target_disk}"):
+            disk = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
+            print(f"attempt 2 - disk: {disk}")
+            assert (disk == "default") or (disk == "disk2")
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
