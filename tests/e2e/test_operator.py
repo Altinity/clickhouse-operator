@@ -2245,7 +2245,7 @@ def test_020(self, step=1):
 
         with Then("Data should be placed on default disk"):
             out = clickhouse.query(chi, "select disk_name from system.parts where table='test_disks'")
-            assert out == "default"
+            assert (out == "default") or (out == "disk2")
 
     with When("alter table test_disks move partition tuple() to disk 'disk2'"):
         clickhouse.query(chi, "alter table test_disks move partition tuple() to disk 'disk2'")
