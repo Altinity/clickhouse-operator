@@ -391,8 +391,8 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		if !spec.Troubleshoot.HasValue() {
 			spec.Troubleshoot = spec.Troubleshoot.MergeFrom(from.Troubleshoot)
 		}
-		if spec.NamespaceDomainPattern == "" {
-			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
+		if !spec.NamespaceDomainPattern.HasValue() {
+			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.HasTaskID() {
@@ -410,8 +410,8 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 			// Override by non-empty values only
 			spec.Troubleshoot = from.Troubleshoot
 		}
-		if from.NamespaceDomainPattern != "" {
-			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
+		if from.NamespaceDomainPattern.HasValue() {
+			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
 		}
 	}
 

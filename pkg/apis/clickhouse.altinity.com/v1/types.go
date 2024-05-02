@@ -104,7 +104,7 @@ type ChiSpec struct {
 	Stop                   *StringBool     `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                *String         `json:"restart,omitempty"                yaml:"restart,omitempty"`
 	Troubleshoot           *StringBool     `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
-	NamespaceDomainPattern string          `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	NamespaceDomainPattern *String         `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating  `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *ChiReconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
 	Defaults               *ChiDefaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`

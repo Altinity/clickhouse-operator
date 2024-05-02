@@ -359,8 +359,8 @@ func (n *Normalizer) normalizeTroubleshoot(troubleshoot *api.StringBool) *api.St
 	return api.NewStringBool(false)
 }
 
-func isNamespaceDomainPatternValid(namespaceDomainPattern string) bool {
-	if strings.Count(namespaceDomainPattern, "%s") > 1 {
+func isNamespaceDomainPatternValid(namespaceDomainPattern *api.String) bool {
+	if strings.Count(namespaceDomainPattern.Value(), "%s") > 1 {
 		return false
 	} else {
 		return true
@@ -368,12 +368,12 @@ func isNamespaceDomainPatternValid(namespaceDomainPattern string) bool {
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
-func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern string) string {
+func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *api.String) *api.String {
 	if isNamespaceDomainPatternValid(namespaceDomainPattern) {
 		return namespaceDomainPattern
 	}
 	// In case namespaceDomainPattern is not valid - do not use it
-	return ""
+	return nil
 }
 
 // normalizeDefaults normalizes .spec.defaults

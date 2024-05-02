@@ -534,6 +534,11 @@ func (in *ChiSpec) DeepCopyInto(out *ChiSpec) {
 		*out = new(StringBool)
 		**out = **in
 	}
+	if in.NamespaceDomainPattern != nil {
+		in, out := &in.NamespaceDomainPattern, &out.NamespaceDomainPattern
+		*out = new(String)
+		**out = **in
+	}
 	if in.Templating != nil {
 		in, out := &in.Templating, &out.Templating
 		*out = new(ChiTemplating)

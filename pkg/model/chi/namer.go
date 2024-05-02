@@ -383,9 +383,9 @@ func CreateCHIServiceFQDN(chi *api.ClickHouseInstallation) string {
 	// Start with default pattern
 	pattern := serviceFQDNPattern
 
-	if chi.GetSpec().NamespaceDomainPattern != "" {
+	if chi.GetSpec().NamespaceDomainPattern.HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + chi.GetSpec().NamespaceDomainPattern
+		pattern = "%s." + chi.GetSpec().NamespaceDomainPattern.Value()
 	}
 
 	// Create FQDN based on pattern available
@@ -574,9 +574,9 @@ func createPodFQDN(host *api.ChiHost) string {
 	// Start with default pattern
 	pattern := podFQDNPattern
 
-	if host.GetCHI().GetSpec().NamespaceDomainPattern != "" {
+	if host.GetCHI().GetSpec().NamespaceDomainPattern.HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + host.GetCHI().GetSpec().NamespaceDomainPattern
+		pattern = "%s." + host.GetCHI().GetSpec().NamespaceDomainPattern.Value()
 	}
 
 	// Create FQDN based on pattern available
