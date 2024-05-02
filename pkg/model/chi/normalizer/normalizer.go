@@ -84,13 +84,17 @@ func (n *Normalizer) applyTemplates(subj templatesNormalizer.TemplateSubject) {
 	}
 }
 
+func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
+	return creator.NewCHI()
+}
+
 func (n *Normalizer) ensureNormalizationSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	switch {
 	case subj == nil:
 		// No subject specified - meaning we are normalizing non-existing subject
 		// Need to create subject
 		n.ctx.Options().WithDefaultCluster = false
-		return creator.NewCHI()
+		return n.newSubject()
 	default:
 		// Even in case having subject provided, we need to ensure default cluster presence
 		n.ctx.Options().WithDefaultCluster = true
@@ -98,14 +102,21 @@ func (n *Normalizer) ensureNormalizationSubject(subj *api.ClickHouseInstallation
 	}
 }
 
+func (n *Normalizer) GetTargetTemplate() *api.ClickHouseInstallation {
+	return chop.Config().Template.CHI.Runtime.Template
+}
+
+func (n *Normalizer) HasTargetTemplate() bool {
+	return n.GetTargetTemplate() != nil
+}
+
 func (n *Normalizer) createTarget() *api.ClickHouseInstallation {
-	// What base should be used to create CHI
-	if chop.Config().Template.CHI.Runtime.Template == nil {
-		// No template specified - start with clear page
-		return creator.NewCHI()
-	} else {
+	if n.HasTargetTemplate() {
 		// Template specified - start with template
-		return chop.Config().Template.CHI.Runtime.Template.DeepCopy()
+		return n.GetTargetTemplate().DeepCopy()
+	} else {
+		// No template specified - start with clear page
+		return n.newSubject()
 	}
 }
 
