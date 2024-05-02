@@ -69,7 +69,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 	// At this moment we have target available - is either newly created or a system-wide template
 
 	// Apply templates - both auto and explicitly requested - on top of target
-	n.applyTemplates(subj)
+	n.applyTemplatesOnTarget(subj)
 
 	// After all templates applied, place provided 'subject' on top of the whole stack (target)
 	n.ctx.GetTarget().MergeFrom(subj, api.MergeTypeOverrideByNonEmptyValues)
@@ -78,7 +78,7 @@ func (n *Normalizer) CreateTemplatedCHI(
 	return n.normalize()
 }
 
-func (n *Normalizer) applyTemplates(subj templatesNormalizer.TemplateSubject) {
+func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSubject) {
 	for _, template := range templatesNormalizer.ApplyTemplates(n.ctx.GetTarget(), subj) {
 		n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	}
@@ -91,12 +91,12 @@ func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
 func (n *Normalizer) ensureNormalizationSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	switch {
 	case subj == nil:
-		// No subject specified - meaning we are normalizing non-existing subject
+		// No subject specified - meaning we are normalizing non-existing subject and it should have no clusters inside
 		// Need to create subject
 		n.ctx.Options().WithDefaultCluster = false
 		return n.newSubject()
 	default:
-		// Even in case having subject provided, we need to ensure default cluster presence
+		// Subject specified - meaning we are normalizing existing subject and we need to ensure default cluster presence
 		n.ctx.Options().WithDefaultCluster = true
 		return subj
 	}
