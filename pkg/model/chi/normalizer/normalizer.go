@@ -57,15 +57,18 @@ func (n *Normalizer) CreateTemplatedCHI(subj *api.ClickHouseInstallation, option
 	*api.ClickHouseInstallation,
 	error,
 ) {
-	// New normalization starts with a new context
-	n.ctx = NewContext(options)
-
+	// Normalization starts with a new context
+	n.buildContext(options)
 	// Ensure normalization subject presence
 	subj = n.ensureNormalizationSubject(subj)
 	// Build target from all templates and subject
 	n.buildTargetFromTemplates(subj)
 	// And launch normalization of the whole stack
 	return n.normalizeTarget()
+}
+
+func (n *Normalizer) buildContext(options *Options) {
+	n.ctx = NewContext(options)
 }
 
 func (n *Normalizer) buildTargetFromTemplates(subj *api.ClickHouseInstallation) {
