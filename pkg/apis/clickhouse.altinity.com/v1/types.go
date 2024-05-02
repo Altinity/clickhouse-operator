@@ -100,7 +100,7 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	TaskID                 *string         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	TaskID                 *String         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	Stop                   *StringBool     `json:"stop,omitempty"                   yaml:"stop,omitempty"`
 	Restart                string          `json:"restart,omitempty"                yaml:"restart,omitempty"`
 	Troubleshoot           *StringBool     `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`

@@ -363,24 +363,12 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 
 // HasTaskID checks whether task id is specified
 func (spec *ChiSpec) HasTaskID() bool {
-	switch {
-	case spec == nil:
-		return false
-	case spec.TaskID == nil:
-		return false
-	case len(*spec.TaskID) == 0:
-		return false
-	default:
-		return true
-	}
+	return len(spec.TaskID.Value()) > 0
 }
 
 // GetTaskID gets task id as a string
 func (spec *ChiSpec) GetTaskID() string {
-	if spec.HasTaskID() {
-		return *spec.TaskID
-	}
-	return ""
+	return spec.TaskID.Value()
 }
 
 // MergeFrom merges from spec
@@ -392,7 +380,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if !spec.HasTaskID() {
-			spec.TaskID = from.TaskID
+			spec.TaskID.MergeFrom(from.TaskID)
 		}
 		if !spec.Stop.HasValue() {
 			spec.Stop = spec.Stop.MergeFrom(from.Stop)
@@ -408,7 +396,7 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.HasTaskID() {
-			spec.TaskID = from.TaskID
+			spec.TaskID.MergeFrom(from.TaskID)
 		}
 		if from.Stop.HasValue() {
 			// Override by non-empty values only

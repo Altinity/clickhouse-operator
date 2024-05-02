@@ -516,7 +516,7 @@ func (in *ChiSpec) DeepCopyInto(out *ChiSpec) {
 	*out = *in
 	if in.TaskID != nil {
 		in, out := &in.TaskID, &out.TaskID
-		*out = new(string)
+		*out = new(String)
 		**out = **in
 	}
 	if in.Stop != nil {
