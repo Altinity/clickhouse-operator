@@ -53,16 +53,22 @@ func NewNormalizer(secretGet secretGet) *Normalizer {
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedCHI(
-	subj *api.ClickHouseInstallation,
-	options *Options,
-) (*api.ClickHouseInstallation, error) {
+func (n *Normalizer) CreateTemplatedCHI(subj *api.ClickHouseInstallation, options *Options) (
+	*api.ClickHouseInstallation,
+	error,
+) {
 	// New normalization starts with a new context
 	n.ctx = NewContext(options)
 
 	// Ensure normalization subject presence
 	subj = n.ensureNormalizationSubject(subj)
+	// Build target from all templates and subject
+	n.buildTargetFromTemplates(subj)
+	// And launch normalization of the whole stack
+	return n.normalizeTarget()
+}
 
+func (n *Normalizer) buildTargetFromTemplates(subj *api.ClickHouseInstallation) {
 	// Create new target that will be populated with data during normalization process
 	n.ctx.SetTarget(n.createTarget())
 
@@ -73,9 +79,6 @@ func (n *Normalizer) CreateTemplatedCHI(
 
 	// After all templates applied, place provided 'subject' on top of the whole stack (target)
 	n.ctx.GetTarget().MergeFrom(subj, api.MergeTypeOverrideByNonEmptyValues)
-
-	// And launch normalization of the whole stack
-	return n.normalize()
 }
 
 func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSubject) {
@@ -120,9 +123,8 @@ func (n *Normalizer) createTarget() *api.ClickHouseInstallation {
 	}
 }
 
-// normalize normalizes whole CHI.
-// Returns normalized CHI
-func (n *Normalizer) normalize() (*api.ClickHouseInstallation, error) {
+// normalizeTarget normalizes target
+func (n *Normalizer) normalizeTarget() (*api.ClickHouseInstallation, error) {
 	n.normalizeSpec()
 	n.finalize()
 	n.fillStatus()
@@ -902,7 +904,7 @@ const chopProfile = "clickhouse_operator"
 
 // normalizeConfigurationUsers normalizes .spec.configuration.users
 func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Settings {
-	// Ensure and normalize user settings
+	// Ensure and normalizeTarget user settings
 	users = users.Ensure().Normalize()
 
 	// Add special "default" user to the list of users, which is used/required for:
