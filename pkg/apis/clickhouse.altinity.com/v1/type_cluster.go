@@ -52,10 +52,9 @@ type ChiClusterAddress struct {
 
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
-	// DEPRECATED - to be removed soon
-	Type          string `json:"type,omitempty"          yaml:"type,omitempty"`
-	ShardsCount   int    `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
-	ReplicasCount int    `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
+	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
+	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
+
 	// TODO refactor into map[string]ChiShard
 	Shards   []ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
 	Replicas []ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
