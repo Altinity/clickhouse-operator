@@ -116,7 +116,7 @@ const (
             toString(free_space)  AS free_space,
 			toString(total_space) AS total_space
         FROM system.disks
-       WHERE type = 'local'
+       WHERE type IN ('local','Local')
 	`
 
 	queryDetachedPartsSQL = `
