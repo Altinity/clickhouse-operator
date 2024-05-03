@@ -45,9 +45,17 @@ func prepareListOfTemplates(subj TemplateSubject) (templates []*api.TemplateRef)
 	return templates
 }
 
+func getListOfAutoTemplates() []*api.ClickHouseInstallation {
+	return chop.Config().GetAutoTemplates()
+}
+
+func getTemplate(templateRef *api.TemplateRef, fallbackNamespace string) *api.ClickHouseInstallation {
+	return chop.Config().FindTemplate(templateRef, fallbackNamespace)
+}
+
 func prepareListOfAutoTemplates(subj any) (templates []*api.TemplateRef) {
 	// 1. Get list of auto templates available
-	if autoTemplates := chop.Config().GetAutoTemplates(); len(autoTemplates) > 0 {
+	if autoTemplates := getListOfAutoTemplates(); len(autoTemplates) > 0 {
 		log.V(1).M(subj).F().Info("Found auto-templates num: %d", len(autoTemplates))
 		for _, template := range autoTemplates {
 			log.V(1).M(subj).F().Info(
@@ -75,7 +83,7 @@ func prepareListOfManualTemplates(subj TemplateSubject) (templates []*api.Templa
 
 // ApplyTemplates applies templates provided by 'subj' over 'target'
 func ApplyTemplates(target *api.ClickHouseInstallation, subj TemplateSubject) (appliedTemplates []*api.TemplateRef) {
-	// Prepare list of templates to be applied to the CHI
+	// Prepare list of templates to be applied to the target
 	templates := prepareListOfTemplates(subj)
 
 	// Apply templates from the list and count applied templates - just to make nice log entry
@@ -100,7 +108,7 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 
 	// What template are we going to apply?
 	defaultNamespace := subj.GetNamespace()
-	template := chop.Config().FindTemplate(templateRef, defaultNamespace)
+	template := getTemplate(templateRef, defaultNamespace)
 	if template == nil {
 		log.V(1).M(templateRef).F().Warning(
 			"skip template - UNABLE to find by templateRef: %s/%s",
@@ -150,7 +158,8 @@ func mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickH
 
 	// Merge template's Annotations over target's Annotations
 	target.Annotations = util.MergeStringMapsOverwrite(
-		target.Annotations, util.CopyMapFilter(
+		target.Annotations,
+		util.CopyMapFilter(
 			template.Annotations,
 			chop.Config().Annotation.Include,
 			append(chop.Config().Annotation.Exclude, util.ListSkippedAnnotations()...),
