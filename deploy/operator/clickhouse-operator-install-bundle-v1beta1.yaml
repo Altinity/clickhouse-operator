@@ -694,9 +694,6 @@ spec:
                           allows override settings on each shard and replica separatelly
                         # nullable: true
                         properties:
-                          type:
-                            type: string
-                            description: "DEPRECATED - to be removed soon"
                           shardsCount:
                             type: integer
                             description: "how much shards for current ClickHouse cluster will run in Kubernetes, each shard contains shared-nothing part of data and contains set of replicas, cluster contains 1 shard by default"
@@ -1916,9 +1913,6 @@ spec:
                           allows override settings on each shard and replica separatelly
                         # nullable: true
                         properties:
-                          type:
-                            type: string
-                            description: "DEPRECATED - to be removed soon"
                           shardsCount:
                             type: integer
                             description: "how much shards for current ClickHouse cluster will run in Kubernetes, each shard contains shared-nothing part of data and contains set of replicas, cluster contains 1 shard by default"
