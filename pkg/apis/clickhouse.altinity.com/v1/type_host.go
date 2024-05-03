@@ -141,7 +141,7 @@ func (host *ChiHost) GetHostTemplate() (*HostTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetHostTemplate()
-	return host.Runtime.CHI.GetHostTemplate(name)
+	return host.GetCHI().GetHostTemplate(name)
 }
 
 // GetPodTemplate gets pod template
@@ -150,7 +150,7 @@ func (host *ChiHost) GetPodTemplate() (*PodTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetPodTemplate()
-	return host.Runtime.CHI.GetPodTemplate(name)
+	return host.GetCHI().GetPodTemplate(name)
 }
 
 // GetServiceTemplate gets service template
@@ -159,7 +159,7 @@ func (host *ChiHost) GetServiceTemplate() (*ServiceTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetReplicaServiceTemplate()
-	return host.Runtime.CHI.GetServiceTemplate(name)
+	return host.GetCHI().GetServiceTemplate(name)
 }
 
 // GetStatefulSetReplicasNum gets stateful set replica num
@@ -206,6 +206,10 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 // HasCHI checks whether host has CHI
 func (host *ChiHost) HasCHI() bool {
 	return host.GetCHI() != nil
+}
+
+func (host *ChiHost) SetCHI(chi *ClickHouseInstallation) {
+	host.Runtime.CHI = chi
 }
 
 // GetCluster gets cluster

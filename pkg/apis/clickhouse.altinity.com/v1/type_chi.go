@@ -181,7 +181,7 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 			cluster.Runtime.CHI = chi
 			shard.Runtime.CHI = chi
 			replica.Runtime.CHI = chi
-			host.Runtime.CHI = chi
+			host.SetCHI(chi)
 			return nil
 		},
 	)
