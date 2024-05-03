@@ -50,10 +50,34 @@ type ChiClusterAddress struct {
 	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
 }
 
-// ChiClusterLayout defines layout section of .spec.configuration.clusters
-type ChiClusterLayout struct {
+// ClusterLayout defines layout section of .spec.configuration.clusters
+type ClusterLayout struct {
 	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
 	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
+}
+
+// NewClusterLayout creates new cluster layout
+func NewClusterLayout() *ClusterLayout {
+	return new(ClusterLayout)
+}
+
+func (c *ClusterLayout) GetShardsCount() int {
+	if c == nil {
+		return 0
+	}
+	return c.ShardsCount
+}
+
+func (c *ClusterLayout) GetReplicasCount() int {
+	if c == nil {
+		return 0
+	}
+	return c.ReplicasCount
+}
+
+// ChiClusterLayout defines layout section of .spec.configuration.clusters
+type ChiClusterLayout struct {
+	ClusterLayout `json:",inline" yaml:",inline"`
 
 	// TODO refactor into map[string]ChiShard
 	Shards   []ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`

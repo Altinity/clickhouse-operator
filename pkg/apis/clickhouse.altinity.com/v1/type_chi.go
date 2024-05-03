@@ -187,6 +187,11 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 	)
 }
 
+func (chi *ClickHouseInstallation) Fill() {
+	chi.FillSelfCalculatedAddressInfo()
+	chi.FillCHIPointer()
+}
+
 // WalkClustersFullPath walks clusters with full path
 func (chi *ClickHouseInstallation) WalkClustersFullPath(
 	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error,

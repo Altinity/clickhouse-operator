@@ -247,33 +247,15 @@ func (configuration *ChkConfiguration) MergeFrom(from *ChkConfiguration, _type a
 
 // ChkCluster defines item of a clusters section of .configuration
 type ChkCluster struct {
-	Name   string            `json:"name,omitempty"         yaml:"name,omitempty"`
-	Layout *ChkClusterLayout `json:"layout,omitempty"       yaml:"layout,omitempty"`
+	Name   string                `json:"name,omitempty"         yaml:"name,omitempty"`
+	Layout *apiChi.ClusterLayout `json:"layout,omitempty"       yaml:"layout,omitempty"`
 }
 
-func (c *ChkCluster) GetLayout() *ChkClusterLayout {
+func (c *ChkCluster) GetLayout() *apiChi.ClusterLayout {
 	if c == nil {
 		return nil
 	}
 	return c.Layout
-}
-
-// ChkClusterLayout defines layout section of .spec.configuration.clusters
-type ChkClusterLayout struct {
-	// The valid range of size is from 1 to 7.
-	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
-}
-
-// NewChkClusterLayout creates new cluster layout
-func NewChkClusterLayout() *ChkClusterLayout {
-	return new(ChkClusterLayout)
-}
-
-func (c *ChkClusterLayout) GetReplicasCount() int {
-	if c == nil {
-		return 0
-	}
-	return c.ReplicasCount
 }
 
 func (spec *ChkSpec) GetPath() string {

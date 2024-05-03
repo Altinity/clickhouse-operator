@@ -153,8 +153,7 @@ func (n *Normalizer) normalizeSpec() {
 
 // finalize performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalize() {
-	n.ctx.GetTarget().FillSelfCalculatedAddressInfo()
-	n.ctx.GetTarget().FillCHIPointer()
+	n.ctx.GetTarget().Fill()
 	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
 		hostTemplate := n.getHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)

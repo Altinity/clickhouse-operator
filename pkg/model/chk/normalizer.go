@@ -232,7 +232,7 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 
 	// Ensure layout
 	if cluster.Layout == nil {
-		cluster.Layout = apiChk.NewChkClusterLayout()
+		cluster.Layout = apiChi.NewClusterLayout()
 	}
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
 
@@ -240,10 +240,10 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *apiChk.ChkClusterLayout) *apiChk.ChkClusterLayout {
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *apiChi.ClusterLayout) *apiChi.ClusterLayout {
 	// Ensure layout
 	if layout == nil {
-		layout = apiChk.NewChkClusterLayout()
+		layout = apiChi.NewClusterLayout()
 	}
 
 	// Layout.ShardsCount and
