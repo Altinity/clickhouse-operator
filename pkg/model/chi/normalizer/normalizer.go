@@ -60,7 +60,7 @@ func (n *Normalizer) CreateTemplatedCHI(subj *api.ClickHouseInstallation, option
 	// Normalization starts with a new context
 	n.buildContext(options)
 	// Ensure normalization subject presence
-	subj = n.ensureNormalizationSubject(subj)
+	subj = n.ensureSubject(subj)
 	// Build target from all templates and subject
 	n.buildTargetFromTemplates(subj)
 	// And launch normalization of the whole stack
@@ -94,7 +94,7 @@ func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
 	return creator.NewCHI()
 }
 
-func (n *Normalizer) ensureNormalizationSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 	switch {
 	case subj == nil:
 		// No subject specified - meaning we are normalizing non-existing subject and it should have no clusters inside
