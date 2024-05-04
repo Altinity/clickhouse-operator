@@ -155,7 +155,7 @@ func (n *Normalizer) normalizeSpec() {
 func (n *Normalizer) finalize() {
 	n.ctx.GetTarget().Fill()
 	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
-		hostTemplate := n.getHostTemplate(host)
+		hostTemplate := hostGetHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
 	})
@@ -171,8 +171,8 @@ func (n *Normalizer) fillCHIAddressInfo() {
 	})
 }
 
-// getHostTemplate gets Host Template to be used to normalize Host
-func (n *Normalizer) getHostTemplate(host *api.ChiHost) *api.HostTemplate {
+// hostGetHostTemplate gets Host Template to be used to normalize Host
+func hostGetHostTemplate(host *api.ChiHost) *api.HostTemplate {
 	// Which host template would be used - either explicitly defined in or a default one
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {

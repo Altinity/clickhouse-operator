@@ -32,6 +32,14 @@ type TemplateSubject interface {
 	GetUsedTemplates() []*api.TemplateRef
 }
 
+func getListOfAutoTemplates() []*api.ClickHouseInstallation {
+	return chop.Config().GetAutoTemplates()
+}
+
+func getTemplate(templateRef *api.TemplateRef, fallbackNamespace string) *api.ClickHouseInstallation {
+	return chop.Config().FindTemplate(templateRef, fallbackNamespace)
+}
+
 // prepareListOfTemplates prepares list of CHI templates to be used by the CHI
 func prepareListOfTemplates(subj TemplateSubject) (templates []*api.TemplateRef) {
 	// 1. Get list of auto templates available
@@ -43,14 +51,6 @@ func prepareListOfTemplates(subj TemplateSubject) (templates []*api.TemplateRef)
 
 	log.V(1).M(subj).F().Info("Found applicable templates num: %d", len(templates))
 	return templates
-}
-
-func getListOfAutoTemplates() []*api.ClickHouseInstallation {
-	return chop.Config().GetAutoTemplates()
-}
-
-func getTemplate(templateRef *api.TemplateRef, fallbackNamespace string) *api.ClickHouseInstallation {
-	return chop.Config().FindTemplate(templateRef, fallbackNamespace)
 }
 
 func prepareListOfAutoTemplates(subj any) (templates []*api.TemplateRef) {
@@ -97,13 +97,23 @@ func ApplyTemplates(target *api.ClickHouseInstallation, subj TemplateSubject) (a
 	return appliedTemplates
 }
 
-// applyTemplate applies a template over target n.ctx.chi
-// `initiator` is used to determine whether the template should be applied or not
+// applyTemplate finds and applies a template over target
+// 'subj' is used to determine whether the template should be applied or not
 func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.TemplateRef, subj TemplateSubject) bool {
+	// Find and apply (merge) template
+	if template := findApplicableTemplate(templateRef, subj); template != nil {
+		mergeFromTemplate(target, template)
+		return true
+	}
+
+	return false
+}
+
+func findApplicableTemplate(templateRef *api.TemplateRef, subj TemplateSubject) *api.ClickHouseInstallation {
 	if templateRef == nil {
 		log.Warning("unable to apply template - nil templateRef provided")
 		// Template is not applied
-		return false
+		return nil
 	}
 
 	// What template are we going to apply?
@@ -114,7 +124,7 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 			"skip template - UNABLE to find by templateRef: %s/%s",
 			templateRef.Namespace, templateRef.Name)
 		// Template is not applied
-		return false
+		return nil
 	}
 
 	// What target(s) this template wants to be applied to?
@@ -127,7 +137,7 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 			"Skip template: %s/%s. Selector: %v does not match labels: %v",
 			templateRef.Namespace, templateRef.Name, selector, subj.GetLabels())
 		// Template is not applied
-		return false
+		return nil
 	}
 
 	//
@@ -138,11 +148,7 @@ func applyTemplate(target *api.ClickHouseInstallation, templateRef *api.Template
 		"Apply template: %s/%s. Selector: %v matches labels: %v",
 		templateRef.Namespace, templateRef.Name, selector, subj.GetLabels())
 
-	//  Let's apply template and append used template to the list of used templates
-	mergeFromTemplate(target, template)
-
-	// Template is applied
-	return true
+	return template
 }
 
 func mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickHouseInstallation {
