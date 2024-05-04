@@ -822,14 +822,14 @@ func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
 		return
 	}
 
-	for _, existingEnvVar := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars {
+	for _, existingEnvVar := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().GetAdditionalEnvVars() {
 		if existingEnvVar.Name == envVar.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalEnvVars, envVar)
+	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AppendAdditionalEnvVars(envVar)
 }
 
 func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
@@ -838,14 +838,14 @@ func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
 		return
 	}
 
-	for _, existingVolume := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes {
+	for _, existingVolume := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().GetAdditionalVolumes() {
 		if existingVolume.Name == volume.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumes, volume)
+	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AppendAdditionalVolumes(volume)
 }
 
 func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
@@ -854,14 +854,14 @@ func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 		return
 	}
 
-	for _, existingVolumeMount := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts {
+	for _, existingVolumeMount := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().GetAdditionalVolumeMounts() {
 		if existingVolumeMount.Name == volumeMount.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts = append(n.ctx.GetTarget().EnsureRuntime().GetAttributes().AdditionalVolumeMounts, volumeMount)
+	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AppendAdditionalVolumeMounts(volumeMount)
 }
 
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")

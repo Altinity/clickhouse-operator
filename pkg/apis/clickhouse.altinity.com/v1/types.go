@@ -79,6 +79,62 @@ type ComparableAttributes struct {
 	SkipOwnerRef           bool               `json:"-" yaml:"-"`
 }
 
+func (a *ComparableAttributes) GetAdditionalEnvVars() []core.EnvVar {
+	if a == nil {
+		return nil
+	}
+	return a.AdditionalEnvVars
+}
+
+func (a *ComparableAttributes) AppendAdditionalEnvVars(envVars ...core.EnvVar) {
+	if a == nil {
+		return
+	}
+	a.AdditionalEnvVars = append(a.AdditionalEnvVars, envVars...)
+}
+
+func (a *ComparableAttributes) GetAdditionalVolumes() []core.Volume {
+	if a == nil {
+		return nil
+	}
+	return a.AdditionalVolumes
+}
+
+func (a *ComparableAttributes) AppendAdditionalVolumes(volumes ...core.Volume) {
+	if a == nil {
+		return
+	}
+	a.AdditionalVolumes = append(a.AdditionalVolumes, volumes...)
+}
+
+func (a *ComparableAttributes) GetAdditionalVolumeMounts() []core.VolumeMount {
+	if a == nil {
+		return nil
+	}
+	return a.AdditionalVolumeMounts
+}
+
+func (a *ComparableAttributes) AppendAdditionalVolumeMounts(volumeMounts ...core.VolumeMount) {
+	if a == nil {
+		return
+	}
+	a.AdditionalVolumeMounts = append(a.AdditionalVolumeMounts, volumeMounts...)
+}
+
+func (a *ComparableAttributes) GetSkipOwnerRef() bool {
+	if a == nil {
+		return false
+	}
+	return a.SkipOwnerRef
+}
+
+func (a *ComparableAttributes) SetSkipOwnerRef(skip bool) {
+	if a == nil {
+		return
+	}
+	a.SkipOwnerRef = skip
+}
+
 // +genclient
 // +genclient:noStatus
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
