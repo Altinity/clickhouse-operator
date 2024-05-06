@@ -38,10 +38,15 @@ type ClusterRuntime struct {
 
 type IClusterRuntime interface {
 	GetAddress() IClusterAddress
+	GetRoot() IRoot
 }
 
 func (r ClusterRuntime) GetAddress() IClusterAddress {
 	return r.Address
+}
+
+func (r ClusterRuntime) GetRoot() IRoot {
+	return r.CHI
 }
 
 // SchemaPolicy defines schema management policy - replica or shard-based

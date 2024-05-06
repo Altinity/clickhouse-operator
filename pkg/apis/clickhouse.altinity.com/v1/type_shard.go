@@ -14,6 +14,10 @@
 
 package v1
 
+func (shard *ChiShard) GetName() string {
+	return shard.Name
+}
+
 // InheritSettingsFrom inherits settings from specified cluster
 func (shard *ChiShard) InheritSettingsFrom(cluster *Cluster) {
 	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)

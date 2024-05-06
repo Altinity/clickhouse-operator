@@ -29,7 +29,7 @@ import (
 
 // CreateServiceCHI creates new core.Service for specified CHI
 func (c *Creator) CreateServiceCHI() *core.Service {
-	if template, ok := c.chi.GetCHIServiceTemplate(); ok {
+	if template, ok := c.chi.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,

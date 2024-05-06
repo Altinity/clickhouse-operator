@@ -175,6 +175,14 @@ type ChiSpec struct {
 	UseTemplates           []*TemplateRef  `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
+func (s *ChiSpec) GetNamespaceDomainPattern() *String {
+	return s.NamespaceDomainPattern
+}
+
+type ICHISpec interface {
+	GetNamespaceDomainPattern() *String
+}
+
 // TemplateRef defines UseTemplate section of ClickHouseInstallation resource
 type TemplateRef struct {
 	Name      string `json:"name,omitempty"      yaml:"name,omitempty"`

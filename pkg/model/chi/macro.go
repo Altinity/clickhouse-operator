@@ -235,14 +235,27 @@ type chi interface {
 	GetNamespace() string
 	GetName() string
 	GetRuntime() api.IClickHouseInstallationRuntime
+	WalkHosts(func(host *api.ChiHost) error) []error
+	GetRootServiceTemplate() (*api.ServiceTemplate, bool)
+	GetSpec() *api.ChiSpec
 }
 
 type cluster interface {
+	GetName() string
 	GetRuntime() api.IClusterRuntime
+	WalkHosts(func(host *api.ChiHost) error) []error
+	GetServiceTemplate() (*api.ServiceTemplate, bool)
 }
 
 type shard interface {
+	GetName() string
 	GetRuntime() api.IShardRuntime
+	WalkHosts(func(host *api.ChiHost) error) []error
+	GetServiceTemplate() (*api.ServiceTemplate, bool)
+}
+
+type replica interface {
+	GetName() string
 }
 
 type host interface {

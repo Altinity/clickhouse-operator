@@ -27,6 +27,11 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+type IRoot interface {
+	GetName() string
+	WalkHosts(f func(host *ChiHost) error) []error
+}
+
 func (chi *ClickHouseInstallation) GetSpec() *ChiSpec {
 	return &chi.Spec
 }
@@ -548,8 +553,8 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ServiceTemp
 	return chi.GetSpec().Templates.GetServiceTemplatesIndex().Get(name), true
 }
 
-// GetCHIServiceTemplate gets ServiceTemplate of a CHI
-func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ServiceTemplate, bool) {
+// GetRootServiceTemplate gets ServiceTemplate of a CHI
+func (chi *ClickHouseInstallation) GetRootServiceTemplate() (*ServiceTemplate, bool) {
 	if !chi.GetSpec().Defaults.Templates.HasServiceTemplate() {
 		return nil, false
 	}

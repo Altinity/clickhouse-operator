@@ -14,6 +14,10 @@
 
 package v1
 
+func (replica *ChiReplica) GetName() string {
+	return replica.Name
+}
+
 // InheritSettingsFrom inherits settings from specified cluster
 func (replica *ChiReplica) InheritSettingsFrom(cluster *Cluster) {
 	replica.Settings = replica.Settings.MergeFrom(cluster.Settings)
