@@ -1238,6 +1238,56 @@ spec:
                 labels:
                   app: clickhouse-operator
               spec:
+                volumes:
+                  - name: etc-clickhouse-operator-folder
+                    configMap:
+                      name: etc-clickhouse-operator-files
+                      optional: true
+                  - name: etc-clickhouse-operator-confd-folder
+                    configMap:
+                      name: etc-clickhouse-operator-confd-files
+                      optional: true
+                  - name: etc-clickhouse-operator-configd-folder
+                    configMap:
+                      name: etc-clickhouse-operator-configd-files
+                      optional: true
+                  - name: etc-clickhouse-operator-templatesd-folder
+                    configMap:
+                      name: etc-clickhouse-operator-templatesd-files
+                      optional: true
+                  - name: etc-clickhouse-operator-usersd-folder
+                    configMap:
+                      name: etc-clickhouse-operator-usersd-files
+                      optional: true
+                  - name: tmp-for-log
+                    emptyDir: {}            
+                initContainers:
+                  - name: add-configmaps-secret
+                    image: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
+                    command:
+                      - /clickhouse-operator
+                      - --configmaps-secret
+                    env:
+                      - name: POD_NAMESPACE
+                        valueFrom:
+                          fieldRef:
+                            fieldPath: metadata.namespace
+                    volumeMounts:
+                      - name: tmp-for-log
+                        mountPath: /tmp
+                    imagePullPolicy: Always
+                    securityContext:
+                      privileged: false
+                      readOnlyRootFilesystem: true
+                    resources:
+                      limits:
+                        cpu: 100m
+                        ephemeral-storage: 200Mi
+                        memory: 128Mi
+                      requests:
+                        cpu: 100m
+                        ephemeral-storage: 50Mi
+                        memory: 128Mi
                 containers:
                   - env:
                       - name: OPERATOR_POD_NODE_NAME
@@ -1287,6 +1337,17 @@ spec:
                     image: docker.io/altinity/clickhouse-operator:${OPERATOR_VERSION}
                     imagePullPolicy: Always
                     name: clickhouse-operator
+                    volumeMounts:
+                      - name: etc-clickhouse-operator-folder
+                        mountPath: /etc/clickhouse-operator
+                      - name: etc-clickhouse-operator-confd-folder
+                        mountPath: /etc/clickhouse-operator/conf.d
+                      - name: etc-clickhouse-operator-configd-folder
+                        mountPath: /etc/clickhouse-operator/config.d
+                      - name: etc-clickhouse-operator-templatesd-folder
+                        mountPath: /etc/clickhouse-operator/templates.d
+                      - name: etc-clickhouse-operator-usersd-folder
+                        mountPath: /etc/clickhouse-operator/users.d
                   - image: docker.io/altinity/metrics-exporter:${OPERATOR_VERSION}
                     imagePullPolicy: Always
                     name: metrics-exporter

@@ -18,12 +18,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/version"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // CLI parameter variables
@@ -42,6 +44,10 @@ var (
 
 	// masterURL defines URL of kubernetes master to be used
 	masterURL string
+
+	// configmapsSecretRequest defines request for creating required defaults in configmaps and a secret to be used by the operator.
+	// This is for OCP deployment only
+	configmapsSecretRequest bool
 )
 
 func init() {
@@ -49,6 +55,7 @@ func init() {
 	flag.BoolVar(&debugRequest, "debug", false, "Debug run")
 	flag.StringVar(&chopConfigFile, "config", "", "Path to clickhouse-operator config file.")
 	flag.StringVar(&masterURL, "master", "", "The address of custom Kubernetes API server. Makes sense if runs outside of the cluster and not being specified in kube config file only.")
+	flag.BoolVar(&configmapsSecretRequest, "configmaps-secret", false, "Add configmaps and secret to the namespace the operator resides")
 }
 
 // Run is an entry point of the application
@@ -57,6 +64,21 @@ func Run() {
 
 	if versionRequest {
 		fmt.Printf("%s\n", version.Version)
+		os.Exit(0)
+	}
+
+	if configmapsSecretRequest {
+		kubeClient, _, _ := chop.GetClientset(kubeConfigFile, masterURL)
+		err := chop.HandleConfigmapsCreation(kubeClient)
+		if err != nil {
+			fmt.Printf("Error creating ConfigMaps: %v\n", err)
+			os.Exit(1)
+		}
+		err = chop.HandleSecretCreation(kubeClient)
+		if err != nil {
+			fmt.Printf("Error creating Secret: %v\n", err)
+			os.Exit(2)
+		}
 		os.Exit(0)
 	}
 
