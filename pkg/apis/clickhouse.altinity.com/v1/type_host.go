@@ -54,6 +54,18 @@ type ChiHostRuntime struct {
 	CHI *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+func (r ChiHostRuntime) GetAddress() IHostAddress {
+	return r.Address
+}
+
+type IHostRuntime interface {
+	GetAddress() IHostAddress
+}
+
+func (host *ChiHost) GetRuntime() IHostRuntime {
+	return host.Runtime
+}
+
 // GetReconcileAttributes is an ensurer getter
 func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
 	if host == nil {

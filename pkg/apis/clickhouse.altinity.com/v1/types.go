@@ -59,6 +59,12 @@ func newClickHouseInstallationRuntime() *ClickHouseInstallationRuntime {
 	}
 }
 
+type IClickHouseInstallationRuntime interface {
+	GetAttributes() *ComparableAttributes
+	LockCommonConfig()
+	UnlockCommonConfig()
+}
+
 func (runtime *ClickHouseInstallationRuntime) GetAttributes() *ComparableAttributes {
 	return runtime.attributes
 }
@@ -678,6 +684,10 @@ type ChiShardRuntime struct {
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+func (r ChiShardRuntime) GetAddress() IShardAddress {
+	return r.Address
+}
+
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
 // TODO unify with ChiShard based on HostsSet
 type ChiReplica struct {
@@ -705,6 +715,34 @@ type ChiShardAddress struct {
 	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
 	ShardName    string `json:"shardName,omitempty"    yaml:"shardName,omitempty"`
 	ShardIndex   int    `json:"shardIndex,omitempty"   yaml:"shardIndex,omitempty"`
+}
+
+type IShardAddress interface {
+	GetNamespace() string
+	GetRootName() string
+	GetClusterName() string
+	GetClusterIndex() int
+	GetShardName() string
+	GetShardIndex() int
+}
+
+func (a ChiShardAddress) GetNamespace() string {
+	return a.Namespace
+}
+func (a ChiShardAddress) GetRootName() string {
+	return a.CHIName
+}
+func (a ChiShardAddress) GetClusterName() string {
+	return a.ClusterName
+}
+func (a ChiShardAddress) GetClusterIndex() int {
+	return a.ClusterIndex
+}
+func (a ChiShardAddress) GetShardName() string {
+	return a.ShardName
+}
+func (a ChiShardAddress) GetShardIndex() int {
+	return a.ShardIndex
 }
 
 // ChiReplicaAddress defines address of a replica within ClickHouseInstallation

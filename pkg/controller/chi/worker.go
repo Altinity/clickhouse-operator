@@ -1104,10 +1104,10 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	// Specify in options to exclude this host from ClickHouse config file
-	host.GetCHI().EnsureRuntime().LockCommonConfig()
+	host.GetCHI().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().SetExclude()
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), w.options())
-	host.GetCHI().EnsureRuntime().UnlockCommonConfig()
+	host.GetCHI().GetRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitExcludeHost(host) {
 		return
@@ -1129,10 +1129,10 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	// Specify in options to add this host into ClickHouse config file
-	host.GetCHI().EnsureRuntime().LockCommonConfig()
+	host.GetCHI().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().UnsetExclude()
 	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), w.options())
-	host.GetCHI().EnsureRuntime().UnlockCommonConfig()
+	host.GetCHI().GetRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitIncludeHost(host) {
 		return

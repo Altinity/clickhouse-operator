@@ -33,7 +33,7 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
-			c.chi.Namespace,
+			c.chi.GetNamespace(),
 			model.CreateCHIServiceName(c.chi),
 			c.labels.GetServiceCHI(c.chi),
 			c.annotations.GetServiceCHI(c.chi),
@@ -48,7 +48,7 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateCHIServiceName(c.chi),
-			Namespace:       c.chi.Namespace,
+			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetServiceCHI(c.chi)),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetServiceCHI(c.chi)),
 			OwnerReferences: getOwnerReferences(c.chi),

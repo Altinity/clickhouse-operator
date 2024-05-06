@@ -822,14 +822,14 @@ func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
 		return
 	}
 
-	for _, existingEnvVar := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().GetAdditionalEnvVars() {
+	for _, existingEnvVar := range n.ctx.GetTarget().GetRuntime().GetAttributes().GetAdditionalEnvVars() {
 		if existingEnvVar.Name == envVar.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AppendAdditionalEnvVars(envVar)
+	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVars(envVar)
 }
 
 func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
@@ -838,14 +838,14 @@ func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
 		return
 	}
 
-	for _, existingVolume := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().GetAdditionalVolumes() {
+	for _, existingVolume := range n.ctx.GetTarget().GetRuntime().GetAttributes().GetAdditionalVolumes() {
 		if existingVolume.Name == volume.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AppendAdditionalVolumes(volume)
+	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumes(volume)
 }
 
 func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
@@ -854,14 +854,14 @@ func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 		return
 	}
 
-	for _, existingVolumeMount := range n.ctx.GetTarget().EnsureRuntime().GetAttributes().GetAdditionalVolumeMounts() {
+	for _, existingVolumeMount := range n.ctx.GetTarget().GetRuntime().GetAttributes().GetAdditionalVolumeMounts() {
 		if existingVolumeMount.Name == volumeMount.Name {
 			// Such a variable already exists
 			return
 		}
 	}
 
-	n.ctx.GetTarget().EnsureRuntime().GetAttributes().AppendAdditionalVolumeMounts(volumeMount)
+	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMounts(volumeMount)
 }
 
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")

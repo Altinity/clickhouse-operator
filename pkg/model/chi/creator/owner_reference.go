@@ -21,7 +21,7 @@ import (
 )
 
 func getOwnerReferences(chi *api.ClickHouseInstallation) []meta.OwnerReference {
-	if chi.EnsureRuntime().GetAttributes().GetSkipOwnerRef() {
+	if chi.GetRuntime().GetAttributes().GetSkipOwnerRef() {
 		return nil
 	}
 	return []meta.OwnerReference{

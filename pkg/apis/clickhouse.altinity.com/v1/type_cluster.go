@@ -36,6 +36,14 @@ type ClusterRuntime struct {
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+type IClusterRuntime interface {
+	GetAddress() IClusterAddress
+}
+
+func (r ClusterRuntime) GetAddress() IClusterAddress {
+	return r.Address
+}
+
 // SchemaPolicy defines schema management policy - replica or shard-based
 type SchemaPolicy struct {
 	Replica string `json:"replica" yaml:"replica"`
@@ -48,6 +56,26 @@ type ChiClusterAddress struct {
 	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
 	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
 	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
+}
+
+type IClusterAddress interface {
+	GetNamespace() string
+	GetRootName() string
+	GetClusterName() string
+	GetClusterIndex() int
+}
+
+func (a ChiClusterAddress) GetNamespace() string {
+	return a.Namespace
+}
+func (a ChiClusterAddress) GetRootName() string {
+	return a.CHIName
+}
+func (a ChiClusterAddress) GetClusterName() string {
+	return a.ClusterName
+}
+func (a ChiClusterAddress) GetClusterIndex() int {
+	return a.ClusterIndex
 }
 
 // ClusterLayout defines layout section of .spec.configuration.clusters
@@ -98,6 +126,10 @@ func NewClusterSchemaPolicy() *SchemaPolicy {
 // NewChiClusterLayout creates new cluster layout
 func NewChiClusterLayout() *ChiClusterLayout {
 	return new(ChiClusterLayout)
+}
+
+func (cluster *Cluster) GetRuntime() IClusterRuntime {
+	return cluster.Runtime
 }
 
 // FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
@@ -185,6 +217,10 @@ func (cluster *Cluster) GetServiceTemplate() (*ServiceTemplate, bool) {
 	}
 	name := cluster.Templates.GetClusterServiceTemplate()
 	return cluster.Runtime.CHI.GetServiceTemplate(name)
+}
+
+func (cluster *Cluster) GetName() string {
+	return cluster.Name
 }
 
 // GetCHI gets parent CHI

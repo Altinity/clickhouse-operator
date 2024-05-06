@@ -133,3 +133,11 @@ func (shard *ChiShard) GetWeight() int {
 	}
 	return 0
 }
+
+type IShardRuntime interface {
+	GetAddress() IShardAddress
+}
+
+func (shard *ChiShard) GetRuntime() IShardRuntime {
+	return shard.Runtime
+}

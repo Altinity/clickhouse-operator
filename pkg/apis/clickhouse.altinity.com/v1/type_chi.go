@@ -359,7 +359,7 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	chi.GetSpec().MergeFrom(from.GetSpec(), _type)
 
 	// Copy service attributes
-	chi.EnsureRuntime().attributes = from.EnsureRuntime().attributes
+	chi.ensureRuntime().attributes = from.ensureRuntime().attributes
 
 	chi.EnsureStatus().CopyFrom(from.Status, CopyCHIStatusOptions{
 		InheritableFields: true,
@@ -708,7 +708,11 @@ func (chi *ClickHouseInstallation) YAML(opts CopyCHIOptions) string {
 	return string(yamlBytes)
 }
 
-func (chi *ClickHouseInstallation) EnsureRuntime() *ClickHouseInstallationRuntime {
+func (chi *ClickHouseInstallation) GetRuntime() IClickHouseInstallationRuntime {
+	return chi.ensureRuntime()
+}
+
+func (chi *ClickHouseInstallation) ensureRuntime() *ClickHouseInstallationRuntime {
 	if chi == nil {
 		return nil
 	}

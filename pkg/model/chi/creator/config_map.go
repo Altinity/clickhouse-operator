@@ -27,7 +27,7 @@ func (c *Creator) CreateConfigMapCHICommon(options *model.ClickHouseConfigFilesG
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapCommonName(c.chi),
-			Namespace:       c.chi.Namespace,
+			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommon()),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetConfigMapCHICommon()),
 			OwnerReferences: getOwnerReferences(c.chi),
@@ -45,7 +45,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapCommonUsersName(c.chi),
-			Namespace:       c.chi.Namespace,
+			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommonUsers()),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetConfigMapCHICommonUsers()),
 			OwnerReferences: getOwnerReferences(c.chi),

@@ -57,21 +57,21 @@ func NewActionPlan(old, new *api.ClickHouseInstallation) *ActionPlan {
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, ap.new.Finalizers)
-		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.EnsureRuntime().GetAttributes(), ap.new.EnsureRuntime().GetAttributes())
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.GetRuntime().GetAttributes(), ap.new.GetRuntime().GetAttributes())
 	} else if old == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.GetSpec())
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.Labels)
 		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.DeletionTimestamp)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(nil, ap.new.DeletionTimestamp)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.Finalizers)
-		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(nil, ap.new.EnsureRuntime().GetAttributes())
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(nil, ap.new.GetRuntime().GetAttributes())
 	} else if new == nil {
 		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.GetSpec(), nil)
 		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, nil)
 		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, nil)
 		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, nil)
 		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, nil)
-		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.EnsureRuntime().GetAttributes(), nil)
+		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.GetRuntime().GetAttributes(), nil)
 	} else {
 		// Both are nil
 		ap.specDiff = nil
