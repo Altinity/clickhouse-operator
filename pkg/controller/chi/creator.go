@@ -200,7 +200,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *api.Ch
 		// Delete gracefully failed StatefulSet
 		log.V(1).M(host).F().Info(
 			"going to DELETE FAILED StatefulSet %s",
-			util.NamespaceNameString(host.Runtime.DesiredStatefulSet.ObjectMeta))
+			util.NamespaceNameString(host.Runtime.DesiredStatefulSet.GetObjectMeta()))
 		_ = c.deleteHost(ctx, host)
 		return c.shouldContinueOnCreateFailed()
 
@@ -208,7 +208,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *api.Ch
 		// Ignore error, continue reconcile loop
 		log.V(1).M(host).F().Info(
 			"going to ignore error %s",
-			util.NamespaceNameString(host.Runtime.DesiredStatefulSet.ObjectMeta))
+			util.NamespaceNameString(host.Runtime.DesiredStatefulSet.GetObjectMeta()))
 		return errCRUDIgnore
 
 	default:
@@ -236,15 +236,15 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	switch chop.Config().Reconcile.StatefulSet.Update.OnFailure {
 	case api.OnStatefulSetUpdateFailureActionAbort:
 		// Report appropriate error, it will break reconcile loop
-		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info("abort StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
 		return errCRUDAbort
 
 	case api.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
-		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
 		statefulSet, err := c.getStatefulSet(host)
 		if err != nil {
-			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta), err)
+			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()), err)
 			return c.shouldContinueOnUpdateFailed()
 		}
 
@@ -261,7 +261,7 @@ func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 
 	case api.OnStatefulSetUpdateFailureActionIgnore:
 		// Ignore error, continue reconcile loop
-		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.ObjectMeta))
+		log.V(1).M(host).F().Info("going to ignore error %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
 		return errCRUDIgnore
 
 	default:

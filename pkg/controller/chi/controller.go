@@ -222,7 +222,7 @@ func (c *Controller) addEventHandlersService(
 	kubeInformerFactory.Core().V1().Services().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
-			if !c.isTrackedObject(&service.ObjectMeta) {
+			if !c.isTrackedObject(service.GetObjectMeta()) {
 				return
 			}
 			log.V(3).M(service).Info("serviceInformer.AddFunc")
@@ -454,8 +454,8 @@ func (c *Controller) addEventHandlers(
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
-func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
-	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && model.IsCHOPGeneratedObject(objectMeta)
+func (c *Controller) isTrackedObject(meta meta.Object) bool {
+	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && model.IsCHOPGeneratedObject(meta)
 }
 
 // Run syncs caches, starts workers
@@ -649,13 +649,13 @@ func (c *Controller) addChopConfig(chopConfig *api.ClickHouseOperatorConfigurati
 
 // updateChopConfig
 func (c *Controller) updateChopConfig(old, new *api.ClickHouseOperatorConfiguration) error {
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
+	if old.GetObjectMeta().GetResourceVersion() == new.GetObjectMeta().GetResourceVersion() {
+		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.GetObjectMeta().GetResourceVersion())
 		// No need to react
 		return nil
 	}
 
-	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.GetObjectMeta().GetResourceVersion(), new.GetObjectMeta().GetResourceVersion())
 	// TODO
 	// NEED REFACTORING
 	//os.Exit(0)
@@ -698,7 +698,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 	payload, _ := json.Marshal([]patchFinalizers{{
 		Op:    "replace",
 		Path:  "/metadata/finalizers",
-		Value: chi.ObjectMeta.Finalizers,
+		Value: chi.GetObjectMeta().GetFinalizers(),
 	}})
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, controller.NewPatchOptions())
@@ -708,10 +708,10 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 		return err
 	}
 
-	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
+	if chi.GetObjectMeta().GetResourceVersion() != _new.GetObjectMeta().GetResourceVersion() {
 		// Updated
-		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
-		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
+		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetObjectMeta().GetResourceVersion(), _new.GetObjectMeta().GetResourceVersion())
+		chi.GetObjectMeta().SetResourceVersion(_new.GetObjectMeta().GetResourceVersion())
 		return nil
 	}
 
@@ -760,7 +760,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 		return nil
 	}
 
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.GetObjectMeta())
 	log.V(3).M(chi).F().Info("Update CHI status")
 
 	podIPs := c.getPodsIPs(chi)
@@ -793,9 +793,9 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 	}
 
 	// Propagate updated ResourceVersion into chi
-	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
-		log.V(3).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
-		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
+	if chi.GetObjectMeta().GetResourceVersion() != _new.GetObjectMeta().GetResourceVersion() {
+		log.V(3).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetObjectMeta().GetResourceVersion(), _new.GetObjectMeta().GetResourceVersion())
+		chi.GetObjectMeta().SetResourceVersion(_new.GetObjectMeta().GetResourceVersion())
 		return nil
 	}
 
@@ -810,7 +810,7 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 		return
 	}
 
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.GetObjectMeta())
 
 	for {
 		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
@@ -846,13 +846,13 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseIn
 		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
-	if util.InArray(FinalizerName, cur.ObjectMeta.Finalizers) {
+	if util.InArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()) {
 		// Already installed
 		return nil
 	}
 	log.V(3).M(chi).F().Info("no finalizer found, need to install one")
 
-	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
+	cur.GetObjectMeta().SetFinalizers(append(cur.GetObjectMeta().GetFinalizers(), FinalizerName))
 	return c.patchCHIFinalizers(ctx, cur)
 }
 
@@ -874,7 +874,7 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
-	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
+	cur.GetObjectMeta().SetFinalizers(util.RemoveFromArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()))
 
 	return c.patchCHIFinalizers(ctx, cur)
 }

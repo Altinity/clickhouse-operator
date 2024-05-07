@@ -23,6 +23,8 @@ import (
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -30,6 +32,10 @@ import (
 type IRoot interface {
 	GetName() string
 	WalkHosts(f func(host *ChiHost) error) []error
+}
+
+func (chi *ClickHouseInstallation) GetObjectMeta() meta.Object {
+	return &chi.ObjectMeta
 }
 
 func (chi *ClickHouseInstallation) GetSpec() *ChiSpec {

@@ -56,7 +56,7 @@ func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registr
 		return
 	}
 	for _, obj := range list.Items {
-		r.RegisterStatefulSet(obj.ObjectMeta)
+		r.RegisterStatefulSet(obj.GetObjectMeta())
 	}
 }
 
@@ -71,7 +71,7 @@ func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry,
 		return
 	}
 	for _, obj := range list.Items {
-		r.RegisterConfigMap(obj.ObjectMeta)
+		r.RegisterConfigMap(obj.GetObjectMeta())
 	}
 }
 
@@ -86,7 +86,7 @@ func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, c
 		return
 	}
 	for _, obj := range list.Items {
-		r.RegisterService(obj.ObjectMeta)
+		r.RegisterService(obj.GetObjectMeta())
 	}
 }
 
@@ -101,7 +101,7 @@ func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, ch
 		return
 	}
 	for _, obj := range list.Items {
-		r.RegisterSecret(obj.ObjectMeta)
+		r.RegisterSecret(obj.GetObjectMeta())
 	}
 }
 
@@ -116,7 +116,7 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, chi *
 		return
 	}
 	for _, obj := range list.Items {
-		r.RegisterPVC(obj.ObjectMeta)
+		r.RegisterPVC(obj.GetObjectMeta())
 	}
 }
 
@@ -147,6 +147,6 @@ func (c *Controller) discoveryPDBs(ctx context.Context, r *model.Registry, chi *
 		return
 	}
 	for _, obj := range list.Items {
-		r.RegisterPDB(obj.ObjectMeta)
+		r.RegisterPDB(obj.GetObjectMeta())
 	}
 }

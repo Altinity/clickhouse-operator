@@ -288,7 +288,7 @@ func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
-		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.Labels, err)
+		w.a.M(cmd.initiator).F().Error("unable to find CHI by %v err: %v", cmd.initiator.GetLabels(), err)
 	}
 	return nil
 }
@@ -359,12 +359,12 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 	}
 
 	// In case CHI is being deleted already, no need to meddle with finalizers
-	if !chi.ObjectMeta.DeletionTimestamp.IsZero() {
+	if !chi.GetObjectMeta().GetDeletionTimestamp().IsZero() {
 		return false
 	}
 
 	// Finalizer can already be listed in CHI, do nothing in this case
-	if util.InArray(FinalizerName, chi.ObjectMeta.Finalizers) {
+	if util.InArray(FinalizerName, chi.GetObjectMeta().GetFinalizers()) {
 		w.a.V(2).M(chi).F().Info("finalizer already installed")
 		return false
 	}
@@ -383,13 +383,13 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 
-	if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, normalizer.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, normalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := normalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCHIFromObjectMeta(&new.ObjectMeta, false, opts); err == nil {
+		if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
 
 			// TODO unify with finalize reconcile
@@ -402,10 +402,10 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 				},
 			})
 		} else {
-			w.a.M(&new.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", new.Labels, err)
+			w.a.M(new.GetObjectMeta()).F().Error("internal unable to find CHI by %v err: %v", new.GetLabels(), err)
 		}
 	} else {
-		w.a.M(&new.ObjectMeta).F().Error("external unable to find CHI by %v err %v", new.Labels, err)
+		w.a.M(new.GetObjectMeta()).F().Error("external unable to find CHI by %v err %v", new.GetLabels(), err)
 	}
 	return nil
 }
@@ -422,9 +422,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 	update := (old != nil) && (new != nil)
 
-	if update && (old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion) {
+	if update && (old.GetObjectMeta().GetResourceVersion() == new.GetObjectMeta().GetResourceVersion()) {
 		// No need to react
-		w.a.V(3).M(new).F().Info("ResourceVersion did not change: %s", new.ObjectMeta.ResourceVersion)
+		w.a.V(3).M(new).F().Info("ResourceVersion did not change: %s", new.GetObjectMeta().GetResourceVersion())
 		return nil
 	}
 
@@ -673,13 +673,13 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	w.a.V(1).M(_chi).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, normalizer.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(_chi.GetObjectMeta(), true, normalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := normalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCHIFromObjectMeta(&_chi.ObjectMeta, true, opts); err == nil {
+		if chi, err := w.createCHIFromObjectMeta(_chi.GetObjectMeta(), true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
 			chi.SetAncestor(chi.GetTarget())
 			chi.SetTarget(nil)
@@ -693,10 +693,10 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 				},
 			})
 		} else {
-			w.a.M(&_chi.ObjectMeta).F().Error("internal unable to find CHI by %v err: %v", _chi.Labels, err)
+			w.a.M(_chi.GetObjectMeta()).F().Error("internal unable to find CHI by %v err: %v", _chi.GetLabels(), err)
 		}
 	} else {
-		w.a.M(&_chi.ObjectMeta).F().Error("external unable to find CHI by %v err %v", _chi.Labels, err)
+		w.a.M(_chi.GetObjectMeta()).F().Error("external unable to find CHI by %v err %v", _chi.GetLabels(), err)
 	}
 
 	w.a.V(1).
@@ -750,8 +750,8 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 				// Have we found this StatefulSet
 				found := false
 
-				objs.WalkStatefulSet(func(meta meta.ObjectMeta) {
-					if name == meta.Name {
+				objs.WalkStatefulSet(func(meta meta.Object) {
+					if name == meta.GetName() {
 						// StatefulSet of this host already exist
 						found = true
 					}
@@ -1288,11 +1288,11 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.ChiHost)
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool, options *normalizer.Options) (*api.ClickHouseInstallation, error) {
-	w.a.V(3).M(objectMeta).S().P()
-	defer w.a.V(3).M(objectMeta).E().P()
+func (w *worker) createCHIFromObjectMeta(meta meta.Object, isCHI bool, options *normalizer.Options) (*api.ClickHouseInstallation, error) {
+	w.a.V(3).M(meta).S().P()
+	defer w.a.V(3).M(meta).E().P()
 
-	chi, err := w.c.GetCHIByObjectMeta(objectMeta, isCHI)
+	chi, err := w.c.GetCHIByObjectMeta(meta, isCHI)
 	if err != nil {
 		return nil, err
 	}
@@ -1448,23 +1448,23 @@ func (w *worker) updateService(
 	//
 	// Migrate labels, annotations and finalizers to the new service
 	//
-	newService.ObjectMeta.Labels = util.MergeStringMapsPreserve(newService.ObjectMeta.Labels, curService.ObjectMeta.Labels)
-	newService.ObjectMeta.Annotations = util.MergeStringMapsPreserve(newService.ObjectMeta.Annotations, curService.ObjectMeta.Annotations)
-	newService.ObjectMeta.Finalizers = util.MergeStringArrays(newService.ObjectMeta.Finalizers, curService.ObjectMeta.Finalizers)
+	newService.GetObjectMeta().SetLabels(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetLabels(), curService.GetObjectMeta().GetLabels()))
+	newService.GetObjectMeta().SetAnnotations(util.MergeStringMapsPreserve(newService.GetObjectMeta().GetAnnotations(), curService.GetObjectMeta().GetAnnotations()))
+	newService.GetObjectMeta().SetFinalizers(util.MergeStringArrays(newService.GetObjectMeta().GetFinalizers(), curService.GetObjectMeta().GetFinalizers()))
 
 	//
 	// And only now we are ready to actually update the service with new version of the service
 	//
 
-	_, err := w.c.kubeClient.CoreV1().Services(newService.Namespace).Update(ctx, newService, controller.NewUpdateOptions())
+	_, err := w.c.kubeClient.CoreV1().Services(newService.GetNamespace()).Update(ctx, newService, controller.NewUpdateOptions())
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
-			Info("Update Service success: %s/%s", newService.Namespace, newService.Name)
+			Info("Update Service success: %s/%s", newService.GetNamespace(), newService.GetName())
 	} else {
-		w.a.M(chi).F().Error("Update Service fail: %s/%s failed with error %v", newService.Namespace, newService.Name)
+		w.a.M(chi).F().Error("Update Service fail: %s/%s failed with error %v", newService.GetNamespace(), newService.GetName())
 	}
 
 	return err
@@ -1522,35 +1522,35 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 
 // getStatefulSetStatus gets StatefulSet status
 func (w *worker) getStatefulSetStatus(host *api.ChiHost) api.ObjectStatus {
-	meta := host.Runtime.DesiredStatefulSet.ObjectMeta
+	meta := host.Runtime.DesiredStatefulSet.GetObjectMeta()
 	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
 	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
 
 	curStatefulSet, err := w.c.getStatefulSet(&meta, false)
 	switch {
 	case curStatefulSet != nil:
-		w.a.V(2).M(meta).Info("Have StatefulSet available, try to perform label-based comparison for %s/%s", meta.Namespace, meta.Name)
-		return w.getObjectStatusFromMetas(curStatefulSet.ObjectMeta, meta)
+		w.a.V(2).M(meta).Info("Have StatefulSet available, try to perform label-based comparison for %s/%s", meta.GetNamespace(), meta.GetName())
+		return w.getObjectStatusFromMetas(curStatefulSet.GetObjectMeta(), meta)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
 		// However, it may be just deleted
-		w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found. Either new one or deleted for %s/%s", meta.Namespace, meta.Name)
+		w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found. Either new one or deleted for %s/%s", meta.GetNamespace(), meta.GetName())
 		if host.IsNewOne() {
-			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is a new one. New one for %s/%s", meta.Namespace, meta.Name)
+			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is a new one. New one for %s/%s", meta.GetNamespace(), meta.GetName())
 			return api.ObjectStatusNew
 		}
-		w.a.V(1).M(meta).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for %s/%s", meta.Namespace, meta.Name)
+		w.a.V(1).M(meta).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for %s/%s", meta.GetNamespace(), meta.GetName())
 		return api.ObjectStatusModified
 
 	default:
-		w.a.V(2).M(meta).Warning("Have no StatefulSet available, nor it is not found for %s/%s err: %v", meta.Namespace, meta.Name, err)
+		w.a.V(2).M(meta).Warning("Have no StatefulSet available, nor it is not found for %s/%s err: %v", meta.GetNamespace(), meta.GetName(), err)
 		return api.ObjectStatusUnknown
 	}
 }
 
 // getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
-func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.ObjectMeta) api.ObjectStatus {
+func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.Object) api.ObjectStatus {
 	// Try to perform label-based version comparison
 	curVersion, curHasLabel := model.GetObjectVersion(curMeta)
 	newVersion, newHasLabel := model.GetObjectVersion(newMeta)
@@ -1592,8 +1592,8 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost, regis
 
 	statefulSet := host.Runtime.DesiredStatefulSet
 
-	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
-	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.ObjectMeta))
+	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
+	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
 
 	w.a.V(1).
 		WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).

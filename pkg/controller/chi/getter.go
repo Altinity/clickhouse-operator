@@ -31,13 +31,13 @@ import (
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*core.ConfigMap, error) {
-	get := c.configMapLister.ConfigMaps(objMeta.Namespace).Get
-	list := c.configMapLister.ConfigMaps(objMeta.Namespace).List
+func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.ConfigMap, error) {
+	get := c.configMapLister.ConfigMaps(meta.GetNamespace()).Get
+	list := c.configMapLister.ConfigMaps(meta.GetNamespace()).List
 	var objects []*core.ConfigMap
 
 	// Check whether object with such name already exists
-	obj, err := get(objMeta.Name)
+	obj, err := get(meta.GetName())
 
 	if (obj != nil) && (err == nil) {
 		// Object found by name
@@ -58,7 +58,7 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 	// Try to find by labels
 
 	var selector k8sLabels.Selector
-	if selector, err = model.MakeSelectorFromObjectMeta(objMeta); err != nil {
+	if selector, err = model.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
@@ -67,7 +67,7 @@ func (c *Controller) getConfigMap(objMeta *meta.ObjectMeta, byNameOnly bool) (*c
 	}
 
 	if len(objects) == 0 {
-		return nil, apiErrors.NewNotFound(apps.Resource("ConfigMap"), objMeta.Name)
+		return nil, apiErrors.NewNotFound(apps.Resource("ConfigMap"), meta.GetName())
 	}
 
 	if len(objects) == 1 {
@@ -115,13 +115,13 @@ func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.Stat
 
 // getStatefulSet gets StatefulSet either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool) (*apps.StatefulSet, error) {
-	get := c.statefulSetLister.StatefulSets(meta.Namespace).Get
-	list := c.statefulSetLister.StatefulSets(meta.Namespace).List
+func (c *Controller) getStatefulSetByMeta(meta meta.Object, byNameOnly bool) (*apps.StatefulSet, error) {
+	get := c.statefulSetLister.StatefulSets(meta.GetNamespace()).Get
+	list := c.statefulSetLister.StatefulSets(meta.GetNamespace()).List
 	var objects []*apps.StatefulSet
 
 	// Check whether object with such name already exists
-	obj, err := get(meta.Name)
+	obj, err := get(meta.GetName())
 
 	if (obj != nil) && (err == nil) {
 		// Object found by name
@@ -136,7 +136,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 	// Object not found by name. Try to find by labels
 
 	if byNameOnly {
-		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", meta.Namespace, meta.Name)
+		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", meta.GetNamespace(), meta.GetName())
 	}
 
 	var selector k8sLabels.Selector
@@ -149,7 +149,7 @@ func (c *Controller) getStatefulSetByMeta(meta *meta.ObjectMeta, byNameOnly bool
 	}
 
 	if len(objects) == 0 {
-		return nil, apiErrors.NewNotFound(apps.Resource("StatefulSet"), meta.Name)
+		return nil, apiErrors.NewNotFound(apps.Resource("StatefulSet"), meta.GetName())
 	}
 
 	if len(objects) == 1 {
@@ -262,17 +262,17 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(objectMeta *meta.ObjectMeta, isCHI bool) (*api.ClickHouseInstallation, error) {
+func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCHI bool) (*api.ClickHouseInstallation, error) {
 	var chiName string
 	var err error
 	if isCHI {
-		chiName = objectMeta.Name
+		chiName = meta.GetName()
 	} else {
-		chiName, err = model.GetCHINameFromObjectMeta(objectMeta)
+		chiName, err = model.GetCHINameFromObjectMeta(meta)
 		if err != nil {
-			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", objectMeta.Name, err)
+			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", meta.GetName(), err)
 		}
 	}
 
-	return c.chopClient.ClickhouseV1().ClickHouseInstallations(objectMeta.Namespace).Get(controller.NewContext(), chiName, controller.NewGetOptions())
+	return c.chopClient.ClickhouseV1().ClickHouseInstallations(meta.GetNamespace()).Get(controller.NewContext(), chiName, controller.NewGetOptions())
 }

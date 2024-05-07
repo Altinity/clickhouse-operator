@@ -14,16 +14,18 @@
 
 package util
 
-import "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // NamespaceName returns namespace and anme from the meta
-func NamespaceName(meta v1.ObjectMeta) (string, string) {
-	return meta.Namespace, meta.Name
+func NamespaceName(meta meta.Object) (string, string) {
+	return meta.GetNamespace(), meta.GetName()
 }
 
 // NamespaceNameString returns namespace and name as one string
-func NamespaceNameString(meta v1.ObjectMeta) string {
-	return meta.Namespace + "/" + meta.Name
+func NamespaceNameString(meta meta.Object) string {
+	return meta.GetNamespace() + "/" + meta.GetName()
 }
 
 // AnnotationsTobeSkipped kubectl service annotation that we'd like to skip

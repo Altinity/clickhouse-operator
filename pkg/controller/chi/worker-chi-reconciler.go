@@ -222,10 +222,10 @@ func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *api.ClickHou
 	if service := w.task.creator.CreateServiceCHI(); service != nil {
 		if err := w.reconcileService(ctx, chi, service); err != nil {
 			// Service not reconciled
-			w.task.registryFailed.RegisterService(service.ObjectMeta)
+			w.task.registryFailed.RegisterService(service.GetObjectMeta())
 			return err
 		}
-		w.task.registryReconciled.RegisterService(service.ObjectMeta)
+		w.task.registryReconciled.RegisterService(service.GetObjectMeta())
 	}
 
 	return nil
@@ -265,9 +265,9 @@ func (w *worker) reconcileCHIConfigMapCommon(
 	configMapCommon := w.task.creator.CreateConfigMapCHICommon(options)
 	err := w.reconcileConfigMap(ctx, chi, configMapCommon)
 	if err == nil {
-		w.task.registryReconciled.RegisterConfigMap(configMapCommon.ObjectMeta)
+		w.task.registryReconciled.RegisterConfigMap(configMapCommon.GetObjectMeta())
 	} else {
-		w.task.registryFailed.RegisterConfigMap(configMapCommon.ObjectMeta)
+		w.task.registryFailed.RegisterConfigMap(configMapCommon.GetObjectMeta())
 	}
 	return err
 }
@@ -284,9 +284,9 @@ func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *api.ClickH
 	configMapUsers := w.task.creator.CreateConfigMapCHICommonUsers()
 	err := w.reconcileConfigMap(ctx, chi, configMapUsers)
 	if err == nil {
-		w.task.registryReconciled.RegisterConfigMap(configMapUsers.ObjectMeta)
+		w.task.registryReconciled.RegisterConfigMap(configMapUsers.GetObjectMeta())
 	} else {
-		w.task.registryFailed.RegisterConfigMap(configMapUsers.ObjectMeta)
+		w.task.registryFailed.RegisterConfigMap(configMapUsers.GetObjectMeta())
 	}
 	return err
 }
@@ -302,9 +302,9 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.ChiHost) 
 	configMap := w.task.creator.CreateConfigMapHost(host)
 	err := w.reconcileConfigMap(ctx, host.GetCHI(), configMap)
 	if err == nil {
-		w.task.registryReconciled.RegisterConfigMap(configMap.ObjectMeta)
+		w.task.registryReconciled.RegisterConfigMap(configMap.GetObjectMeta())
 	} else {
-		w.task.registryFailed.RegisterConfigMap(configMap.ObjectMeta)
+		w.task.registryFailed.RegisterConfigMap(configMap.GetObjectMeta())
 		return err
 	}
 
@@ -427,9 +427,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 	w.prepareHostStatefulSetWithStatus(ctx, host, false)
 	err := w.reconcileStatefulSet(ctx, host, true, opts...)
 	if err == nil {
-		w.task.registryReconciled.RegisterStatefulSet(host.Runtime.DesiredStatefulSet.ObjectMeta)
+		w.task.registryReconciled.RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
 	} else {
-		w.task.registryFailed.RegisterStatefulSet(host.Runtime.DesiredStatefulSet.ObjectMeta)
+		w.task.registryFailed.RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
 		if err == errCRUDIgnore {
 			// Pretend nothing happened in case of ignore
 			err = nil
@@ -460,10 +460,10 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.ChiHost) er
 	err := w.reconcileService(ctx, host.GetCHI(), service)
 	if err == nil {
 		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
-		w.task.registryReconciled.RegisterService(service.ObjectMeta)
+		w.task.registryReconciled.RegisterService(service.GetObjectMeta())
 	} else {
 		w.a.V(1).M(host).F().Warning("FAILED Reconcile service of the host: %s", host.GetName())
-		w.task.registryFailed.RegisterService(service.ObjectMeta)
+		w.task.registryFailed.RegisterService(service.GetObjectMeta())
 	}
 	return err
 }
@@ -481,9 +481,9 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	// Add ChkCluster's Service
 	if service := w.task.creator.CreateServiceCluster(cluster); service != nil {
 		if err := w.reconcileService(ctx, cluster.Runtime.CHI, service); err == nil {
-			w.task.registryReconciled.RegisterService(service.ObjectMeta)
+			w.task.registryReconciled.RegisterService(service.GetObjectMeta())
 		} else {
-			w.task.registryFailed.RegisterService(service.ObjectMeta)
+			w.task.registryFailed.RegisterService(service.GetObjectMeta())
 		}
 	}
 
@@ -491,18 +491,18 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
 		if secret := w.task.creator.CreateClusterSecret(model.CreateClusterAutoSecretName(cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
-				w.task.registryReconciled.RegisterSecret(secret.ObjectMeta)
+				w.task.registryReconciled.RegisterSecret(secret.GetObjectMeta())
 			} else {
-				w.task.registryFailed.RegisterSecret(secret.ObjectMeta)
+				w.task.registryFailed.RegisterSecret(secret.GetObjectMeta())
 			}
 		}
 	}
 
 	pdb := w.task.creator.NewPodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
-		w.task.registryReconciled.RegisterPDB(pdb.ObjectMeta)
+		w.task.registryReconciled.RegisterPDB(pdb.GetObjectMeta())
 	} else {
-		w.task.registryFailed.RegisterPDB(pdb.ObjectMeta)
+		w.task.registryFailed.RegisterPDB(pdb.GetObjectMeta())
 	}
 
 	return nil
@@ -646,9 +646,9 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 	}
 	err := w.reconcileService(ctx, shard.Runtime.CHI, service)
 	if err == nil {
-		w.task.registryReconciled.RegisterService(service.ObjectMeta)
+		w.task.registryReconciled.RegisterService(service.GetObjectMeta())
 	} else {
-		w.task.registryFailed.RegisterService(service.ObjectMeta)
+		w.task.registryFailed.RegisterService(service.GetObjectMeta())
 	}
 	return err
 }
@@ -850,7 +850,7 @@ func (w *worker) reconcileConfigMap(
 	defer w.a.V(2).M(chi).E().P()
 
 	// Check whether this object already exists in k8s
-	curConfigMap, err := w.c.getConfigMap(&configMap.ObjectMeta, true)
+	curConfigMap, err := w.c.getConfigMap(configMap.GetObjectMeta(), true)
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it
@@ -1019,11 +1019,11 @@ func (w *worker) reconcileStatefulSet(
 
 	newStatefulSet := host.Runtime.DesiredStatefulSet
 
-	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
-	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.ObjectMeta))
+	w.a.V(2).M(host).S().Info(util.NamespaceNameString(newStatefulSet.GetObjectMeta()))
+	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(newStatefulSet.GetObjectMeta()))
 
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
-		w.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		w.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet.GetObjectMeta()))
 		if register {
 			host.GetCHI().EnsureStatus().HostUnchanged()
 			_ = w.c.updateCHIObjectStatus(ctx, host.GetCHI(), UpdateCHIStatusOptions{
@@ -1036,11 +1036,11 @@ func (w *worker) reconcileStatefulSet(
 	}
 
 	// Check whether this object already exists in k8s
-	host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
+	host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(newStatefulSet.GetObjectMeta(), false)
 
 	// Report diff to trace
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
-		w.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet.ObjectMeta))
+		w.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet.GetObjectMeta()))
 		w.dumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}
 
@@ -1060,7 +1060,7 @@ func (w *worker) reconcileStatefulSet(
 	}
 
 	// Host has to know current StatefulSet and Pod
-	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(&newStatefulSet.ObjectMeta, false)
+	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(newStatefulSet.GetObjectMeta(), false)
 
 	return err
 }
@@ -1181,9 +1181,9 @@ func (w *worker) reconcilePVCFromVolumeMount(
 	case errNilPVC:
 		w.a.M(host).F().Error("Unable to reconcile nil PVC: %s/%s", namespace, pvcName)
 	case nil:
-		w.task.registryReconciled.RegisterPVC(pvcReconciled.ObjectMeta)
+		w.task.registryReconciled.RegisterPVC(pvcReconciled.GetObjectMeta())
 	default:
-		w.task.registryFailed.RegisterPVC(pvc.ObjectMeta)
+		w.task.registryFailed.RegisterPVC(pvc.GetObjectMeta())
 		w.a.M(host).F().Error("Unable to reconcile PVC: %s/%s err: %v", pvc.Namespace, pvc.Name, err)
 	}
 
