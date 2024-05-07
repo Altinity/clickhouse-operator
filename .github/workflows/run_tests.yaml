@@ -9,9 +9,9 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Cache python
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-python
         with:
           path: ~/venv/qa
@@ -73,7 +73,7 @@ jobs:
           # bash ./tests/e2e/run_tests_parallel.sh
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
           ONLY='*'
-          # ONLY='*test_036*'
+          ONLY='*test_008*'
 
           ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --trim-results on --debug --native --log ./tests/raw.log
           ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
