@@ -43,7 +43,7 @@ jobs:
       - name: Build clickhouse-operator locally without push to registry
         run: |
           minikube status          
-          export DOCKER_ORG=${{ github.event.repository.owner.name }}
+          export DOCKER_ORG=${{ github.event.org }}
           export CHO_RELEASE=$(cat release)
           echo "current release=$CHO_RELEASE"
           
@@ -76,7 +76,7 @@ jobs:
           ONLY='*'
           # ONLY='*test_036*'
 
-          DOCKER_ORG=${{ github.event.repository.owner.name }}
+          DOCKER_ORG=${{ github.event.org }}
           export OPERATOR_DOCKER_REPO=docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE}
           export METRICS_EXPORTER_DOCKER_REPO=docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE}
 
