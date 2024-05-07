@@ -43,7 +43,7 @@ jobs:
       - name: Build clickhouse-operator locally without push to registry
         run: |
           minikube status          
-
+          export DOCKER_ORG=${{ github.event.repository.owner.name }}
           export CHO_RELEASE=$(cat release)
           echo "current release=$CHO_RELEASE"
           
@@ -75,6 +75,11 @@ jobs:
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
           ONLY='*'
           # ONLY='*test_036*'
+
+          DOCKER_ORG=${{ github.event.repository.owner.name }}
+          export OPERATOR_DOCKER_REPO=docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE}
+          export METRICS_EXPORTER_DOCKER_REPO=docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE}
+
           ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --trim-results on --debug --native --log ./tests/raw.log
           ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
