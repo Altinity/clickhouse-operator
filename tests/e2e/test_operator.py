@@ -2239,6 +2239,11 @@ def test_020(self, step=1):
         },
     )
     kubectl.wait_chi_status(chi, "Completed", retries=20)
+
+    with Then("Test that ClickHouse recognizes two disks"):
+        cnt = clickhouse.query(chi, "select count() from system.disks")
+        assert cnt == "2"
+
     with When("Create a table and insert 1 row"):
         clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
         clickhouse.query(chi, "insert into test_disks values (1)")
