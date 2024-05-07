@@ -25,7 +25,7 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 100Mi
+              storage: 300Mi
       - name: disk2
         spec:
           accessModes:
