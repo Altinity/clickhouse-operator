@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/xml"
@@ -375,6 +376,9 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 			shard.WalkHosts(func(host *api.ChiHost) error {
 				if options.Include(host) {
 					c.getRemoteServersReplica(host, b)
+					log.V(2).M(host).Info("Adding host to remote servers: %s", host.GetName())
+				} else {
+					log.V(1).M(host).Info("SKIP host from remote servers: %s", host.GetName())
 				}
 				return nil
 			})
