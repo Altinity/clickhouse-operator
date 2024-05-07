@@ -4358,6 +4358,7 @@ def test_044(self):
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
+                "chi_status": "Aborted"
             },
         )
         client_pod = f"chi-{chi}-{cluster}-0-1-0"
