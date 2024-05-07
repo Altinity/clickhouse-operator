@@ -599,7 +599,7 @@ def check_configmap(cfg_name, values, ns=None, shell=None):
 
 
 def check_pdb(chi, clusters, ns=None, shell=None):
-    for c in clusters:
+    for c in clusters.keys():
         with Then(f"PDB is configured for cluster {c}"):
             pdb = get("pdb", chi + "-" + c, shell=shell)
             labels = pdb["spec"]["selector"]["matchLabels"]
@@ -607,4 +607,4 @@ def check_pdb(chi, clusters, ns=None, shell=None):
             assert labels["clickhouse.altinity.com/chi"] == chi
             assert labels["clickhouse.altinity.com/cluster"] == c
             assert labels["clickhouse.altinity.com/namespace"] == current().context.test_namespace
-            assert pdb["spec"]["maxUnavailable"] == 1
+            assert pdb["spec"]["maxUnavailable"] == clusters[c]

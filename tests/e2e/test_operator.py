@@ -33,7 +33,7 @@ def test_001(self):
                 "service": 2,
             },
             "configmaps": 1,
-            "pdb": ["single"],
+            "pdb": {"single": 1},
         },
     )
     with Finally("I clean up"):
@@ -86,11 +86,11 @@ def test_003(self):
         manifest="manifests/chi/test-003-complex-layout.yaml",
         check={
             "object_counts": {
-                "statefulset": 5,
-                "pod": 5,
-                "service": 6,
+                "statefulset": 4,
+                "pod": 4,
+                "service": 5,
             },
-            "pdb": ["cluster1", "cluster2"],
+            "pdb": {"cluster1": 0, "cluster2": 1},
         },
     )
     with Finally("I clean up"):
@@ -1047,7 +1047,7 @@ def test_013_1(self):
                     "manifests/chit/tpl-persistent-volume-100Mi.yaml",
                 },
                 "pod_count": 1,
-                "pdb": ["simple"],
+                "pdb": {"simple": 1},
                 "do_not_delete": 1,
             },
         )
@@ -1171,7 +1171,7 @@ def test_013_1(self):
                     current().context.clickhouse_template,
                 },
                 "pod_count": 2,
-                "pdb": ["simple"],
+                "pdb": {"simple": 1},
                 "do_not_delete": 1,
             },
         )
@@ -1207,7 +1207,7 @@ def test_013_1(self):
             manifest=manifest,
             check={
                 "pod_count": 1,
-                "pdb": ["simple"],
+                "pdb": {"simple": 1},
                 "do_not_delete": 1,
             },
         )
@@ -1224,7 +1224,7 @@ def test_013_1(self):
             manifest="manifests/chi/test-013-1-3-schema-propagation.yaml",
             check={
                 "pod_count": 2,
-                "pdb": ["simple"],
+                "pdb": {"simple": 1},
                 "do_not_delete": 1,
             },
         )
@@ -1258,7 +1258,7 @@ def test_013_1(self):
             manifest=manifest,
             check={
                 "pod_count": 1,
-                "pdb": ["simple"],
+                "pdb": {"simple": 1},
                 "do_not_delete": 1,
             },
         )
@@ -1268,7 +1268,7 @@ def test_013_1(self):
             manifest="manifests/chi/test-013-1-4-schema-propagation.yaml",
             check={
                 "pod_count": 2,
-                "pdb": ["simple"],
+                "pdb": {"simple": 1},
                 "do_not_delete": 1,
             },
         )
@@ -1305,24 +1305,27 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 
 def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
     with Given(f"Cluster {cluster} is properly configured"):
-        with By(f"remote_servers have {num_shards} shards"):
-            assert num_shards == get_shards_from_remote_servers(chi, cluster)
-        with By(f"ClickHouse recognizes {num_shards} shards in the cluster"):
-            for shard in range(num_shards):
-                shards = ""
-                for i in range(1, 10):
-                    shards = clickhouse.query(
-                        chi,
-                        f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
-                        host=f"chi-{chi}-{cluster}-{shard}-0",
-                        pwd=pwd,
-                        with_error=True,
-                    )
-                    if shards == str(num_shards):
-                        break
-                    with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
-                        time.sleep(i * 5)
-                assert shards == str(num_shards)
+        if current().context.operator_version >= "0.24":
+            print(f"operator ${current().context.operator_version} does not require extra wait, skipping check")
+        else:
+            with By(f"remote_servers have {num_shards} shards"):
+                assert num_shards == get_shards_from_remote_servers(chi, cluster)
+            with By(f"ClickHouse recognizes {num_shards} shards in the cluster"):
+                for shard in range(num_shards):
+                    shards = ""
+                    for i in range(1, 10):
+                        shards = clickhouse.query(
+                            chi,
+                            f"select uniq(shard_num) from system.clusters where cluster ='{cluster}'",
+                            host=f"chi-{chi}-{cluster}-{shard}-0",
+                            pwd=pwd,
+                            with_error=True,
+                        )
+                        if shards == str(num_shards):
+                            break
+                        with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
+                            time.sleep(i * 5)
+                    assert shards == str(num_shards)
 
         if num_replicas>0:
             with By(f"ClickHouse recognizes {num_replicas} replicas in the cluster"):
@@ -1371,7 +1374,7 @@ def test_014_0(self):
                 "pod": 2,
                 "service": 3,
             },
-            "pdb": ["default"],
+            "pdb": {"default": 1},
             "do_not_delete": 1,
         },
         timeout=600,
@@ -1517,7 +1520,7 @@ def test_014_0(self):
             manifest=manifest,
             check={
                 "pod_count": 2 + 2 * len(replicas),
-                "pdb": ["default"],
+                "pdb": {"default": 1},
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -1538,7 +1541,7 @@ def test_014_0(self):
             manifest=manifest,
             check={
                 "pod_count": 2,
-                "pdb": ["default"],
+                "pdb": {"default": 1},
                 "do_not_delete": 1,
             },
         )
@@ -1585,7 +1588,7 @@ def test_014_0(self):
             manifest=manifest,
             check={
                 "pod_count": 4,
-                "pdb": ["default"],
+                "pdb": {"default": 1},
                 "do_not_delete": 1,
             },
             timeout=600,
@@ -1605,7 +1608,7 @@ def test_014_0(self):
                 manifest=manifest,
                 check={
                     "pod_count": 2,
-                    "pdb": ["default"],
+                    "pdb": {"default": 1},
                     "do_not_delete": 1,
                 },
             )
