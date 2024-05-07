@@ -8,5 +8,6 @@ spec:
       - name: "max-un-0"
         pdbMaxUnavailable: 0
       - name: "max-un-1"
+        # assume pdbMaxUnavailable: 1
       - name: "max-un-2"
         pdbMaxUnavailable: 2
