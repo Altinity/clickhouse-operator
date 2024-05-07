@@ -1,5 +1,9 @@
 name: run_tests
-on: workflow_dispatch
+on:
+  pull_request:
+    branches:
+      - *
+  workflow_dispatch:
 jobs:
   run_tests:
     name: Run Tests
@@ -32,15 +36,31 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.25.3
+          kubernetes-version: v1.30.0
           cpus: max
           memory: max
+
+      - name: Build clickhouse-operator locally without push to registry
+        run: |
+          minikube status          
+
+          export CHO_RELEASE=$(cat release)
+          echo "current release=$CHO_RELEASE"
+          
+          docker build -f dockerfile/operator/Dockerfile -t docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} --pull .
+          docker build -f dockerfile/metrics-exporter/Dockerfile -t docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE} --pull .
+          
+          docker image save docker.io/${DOCKER_ORG}/clickhouse-operator:${CHO_RELEASE} -o operator.tar 
+          docker image save docker.io/${DOCKER_ORG}/metrics-exporter:${CHO_RELEASE} -o metrics-exporter.tar
+
+          minikube image load operator.tar 
+          minikube image load metrics-exporter.tar
 
       - name: Run Tests
         run: |
           source ~/venv/qa/bin/activate
           set -x
-
+        
           # bash -xe ./deploy/prometheus/create-prometheus.sh
           # bash -xe ./deploy/minio/install-minio-operator.sh
           # bash -xe ./deploy/minio/install-minio-tenant.sh
