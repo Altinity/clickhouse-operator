@@ -270,7 +270,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
             util.install_operator_version(version_to, shell=shell_3)
             time.sleep(15)
 
-            kubectl.wait_chi_status(chi, "Completed", retries=20, shell=shell_3)
+            kubectl.wait_chi_status(chi, "Completed", shell=shell_3)
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3}, shell=shell_3)
 
     finally:
@@ -530,7 +530,6 @@ def test_008_3(self):
                     "",
                     label=f"-l clickhouse.altinity.com/chi={chi}",
                     count=3,
-                    retries=10,
                 )
                 kubectl.wait_objects(chi, full_cluster)
                 kubectl.wait_chi_status(chi, "Completed")
@@ -2238,7 +2237,7 @@ def test_020(self, step=1):
             "do_not_delete": 1,
         },
     )
-    kubectl.wait_chi_status(chi, "Completed", retries=20)
+    kubectl.wait_chi_status(chi, "Completed")
     with When("Create a table and insert 1 row"):
         clickhouse.query(chi, "create table test_disks(a Int8) Engine = MergeTree() order by a")
         clickhouse.query(chi, "insert into test_disks values (1)")
@@ -4182,7 +4181,7 @@ def test_042(self):
         )
 
         with Then("Operator should apply changes, and both pods should be created"):
-            kubectl.wait_chi_status(chi, "Aborted", retries=20)
+            kubectl.wait_chi_status(chi, "Aborted")
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
         with And("First node is in CrashLoopBackOff"):
@@ -4211,7 +4210,7 @@ def test_042(self):
         )
 
         with Then("Operator should apply changes, and both pods should be created"):
-            kubectl.wait_chi_status(chi, "Aborted", retries=20)
+            kubectl.wait_chi_status(chi, "Aborted")
             kubectl.wait_objects(chi, {"statefulset": 2, "pod": 2, "service": 3})
 
         with And("First node is in CrashLoopBackOff"):
