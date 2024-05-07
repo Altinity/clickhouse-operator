@@ -234,6 +234,7 @@ func (m *MacrosEngine) newMapMacroReplacerHost(host host) *util.MapReplacer {
 type chi interface {
 	GetNamespace() string
 	GetName() string
+	GetLabels() map[string]string
 	GetRuntime() api.IClickHouseInstallationRuntime
 	WalkHosts(func(host *api.ChiHost) error) []error
 	GetRootServiceTemplate() (*api.ServiceTemplate, bool)
