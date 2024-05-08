@@ -1303,9 +1303,9 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 
     return chi_shards
 
-def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd=""):
+def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wait = False):
     with Given(f"Cluster {cluster} is properly configured"):
-        if current().context.operator_version >= "0.24":
+        if current().context.operator_version >= "0.24" and force_wait == False:
             print(f"operator ${current().context.operator_version} does not require extra wait, skipping check")
         else:
             with By(f"remote_servers have {num_shards} shards"):
@@ -3361,7 +3361,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
 
 @TestScenario
 @Name("test_032. Test rolling update logic")
-@Tags("NO_PARALLEL")
+# @Tags("NO_PARALLEL")
 def test_032(self):
     """Test rolling update logic."""
     create_shell_namespace_clickhouse_template()
@@ -3401,6 +3401,8 @@ def test_032(self):
 
     numbers = 100
 
+    # remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
+    # print(remote_servers)
     wait_for_cluster(chi, 'default', 2, 2)
 
     with Given("Create replicated and distributed tables"):
@@ -3410,6 +3412,10 @@ def test_032(self):
             "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)",
         )
         clickhouse.query(chi, f"INSERT INTO test_distr_032 select * from numbers({numbers})")
+
+        with Then("Distributed table is created on all nodes"):
+            cnt = clickhouse.query(chi_name=chi, sql="select count() from cluster('all-sharded', system.tables) where name='test_distr_032'")
+            assert cnt == "4", error()
 
     with When("check the initial select query count before rolling update"):
         with By("executing query in the clickhouse installation"):
@@ -4358,6 +4364,7 @@ def test_044(self):
             check={
                 "pod_count": 2,
                 "do_not_delete": 1,
+                "chi_status": "Aborted"
             },
         )
         client_pod = f"chi-{chi}-{cluster}-0-1-0"
