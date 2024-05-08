@@ -16,6 +16,7 @@ package creator
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,16 +58,16 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 			ClusterIP: model.TemplateDefaultsServiceClusterIP,
 			Ports: []core.ServicePort{
 				{
-					Name:       model.ChDefaultHTTPPortName,
+					Name:       config.ChDefaultHTTPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       model.ChDefaultHTTPPortNumber,
-					TargetPort: intstr.FromString(model.ChDefaultHTTPPortName),
+					Port:       config.ChDefaultHTTPPortNumber,
+					TargetPort: intstr.FromString(config.ChDefaultHTTPPortName),
 				},
 				{
-					Name:       model.ChDefaultTCPPortName,
+					Name:       config.ChDefaultTCPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       model.ChDefaultTCPPortNumber,
-					TargetPort: intstr.FromString(model.ChDefaultTCPPortName),
+					Port:       config.ChDefaultTCPPortNumber,
+					TargetPort: intstr.FromString(config.ChDefaultTCPPortName),
 				},
 			},
 			Selector: c.labels.GetSelectorCHIScopeReady(),
@@ -74,7 +75,7 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
-	model.MakeObjectVersion(&svc.ObjectMeta, svc)
+	model.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
@@ -83,12 +84,12 @@ func (c *Creator) CreateServiceCluster(cluster *api.Cluster) *core.Service {
 	serviceName := model.CreateClusterServiceName(cluster)
 	ownerReferences := getOwnerReferences(c.chi)
 
-	c.a.V(1).F().Info("%s/%s", cluster.Runtime.Address.Namespace, serviceName)
+	c.a.V(1).F().Info("%s/%s", cluster.GetRuntime().GetAddress().GetNamespace(), serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
-			cluster.Runtime.Address.Namespace,
+			cluster.GetRuntime().GetAddress().GetNamespace(),
 			serviceName,
 			c.labels.GetServiceCluster(cluster),
 			c.annotations.GetServiceCluster(cluster),
@@ -107,7 +108,7 @@ func (c *Creator) CreateServiceShard(shard *api.ChiShard) *core.Service {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
-			shard.Runtime.Address.Namespace,
+			shard.GetRuntime().GetAddress().GetNamespace(),
 			model.CreateShardServiceName(shard),
 			c.labels.GetServiceShard(shard),
 			c.annotations.GetServiceShard(shard),
@@ -154,13 +155,13 @@ func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
 		},
 	}
 	appendServicePorts(svc, host)
-	model.MakeObjectVersion(&svc.ObjectMeta, svc)
+	model.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
 func appendServicePorts(service *core.Service, host *api.ChiHost) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
-	model.HostWalkAssignedPorts(
+	config.HostWalkAssignedPorts(
 		host,
 		func(name string, port *int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of service's ports
@@ -215,7 +216,7 @@ func (c *Creator) createServiceFromTemplate(
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(&service.ObjectMeta, service)
+	model.MakeObjectVersion(service.GetObjectMeta(), service)
 
 	return service
 }

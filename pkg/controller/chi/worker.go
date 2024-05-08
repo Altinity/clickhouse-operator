@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -99,7 +100,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *api.ClickHouseInstallation) {
-	w.task = newTask(chiCreator.NewCreator(chi))
+	w.task = newTask(chiCreator.NewCreator(chi, config.NewClickHouseConfigFilesGenerator(chi)))
 }
 
 // timeToStart specifies time that operator does not accept changes
@@ -827,11 +828,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 
 // getRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
 // which are applied on each of `remote_servers` reconfiguration during reconcile cycle
-func (w *worker) getRemoteServersGeneratorOptions() *model.RemoteServersGeneratorOptions {
+func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersGeneratorOptions {
 	// Base model.RemoteServersGeneratorOptions specifies to exclude:
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
-	return model.NewRemoteServersGeneratorOptions().ExcludeReconcileAttributes(
+	return config.NewRemoteServersGeneratorOptions().ExcludeReconcileAttributes(
 		api.NewChiHostReconcileAttributes().
 			SetAdd().
 			SetExclude(),
@@ -839,10 +840,10 @@ func (w *worker) getRemoteServersGeneratorOptions() *model.RemoteServersGenerato
 }
 
 // options build ClickHouseConfigFilesGeneratorOptions
-func (w *worker) options() *model.ClickHouseConfigFilesGeneratorOptions {
+func (w *worker) options() *config.ClickHouseConfigFilesGeneratorOptions {
 	opts := w.getRemoteServersGeneratorOptions()
 	w.a.Info("RemoteServersGeneratorOptions: %s", opts)
-	return model.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
+	return config.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status

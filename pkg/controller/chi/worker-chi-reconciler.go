@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"math"
 	"sync"
 	"time"
@@ -252,7 +253,7 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *api.Click
 func (w *worker) reconcileCHIConfigMapCommon(
 	ctx context.Context,
 	chi *api.ClickHouseInstallation,
-	options *model.ClickHouseConfigFilesGeneratorOptions,
+	options *config.ClickHouseConfigFilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")

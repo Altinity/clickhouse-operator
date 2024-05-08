@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +32,7 @@ func (c *Creator) CreateStatefulSet(host *api.ChiHost, shutdown bool) *apps.Stat
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateStatefulSetName(host),
-			Namespace:       host.Runtime.Address.Namespace,
+			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          model.Macro(host).Map(c.labels.GetHostScope(host, true)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetHostScope(host)),
 			OwnerReferences: getOwnerReferences(c.chi),
@@ -59,7 +60,7 @@ func (c *Creator) CreateStatefulSet(host *api.ChiHost, shutdown bool) *apps.Stat
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
-	model.MakeObjectVersion(&statefulSet.ObjectMeta, statefulSet)
+	model.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
 
 	return statefulSet
 }
@@ -258,9 +259,9 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 	// So Pod will have ConfigMaps mounted as Volumes
 	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
-		newVolumeMount(configMapCommonName, model.DirPathCommonConfig),
-		newVolumeMount(configMapCommonUsersName, model.DirPathUsersConfig),
-		newVolumeMount(configMapHostName, model.DirPathHostConfig),
+		newVolumeMount(configMapCommonName, config.DirPathCommonConfig),
+		newVolumeMount(configMapCommonUsersName, config.DirPathUsersConfig),
+		newVolumeMount(configMapHostName, config.DirPathHostConfig),
 	)
 }
 
@@ -311,11 +312,11 @@ func (c *Creator) statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
 		k8s.ContainerAppendVolumeMounts(
 			container,
-			newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), model.DirPathClickHouseData),
+			newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseData),
 		)
 		k8s.ContainerAppendVolumeMounts(
 			container,
-			newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), model.DirPathClickHouseLog),
+			newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseLog),
 		)
 	}
 }
@@ -339,11 +340,11 @@ func (c *Creator) statefulSetApplyPodTemplate(
 			Name: template.Name,
 			Labels: model.Macro(host).Map(util.MergeStringMapsOverwrite(
 				c.labels.GetHostScopeReady(host, true),
-				template.ObjectMeta.Labels,
+				template.ObjectMeta.GetLabels(),
 			)),
 			Annotations: model.Macro(host).Map(util.MergeStringMapsOverwrite(
 				c.annotations.GetHostScope(host),
-				template.ObjectMeta.Annotations,
+				template.ObjectMeta.GetAnnotations(),
 			)),
 		},
 		Spec: *template.Spec.DeepCopy(),
@@ -361,12 +362,12 @@ func getMainContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 
 // getClickHouseContainer
 func getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return k8s.StatefulSetContainerGet(statefulSet, model.ClickHouseContainerName, 0)
+	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
 }
 
 // getClickHouseLogContainer
 func getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return k8s.StatefulSetContainerGet(statefulSet, model.ClickHouseLogContainerName, -1)
+	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseLogContainerName, -1)
 }
 
 // ensureNamedPortsSpecified
@@ -377,7 +378,7 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost)
 		return
 	}
 	// Walk over all assigned ports of the host and ensure each port in container
-	model.HostWalkAssignedPorts(
+	config.HostWalkAssignedPorts(
 		host,
 		func(name string, port *int32, protocol core.Protocol) bool {
 			k8s.ContainerEnsurePortByName(container, name, *port)
@@ -454,7 +455,7 @@ func newDefaultClickHousePodTemplate(host *api.ChiHost) *api.PodTemplate {
 
 func appendContainerPorts(container *core.Container, host *api.ChiHost) {
 	// Walk over all assigned ports of the host and append each port to the list of container's ports
-	model.HostWalkAssignedPorts(
+	config.HostWalkAssignedPorts(
 		host,
 		func(name string, port *int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of container's ports
@@ -474,8 +475,8 @@ func appendContainerPorts(container *core.Container, host *api.ChiHost) {
 // newDefaultClickHouseContainer returns default ClickHouse Container
 func newDefaultClickHouseContainer(host *api.ChiHost) core.Container {
 	container := core.Container{
-		Name:           model.ClickHouseContainerName,
-		Image:          model.DefaultClickHouseDockerImage,
+		Name:           config.ClickHouseContainerName,
+		Image:          config.DefaultClickHouseDockerImage,
 		LivenessProbe:  newDefaultClickHouseLivenessProbe(host),
 		ReadinessProbe: newDefaultClickHouseReadinessProbe(host),
 	}
@@ -486,8 +487,8 @@ func newDefaultClickHouseContainer(host *api.ChiHost) core.Container {
 // newDefaultLogContainer returns default ClickHouse Log Container
 func newDefaultLogContainer() core.Container {
 	return core.Container{
-		Name:  model.ClickHouseLogContainerName,
-		Image: model.DefaultUbiDockerImage,
+		Name:  config.ClickHouseLogContainerName,
+		Image: config.DefaultUbiDockerImage,
 		Command: []string{
 			"/bin/sh", "-c", "--",
 		},

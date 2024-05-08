@@ -69,7 +69,7 @@ func (chi *WatchedCHI) readFrom(c *api.ClickHouseInstallation) {
 	})
 }
 
-func (chi *WatchedCHI) isValid() bool {
+func (chi *WatchedCHI) IsValid() bool {
 	return !chi.empty()
 }
 
@@ -77,11 +77,11 @@ func (chi *WatchedCHI) empty() bool {
 	return (len(chi.Namespace) == 0) && (len(chi.Name) == 0) && (len(chi.Clusters) == 0)
 }
 
-func (chi *WatchedCHI) indexKey() string {
+func (chi *WatchedCHI) IndexKey() string {
 	return chi.Namespace + ":" + chi.Name
 }
 
-func (chi *WatchedCHI) walkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHost)) {
+func (chi *WatchedCHI) WalkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHost)) {
 	if chi == nil {
 		return
 	}

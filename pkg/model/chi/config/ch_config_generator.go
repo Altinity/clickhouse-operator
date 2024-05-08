@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package config
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
@@ -44,42 +45,42 @@ type ClickHouseConfigGenerator struct {
 	chi *api.ClickHouseInstallation
 }
 
-// NewClickHouseConfigGenerator returns new ClickHouseConfigGenerator struct
-func NewClickHouseConfigGenerator(chi *api.ClickHouseInstallation) *ClickHouseConfigGenerator {
+// newClickHouseConfigGenerator returns new ClickHouseConfigGenerator struct
+func newClickHouseConfigGenerator(chi *api.ClickHouseInstallation) *ClickHouseConfigGenerator {
 	return &ClickHouseConfigGenerator{
 		chi: chi,
 	}
 }
 
-// GetUsers creates data for users section. Used as "users.xml"
-func (c *ClickHouseConfigGenerator) GetUsers() string {
+// getUsers creates data for users section. Used as "users.xml"
+func (c *ClickHouseConfigGenerator) getUsers() string {
 	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Users, configUsers)
 }
 
-// GetProfiles creates data for profiles section. Used as "profiles.xml"
-func (c *ClickHouseConfigGenerator) GetProfiles() string {
+// getProfiles creates data for profiles section. Used as "profiles.xml"
+func (c *ClickHouseConfigGenerator) getProfiles() string {
 	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Profiles, configProfiles)
 }
 
-// GetQuotas creates data for "quotas.xml"
-func (c *ClickHouseConfigGenerator) GetQuotas() string {
+// getQuotas creates data for "quotas.xml"
+func (c *ClickHouseConfigGenerator) getQuotas() string {
 	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Quotas, configQuotas)
 }
 
-// GetSettingsGlobal creates data for "settings.xml"
-func (c *ClickHouseConfigGenerator) GetSettingsGlobal() string {
+// getSettingsGlobal creates data for "settings.xml"
+func (c *ClickHouseConfigGenerator) getSettingsGlobal() string {
 	// No host specified means request to generate common config
 	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Settings, "")
 }
 
-// GetSettings creates data for "settings.xml"
-func (c *ClickHouseConfigGenerator) GetSettings(host *api.ChiHost) string {
+// getSettings creates data for "settings.xml"
+func (c *ClickHouseConfigGenerator) getSettings(host *api.ChiHost) string {
 	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }
 
-// GetSectionFromFiles creates data for custom common config files
-func (c *ClickHouseConfigGenerator) GetSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.ChiHost) map[string]string {
+// getSectionFromFiles creates data for custom common config files
+func (c *ClickHouseConfigGenerator) getSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.ChiHost) map[string]string {
 	var files *api.Settings
 	if host == nil {
 		// We are looking into Common files
@@ -94,8 +95,8 @@ func (c *ClickHouseConfigGenerator) GetSectionFromFiles(section api.SettingsSect
 	return files.GetSection(section, includeUnspecified)
 }
 
-// GetHostZookeeper creates data for "zookeeper.xml"
-func (c *ClickHouseConfigGenerator) GetHostZookeeper(host *api.ChiHost) string {
+// getHostZookeeper creates data for "zookeeper.xml"
+func (c *ClickHouseConfigGenerator) getHostZookeeper(host *api.ChiHost) string {
 	zk := host.GetZookeeper()
 
 	if zk.IsEmpty() {
@@ -269,8 +270,8 @@ func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	return NewRemoteServersGeneratorOptions()
 }
 
-// CHIHostsNum count hosts according to the options
-func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorOptions) int {
+// chiHostsNum count hosts according to the options
+func (c *ClickHouseConfigGenerator) chiHostsNum(options *RemoteServersGeneratorOptions) int {
 	num := 0
 	c.chi.WalkHosts(func(host *api.ChiHost) error {
 		if options.Include(host) {
@@ -281,19 +282,19 @@ func (c *ClickHouseConfigGenerator) CHIHostsNum(options *RemoteServersGeneratorO
 	return num
 }
 
-// ClusterHostsNum count hosts according to the options
-func (c *ClickHouseConfigGenerator) ClusterHostsNum(cluster *api.Cluster, options *RemoteServersGeneratorOptions) int {
+// clusterHostsNum count hosts according to the options
+func (c *ClickHouseConfigGenerator) clusterHostsNum(cluster *api.Cluster, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	// Build each shard XML
 	cluster.WalkShards(func(index int, shard *api.ChiShard) error {
-		num += c.ShardHostsNum(shard, options)
+		num += c.shardHostsNum(shard, options)
 		return nil
 	})
 	return num
 }
 
-// ShardHostsNum count hosts according to the options
-func (c *ClickHouseConfigGenerator) ShardHostsNum(shard *api.ChiShard, options *RemoteServersGeneratorOptions) int {
+// shardHostsNum count hosts according to the options
+func (c *ClickHouseConfigGenerator) shardHostsNum(shard *api.ChiShard, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	shard.WalkHosts(func(host *api.ChiHost) error {
 		if options.Include(host) {
@@ -323,8 +324,8 @@ func (c *ClickHouseConfigGenerator) getRemoteServersReplica(host *api.ChiHost, b
 	util.Iline(b, 16, "</replica>")
 }
 
-// GetRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGeneratorOptions) string {
+// getRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
+func (c *ClickHouseConfigGenerator) getRemoteServers(options *RemoteServersGeneratorOptions) string {
 	if options == nil {
 		options = defaultRemoteServersGeneratorOptions()
 	}
@@ -340,12 +341,12 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 
 	// Build each cluster XML
 	c.chi.WalkClusters(func(cluster *api.Cluster) error {
-		if c.ClusterHostsNum(cluster, options) < 1 {
+		if c.clusterHostsNum(cluster, options) < 1 {
 			// Skip empty cluster
 			return nil
 		}
 		// <my_cluster_name>
-		util.Iline(b, 8, "<%s>", cluster.Name)
+		util.Iline(b, 8, "<%s>", cluster.GetName())
 
 		// <secret>VALUE</secret>
 		switch cluster.Secret.Source() {
@@ -354,12 +355,12 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret.Value)
 		case api.ClusterSecretSourceSecretRef, api.ClusterSecretSourceAuto:
 			// Use secret via ENV var from secret
-			util.Iline(b, 12, `<secret from_env="%s" />`, InternodeClusterSecretEnvName)
+			util.Iline(b, 12, `<secret from_env="%s" />`, chi.InternodeClusterSecretEnvName)
 		}
 
 		// Build each shard XML
 		cluster.WalkShards(func(index int, shard *api.ChiShard) error {
-			if c.ShardHostsNum(shard, options) < 1 {
+			if c.shardHostsNum(shard, options) < 1 {
 				// Skip empty shard
 				return nil
 			}
@@ -390,14 +391,14 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 			return nil
 		})
 		// </my_cluster_name>
-		util.Iline(b, 8, "</%s>", cluster.Name)
+		util.Iline(b, 8, "</%s>", cluster.GetName())
 
 		return nil
 	})
 
 	// Auto-generated clusters
 
-	if c.CHIHostsNum(options) < 1 {
+	if c.chiHostsNum(options) < 1 {
 		util.Iline(b, 8, "<!-- Autogenerated clusters are skipped due to absence of hosts -->")
 	} else {
 		util.Iline(b, 8, "<!-- Autogenerated clusters -->")
@@ -451,7 +452,7 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 		util.Iline(b, 8, "<%s>", clusterName)
 		c.chi.WalkClusters(func(cluster *api.Cluster) error {
 			cluster.WalkShards(func(index int, shard *api.ChiShard) error {
-				if c.ShardHostsNum(shard, options) < 1 {
+				if c.shardHostsNum(shard, options) < 1 {
 					// Skip empty shard
 					return nil
 				}
@@ -483,8 +484,8 @@ func (c *ClickHouseConfigGenerator) GetRemoteServers(options *RemoteServersGener
 	return b.String()
 }
 
-// GetHostMacros creates "macros.xml" content
-func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
+// getHostMacros creates "macros.xml" content
+func (c *ClickHouseConfigGenerator) getHostMacros(host *api.ChiHost) string {
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -511,7 +512,7 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 	util.Iline(b, 8, "<shard>%s</shard>", host.Runtime.Address.ShardName)
 	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
-	util.Iline(b, 8, "<replica>%s</replica>", CreatePodHostname(host))
+	util.Iline(b, 8, "<replica>%s</replica>", chi.CreatePodHostname(host))
 
 	// 		</macros>
 	// </yandex>
@@ -521,8 +522,8 @@ func (c *ClickHouseConfigGenerator) GetHostMacros(host *api.ChiHost) string {
 	return b.String()
 }
 
-// GetHostHostnameAndPorts creates "ports.xml" content
-func (c *ClickHouseConfigGenerator) GetHostHostnameAndPorts(host *api.ChiHost) string {
+// getHostHostnameAndPorts creates "ports.xml" content
+func (c *ClickHouseConfigGenerator) getHostHostnameAndPorts(host *api.ChiHost) string {
 
 	b := &bytes.Buffer{}
 
@@ -577,13 +578,13 @@ func (c *ClickHouseConfigGenerator) generateXMLConfig(settings *api.Settings, pr
 
 // getDistributedDDLPath returns string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
 func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
-	return fmt.Sprintf(DistributedDDLPathPattern, c.chi.Name)
+	return fmt.Sprintf(DistributedDDLPathPattern, c.chi.GetName())
 }
 
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *api.ChiHost) string {
-	return CreateInstanceHostname(host)
+	return chi.CreateInstanceHostname(host)
 }
 
 // getSecure gets config-usable value for host or node secure flag

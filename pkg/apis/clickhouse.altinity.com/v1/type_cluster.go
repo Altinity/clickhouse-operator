@@ -137,6 +137,10 @@ func (cluster *Cluster) GetRuntime() IClusterRuntime {
 	return cluster.Runtime
 }
 
+func (cluster *Cluster) GetPDBMaxUnavailable() *Int32 {
+	return cluster.PDBMaxUnavailable
+}
+
 // FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
 func (cluster *Cluster) FillShardReplicaSpecified() {
 	if len(cluster.Layout.Shards) > 0 {

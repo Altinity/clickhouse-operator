@@ -28,8 +28,8 @@ func (c *Creator) PreparePersistentVolumeClaim(
 	host *api.ChiHost,
 	template *api.VolumeClaimTemplate,
 ) *core.PersistentVolumeClaim {
-	pvc.Labels = model.Macro(host).Map(c.labels.GetPVC(pvc, host, template))
-	pvc.Annotations = model.Macro(host).Map(c.annotations.GetPVC(pvc, host, template))
+	pvc.SetLabels(model.Macro(host).Map(c.labels.GetPVC(pvc, host, template)))
+	pvc.SetAnnotations(model.Macro(host).Map(c.annotations.GetPVC(pvc, host, template)))
 	// And after the object is ready we can put version label
 	model.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc

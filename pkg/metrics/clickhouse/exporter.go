@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package clickhouse
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"net/http"
 	"sync"
 	"time"
@@ -53,13 +54,13 @@ var _ prometheus.Collector = &Exporter{}
 // NewExporter returns a new instance of Exporter type
 func NewExporter(collectorTimeout time.Duration) *Exporter {
 	return &Exporter{
-		chInstallations:  make(map[string]*WatchedCHI),
+		chInstallations:  make(map[string]*metrics.WatchedCHI),
 		collectorTimeout: collectorTimeout,
 	}
 }
 
 // getWatchedCHIs
-func (e *Exporter) getWatchedCHIs() []*WatchedCHI {
+func (e *Exporter) getWatchedCHIs() []*metrics.WatchedCHI {
 	return e.chInstallations.slice()
 }
 
@@ -91,9 +92,9 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	log.V(1).Infof("Launching host collectors [%s]", time.Now().Sub(start))
 
 	var wg = sync.WaitGroup{}
-	e.chInstallations.walk(func(chi *WatchedCHI, _ *WatchedCluster, host *WatchedHost) {
+	e.chInstallations.walk(func(chi *metrics.WatchedCHI, _ *metrics.WatchedCluster, host *metrics.WatchedHost) {
 		wg.Add(1)
-		go func(ctx context.Context, chi *WatchedCHI, host *WatchedHost, ch chan<- prometheus.Metric) {
+		go func(ctx context.Context, chi *metrics.WatchedCHI, host *metrics.WatchedHost, ch chan<- prometheus.Metric) {
 			defer wg.Done()
 			e.collectHostMetrics(ctx, chi, host, ch)
 		}(ctx, chi, host, ch)
@@ -107,7 +108,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // enqueueToRemoveFromWatched
-func (e *Exporter) enqueueToRemoveFromWatched(chi *WatchedCHI) {
+func (e *Exporter) enqueueToRemoveFromWatched(chi *metrics.WatchedCHI) {
 	e.toRemoveFromWatched.Store(chi, struct{}{})
 }
 
@@ -117,10 +118,10 @@ func (e *Exporter) cleanup() {
 	log.V(2).Info("Starting cleanup")
 	e.toRemoveFromWatched.Range(func(key, value interface{}) bool {
 		switch key.(type) {
-		case *WatchedCHI:
+		case *metrics.WatchedCHI:
 			e.toRemoveFromWatched.Delete(key)
-			e.removeFromWatched(key.(*WatchedCHI))
-			log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*WatchedCHI).Name, key.(*WatchedCHI).Namespace)
+			e.removeFromWatched(key.(*metrics.WatchedCHI))
+			log.V(1).Infof("Removed ClickHouseInstallation (%s/%s) from Exporter", key.(*metrics.WatchedCHI).Name, key.(*metrics.WatchedCHI).Namespace)
 		}
 		return true
 	})
@@ -128,23 +129,23 @@ func (e *Exporter) cleanup() {
 }
 
 // removeFromWatched deletes record from Exporter.chInstallation map identified by chiName key
-func (e *Exporter) removeFromWatched(chi *WatchedCHI) {
+func (e *Exporter) removeFromWatched(chi *metrics.WatchedCHI) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	log.V(1).Infof("Remove ClickHouseInstallation (%s/%s)", chi.Namespace, chi.Name)
-	e.chInstallations.remove(chi.indexKey())
+	e.chInstallations.remove(chi.IndexKey())
 }
 
 // updateWatched updates Exporter.chInstallation map with values from chInstances slice
-func (e *Exporter) updateWatched(chi *WatchedCHI) {
+func (e *Exporter) updateWatched(chi *metrics.WatchedCHI) {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 	log.V(1).Infof("Update ClickHouseInstallation (%s/%s): %s", chi.Namespace, chi.Name, chi)
-	e.chInstallations.set(chi.indexKey(), chi)
+	e.chInstallations.set(chi.IndexKey(), chi)
 }
 
 // newFetcher returns new Metrics Fetcher for specified host
-func (e *Exporter) newHostFetcher(host *WatchedHost) *ClickHouseMetricsFetcher {
+func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *ClickHouseMetricsFetcher {
 	// Make base cluster connection params
 	clusterConnectionParams := clickhouse.NewClusterConnectionParamsFromCHOpConfig(chop.Config())
 	// Adjust base cluster connection params with per-host props
@@ -168,33 +169,33 @@ func (e *Exporter) newHostFetcher(host *WatchedHost) *ClickHouseMetricsFetcher {
 }
 
 // collectHostMetrics collects metrics from one host and writes them into chan
-func (e *Exporter) collectHostMetrics(ctx context.Context, chi *WatchedCHI, host *WatchedHost, c chan<- prometheus.Metric) {
+func (e *Exporter) collectHostMetrics(ctx context.Context, chi *metrics.WatchedCHI, host *metrics.WatchedHost, c chan<- prometheus.Metric) {
 	fetcher := e.newHostFetcher(host)
 	writer := NewCHIPrometheusWriter(c, chi, host)
 
 	wg := sync.WaitGroup{}
 	wg.Add(6)
-	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
+	go func(ctx context.Context, host *metrics.WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
 		e.collectHostSystemMetrics(ctx, host, fetcher, writer)
 		wg.Done()
 	}(ctx, host, fetcher, writer)
-	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
+	go func(ctx context.Context, host *metrics.WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
 		e.collectHostSystemPartsMetrics(ctx, host, fetcher, writer)
 		wg.Done()
 	}(ctx, host, fetcher, writer)
-	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
+	go func(ctx context.Context, host *metrics.WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
 		e.collectHostSystemReplicasMetrics(ctx, host, fetcher, writer)
 		wg.Done()
 	}(ctx, host, fetcher, writer)
-	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
+	go func(ctx context.Context, host *metrics.WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
 		e.collectHostMutationsMetrics(ctx, host, fetcher, writer)
 		wg.Done()
 	}(ctx, host, fetcher, writer)
-	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
+	go func(ctx context.Context, host *metrics.WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
 		e.collectHostSystemDisksMetrics(ctx, host, fetcher, writer)
 		wg.Done()
 	}(ctx, host, fetcher, writer)
-	go func(ctx context.Context, host *WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
+	go func(ctx context.Context, host *metrics.WatchedHost, fetcher *ClickHouseMetricsFetcher, writer *CHIPrometheusWriter) {
 		e.collectHostDetachedPartsMetrics(ctx, host, fetcher, writer)
 		wg.Done()
 	}(ctx, host, fetcher, writer)
@@ -203,7 +204,7 @@ func (e *Exporter) collectHostMetrics(ctx context.Context, chi *WatchedCHI, host
 
 func (e *Exporter) collectHostSystemMetrics(
 	ctx context.Context,
-	host *WatchedHost,
+	host *metrics.WatchedHost,
 	fetcher *ClickHouseMetricsFetcher,
 	writer *CHIPrometheusWriter,
 ) {
@@ -224,7 +225,7 @@ func (e *Exporter) collectHostSystemMetrics(
 
 func (e *Exporter) collectHostSystemPartsMetrics(
 	ctx context.Context,
-	host *WatchedHost,
+	host *metrics.WatchedHost,
 	fetcher *ClickHouseMetricsFetcher,
 	writer *CHIPrometheusWriter,
 ) {
@@ -248,7 +249,7 @@ func (e *Exporter) collectHostSystemPartsMetrics(
 
 func (e *Exporter) collectHostSystemReplicasMetrics(
 	ctx context.Context,
-	host *WatchedHost,
+	host *metrics.WatchedHost,
 	fetcher *ClickHouseMetricsFetcher,
 	writer *CHIPrometheusWriter,
 ) {
@@ -269,7 +270,7 @@ func (e *Exporter) collectHostSystemReplicasMetrics(
 
 func (e *Exporter) collectHostMutationsMetrics(
 	ctx context.Context,
-	host *WatchedHost,
+	host *metrics.WatchedHost,
 	fetcher *ClickHouseMetricsFetcher,
 	writer *CHIPrometheusWriter,
 ) {
@@ -290,7 +291,7 @@ func (e *Exporter) collectHostMutationsMetrics(
 
 func (e *Exporter) collectHostSystemDisksMetrics(
 	ctx context.Context,
-	host *WatchedHost,
+	host *metrics.WatchedHost,
 	fetcher *ClickHouseMetricsFetcher,
 	writer *CHIPrometheusWriter,
 ) {
@@ -311,7 +312,7 @@ func (e *Exporter) collectHostSystemDisksMetrics(
 
 func (e *Exporter) collectHostDetachedPartsMetrics(
 	ctx context.Context,
-	host *WatchedHost,
+	host *metrics.WatchedHost,
 	fetcher *ClickHouseMetricsFetcher,
 	writer *CHIPrometheusWriter,
 ) {
@@ -337,10 +338,10 @@ func (e *Exporter) getWatchedCHI(w http.ResponseWriter, r *http.Request) {
 }
 
 // fetchCHI decodes chi from the request
-func (e *Exporter) fetchCHI(r *http.Request) (*WatchedCHI, error) {
-	chi := &WatchedCHI{}
+func (e *Exporter) fetchCHI(r *http.Request) (*metrics.WatchedCHI, error) {
+	chi := &metrics.WatchedCHI{}
 	if err := json.NewDecoder(r.Body).Decode(chi); err == nil {
-		if chi.isValid() {
+		if chi.IsValid() {
 			return chi, nil
 		}
 	}
@@ -402,7 +403,7 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		})
 		normalized, _ := normalizer.CreateTemplatedCHI(chi, chiNormalizer.NewOptions())
 
-		watchedCHI := NewWatchedCHI(normalized)
+		watchedCHI := metrics.NewWatchedCHI(normalized)
 		e.updateWatched(watchedCHI)
 	}
 }

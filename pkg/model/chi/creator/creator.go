@@ -17,26 +17,65 @@ package creator
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	core "k8s.io/api/core/v1"
 )
+
+type labeler interface {
+	GetConfigMapCHICommon() map[string]string
+	GetConfigMapCHICommonUsers() map[string]string
+	GetConfigMapHost(host *api.ChiHost) map[string]string
+	GetClusterScope(cluster model.ICluster) map[string]string
+	GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string
+	GetHostScope(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string
+	GetPVC(
+		pvc *core.PersistentVolumeClaim,
+		host *api.ChiHost,
+		template *api.VolumeClaimTemplate,
+	) map[string]string
+	GetServiceCHI(chi model.IChi) map[string]string
+	GetSelectorCHIScopeReady() map[string]string
+	GetServiceCluster(cluster model.ICluster) map[string]string
+	GetServiceHost(host *api.ChiHost) map[string]string
+	GetServiceShard(shard model.IShard) map[string]string
+	GetHostScopeReady(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string
+}
+
+type annotator interface {
+	GetConfigMapCHICommon() map[string]string
+	GetConfigMapCHICommonUsers() map[string]string
+	GetConfigMapHost(host *api.ChiHost) map[string]string
+	GetClusterScope(cluster model.ICluster) map[string]string
+	GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string
+	GetHostScope(host *api.ChiHost) map[string]string
+	GetPVC(
+		pvc *core.PersistentVolumeClaim,
+		host *api.ChiHost,
+		template *api.VolumeClaimTemplate,
+	) map[string]string
+	GetServiceCHI(chi model.IChi) map[string]string
+	GetServiceCluster(cluster model.ICluster) map[string]string
+	GetServiceHost(host *api.ChiHost) map[string]string
+	GetServiceShard(shard model.IShard) map[string]string
+}
 
 // Creator specifies creator object
 type Creator struct {
-	chi                    *api.ClickHouseInstallation
-	chConfigFilesGenerator *model.ClickHouseConfigFilesGenerator
-	labels                 *model.Labeler
-	annotations            *model.Annotator
-	a                      log.Announcer
+	chi                  model.IChi
+	configFilesGenerator *config.ClickHouseConfigFilesGenerator
+	labels               labeler
+	annotations          annotator
+	a                    log.Announcer
 }
 
 // NewCreator creates new Creator object
-func NewCreator(chi *api.ClickHouseInstallation) *Creator {
+func NewCreator(chi model.IChi, configFilesGenerator *config.ClickHouseConfigFilesGenerator) *Creator {
 	return &Creator{
-		chi:                    chi,
-		chConfigFilesGenerator: model.NewClickHouseConfigFilesGenerator(model.NewClickHouseConfigGenerator(chi), chop.Config()),
-		labels:                 model.NewLabeler(chi),
-		annotations:            model.NewAnnotator(chi),
-		a:                      log.M(chi),
+		chi:                  chi,
+		configFilesGenerator: configFilesGenerator,
+		labels:               model.NewLabeler(chi),
+		annotations:          model.NewAnnotator(chi),
+		a:                    log.M(chi),
 	}
 }

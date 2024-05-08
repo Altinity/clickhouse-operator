@@ -674,7 +674,7 @@ func (chi *ClickHouseInstallation) Copy(opts CopyCHIOptions) *ClickHouseInstalla
 		return nil
 	}
 
-	var chi2 ClickHouseInstallation
+	var chi2 *ClickHouseInstallation
 	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
 		return nil
 	}
@@ -684,10 +684,10 @@ func (chi *ClickHouseInstallation) Copy(opts CopyCHIOptions) *ClickHouseInstalla
 	}
 
 	if opts.SkipManagedFields {
-		chi2.ObjectMeta.ManagedFields = nil
+		chi2.GetObjectMeta().SetManagedFields(nil)
 	}
 
-	return &chi2
+	return chi2
 }
 
 // JSON returns JSON string

@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package clickhouse
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"io"
 	"net/http"
 )
 
-func makeRESTCall(chi *WatchedCHI, method string) error {
+func makeRESTCall(chi *metrics.WatchedCHI, method string) error {
 	url := "http://127.0.0.1:8888/chi"
 
 	json, err := json.Marshal(chi)

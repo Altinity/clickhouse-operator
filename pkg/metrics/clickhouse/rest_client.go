@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package clickhouse
+
+import "github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 
 // InformMetricsExporterAboutWatchedCHI informs exporter about new watched CHI
-func InformMetricsExporterAboutWatchedCHI(chi *WatchedCHI) error {
+func InformMetricsExporterAboutWatchedCHI(chi *metrics.WatchedCHI) error {
 	return makeRESTCall(chi, "POST")
 }
 
 // InformMetricsExporterToDeleteWatchedCHI informs exporter to delete/forget watched CHI
-func InformMetricsExporterToDeleteWatchedCHI(chi *WatchedCHI) error {
+func InformMetricsExporterToDeleteWatchedCHI(chi *metrics.WatchedCHI) error {
 	return makeRESTCall(chi, "DELETE")
 }

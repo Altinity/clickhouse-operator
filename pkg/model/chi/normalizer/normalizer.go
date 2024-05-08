@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -231,35 +232,35 @@ func hostApplyHostTemplate(host *api.ChiHost, template *api.HostTemplate) {
 			}
 		case deployment.PortDistributionClusterScopeIndex:
 			if api.IsPortUnassigned(host.TCPPort) {
-				base := model.ChDefaultTCPPortNumber
+				base := config.ChDefaultTCPPortNumber
 				if api.IsPortAssigned(template.Spec.TCPPort) {
 					base = template.Spec.TCPPort
 				}
 				host.TCPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.TLSPort) {
-				base := model.ChDefaultTLSPortNumber
+				base := config.ChDefaultTLSPortNumber
 				if api.IsPortAssigned(template.Spec.TLSPort) {
 					base = template.Spec.TLSPort
 				}
 				host.TLSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.HTTPPort) {
-				base := model.ChDefaultHTTPPortNumber
+				base := config.ChDefaultHTTPPortNumber
 				if api.IsPortAssigned(template.Spec.HTTPPort) {
 					base = template.Spec.HTTPPort
 				}
 				host.HTTPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.HTTPSPort) {
-				base := model.ChDefaultHTTPSPortNumber
+				base := config.ChDefaultHTTPSPortNumber
 				if api.IsPortAssigned(template.Spec.HTTPSPort) {
 					base = template.Spec.HTTPSPort
 				}
 				host.HTTPSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
 			}
 			if api.IsPortUnassigned(host.InterserverHTTPPort) {
-				base := model.ChDefaultInterserverHTTPPortNumber
+				base := config.ChDefaultInterserverHTTPPortNumber
 				if api.IsPortAssigned(template.Spec.InterserverHTTPPort) {
 					base = template.Spec.InterserverHTTPPort
 				}
@@ -297,14 +298,14 @@ func hostEnsurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings,
 	// On the other hand, for final setup we need to assign real numbers to ports
 	if final {
 		if host.IsInsecure() {
-			fallbackTCPPort = model.ChDefaultTCPPortNumber
-			fallbackHTTPPort = model.ChDefaultHTTPPortNumber
+			fallbackTCPPort = config.ChDefaultTCPPortNumber
+			fallbackHTTPPort = config.ChDefaultHTTPPortNumber
 		}
 		if host.IsSecure() {
-			fallbackTLSPort = model.ChDefaultTLSPortNumber
-			fallbackHTTPSPort = model.ChDefaultHTTPSPortNumber
+			fallbackTLSPort = config.ChDefaultTLSPortNumber
+			fallbackHTTPSPort = config.ChDefaultHTTPSPortNumber
 		}
-		fallbackInterserverHTTPPort = model.ChDefaultInterserverHTTPPortNumber
+		fallbackInterserverHTTPPort = config.ChDefaultInterserverHTTPPortNumber
 	}
 
 	//
@@ -629,7 +630,7 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 		// Convenience wrapper
 		node := &zk.Nodes[i]
 		if api.IsPortUnassigned(node.Port) {
-			node.Port = model.ZkDefaultPort
+			node.Port = config.ZkDefaultPort
 		}
 	}
 
@@ -768,7 +769,7 @@ func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, s
 			})
 
 			// TODO setting may have specified mountPath explicitly
-			mountPath := filepath.Join(model.DirPathSecretFilesConfig, filenameInSettingsOrFiles, secretAddress.Name)
+			mountPath := filepath.Join(config.DirPathSecretFilesConfig, filenameInSettingsOrFiles, secretAddress.Name)
 			// TODO setting may have specified subPath explicitly
 			// Mount as file
 			//subPath := filename

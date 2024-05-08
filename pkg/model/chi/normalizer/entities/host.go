@@ -18,13 +18,13 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
 // NormalizeHostPorts ensures api.ChiReplica.Port is reasonable
 func NormalizeHostPorts(host *api.ChiHost) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
-	model.HostWalkInvalidPorts(
+	config.HostWalkInvalidPorts(
 		host,
 		func(name string, port *int32, protocol core.Protocol) bool {
 			*port = api.PortUnassigned()

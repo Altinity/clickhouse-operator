@@ -18,25 +18,26 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-func getOwnerReferences(chi *api.ClickHouseInstallation) []meta.OwnerReference {
-	if chi.GetRuntime().GetAttributes().GetSkipOwnerRef() {
+func getOwnerReferences(owner model.IChi) []meta.OwnerReference {
+	if owner.GetRuntime().GetAttributes().GetSkipOwnerRef() {
 		return nil
 	}
 	return []meta.OwnerReference{
-		getOwnerReference(&chi.ObjectMeta),
+		getOwnerReference(owner.GetObjectMeta()),
 	}
 }
 
-func getOwnerReference(objectMeta *meta.ObjectMeta) meta.OwnerReference {
+func getOwnerReference(m meta.Object) meta.OwnerReference {
 	controller := true
 	block := true
 	return meta.OwnerReference{
 		APIVersion:         api.SchemeGroupVersion.String(),
 		Kind:               api.ClickHouseInstallationCRDResourceKind,
-		Name:               objectMeta.GetName(),
-		UID:                objectMeta.GetUID(),
+		Name:               m.GetName(),
+		UID:                m.GetUID(),
 		Controller:         &controller,
 		BlockOwnerDeletion: &block,
 	}

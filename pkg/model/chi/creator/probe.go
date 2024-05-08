@@ -15,11 +15,11 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
 // newDefaultLivenessProbe is a unification wrapper
@@ -40,7 +40,7 @@ func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(model.ChDefaultHTTPPortName), // What if it is not a default?
+					Port: intstr.Parse(config.ChDefaultHTTPPortName), // What if it is not a default?
 				},
 			},
 			InitialDelaySeconds: 60,
@@ -55,7 +55,7 @@ func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path:   "/ping",
-					Port:   intstr.Parse(model.ChDefaultHTTPSPortName), // What if it is not a default?
+					Port:   intstr.Parse(config.ChDefaultHTTPSPortName), // What if it is not a default?
 					Scheme: core.URISchemeHTTPS,
 				},
 			},
@@ -77,7 +77,7 @@ func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(model.ChDefaultHTTPPortName), // What if port name is not a default?
+					Port: intstr.Parse(config.ChDefaultHTTPPortName), // What if port name is not a default?
 				},
 			},
 			InitialDelaySeconds: 10,
@@ -91,7 +91,7 @@ func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path:   "/ping",
-					Port:   intstr.Parse(model.ChDefaultHTTPSPortName), // What if port name is not a default?
+					Port:   intstr.Parse(config.ChDefaultHTTPSPortName), // What if port name is not a default?
 					Scheme: core.URISchemeHTTPS,
 				},
 			},

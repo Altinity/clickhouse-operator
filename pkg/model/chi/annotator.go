@@ -24,11 +24,11 @@ import (
 
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
-	chi *api.ClickHouseInstallation
+	chi IChi
 }
 
 // NewAnnotator creates new annotator with context
-func NewAnnotator(chi *api.ClickHouseInstallation) *Annotator {
+func NewAnnotator(chi IChi) *Annotator {
 	return &Annotator{
 		chi: chi,
 	}
@@ -59,7 +59,7 @@ func (a *Annotator) GetConfigMapHost(host *api.ChiHost) map[string]string {
 }
 
 // GetServiceCHI
-func (a *Annotator) GetServiceCHI(chi *api.ClickHouseInstallation) map[string]string {
+func (a *Annotator) GetServiceCHI(chi IChi) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getCHIScope(),
 		nil,
@@ -67,7 +67,7 @@ func (a *Annotator) GetServiceCHI(chi *api.ClickHouseInstallation) map[string]st
 }
 
 // GetServiceCluster
-func (a *Annotator) GetServiceCluster(cluster *api.Cluster) map[string]string {
+func (a *Annotator) GetServiceCluster(cluster ICluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.GetClusterScope(cluster),
 		nil,
@@ -75,7 +75,7 @@ func (a *Annotator) GetServiceCluster(cluster *api.Cluster) map[string]string {
 }
 
 // GetServiceShard
-func (a *Annotator) GetServiceShard(shard *api.ChiShard) map[string]string {
+func (a *Annotator) GetServiceShard(shard IShard) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getShardScope(shard),
 		nil,
@@ -97,13 +97,13 @@ func (a *Annotator) getCHIScope() map[string]string {
 }
 
 // GetClusterScope gets annotations for Cluster-scoped object
-func (a *Annotator) GetClusterScope(cluster *api.Cluster) map[string]string {
+func (a *Annotator) GetClusterScope(cluster ICluster) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
 // getShardScope gets annotations for Shard-scoped object
-func (a *Annotator) getShardScope(shard *api.ChiShard) map[string]string {
+func (a *Annotator) getShardScope(shard IShard) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
@@ -120,13 +120,13 @@ func (a *Annotator) filterOutPredefined(m map[string]string) map[string]string {
 
 // appendCHIProvidedTo appends CHI-provided annotations to specified annotations
 func (a *Annotator) appendCHIProvidedTo(dst map[string]string) map[string]string {
-	source := util.CopyMapFilter(a.chi.Annotations, chop.Config().Annotation.Include, chop.Config().Annotation.Exclude)
+	source := util.CopyMapFilter(a.chi.GetAnnotations(), chop.Config().Annotation.Include, chop.Config().Annotation.Exclude)
 	return util.MergeStringMapsOverwrite(dst, source)
 }
 
 // GetPV
 func (a *Annotator) GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string {
-	return util.MergeStringMapsOverwrite(pv.Annotations, a.GetHostScope(host))
+	return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.GetHostScope(host))
 }
 
 // GetPVC
@@ -135,6 +135,6 @@ func (a *Annotator) GetPVC(
 	host *api.ChiHost,
 	template *api.VolumeClaimTemplate,
 ) map[string]string {
-	annotations := util.MergeStringMapsOverwrite(pvc.Annotations, template.ObjectMeta.Annotations)
+	annotations := util.MergeStringMapsOverwrite(pvc.GetAnnotations(), template.ObjectMeta.GetAnnotations())
 	return util.MergeStringMapsOverwrite(annotations, a.GetHostScope(host))
 }

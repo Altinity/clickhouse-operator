@@ -17,6 +17,7 @@ package schemer
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 
 	"github.com/MakeNowJust/heredoc"
 
@@ -258,6 +259,6 @@ func (s *ClusterSchemer) sqlHostInCluster() string {
 		WHERE
 			cluster='%s' AND is_local
 		`,
-		chi.AllShardsOneReplicaClusterName,
+		config.AllShardsOneReplicaClusterName,
 	)
 }

@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -611,7 +612,7 @@ func (c *Controller) updateWatch(chi *api.ClickHouseInstallation) {
 
 // updateWatchAsync
 func (c *Controller) updateWatchAsync(chi *metrics.WatchedCHI) {
-	if err := metrics.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
+	if err := clickhouse.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
 		log.V(1).F().Info("FAIL update watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
 		log.V(1).Info("OK update watch (%s/%s): %s", chi.Namespace, chi.Name, chi)
@@ -626,7 +627,7 @@ func (c *Controller) deleteWatch(chi *api.ClickHouseInstallation) {
 
 // deleteWatchAsync
 func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCHI) {
-	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(chi); err != nil {
+	if err := clickhouse.InformMetricsExporterToDeleteWatchedCHI(chi); err != nil {
 		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
 		log.V(1).Info("OK delete watch (%s/%s)", chi.Namespace, chi.Name)

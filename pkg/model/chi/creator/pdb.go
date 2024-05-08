@@ -41,7 +41,7 @@ func (c *Creator) NewPodDisruptionBudget(cluster *api.Cluster) *policy.PodDisrup
 			},
 			MaxUnavailable: &intstr.IntOrString{
 				Type:   intstr.Int,
-				IntVal: cluster.PDBMaxUnavailable.Value(),
+				IntVal: cluster.GetPDBMaxUnavailable().Value(),
 			},
 		},
 	}

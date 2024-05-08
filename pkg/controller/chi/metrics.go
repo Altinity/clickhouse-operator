@@ -16,12 +16,12 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/metrics/operator"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/metrics"
 )
 
 // Metrics is a set of metrics that are tracked by the operator
@@ -58,64 +58,64 @@ var m *Metrics
 
 func createMetrics() *Metrics {
 	// The unit u should be defined using the appropriate [UCUM](https://ucum.org) case-sensitive code.
-	CHIReconcilesStarted, _ := metrics.Meter().Int64Counter(
+	CHIReconcilesStarted, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_started",
 		metric.WithDescription("number of CHI reconciles started"),
 		metric.WithUnit("items"),
 	)
-	CHIReconcilesCompleted, _ := metrics.Meter().Int64Counter(
+	CHIReconcilesCompleted, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_completed",
 		metric.WithDescription("number of CHI reconciles completed successfully"),
 		metric.WithUnit("items"),
 	)
-	CHIReconcilesAborted, _ := metrics.Meter().Int64Counter(
+	CHIReconcilesAborted, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_chi_reconciles_aborted",
 		metric.WithDescription("number of CHI reconciles aborted"),
 		metric.WithUnit("items"),
 	)
-	CHIReconcilesTimings, _ := metrics.Meter().Float64Histogram(
+	CHIReconcilesTimings, _ := operator.Meter().Float64Histogram(
 		"clickhouse_operator_chi_reconciles_timings",
 		metric.WithDescription("timings of CHI reconciles completed successfully"),
 		metric.WithUnit("s"),
 	)
 
-	HostReconcilesStarted, _ := metrics.Meter().Int64Counter(
+	HostReconcilesStarted, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_started",
 		metric.WithDescription("number of host reconciles started"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesCompleted, _ := metrics.Meter().Int64Counter(
+	HostReconcilesCompleted, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_completed",
 		metric.WithDescription("number of host reconciles completed successfully"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesRestarts, _ := metrics.Meter().Int64Counter(
+	HostReconcilesRestarts, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_restarts",
 		metric.WithDescription("number of host restarts during reconciles"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesErrors, _ := metrics.Meter().Int64Counter(
+	HostReconcilesErrors, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_host_reconciles_errors",
 		metric.WithDescription("number of host reconciles errors"),
 		metric.WithUnit("items"),
 	)
-	HostReconcilesTimings, _ := metrics.Meter().Float64Histogram(
+	HostReconcilesTimings, _ := operator.Meter().Float64Histogram(
 		"clickhouse_operator_host_reconciles_timings",
 		metric.WithDescription("timings of host reconciles completed successfully"),
 		metric.WithUnit("s"),
 	)
 
-	PodAddEvents, _ := metrics.Meter().Int64Counter(
+	PodAddEvents, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_pod_add_events",
 		metric.WithDescription("number PodAdd events"),
 		metric.WithUnit("items"),
 	)
-	PodUpdateEvents, _ := metrics.Meter().Int64Counter(
+	PodUpdateEvents, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_pod_update_events",
 		metric.WithDescription("number PodUpdate events"),
 		metric.WithUnit("items"),
 	)
-	PodDeleteEvents, _ := metrics.Meter().Int64Counter(
+	PodDeleteEvents, _ := operator.Meter().Int64Counter(
 		"clickhouse_operator_pod_delete_events",
 		metric.WithDescription("number PodDelete events"),
 		metric.WithUnit("items"),
@@ -147,7 +147,7 @@ func ensureMetrics() *Metrics {
 }
 
 func prepareLabels(chi *api.ClickHouseInstallation) (attributes []attribute.KeyValue) {
-	labels, values := metrics.GetMandatoryLabelsAndValues(chi)
+	labels, values := operator.GetMandatoryLabelsAndValues(chi)
 	for i := range labels {
 		label := labels[i]
 		value := values[i]

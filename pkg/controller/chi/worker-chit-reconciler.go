@@ -36,28 +36,28 @@ func (w *worker) shouldUpdateCHITList() bool {
 // addChit sync new CHIT - creates all its resources
 func (w *worker) addChit(chit *api.ClickHouseInstallationTemplate) error {
 	if w.shouldUpdateCHITList() {
-		log.V(1).M(chit).F().Info("Add CHIT: %s/%s", chit.Namespace, chit.Name)
+		log.V(1).M(chit).F().Info("Add CHIT: %s/%s", chit.GetNamespace(), chit.GetName())
 		chop.Config().AddCHITemplate((*api.ClickHouseInstallation)(chit))
 	} else {
-		log.V(1).M(chit).F().Info("CHIT will not be added: %s/%s", chit.Namespace, chit.Name)
+		log.V(1).M(chit).F().Info("CHIT will not be added: %s/%s", chit.GetNamespace(), chit.GetName())
 	}
 	return nil
 }
 
 // updateChit sync CHIT which was already created earlier
 func (w *worker) updateChit(old, new *api.ClickHouseInstallationTemplate) error {
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
+	if old.GetObjectMeta().GetResourceVersion() == new.GetObjectMeta().GetResourceVersion() {
+		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.GetObjectMeta().GetResourceVersion())
 		// No need to react
 		return nil
 	}
 
-	log.V(1).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+	log.V(1).M(new).F().Info("ResourceVersion change: %s to %s", old.GetObjectMeta().GetResourceVersion(), new.GetObjectMeta().GetResourceVersion())
 	if w.shouldUpdateCHITList() {
-		log.V(1).M(new).F().Info("Update CHIT: %s/%s", new.Namespace, new.Name)
+		log.V(1).M(new).F().Info("Update CHIT: %s/%s", new.GetNamespace(), new.GetName())
 		chop.Config().UpdateCHITemplate((*api.ClickHouseInstallation)(new))
 	} else {
-		log.V(1).M(new).F().Info("CHIT will not be updated: %s/%s", new.Namespace, new.Name)
+		log.V(1).M(new).F().Info("CHIT will not be updated: %s/%s", new.GetNamespace(), new.GetName())
 	}
 	return nil
 }
@@ -67,10 +67,10 @@ func (w *worker) deleteChit(chit *api.ClickHouseInstallationTemplate) error {
 	log.V(1).M(chit).F().P()
 
 	if w.shouldUpdateCHITList() {
-		log.V(1).M(chit).F().Info("Delete CHIT: %s/%s", chit.Namespace, chit.Name)
+		log.V(1).M(chit).F().Info("Delete CHIT: %s/%s", chit.GetNamespace(), chit.GetName())
 		chop.Config().DeleteCHITemplate((*api.ClickHouseInstallation)(chit))
 	} else {
-		log.V(1).M(chit).F().Info("CHIT will not be deleted: %s/%s", chit.Namespace, chit.Name)
+		log.V(1).M(chit).F().Info("CHIT will not be deleted: %s/%s", chit.GetNamespace(), chit.GetName())
 	}
 	return nil
 }

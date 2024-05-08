@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package metrics
+package clickhouse
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
+	"github.com/altinity/clickhouse-operator/pkg/metrics/operator"
 	"strconv"
 	"time"
 
@@ -40,15 +41,15 @@ const (
 // CHIPrometheusWriter specifies writer to prometheus
 type CHIPrometheusWriter struct {
 	out  chan<- prometheus.Metric
-	chi  *WatchedCHI
-	host *WatchedHost
+	chi  *metrics.WatchedCHI
+	host *metrics.WatchedHost
 }
 
 // NewCHIPrometheusWriter creates new CHI prometheus writer
 func NewCHIPrometheusWriter(
 	out chan<- prometheus.Metric,
-	chi *WatchedCHI,
-	host *WatchedHost,
+	chi *metrics.WatchedCHI,
+	host *metrics.WatchedHost,
 ) *CHIPrometheusWriter {
 	return &CHIPrometheusWriter{
 		out:  out,
@@ -227,7 +228,7 @@ func (w *CHIPrometheusWriter) appendHostLabel(labels, values []string) ([]string
 
 func (w *CHIPrometheusWriter) getMandatoryLabelsAndValues() (labelNames []string, labelValues []string) {
 	// Prepare mandatory set of labels
-	labelNames, labelValues = metrics.GetMandatoryLabelsAndValues(w.chi)
+	labelNames, labelValues = operator.GetMandatoryLabelsAndValues(w.chi)
 	// Append current host label
 	labelNames, labelValues = w.appendHostLabel(labelNames, labelValues)
 

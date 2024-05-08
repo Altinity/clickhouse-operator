@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -23,7 +24,7 @@ import (
 )
 
 // CreateConfigMapCHICommon creates new core.ConfigMap
-func (c *Creator) CreateConfigMapCHICommon(options *model.ClickHouseConfigFilesGeneratorOptions) *core.ConfigMap {
+func (c *Creator) CreateConfigMapCHICommon(options *config.ClickHouseConfigFilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapCommonName(c.chi),
@@ -33,10 +34,10 @@ func (c *Creator) CreateConfigMapCHICommon(options *model.ClickHouseConfigFilesG
 			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupCommon(options),
+		Data: c.configFilesGenerator.CreateConfigFilesGroupCommon(options),
 	}
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(&cm.ObjectMeta, cm)
+	model.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -51,10 +52,10 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *core.ConfigMap {
 			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupUsers(),
+		Data: c.configFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(&cm.ObjectMeta, cm)
+	model.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -63,15 +64,15 @@ func (c *Creator) CreateConfigMapHost(host *api.ChiHost) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapHostName(host),
-			Namespace:       host.Runtime.Address.Namespace,
+			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          model.Macro(host).Map(c.labels.GetConfigMapHost(host)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetConfigMapHost(host)),
 			OwnerReferences: getOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.chConfigFilesGenerator.CreateConfigFilesGroupHost(host),
+		Data: c.configFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(&cm.ObjectMeta, cm)
+	model.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
