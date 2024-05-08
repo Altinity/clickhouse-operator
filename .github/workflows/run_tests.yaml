@@ -1,13 +1,17 @@
 name: run_tests
-on: workflow_dispatch
+on:
+  pull_request:
+    branches:
+      - '*'
+  workflow_dispatch:
 jobs:
   run_tests:
     name: Run Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Cache python
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: cache-python
         with:
           path: ~/venv/qa
@@ -32,15 +36,30 @@ jobs:
         with:
           driver: docker
           container-runtime: containerd
-          kubernetes-version: v1.25.3
+          kubernetes-version: v1.30.0
           cpus: max
           memory: max
+
+      - name: Build clickhouse-operator locally without push to registry
+        run: |
+          minikube status          
+          export CHO_RELEASE=$(cat release)
+          echo "current release=$CHO_RELEASE"
+          
+          docker build -f dockerfile/operator/Dockerfile -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
+          docker build -f dockerfile/metrics-exporter/Dockerfile -t altinity/metrics-exporter:${CHO_RELEASE} --pull .
+          
+          docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar 
+          docker image save altinity/metrics-exporter:${CHO_RELEASE} -o metrics-exporter.tar
+
+          minikube image load operator.tar 
+          minikube image load metrics-exporter.tar
 
       - name: Run Tests
         run: |
           source ~/venv/qa/bin/activate
           set -x
-
+        
           # bash -xe ./deploy/prometheus/create-prometheus.sh
           # bash -xe ./deploy/minio/install-minio-operator.sh
           # bash -xe ./deploy/minio/install-minio-tenant.sh
@@ -54,14 +73,15 @@ jobs:
           # bash ./tests/e2e/run_tests_parallel.sh
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
           ONLY='*'
-          # ONLY='*test_036*'
+          # ONLY='*test_008_2*'
+
           ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --trim-results on --debug --native --log ./tests/raw.log
           ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
           ~/venv/qa/bin/tfs --debug --no-colors transform short ./tests/raw.log ./tests/short.log.txt
           ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity LTD" --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: testflows-logs
           path: |
@@ -70,7 +90,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: testflows-report
           path: |
