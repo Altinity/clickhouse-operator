@@ -308,8 +308,8 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	})
 
 	// Delete all clusters
-	chi.WalkClusters(func(cluster *api.Cluster) error {
-		return w.deleteCluster(ctx, chi, cluster)
+	chi.WalkClusters(func(cluster api.ICluster) error {
+		return w.deleteCluster(ctx, chi, cluster.(*api.Cluster))
 	})
 
 	if util.IsContextDone(ctx) {
@@ -574,8 +574,8 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 	}
 
 	// Delete all shards
-	cluster.WalkShards(func(index int, shard *api.ChiShard) error {
-		return w.deleteShard(ctx, chi, shard)
+	cluster.WalkShards(func(index int, shard api.IShard) error {
+		return w.deleteShard(ctx, chi, shard.(*api.ChiShard))
 	})
 
 	w.a.V(1).

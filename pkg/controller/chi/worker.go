@@ -100,7 +100,14 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *api.ClickHouseInstallation) {
-	w.task = newTask(chiCreator.NewCreator(chi, config.NewClickHouseConfigFilesGenerator(chi)))
+	w.task = newTask(chiCreator.NewCreator(chi, config.NewClickHouseConfigFilesGenerator(chi, &config.ClickHouseConfigGeneratorOptions{
+		Users:          chi.GetSpec().Configuration.Users,
+		Profiles:       chi.GetSpec().Configuration.Profiles,
+		Quotas:         chi.GetSpec().Configuration.Quotas,
+		Settings:       chi.GetSpec().Configuration.Settings,
+		Files:          chi.GetSpec().Configuration.Files,
+		DistributedDDL: chi.GetSpec().Defaults.DistributedDDL,
+	})))
 }
 
 // timeToStart specifies time that operator does not accept changes

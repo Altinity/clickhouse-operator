@@ -18,6 +18,10 @@ func (shard *ChiShard) GetName() string {
 	return shard.Name
 }
 
+func (shard *ChiShard) GetInternalReplication() *StringBool {
+	return shard.InternalReplication
+}
+
 // InheritSettingsFrom inherits settings from specified cluster
 func (shard *ChiShard) InheritSettingsFrom(cluster *Cluster) {
 	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)

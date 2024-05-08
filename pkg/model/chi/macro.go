@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"strconv"
 	"strings"
 
@@ -92,13 +93,13 @@ func Macro(scope any) *MacrosEngine {
 // Line expands line with macros(es)
 func (m *MacrosEngine) Line(line string) string {
 	switch t := m.scope.(type) {
-	case IChi:
+	case v1.IChi:
 		return m.newLineMacroReplacerChi(t).Replace(line)
-	case ICluster:
+	case v1.ICluster:
 		return m.newLineMacroReplacerCluster(t).Replace(line)
-	case IShard:
+	case v1.IShard:
 		return m.newLineMacroReplacerShard(t).Replace(line)
-	case IHost:
+	case v1.IHost:
 		return m.newLineMacroReplacerHost(t).Replace(line)
 	default:
 		return "unknown scope"
@@ -108,13 +109,13 @@ func (m *MacrosEngine) Line(line string) string {
 // Map expands map with macros(es)
 func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 	switch t := m.scope.(type) {
-	case IChi:
+	case v1.IChi:
 		return m.newMapMacroReplacerChi(t).Replace(_map)
-	case ICluster:
+	case v1.ICluster:
 		return m.newMapMacroReplacerCluster(t).Replace(_map)
-	case IShard:
+	case v1.IShard:
 		return m.newMapMacroReplacerShard(t).Replace(_map)
-	case IHost:
+	case v1.IHost:
 		return m.newMapMacroReplacerHost(t).Replace(_map)
 	default:
 		return map[string]string{
@@ -124,7 +125,7 @@ func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 }
 
 // newLineMacroReplacerChi
-func (m *MacrosEngine) newLineMacroReplacerChi(chi IChi) *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerChi(chi v1.IChi) *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(chi.GetNamespace()),
 		macrosChiName, m.names.namePartChiName(chi.GetName()),
@@ -133,12 +134,12 @@ func (m *MacrosEngine) newLineMacroReplacerChi(chi IChi) *strings.Replacer {
 }
 
 // newMapMacroReplacerChi
-func (m *MacrosEngine) newMapMacroReplacerChi(chi IChi) *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerChi(chi v1.IChi) *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerChi(chi))
 }
 
 // newLineMacroReplacerCluster
-func (m *MacrosEngine) newLineMacroReplacerCluster(cluster ICluster) *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerCluster(cluster v1.ICluster) *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(cluster.GetRuntime().GetAddress().GetNamespace()),
 		macrosChiName, m.names.namePartChiName(cluster.GetRuntime().GetAddress().GetRootName()),
@@ -150,12 +151,12 @@ func (m *MacrosEngine) newLineMacroReplacerCluster(cluster ICluster) *strings.Re
 }
 
 // newMapMacroReplacerCluster
-func (m *MacrosEngine) newMapMacroReplacerCluster(cluster ICluster) *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerCluster(cluster v1.ICluster) *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerCluster(cluster))
 }
 
 // newLineMacroReplacerShard
-func (m *MacrosEngine) newLineMacroReplacerShard(shard IShard) *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerShard(shard v1.IShard) *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(shard.GetRuntime().GetAddress().GetNamespace()),
 		macrosChiName, m.names.namePartChiName(shard.GetRuntime().GetAddress().GetRootName()),
@@ -170,12 +171,12 @@ func (m *MacrosEngine) newLineMacroReplacerShard(shard IShard) *strings.Replacer
 }
 
 // newMapMacroReplacerShard
-func (m *MacrosEngine) newMapMacroReplacerShard(shard IShard) *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerShard(shard v1.IShard) *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerShard(shard))
 }
 
 // clusterScopeIndexOfPreviousCycleTail gets cluster-scope index of previous cycle tail
-func clusterScopeIndexOfPreviousCycleTail(host IHost) int {
+func clusterScopeIndexOfPreviousCycleTail(host v1.IHost) int {
 	if host.GetRuntime().GetAddress().GetClusterScopeCycleOffset() == 0 {
 		// This is the cycle head - the first host of the cycle
 		// We need to point to previous host in this cluster - which would be previous cycle tail
@@ -197,7 +198,7 @@ func clusterScopeIndexOfPreviousCycleTail(host IHost) int {
 }
 
 // newLineMacroReplacerHost
-func (m *MacrosEngine) newLineMacroReplacerHost(host IHost) *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerHost(host v1.IHost) *strings.Replacer {
 	return strings.NewReplacer(
 		macrosNamespace, m.names.namePartNamespace(host.GetRuntime().GetAddress().GetNamespace()),
 		macrosChiName, m.names.namePartChiName(host.GetRuntime().GetAddress().GetRootName()),
@@ -226,6 +227,6 @@ func (m *MacrosEngine) newLineMacroReplacerHost(host IHost) *strings.Replacer {
 }
 
 // newMapMacroReplacerHost
-func (m *MacrosEngine) newMapMacroReplacerHost(host IHost) *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerHost(host v1.IHost) *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerHost(host))
 }

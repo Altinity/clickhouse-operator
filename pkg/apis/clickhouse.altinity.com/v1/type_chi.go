@@ -220,7 +220,7 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 }
 
 // WalkClusters walks clusters
-func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *Cluster) error) []error {
+func (chi *ClickHouseInstallation) WalkClusters(f func(i ICluster) error) []error {
 	if chi == nil {
 		return nil
 	}
@@ -475,7 +475,7 @@ func (chi *ClickHouseInstallation) FindHost(needleCluster interface{}, needleSha
 // ClustersCount counts clusters
 func (chi *ClickHouseInstallation) ClustersCount() int {
 	count := 0
-	chi.WalkClusters(func(cluster *Cluster) error {
+	chi.WalkClusters(func(cluster ICluster) error {
 		count++
 		return nil
 	})

@@ -787,8 +787,8 @@ func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, s
 		})
 }
 
-func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
-	switch cluster.Secret.Source() {
+func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
+	switch cluster.GetSecret().Source() {
 	case api.ClusterSecretSourcePlaintext:
 		// Secret has explicit value, it is not passed via ENV vars
 		// Do nothing here
@@ -799,7 +799,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 			core.EnvVar{
 				Name: model.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
-					SecretKeyRef: cluster.Secret.GetSecretKeyRef(),
+					SecretKeyRef: cluster.GetSecret().GetSecretKeyRef(),
 				},
 			},
 		)
@@ -810,7 +810,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster *api.Cluster) {
 			core.EnvVar{
 				Name: model.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
-					SecretKeyRef: cluster.Secret.GetAutoSecretKeyRef(model.CreateClusterAutoSecretName(cluster)),
+					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(model.CreateClusterAutoSecretName(cluster)),
 				},
 			},
 		)
@@ -1191,8 +1191,8 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
-	cluster.WalkShards(func(index int, shard *api.ChiShard) error {
-		n.normalizeShard(shard, cluster, index)
+	cluster.WalkShards(func(index int, shard api.IShard) error {
+		n.normalizeShard(shard.(*api.ChiShard), cluster, index)
 		return nil
 	})
 

@@ -77,11 +77,11 @@ const (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	chi IChi
+	chi api.IChi
 }
 
 // NewLabeler creates new labeler with context
-func NewLabeler(chi IChi) *Labeler {
+func NewLabeler(chi api.IChi) *Labeler {
 	return &Labeler{
 		chi: chi,
 	}
@@ -115,7 +115,7 @@ func (l *Labeler) GetConfigMapHost(host *api.ChiHost) map[string]string {
 }
 
 // GetServiceCHI
-func (l *Labeler) GetServiceCHI(chi IChi) map[string]string {
+func (l *Labeler) GetServiceCHI(chi api.IChi) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getCHIScope(),
 		map[string]string{
@@ -124,7 +124,7 @@ func (l *Labeler) GetServiceCHI(chi IChi) map[string]string {
 }
 
 // GetServiceCluster
-func (l *Labeler) GetServiceCluster(cluster ICluster) map[string]string {
+func (l *Labeler) GetServiceCluster(cluster api.ICluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetClusterScope(cluster),
 		map[string]string{
@@ -133,7 +133,7 @@ func (l *Labeler) GetServiceCluster(cluster ICluster) map[string]string {
 }
 
 // GetServiceShard
-func (l *Labeler) GetServiceShard(shard IShard) map[string]string {
+func (l *Labeler) GetServiceShard(shard api.IShard) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getShardScope(shard),
 		map[string]string{
@@ -174,13 +174,13 @@ func (l *Labeler) GetSelectorCHIScopeReady() map[string]string {
 }
 
 // GetClusterScope gets labels for Cluster-scoped object
-func (l *Labeler) GetClusterScope(cluster ICluster) map[string]string {
+func (l *Labeler) GetClusterScope(cluster api.ICluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutPredefined(l.appendCHIProvidedTo(GetSelectorClusterScope(cluster)))
 }
 
 // GetSelectorClusterScope gets labels to select a Cluster-scoped object
-func GetSelectorClusterScope(cluster ICluster) map[string]string {
+func GetSelectorClusterScope(cluster api.ICluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   labelsNamer.getNamePartNamespace(cluster),
@@ -191,18 +191,18 @@ func GetSelectorClusterScope(cluster ICluster) map[string]string {
 }
 
 // GetSelectorClusterScope gets labels to select a ready-labelled Cluster-scoped object
-func GetSelectorClusterScopeReady(cluster ICluster) map[string]string {
+func GetSelectorClusterScopeReady(cluster api.ICluster) map[string]string {
 	return appendKeyReady(GetSelectorClusterScope(cluster))
 }
 
 // getShardScope gets labels for Shard-scoped object
-func (l *Labeler) getShardScope(shard IShard) map[string]string {
+func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorShardScope(shard)))
 }
 
 // getSelectorShardScope gets labels to select a Shard-scoped object
-func getSelectorShardScope(shard IShard) map[string]string {
+func getSelectorShardScope(shard api.IShard) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   labelsNamer.getNamePartNamespace(shard),
@@ -214,7 +214,7 @@ func getSelectorShardScope(shard IShard) map[string]string {
 }
 
 // GetSelectorShardScopeReady gets labels to select a ready-labelled Shard-scoped object
-func GetSelectorShardScopeReady(shard IShard) map[string]string {
+func GetSelectorShardScopeReady(shard api.IShard) map[string]string {
 	return appendKeyReady(getSelectorShardScope(shard))
 }
 

@@ -31,6 +31,10 @@ type Cluster struct {
 	Runtime ClusterRuntime `json:"-" yaml:"-"`
 }
 
+func (c *Cluster) GetSecret() *ClusterSecret {
+	return c.Secret
+}
+
 type ClusterRuntime struct {
 	Address ChiClusterAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
@@ -256,15 +260,15 @@ func (cluster *Cluster) GetReplica(replica int) *ChiReplica {
 // Expectations: name is expected to be a string, index is expected to be an int.
 func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 	var resultShard *ChiShard
-	cluster.WalkShards(func(index int, shard *ChiShard) error {
+	cluster.WalkShards(func(index int, shard IShard) error {
 		switch v := needle.(type) {
 		case string:
-			if shard.Name == v {
-				resultShard = shard
+			if shard.GetName() == v {
+				resultShard = shard.(*ChiShard)
 			}
 		case int:
 			if index == v {
-				resultShard = shard
+				resultShard = shard.(*ChiShard)
 			}
 		}
 		return nil
@@ -291,9 +295,7 @@ func (cluster *Cluster) FirstHost() *ChiHost {
 }
 
 // WalkShards walks shards
-func (cluster *Cluster) WalkShards(
-	f func(index int, shard *ChiShard) error,
-) []error {
+func (cluster *Cluster) WalkShards(f func(index int, shard IShard) error) []error {
 	if cluster == nil {
 		return nil
 	}

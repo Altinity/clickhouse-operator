@@ -80,7 +80,7 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 }
 
 // CreateServiceCluster creates new core.Service for specified Cluster
-func (c *Creator) CreateServiceCluster(cluster *api.Cluster) *core.Service {
+func (c *Creator) CreateServiceCluster(cluster api.ICluster) *core.Service {
 	serviceName := model.CreateClusterServiceName(cluster)
 	ownerReferences := getOwnerReferences(c.chi)
 
@@ -103,7 +103,7 @@ func (c *Creator) CreateServiceCluster(cluster *api.Cluster) *core.Service {
 }
 
 // CreateServiceShard creates new core.Service for specified Shard
-func (c *Creator) CreateServiceShard(shard *api.ChiShard) *core.Service {
+func (c *Creator) CreateServiceShard(shard api.IShard) *core.Service {
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(

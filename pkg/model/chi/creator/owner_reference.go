@@ -18,10 +18,9 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-func getOwnerReferences(owner model.IChi) []meta.OwnerReference {
+func getOwnerReferences(owner api.IChi) []meta.OwnerReference {
 	if owner.GetRuntime().GetAttributes().GetSkipOwnerRef() {
 		return nil
 	}

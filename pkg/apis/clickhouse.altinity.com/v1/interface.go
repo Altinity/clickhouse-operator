@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package v1
 
 import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 type IChi interface {
@@ -25,25 +23,35 @@ type IChi interface {
 	GetName() string
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
-	GetRuntime() api.IClickHouseInstallationRuntime
-	WalkHosts(func(host *api.ChiHost) error) []error
-	GetRootServiceTemplate() (*api.ServiceTemplate, bool)
-	GetSpec() *api.ChiSpec
+	GetRuntime() IClickHouseInstallationRuntime
+	GetRootServiceTemplate() (*ServiceTemplate, bool)
+	GetSpec() *ChiSpec
 	GetObjectMeta() meta.Object
+
+	WalkClusters(f func(cluster ICluster) error) []error
+	WalkHosts(func(host *ChiHost) error) []error
 }
 
 type ICluster interface {
 	GetName() string
-	GetRuntime() api.IClusterRuntime
-	WalkHosts(func(host *api.ChiHost) error) []error
-	GetServiceTemplate() (*api.ServiceTemplate, bool)
+	GetRuntime() IClusterRuntime
+	GetServiceTemplate() (*ServiceTemplate, bool)
+	GetSecret() *ClusterSecret
+	GetPDBMaxUnavailable() *Int32
+
+	WalkShards(f func(index int, shard IShard) error) []error
+	WalkHosts(func(host *ChiHost) error) []error
 }
 
 type IShard interface {
 	GetName() string
-	GetRuntime() api.IShardRuntime
-	WalkHosts(func(host *api.ChiHost) error) []error
-	GetServiceTemplate() (*api.ServiceTemplate, bool)
+	GetRuntime() IShardRuntime
+	GetServiceTemplate() (*ServiceTemplate, bool)
+	GetInternalReplication() *StringBool
+	HasWeight() bool
+	GetWeight() int
+
+	WalkHosts(func(host *ChiHost) error) []error
 }
 
 type IReplica interface {
@@ -51,5 +59,5 @@ type IReplica interface {
 }
 
 type IHost interface {
-	GetRuntime() api.IHostRuntime
+	GetRuntime() IHostRuntime
 }

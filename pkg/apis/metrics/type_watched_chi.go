@@ -61,7 +61,7 @@ func (chi *WatchedCHI) readFrom(c *api.ClickHouseInstallation) {
 	chi.Labels = c.Labels
 	chi.Annotations = c.Annotations
 
-	c.WalkClusters(func(cl *api.Cluster) error {
+	c.WalkClusters(func(cl api.ICluster) error {
 		cluster := &WatchedCluster{}
 		cluster.readFrom(cl)
 		chi.Clusters = append(chi.Clusters, cluster)
@@ -129,11 +129,11 @@ func (chi *WatchedCHI) String() string {
 	return string(bytes)
 }
 
-func (cluster *WatchedCluster) readFrom(c *api.Cluster) {
+func (cluster *WatchedCluster) readFrom(c api.ICluster) {
 	if cluster == nil {
 		return
 	}
-	cluster.Name = c.Name
+	cluster.Name = c.GetName()
 
 	c.WalkHosts(func(h *api.ChiHost) error {
 		host := &WatchedHost{}

@@ -26,7 +26,7 @@ type labeler interface {
 	GetConfigMapCHICommon() map[string]string
 	GetConfigMapCHICommonUsers() map[string]string
 	GetConfigMapHost(host *api.ChiHost) map[string]string
-	GetClusterScope(cluster model.ICluster) map[string]string
+	GetClusterScope(cluster api.ICluster) map[string]string
 	GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string
 	GetHostScope(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string
 	GetPVC(
@@ -34,11 +34,11 @@ type labeler interface {
 		host *api.ChiHost,
 		template *api.VolumeClaimTemplate,
 	) map[string]string
-	GetServiceCHI(chi model.IChi) map[string]string
+	GetServiceCHI(chi api.IChi) map[string]string
 	GetSelectorCHIScopeReady() map[string]string
-	GetServiceCluster(cluster model.ICluster) map[string]string
+	GetServiceCluster(cluster api.ICluster) map[string]string
 	GetServiceHost(host *api.ChiHost) map[string]string
-	GetServiceShard(shard model.IShard) map[string]string
+	GetServiceShard(shard api.IShard) map[string]string
 	GetHostScopeReady(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string
 }
 
@@ -46,7 +46,7 @@ type annotator interface {
 	GetConfigMapCHICommon() map[string]string
 	GetConfigMapCHICommonUsers() map[string]string
 	GetConfigMapHost(host *api.ChiHost) map[string]string
-	GetClusterScope(cluster model.ICluster) map[string]string
+	GetClusterScope(cluster api.ICluster) map[string]string
 	GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string
 	GetHostScope(host *api.ChiHost) map[string]string
 	GetPVC(
@@ -54,15 +54,15 @@ type annotator interface {
 		host *api.ChiHost,
 		template *api.VolumeClaimTemplate,
 	) map[string]string
-	GetServiceCHI(chi model.IChi) map[string]string
-	GetServiceCluster(cluster model.ICluster) map[string]string
+	GetServiceCHI(chi api.IChi) map[string]string
+	GetServiceCluster(cluster api.ICluster) map[string]string
 	GetServiceHost(host *api.ChiHost) map[string]string
-	GetServiceShard(shard model.IShard) map[string]string
+	GetServiceShard(shard api.IShard) map[string]string
 }
 
 // Creator specifies creator object
 type Creator struct {
-	chi                  model.IChi
+	chi                  api.IChi
 	configFilesGenerator *config.ClickHouseConfigFilesGenerator
 	labels               labeler
 	annotations          annotator
@@ -70,7 +70,7 @@ type Creator struct {
 }
 
 // NewCreator creates new Creator object
-func NewCreator(chi model.IChi, configFilesGenerator *config.ClickHouseConfigFilesGenerator) *Creator {
+func NewCreator(chi api.IChi, configFilesGenerator *config.ClickHouseConfigFilesGenerator) *Creator {
 	return &Creator{
 		chi:                  chi,
 		configFilesGenerator: configFilesGenerator,

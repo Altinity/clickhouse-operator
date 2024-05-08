@@ -23,16 +23,16 @@ import (
 // ClickHouseConfigFilesGenerator specifies clickhouse configuration generator object
 type ClickHouseConfigFilesGenerator struct {
 	// ClickHouse config generator
-	chConfigGenerator *ClickHouseConfigGenerator
+	configGenerator *ClickHouseConfigGenerator
 	// clickhouse-operator configuration
 	chopConfig *api.OperatorConfig
 }
 
 // NewClickHouseConfigFilesGenerator creates new clickhouse configuration generator object
-func NewClickHouseConfigFilesGenerator(chi *api.ClickHouseInstallation) *ClickHouseConfigFilesGenerator {
+func NewClickHouseConfigFilesGenerator(chi *api.ClickHouseInstallation, opts *ClickHouseConfigGeneratorOptions) *ClickHouseConfigFilesGenerator {
 	return &ClickHouseConfigFilesGenerator{
-		chConfigGenerator: newClickHouseConfigGenerator(chi),
-		chopConfig:        chop.Config(),
+		configGenerator: newClickHouseConfigGenerator(chi, opts),
+		chopConfig:      chop.Config(),
 	}
 }
 
@@ -46,9 +46,9 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *C
 	// 1. remote servers
 	// 2. common settings
 	// 3. common files
-	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.chConfigGenerator.getRemoteServers(options.GetRemoteServersGeneratorOptions()))
-	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.getSettingsGlobal())
-	util.MergeStringMapsOverwrite(commonConfigSections, c.chConfigGenerator.getSectionFromFiles(api.SectionCommon, true, nil))
+	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.configGenerator.getRemoteServers(options.GetRemoteServersGeneratorOptions()))
+	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettingsGlobal())
+	util.MergeStringMapsOverwrite(commonConfigSections, c.configGenerator.getSectionFromFiles(api.SectionCommon, true, nil))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(commonConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.CommonConfigFiles)
 
@@ -63,10 +63,10 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[strin
 	// 2. quotas
 	// 3. profiles
 	// 4. user files
-	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configUsers), c.chConfigGenerator.getUsers())
-	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configQuotas), c.chConfigGenerator.getQuotas())
-	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.chConfigGenerator.getProfiles())
-	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chConfigGenerator.getSectionFromFiles(api.SectionUsers, false, nil))
+	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configUsers), c.configGenerator.getUsers())
+	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configQuotas), c.configGenerator.getQuotas())
+	util.IncludeNonEmpty(commonUsersConfigSections, createConfigSectionFilename(configProfiles), c.configGenerator.getProfiles())
+	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.configGenerator.getSectionFromFiles(api.SectionUsers, false, nil))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(commonUsersConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.UsersConfigFiles)
 
@@ -77,11 +77,11 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[strin
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *api.ChiHost) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
-	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.chConfigGenerator.getHostMacros(host))
-	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configHostnamePorts), c.chConfigGenerator.getHostHostnameAndPorts(host))
-	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configZookeeper), c.chConfigGenerator.getHostZookeeper(host))
-	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configSettings), c.chConfigGenerator.getSettings(host))
-	util.MergeStringMapsOverwrite(hostConfigSections, c.chConfigGenerator.getSectionFromFiles(api.SectionHost, true, host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configHostnamePorts), c.configGenerator.getHostHostnameAndPorts(host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configZookeeper), c.configGenerator.getHostZookeeper(host))
+	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettings(host))
+	util.MergeStringMapsOverwrite(hostConfigSections, c.configGenerator.getSectionFromFiles(api.SectionHost, true, host))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(hostConfigSections, c.chopConfig.ClickHouse.Config.File.Runtime.HostConfigFiles)
 

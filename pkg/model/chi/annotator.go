@@ -24,11 +24,11 @@ import (
 
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
-	chi IChi
+	chi api.IChi
 }
 
 // NewAnnotator creates new annotator with context
-func NewAnnotator(chi IChi) *Annotator {
+func NewAnnotator(chi api.IChi) *Annotator {
 	return &Annotator{
 		chi: chi,
 	}
@@ -59,7 +59,7 @@ func (a *Annotator) GetConfigMapHost(host *api.ChiHost) map[string]string {
 }
 
 // GetServiceCHI
-func (a *Annotator) GetServiceCHI(chi IChi) map[string]string {
+func (a *Annotator) GetServiceCHI(chi api.IChi) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getCHIScope(),
 		nil,
@@ -67,7 +67,7 @@ func (a *Annotator) GetServiceCHI(chi IChi) map[string]string {
 }
 
 // GetServiceCluster
-func (a *Annotator) GetServiceCluster(cluster ICluster) map[string]string {
+func (a *Annotator) GetServiceCluster(cluster api.ICluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.GetClusterScope(cluster),
 		nil,
@@ -75,7 +75,7 @@ func (a *Annotator) GetServiceCluster(cluster ICluster) map[string]string {
 }
 
 // GetServiceShard
-func (a *Annotator) GetServiceShard(shard IShard) map[string]string {
+func (a *Annotator) GetServiceShard(shard api.IShard) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.getShardScope(shard),
 		nil,
@@ -97,13 +97,13 @@ func (a *Annotator) getCHIScope() map[string]string {
 }
 
 // GetClusterScope gets annotations for Cluster-scoped object
-func (a *Annotator) GetClusterScope(cluster ICluster) map[string]string {
+func (a *Annotator) GetClusterScope(cluster api.ICluster) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
 // getShardScope gets annotations for Shard-scoped object
-func (a *Annotator) getShardScope(shard IShard) map[string]string {
+func (a *Annotator) getShardScope(shard api.IShard) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }

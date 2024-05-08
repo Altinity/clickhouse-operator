@@ -42,35 +42,46 @@ const (
 // ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
 // which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
 type ClickHouseConfigGenerator struct {
-	chi *api.ClickHouseInstallation
+	chi  api.IChi
+	opts *ClickHouseConfigGeneratorOptions
+}
+
+type ClickHouseConfigGeneratorOptions struct {
+	DistributedDDL *api.ChiDistributedDDL
+	Users          *api.Settings
+	Profiles       *api.Settings
+	Quotas         *api.Settings
+	Settings       *api.Settings
+	Files          *api.Settings
 }
 
 // newClickHouseConfigGenerator returns new ClickHouseConfigGenerator struct
-func newClickHouseConfigGenerator(chi *api.ClickHouseInstallation) *ClickHouseConfigGenerator {
+func newClickHouseConfigGenerator(chi api.IChi, opts *ClickHouseConfigGeneratorOptions) *ClickHouseConfigGenerator {
 	return &ClickHouseConfigGenerator{
-		chi: chi,
+		chi:  chi,
+		opts: opts,
 	}
 }
 
 // getUsers creates data for users section. Used as "users.xml"
 func (c *ClickHouseConfigGenerator) getUsers() string {
-	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Users, configUsers)
+	return c.generateXMLConfig(c.opts.Users, configUsers)
 }
 
 // getProfiles creates data for profiles section. Used as "profiles.xml"
 func (c *ClickHouseConfigGenerator) getProfiles() string {
-	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Profiles, configProfiles)
+	return c.generateXMLConfig(c.opts.Profiles, configProfiles)
 }
 
 // getQuotas creates data for "quotas.xml"
 func (c *ClickHouseConfigGenerator) getQuotas() string {
-	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Quotas, configQuotas)
+	return c.generateXMLConfig(c.opts.Quotas, configQuotas)
 }
 
 // getSettingsGlobal creates data for "settings.xml"
 func (c *ClickHouseConfigGenerator) getSettingsGlobal() string {
 	// No host specified means request to generate common config
-	return c.generateXMLConfig(c.chi.GetSpec().Configuration.Settings, "")
+	return c.generateXMLConfig(c.opts.Settings, "")
 }
 
 // getSettings creates data for "settings.xml"
@@ -84,7 +95,7 @@ func (c *ClickHouseConfigGenerator) getSectionFromFiles(section api.SettingsSect
 	var files *api.Settings
 	if host == nil {
 		// We are looking into Common files
-		files = c.chi.GetSpec().Configuration.Files
+		files = c.opts.Files
 	} else {
 		// We are looking into host's personal files
 		files = host.Files
@@ -156,8 +167,8 @@ func (c *ClickHouseConfigGenerator) getHostZookeeper(host *api.ChiHost) string {
 	//      <profile>X</profile>
 	util.Iline(b, 4, "<distributed_ddl>")
 	util.Iline(b, 4, "    <path>%s</path>", c.getDistributedDDLPath())
-	if c.chi.GetSpec().Defaults.DistributedDDL.HasProfile() {
-		util.Iline(b, 4, "    <profile>%s</profile>", c.chi.GetSpec().Defaults.DistributedDDL.GetProfile())
+	if c.opts.DistributedDDL.HasProfile() {
+		util.Iline(b, 4, "    <profile>%s</profile>", c.opts.DistributedDDL.GetProfile())
 	}
 	//		</distributed_ddl>
 	// </yandex>
@@ -283,10 +294,10 @@ func (c *ClickHouseConfigGenerator) chiHostsNum(options *RemoteServersGeneratorO
 }
 
 // clusterHostsNum count hosts according to the options
-func (c *ClickHouseConfigGenerator) clusterHostsNum(cluster *api.Cluster, options *RemoteServersGeneratorOptions) int {
+func (c *ClickHouseConfigGenerator) clusterHostsNum(cluster api.ICluster, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	// Build each shard XML
-	cluster.WalkShards(func(index int, shard *api.ChiShard) error {
+	cluster.WalkShards(func(index int, shard api.IShard) error {
 		num += c.shardHostsNum(shard, options)
 		return nil
 	})
@@ -294,7 +305,7 @@ func (c *ClickHouseConfigGenerator) clusterHostsNum(cluster *api.Cluster, option
 }
 
 // shardHostsNum count hosts according to the options
-func (c *ClickHouseConfigGenerator) shardHostsNum(shard *api.ChiShard, options *RemoteServersGeneratorOptions) int {
+func (c *ClickHouseConfigGenerator) shardHostsNum(shard api.IShard, options *RemoteServersGeneratorOptions) int {
 	num := 0
 	shard.WalkHosts(func(host *api.ChiHost) error {
 		if options.Include(host) {
@@ -340,7 +351,7 @@ func (c *ClickHouseConfigGenerator) getRemoteServers(options *RemoteServersGener
 	util.Iline(b, 8, "<!-- User-specified clusters -->")
 
 	// Build each cluster XML
-	c.chi.WalkClusters(func(cluster *api.Cluster) error {
+	c.chi.WalkClusters(func(cluster api.ICluster) error {
 		if c.clusterHostsNum(cluster, options) < 1 {
 			// Skip empty cluster
 			return nil
@@ -349,17 +360,17 @@ func (c *ClickHouseConfigGenerator) getRemoteServers(options *RemoteServersGener
 		util.Iline(b, 8, "<%s>", cluster.GetName())
 
 		// <secret>VALUE</secret>
-		switch cluster.Secret.Source() {
+		switch cluster.GetSecret().Source() {
 		case api.ClusterSecretSourcePlaintext:
 			// Secret value is explicitly specified
-			util.Iline(b, 12, "<secret>%s</secret>", cluster.Secret.Value)
+			util.Iline(b, 12, "<secret>%s</secret>", cluster.GetSecret().Value)
 		case api.ClusterSecretSourceSecretRef, api.ClusterSecretSourceAuto:
 			// Use secret via ENV var from secret
 			util.Iline(b, 12, `<secret from_env="%s" />`, chi.InternodeClusterSecretEnvName)
 		}
 
 		// Build each shard XML
-		cluster.WalkShards(func(index int, shard *api.ChiShard) error {
+		cluster.WalkShards(func(index int, shard api.IShard) error {
 			if c.shardHostsNum(shard, options) < 1 {
 				// Skip empty shard
 				return nil
@@ -368,7 +379,7 @@ func (c *ClickHouseConfigGenerator) getRemoteServers(options *RemoteServersGener
 			// <shard>
 			//		<internal_replication>VALUE(true/false)</internal_replication>
 			util.Iline(b, 12, "<shard>")
-			util.Iline(b, 16, "<internal_replication>%s</internal_replication>", shard.InternalReplication)
+			util.Iline(b, 16, "<internal_replication>%s</internal_replication>", shard.GetInternalReplication())
 
 			//		<weight>X</weight>
 			if shard.HasWeight() {
@@ -450,14 +461,14 @@ func (c *ClickHouseConfigGenerator) getRemoteServers(options *RemoteServersGener
 		// <all-clusters>
 		clusterName = AllClustersClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
-		c.chi.WalkClusters(func(cluster *api.Cluster) error {
-			cluster.WalkShards(func(index int, shard *api.ChiShard) error {
+		c.chi.WalkClusters(func(cluster api.ICluster) error {
+			cluster.WalkShards(func(index int, shard api.IShard) error {
 				if c.shardHostsNum(shard, options) < 1 {
 					// Skip empty shard
 					return nil
 				}
 				util.Iline(b, 12, "<shard>")
-				util.Iline(b, 12, "    <internal_replication>%s</internal_replication>", shard.InternalReplication)
+				util.Iline(b, 12, "    <internal_replication>%s</internal_replication>", shard.GetInternalReplication())
 
 				shard.WalkHosts(func(host *api.ChiHost) error {
 					if options.Include(host) {
