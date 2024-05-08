@@ -3334,6 +3334,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
             if res == "":
                 ok += 1
             else:
+                note(f"WTF res={res}")
                 errors += 1
         with By(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
             assert errors == 0
