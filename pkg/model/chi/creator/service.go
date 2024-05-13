@@ -163,14 +163,14 @@ func appendServicePorts(service *core.Service, host *api.ChiHost) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
 	config.HostWalkAssignedPorts(
 		host,
-		func(name string, port *int32, protocol core.Protocol) bool {
+		func(name string, port *api.Int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of service's ports
 			service.Spec.Ports = append(service.Spec.Ports,
 				core.ServicePort{
 					Name:       name,
 					Protocol:   protocol,
-					Port:       *port,
-					TargetPort: intstr.FromInt(int(*port)),
+					Port:       port.Value(),
+					TargetPort: intstr.FromInt(port.IntValue()),
 				},
 			)
 			// Do not abort, continue iterating

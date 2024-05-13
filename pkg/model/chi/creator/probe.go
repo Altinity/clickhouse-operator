@@ -35,7 +35,7 @@ func newDefaultReadinessProbe(host *api.ChiHost) *core.Probe {
 // newDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
 func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 	// Introduce http probe in case http port is specified
-	if api.IsPortAssigned(host.HTTPPort) {
+	if host.HTTPPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
@@ -50,7 +50,7 @@ func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 	}
 
 	// Introduce https probe in case https port is specified
-	if api.IsPortAssigned(host.HTTPSPort) {
+	if host.HTTPSPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
@@ -72,7 +72,7 @@ func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 // newDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
 func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
 	// Introduce http probe in case http port is specified
-	if api.IsPortAssigned(host.HTTPPort) {
+	if host.HTTPPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
@@ -86,7 +86,7 @@ func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
 	}
 
 	// Introduce https probe in case https port is specified
-	if api.IsPortAssigned(host.HTTPSPort) {
+	if host.HTTPSPort.HasValue() {
 		return &core.Probe{
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{

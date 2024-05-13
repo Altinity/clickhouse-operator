@@ -15,30 +15,33 @@
 package v1
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
-
-	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 )
 
 // ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type ChiHost struct {
-	Name string `json:"name,omitempty" yaml:"name,omitempty"`
-	// DEPRECATED - to be removed soon
-	Port int32 `json:"port,omitempty"  yaml:"port,omitempty"`
-
-	Insecure            *StringBool    `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
-	Secure              *StringBool    `json:"secure,omitempty"              yaml:"secure,omitempty"`
-	TCPPort             int32          `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
-	TLSPort             int32          `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
-	HTTPPort            int32          `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
-	HTTPSPort           int32          `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
-	InterserverHTTPPort int32          `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
-	Settings            *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files               *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates           *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
+	Name         string      `json:"name,omitempty" yaml:"name,omitempty"`
+	Insecure     *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
+	Secure       *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	ChiHostPorts `json:",inline"            yaml:",inline"`
+	Settings     *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files        *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates    *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
 	Runtime ChiHostRuntime `json:"-" yaml:"-"`
+}
+
+type ChiHostPorts struct {
+	// DEPRECATED - to be removed soon
+	Port *Int32 `json:"port,omitempty"  yaml:"port,omitempty"`
+
+	TCPPort             *Int32 `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	TLSPort             *Int32 `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
+	HTTPPort            *Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	HTTPSPort           *Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
+	InterserverHTTPPort *Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 }
 
 type ChiHostRuntime struct {
@@ -116,10 +119,6 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, 
 	host.Templates.HandleDeprecatedFields()
 }
 
-func isUnassigned(port int32) bool {
-	return port == PortMayBeAssignedLaterOrLeftUnused
-}
-
 // MergeFrom merges from specified host
 func (host *ChiHost) MergeFrom(from *ChiHost) {
 	if (host == nil) || (from == nil) {
@@ -128,21 +127,23 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 
 	host.Insecure = host.Insecure.MergeFrom(from.Insecure)
 	host.Secure = host.Secure.MergeFrom(from.Secure)
-	if isUnassigned(host.TCPPort) {
-		host.TCPPort = from.TCPPort
+
+	if !host.TCPPort.HasValue() {
+		host.TCPPort.MergeFrom(from.TCPPort)
 	}
-	if isUnassigned(host.TLSPort) {
-		host.TLSPort = from.TLSPort
+	if !host.TLSPort.HasValue() {
+		host.TLSPort.MergeFrom(from.TLSPort)
 	}
-	if isUnassigned(host.HTTPPort) {
-		host.HTTPPort = from.HTTPPort
+	if !host.HTTPPort.HasValue() {
+		host.HTTPPort.MergeFrom(from.HTTPPort)
 	}
-	if isUnassigned(host.HTTPSPort) {
-		host.HTTPSPort = from.HTTPSPort
+	if !host.HTTPSPort.HasValue() {
+		host.HTTPSPort.MergeFrom(from.HTTPSPort)
 	}
-	if isUnassigned(host.InterserverHTTPPort) {
-		host.InterserverHTTPPort = from.InterserverHTTPPort
+	if !host.InterserverHTTPPort.HasValue() {
+		host.InterserverHTTPPort.MergeFrom(from.InterserverHTTPPort)
 	}
+
 	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
 	host.Templates.HandleDeprecatedFields()
 }

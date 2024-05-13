@@ -324,9 +324,9 @@ func (c *ClickHouseConfigGenerator) getRemoteServersReplica(host *api.ChiHost, b
 	// </replica>
 	var port int32
 	if host.IsSecure() {
-		port = host.TLSPort
+		port = host.TLSPort.Value()
 	} else {
-		port = host.TCPPort
+		port = host.TCPPort.Value()
 	}
 	util.Iline(b, 16, "<replica>")
 	util.Iline(b, 16, "    <host>%s</host>", c.getRemoteServersReplicaHostname(host))
@@ -541,23 +541,23 @@ func (c *ClickHouseConfigGenerator) getHostHostnameAndPorts(host *api.ChiHost) s
 	// <yandex>
 	util.Iline(b, 0, "<"+xmlTagYandex+">")
 
-	if host.TCPPort != ChDefaultTCPPortNumber {
-		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort)
+	if host.TCPPort.Value() != ChDefaultTCPPortNumber {
+		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort.Value())
 	}
-	if host.TLSPort != ChDefaultTLSPortNumber {
-		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort)
+	if host.TLSPort.Value() != ChDefaultTLSPortNumber {
+		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort.Value())
 	}
-	if host.HTTPPort != ChDefaultHTTPPortNumber {
-		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort)
+	if host.HTTPPort.Value() != ChDefaultHTTPPortNumber {
+		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort.Value())
 	}
-	if host.HTTPSPort != ChDefaultHTTPSPortNumber {
-		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort)
+	if host.HTTPSPort.Value() != ChDefaultHTTPSPortNumber {
+		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort.Value())
 	}
 
 	// Interserver host and port
 	util.Iline(b, 4, "<interserver_http_host>%s</interserver_http_host>", c.getRemoteServersReplicaHostname(host))
-	if host.InterserverHTTPPort != ChDefaultInterserverHTTPPortNumber {
-		util.Iline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort)
+	if host.InterserverHTTPPort.Value() != ChDefaultInterserverHTTPPortNumber {
+		util.Iline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort.Value())
 	}
 
 	// </yandex>

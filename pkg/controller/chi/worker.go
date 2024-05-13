@@ -1853,17 +1853,17 @@ func (w *worker) ensureClusterSchemer(host *api.ChiHost) *schemer.ClusterSchemer
 	switch clusterConnectionParams.Scheme {
 	case api.ChSchemeAuto:
 		switch {
-		case api.IsPortAssigned(host.HTTPPort):
+		case host.HTTPPort.HasValue():
 			clusterConnectionParams.Scheme = "http"
-			clusterConnectionParams.Port = int(host.HTTPPort)
-		case api.IsPortAssigned(host.HTTPSPort):
+			clusterConnectionParams.Port = host.HTTPPort.IntValue()
+		case host.HTTPSPort.HasValue():
 			clusterConnectionParams.Scheme = "https"
-			clusterConnectionParams.Port = int(host.HTTPSPort)
+			clusterConnectionParams.Port = host.HTTPSPort.IntValue()
 		}
 	case api.ChSchemeHTTP:
-		clusterConnectionParams.Port = int(host.HTTPPort)
+		clusterConnectionParams.Port = host.HTTPPort.IntValue()
 	case api.ChSchemeHTTPS:
-		clusterConnectionParams.Port = int(host.HTTPSPort)
+		clusterConnectionParams.Port = host.HTTPSPort.IntValue()
 	}
 	w.schemer = schemer.NewClusterSchemer(clusterConnectionParams, host.Runtime.Version)
 

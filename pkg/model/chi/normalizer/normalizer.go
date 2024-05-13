@@ -18,7 +18,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -32,8 +31,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
-	entitiesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/entities"
 	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -215,56 +214,56 @@ func hostApplyHostTemplate(host *api.ChiHost, template *api.HostTemplate) {
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case deployment.PortDistributionUnspecified:
-			if api.IsPortUnassigned(host.TCPPort) {
+			if !host.TCPPort.HasValue() {
 				host.TCPPort = template.Spec.TCPPort
 			}
-			if api.IsPortUnassigned(host.TLSPort) {
+			if !host.TLSPort.HasValue() {
 				host.TLSPort = template.Spec.TLSPort
 			}
-			if api.IsPortUnassigned(host.HTTPPort) {
+			if !host.HTTPPort.HasValue() {
 				host.HTTPPort = template.Spec.HTTPPort
 			}
-			if api.IsPortUnassigned(host.HTTPSPort) {
+			if !host.HTTPSPort.HasValue() {
 				host.HTTPSPort = template.Spec.HTTPSPort
 			}
-			if api.IsPortUnassigned(host.InterserverHTTPPort) {
+			if !host.InterserverHTTPPort.HasValue() {
 				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
 			}
 		case deployment.PortDistributionClusterScopeIndex:
-			if api.IsPortUnassigned(host.TCPPort) {
+			if !host.TCPPort.HasValue() {
 				base := config.ChDefaultTCPPortNumber
-				if api.IsPortAssigned(template.Spec.TCPPort) {
-					base = template.Spec.TCPPort
+				if template.Spec.TCPPort.HasValue() {
+					base = template.Spec.TCPPort.Value()
 				}
-				host.TCPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
+				host.TCPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
-			if api.IsPortUnassigned(host.TLSPort) {
+			if !host.TLSPort.HasValue() {
 				base := config.ChDefaultTLSPortNumber
-				if api.IsPortAssigned(template.Spec.TLSPort) {
-					base = template.Spec.TLSPort
+				if template.Spec.TLSPort.HasValue() {
+					base = template.Spec.TLSPort.Value()
 				}
-				host.TLSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
+				host.TLSPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
-			if api.IsPortUnassigned(host.HTTPPort) {
+			if !host.HTTPPort.HasValue() {
 				base := config.ChDefaultHTTPPortNumber
-				if api.IsPortAssigned(template.Spec.HTTPPort) {
-					base = template.Spec.HTTPPort
+				if template.Spec.HTTPPort.HasValue() {
+					base = template.Spec.HTTPPort.Value()
 				}
-				host.HTTPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
+				host.HTTPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
-			if api.IsPortUnassigned(host.HTTPSPort) {
+			if !host.HTTPSPort.HasValue() {
 				base := config.ChDefaultHTTPSPortNumber
-				if api.IsPortAssigned(template.Spec.HTTPSPort) {
-					base = template.Spec.HTTPSPort
+				if template.Spec.HTTPSPort.HasValue() {
+					base = template.Spec.HTTPSPort.Value()
 				}
-				host.HTTPSPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
+				host.HTTPSPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
-			if api.IsPortUnassigned(host.InterserverHTTPPort) {
+			if !host.InterserverHTTPPort.HasValue() {
 				base := config.ChDefaultInterserverHTTPPortNumber
-				if api.IsPortAssigned(template.Spec.InterserverHTTPPort) {
-					base = template.Spec.InterserverHTTPPort
+				if template.Spec.InterserverHTTPPort.HasValue() {
+					base = template.Spec.InterserverHTTPPort.Value()
 				}
-				host.InterserverHTTPPort = base + int32(host.Runtime.Address.ClusterScopeIndex)
+				host.InterserverHTTPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 		}
 	}
@@ -289,23 +288,25 @@ func hostEnsurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings,
 	//
 	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
 	// because this is not final setup (just intermittent) and all these ports may be overwritten later
-	fallbackTCPPort := api.PortUnassigned()
-	fallbackTLSPort := api.PortUnassigned()
-	fallbackHTTPPort := api.PortUnassigned()
-	fallbackHTTPSPort := api.PortUnassigned()
-	fallbackInterserverHTTPPort := api.PortUnassigned()
+	var (
+		fallbackTCPPort             *api.Int32
+		fallbackTLSPort             *api.Int32
+		fallbackHTTPPort            *api.Int32
+		fallbackHTTPSPort           *api.Int32
+		fallbackInterserverHTTPPort *api.Int32
+	)
 
 	// On the other hand, for final setup we need to assign real numbers to ports
 	if final {
 		if host.IsInsecure() {
-			fallbackTCPPort = config.ChDefaultTCPPortNumber
-			fallbackHTTPPort = config.ChDefaultHTTPPortNumber
+			fallbackTCPPort = api.NewInt32(config.ChDefaultTCPPortNumber)
+			fallbackHTTPPort = api.NewInt32(config.ChDefaultHTTPPortNumber)
 		}
 		if host.IsSecure() {
-			fallbackTLSPort = config.ChDefaultTLSPortNumber
-			fallbackHTTPSPort = config.ChDefaultHTTPSPortNumber
+			fallbackTLSPort = api.NewInt32(config.ChDefaultTLSPortNumber)
+			fallbackHTTPSPort = api.NewInt32(config.ChDefaultHTTPSPortNumber)
 		}
-		fallbackInterserverHTTPPort = config.ChDefaultInterserverHTTPPortNumber
+		fallbackInterserverHTTPPort = api.NewInt32(config.ChDefaultInterserverHTTPPortNumber)
 	}
 
 	//
@@ -1505,7 +1506,6 @@ func (n *Normalizer) normalizeHost(
 ) {
 
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
-	entitiesNormalizer.NormalizeHostPorts(host)
 	// Inherit from either Shard or Replica
 	var s *api.ChiShard
 	var r *api.ChiReplica

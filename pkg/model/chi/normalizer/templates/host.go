@@ -17,7 +17,6 @@ package templates
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/entities"
 )
 
 // NormalizeHostTemplate normalizes .spec.templates.hostTemplates
@@ -55,5 +54,4 @@ func NormalizeHostTemplate(template *api.HostTemplate) {
 
 // normalizeHostTemplateSpec is the same as normalizeHost but for a template
 func normalizeHostTemplateSpec(host *api.ChiHost) {
-	entities.NormalizeHostPorts(host)
 }

@@ -380,8 +380,8 @@ func ensureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.ChiHost)
 	// Walk over all assigned ports of the host and ensure each port in container
 	config.HostWalkAssignedPorts(
 		host,
-		func(name string, port *int32, protocol core.Protocol) bool {
-			k8s.ContainerEnsurePortByName(container, name, *port)
+		func(name string, port *api.Int32, protocol core.Protocol) bool {
+			k8s.ContainerEnsurePortByName(container, name, port.Value())
 			// Do not abort, continue iterating
 			return false
 		},
@@ -457,12 +457,12 @@ func appendContainerPorts(container *core.Container, host *api.ChiHost) {
 	// Walk over all assigned ports of the host and append each port to the list of container's ports
 	config.HostWalkAssignedPorts(
 		host,
-		func(name string, port *int32, protocol core.Protocol) bool {
+		func(name string, port *api.Int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of container's ports
 			container.Ports = append(container.Ports,
 				core.ContainerPort{
 					Name:          name,
-					ContainerPort: *port,
+					ContainerPort: port.Value(),
 					Protocol:      protocol,
 				},
 			)

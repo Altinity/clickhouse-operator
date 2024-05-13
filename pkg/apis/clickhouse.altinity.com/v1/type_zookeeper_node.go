@@ -16,8 +16,8 @@ package v1
 
 // ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiZookeeperNode struct {
-	Host   string      `json:"host,omitempty" yaml:"host,omitempty"`
-	Port   int32       `json:"port,omitempty" yaml:"port,omitempty"`
+	Host   string      `json:"host,omitempty"   yaml:"host,omitempty"`
+	Port   int32       `json:"port,omitempty"   yaml:"port,omitempty"`
 	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
 }
 

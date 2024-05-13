@@ -29,13 +29,7 @@ func NewDefaultHostTemplate(name string) *api.HostTemplate {
 			},
 		},
 		Spec: api.ChiHost{
-			Name:                "",
-			TCPPort:             api.PortUnassigned(),
-			TLSPort:             api.PortUnassigned(),
-			HTTPPort:            api.PortUnassigned(),
-			HTTPSPort:           api.PortUnassigned(),
-			InterserverHTTPPort: api.PortUnassigned(),
-			Templates:           nil,
+			Name: "",
 		},
 	}
 }
@@ -50,13 +44,7 @@ func NewDefaultHostTemplateForHostNetwork(name string) *api.HostTemplate {
 			},
 		},
 		Spec: api.ChiHost{
-			Name:                "",
-			TCPPort:             api.PortUnassigned(),
-			TLSPort:             api.PortUnassigned(),
-			HTTPPort:            api.PortUnassigned(),
-			HTTPSPort:           api.PortUnassigned(),
-			InterserverHTTPPort: api.PortUnassigned(),
-			Templates:           nil,
+			Name: "",
 		},
 	}
 }

@@ -149,8 +149,8 @@ func (host *WatchedHost) readFrom(h *api.ChiHost) {
 	}
 	host.Name = h.Name
 	host.Hostname = h.Runtime.Address.FQDN
-	host.TCPPort = h.TCPPort
-	host.TLSPort = h.TLSPort
-	host.HTTPPort = h.HTTPPort
-	host.HTTPSPort = h.HTTPSPort
+	host.TCPPort = h.TCPPort.Value()
+	host.TLSPort = h.TLSPort.Value()
+	host.HTTPPort = h.HTTPPort.Value()
+	host.HTTPSPort = h.HTTPSPort.Value()
 }
