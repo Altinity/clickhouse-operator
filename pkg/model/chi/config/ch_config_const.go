@@ -113,7 +113,7 @@ const (
 	ZkDefaultRootTemplate = "/clickhouse/%s/%s"
 )
 
-func HostWalkPorts(host *api.ChiHost, f func(name string, port *api.Int32, protocol core.Protocol) bool) {
+func HostWalkPorts(host *api.Host, f func(name string, port *api.Int32, protocol core.Protocol) bool) {
 	if host == nil {
 		return
 	}
@@ -134,7 +134,7 @@ func HostWalkPorts(host *api.ChiHost, f func(name string, port *api.Int32, proto
 	}
 }
 
-func HostWalkAssignedPorts(host *api.ChiHost, f func(name string, port *api.Int32, protocol core.Protocol) bool) {
+func HostWalkAssignedPorts(host *api.Host, f func(name string, port *api.Int32, protocol core.Protocol) bool) {
 	if host == nil {
 		return
 	}

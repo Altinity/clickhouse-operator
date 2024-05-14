@@ -137,6 +137,6 @@ type WalkHostsAddressFn func(
 	cluster *Cluster,
 	shard *ChiShard,
 	replica *ChiReplica,
-	host *ChiHost,
+	host *Host,
 	address *HostScopeAddress,
 ) error

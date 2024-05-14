@@ -123,8 +123,8 @@ func (c *Cluster) ExecShard(ctx context.Context, shard *api.ChiShard, SQLs []str
 }
 
 // ExecHost runs set of SQL queries over the replica
-func (c *Cluster) ExecHost(ctx context.Context, host *api.ChiHost, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := model.CreateFQDNs(host, api.ChiHost{}, false)
+func (c *Cluster) ExecHost(ctx context.Context, host *api.Host, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
+	hosts := model.CreateFQDNs(host, api.Host{}, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	c.SetHosts(hosts)
 	if opts.GetSilent() {
@@ -136,8 +136,8 @@ func (c *Cluster) ExecHost(ctx context.Context, host *api.ChiHost, SQLs []string
 }
 
 // QueryHost runs specified query on specified host
-func (c *Cluster) QueryHost(ctx context.Context, host *api.ChiHost, sql string, _opts ...*clickhouse.QueryOptions) (*clickhouse.QueryResult, error) {
-	hosts := model.CreateFQDNs(host, api.ChiHost{}, false)
+func (c *Cluster) QueryHost(ctx context.Context, host *api.Host, sql string, _opts ...*clickhouse.QueryOptions) (*clickhouse.QueryResult, error) {
+	hosts := model.CreateFQDNs(host, api.Host{}, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	c.SetHosts(hosts)
 	if opts.GetSilent() {
@@ -150,7 +150,7 @@ func (c *Cluster) QueryHost(ctx context.Context, host *api.ChiHost, sql string, 
 }
 
 // QueryHostInt runs specified query on specified host and returns one int as a result
-func (c *Cluster) QueryHostInt(ctx context.Context, host *api.ChiHost, sql string, _opts ...*clickhouse.QueryOptions) (int, error) {
+func (c *Cluster) QueryHostInt(ctx context.Context, host *api.Host, sql string, _opts ...*clickhouse.QueryOptions) (int, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return 0, nil
@@ -169,7 +169,7 @@ func (c *Cluster) QueryHostInt(ctx context.Context, host *api.ChiHost, sql strin
 }
 
 // QueryHostString runs specified query on specified host and returns one string as a result
-func (c *Cluster) QueryHostString(ctx context.Context, host *api.ChiHost, sql string, _opts ...*clickhouse.QueryOptions) (string, error) {
+func (c *Cluster) QueryHostString(ctx context.Context, host *api.Host, sql string, _opts ...*clickhouse.QueryOptions) (string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return "", nil

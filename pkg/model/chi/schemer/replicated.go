@@ -24,7 +24,7 @@ import (
 )
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
-func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
+func shouldCreateReplicatedObjects(host *api.Host) bool {
 	shard := model.CreateFQDNs(host, api.ChiShard{}, false)
 	cluster := model.CreateFQDNs(host, api.Cluster{}, false)
 
@@ -52,7 +52,7 @@ func shouldCreateReplicatedObjects(host *api.ChiHost) bool {
 }
 
 // getReplicatedObjectsSQLs returns a list of objects that needs to be created on a host in a cluster
-func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil

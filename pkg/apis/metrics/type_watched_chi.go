@@ -135,7 +135,7 @@ func (cluster *WatchedCluster) readFrom(c api.ICluster) {
 	}
 	cluster.Name = c.GetName()
 
-	c.WalkHosts(func(h *api.ChiHost) error {
+	c.WalkHosts(func(h *api.Host) error {
 		host := &WatchedHost{}
 		host.readFrom(h)
 		cluster.Hosts = append(cluster.Hosts, host)
@@ -143,7 +143,7 @@ func (cluster *WatchedCluster) readFrom(c api.ICluster) {
 	})
 }
 
-func (host *WatchedHost) readFrom(h *api.ChiHost) {
+func (host *WatchedHost) readFrom(h *api.Host) {
 	if host == nil {
 		return
 	}

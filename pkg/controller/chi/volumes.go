@@ -23,7 +23,7 @@ import (
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-func (c *Controller) walkPVCs(host *api.ChiHost, f func(pvc *core.PersistentVolumeClaim)) {
+func (c *Controller) walkPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
 	namespace := host.Runtime.Address.Namespace
 	name := model.CreatePodName(host)
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
@@ -49,7 +49,7 @@ func (c *Controller) walkPVCs(host *api.ChiHost, f func(pvc *core.PersistentVolu
 	}
 }
 
-func (c *Controller) walkDiscoveredPVCs(host *api.ChiHost, f func(pvc *core.PersistentVolumeClaim)) {
+func (c *Controller) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
 	namespace := host.Runtime.Address.Namespace
 
 	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(controller.NewContext(), controller.NewListOptions(model.GetSelectorHostScope(host)))
@@ -67,7 +67,7 @@ func (c *Controller) walkDiscoveredPVCs(host *api.ChiHost, f func(pvc *core.Pers
 }
 
 // Comment out PV
-//func (c *Controller) walkPVs(host *api.ChiHost, f func(pv *core.PersistentVolume)) {
+//func (c *Controller) walkPVs(host *api.Host, f func(pv *core.PersistentVolume)) {
 //	c.walkPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 //		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(newContext(), pvc.Spec.VolumeName, newGetOptions())
 //		if err != nil {

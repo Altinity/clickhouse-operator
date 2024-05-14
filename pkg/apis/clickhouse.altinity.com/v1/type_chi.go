@@ -31,7 +31,7 @@ import (
 
 type IRoot interface {
 	GetName() string
-	WalkHosts(f func(host *ChiHost) error) []error
+	WalkHosts(f func(host *Host) error) []error
 }
 
 func (chi *ClickHouseInstallation) GetObjectMeta() meta.Object {
@@ -129,7 +129,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			cluster *Cluster,
 			shard *ChiShard,
 			replica *ChiReplica,
-			host *ChiHost,
+			host *Host,
 			address *HostScopeAddress,
 		) error {
 			cluster.Runtime.Address.Namespace = chi.Namespace
@@ -186,7 +186,7 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 			cluster *Cluster,
 			shard *ChiShard,
 			replica *ChiReplica,
-			host *ChiHost,
+			host *Host,
 			address *HostScopeAddress,
 		) error {
 			cluster.Runtime.CHI = chi
@@ -290,7 +290,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(f WalkHostsAddressFn) []err
 }
 
 // WalkHosts walks hosts with a function
-func (chi *ClickHouseInstallation) WalkHosts(f func(host *ChiHost) error) []error {
+func (chi *ClickHouseInstallation) WalkHosts(f func(host *Host) error) []error {
 	if chi == nil {
 		return nil
 	}
@@ -468,7 +468,7 @@ func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleSh
 
 // FindHost finds shard by name or index
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (chi *ClickHouseInstallation) FindHost(needleCluster interface{}, needleShard interface{}, needleHost interface{}) *ChiHost {
+func (chi *ClickHouseInstallation) FindHost(needleCluster interface{}, needleShard interface{}, needleHost interface{}) *Host {
 	return chi.FindCluster(needleCluster).FindHost(needleShard, needleHost)
 }
 
@@ -495,7 +495,7 @@ func (chi *ClickHouseInstallation) ShardsCount() int {
 // HostsCount counts hosts
 func (chi *ClickHouseInstallation) HostsCount() int {
 	count := 0
-	chi.WalkHosts(func(host *ChiHost) error {
+	chi.WalkHosts(func(host *Host) error {
 		count++
 		return nil
 	})
@@ -505,7 +505,7 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 // HostsCountAttributes counts hosts by attributes
 func (chi *ClickHouseInstallation) HostsCountAttributes(a *HostReconcileAttributes) int {
 	count := 0
-	chi.WalkHosts(func(host *ChiHost) error {
+	chi.WalkHosts(func(host *Host) error {
 		if host.GetReconcileAttributes().Any(a) {
 			count++
 		}
@@ -829,9 +829,9 @@ func (chi *ClickHouseInstallation) SetTarget(a *ClickHouseInstallation) {
 }
 
 // FirstHost returns first host of the CHI
-func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
-	var result *ChiHost
-	chi.WalkHosts(func(host *ChiHost) error {
+func (chi *ClickHouseInstallation) FirstHost() *Host {
+	var result *Host
+	chi.WalkHosts(func(host *Host) error {
 		if result == nil {
 			result = host
 		}

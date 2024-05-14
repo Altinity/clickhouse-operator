@@ -25,7 +25,7 @@ import (
 // PreparePersistentVolumeClaim prepares PVC - labels and annotations
 func (c *Creator) PreparePersistentVolumeClaim(
 	pvc *core.PersistentVolumeClaim,
-	host *api.ChiHost,
+	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) *core.PersistentVolumeClaim {
 	pvc.SetLabels(model.Macro(host).Map(c.labels.GetPVC(pvc, host, template)))
@@ -39,7 +39,7 @@ func (c *Creator) PreparePersistentVolumeClaim(
 func (c *Creator) createPVC(
 	name string,
 	namespace string,
-	host *api.ChiHost,
+	host *api.Host,
 	spec *core.PersistentVolumeClaimSpec,
 ) core.PersistentVolumeClaim {
 	persistentVolumeClaim := core.PersistentVolumeClaim{
@@ -71,12 +71,12 @@ func (c *Creator) createPVC(
 }
 
 // CreatePVC creates PVC
-func (c *Creator) CreatePVC(name string, host *api.ChiHost, spec *core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
+func (c *Creator) CreatePVC(name string, host *api.Host, spec *core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
 	pvc := c.createPVC(name, host.Runtime.Address.Namespace, host, spec)
 	return &pvc
 }
 
 // OperatorShouldCreatePVC checks whether operator should create PVC for specified volumeCLimaTemplate
-func OperatorShouldCreatePVC(host *api.ChiHost, volumeClaimTemplate *api.VolumeClaimTemplate) bool {
+func OperatorShouldCreatePVC(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) bool {
 	return model.GetPVCProvisioner(host, volumeClaimTemplate) == api.PVCProvisionerOperator
 }

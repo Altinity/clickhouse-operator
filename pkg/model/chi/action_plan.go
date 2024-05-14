@@ -249,7 +249,7 @@ func (ap *ActionPlan) GetRemovedHostsNum() int {
 		func(shard *api.ChiShard) {
 			count += shard.HostsCount()
 		},
-		func(host *api.ChiHost) {
+		func(host *api.Host) {
 			count++
 		},
 	)
@@ -260,7 +260,7 @@ func (ap *ActionPlan) GetRemovedHostsNum() int {
 func (ap *ActionPlan) WalkRemoved(
 	clusterFunc func(cluster *api.Cluster),
 	shardFunc func(shard *api.ChiShard),
-	hostFunc func(host *api.ChiHost),
+	hostFunc func(host *api.Host),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Removed {
@@ -271,8 +271,8 @@ func (ap *ActionPlan) WalkRemoved(
 		case api.ChiShard:
 			shard := ap.specDiff.Removed[path].(api.ChiShard)
 			shardFunc(&shard)
-		case api.ChiHost:
-			host := ap.specDiff.Removed[path].(api.ChiHost)
+		case api.Host:
+			host := ap.specDiff.Removed[path].(api.Host)
 			hostFunc(&host)
 		case *api.Cluster:
 			cluster := ap.specDiff.Removed[path].(*api.Cluster)
@@ -280,8 +280,8 @@ func (ap *ActionPlan) WalkRemoved(
 		case *api.ChiShard:
 			shard := ap.specDiff.Removed[path].(*api.ChiShard)
 			shardFunc(shard)
-		case *api.ChiHost:
-			host := ap.specDiff.Removed[path].(*api.ChiHost)
+		case *api.Host:
+			host := ap.specDiff.Removed[path].(*api.Host)
 			hostFunc(host)
 		}
 	}
@@ -291,7 +291,7 @@ func (ap *ActionPlan) WalkRemoved(
 func (ap *ActionPlan) WalkAdded(
 	clusterFunc func(cluster *api.Cluster),
 	shardFunc func(shard *api.ChiShard),
-	hostFunc func(host *api.ChiHost),
+	hostFunc func(host *api.Host),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Added {
@@ -302,8 +302,8 @@ func (ap *ActionPlan) WalkAdded(
 		case api.ChiShard:
 			shard := ap.specDiff.Added[path].(api.ChiShard)
 			shardFunc(&shard)
-		case api.ChiHost:
-			host := ap.specDiff.Added[path].(api.ChiHost)
+		case api.Host:
+			host := ap.specDiff.Added[path].(api.Host)
 			hostFunc(&host)
 		case *api.Cluster:
 			cluster := ap.specDiff.Added[path].(*api.Cluster)
@@ -311,8 +311,8 @@ func (ap *ActionPlan) WalkAdded(
 		case *api.ChiShard:
 			shard := ap.specDiff.Added[path].(*api.ChiShard)
 			shardFunc(shard)
-		case *api.ChiHost:
-			host := ap.specDiff.Added[path].(*api.ChiHost)
+		case *api.Host:
+			host := ap.specDiff.Added[path].(*api.Host)
 			hostFunc(host)
 		}
 	}
@@ -322,7 +322,7 @@ func (ap *ActionPlan) WalkAdded(
 func (ap *ActionPlan) WalkModified(
 	clusterFunc func(cluster *api.Cluster),
 	shardFunc func(shard *api.ChiShard),
-	hostFunc func(host *api.ChiHost),
+	hostFunc func(host *api.Host),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Modified {
@@ -333,8 +333,8 @@ func (ap *ActionPlan) WalkModified(
 		case api.ChiShard:
 			shard := ap.specDiff.Modified[path].(api.ChiShard)
 			shardFunc(&shard)
-		case api.ChiHost:
-			host := ap.specDiff.Modified[path].(api.ChiHost)
+		case api.Host:
+			host := ap.specDiff.Modified[path].(api.Host)
 			hostFunc(&host)
 		case *api.Cluster:
 			cluster := ap.specDiff.Modified[path].(*api.Cluster)
@@ -342,8 +342,8 @@ func (ap *ActionPlan) WalkModified(
 		case *api.ChiShard:
 			shard := ap.specDiff.Modified[path].(*api.ChiShard)
 			shardFunc(shard)
-		case *api.ChiHost:
-			host := ap.specDiff.Modified[path].(*api.ChiHost)
+		case *api.Host:
+			host := ap.specDiff.Modified[path].(*api.Host)
 			hostFunc(host)
 		}
 	}

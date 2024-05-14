@@ -23,17 +23,17 @@ import (
 )
 
 // newDefaultLivenessProbe is a unification wrapper
-func newDefaultLivenessProbe(host *api.ChiHost) *core.Probe {
+func newDefaultLivenessProbe(host *api.Host) *core.Probe {
 	return newDefaultClickHouseLivenessProbe(host)
 }
 
 // newDefaultReadinessProbe is a unification wrapper
-func newDefaultReadinessProbe(host *api.ChiHost) *core.Probe {
+func newDefaultReadinessProbe(host *api.Host) *core.Probe {
 	return newDefaultClickHouseReadinessProbe(host)
 }
 
 // newDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
-func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
+func newDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{
@@ -70,7 +70,7 @@ func newDefaultClickHouseLivenessProbe(host *api.ChiHost) *core.Probe {
 }
 
 // newDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
-func newDefaultClickHouseReadinessProbe(host *api.ChiHost) *core.Probe {
+func newDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{

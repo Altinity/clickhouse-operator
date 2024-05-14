@@ -72,7 +72,7 @@ func (w *worker) dropReplicas(ctx context.Context, chi *api.ClickHouseInstallati
 		},
 		func(shard *api.ChiShard) {
 		},
-		func(host *api.ChiHost) {
+		func(host *api.Host) {
 			_ = w.dropReplica(ctx, host)
 			cnt++
 		},
@@ -247,7 +247,7 @@ func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *api.ClickHouseI
 
 	objs := w.c.discovery(ctx, chi)
 	if objs.NumStatefulSet() > 0 {
-		chi.WalkHosts(func(host *api.ChiHost) error {
+		chi.WalkHosts(func(host *api.Host) error {
 			_ = w.ensureClusterSchemer(host).HostSyncTables(ctx, host)
 			return nil
 		})
@@ -302,7 +302,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	// Delete Service
 	_ = w.c.deleteServiceCHI(ctx, chi)
 
-	chi.WalkHosts(func(host *api.ChiHost) error {
+	chi.WalkHosts(func(host *api.Host) error {
 		_ = w.ensureClusterSchemer(host).HostSyncTables(ctx, host)
 		return nil
 	})
@@ -330,7 +330,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 }
 
 // canDropReplica
-func (w *worker) canDropReplica(host *api.ChiHost, opts ...*dropReplicaOptions) (can bool) {
+func (w *worker) canDropReplica(host *api.Host, opts ...*dropReplicaOptions) (can bool) {
 	o := NewDropReplicaOptionsArr(opts...).First()
 
 	if o.ForceDrop() {
@@ -377,7 +377,7 @@ func (a dropReplicaOptionsArr) First() *dropReplicaOptions {
 }
 
 // dropReplica drops replica's info from Zookeeper
-func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.ChiHost, opts ...*dropReplicaOptions) error {
+func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...*dropReplicaOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -394,7 +394,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.ChiHost, opts 
 	}
 
 	// Sometimes host to drop is already unavailable, so let's run SQL statement of the first replica in the shard
-	var hostToRunOn *api.ChiHost
+	var hostToRunOn *api.Host
 	if shard := hostToDrop.GetShard(); shard != nil {
 		hostToRunOn = shard.FirstHost()
 	}
@@ -423,7 +423,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.ChiHost, opts 
 }
 
 // deleteTables
-func (w *worker) deleteTables(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -453,7 +453,7 @@ func (w *worker) deleteTables(ctx context.Context, host *api.ChiHost) error {
 
 // deleteHost deletes all kubernetes resources related to a host
 // chi is the new CHI in which there will be no more this host
-func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation, host *api.ChiHost) error {
+func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -534,7 +534,7 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 	_ = w.c.deleteServiceShard(ctx, shard)
 
 	// Delete all replicas
-	shard.WalkHosts(func(host *api.ChiHost) error {
+	shard.WalkHosts(func(host *api.Host) error {
 		return w.deleteHost(ctx, chi, host)
 	})
 

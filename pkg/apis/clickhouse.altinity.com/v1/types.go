@@ -678,8 +678,8 @@ type ChiShard struct {
 	Files               *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
 	ReplicasCount       int            `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
-	// TODO refactor into map[string]ChiHost
-	Hosts []*ChiHost `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*Host `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
 	Runtime ChiShardRuntime `json:"-" yaml:"-"`
 
@@ -704,8 +704,8 @@ type ChiReplica struct {
 	Files       *Settings      `json:"files,omitempty"       yaml:"files,omitempty"`
 	Templates   *TemplatesList `json:"templates,omitempty"   yaml:"templates,omitempty"`
 	ShardsCount int            `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
-	// TODO refactor into map[string]ChiHost
-	Hosts []*ChiHost `json:"shards,omitempty" yaml:"shards,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*Host `json:"shards,omitempty" yaml:"shards,omitempty"`
 
 	Runtime ChiReplicaRuntime `json:"-" yaml:"-"`
 }
@@ -767,7 +767,7 @@ type ChiReplicaAddress struct {
 type HostTemplate struct {
 	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
 	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
-	Spec             ChiHost            `json:"spec,omitempty"             yaml:"spec,omitempty"`
+	Spec             Host               `json:"spec,omitempty"             yaml:"spec,omitempty"`
 }
 
 // PortDistribution defines port distribution

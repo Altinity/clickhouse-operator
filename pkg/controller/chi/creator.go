@@ -31,7 +31,7 @@ import (
 )
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *Controller) createStatefulSet(ctx context.Context, host *api.ChiHost) ErrorCRUD {
+func (c *Controller) createStatefulSet(ctx context.Context, host *api.Host) ErrorCRUD {
 	log.V(1).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -62,7 +62,7 @@ func (c *Controller) updateStatefulSet(
 	ctx context.Context,
 	oldStatefulSet *apps.StatefulSet,
 	newStatefulSet *apps.StatefulSet,
-	host *api.ChiHost,
+	host *api.Host,
 ) ErrorCRUD {
 	log.V(2).M(host).F().P()
 
@@ -183,7 +183,7 @@ func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *core.
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed
 // It can just delete failed StatefulSet or do nothing
-func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *api.ChiHost) ErrorCRUD {
+func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *api.Host) ErrorCRUD {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return errCRUDIgnore
@@ -223,7 +223,7 @@ func (c *Controller) onStatefulSetCreateFailed(ctx context.Context, host *api.Ch
 
 // onStatefulSetUpdateFailed handles situation when StatefulSet update failed
 // It can try to revert StatefulSet to its previous version, specified in rollbackStatefulSet
-func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *api.ChiHost) ErrorCRUD {
+func (c *Controller) onStatefulSetUpdateFailed(ctx context.Context, rollbackStatefulSet *apps.StatefulSet, host *api.Host) ErrorCRUD {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return errCRUDIgnore

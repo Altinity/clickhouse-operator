@@ -22,7 +22,7 @@ import (
 )
 
 // PreparePersistentVolume prepares PV labels
-func (c *Creator) PreparePersistentVolume(pv *core.PersistentVolume, host *api.ChiHost) *core.PersistentVolume {
+func (c *Creator) PreparePersistentVolume(pv *core.PersistentVolume, host *api.Host) *core.PersistentVolume {
 	pv.SetLabels(model.Macro(host).Map(c.labels.GetPV(pv, host)))
 	pv.SetAnnotations(model.Macro(host).Map(c.annotations.GetPV(pv, host)))
 	// And after the object is ready we can put version label

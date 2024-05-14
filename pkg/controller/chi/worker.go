@@ -118,12 +118,12 @@ func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < timeToStart
 }
 
-func (w *worker) isConfigurationChangeRequiresReboot(host *api.ChiHost) bool {
+func (w *worker) isConfigurationChangeRequiresReboot(host *api.Host) bool {
 	return model.IsConfigurationChangeRequiresReboot(host)
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
-func (w *worker) shouldForceRestartHost(host *api.ChiHost) bool {
+func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	// RollingUpdate purpose is to always shut the host down.
 	// It is such an interesting policy.
 	if host.GetCHI().IsRollingUpdate() {
@@ -751,7 +751,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 	ap.WalkAdded(
 		// Walk over added clusters
 		func(cluster *api.Cluster) {
-			cluster.WalkHosts(func(host *api.ChiHost) error {
+			cluster.WalkHosts(func(host *api.Host) error {
 
 				// Name of the StatefulSet for this host
 				name := model.CreateStatefulSetName(host)
@@ -782,13 +782,13 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		// Walk over added shards
 		func(shard *api.ChiShard) {
 			// Mark all hosts of the shard as newly added
-			shard.WalkHosts(func(host *api.ChiHost) error {
+			shard.WalkHosts(func(host *api.Host) error {
 				host.GetReconcileAttributes().SetAdd()
 				return nil
 			})
 		},
 		// Walk over added hosts
-		func(host *api.ChiHost) {
+		func(host *api.Host) {
 			host.GetReconcileAttributes().SetAdd()
 		},
 	)
@@ -798,12 +798,12 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		},
 		func(shard *api.ChiShard) {
 		},
-		func(host *api.ChiHost) {
+		func(host *api.Host) {
 			host.GetReconcileAttributes().SetModify()
 		},
 	)
 
-	chi.WalkHosts(func(host *api.ChiHost) error {
+	chi.WalkHosts(func(host *api.Host) error {
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
 			// Already added
@@ -818,7 +818,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		return nil
 	})
 
-	chi.WalkHosts(func(host *api.ChiHost) error {
+	chi.WalkHosts(func(host *api.Host) error {
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
 			w.a.M(host).Info("ADD host: %s", host.Runtime.Address.CompactString())
@@ -854,7 +854,7 @@ func (w *worker) options() *config.ClickHouseConfigFilesGeneratorOptions {
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status
-func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api.ChiHost, shutdown bool) {
+func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -865,7 +865,7 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api
 }
 
 // prepareDesiredStatefulSet prepares desired StatefulSet
-func (w *worker) prepareDesiredStatefulSet(host *api.ChiHost, shutdown bool) {
+func (w *worker) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
 	host.Runtime.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
 }
 
@@ -904,7 +904,7 @@ func (a migrateTableOptionsArr) First() *migrateTableOptions {
 }
 
 // migrateTables
-func (w *worker) migrateTables(ctx context.Context, host *api.ChiHost, opts ...*migrateTableOptions) error {
+func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*migrateTableOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -959,7 +959,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.ChiHost, opts ...*
 }
 
 // shouldMigrateTables
-func (w *worker) shouldMigrateTables(host *api.ChiHost, opts ...*migrateTableOptions) bool {
+func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOptions) bool {
 	o := NewMigrateTableOptionsArr(opts...).First()
 
 	// Deal with special cases in order of priority
@@ -986,7 +986,7 @@ func (w *worker) shouldMigrateTables(host *api.ChiHost, opts ...*migrateTableOpt
 }
 
 // shouldDropTables
-func (w *worker) shouldDropReplica(host *api.ChiHost, opts ...*migrateTableOptions) bool {
+func (w *worker) shouldDropReplica(host *api.Host, opts ...*migrateTableOptions) bool {
 	o := NewMigrateTableOptionsArr(opts...).First()
 
 	// Deal with special cases
@@ -1000,7 +1000,7 @@ func (w *worker) shouldDropReplica(host *api.ChiHost, opts ...*migrateTableOptio
 }
 
 // excludeHost excludes host from ClickHouse clusters if required
-func (w *worker) excludeHost(ctx context.Context, host *api.ChiHost) bool {
+func (w *worker) excludeHost(ctx context.Context, host *api.Host) bool {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return false
@@ -1028,7 +1028,7 @@ func (w *worker) excludeHost(ctx context.Context, host *api.ChiHost) bool {
 }
 
 // completeQueries wait for running queries to complete
-func (w *worker) completeQueries(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) completeQueries(ctx context.Context, host *api.Host) error {
 	log.V(1).M(host).F().S().Info("complete queries start")
 	defer log.V(1).M(host).F().E().Info("complete queries end")
 
@@ -1040,7 +1040,7 @@ func (w *worker) completeQueries(ctx context.Context, host *api.ChiHost) error {
 }
 
 // shouldIncludeHost determines whether host to be included into cluster after reconciling
-func (w *worker) shouldIncludeHost(host *api.ChiHost) bool {
+func (w *worker) shouldIncludeHost(host *api.Host) bool {
 	switch {
 	case host.IsStopped():
 		// No need to include stopped host
@@ -1050,7 +1050,7 @@ func (w *worker) shouldIncludeHost(host *api.ChiHost) bool {
 }
 
 // includeHost includes host back back into ClickHouse clusters
-func (w *worker) includeHost(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1076,7 +1076,7 @@ func (w *worker) includeHost(ctx context.Context, host *api.ChiHost) error {
 }
 
 // excludeHostFromService
-func (w *worker) excludeHostFromService(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) excludeHostFromService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1088,7 +1088,7 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *api.ChiHost) 
 }
 
 // includeHostIntoService
-func (w *worker) includeHostIntoService(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) includeHostIntoService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1100,7 +1100,7 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *api.ChiHost) 
 }
 
 // excludeHostFromClickHouseCluster excludes host from ClickHouse configuration
-func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api.ChiHost) {
+func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api.Host) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -1125,7 +1125,7 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 }
 
 // includeHostIntoClickHouseCluster includes host into ClickHouse configuration
-func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api.ChiHost) {
+func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api.Host) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -1150,7 +1150,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 }
 
 // shouldExcludeHost determines whether host to be excluded from cluster before reconciling
-func (w *worker) shouldExcludeHost(host *api.ChiHost) bool {
+func (w *worker) shouldExcludeHost(host *api.Host) bool {
 	switch {
 	case host.IsStopped():
 		w.a.V(1).
@@ -1193,7 +1193,7 @@ func (w *worker) shouldExcludeHost(host *api.ChiHost) bool {
 }
 
 // shouldWaitExcludeHost determines whether reconciler should wait for the host to be excluded from cluster
-func (w *worker) shouldWaitExcludeHost(host *api.ChiHost) bool {
+func (w *worker) shouldWaitExcludeHost(host *api.Host) bool {
 	// Check CHI settings
 	switch {
 	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
@@ -1218,7 +1218,7 @@ func (w *worker) shouldWaitExcludeHost(host *api.ChiHost) bool {
 }
 
 // shouldWaitQueries determines whether reconciler should wait for the host to complete running queries
-func (w *worker) shouldWaitQueries(host *api.ChiHost) bool {
+func (w *worker) shouldWaitQueries(host *api.Host) bool {
 	switch {
 	case host.GetReconcileAttributes().GetStatus() == api.ObjectStatusNew:
 		w.a.V(1).
@@ -1252,7 +1252,7 @@ func (w *worker) shouldWaitQueries(host *api.ChiHost) bool {
 }
 
 // shouldWaitIncludeHost determines whether reconciler should wait for the host to be included into cluster
-func (w *worker) shouldWaitIncludeHost(host *api.ChiHost) bool {
+func (w *worker) shouldWaitIncludeHost(host *api.Host) bool {
 	status := host.GetReconcileAttributes().GetStatus()
 	switch {
 	case status == api.ObjectStatusNew:
@@ -1276,20 +1276,20 @@ func (w *worker) shouldWaitIncludeHost(host *api.ChiHost) bool {
 }
 
 // waitHostInCluster
-func (w *worker) waitHostInCluster(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) waitHostInCluster(ctx context.Context, host *api.Host) error {
 	return w.c.pollHost(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
 }
 
 // waitHostNotInCluster
-func (w *worker) waitHostNotInCluster(ctx context.Context, host *api.ChiHost) error {
-	return w.c.pollHost(ctx, host, nil, func(ctx context.Context, host *api.ChiHost) bool {
+func (w *worker) waitHostNotInCluster(ctx context.Context, host *api.Host) error {
+	return w.c.pollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
 		return !w.ensureClusterSchemer(host).IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
-func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.ChiHost) error {
-	return w.c.pollHost(ctx, host, nil, func(ctx context.Context, host *api.ChiHost) bool {
+func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) error {
+	return w.c.pollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
 		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})
@@ -1529,7 +1529,7 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 }
 
 // getStatefulSetStatus gets StatefulSet status
-func (w *worker) getStatefulSetStatus(host *api.ChiHost) api.ObjectStatus {
+func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	meta := host.Runtime.DesiredStatefulSet.GetObjectMeta()
 	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
 	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
@@ -1592,7 +1592,7 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.Object) api.Obje
 }
 
 // createStatefulSet
-func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
+func (w *worker) createStatefulSet(ctx context.Context, host *api.Host, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1654,7 +1654,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.ChiHost, regis
 }
 
 // waitConfigMapPropagation
-func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.ChiHost) bool {
+func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) bool {
 	// No need to wait for ConfigMap propagation on stopped host
 	if host.IsStopped() {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
@@ -1695,7 +1695,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.ChiHost
 }
 
 // updateStatefulSet
-func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
+func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1766,7 +1766,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.ChiHost, regis
 }
 
 // recreateStatefulSet
-func (w *worker) recreateStatefulSet(ctx context.Context, host *api.ChiHost, register bool) error {
+func (w *worker) recreateStatefulSet(ctx context.Context, host *api.Host, register bool) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -1843,7 +1843,7 @@ func (w *worker) applyResource(
 	return true
 }
 
-func (w *worker) ensureClusterSchemer(host *api.ChiHost) *schemer.ClusterSchemer {
+func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
 	if w == nil {
 		return nil
 	}

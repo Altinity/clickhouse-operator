@@ -25,12 +25,12 @@ import (
 
 // isZookeeperChangeRequiresReboot checks two ZooKeeper configs and decides,
 // whether config modifications require a reboot to be applied
-func isZookeeperChangeRequiresReboot(host *api.ChiHost, a, b *api.ChiZookeeperConfig) bool {
+func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ChiZookeeperConfig) bool {
 	return !a.Equals(b)
 }
 
 // isSettingsChangeRequiresReboot checks whether changes between two settings requires ClickHouse reboot
-func isSettingsChangeRequiresReboot(host *api.ChiHost, configurationRestartPolicyRulesSection string, a, b *api.Settings) bool {
+func isSettingsChangeRequiresReboot(host *api.Host, configurationRestartPolicyRulesSection string, a, b *api.Settings) bool {
 	diff, equal := messagediff.DeepDiff(a, b)
 	if equal {
 		return false
@@ -40,7 +40,7 @@ func isSettingsChangeRequiresReboot(host *api.ChiHost, configurationRestartPolic
 }
 
 // hostVersionMatches checks whether host's ClickHouse version matches specified constraint
-func hostVersionMatches(host *api.ChiHost, versionConstraint string) bool {
+func hostVersionMatches(host *api.Host, versionConstraint string) bool {
 	// Special version of "*" - default version - has to satisfy all host versions
 	// Default version will also be used in case ClickHouse version is unknown.
 	// ClickHouse version may be unknown due to host being down - for example, because of incorrect "settings" section.
@@ -68,7 +68,7 @@ func ruleMatches(set api.OperatorConfigRestartPolicyRuleSet, path string) (match
 
 // getLatestConfigMatchValue returns value of the latest match of a specified `path` in ConfigRestartPolicy.Rules
 // in case match found in ConfigRestartPolicy.Rules or false
-func getLatestConfigMatchValue(host *api.ChiHost, path string) (matches bool, value bool) {
+func getLatestConfigMatchValue(host *api.Host, path string) (matches bool, value bool) {
 	// Check all rules
 	for _, r := range chop.Config().ClickHouse.ConfigRestartPolicy.Rules {
 		// Check ClickHouse version of a particular rule
@@ -89,7 +89,7 @@ func getLatestConfigMatchValue(host *api.ChiHost, path string) (matches bool, va
 }
 
 // isListedChangeRequiresReboot checks whether any of the provided paths requires reboot to apply configuration
-func isListedChangeRequiresReboot(host *api.ChiHost, paths []string) bool {
+func isListedChangeRequiresReboot(host *api.Host, paths []string) bool {
 	// Check whether any path matches ClickHouse configuration restart policy rules requires reboot
 	for _, path := range paths {
 		if matches, value := getLatestConfigMatchValue(host, path); matches {
@@ -148,7 +148,7 @@ const (
 )
 
 // IsConfigurationChangeRequiresReboot checks whether configuration changes requires a reboot
-func IsConfigurationChangeRequiresReboot(host *api.ChiHost) bool {
+func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	// Zookeeper
 	{
 		var old, new *api.ChiZookeeperConfig

@@ -53,7 +53,7 @@ func (replica *ChiReplica) HasShardsCount() bool {
 }
 
 // WalkHosts walks over hosts
-func (replica *ChiReplica) WalkHosts(f func(host *ChiHost) error) []error {
+func (replica *ChiReplica) WalkHosts(f func(host *Host) error) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range replica.Hosts {
@@ -67,7 +67,7 @@ func (replica *ChiReplica) WalkHosts(f func(host *ChiHost) error) []error {
 // HostsCount returns number of hosts
 func (replica *ChiReplica) HostsCount() int {
 	count := 0
-	replica.WalkHosts(func(host *ChiHost) error {
+	replica.WalkHosts(func(host *Host) error {
 		count++
 		return nil
 	})

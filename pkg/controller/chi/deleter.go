@@ -29,8 +29,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// deleteHost deletes all kubernetes resources related to replica *chop.ChiHost
-func (c *Controller) deleteHost(ctx context.Context, host *api.ChiHost) error {
+// deleteHost deletes all kubernetes resources related to replica *chop.Host
+func (c *Controller) deleteHost(ctx context.Context, host *api.Host) error {
 	log.V(1).M(host).S().Info(host.Runtime.Address.ClusterNameString())
 
 	// Each host consists of:
@@ -88,7 +88,7 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *api.ClickHous
 }
 
 // statefulSetDeletePod delete a pod of a StatefulSet. This requests StatefulSet to relaunch deleted pod
-func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps.StatefulSet, host *api.ChiHost) error {
+func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps.StatefulSet, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -110,7 +110,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
-func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -164,7 +164,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.ChiHost) e
 }
 
 // syncStatefulSet
-func (c *Controller) syncStatefulSet(ctx context.Context, host *api.ChiHost) {
+func (c *Controller) syncStatefulSet(ctx context.Context, host *api.Host) {
 	for {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("task is done")
@@ -183,7 +183,7 @@ func (c *Controller) syncStatefulSet(ctx context.Context, host *api.ChiHost) {
 }
 
 // deletePVC deletes PersistentVolumeClaim
-func (c *Controller) deletePVC(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) deletePVC(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -222,7 +222,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *api.ChiHost) error {
 }
 
 // deleteConfigMap deletes ConfigMap
-func (c *Controller) deleteConfigMap(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) deleteConfigMap(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -256,7 +256,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *api.ChiHost) err
 }
 
 // deleteServiceHost deletes Service
-func (c *Controller) deleteServiceHost(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) deleteServiceHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

@@ -247,7 +247,7 @@ func (cluster *Cluster) GetShard(shard int) *ChiShard {
 }
 
 // GetOrCreateHost gets or creates host on specified coordinates
-func (cluster *Cluster) GetOrCreateHost(shard, replica int) *ChiHost {
+func (cluster *Cluster) GetOrCreateHost(shard, replica int) *Host {
 	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
 }
 
@@ -278,14 +278,14 @@ func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 
 // FindHost finds host by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (cluster *Cluster) FindHost(needleShard interface{}, needleHost interface{}) *ChiHost {
+func (cluster *Cluster) FindHost(needleShard interface{}, needleHost interface{}) *Host {
 	return cluster.FindShard(needleShard).FindHost(needleHost)
 }
 
 // FirstHost finds first host in the cluster
-func (cluster *Cluster) FirstHost() *ChiHost {
-	var result *ChiHost
-	cluster.WalkHosts(func(host *ChiHost) error {
+func (cluster *Cluster) FirstHost() *Host {
+	var result *Host
+	cluster.WalkHosts(func(host *Host) error {
 		if result == nil {
 			result = host
 		}
@@ -322,7 +322,7 @@ func (cluster *Cluster) WalkReplicas(f func(index int, replica *ChiReplica) erro
 }
 
 // WalkHosts walks hosts
-func (cluster *Cluster) WalkHosts(f func(host *ChiHost) error) []error {
+func (cluster *Cluster) WalkHosts(f func(host *Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -338,7 +338,7 @@ func (cluster *Cluster) WalkHosts(f func(host *ChiHost) error) []error {
 }
 
 // WalkHostsByShards walks hosts by shards
-func (cluster *Cluster) WalkHostsByShards(f func(shard, replica int, host *ChiHost) error) []error {
+func (cluster *Cluster) WalkHostsByShards(f func(shard, replica int, host *Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -354,7 +354,7 @@ func (cluster *Cluster) WalkHostsByShards(f func(shard, replica int, host *ChiHo
 }
 
 // WalkHostsByReplicas walks hosts by replicas
-func (cluster *Cluster) WalkHostsByReplicas(f func(shard, replica int, host *ChiHost) error) []error {
+func (cluster *Cluster) WalkHostsByReplicas(f func(shard, replica int, host *Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -372,7 +372,7 @@ func (cluster *Cluster) WalkHostsByReplicas(f func(shard, replica int, host *Chi
 // HostsCount counts hosts
 func (cluster *Cluster) HostsCount() int {
 	count := 0
-	cluster.WalkHosts(func(host *ChiHost) error {
+	cluster.WalkHosts(func(host *Host) error {
 		count++
 		return nil
 	})

@@ -74,7 +74,7 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[strin
 }
 
 // CreateConfigFilesGroupHost creates host config files
-func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *api.ChiHost) map[string]string {
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *api.Host) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(host))

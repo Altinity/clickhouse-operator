@@ -823,7 +823,7 @@ func newWeightedPodAffinityTermWithMatchLabels(
 }
 
 // PrepareAffinity
-func PrepareAffinity(podTemplate *api.PodTemplate, host *api.ChiHost) {
+func PrepareAffinity(podTemplate *api.PodTemplate, host *api.Host) {
 	switch {
 	case podTemplate == nil:
 		return
@@ -850,7 +850,7 @@ func PrepareAffinity(podTemplate *api.PodTemplate, host *api.ChiHost) {
 }
 
 // processNodeSelector
-func processNodeSelector(nodeSelector *core.NodeSelector, host *api.ChiHost) {
+func processNodeSelector(nodeSelector *core.NodeSelector, host *api.Host) {
 	if nodeSelector == nil {
 		return
 	}
@@ -861,7 +861,7 @@ func processNodeSelector(nodeSelector *core.NodeSelector, host *api.ChiHost) {
 }
 
 // processPreferredSchedulingTerms
-func processPreferredSchedulingTerms(preferredSchedulingTerms []core.PreferredSchedulingTerm, host *api.ChiHost) {
+func processPreferredSchedulingTerms(preferredSchedulingTerms []core.PreferredSchedulingTerm, host *api.Host) {
 	for i := range preferredSchedulingTerms {
 		nodeSelectorTerm := &preferredSchedulingTerms[i].Preference
 		processNodeSelectorTerm(nodeSelectorTerm, host)
@@ -869,7 +869,7 @@ func processPreferredSchedulingTerms(preferredSchedulingTerms []core.PreferredSc
 }
 
 // processNodeSelectorTerm
-func processNodeSelectorTerm(nodeSelectorTerm *core.NodeSelectorTerm, host *api.ChiHost) {
+func processNodeSelectorTerm(nodeSelectorTerm *core.NodeSelectorTerm, host *api.Host) {
 	for i := range nodeSelectorTerm.MatchExpressions {
 		nodeSelectorRequirement := &nodeSelectorTerm.MatchExpressions[i]
 		processNodeSelectorRequirement(nodeSelectorRequirement, host)
@@ -882,7 +882,7 @@ func processNodeSelectorTerm(nodeSelectorTerm *core.NodeSelectorTerm, host *api.
 }
 
 // processNodeSelectorRequirement
-func processNodeSelectorRequirement(nodeSelectorRequirement *core.NodeSelectorRequirement, host *api.ChiHost) {
+func processNodeSelectorRequirement(nodeSelectorRequirement *core.NodeSelectorRequirement, host *api.Host) {
 	if nodeSelectorRequirement == nil {
 		return
 	}
@@ -894,7 +894,7 @@ func processNodeSelectorRequirement(nodeSelectorRequirement *core.NodeSelectorRe
 }
 
 // processPodAffinityTerms
-func processPodAffinityTerms(podAffinityTerms []core.PodAffinityTerm, host *api.ChiHost) {
+func processPodAffinityTerms(podAffinityTerms []core.PodAffinityTerm, host *api.Host) {
 	for i := range podAffinityTerms {
 		podAffinityTerm := &podAffinityTerms[i]
 		processPodAffinityTerm(podAffinityTerm, host)
@@ -902,7 +902,7 @@ func processPodAffinityTerms(podAffinityTerms []core.PodAffinityTerm, host *api.
 }
 
 // processWeightedPodAffinityTerms
-func processWeightedPodAffinityTerms(weightedPodAffinityTerms []core.WeightedPodAffinityTerm, host *api.ChiHost) {
+func processWeightedPodAffinityTerms(weightedPodAffinityTerms []core.WeightedPodAffinityTerm, host *api.Host) {
 	for i := range weightedPodAffinityTerms {
 		podAffinityTerm := &weightedPodAffinityTerms[i].PodAffinityTerm
 		processPodAffinityTerm(podAffinityTerm, host)
@@ -910,7 +910,7 @@ func processWeightedPodAffinityTerms(weightedPodAffinityTerms []core.WeightedPod
 }
 
 // processPodAffinityTerm
-func processPodAffinityTerm(podAffinityTerm *core.PodAffinityTerm, host *api.ChiHost) {
+func processPodAffinityTerm(podAffinityTerm *core.PodAffinityTerm, host *api.Host) {
 	if podAffinityTerm == nil {
 		return
 	}
@@ -919,7 +919,7 @@ func processPodAffinityTerm(podAffinityTerm *core.PodAffinityTerm, host *api.Chi
 }
 
 // processLabelSelector
-func processLabelSelector(labelSelector *meta.LabelSelector, host *api.ChiHost) {
+func processLabelSelector(labelSelector *meta.LabelSelector, host *api.Host) {
 	if labelSelector == nil {
 		return
 	}
@@ -934,7 +934,7 @@ func processLabelSelector(labelSelector *meta.LabelSelector, host *api.ChiHost) 
 }
 
 // processLabelSelectorRequirement
-func processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *api.ChiHost) {
+func processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelectorRequirement, host *api.Host) {
 	if labelSelectorRequirement == nil {
 		return
 	}

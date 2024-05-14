@@ -22,11 +22,11 @@ import (
 // HostIsNewOne checks whether host is a newly created
 // TODO there should be better way to detect newly created CHI
 // TODO unify with api host.IsNew
-func HostIsNewOne(host *api.ChiHost) bool {
+func HostIsNewOne(host *api.Host) bool {
 	return host.GetCHI().EnsureStatus().GetHostsCount() == host.GetCHI().EnsureStatus().GetHostsAddedCount()
 }
 
 // HostHasTablesCreated checks whether host has tables listed as already created
-func HostHasTablesCreated(host *api.ChiHost) bool {
+func HostHasTablesCreated(host *api.Host) bool {
 	return util.InArray(CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated())
 }

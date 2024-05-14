@@ -53,5 +53,5 @@ func NormalizeHostTemplate(template *api.HostTemplate) {
 }
 
 // normalizeHostTemplateSpec is the same as normalizeHost but for a template
-func normalizeHostTemplateSpec(host *api.ChiHost) {
+func normalizeHostTemplateSpec(host *api.Host) {
 }

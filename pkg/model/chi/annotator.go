@@ -51,7 +51,7 @@ func (a *Annotator) GetConfigMapCHICommonUsers() map[string]string {
 }
 
 // GetConfigMapHost
-func (a *Annotator) GetConfigMapHost(host *api.ChiHost) map[string]string {
+func (a *Annotator) GetConfigMapHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.GetHostScope(host),
 		nil,
@@ -83,7 +83,7 @@ func (a *Annotator) GetServiceShard(shard api.IShard) map[string]string {
 }
 
 // GetServiceHost
-func (a *Annotator) GetServiceHost(host *api.ChiHost) map[string]string {
+func (a *Annotator) GetServiceHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		a.GetHostScope(host),
 		nil,
@@ -109,7 +109,7 @@ func (a *Annotator) getShardScope(shard api.IShard) map[string]string {
 }
 
 // GetHostScope gets annotations for Host-scoped object
-func (a *Annotator) GetHostScope(host *api.ChiHost) map[string]string {
+func (a *Annotator) GetHostScope(host *api.Host) map[string]string {
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
@@ -125,14 +125,14 @@ func (a *Annotator) appendCHIProvidedTo(dst map[string]string) map[string]string
 }
 
 // GetPV
-func (a *Annotator) GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string {
+func (a *Annotator) GetPV(pv *core.PersistentVolume, host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.GetHostScope(host))
 }
 
 // GetPVC
 func (a *Annotator) GetPVC(
 	pvc *core.PersistentVolumeClaim,
-	host *api.ChiHost,
+	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) map[string]string {
 	annotations := util.MergeStringMapsOverwrite(pvc.GetAnnotations(), template.ObjectMeta.GetAnnotations())

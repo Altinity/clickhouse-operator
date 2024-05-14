@@ -101,7 +101,7 @@ func (n *Normalizer) fillStatus() {
 	//endpoint := CreateCHIServiceFQDN(n.ctx.chi)
 	//pods := make([]string, 0)
 	//fqdns := make([]string, 0)
-	//n.ctx.chi.WalkHosts(func(host *apiChi.ChiHost) error {
+	//n.ctx.chi.WalkHosts(func(host *apiChi.Host) error {
 	//	pods = append(pods, CreatePodName(host))
 	//	fqdns = append(fqdns, CreateFQDN(host))
 	//	return nil

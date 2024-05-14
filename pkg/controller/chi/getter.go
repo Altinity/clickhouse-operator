@@ -81,14 +81,14 @@ func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.Conf
 
 // getService gets Service. Accepted types:
 //  1. *core.Service
-//  2. *chop.ChiHost
+//  2. *chop.Host
 func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *core.Service:
 		name = typedObj.Name
 		namespace = typedObj.Namespace
-	case *api.ChiHost:
+	case *api.Host:
 		name = model.CreateStatefulSetServiceName(typedObj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
@@ -98,7 +98,7 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 
 // getStatefulSet gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
-//  2. *chop.ChiHost
+//  2. *chop.Host
 func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.StatefulSet, error) {
 	switch typedObj := obj.(type) {
 	case *meta.ObjectMeta:
@@ -107,7 +107,7 @@ func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.Stat
 			b = byName[0]
 		}
 		return c.getStatefulSetByMeta(typedObj, b)
-	case *api.ChiHost:
+	case *api.Host:
 		return c.getStatefulSetByHost(typedObj)
 	}
 	return nil, fmt.Errorf("unknown type")
@@ -162,7 +162,7 @@ func (c *Controller) getStatefulSetByMeta(meta meta.Object, byNameOnly bool) (*a
 }
 
 // getStatefulSetByHost finds StatefulSet of a specified host
-func (c *Controller) getStatefulSetByHost(host *api.ChiHost) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSetByHost(host *api.Host) (*apps.StatefulSet, error) {
 	// Namespaced name
 	name := model.CreateStatefulSetName(host)
 	namespace := host.Runtime.Address.Namespace
@@ -177,14 +177,14 @@ func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
 
 // getPod gets pod. Accepted types:
 //  1. *apps.StatefulSet
-//  2. *chop.ChiHost
+//  2. *chop.Host
 func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *apps.StatefulSet:
 		name = model.CreatePodName(obj)
 		namespace = typedObj.Namespace
-	case *api.ChiHost:
+	case *api.Host:
 		name = model.CreatePodName(obj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
@@ -201,7 +201,7 @@ func (c *Controller) getPods(obj interface{}) []*core.Pod {
 	case *api.ChiShard:
 		return c.getPodsOfShard(typed)
 	case
-		*api.ChiHost,
+		*api.Host,
 		*apps.StatefulSet:
 		if pod, err := c.getPod(typed); err == nil {
 			return []*core.Pod{
@@ -214,7 +214,7 @@ func (c *Controller) getPods(obj interface{}) []*core.Pod {
 
 // getPodsOfCluster gets all pods in a cluster
 func (c *Controller) getPodsOfCluster(cluster *api.Cluster) (pods []*core.Pod) {
-	cluster.WalkHosts(func(host *api.ChiHost) error {
+	cluster.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -225,7 +225,7 @@ func (c *Controller) getPodsOfCluster(cluster *api.Cluster) (pods []*core.Pod) {
 
 // getPodsOfShard gets all pods in a shard
 func (c *Controller) getPodsOfShard(shard *api.ChiShard) (pods []*core.Pod) {
-	shard.WalkHosts(func(host *api.ChiHost) error {
+	shard.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}
@@ -236,7 +236,7 @@ func (c *Controller) getPodsOfShard(shard *api.ChiShard) (pods []*core.Pod) {
 
 // getPodsOfCHI gets all pods in a CHI
 func (c *Controller) getPodsOfCHI(chi *api.ClickHouseInstallation) (pods []*core.Pod) {
-	chi.WalkHosts(func(host *api.ChiHost) error {
+	chi.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.getPod(host); err == nil {
 			pods = append(pods, pod)
 		}

@@ -106,7 +106,7 @@ func (l *Labeler) GetConfigMapCHICommonUsers() map[string]string {
 }
 
 // GetConfigMapHost
-func (l *Labeler) GetConfigMapHost(host *api.ChiHost) map[string]string {
+func (l *Labeler) GetConfigMapHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetHostScope(host, false),
 		map[string]string{
@@ -142,7 +142,7 @@ func (l *Labeler) GetServiceShard(shard api.IShard) map[string]string {
 }
 
 // GetServiceHost
-func (l *Labeler) GetServiceHost(host *api.ChiHost) map[string]string {
+func (l *Labeler) GetServiceHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetHostScope(host, false),
 		map[string]string{
@@ -219,7 +219,7 @@ func GetSelectorShardScopeReady(shard api.IShard) map[string]string {
 }
 
 // GetHostScope gets labels for Host-scoped object
-func (l *Labeler) GetHostScope(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
+func (l *Labeler) GetHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := GetSelectorHostScope(host)
 	if chop.Config().Label.Runtime.AppendScope {
@@ -244,7 +244,7 @@ func (l *Labeler) GetHostScope(host *api.ChiHost, applySupplementaryServiceLabel
 	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))
 }
 
-func appendConfigLabels(host *api.ChiHost, labels map[string]string) map[string]string {
+func appendConfigLabels(host *api.Host, labels map[string]string) map[string]string {
 	if !host.HasCurStatefulSet() {
 		return labels
 	}
@@ -266,26 +266,26 @@ func appendConfigLabels(host *api.ChiHost, labels map[string]string) map[string]
 }
 
 // GetHostScopeReady gets labels for Host-scoped object including Ready label
-func (l *Labeler) GetHostScopeReady(host *api.ChiHost, applySupplementaryServiceLabels bool) map[string]string {
+func (l *Labeler) GetHostScopeReady(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
 	return appendKeyReady(l.GetHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getHostScopeReclaimPolicy gets host scope labels with PVCReclaimPolicy from template
-func (l *Labeler) getHostScopeReclaimPolicy(host *api.ChiHost, template *api.VolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
+func (l *Labeler) getHostScopeReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
 	return util.MergeStringMapsOverwrite(l.GetHostScope(host, applySupplementaryServiceLabels), map[string]string{
 		LabelPVCReclaimPolicyName: getPVCReclaimPolicy(host, template).String(),
 	})
 }
 
 // GetPV
-func (l *Labeler) GetPV(pv *core.PersistentVolume, host *api.ChiHost) map[string]string {
+func (l *Labeler) GetPV(pv *core.PersistentVolume, host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(pv.GetLabels(), l.GetHostScope(host, false))
 }
 
 // GetPVC
 func (l *Labeler) GetPVC(
 	pvc *core.PersistentVolumeClaim,
-	host *api.ChiHost,
+	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) map[string]string {
 	// Prepare main labels based on template
@@ -317,7 +317,7 @@ func GetReclaimPolicy(meta meta.Object) api.PVCReclaimPolicy {
 }
 
 // GetSelectorHostScope gets labels to select a Host-scoped object
-func GetSelectorHostScope(host *api.ChiHost) map[string]string {
+func GetSelectorHostScope(host *api.Host) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   labelsNamer.getNamePartNamespace(host),

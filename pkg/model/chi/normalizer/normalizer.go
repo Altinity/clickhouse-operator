@@ -154,7 +154,7 @@ func (n *Normalizer) normalizeSpec() {
 // finalize performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalize() {
 	n.ctx.GetTarget().Fill()
-	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
+	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
 		hostTemplate := hostGetHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
@@ -164,7 +164,7 @@ func (n *Normalizer) finalize() {
 
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
-	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
+	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
 		host.Runtime.Address.StatefulSet = model.CreateStatefulSetName(host)
 		host.Runtime.Address.FQDN = model.CreateFQDN(host)
 		return nil
@@ -172,7 +172,7 @@ func (n *Normalizer) fillCHIAddressInfo() {
 }
 
 // hostGetHostTemplate gets Host Template to be used to normalize Host
-func hostGetHostTemplate(host *api.ChiHost) *api.HostTemplate {
+func hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	// Which host template would be used - either explicitly defined in or a default one
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
@@ -203,7 +203,7 @@ func hostGetHostTemplate(host *api.ChiHost) *api.HostTemplate {
 }
 
 // hostApplyHostTemplate
-func hostApplyHostTemplate(host *api.ChiHost, template *api.HostTemplate) {
+func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 	if host.GetName() == "" {
 		host.Name = template.Spec.Name
 	}
@@ -274,7 +274,7 @@ func hostApplyHostTemplate(host *api.ChiHost, template *api.HostTemplate) {
 }
 
 // hostApplyPortsFromSettings
-func hostApplyPortsFromSettings(host *api.ChiHost) {
+func hostApplyPortsFromSettings(host *api.Host) {
 	// Use host personal settings at first
 	hostEnsurePortValuesFromSettings(host, host.GetSettings(), false)
 	// Fallback to common settings
@@ -282,7 +282,7 @@ func hostApplyPortsFromSettings(host *api.ChiHost) {
 }
 
 // hostEnsurePortValuesFromSettings fetches port spec from settings, if any provided
-func hostEnsurePortValuesFromSettings(host *api.ChiHost, settings *api.Settings, final bool) {
+func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, final bool) {
 	//
 	// 1. Setup fallback/default ports
 	//
@@ -324,7 +324,7 @@ func (n *Normalizer) fillStatus() {
 	endpoint := model.CreateCHIServiceFQDN(n.ctx.GetTarget())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
-	n.ctx.GetTarget().WalkHosts(func(host *api.ChiHost) error {
+	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
 		pods = append(pods, model.CreatePodName(host))
 		fqdns = append(fqdns, model.CreateFQDN(host))
 		return nil
@@ -1202,7 +1202,7 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 		return nil
 	})
 
-	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *api.ChiHost) error {
+	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *api.Host) error {
 		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
 		return nil
 	})
@@ -1215,7 +1215,7 @@ func (n *Normalizer) createHostsField(cluster *api.Cluster) {
 	cluster.Layout.HostsField = api.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
 	// Need to migrate hosts from Shards and Replicas into HostsField
-	hostMergeFunc := func(shard, replica int, host *api.ChiHost) error {
+	hostMergeFunc := func(shard, replica int, host *api.Host) error {
 		if curHost := cluster.Layout.HostsField.Get(shard, replica); curHost == nil {
 			cluster.Layout.HostsField.Set(shard, replica, host)
 		} else {
@@ -1497,7 +1497,7 @@ func (n *Normalizer) normalizeReplicaHosts(replica *api.ChiReplica, cluster *api
 
 // normalizeHost normalizes a host/replica
 func (n *Normalizer) normalizeHost(
-	host *api.ChiHost,
+	host *api.Host,
 	shard *api.ChiShard,
 	replica *api.ChiReplica,
 	cluster *api.Cluster,
@@ -1523,7 +1523,7 @@ func (n *Normalizer) normalizeHost(
 
 // normalizeHostName normalizes host's name
 func (n *Normalizer) normalizeHostName(
-	host *api.ChiHost,
+	host *api.Host,
 	shard *api.ChiShard,
 	shardIndex int,
 	replica *api.ChiReplica,

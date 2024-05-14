@@ -24,7 +24,7 @@ import (
 )
 
 // shouldCreateDistributedObjects determines whether distributed objects should be created
-func shouldCreateDistributedObjects(host *api.ChiHost) bool {
+func shouldCreateDistributedObjects(host *api.Host) bool {
 	hosts := model.CreateFQDNs(host, api.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardNone {
@@ -42,7 +42,7 @@ func shouldCreateDistributedObjects(host *api.ChiHost) bool {
 
 // getDistributedObjectsSQLs returns a list of objects that needs to be created on a shard in a cluster.
 // That includes all distributed tables, corresponding local tables and databases, if necessary
-func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil, nil, nil

@@ -155,7 +155,7 @@ func (w *worker) reconcile(ctx context.Context, chi *api.ClickHouseInstallation)
 	defer w.a.V(2).M(chi).E().P()
 
 	counters := api.NewChiHostReconcileAttributesCounters()
-	chi.WalkHosts(func(host *api.ChiHost) error {
+	chi.WalkHosts(func(host *api.Host) error {
 		counters.Add(host.GetReconcileAttributes())
 		return nil
 	})
@@ -293,7 +293,7 @@ func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *api.ClickH
 }
 
 // reconcileHostConfigMap reconciles host's personal ConfigMap
-func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -320,7 +320,7 @@ type versionOptions struct {
 	skipStoppedAncestor bool
 }
 
-func (opts versionOptions) shouldSkip(host *api.ChiHost) (bool, string) {
+func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
 	if opts.skipNew && (host.IsNewOne()) {
 		return true, "host is a new one, version is not not applicable"
 	}
@@ -337,7 +337,7 @@ func (opts versionOptions) shouldSkip(host *api.ChiHost) (bool, string) {
 }
 
 // getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost, opts versionOptions) (string, error) {
+func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host, opts versionOptions) (string, error) {
 	if skip, description := opts.shouldSkip(host); skip {
 		return description, nil
 	}
@@ -354,12 +354,12 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.ChiHost
 	return version, nil
 }
 
-func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.ChiHost) (version string, err error) {
+func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version string, err error) {
 	err = w.c.pollHost(
 		ctx,
 		host,
 		nil,
-		func(_ctx context.Context, _host *api.ChiHost) bool {
+		func(_ctx context.Context, _host *api.Host) bool {
 			var e error
 			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{skipStopped: true})
 			if e == nil {
@@ -399,7 +399,7 @@ func (a reconcileHostStatefulSetOptionsArr) First() *reconcileHostStatefulSetOpt
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost, opts ...*reconcileHostStatefulSetOptions) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*reconcileHostStatefulSetOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -448,7 +448,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.ChiHost
 }
 
 // reconcileHostService reconciles host's Service
-func (w *worker) reconcileHostService(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -655,7 +655,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 }
 
 // reconcileHost reconciles specified ClickHouse host
-func (w *worker) reconcileHost(ctx context.Context, host *api.ChiHost) error {
+func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	var (
 		reconcileHostStatefulSetOpts *reconcileHostStatefulSetOptions
 		migrateTableOpts             *migrateTableOptions
@@ -960,7 +960,7 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *api.ClickHouseInstall
 	return err
 }
 
-func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulSet) {
+func (w *worker) dumpStatefulSetDiff(host *api.Host, cur, new *apps.StatefulSet) {
 	if cur == nil {
 		w.a.V(1).M(host).Info("Cur StatefulSet is not available, nothing to compare to")
 		return
@@ -1009,7 +1009,7 @@ func (w *worker) dumpStatefulSetDiff(host *api.ChiHost, cur, new *apps.StatefulS
 // reconcileStatefulSet reconciles StatefulSet of a host
 func (w *worker) reconcileStatefulSet(
 	ctx context.Context,
-	host *api.ChiHost,
+	host *api.Host,
 	register bool,
 	opts ...*reconcileHostStatefulSetOptions,
 ) (err error) {
@@ -1068,7 +1068,7 @@ func (w *worker) reconcileStatefulSet(
 
 // Comment out PV
 // reconcilePersistentVolumes reconciles all PVs of a host
-//func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *api.ChiHost) {
+//func (w *worker) reconcilePersistentVolumes(ctx context.Context, host *api.Host) {
 //	if util.IsContextDone(ctx) {
 //		return
 //	}
@@ -1080,7 +1080,7 @@ func (w *worker) reconcileStatefulSet(
 //}
 
 // reconcilePVCs reconciles all PVCs of a host
-func (w *worker) reconcilePVCs(ctx context.Context, host *api.ChiHost, which api.WhichStatefulSet) (res ErrorDataPersistence) {
+func (w *worker) reconcilePVCs(ctx context.Context, host *api.Host, which api.WhichStatefulSet) (res ErrorDataPersistence) {
 	if util.IsContextDone(ctx) {
 		return nil
 	}
@@ -1103,7 +1103,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *api.ChiHost, which api
 	return
 }
 
-func isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.ChiHost) bool {
+func isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
 	if !model.HostHasTablesCreated(host) {
 		// No data to loose
 		return false
@@ -1129,7 +1129,7 @@ func isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Ch
 
 func (w *worker) reconcilePVCFromVolumeMount(
 	ctx context.Context,
-	host *api.ChiHost,
+	host *api.Host,
 	volumeMount *core.VolumeMount,
 ) (
 	res ErrorDataPersistence,
@@ -1194,7 +1194,7 @@ func (w *worker) reconcilePVCFromVolumeMount(
 
 func (w *worker) fetchPVC(
 	ctx context.Context,
-	host *api.ChiHost,
+	host *api.Host,
 	volumeMount *core.VolumeMount,
 ) (
 	pvc *core.PersistentVolumeClaim,
@@ -1257,7 +1257,7 @@ var errNilPVC = fmt.Errorf("nil PVC, nothing to reconcile")
 func (w *worker) reconcilePVC(
 	ctx context.Context,
 	pvc *core.PersistentVolumeClaim,
-	host *api.ChiHost,
+	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) (*core.PersistentVolumeClaim, error) {
 	if pvc == nil {

@@ -20,20 +20,20 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
-type ChiHost struct {
-	Name         string      `json:"name,omitempty" yaml:"name,omitempty"`
-	Insecure     *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
-	Secure       *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
-	ChiHostPorts `json:",inline"            yaml:",inline"`
-	Settings     *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files        *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates    *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
+// Host defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
+type Host struct {
+	Name      string      `json:"name,omitempty" yaml:"name,omitempty"`
+	Insecure  *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
+	Secure    *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	HostPorts `json:",inline"            yaml:",inline"`
+	Settings  *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files     *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
-	Runtime ChiHostRuntime `json:"-" yaml:"-"`
+	Runtime HostRuntime `json:"-" yaml:"-"`
 }
 
-type ChiHostPorts struct {
+type HostPorts struct {
 	// DEPRECATED - to be removed soon
 	Port *Int32 `json:"port,omitempty"  yaml:"port,omitempty"`
 
@@ -44,7 +44,7 @@ type ChiHostPorts struct {
 	InterserverHTTPPort *Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 }
 
-type ChiHostRuntime struct {
+type HostRuntime struct {
 	// Internal data
 	Address             HostAddress                `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
@@ -57,7 +57,7 @@ type ChiHostRuntime struct {
 	CHI *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
-func (r ChiHostRuntime) GetAddress() IHostAddress {
+func (r HostRuntime) GetAddress() IHostAddress {
 	return r.Address
 }
 
@@ -65,12 +65,12 @@ type IHostRuntime interface {
 	GetAddress() IHostAddress
 }
 
-func (host *ChiHost) GetRuntime() IHostRuntime {
+func (host *Host) GetRuntime() IHostRuntime {
 	return host.Runtime
 }
 
 // GetReconcileAttributes is an ensurer getter
-func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
+func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
 	if host == nil {
 		return nil
 	}
@@ -81,7 +81,7 @@ func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
-func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
+func (host *Host) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
 		host.Settings = host.Settings.MergeFrom(shard.Settings)
 	}
@@ -92,7 +92,7 @@ func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 }
 
 // InheritFilesFrom inherits files from specified shard and replica
-func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
+func (host *Host) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
 		host.Files = host.Files.MergeFrom(shard.Files)
 	}
@@ -103,7 +103,7 @@ func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 }
 
 // InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
+func (host *Host) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
 	if shard != nil {
 		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
 	}
@@ -120,7 +120,7 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, 
 }
 
 // MergeFrom merges from specified host
-func (host *ChiHost) MergeFrom(from *ChiHost) {
+func (host *Host) MergeFrom(from *Host) {
 	if (host == nil) || (from == nil) {
 		return
 	}
@@ -149,7 +149,7 @@ func (host *ChiHost) MergeFrom(from *ChiHost) {
 }
 
 // GetHostTemplate gets host template
-func (host *ChiHost) GetHostTemplate() (*HostTemplate, bool) {
+func (host *Host) GetHostTemplate() (*HostTemplate, bool) {
 	if !host.Templates.HasHostTemplate() {
 		return nil, false
 	}
@@ -158,7 +158,7 @@ func (host *ChiHost) GetHostTemplate() (*HostTemplate, bool) {
 }
 
 // GetPodTemplate gets pod template
-func (host *ChiHost) GetPodTemplate() (*PodTemplate, bool) {
+func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
 	if !host.Templates.HasPodTemplate() {
 		return nil, false
 	}
@@ -167,7 +167,7 @@ func (host *ChiHost) GetPodTemplate() (*PodTemplate, bool) {
 }
 
 // GetServiceTemplate gets service template
-func (host *ChiHost) GetServiceTemplate() (*ServiceTemplate, bool) {
+func (host *Host) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !host.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}
@@ -176,7 +176,7 @@ func (host *ChiHost) GetServiceTemplate() (*ServiceTemplate, bool) {
 }
 
 // GetStatefulSetReplicasNum gets stateful set replica num
-func (host *ChiHost) GetStatefulSetReplicasNum(shutdown bool) *int32 {
+func (host *Host) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 	var num int32 = 0
 	switch {
 	case shutdown:
@@ -190,18 +190,18 @@ func (host *ChiHost) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 }
 
 // GetSettings gets settings
-func (host *ChiHost) GetSettings() *Settings {
+func (host *Host) GetSettings() *Settings {
 	return host.Settings
 }
 
 // GetZookeeper gets zookeeper
-func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
+func (host *Host) GetZookeeper() *ChiZookeeperConfig {
 	cluster := host.GetCluster()
 	return cluster.Zookeeper
 }
 
 // GetName gets name
-func (host *ChiHost) GetName() string {
+func (host *Host) GetName() string {
 	if host == nil {
 		return "host-is-nil"
 	}
@@ -209,7 +209,7 @@ func (host *ChiHost) GetName() string {
 }
 
 // GetCHI gets CHI
-func (host *ChiHost) GetCHI() *ClickHouseInstallation {
+func (host *Host) GetCHI() *ClickHouseInstallation {
 	if host == nil {
 		return nil
 	}
@@ -217,28 +217,28 @@ func (host *ChiHost) GetCHI() *ClickHouseInstallation {
 }
 
 // HasCHI checks whether host has CHI
-func (host *ChiHost) HasCHI() bool {
+func (host *Host) HasCHI() bool {
 	return host.GetCHI() != nil
 }
 
-func (host *ChiHost) SetCHI(chi *ClickHouseInstallation) {
+func (host *Host) SetCHI(chi *ClickHouseInstallation) {
 	host.Runtime.CHI = chi
 }
 
 // GetCluster gets cluster
-func (host *ChiHost) GetCluster() *Cluster {
+func (host *Host) GetCluster() *Cluster {
 	// Host has to have filled Address
 	return host.GetCHI().FindCluster(host.Runtime.Address.ClusterName)
 }
 
 // GetShard gets shard
-func (host *ChiHost) GetShard() *ChiShard {
+func (host *Host) GetShard() *ChiShard {
 	// Host has to have filled Address
 	return host.GetCHI().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
 }
 
 // GetAncestor gets ancestor of a host
-func (host *ChiHost) GetAncestor() *ChiHost {
+func (host *Host) GetAncestor() *Host {
 	return host.GetCHI().GetAncestor().FindHost(
 		host.Runtime.Address.ClusterName,
 		host.Runtime.Address.ShardName,
@@ -247,33 +247,33 @@ func (host *ChiHost) GetAncestor() *ChiHost {
 }
 
 // HasAncestor checks whether host has an ancestor
-func (host *ChiHost) HasAncestor() bool {
+func (host *Host) HasAncestor() bool {
 	return host.GetAncestor() != nil
 }
 
 // GetAncestorCHI gets ancestor of a host
-func (host *ChiHost) GetAncestorCHI() *ClickHouseInstallation {
+func (host *Host) GetAncestorCHI() *ClickHouseInstallation {
 	return host.GetCHI().GetAncestor()
 }
 
 // HasAncestorCHI checks whether host has an ancestor
-func (host *ChiHost) HasAncestorCHI() bool {
+func (host *Host) HasAncestorCHI() bool {
 	return host.GetAncestorCHI() != nil
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
-func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
+func (host *Host) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
 	host.GetCHI().WalkVolumeClaimTemplates(f)
 }
 
 // IsStopped checks whether host is stopped
-func (host *ChiHost) IsStopped() bool {
+func (host *Host) IsStopped() bool {
 	return host.GetCHI().IsStopped()
 }
 
 // IsNewOne checks whether host is a new one
 // TODO unify with model HostIsNewOne
-func (host *ChiHost) IsNewOne() bool {
+func (host *Host) IsNewOne() bool {
 	return !host.HasAncestor()
 }
 
@@ -298,7 +298,7 @@ func (w WhichStatefulSet) DesiredStatefulSet() bool {
 }
 
 // WalkVolumeMounts walks VolumeMount(s)
-func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *core.VolumeMount)) {
+func (host *Host) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *core.VolumeMount)) {
 	if host == nil {
 		return
 	}
@@ -331,7 +331,7 @@ func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount
 }
 
 // GetVolumeMount gets VolumeMount by the name
-//func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
+//func (host *Host) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
 //	host.WalkVolumeMounts(func(volumeMount *corev1.VolumeMount) {
 //		if volumeMount.Name == volumeMountName {
 //			vm = volumeMount
@@ -342,7 +342,7 @@ func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount
 //}
 
 // IsSecure checks whether the host requires secure communication
-func (host *ChiHost) IsSecure() bool {
+func (host *Host) IsSecure() bool {
 	if host == nil {
 		return false
 	}
@@ -362,7 +362,7 @@ func (host *ChiHost) IsSecure() bool {
 }
 
 // IsInsecure checks whether the host requires insecure communication
-func (host *ChiHost) IsInsecure() bool {
+func (host *Host) IsInsecure() bool {
 	if host == nil {
 		return false
 	}
@@ -382,7 +382,7 @@ func (host *ChiHost) IsInsecure() bool {
 }
 
 // IsFirst checks whether the host is the first host of the whole CHI
-func (host *ChiHost) IsFirst() bool {
+func (host *Host) IsFirst() bool {
 	if host == nil {
 		return false
 	}
@@ -391,7 +391,7 @@ func (host *ChiHost) IsFirst() bool {
 }
 
 // HasCurStatefulSet checks whether host has CurStatefulSet
-func (host *ChiHost) HasCurStatefulSet() bool {
+func (host *Host) HasCurStatefulSet() bool {
 	if host == nil {
 		return false
 	}
@@ -400,7 +400,7 @@ func (host *ChiHost) HasCurStatefulSet() bool {
 }
 
 // HasDesiredStatefulSet checks whether host has DesiredStatefulSet
-func (host *ChiHost) HasDesiredStatefulSet() bool {
+func (host *Host) HasDesiredStatefulSet() bool {
 	if host == nil {
 		return false
 	}

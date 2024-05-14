@@ -41,7 +41,7 @@ func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionPara
 }
 
 // HostSyncTables calls SYSTEM SYNC REPLICA for replicated tables
-func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.ChiHost) error {
+func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.Host) error {
 	tableNames, syncTableSQLs, _ := s.sqlSyncTable(ctx, host)
 	log.V(1).M(host).F().Info("Sync tables: %v as %v", tableNames, syncTableSQLs)
 	opts := clickhouse.NewQueryOptions()
@@ -50,7 +50,7 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.ChiHost) 
 }
 
 // HostDropReplica calls SYSTEM DROP REPLICA
-func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.ChiHost) error {
+func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
 	replica := model.CreateInstanceHostname(hostToDrop)
 	shard := hostToRunOn.Runtime.Address.ShardIndex
 	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
@@ -60,7 +60,7 @@ func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostT
 // createTablesSQLs makes all SQL for migrating tables
 func (s *ClusterSchemer) createTablesSQLs(
 	ctx context.Context,
-	host *api.ChiHost,
+	host *api.Host,
 ) (
 	replicatedObjectNames []string,
 	replicatedCreateSQLs []string,
@@ -79,7 +79,7 @@ func (s *ClusterSchemer) createTablesSQLs(
 }
 
 // HostCreateTables creates tables on a new host
-func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.ChiHost) error {
+func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("ctx is done")
 		return nil
@@ -118,14 +118,14 @@ func (s *ClusterSchemer) HostCreateTables(ctx context.Context, host *api.ChiHost
 }
 
 // HostDropTables drops tables on a host
-func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *api.ChiHost) error {
+func (s *ClusterSchemer) HostDropTables(ctx context.Context, host *api.Host) error {
 	tableNames, dropTableSQLs, _ := s.sqlDropTable(ctx, host)
 	log.V(1).M(host).F().Info("Drop tables: %v as %v", tableNames, dropTableSQLs)
 	return s.ExecHost(ctx, host, dropTableSQLs, clickhouse.NewQueryOptions().SetRetry(false))
 }
 
 // IsHostInCluster checks whether host is a member of at least one ClickHouse cluster
-func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.ChiHost) bool {
+func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.Host) bool {
 	inside := false
 	SQLs := []string{s.sqlHostInCluster()}
 	opts := clickhouse.NewQueryOptions().SetSilent(true)
@@ -142,19 +142,19 @@ func (s *ClusterSchemer) IsHostInCluster(ctx context.Context, host *api.ChiHost)
 
 // CHIDropDnsCache runs 'DROP DNS CACHE' over the whole CHI
 func (s *ClusterSchemer) CHIDropDnsCache(ctx context.Context, chi *api.ClickHouseInstallation) error {
-	chi.WalkHosts(func(host *api.ChiHost) error {
+	chi.WalkHosts(func(host *api.Host) error {
 		return s.ExecHost(ctx, host, []string{s.sqlDropDNSCache()})
 	})
 	return nil
 }
 
 // HostActiveQueriesNum returns how many active queries are on the host
-func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *api.ChiHost) (int, error) {
+func (s *ClusterSchemer) HostActiveQueriesNum(ctx context.Context, host *api.Host) (int, error) {
 	return s.QueryHostInt(ctx, host, s.sqlActiveQueriesNum())
 }
 
 // HostClickHouseVersion returns ClickHouse version on the host
-func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.ChiHost) (string, error) {
+func (s *ClusterSchemer) HostClickHouseVersion(ctx context.Context, host *api.Host) (string, error) {
 	return s.QueryHostString(ctx, host, s.sqlVersion())
 }
 

@@ -29,7 +29,7 @@ type IChi interface {
 	GetObjectMeta() meta.Object
 
 	WalkClusters(f func(cluster ICluster) error) []error
-	WalkHosts(func(host *ChiHost) error) []error
+	WalkHosts(func(host *Host) error) []error
 }
 
 type ICluster interface {
@@ -40,7 +40,7 @@ type ICluster interface {
 	GetPDBMaxUnavailable() *Int32
 
 	WalkShards(f func(index int, shard IShard) error) []error
-	WalkHosts(func(host *ChiHost) error) []error
+	WalkHosts(func(host *Host) error) []error
 }
 
 type IShard interface {
@@ -51,7 +51,7 @@ type IShard interface {
 	HasWeight() bool
 	GetWeight() int
 
-	WalkHosts(func(host *ChiHost) error) []error
+	WalkHosts(func(host *Host) error) []error
 }
 
 type IReplica interface {

@@ -29,7 +29,7 @@ const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
 // sqlDropTable returns set of 'DROP TABLE ...' SQLs
-func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -60,12 +60,12 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 
 // sqlSyncTable returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
-func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	sql := heredoc.Doc(`
 		SELECT
 			DISTINCT name,
@@ -77,7 +77,7 @@ func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([
 		`,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 

@@ -122,7 +122,7 @@ func (c *Creator) CreateServiceShard(shard api.IShard) *core.Service {
 }
 
 // CreateServiceHost creates new core.Service for specified host
-func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
+func (c *Creator) CreateServiceHost(host *api.Host) *core.Service {
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -159,7 +159,7 @@ func (c *Creator) CreateServiceHost(host *api.ChiHost) *core.Service {
 	return svc
 }
 
-func appendServicePorts(service *core.Service, host *api.ChiHost) {
+func appendServicePorts(service *core.Service, host *api.Host) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
 	config.HostWalkAssignedPorts(
 		host,

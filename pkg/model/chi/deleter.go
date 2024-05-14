@@ -21,7 +21,7 @@ import (
 )
 
 // HostCanDeletePVC checks whether PVC on a host can be deleted
-func HostCanDeletePVC(host *api.ChiHost, pvcName string) bool {
+func HostCanDeletePVC(host *api.Host, pvcName string) bool {
 	// In any unknown cases just delete PVC with unclear bindings
 	policy := api.PVCReclaimPolicyDelete
 
@@ -46,7 +46,7 @@ func HostCanDeletePVC(host *api.ChiHost, pvcName string) bool {
 }
 
 // HostCanDeleteAllPVCs checks whether all PVCs can be deleted
-func HostCanDeleteAllPVCs(host *api.ChiHost) bool {
+func HostCanDeleteAllPVCs(host *api.Host) bool {
 	canDeleteAllPVCs := true
 	host.GetCHI().WalkVolumeClaimTemplates(func(template *api.VolumeClaimTemplate) {
 		if getPVCReclaimPolicy(host, template) == api.PVCReclaimPolicyRetain {

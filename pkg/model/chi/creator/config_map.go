@@ -60,7 +60,7 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *core.ConfigMap {
 }
 
 // CreateConfigMapHost creates new core.ConfigMap
-func (c *Creator) CreateConfigMapHost(host *api.ChiHost) *core.ConfigMap {
+func (c *Creator) CreateConfigMapHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapHostName(host),
