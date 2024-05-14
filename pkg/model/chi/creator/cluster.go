@@ -16,8 +16,23 @@ package creator
 
 import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
-// NewDefaultCluster
-func NewDefaultCluster() *api.Cluster {
+type ClusterType string
+
+const (
+	ClusterCHIDefault ClusterType = "chi cluster default"
+)
+
+func CreateCluster(what ClusterType) *api.Cluster {
+	switch what {
+	case ClusterCHIDefault:
+		return createDefaultCluster()
+	default:
+		return nil
+	}
+}
+
+// createDefaultCluster
+func createDefaultCluster() *api.Cluster {
 	return &api.Cluster{
 		Name: "cluster",
 	}

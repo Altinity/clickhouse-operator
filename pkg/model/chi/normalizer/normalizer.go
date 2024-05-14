@@ -612,7 +612,7 @@ func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 	// In case no clusters available, we may want to create a default one
 	if n.ctx.Options().WithDefaultCluster {
 		return []*api.Cluster{
-			creator.NewDefaultCluster(),
+			creator.CreateCluster(creator.ClusterCHIDefault),
 		}
 	}
 
@@ -1159,7 +1159,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	if cluster == nil {
-		cluster = creator.NewDefaultCluster()
+		cluster = creator.CreateCluster(creator.ClusterCHIDefault)
 	}
 
 	// Runtime has to be prepared first
