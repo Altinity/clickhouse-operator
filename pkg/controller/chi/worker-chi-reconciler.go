@@ -499,7 +499,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 		}
 	}
 
-	pdb := w.task.creator.NewPodDisruptionBudget(cluster)
+	pdb := w.task.creator.CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
 		w.task.registryReconciled.RegisterPDB(pdb.GetObjectMeta())
 	} else {

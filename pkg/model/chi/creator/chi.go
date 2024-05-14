@@ -20,7 +20,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func NewCHI() *api.ClickHouseInstallation {
+func CreateCHI() *api.ClickHouseInstallation {
 	return &api.ClickHouseInstallation{
 		TypeMeta: meta.TypeMeta{
 			Kind:       api.ClickHouseInstallationCRDResourceKind,

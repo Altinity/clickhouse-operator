@@ -20,18 +20,18 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// getOwnerReferences gets MULTIPLE owner references
-func getOwnerReferences(owner api.IChi) []meta.OwnerReference {
+// createOwnerReferences gets MULTIPLE owner references
+func createOwnerReferences(owner api.IChi) []meta.OwnerReference {
 	if owner.GetRuntime().GetAttributes().GetSkipOwnerRef() {
 		return nil
 	}
 	return []meta.OwnerReference{
-		getOwnerReference(owner.GetObjectMeta()),
+		createOwnerReference(owner.GetObjectMeta()),
 	}
 }
 
-// getOwnerReference gets ONE owner reference
-func getOwnerReference(m meta.Object) meta.OwnerReference {
+// createOwnerReference gets ONE owner reference
+func createOwnerReference(m meta.Object) meta.OwnerReference {
 	controller := true
 	block := true
 	return meta.OwnerReference{

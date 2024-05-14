@@ -26,7 +26,7 @@ const (
 	HostTemplateHostNetwork HostTemplateType = "ht host net"
 )
 
-func NewHostTemplate(what HostTemplateType, name string) *api.HostTemplate {
+func CreateHostTemplate(what HostTemplateType, name string) *api.HostTemplate {
 	switch what {
 	case HostTemplateCommon:
 		return newDefaultHostTemplate(name)

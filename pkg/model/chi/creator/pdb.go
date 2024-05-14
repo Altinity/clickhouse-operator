@@ -25,15 +25,15 @@ import (
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-// NewPodDisruptionBudget creates new PodDisruptionBudget
-func (c *Creator) NewPodDisruptionBudget(cluster api.ICluster) *policy.PodDisruptionBudget {
+// CreatePodDisruptionBudget creates new PodDisruptionBudget
+func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDisruptionBudget {
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetRootName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetClusterScope(cluster)),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetClusterScope(cluster)),
-			OwnerReferences: getOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector: &meta.LabelSelector{

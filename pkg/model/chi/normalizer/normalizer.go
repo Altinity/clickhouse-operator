@@ -91,7 +91,7 @@ func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSub
 }
 
 func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
-	return creator.NewCHI()
+	return creator.CreateCHI()
 }
 
 func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
@@ -188,13 +188,13 @@ func hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = creator.NewHostTemplate(creator.HostTemplateHostNetwork, model.CreateHostTemplateName(host))
+			hostTemplate = creator.CreateHostTemplate(creator.HostTemplateHostNetwork, model.CreateHostTemplateName(host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = creator.NewHostTemplate(creator.HostTemplateCommon, model.CreateHostTemplateName(host))
+		hostTemplate = creator.CreateHostTemplate(creator.HostTemplateCommon, model.CreateHostTemplateName(host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)

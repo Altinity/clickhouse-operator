@@ -60,7 +60,7 @@ func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFiles
 			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommon()),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetConfigMapCHICommon()),
-			OwnerReferences: getOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFilesGroupCommon(options),
@@ -78,7 +78,7 @@ func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommonUsers()),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetConfigMapCHICommonUsers()),
-			OwnerReferences: getOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFilesGroupUsers(),
@@ -96,7 +96,7 @@ func (c *Creator) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          model.Macro(host).Map(c.labels.GetConfigMapHost(host)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetConfigMapHost(host)),
-			OwnerReferences: getOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFilesGroupHost(host),

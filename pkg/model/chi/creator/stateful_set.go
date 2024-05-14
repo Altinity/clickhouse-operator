@@ -35,7 +35,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          model.Macro(host).Map(c.labels.GetHostScope(host, true)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetHostScope(host)),
-			OwnerReferences: getOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
@@ -249,19 +249,19 @@ func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.Statefu
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		newVolumeForConfigMap(configMapCommonName),
-		newVolumeForConfigMap(configMapCommonUsersName),
-		newVolumeForConfigMap(configMapHostName),
-		//newVolumeForConfigMap(configMapHostMigrationName),
+		createVolumeForConfigMap(configMapCommonName),
+		createVolumeForConfigMap(configMapCommonUsersName),
+		createVolumeForConfigMap(configMapHostName),
+		//createVolumeForConfigMap(configMapHostMigrationName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have ConfigMaps mounted as Volumes
 	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
-		newVolumeMount(configMapCommonName, config.DirPathCommonConfig),
-		newVolumeMount(configMapCommonUsersName, config.DirPathUsersConfig),
-		newVolumeMount(configMapHostName, config.DirPathHostConfig),
+		createVolumeMount(configMapCommonName, config.DirPathCommonConfig),
+		createVolumeMount(configMapCommonUsersName, config.DirPathUsersConfig),
+		createVolumeMount(configMapHostName, config.DirPathHostConfig),
 	)
 }
 
@@ -312,11 +312,11 @@ func (c *Creator) statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates
 		container := &statefulSet.Spec.Template.Spec.Containers[i]
 		k8s.ContainerAppendVolumeMounts(
 			container,
-			newVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseData),
+			createVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseData),
 		)
 		k8s.ContainerAppendVolumeMounts(
 			container,
-			newVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseLog),
+			createVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseLog),
 		)
 	}
 }
@@ -421,7 +421,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 		claimName := model.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
 		statefulSet.Spec.Template.Spec.Volumes = append(
 			statefulSet.Spec.Template.Spec.Volumes,
-			newVolumeForPVC(volumeClaimTemplate.Name, claimName),
+			createVolumeForPVC(volumeClaimTemplate.Name, claimName),
 		)
 	} else {
 		statefulSet.Spec.VolumeClaimTemplates = append(

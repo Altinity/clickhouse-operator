@@ -75,7 +75,7 @@ func (c *Creator) createServiceCHI() *core.Service {
 			c.labels.GetServiceCHI(c.chi),
 			c.annotations.GetServiceCHI(c.chi),
 			c.labels.GetSelectorCHIScopeReady(),
-			getOwnerReferences(c.chi),
+			createOwnerReferences(c.chi),
 			model.Macro(c.chi),
 		)
 	}
@@ -88,7 +88,7 @@ func (c *Creator) createServiceCHI() *core.Service {
 			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetServiceCHI(c.chi)),
 			Annotations:     model.Macro(c.chi).Map(c.annotations.GetServiceCHI(c.chi)),
-			OwnerReferences: getOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: core.ServiceSpec{
 			ClusterIP: model.TemplateDefaultsServiceClusterIP,
@@ -118,7 +118,7 @@ func (c *Creator) createServiceCHI() *core.Service {
 // createServiceCluster creates new core.Service for specified Cluster
 func (c *Creator) createServiceCluster(cluster api.ICluster) *core.Service {
 	serviceName := model.CreateClusterServiceName(cluster)
-	ownerReferences := getOwnerReferences(c.chi)
+	ownerReferences := createOwnerReferences(c.chi)
 
 	c.a.V(1).F().Info("%s/%s", cluster.GetRuntime().GetAddress().GetNamespace(), serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
@@ -149,7 +149,7 @@ func (c *Creator) createServiceShard(shard api.IShard) *core.Service {
 			c.labels.GetServiceShard(shard),
 			c.annotations.GetServiceShard(shard),
 			model.GetSelectorShardScopeReady(shard),
-			getOwnerReferences(c.chi),
+			createOwnerReferences(c.chi),
 			model.Macro(shard),
 		)
 	}
@@ -168,7 +168,7 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 			c.labels.GetServiceHost(host),
 			c.annotations.GetServiceHost(host),
 			model.GetSelectorHostScope(host),
-			getOwnerReferences(c.chi),
+			createOwnerReferences(c.chi),
 			model.Macro(host),
 		)
 	}
@@ -181,7 +181,7 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          model.Macro(host).Map(c.labels.GetServiceHost(host)),
 			Annotations:     model.Macro(host).Map(c.annotations.GetServiceHost(host)),
-			OwnerReferences: getOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: core.ServiceSpec{
 			Selector:                 model.GetSelectorHostScope(host),

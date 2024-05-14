@@ -20,8 +20,8 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// newVolumeForPVC returns core.Volume object with defined name
-func newVolumeForPVC(name, claimName string) core.Volume {
+// createVolumeForPVC returns core.Volume object with defined name
+func createVolumeForPVC(name, claimName string) core.Volume {
 	return core.Volume{
 		Name: name,
 		VolumeSource: core.VolumeSource{
@@ -33,8 +33,8 @@ func newVolumeForPVC(name, claimName string) core.Volume {
 	}
 }
 
-// newVolumeForConfigMap returns core.Volume object with defined name
-func newVolumeForConfigMap(name string) core.Volume {
+// createVolumeForConfigMap returns core.Volume object with defined name
+func createVolumeForConfigMap(name string) core.Volume {
 	var defaultMode int32 = 0644
 	return core.Volume{
 		Name: name,
@@ -49,8 +49,8 @@ func newVolumeForConfigMap(name string) core.Volume {
 	}
 }
 
-// newVolumeMount returns core.VolumeMount object with name and mount path
-func newVolumeMount(name, mountPath string) core.VolumeMount {
+// createVolumeMount returns core.VolumeMount object with name and mount path
+func createVolumeMount(name, mountPath string) core.VolumeMount {
 	return core.VolumeMount{
 		Name:      name,
 		MountPath: mountPath,
