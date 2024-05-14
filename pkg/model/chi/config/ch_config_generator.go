@@ -125,6 +125,12 @@ func (c *ClickHouseConfigGenerator) getHostZookeeper(host *api.ChiHost) string {
 	for i := range zk.Nodes {
 		// Convenience wrapper
 		node := &zk.Nodes[i]
+
+		if !node.Port.IsValid() {
+			// Node has to have correct port specified
+			continue
+		}
+
 		// <node>
 		//		<host>HOST</host>
 		//		<port>PORT</port>
@@ -132,7 +138,7 @@ func (c *ClickHouseConfigGenerator) getHostZookeeper(host *api.ChiHost) string {
 		// </node>
 		util.Iline(b, 8, "<node>")
 		util.Iline(b, 8, "    <host>%s</host>", node.Host)
-		util.Iline(b, 8, "    <port>%d</port>", node.Port)
+		util.Iline(b, 8, "    <port>%d</port>", node.Port.Value())
 		if node.Secure.HasValue() {
 			util.Iline(b, 8, "    <secure>%d</secure>", c.getSecure(node))
 		}

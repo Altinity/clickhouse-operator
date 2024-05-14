@@ -630,8 +630,8 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig)
 	for i := range zk.Nodes {
 		// Convenience wrapper
 		node := &zk.Nodes[i]
-		if api.IsPortUnassigned(node.Port) {
-			node.Port = config.ZkDefaultPort
+		if !node.Port.IsValid() {
+			node.Port = api.NewInt32(config.ZkDefaultPort)
 		}
 	}
 

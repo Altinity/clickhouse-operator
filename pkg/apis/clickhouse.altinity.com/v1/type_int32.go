@@ -95,3 +95,24 @@ func (i *Int32) MergeFrom(from *Int32) *Int32 {
 	// Prefer local value
 	return i
 }
+
+// Equal checks whether is equal to another
+func (i *Int32) Equal(to *Int32) bool {
+	if (i == nil) && (to == nil) {
+		// Consider nil equal
+		return true
+	}
+
+	return i.EqualValue(to)
+}
+
+// EqualValue checks whether has equal values
+func (i *Int32) EqualValue(to *Int32) bool {
+	if !i.HasValue() || !to.HasValue() {
+		// Need to compare values only
+		return false
+	}
+
+	// Both have value available, comparable
+	return i.Value() == to.Value()
+}

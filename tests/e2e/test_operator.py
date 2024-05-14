@@ -1303,6 +1303,7 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 
     return chi_shards
 
+
 def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wait = False):
     with Given(f"Cluster {cluster} is properly configured"):
         if current().context.operator_version >= "0.24" and force_wait == False:
@@ -3405,6 +3406,7 @@ def test_032(self):
     # remote_servers = kubectl.get("configmap", f"chi-{chi}-common-configd")["data"]["chop-generated-remote_servers.xml"]
     # print(remote_servers)
     wait_for_cluster(chi, 'default', 2, 2)
+    time.sleep(60)
 
     with Given("Create replicated and distributed tables"):
         clickhouse.query(chi, create_table)
@@ -3413,6 +3415,7 @@ def test_032(self):
             "CREATE TABLE test_distr_032 ON CLUSTER 'default' AS test_local_032 Engine = Distributed('default', default, test_local_032, a%2)",
         )
         clickhouse.query(chi, f"INSERT INTO test_distr_032 select * from numbers({numbers})")
+        time.sleep(60)
 
         with Then("Distributed table is created on all nodes"):
             cnt = clickhouse.query(chi_name=chi, sql="select count() from cluster('all-sharded', system.tables) where name='test_distr_032'")
