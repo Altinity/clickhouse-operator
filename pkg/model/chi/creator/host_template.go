@@ -19,8 +19,26 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 )
 
-// NewDefaultHostTemplate returns default Host Template to be used with StatefulSet
-func NewDefaultHostTemplate(name string) *api.HostTemplate {
+type HostTemplateType string
+
+const (
+	HostTemplateCommon      HostTemplateType = "ht common"
+	HostTemplateHostNetwork HostTemplateType = "ht host net"
+)
+
+func NewHostTemplate(what HostTemplateType, name string) *api.HostTemplate {
+	switch what {
+	case HostTemplateCommon:
+		return newDefaultHostTemplate(name)
+	case HostTemplateHostNetwork:
+		return newDefaultHostTemplateForHostNetwork(name)
+	default:
+		return nil
+	}
+}
+
+// newDefaultHostTemplate returns default Host Template to be used with StatefulSet
+func newDefaultHostTemplate(name string) *api.HostTemplate {
 	return &api.HostTemplate{
 		Name: name,
 		PortDistribution: []api.PortDistribution{
@@ -31,8 +49,8 @@ func NewDefaultHostTemplate(name string) *api.HostTemplate {
 	}
 }
 
-// NewDefaultHostTemplateForHostNetwork
-func NewDefaultHostTemplateForHostNetwork(name string) *api.HostTemplate {
+// newDefaultHostTemplateForHostNetwork
+func newDefaultHostTemplateForHostNetwork(name string) *api.HostTemplate {
 	return &api.HostTemplate{
 		Name: name,
 		PortDistribution: []api.PortDistribution{

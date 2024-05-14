@@ -188,13 +188,13 @@ func hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = creator.NewDefaultHostTemplateForHostNetwork(model.CreateHostTemplateName(host))
+			hostTemplate = creator.NewHostTemplate(creator.HostTemplateHostNetwork, model.CreateHostTemplateName(host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = creator.NewDefaultHostTemplate(model.CreateHostTemplateName(host))
+		hostTemplate = creator.NewHostTemplate(creator.HostTemplateCommon, model.CreateHostTemplateName(host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)

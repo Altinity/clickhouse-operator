@@ -20,6 +20,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
+// getOwnerReferences gets MULTIPLE owner references
 func getOwnerReferences(owner api.IChi) []meta.OwnerReference {
 	if owner.GetRuntime().GetAttributes().GetSkipOwnerRef() {
 		return nil
@@ -29,6 +30,7 @@ func getOwnerReferences(owner api.IChi) []meta.OwnerReference {
 	}
 }
 
+// getOwnerReference gets ONE owner reference
 func getOwnerReference(m meta.Object) meta.OwnerReference {
 	controller := true
 	block := true
