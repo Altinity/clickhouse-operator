@@ -22,6 +22,26 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+type AnnotateType string
+
+const (
+	AnnotateConfigMapCommon AnnotateType = "annotate cm common"
+	AnnotateConfigMapHost   AnnotateType = "annotate cm host"
+
+	AnnotateServiceCHI     AnnotateType = "annotate svc chi"
+	AnnotateServiceCluster AnnotateType = "annotate svc cluster"
+	AnnotateServiceShard   AnnotateType = "annotate svc shard"
+	AnnotateServiceHost    AnnotateType = "annotate svc host"
+
+	AnnotateExistingPV  AnnotateType = "annotate existing pv"
+	AnnotateNewPVC      AnnotateType = "annotate new pvc"
+	AnnotateExistingPVC AnnotateType = "annotate existing pvc"
+
+	AnnotatePDB AnnotateType = "annotate pdb"
+
+	AnnotateSTS AnnotateType = "annotate STS"
+)
+
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
 	chi api.IChi
@@ -34,60 +54,90 @@ func NewAnnotator(chi api.IChi) *Annotator {
 	}
 }
 
-// GetConfigMapCHICommon
-func (a *Annotator) GetConfigMapCHICommon() map[string]string {
-	return util.MergeStringMapsOverwrite(
-		a.getCHIScope(),
-		nil,
-	)
-}
+func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string {
+	switch what {
+	case AnnotateConfigMapCommon:
+		return a.getCHIScope()
+	case AnnotateConfigMapHost:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+		}
+		return a.getHostScope(host)
 
-// GetConfigMapCHICommonUsers
-func (a *Annotator) GetConfigMapCHICommonUsers() map[string]string {
-	return util.MergeStringMapsOverwrite(
-		a.getCHIScope(),
-		nil,
-	)
-}
+	case AnnotateServiceCHI:
+		return a.getCHIScope()
+	case AnnotateServiceCluster:
+		var cluster api.ICluster
+		if len(params) > 0 {
+			cluster = params[0].(api.ICluster)
+		}
+		return a.getClusterScope(cluster)
+	case AnnotateServiceShard:
+		var shard api.IShard
+		if len(params) > 0 {
+			shard = params[0].(api.IShard)
+		}
+		return a.getShardScope(shard)
+	case AnnotateServiceHost:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+		}
+		return a.getHostScope(host)
 
-// GetConfigMapHost
-func (a *Annotator) GetConfigMapHost(host *api.Host) map[string]string {
-	return util.MergeStringMapsOverwrite(
-		a.GetHostScope(host),
-		nil,
-	)
-}
+	case AnnotateExistingPV:
+		var pv *core.PersistentVolume
+		var host *api.Host
+		if len(params) > 1 {
+			pv = params[0].(*core.PersistentVolume)
+			host = params[1].(*api.Host)
+		}
+		// Merge annotations from
+		// 1. Existing PV
+		// 2. Scope
+		return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.getHostScope(host))
 
-// GetServiceCHI
-func (a *Annotator) GetServiceCHI(chi api.IChi) map[string]string {
-	return util.MergeStringMapsOverwrite(
-		a.getCHIScope(),
-		nil,
-	)
-}
+	case AnnotateNewPVC:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+		}
+		return a.getHostScope(host)
 
-// GetServiceCluster
-func (a *Annotator) GetServiceCluster(cluster api.ICluster) map[string]string {
-	return util.MergeStringMapsOverwrite(
-		a.GetClusterScope(cluster),
-		nil,
-	)
-}
+	case AnnotateExistingPVC:
+		var pvc *core.PersistentVolumeClaim
+		var host *api.Host
+		var template *api.VolumeClaimTemplate
+		if len(params) > 2 {
+			pvc = params[0].(*core.PersistentVolumeClaim)
+			host = params[1].(*api.Host)
+			template = params[2].(*api.VolumeClaimTemplate)
+		}
+		// Merge annotations from
+		// 1. Template
+		// 2. Existing PVC
+		// 3. Scope
+		annotations := util.MergeStringMapsOverwrite(pvc.GetAnnotations(), template.ObjectMeta.GetAnnotations())
+		return util.MergeStringMapsOverwrite(annotations, a.getHostScope(host))
 
-// GetServiceShard
-func (a *Annotator) GetServiceShard(shard api.IShard) map[string]string {
-	return util.MergeStringMapsOverwrite(
-		a.getShardScope(shard),
-		nil,
-	)
-}
+	case AnnotatePDB:
+		var cluster api.ICluster
+		if len(params) > 0 {
+			cluster = params[0].(api.ICluster)
+		}
+		return a.getClusterScope(cluster)
 
-// GetServiceHost
-func (a *Annotator) GetServiceHost(host *api.Host) map[string]string {
-	return util.MergeStringMapsOverwrite(
-		a.GetHostScope(host),
-		nil,
-	)
+	case AnnotateSTS:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+		}
+		return a.getHostScope(host)
+
+	default:
+		return nil
+	}
 }
 
 // getCHIScope gets annotations for CHI-scoped object
@@ -96,8 +146,8 @@ func (a *Annotator) getCHIScope() map[string]string {
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
-// GetClusterScope gets annotations for Cluster-scoped object
-func (a *Annotator) GetClusterScope(cluster api.ICluster) map[string]string {
+// getClusterScope gets annotations for Cluster-scoped object
+func (a *Annotator) getClusterScope(cluster api.ICluster) map[string]string {
 	// Combine generated annotations and CHI-provided annotations
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
@@ -108,8 +158,8 @@ func (a *Annotator) getShardScope(shard api.IShard) map[string]string {
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
-// GetHostScope gets annotations for Host-scoped object
-func (a *Annotator) GetHostScope(host *api.Host) map[string]string {
+// getHostScope gets annotations for Host-scoped object
+func (a *Annotator) getHostScope(host *api.Host) map[string]string {
 	return a.filterOutPredefined(a.appendCHIProvidedTo(nil))
 }
 
@@ -122,19 +172,4 @@ func (a *Annotator) filterOutPredefined(m map[string]string) map[string]string {
 func (a *Annotator) appendCHIProvidedTo(dst map[string]string) map[string]string {
 	source := util.CopyMapFilter(a.chi.GetAnnotations(), chop.Config().Annotation.Include, chop.Config().Annotation.Exclude)
 	return util.MergeStringMapsOverwrite(dst, source)
-}
-
-// GetPV
-func (a *Annotator) GetPV(pv *core.PersistentVolume, host *api.Host) map[string]string {
-	return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.GetHostScope(host))
-}
-
-// GetPVC
-func (a *Annotator) GetPVC(
-	pvc *core.PersistentVolumeClaim,
-	host *api.Host,
-	template *api.VolumeClaimTemplate,
-) map[string]string {
-	annotations := util.MergeStringMapsOverwrite(pvc.GetAnnotations(), template.ObjectMeta.GetAnnotations())
-	return util.MergeStringMapsOverwrite(annotations, a.GetHostScope(host))
 }

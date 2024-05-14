@@ -34,7 +34,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 			Name:            model.CreateStatefulSetName(host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          model.Macro(host).Map(c.labels.GetHostScope(host, true)),
-			Annotations:     model.Macro(host).Map(c.annotations.GetHostScope(host)),
+			Annotations:     model.Macro(host).Map(c.annotations.Annotate(model.AnnotateSTS, host)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: apps.StatefulSetSpec{
@@ -343,7 +343,7 @@ func (c *Creator) statefulSetApplyPodTemplate(
 				template.ObjectMeta.GetLabels(),
 			)),
 			Annotations: model.Macro(host).Map(util.MergeStringMapsOverwrite(
-				c.annotations.GetHostScope(host),
+				c.annotations.Annotate(model.AnnotateSTS, host),
 				template.ObjectMeta.GetAnnotations(),
 			)),
 		},

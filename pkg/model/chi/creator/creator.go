@@ -26,38 +26,27 @@ type labeler interface {
 	GetConfigMapCHICommon() map[string]string
 	GetConfigMapCHICommonUsers() map[string]string
 	GetConfigMapHost(host *api.Host) map[string]string
-	GetClusterScope(cluster api.ICluster) map[string]string
+	GetServiceCHI(chi api.IChi) map[string]string
+	GetServiceCluster(cluster api.ICluster) map[string]string
+	GetServiceHost(host *api.Host) map[string]string
+	GetServiceShard(shard api.IShard) map[string]string
+
 	GetPV(pv *core.PersistentVolume, host *api.Host) map[string]string
-	GetHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string
 	GetPVC(
 		pvc *core.PersistentVolumeClaim,
 		host *api.Host,
 		template *api.VolumeClaimTemplate,
 	) map[string]string
-	GetServiceCHI(chi api.IChi) map[string]string
-	GetSelectorCHIScopeReady() map[string]string
-	GetServiceCluster(cluster api.ICluster) map[string]string
-	GetServiceHost(host *api.Host) map[string]string
-	GetServiceShard(shard api.IShard) map[string]string
+
+	GetClusterScope(cluster api.ICluster) map[string]string
+	GetHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string
 	GetHostScopeReady(host *api.Host, applySupplementaryServiceLabels bool) map[string]string
+
+	GetSelectorCHIScopeReady() map[string]string
 }
 
 type annotator interface {
-	GetConfigMapCHICommon() map[string]string
-	GetConfigMapCHICommonUsers() map[string]string
-	GetConfigMapHost(host *api.Host) map[string]string
-	GetClusterScope(cluster api.ICluster) map[string]string
-	GetPV(pv *core.PersistentVolume, host *api.Host) map[string]string
-	GetHostScope(host *api.Host) map[string]string
-	GetPVC(
-		pvc *core.PersistentVolumeClaim,
-		host *api.Host,
-		template *api.VolumeClaimTemplate,
-	) map[string]string
-	GetServiceCHI(chi api.IChi) map[string]string
-	GetServiceCluster(cluster api.ICluster) map[string]string
-	GetServiceHost(host *api.Host) map[string]string
-	GetServiceShard(shard api.IShard) map[string]string
+	Annotate(what model.AnnotateType, params ...any) map[string]string
 }
 
 // Creator specifies creator object

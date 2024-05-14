@@ -29,7 +29,7 @@ func (c *Creator) PreparePersistentVolumeClaim(
 	template *api.VolumeClaimTemplate,
 ) *core.PersistentVolumeClaim {
 	pvc.SetLabels(model.Macro(host).Map(c.labels.GetPVC(pvc, host, template)))
-	pvc.SetAnnotations(model.Macro(host).Map(c.annotations.GetPVC(pvc, host, template)))
+	pvc.SetAnnotations(model.Macro(host).Map(c.annotations.Annotate(model.AnnotateExistingPVC, pvc, host, template)))
 	// And after the object is ready we can put version label
 	model.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
@@ -57,7 +57,7 @@ func (c *Creator) createPVC(
 			// Right now we hit the following error:
 			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
 			Labels:      model.Macro(host).Map(c.labels.GetHostScope(host, false)),
-			Annotations: model.Macro(host).Map(c.annotations.GetHostScope(host)),
+			Annotations: model.Macro(host).Map(c.annotations.Annotate(model.AnnotateNewPVC, host)),
 		},
 		// Append copy of PersistentVolumeClaimSpec
 		Spec: *spec.DeepCopy(),

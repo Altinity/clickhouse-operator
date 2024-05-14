@@ -59,7 +59,7 @@ func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFiles
 			Name:            model.CreateConfigMapCommonName(c.chi),
 			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommon()),
-			Annotations:     model.Macro(c.chi).Map(c.annotations.GetConfigMapCHICommon()),
+			Annotations:     model.Macro(c.chi).Map(c.annotations.Annotate(model.AnnotateConfigMapCommon)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -77,7 +77,7 @@ func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 			Name:            model.CreateConfigMapCommonUsersName(c.chi),
 			Namespace:       c.chi.GetNamespace(),
 			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommonUsers()),
-			Annotations:     model.Macro(c.chi).Map(c.annotations.GetConfigMapCHICommonUsers()),
+			Annotations:     model.Macro(c.chi).Map(c.annotations.Annotate(model.AnnotateConfigMapCommon)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -95,7 +95,7 @@ func (c *Creator) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 			Name:            model.CreateConfigMapHostName(host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          model.Macro(host).Map(c.labels.GetConfigMapHost(host)),
-			Annotations:     model.Macro(host).Map(c.annotations.GetConfigMapHost(host)),
+			Annotations:     model.Macro(host).Map(c.annotations.Annotate(model.AnnotateConfigMapHost, host)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
