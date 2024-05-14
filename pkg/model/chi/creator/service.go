@@ -28,8 +28,44 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// CreateServiceCHI creates new core.Service for specified CHI
-func (c *Creator) CreateServiceCHI() *core.Service {
+type ServiceType string
+
+const (
+	ServiceCHI        ServiceType = "svc chi"
+	ServiceCHICluster ServiceType = "svc chi cluster"
+	ServiceCHIShard   ServiceType = "svc chi shard"
+	ServiceCHIHost    ServiceType = "svc chi host"
+)
+
+func (c *Creator) CreateService(what ServiceType, params ...any) *core.Service {
+	switch what {
+	case ServiceCHI:
+		return c.createServiceCHI()
+	case ServiceCHICluster:
+		var cluster api.ICluster
+		if len(params) > 0 {
+			cluster = params[0].(api.ICluster)
+		}
+		return c.createServiceCluster(cluster)
+	case ServiceCHIShard:
+		var shard api.IShard
+		if len(params) > 0 {
+			shard = params[0].(api.IShard)
+		}
+		return c.createServiceShard(shard)
+	case ServiceCHIHost:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+		}
+		return c.createServiceHost(host)
+	default:
+		return nil
+	}
+}
+
+// createServiceCHI creates new core.Service for specified CHI
+func (c *Creator) createServiceCHI() *core.Service {
 	if template, ok := c.chi.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -79,8 +115,8 @@ func (c *Creator) CreateServiceCHI() *core.Service {
 	return svc
 }
 
-// CreateServiceCluster creates new core.Service for specified Cluster
-func (c *Creator) CreateServiceCluster(cluster api.ICluster) *core.Service {
+// createServiceCluster creates new core.Service for specified Cluster
+func (c *Creator) createServiceCluster(cluster api.ICluster) *core.Service {
 	serviceName := model.CreateClusterServiceName(cluster)
 	ownerReferences := getOwnerReferences(c.chi)
 
@@ -102,8 +138,8 @@ func (c *Creator) CreateServiceCluster(cluster api.ICluster) *core.Service {
 	return nil
 }
 
-// CreateServiceShard creates new core.Service for specified Shard
-func (c *Creator) CreateServiceShard(shard api.IShard) *core.Service {
+// createServiceShard creates new core.Service for specified Shard
+func (c *Creator) createServiceShard(shard api.IShard) *core.Service {
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
@@ -121,8 +157,8 @@ func (c *Creator) CreateServiceShard(shard api.IShard) *core.Service {
 	return nil
 }
 
-// CreateServiceHost creates new core.Service for specified host
-func (c *Creator) CreateServiceHost(host *api.Host) *core.Service {
+// createServiceHost creates new core.Service for specified host
+func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
