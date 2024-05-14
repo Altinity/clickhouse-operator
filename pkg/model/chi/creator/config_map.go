@@ -23,8 +23,37 @@ import (
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
-// CreateConfigMapCHICommon creates new core.ConfigMap
-func (c *Creator) CreateConfigMapCHICommon(options *config.ClickHouseConfigFilesGeneratorOptions) *core.ConfigMap {
+type ConfigMapType string
+
+const (
+	ConfigMapCHICommon      ConfigMapType = "chi common"
+	ConfigMapCHICommonUsers ConfigMapType = "chi common users"
+	ConfigMapCHIHost        ConfigMapType = "chi host"
+)
+
+func (c *Creator) CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap {
+	switch what {
+	case ConfigMapCHICommon:
+		var options *config.ClickHouseConfigFilesGeneratorOptions
+		if len(params) > 0 {
+			options = params[0].(*config.ClickHouseConfigFilesGeneratorOptions)
+		}
+		return c.createConfigMapCHICommon(options)
+	case ConfigMapCHICommonUsers:
+		return c.createConfigMapCHICommonUsers()
+	case ConfigMapCHIHost:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+		}
+		return c.createConfigMapCHIHost(host)
+	default:
+		return nil
+	}
+}
+
+// createConfigMapCHICommon creates new core.ConfigMap
+func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapCommonName(c.chi),
@@ -41,8 +70,8 @@ func (c *Creator) CreateConfigMapCHICommon(options *config.ClickHouseConfigFiles
 	return cm
 }
 
-// CreateConfigMapCHICommonUsers creates new core.ConfigMap
-func (c *Creator) CreateConfigMapCHICommonUsers() *core.ConfigMap {
+// createConfigMapCHICommonUsers creates new core.ConfigMap
+func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapCommonUsersName(c.chi),
@@ -59,8 +88,8 @@ func (c *Creator) CreateConfigMapCHICommonUsers() *core.ConfigMap {
 	return cm
 }
 
-// CreateConfigMapHost creates new core.ConfigMap
-func (c *Creator) CreateConfigMapHost(host *api.Host) *core.ConfigMap {
+// createConfigMapCHIHost creates new core.ConfigMap
+func (c *Creator) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            model.CreateConfigMapHostName(host),

@@ -28,9 +28,6 @@ func NewDefaultHostTemplate(name string) *api.HostTemplate {
 				Type: deployment.PortDistributionUnspecified,
 			},
 		},
-		Spec: api.Host{
-			Name: "",
-		},
 	}
 }
 
@@ -42,9 +39,6 @@ func NewDefaultHostTemplateForHostNetwork(name string) *api.HostTemplate {
 			{
 				Type: deployment.PortDistributionClusterScopeIndex,
 			},
-		},
-		Spec: api.Host{
-			Name: "",
 		},
 	}
 }

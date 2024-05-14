@@ -263,7 +263,7 @@ func (w *worker) reconcileCHIConfigMapCommon(
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.task.creator.CreateConfigMapCHICommon(options)
+	configMapCommon := w.task.creator.CreateConfigMap(creator.ConfigMapCHICommon, options)
 	err := w.reconcileConfigMap(ctx, chi, configMapCommon)
 	if err == nil {
 		w.task.registryReconciled.RegisterConfigMap(configMapCommon.GetObjectMeta())
@@ -282,7 +282,7 @@ func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *api.ClickH
 	}
 
 	// ConfigMap common for all users resources in CHI
-	configMapUsers := w.task.creator.CreateConfigMapCHICommonUsers()
+	configMapUsers := w.task.creator.CreateConfigMap(creator.ConfigMapCHICommonUsers)
 	err := w.reconcileConfigMap(ctx, chi, configMapUsers)
 	if err == nil {
 		w.task.registryReconciled.RegisterConfigMap(configMapUsers.GetObjectMeta())
@@ -300,7 +300,7 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.Host) err
 	}
 
 	// ConfigMap for a host
-	configMap := w.task.creator.CreateConfigMapHost(host)
+	configMap := w.task.creator.CreateConfigMap(creator.ConfigMapCHIHost, host)
 	err := w.reconcileConfigMap(ctx, host.GetCHI(), configMap)
 	if err == nil {
 		w.task.registryReconciled.RegisterConfigMap(configMap.GetObjectMeta())
