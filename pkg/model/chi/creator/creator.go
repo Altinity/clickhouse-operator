@@ -33,6 +33,13 @@ type Creator struct {
 	configFilesGenerator *config.ClickHouseConfigFilesGenerator
 	tagger               tagger
 	a                    log.Announcer
+	// namer
+	// container builder
+	// probes builder
+	// config map volumes
+	// statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates
+	// default pod template builder
+	// port walker
 }
 
 // NewCreator creates new Creator object

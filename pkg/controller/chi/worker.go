@@ -128,7 +128,7 @@ func (w *worker) isConfigurationChangeRequiresReboot(host *api.Host) bool {
 func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	// RollingUpdate purpose is to always shut the host down.
 	// It is such an interesting policy.
-	if host.GetCHI().IsRollingUpdate() {
+	if host.GetCR().IsRollingUpdate() {
 		w.a.V(1).M(host).F().Info("RollingUpdate requires force restart. Host: %s", host.GetName())
 		return true
 	}
@@ -933,8 +933,8 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	}
 
 	w.a.V(1).
-		WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).
-		WithStatusAction(host.GetCHI()).
+		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info(
 			"Adding tables on shard/host:%d/%d cluster:%s",
@@ -943,16 +943,16 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateCompleted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
-		host.GetCHI().EnsureStatus().PushHostTablesCreated(namer.CreateFQDN(host))
+		host.GetCR().EnsureStatus().PushHostTablesCreated(namer.CreateFQDN(host))
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName, err)
@@ -1114,10 +1114,10 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	// Specify in options to exclude this host from ClickHouse config file
-	host.GetCHI().GetRuntime().LockCommonConfig()
+	host.GetCR().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().SetExclude()
-	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), w.options())
-	host.GetCHI().GetRuntime().UnlockCommonConfig()
+	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCR(), w.options())
+	host.GetCR().GetRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitExcludeHost(host) {
 		return
@@ -1139,10 +1139,10 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 
 	// Specify in options to add this host into ClickHouse config file
-	host.GetCHI().GetRuntime().LockCommonConfig()
+	host.GetCR().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().UnsetExclude()
-	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCHI(), w.options())
-	host.GetCHI().GetRuntime().UnlockCommonConfig()
+	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCR(), w.options())
+	host.GetCR().GetRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitIncludeHost(host) {
 		return
@@ -1198,13 +1198,13 @@ func (w *worker) shouldExcludeHost(host *api.Host) bool {
 func (w *worker) shouldWaitExcludeHost(host *api.Host) bool {
 	// Check CHI settings
 	switch {
-	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
 			Info("IsReconcilingPolicyWait() need to wait to exclude host. Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
-	case host.GetCHI().GetReconciling().IsReconcilingPolicyNoWait():
+	case host.GetCR().GetReconciling().IsReconcilingPolicyNoWait():
 		w.a.V(1).
 			M(host).F().
 			Info("IsReconcilingPolicyNoWait() need NOT to wait to exclude host. Host/shard/cluster: %d/%d/%s",
@@ -1236,7 +1236,7 @@ func (w *worker) shouldWaitQueries(host *api.Host) bool {
 				"Host/shard/cluster: %d/%d/%s",
 				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 		return true
-	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
 		w.a.V(1).
 			M(host).F().
 			Info("Will wait for queries to complete on a host according to CHI 'reconciling.policy' setting. "+
@@ -1265,10 +1265,10 @@ func (w *worker) shouldWaitIncludeHost(host *api.Host) bool {
 	case host.GetShard().HostsCount() == 1:
 		// No need to wait one-host-shard
 		return false
-	case host.GetCHI().GetReconciling().IsReconcilingPolicyWait():
+	case host.GetCR().GetReconciling().IsReconcilingPolicyWait():
 		// Check CHI settings - explicitly requested to wait
 		return true
-	case host.GetCHI().GetReconciling().IsReconcilingPolicyNoWait():
+	case host.GetCR().GetReconciling().IsReconcilingPolicyNoWait():
 		// Check CHI settings - explicitly requested to not wait
 		return false
 	}
@@ -1606,16 +1606,16 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.Host, register
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
 
 	w.a.V(1).
-		WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).
-		WithStatusAction(host.GetCHI()).
+		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
 
 	action := w.c.createStatefulSet(ctx, host)
 
 	if register {
-		host.GetCHI().EnsureStatus().HostAdded()
-		_ = w.c.updateCHIObjectStatus(ctx, host.GetCHI(), UpdateCHIStatusOptions{
+		host.GetCR().EnsureStatus().HostAdded()
+		_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
 			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
 				MainFields: true,
 			},
@@ -1625,21 +1625,21 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.Host, register
 	switch action {
 	case nil:
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateCompleted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
 		return nil
 	case errCRUDAbort:
-		w.a.WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
-			WithStatusAction(host.GetCHI()).
-			WithStatusError(host.GetCHI()).
+		w.a.WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.GetCR()).
+			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, action)
 		return action
 	case errCRUDIgnore:
-		w.a.WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
-			WithStatusAction(host.GetCHI()).
+		w.a.WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
 		return nil
@@ -1671,7 +1671,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) b
 
 	// What timeout is expected to be enough for ConfigMap propagation?
 	// In case timeout is not specified, no need to wait
-	timeout := host.GetCHI().GetReconciling().GetConfigMapPropagationTimeoutDuration()
+	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
 	if timeout == 0 {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
 		return false
@@ -1714,8 +1714,8 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 	name := newStatefulSet.Name
 
 	w.a.V(1).
-		WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateStarted).
-		WithStatusAction(host.GetCHI()).
+		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
+		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
@@ -1732,16 +1732,16 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 	switch action {
 	case nil:
 		if register {
-			host.GetCHI().EnsureStatus().HostUpdated()
-			_ = w.c.updateCHIObjectStatus(ctx, host.GetCHI(), UpdateCHIStatusOptions{
+			host.GetCR().EnsureStatus().HostUpdated()
+			_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
 					MainFields: true,
 				},
 			})
 		}
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionUpdate, eventReasonUpdateCompleted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionUpdate, eventReasonUpdateCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
 		return nil
@@ -1752,8 +1752,8 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 		w.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
 		return nil
 	case errCRUDRecreate:
-		w.a.WithEvent(host.GetCHI(), eventActionUpdate, eventReasonUpdateInProgress).
-			WithStatusAction(host.GetCHI()).
+		w.a.WithEvent(host.GetCR(), eventActionUpdate, eventReasonUpdateInProgress).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
 		w.dumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)

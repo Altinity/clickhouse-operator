@@ -279,7 +279,7 @@ func hostApplyPortsFromSettings(host *api.Host) {
 	// Use host personal settings at first
 	hostEnsurePortValuesFromSettings(host, host.GetSettings(), false)
 	// Fallback to common settings
-	hostEnsurePortValuesFromSettings(host, host.GetCHI().GetSpec().Configuration.Settings, true)
+	hostEnsurePortValuesFromSettings(host, host.GetCR().GetSpec().Configuration.Settings, true)
 }
 
 // hostEnsurePortValuesFromSettings fetches port spec from settings, if any provided
@@ -322,7 +322,7 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := namer.CreateCHIServiceFQDN(n.ctx.GetTarget())
+	endpoint := namer.CreateCHIServiceFQDN(n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {

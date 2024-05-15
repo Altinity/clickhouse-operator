@@ -23,9 +23,8 @@ type IChi interface {
 	GetName() string
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
-	GetRuntime() IClickHouseInstallationRuntime
+	GetRuntime() ICustomResourceRuntime
 	GetRootServiceTemplate() (*ServiceTemplate, bool)
-	GetSpec() *ChiSpec
 	GetObjectMeta() meta.Object
 
 	WalkClusters(f func(cluster ICluster) error) []error

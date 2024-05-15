@@ -59,7 +59,7 @@ func newClickHouseInstallationRuntime() *ClickHouseInstallationRuntime {
 	}
 }
 
-type IClickHouseInstallationRuntime interface {
+type ICustomResourceRuntime interface {
 	GetAttributes() *ComparableAttributes
 	LockCommonConfig()
 	UnlockCommonConfig()

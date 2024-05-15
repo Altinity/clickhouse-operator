@@ -22,15 +22,18 @@ import (
 
 // Host defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
 type Host struct {
-	Name      string      `json:"name,omitempty" yaml:"name,omitempty"`
-	Insecure  *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
-	Secure    *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
-	HostPorts `json:",inline"            yaml:",inline"`
-	Settings  *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files     *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
+	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
+	HostSecure   `json:",inline" yaml:",inline"`
+	HostPorts    `json:",inline" yaml:",inline"`
+	HostSettings `json:",inline" yaml:",inline"`
+	Templates    *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
 	Runtime HostRuntime `json:"-" yaml:"-"`
+}
+
+type HostSecure struct {
+	Insecure *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
+	Secure   *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
 }
 
 type HostPorts struct {
@@ -42,6 +45,11 @@ type HostPorts struct {
 	HTTPPort            *Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	HTTPSPort           *Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
 	InterserverHTTPPort *Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+}
+
+type HostSettings struct {
+	Settings *Settings `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files    *Settings `json:"files,omitempty"               yaml:"files,omitempty"`
 }
 
 type HostRuntime struct {
@@ -154,7 +162,7 @@ func (host *Host) GetHostTemplate() (*HostTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetHostTemplate()
-	return host.GetCHI().GetHostTemplate(name)
+	return host.GetCR().GetHostTemplate(name)
 }
 
 // GetPodTemplate gets pod template
@@ -163,7 +171,7 @@ func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetPodTemplate()
-	return host.GetCHI().GetPodTemplate(name)
+	return host.GetCR().GetPodTemplate(name)
 }
 
 // GetServiceTemplate gets service template
@@ -172,7 +180,7 @@ func (host *Host) GetServiceTemplate() (*ServiceTemplate, bool) {
 		return nil, false
 	}
 	name := host.Templates.GetReplicaServiceTemplate()
-	return host.GetCHI().GetServiceTemplate(name)
+	return host.GetCR().GetServiceTemplate(name)
 }
 
 // GetStatefulSetReplicasNum gets stateful set replica num
@@ -208,38 +216,38 @@ func (host *Host) GetName() string {
 	return host.Name
 }
 
-// GetCHI gets CHI
-func (host *Host) GetCHI() *ClickHouseInstallation {
+// GetCR gets CHI
+func (host *Host) GetCR() *ClickHouseInstallation {
 	if host == nil {
 		return nil
 	}
 	return host.Runtime.CHI
 }
 
-// HasCHI checks whether host has CHI
-func (host *Host) HasCHI() bool {
-	return host.GetCHI() != nil
+// HasCR checks whether host has CHI
+func (host *Host) HasCR() bool {
+	return host.GetCR() != nil
 }
 
-func (host *Host) SetCHI(chi *ClickHouseInstallation) {
+func (host *Host) SetCR(chi *ClickHouseInstallation) {
 	host.Runtime.CHI = chi
 }
 
 // GetCluster gets cluster
 func (host *Host) GetCluster() *Cluster {
 	// Host has to have filled Address
-	return host.GetCHI().FindCluster(host.Runtime.Address.ClusterName)
+	return host.GetCR().FindCluster(host.Runtime.Address.ClusterName)
 }
 
 // GetShard gets shard
 func (host *Host) GetShard() *ChiShard {
 	// Host has to have filled Address
-	return host.GetCHI().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
+	return host.GetCR().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
 }
 
 // GetAncestor gets ancestor of a host
 func (host *Host) GetAncestor() *Host {
-	return host.GetCHI().GetAncestor().FindHost(
+	return host.GetCR().GetAncestor().FindHost(
 		host.Runtime.Address.ClusterName,
 		host.Runtime.Address.ShardName,
 		host.Runtime.Address.HostName,
@@ -253,7 +261,7 @@ func (host *Host) HasAncestor() bool {
 
 // GetAncestorCHI gets ancestor of a host
 func (host *Host) GetAncestorCHI() *ClickHouseInstallation {
-	return host.GetCHI().GetAncestor()
+	return host.GetCR().GetAncestor()
 }
 
 // HasAncestorCHI checks whether host has an ancestor
@@ -263,12 +271,12 @@ func (host *Host) HasAncestorCHI() bool {
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
 func (host *Host) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
-	host.GetCHI().WalkVolumeClaimTemplates(f)
+	host.GetCR().WalkVolumeClaimTemplates(f)
 }
 
 // IsStopped checks whether host is stopped
 func (host *Host) IsStopped() bool {
-	return host.GetCHI().IsStopped()
+	return host.GetCR().IsStopped()
 }
 
 // IsNewOne checks whether host is a new one

@@ -21,7 +21,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 )
 
 // PreparePersistentVolumeClaim prepares PVC - labels and annotations
@@ -76,9 +75,4 @@ func (c *Creator) createPVC(
 func (c *Creator) CreatePVC(name string, host *api.Host, spec *core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
 	pvc := c.createPVC(name, host.Runtime.Address.Namespace, host, spec)
 	return &pvc
-}
-
-// OperatorShouldCreatePVC checks whether operator should create PVC for specified volumeCLimaTemplate
-func OperatorShouldCreatePVC(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) bool {
-	return volume.GetPVCProvisioner(host, volumeClaimTemplate) == api.PVCProvisionerOperator
 }

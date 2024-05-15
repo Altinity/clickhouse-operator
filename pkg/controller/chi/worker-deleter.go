@@ -410,13 +410,13 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(hostToRunOn.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(hostToRunOn.GetCHI()).
+			WithEvent(hostToRunOn.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(hostToRunOn.GetCR()).
 			M(hostToRunOn).F().
 			Info("Drop replica host: %s in cluster: %s", hostToDrop.GetName(), hostToDrop.Runtime.Address.ClusterName)
 	} else {
-		w.a.WithEvent(hostToRunOn.GetCHI(), eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(hostToRunOn.GetCHI()).
+		w.a.WithEvent(hostToRunOn.GetCR(), eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(hostToRunOn.GetCR()).
 			M(hostToRunOn).F().
 			Error("FAILED to drop replica on host: %s with error: %v", hostToDrop.GetName(), err)
 	}
@@ -438,14 +438,14 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Deleted tables on host: %s replica: %d to shard: %d in cluster: %s",
 				host.GetName(), host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 	} else {
-		w.a.WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(host.GetCHI()).
+		w.a.WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("FAILED to delete tables on host: %s with error: %v", host.GetName(), err)
 	}
@@ -465,15 +465,15 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 	defer w.a.V(2).M(host).E().Info(host.Runtime.Address.HostName)
 
 	w.a.V(1).
-		WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteStarted).
-		WithStatusAction(host.GetCHI()).
+		WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteStarted).
+		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Delete host: %s/%s - started", host.Runtime.Address.ClusterName, host.GetName())
 
 	var err error
 	if host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
-		w.a.WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.GetCHI()).
+		w.a.WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Delete host: %s/%s - completed StatefulSet not found - already deleted? err: %v",
 				host.Runtime.Address.ClusterName, host.GetName(), err)
@@ -501,13 +501,13 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteCompleted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Delete host: %s/%s - completed", host.Runtime.Address.ClusterName, host.GetName())
 	} else {
-		w.a.WithEvent(host.GetCHI(), eventActionDelete, eventReasonDeleteFailed).
-			WithStatusError(host.GetCHI()).
+		w.a.WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteFailed).
+			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("FAILED Delete host: %s/%s - completed", host.Runtime.Address.ClusterName, host.GetName())
 	}

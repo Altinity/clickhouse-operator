@@ -166,8 +166,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 		if host.HasAncestorCHI() {
 			old = host.GetAncestorCHI().GetSpec().Configuration.Profiles
 		}
-		if host.HasCHI() {
-			new = host.GetCHI().GetSpec().Configuration.Profiles
+		if host.HasCR() {
+			new = host.GetCR().GetSpec().Configuration.Profiles
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionProfiles, old, new) {
 			return true
@@ -179,8 +179,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 		if host.HasAncestorCHI() {
 			old = host.GetAncestorCHI().GetSpec().Configuration.Quotas
 		}
-		if host.HasCHI() {
-			new = host.GetCHI().GetSpec().Configuration.Quotas
+		if host.HasCR() {
+			new = host.GetCR().GetSpec().Configuration.Quotas
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionQuotas, old, new) {
 			return true
@@ -192,8 +192,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 		if host.HasAncestorCHI() {
 			old = host.GetAncestorCHI().GetSpec().Configuration.Settings
 		}
-		if host.HasCHI() {
-			new = host.GetCHI().GetSpec().Configuration.Settings
+		if host.HasCR() {
+			new = host.GetCR().GetSpec().Configuration.Settings
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new) {
 			return true
@@ -220,8 +220,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 				true,
 			)
 		}
-		if host.HasCHI() {
-			new = host.GetCHI().GetSpec().Configuration.Files.Filter(
+		if host.HasCR() {
+			new = host.GetCR().GetSpec().Configuration.Files.Filter(
 				nil,
 				[]api.SettingsSection{api.SectionUsers},
 				true,

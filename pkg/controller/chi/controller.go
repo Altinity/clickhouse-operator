@@ -780,7 +780,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 			return nil
 		}
 		log.V(1).M(chi).F().Error("NULL returned")
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
 	}
 
 	// Update status of a real object.
@@ -845,7 +845,7 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseIn
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
+		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
 	if util.InArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()) {
@@ -873,7 +873,7 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
+		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
 	cur.GetObjectMeta().SetFinalizers(util.RemoveFromArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()))

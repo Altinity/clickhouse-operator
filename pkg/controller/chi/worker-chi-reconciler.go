@@ -303,7 +303,7 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.Host) err
 
 	// ConfigMap for a host
 	configMap := w.task.creator.CreateConfigMap(creator.ConfigMapCHIHost, host)
-	err := w.reconcileConfigMap(ctx, host.GetCHI(), configMap)
+	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.registryReconciled.RegisterConfigMap(configMap.GetObjectMeta())
 	} else {
@@ -420,7 +420,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
 		w.prepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.reconcileStatefulSet(ctx, host, false)
-		metricsHostReconcilesRestart(ctx, host.GetCHI())
+		metricsHostReconcilesRestart(ctx, host.GetCR())
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
 	}
@@ -438,10 +438,10 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 			err = nil
 		}
 
-		host.GetCHI().EnsureStatus().HostFailed()
-		w.a.WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileFailed).
-			WithStatusAction(host.GetCHI()).
-			WithStatusError(host.GetCHI()).
+		host.GetCR().EnsureStatus().HostFailed()
+		w.a.WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileFailed).
+			WithStatusAction(host.GetCR()).
+			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("FAILED to reconcile StatefulSet for host: %s", host.GetName())
 	}
@@ -460,7 +460,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		// This is not a problem, service may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, host.GetCHI(), service)
+	err := w.reconcileService(ctx, host.GetCR(), service)
 	if err == nil {
 		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
 		w.task.registryReconciled.RegisterService(service.GetObjectMeta())
@@ -671,25 +671,25 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 
-	metricsHostReconcilesStarted(ctx, host.GetCHI())
+	metricsHostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
 
 	if host.IsFirst() {
-		w.reconcileCHIServicePreliminary(ctx, host.GetCHI())
-		defer w.reconcileCHIServiceFinal(ctx, host.GetCHI())
+		w.reconcileCHIServicePreliminary(ctx, host.GetCR())
+		defer w.reconcileCHIServiceFinal(ctx, host.GetCR())
 	}
 
 	// Check whether ClickHouse is running and accessible and what version is available
 	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileStarted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileStarted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileStarted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
@@ -705,7 +705,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx, host.GetCHI())
+		metricsHostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
@@ -732,7 +732,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
-		metricsHostReconcilesErrors(ctx, host.GetCHI())
+		metricsHostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
@@ -760,7 +760,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx, host.GetCHI())
+		metricsHostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
@@ -771,14 +771,14 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
 	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileCompleted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCHI(), eventActionReconcile, eventReasonReconcileCompleted).
-			WithStatusAction(host.GetCHI()).
+			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileCompleted).
+			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
@@ -786,25 +786,25 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	now := time.Now()
 	hostsCompleted := 0
 	hostsCount := 0
-	host.GetCHI().EnsureStatus().HostCompleted()
-	if host.GetCHI() != nil && host.GetCHI().Status != nil {
-		hostsCompleted = host.GetCHI().Status.GetHostsCompletedCount()
-		hostsCount = host.GetCHI().Status.GetHostsCount()
+	host.GetCR().EnsureStatus().HostCompleted()
+	if host.GetCR() != nil && host.GetCR().Status != nil {
+		hostsCompleted = host.GetCR().Status.GetHostsCompletedCount()
+		hostsCount = host.GetCR().Status.GetHostsCount()
 	}
 	w.a.V(1).
-		WithEvent(host.GetCHI(), eventActionProgress, eventReasonProgressHostsCompleted).
-		WithStatusAction(host.GetCHI()).
+		WithEvent(host.GetCR(), eventActionProgress, eventReasonProgressHostsCompleted).
+		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("[now: %s] %s: %d of %d", now, eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
-	_ = w.c.updateCHIObjectStatus(ctx, host.GetCHI(), UpdateCHIStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
 			MainFields: true,
 		},
 	})
 
-	metricsHostReconcilesCompleted(ctx, host.GetCHI())
-	metricsHostReconcilesTimings(ctx, host.GetCHI(), time.Now().Sub(startTime).Seconds())
+	metricsHostReconcilesCompleted(ctx, host.GetCR())
+	metricsHostReconcilesTimings(ctx, host.GetCR(), time.Now().Sub(startTime).Seconds())
 
 	return nil
 }
@@ -1028,8 +1028,8 @@ func (w *worker) reconcileStatefulSet(
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
 		w.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet.GetObjectMeta()))
 		if register {
-			host.GetCHI().EnsureStatus().HostUnchanged()
-			_ = w.c.updateCHIObjectStatus(ctx, host.GetCHI(), UpdateCHIStatusOptions{
+			host.GetCR().EnsureStatus().HostUnchanged()
+			_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
 				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
 					MainFields: true,
 				},
@@ -1234,7 +1234,7 @@ func (w *worker) fetchPVC(
 	// This is not an error per se, means PVC is not created (yet)?
 	w.a.V(2).M(host).Info("PVC (%s/%s/%s/%s) not found", namespace, host.GetName(), volumeMount.Name, pvcName)
 
-	if creator.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		// Operator is in charge of PVCs
 		// Create PVC model.
 		pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)

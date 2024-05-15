@@ -22,7 +22,7 @@ import (
 
 func GetVolumeClaimTemplate(host *api.Host, volumeMount *core.VolumeMount) (*api.VolumeClaimTemplate, bool) {
 	volumeClaimTemplateName := volumeMount.Name
-	volumeClaimTemplate, ok := host.GetCHI().GetVolumeClaimTemplate(volumeClaimTemplateName)
+	volumeClaimTemplate, ok := host.GetCR().GetVolumeClaimTemplate(volumeClaimTemplateName)
 	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
 	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
 	return volumeClaimTemplate, ok
@@ -36,8 +36,8 @@ func GetPVCReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate) api.
 		return template.PVCReclaimPolicy
 	}
 
-	if host.GetCHI().GetSpec().Defaults.StorageManagement.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
-		return host.GetCHI().GetSpec().Defaults.StorageManagement.PVCReclaimPolicy
+	if host.GetCR().GetSpec().Defaults.StorageManagement.PVCReclaimPolicy != api.PVCReclaimPolicyUnspecified {
+		return host.GetCR().GetSpec().Defaults.StorageManagement.PVCReclaimPolicy
 	}
 
 	// Default value
@@ -52,10 +52,15 @@ func GetPVCProvisioner(host *api.Host, template *api.VolumeClaimTemplate) api.PV
 		return template.PVCProvisioner
 	}
 
-	if host.GetCHI().GetSpec().Defaults.StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
-		return host.GetCHI().GetSpec().Defaults.StorageManagement.PVCProvisioner
+	if host.GetCR().GetSpec().Defaults.StorageManagement.PVCProvisioner != api.PVCProvisionerUnspecified {
+		return host.GetCR().GetSpec().Defaults.StorageManagement.PVCProvisioner
 	}
 
 	// Default value
 	return api.PVCProvisionerStatefulSet
+}
+
+// OperatorShouldCreatePVC checks whether operator should create PVC for specified volumeCLimaTemplate
+func OperatorShouldCreatePVC(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) bool {
+	return GetPVCProvisioner(host, volumeClaimTemplate) == api.PVCProvisionerOperator
 }

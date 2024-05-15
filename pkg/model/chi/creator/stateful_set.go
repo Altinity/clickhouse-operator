@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,7 +94,7 @@ func setupEnvVars(statefulSet *apps.StatefulSet, host *api.Host) {
 		return
 	}
 
-	container.Env = append(container.Env, host.GetCHI().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
+	container.Env = append(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
 }
 
 // ensureMainContainerSpecified is a unification wrapper
@@ -171,7 +172,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 
 // setupTroubleshootingMode
 func (c *Creator) setupTroubleshootingMode(statefulSet *apps.StatefulSet, host *api.Host) {
-	if !host.GetCHI().IsTroubleshoot() {
+	if !host.GetCR().IsTroubleshoot() {
 		// We are not troubleshooting
 		return
 	}
@@ -272,14 +273,14 @@ func (c *Creator) statefulSetSetupVolumesForSecrets(statefulSet *apps.StatefulSe
 	// Add all additional Volumes
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		host.GetCHI().GetRuntime().GetAttributes().GetAdditionalVolumes()...,
+		host.GetCR().GetRuntime().GetAttributes().GetAdditionalVolumes()...,
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have additional volumes mounted as Volumes
 	k8s.StatefulSetAppendVolumeMounts(
 		statefulSet,
-		host.GetCHI().GetRuntime().GetAttributes().GetAdditionalVolumeMounts()...,
+		host.GetCR().GetRuntime().GetAttributes().GetAdditionalVolumeMounts()...,
 	)
 }
 
@@ -419,7 +420,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	// statefulSet.Spec.VolumeClaimTemplates
 	// so, let's add it
 
-	if OperatorShouldCreatePVC(host, volumeClaimTemplate) {
+	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		claimName := namer.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
 		statefulSet.Spec.Template.Spec.Volumes = append(
 			statefulSet.Spec.Template.Spec.Volumes,

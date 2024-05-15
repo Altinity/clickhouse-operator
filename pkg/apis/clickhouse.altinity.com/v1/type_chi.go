@@ -192,7 +192,7 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 			cluster.Runtime.CHI = chi
 			shard.Runtime.CHI = chi
 			replica.Runtime.CHI = chi
-			host.SetCHI(chi)
+			host.SetCR(chi)
 			return nil
 		},
 	)
@@ -719,7 +719,7 @@ func (chi *ClickHouseInstallation) YAML(opts CopyCHIOptions) string {
 	return string(yamlBytes)
 }
 
-func (chi *ClickHouseInstallation) GetRuntime() IClickHouseInstallationRuntime {
+func (chi *ClickHouseInstallation) GetRuntime() ICustomResourceRuntime {
 	return chi.ensureRuntime()
 }
 

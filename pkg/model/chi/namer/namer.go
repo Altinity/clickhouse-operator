@@ -298,16 +298,16 @@ func CreateCHIServiceName(chi api.IChi) string {
 }
 
 // CreateCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
-func CreateCHIServiceFQDN(chi api.IChi) string {
+func CreateCHIServiceFQDN(chi api.IChi, namespaceDomainPattern *api.String) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
 	// Start with default pattern
 	pattern := serviceFQDNPattern
 
-	if chi.GetSpec().GetNamespaceDomainPattern().HasValue() {
+	if namespaceDomainPattern.HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + chi.GetSpec().GetNamespaceDomainPattern().Value()
+		pattern = "%s." + namespaceDomainPattern.Value()
 	}
 
 	// Create FQDN based on pattern available
@@ -390,7 +390,7 @@ func CreateHostTemplateName(host *api.Host) string {
 // any other places
 // Function operations are based on .Spec.Defaults.ReplicasUseFQDN
 func CreateInstanceHostname(host *api.Host) string {
-	if host.GetCHI().GetSpec().Defaults.ReplicasUseFQDN.IsTrue() {
+	if host.GetCR().GetSpec().Defaults.ReplicasUseFQDN.IsTrue() {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
@@ -459,9 +459,9 @@ func createPodFQDN(host *api.Host) string {
 	// Start with default pattern
 	pattern := podFQDNPattern
 
-	if host.GetCHI().GetSpec().NamespaceDomainPattern.HasValue() {
+	if host.GetCR().GetSpec().NamespaceDomainPattern.HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + host.GetCHI().GetSpec().NamespaceDomainPattern.Value()
+		pattern = "%s." + host.GetCR().GetSpec().NamespaceDomainPattern.Value()
 	}
 
 	// Create FQDN based on pattern available
@@ -529,7 +529,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 		case api.Cluster:
 			return util.RemoveFromArray(self, createPodFQDNsOfCluster(any(typed.GetCluster()).(api.ICluster)))
 		case api.ClickHouseInstallation:
-			return util.RemoveFromArray(self, createPodFQDNsOfCHI(any(typed.GetCHI()).(api.IChi)))
+			return util.RemoveFromArray(self, createPodFQDNsOfCHI(any(typed.GetCR()).(api.IChi)))
 		}
 	}
 	return nil
@@ -553,53 +553,6 @@ func CreatePodName(obj interface{}) string {
 		return fmt.Sprintf(podNamePattern, CreateStatefulSetName(host))
 	}
 	return "unknown-type"
-}
-
-// CreatePodNames is a wrapper over set of create pod names functions
-// obj specifies source object to create names from
-func CreatePodNames(obj interface{}) []string {
-	switch typed := obj.(type) {
-	case api.IChi:
-		return createPodNamesOfCHI(typed)
-	case api.ICluster:
-		return createPodNamesOfCluster(typed)
-	case api.IShard:
-		return createPodNamesOfShard(typed)
-	case
-		*api.Host,
-		*apps.StatefulSet:
-		return []string{
-			CreatePodName(typed),
-		}
-	}
-	return nil
-}
-
-// createPodNamesOfCluster creates pod names of all pods in a cluster
-func createPodNamesOfCluster(cluster api.ICluster) (names []string) {
-	cluster.WalkHosts(func(host *api.Host) error {
-		names = append(names, CreatePodName(host))
-		return nil
-	})
-	return names
-}
-
-// createPodNamesOfShard creates pod names of all pods in a shard
-func createPodNamesOfShard(shard api.IShard) (names []string) {
-	shard.WalkHosts(func(host *api.Host) error {
-		names = append(names, CreatePodName(host))
-		return nil
-	})
-	return names
-}
-
-// createPodNamesOfCHI creates fully qualified domain names of all pods in a CHI
-func createPodNamesOfCHI(chi api.IChi) (names []string) {
-	chi.WalkHosts(func(host *api.Host) error {
-		names = append(names, CreatePodName(host))
-		return nil
-	})
-	return names
 }
 
 // CreatePVCNameByVolumeClaimTemplate creates PVC name
