@@ -15,17 +15,18 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	core "k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
 func (c *Controller) walkPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
 	namespace := host.Runtime.Address.Namespace
-	name := model.CreatePodName(host)
+	name := namer.CreatePodName(host)
 	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s/%s err:%v", namespace, host.GetName(), err)
@@ -52,7 +53,7 @@ func (c *Controller) walkPVCs(host *api.Host, f func(pvc *core.PersistentVolumeC
 func (c *Controller) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
 	namespace := host.Runtime.Address.Namespace
 
-	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(controller.NewContext(), controller.NewListOptions(model.GetSelectorHostScope(host)))
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).List(controller.NewContext(), controller.NewListOptions(tags.GetSelectorHostScope(host)))
 	if err != nil {
 		log.M(host).F().Error("FAIL get list of PVCs for the host %s/%s err:%v", namespace, host.GetName(), err)
 		return

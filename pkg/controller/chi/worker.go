@@ -19,6 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -754,7 +756,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 			cluster.WalkHosts(func(host *api.Host) error {
 
 				// Name of the StatefulSet for this host
-				name := model.CreateStatefulSetName(host)
+				name := namer.CreateStatefulSetName(host)
 				// Have we found this StatefulSet
 				found := false
 
@@ -946,7 +948,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
-		host.GetCHI().EnsureStatus().PushHostTablesCreated(model.CreateFQDN(host))
+		host.GetCHI().EnsureStatus().PushHostTablesCreated(namer.CreateFQDN(host))
 	} else {
 		w.a.V(1).
 			WithEvent(host.GetCHI(), eventActionCreate, eventReasonCreateFailed).
@@ -1560,8 +1562,8 @@ func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 // getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
 func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.Object) api.ObjectStatus {
 	// Try to perform label-based version comparison
-	curVersion, curHasLabel := model.GetObjectVersion(curMeta)
-	newVersion, newHasLabel := model.GetObjectVersion(newMeta)
+	curVersion, curHasLabel := tags.GetObjectVersion(curMeta)
+	newVersion, newHasLabel := tags.GetObjectVersion(newMeta)
 
 	if !curHasLabel || !newHasLabel {
 		w.a.M(newMeta).F().Warning(

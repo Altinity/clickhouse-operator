@@ -16,6 +16,7 @@ package chi
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -28,5 +29,5 @@ func HostIsNewOne(host *api.Host) bool {
 
 // HostHasTablesCreated checks whether host has tables listed as already created
 func HostHasTablesCreated(host *api.Host) bool {
-	return util.InArray(CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated())
+	return util.InArray(namer.CreateFQDN(host), host.GetCHI().EnsureStatus().GetHostsWithTablesCreated())
 }

@@ -16,6 +16,8 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -25,7 +27,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -59,8 +60,8 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *api.ClickHous
 
 	var err error
 
-	configMapCommon := model.CreateConfigMapCommonName(chi)
-	configMapCommonUsersName := model.CreateConfigMapCommonUsersName(chi)
+	configMapCommon := namer.CreateConfigMapCommonName(chi)
+	configMapCommonUsersName := namer.CreateConfigMapCommonUsersName(chi)
 
 	// Delete ConfigMap
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommon, controller.NewDeleteOptions())
@@ -94,7 +95,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 		return nil
 	}
 
-	name := model.CreatePodName(statefulSet)
+	name := namer.CreatePodName(statefulSet)
 	log.V(1).M(host).Info("Delete Pod %s/%s", statefulSet.Namespace, name)
 	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	if err == nil {
@@ -122,7 +123,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.Host) erro
 	// it is possible to scale the StatefulSet down to 0 prior to deletion.
 
 	// Namespaced name
-	name := model.CreateStatefulSetName(host)
+	name := namer.CreateStatefulSetName(host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -200,7 +201,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *api.Host) error {
 		}
 
 		// Check whether PVC can be deleted
-		if model.HostCanDeletePVC(host, pvc.Name) {
+		if volume.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).M(host).Info("PVC %s/%s would be deleted", namespace, pvc.Name)
 		} else {
 			log.V(1).M(host).Info("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
@@ -228,7 +229,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *api.Host) error 
 		return nil
 	}
 
-	name := model.CreateConfigMapHostName(host)
+	name := namer.CreateConfigMapHostName(host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -262,7 +263,7 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *api.Host) erro
 		return nil
 	}
 
-	serviceName := model.CreateStatefulSetServiceName(host)
+	serviceName := namer.CreateStatefulSetServiceName(host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -275,7 +276,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *api.ChiShard
 		return nil
 	}
 
-	serviceName := model.CreateShardServiceName(shard)
+	serviceName := namer.CreateShardServiceName(shard)
 	namespace := shard.Runtime.Address.Namespace
 	log.V(1).M(shard).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -288,7 +289,7 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *api.Clus
 		return nil
 	}
 
-	serviceName := model.CreateClusterServiceName(cluster)
+	serviceName := namer.CreateClusterServiceName(cluster)
 	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -301,7 +302,7 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *api.ClickHouseIn
 		return nil
 	}
 
-	serviceName := model.CreateCHIServiceName(chi)
+	serviceName := namer.CreateCHIServiceName(chi)
 	namespace := chi.Namespace
 	log.V(1).M(chi).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -341,7 +342,7 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *api.Clust
 		return nil
 	}
 
-	secretName := model.CreateClusterAutoSecretName(cluster)
+	secretName := namer.CreateClusterAutoSecretName(cluster)
 	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, secretName)
 	return c.deleteSecretIfExists(ctx, namespace, secretName)

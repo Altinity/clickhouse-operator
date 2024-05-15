@@ -19,7 +19,9 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 )
 
 // PreparePersistentVolumeClaim prepares PVC - labels and annotations
@@ -28,10 +30,10 @@ func (c *Creator) PreparePersistentVolumeClaim(
 	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) *core.PersistentVolumeClaim {
-	pvc.SetLabels(model.Macro(host).Map(c.labels.GetPVC(pvc, host, template)))
-	pvc.SetAnnotations(model.Macro(host).Map(c.annotations.Annotate(model.AnnotateExistingPVC, pvc, host, template)))
+	pvc.SetLabels(namer.Macro(host).Map(c.tagger.Label(tags.LabelExistingPVC, pvc, host, template)))
+	pvc.SetAnnotations(namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateExistingPVC, pvc, host, template)))
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(&pvc.ObjectMeta, pvc)
+	tags.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
 }
 
@@ -56,8 +58,8 @@ func (c *Creator) createPVC(
 			//  we are close to proper disk inheritance
 			// Right now we hit the following error:
 			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-			Labels:      model.Macro(host).Map(c.labels.GetHostScope(host, false)),
-			Annotations: model.Macro(host).Map(c.annotations.Annotate(model.AnnotateNewPVC, host)),
+			Labels:      namer.Macro(host).Map(c.tagger.Label(tags.LabelNewPVC, host, false)),
+			Annotations: namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateNewPVC, host)),
 		},
 		// Append copy of PersistentVolumeClaimSpec
 		Spec: *spec.DeepCopy(),
@@ -78,5 +80,5 @@ func (c *Creator) CreatePVC(name string, host *api.Host, spec *core.PersistentVo
 
 // OperatorShouldCreatePVC checks whether operator should create PVC for specified volumeCLimaTemplate
 func OperatorShouldCreatePVC(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) bool {
-	return model.GetPVCProvisioner(host, volumeClaimTemplate) == api.PVCProvisionerOperator
+	return volume.GetPVCProvisioner(host, volumeClaimTemplate) == api.PVCProvisionerOperator
 }

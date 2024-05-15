@@ -16,7 +16,6 @@ package creator
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,6 +23,9 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -71,12 +73,12 @@ func (c *Creator) createServiceCHI() *core.Service {
 		return c.createServiceFromTemplate(
 			template,
 			c.chi.GetNamespace(),
-			model.CreateCHIServiceName(c.chi),
-			c.labels.GetServiceCHI(c.chi),
-			c.annotations.Annotate(model.AnnotateServiceCHI, c.chi),
-			c.labels.GetSelectorCHIScopeReady(),
+			namer.CreateCHIServiceName(c.chi),
+			c.tagger.Label(tags.LabelServiceCHI, c.chi),
+			c.tagger.Annotate(tags.AnnotateServiceCHI, c.chi),
+			c.tagger.Selector(tags.SelectorCHIScopeReady),
 			createOwnerReferences(c.chi),
-			model.Macro(c.chi),
+			namer.Macro(c.chi),
 		)
 	}
 
@@ -84,10 +86,10 @@ func (c *Creator) createServiceCHI() *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateCHIServiceName(c.chi),
+			Name:            namer.CreateCHIServiceName(c.chi),
 			Namespace:       c.chi.GetNamespace(),
-			Labels:          model.Macro(c.chi).Map(c.labels.GetServiceCHI(c.chi)),
-			Annotations:     model.Macro(c.chi).Map(c.annotations.Annotate(model.AnnotateServiceCHI, c.chi)),
+			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelServiceCHI, c.chi)),
+			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotateServiceCHI, c.chi)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: core.ServiceSpec{
@@ -106,18 +108,18 @@ func (c *Creator) createServiceCHI() *core.Service {
 					TargetPort: intstr.FromString(config.ChDefaultTCPPortName),
 				},
 			},
-			Selector: c.labels.GetSelectorCHIScopeReady(),
+			Selector: c.tagger.Selector(tags.SelectorCHIScopeReady),
 			Type:     core.ServiceTypeClusterIP,
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
-	model.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	tags.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
 // createServiceCluster creates new core.Service for specified Cluster
 func (c *Creator) createServiceCluster(cluster api.ICluster) *core.Service {
-	serviceName := model.CreateClusterServiceName(cluster)
+	serviceName := namer.CreateClusterServiceName(cluster)
 	ownerReferences := createOwnerReferences(c.chi)
 
 	c.a.V(1).F().Info("%s/%s", cluster.GetRuntime().GetAddress().GetNamespace(), serviceName)
@@ -127,11 +129,11 @@ func (c *Creator) createServiceCluster(cluster api.ICluster) *core.Service {
 			template,
 			cluster.GetRuntime().GetAddress().GetNamespace(),
 			serviceName,
-			c.labels.GetServiceCluster(cluster),
-			c.annotations.Annotate(model.AnnotateServiceCluster, cluster),
-			model.GetSelectorClusterScopeReady(cluster),
+			c.tagger.Label(tags.LabelServiceCluster, cluster),
+			c.tagger.Annotate(tags.AnnotateServiceCluster, cluster),
+			c.tagger.Selector(tags.SelectorClusterScopeReady, cluster),
 			ownerReferences,
-			model.Macro(cluster),
+			namer.Macro(cluster),
 		)
 	}
 	// No template specified, no need to create service
@@ -145,12 +147,12 @@ func (c *Creator) createServiceShard(shard api.IShard) *core.Service {
 		return c.createServiceFromTemplate(
 			template,
 			shard.GetRuntime().GetAddress().GetNamespace(),
-			model.CreateShardServiceName(shard),
-			c.labels.GetServiceShard(shard),
-			c.annotations.Annotate(model.AnnotateServiceShard, shard),
-			model.GetSelectorShardScopeReady(shard),
+			namer.CreateShardServiceName(shard),
+			c.tagger.Label(tags.LabelServiceShard, shard),
+			c.tagger.Annotate(tags.AnnotateServiceShard, shard),
+			c.tagger.Selector(tags.SelectorShardScopeReady, shard),
 			createOwnerReferences(c.chi),
-			model.Macro(shard),
+			namer.Macro(shard),
 		)
 	}
 	// No template specified, no need to create service
@@ -164,12 +166,12 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 		return c.createServiceFromTemplate(
 			template,
 			host.Runtime.Address.Namespace,
-			model.CreateStatefulSetServiceName(host),
-			c.labels.GetServiceHost(host),
-			c.annotations.Annotate(model.AnnotateServiceHost, host),
-			model.GetSelectorHostScope(host),
+			namer.CreateStatefulSetServiceName(host),
+			c.tagger.Label(tags.LabelServiceHost, host),
+			c.tagger.Annotate(tags.AnnotateServiceHost, host),
+			c.tagger.Selector(tags.SelectorHostScope, host),
 			createOwnerReferences(c.chi),
-			model.Macro(host),
+			namer.Macro(host),
 		)
 	}
 
@@ -177,21 +179,21 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateStatefulSetServiceName(host),
+			Name:            namer.CreateStatefulSetServiceName(host),
 			Namespace:       host.Runtime.Address.Namespace,
-			Labels:          model.Macro(host).Map(c.labels.GetServiceHost(host)),
-			Annotations:     model.Macro(host).Map(c.annotations.Annotate(model.AnnotateServiceHost, host)),
+			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelServiceHost, host)),
+			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateServiceHost, host)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: core.ServiceSpec{
-			Selector:                 model.GetSelectorHostScope(host),
+			Selector:                 c.tagger.Selector(tags.SelectorHostScope, host),
 			ClusterIP:                model.TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
 		},
 	}
 	appendServicePorts(svc, host)
-	model.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	tags.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
@@ -224,7 +226,7 @@ func (c *Creator) createServiceFromTemplate(
 	annotations map[string]string,
 	selector map[string]string,
 	ownerReferences []meta.OwnerReference,
-	macro *model.MacrosEngine,
+	macro *namer.MacrosEngine,
 ) *core.Service {
 
 	// Verify Ports
@@ -252,7 +254,7 @@ func (c *Creator) createServiceFromTemplate(
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(service.GetObjectMeta(), service)
+	tags.MakeObjectVersion(service.GetObjectMeta(), service)
 
 	return service
 }

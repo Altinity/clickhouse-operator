@@ -16,6 +16,8 @@ package chi
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -26,7 +28,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
@@ -58,7 +59,7 @@ func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.Conf
 	// Try to find by labels
 
 	var selector k8sLabels.Selector
-	if selector, err = model.MakeSelectorFromObjectMeta(meta); err != nil {
+	if selector, err = tags.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +90,7 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 		name = typedObj.Name
 		namespace = typedObj.Namespace
 	case *api.Host:
-		name = model.CreateStatefulSetServiceName(typedObj)
+		name = namer.CreateStatefulSetServiceName(typedObj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
 	return c.serviceLister.Services(namespace).Get(name)
@@ -140,7 +141,7 @@ func (c *Controller) getStatefulSetByMeta(meta meta.Object, byNameOnly bool) (*a
 	}
 
 	var selector k8sLabels.Selector
-	if selector, err = model.MakeSelectorFromObjectMeta(meta); err != nil {
+	if selector, err = tags.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
@@ -164,7 +165,7 @@ func (c *Controller) getStatefulSetByMeta(meta meta.Object, byNameOnly bool) (*a
 // getStatefulSetByHost finds StatefulSet of a specified host
 func (c *Controller) getStatefulSetByHost(host *api.Host) (*apps.StatefulSet, error) {
 	// Namespaced name
-	name := model.CreateStatefulSetName(host)
+	name := namer.CreateStatefulSetName(host)
 	namespace := host.Runtime.Address.Namespace
 
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
@@ -182,10 +183,10 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *apps.StatefulSet:
-		name = model.CreatePodName(obj)
+		name = namer.CreatePodName(obj)
 		namespace = typedObj.Namespace
 	case *api.Host:
-		name = model.CreatePodName(obj)
+		name = namer.CreatePodName(obj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
@@ -268,7 +269,7 @@ func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCHI bool) (*api.Clic
 	if isCHI {
 		chiName = meta.GetName()
 	} else {
-		chiName, err = model.GetCHINameFromObjectMeta(meta)
+		chiName, err = tags.GetCHINameFromObjectMeta(meta)
 		if err != nil {
 			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", meta.GetName(), err)
 		}

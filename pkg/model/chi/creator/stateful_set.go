@@ -15,7 +15,6 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,6 +22,9 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -31,17 +33,17 @@ import (
 func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet {
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateStatefulSetName(host),
+			Name:            namer.CreateStatefulSetName(host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          model.Macro(host).Map(c.labels.GetHostScope(host, true)),
-			Annotations:     model.Macro(host).Map(c.annotations.Annotate(model.AnnotateSTS, host)),
+			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelSTS, host)),
+			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateSTS, host)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
-			ServiceName: model.CreateStatefulSetServiceName(host),
+			ServiceName: namer.CreateStatefulSetServiceName(host),
 			Selector: &meta.LabelSelector{
-				MatchLabels: model.GetSelectorHostScope(host),
+				MatchLabels: c.tagger.Selector(tags.SelectorHostScope, host),
 			},
 
 			// IMPORTANT
@@ -60,7 +62,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 
 	c.setupStatefulSetPodTemplate(statefulSet, host)
 	c.setupStatefulSetVolumeClaimTemplates(statefulSet, host)
-	model.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
+	tags.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
 
 	return statefulSet
 }
@@ -154,7 +156,7 @@ func (c *Creator) personalizeStatefulSetTemplate(statefulSet *apps.StatefulSet, 
 		{
 			IP: "127.0.0.1",
 			Hostnames: []string{
-				model.CreatePodHostname(host),
+				namer.CreatePodHostname(host),
 			},
 		},
 	}
@@ -242,9 +244,9 @@ func (c *Creator) statefulSetSetupVolumes(statefulSet *apps.StatefulSet, host *a
 
 // statefulSetSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
 func (c *Creator) statefulSetSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
-	configMapHostName := model.CreateConfigMapHostName(host)
-	configMapCommonName := model.CreateConfigMapCommonName(c.chi)
-	configMapCommonUsersName := model.CreateConfigMapCommonUsersName(c.chi)
+	configMapHostName := namer.CreateConfigMapHostName(host)
+	configMapCommonName := namer.CreateConfigMapCommonName(c.chi)
+	configMapCommonUsersName := namer.CreateConfigMapCommonUsersName(c.chi)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(
@@ -338,12 +340,12 @@ func (c *Creator) statefulSetApplyPodTemplate(
 	statefulSet.Spec.Template = core.PodTemplateSpec{
 		ObjectMeta: meta.ObjectMeta{
 			Name: template.Name,
-			Labels: model.Macro(host).Map(util.MergeStringMapsOverwrite(
-				c.labels.GetHostScopeReady(host, true),
+			Labels: namer.Macro(host).Map(util.MergeStringMapsOverwrite(
+				c.tagger.Label(tags.LabelPodTemplate, host),
 				template.ObjectMeta.GetLabels(),
 			)),
-			Annotations: model.Macro(host).Map(util.MergeStringMapsOverwrite(
-				c.annotations.Annotate(model.AnnotateSTS, host),
+			Annotations: namer.Macro(host).Map(util.MergeStringMapsOverwrite(
+				c.tagger.Annotate(tags.AnnotatePodTemplate, host),
 				template.ObjectMeta.GetAnnotations(),
 			)),
 		},
@@ -418,7 +420,7 @@ func (c *Creator) statefulSetAppendPVCTemplate(
 	// so, let's add it
 
 	if OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-		claimName := model.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
+		claimName := namer.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
 		statefulSet.Spec.Template.Spec.Volumes = append(
 			statefulSet.Spec.Template.Spec.Volumes,
 			createVolumeForPVC(volumeClaimTemplate.Name, claimName),
@@ -440,7 +442,7 @@ func newDefaultPodTemplate(host *api.Host) *api.PodTemplate {
 // newDefaultClickHousePodTemplate returns default Pod Template to be used with StatefulSet
 func newDefaultClickHousePodTemplate(host *api.Host) *api.PodTemplate {
 	podTemplate := &api.PodTemplate{
-		Name: model.CreateStatefulSetName(host),
+		Name: namer.CreateStatefulSetName(host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
 			Volumes:    []core.Volume{},

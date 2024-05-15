@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package volume
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -33,10 +34,10 @@ func HostCanDeletePVC(host *api.Host, pvcName string) bool {
 			return
 		}
 
-		if pvcName == CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate) {
+		if pvcName == namer.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate) {
 			// This PVC is made from these host, VolumeMount and VolumeClaimTemplate
 			// So, what policy does this PVC have?
-			policy = getPVCReclaimPolicy(host, volumeClaimTemplate)
+			policy = GetPVCReclaimPolicy(host, volumeClaimTemplate)
 			return
 		}
 	})
@@ -49,7 +50,7 @@ func HostCanDeletePVC(host *api.Host, pvcName string) bool {
 func HostCanDeleteAllPVCs(host *api.Host) bool {
 	canDeleteAllPVCs := true
 	host.GetCHI().WalkVolumeClaimTemplates(func(template *api.VolumeClaimTemplate) {
-		if getPVCReclaimPolicy(host, template) == api.PVCReclaimPolicyRetain {
+		if GetPVCReclaimPolicy(host, template) == api.PVCReclaimPolicyRetain {
 			// At least one template wants to keep its PVC
 			canDeleteAllPVCs = false
 		}

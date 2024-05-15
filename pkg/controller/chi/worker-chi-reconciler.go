@@ -19,6 +19,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"math"
 	"sync"
 	"time"
@@ -490,7 +492,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 
 	// Add ChkCluster's Auto Secret
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
-		if secret := w.task.creator.CreateClusterSecret(model.CreateClusterAutoSecretName(cluster)); secret != nil {
+		if secret := w.task.creator.CreateClusterSecret(namer.CreateClusterAutoSecretName(cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
 				w.task.registryReconciled.RegisterSecret(secret.GetObjectMeta())
 			} else {
@@ -1204,18 +1206,12 @@ func (w *worker) fetchPVC(
 ) {
 	namespace := host.Runtime.Address.Namespace
 
-	// Try to find volumeClaimTemplate that is used to build this mounted volume
-	// Volume mount can point not only to volume claim, but also to other entities, such as ConfigMap, for example.
-	pvcName, ok := model.CreatePVCNameByVolumeMount(host, volumeMount)
-	if !ok {
-		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
-		return nil, nil, false, fmt.Errorf("unable to make PVC name from volume mount")
-	}
-	volumeClaimTemplate, ok := model.GetVolumeClaimTemplate(host, volumeMount)
+	volumeClaimTemplate, ok := volume.GetVolumeClaimTemplate(host, volumeMount)
 	if !ok {
 		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
 		return nil, nil, false, fmt.Errorf("unable to find VolumeClaimTemplate from volume mount")
 	}
+	pvcName := namer.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
 
 	// We have a VolumeClaimTemplate for this VolumeMount
 	// Treat it as persistent storage mount

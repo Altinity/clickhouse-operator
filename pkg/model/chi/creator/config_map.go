@@ -15,12 +15,13 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
 type ConfigMapType string
@@ -56,17 +57,17 @@ func (c *Creator) CreateConfigMap(what ConfigMapType, params ...any) *core.Confi
 func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateConfigMapCommonName(c.chi),
+			Name:            namer.CreateConfigMapCommonName(c.chi),
 			Namespace:       c.chi.GetNamespace(),
-			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommon()),
-			Annotations:     model.Macro(c.chi).Map(c.annotations.Annotate(model.AnnotateConfigMapCommon)),
+			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelConfigMapCommon)),
+			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommon)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFilesGroupCommon(options),
 	}
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -74,17 +75,17 @@ func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFiles
 func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateConfigMapCommonUsersName(c.chi),
+			Name:            namer.CreateConfigMapCommonUsersName(c.chi),
 			Namespace:       c.chi.GetNamespace(),
-			Labels:          model.Macro(c.chi).Map(c.labels.GetConfigMapCHICommonUsers()),
-			Annotations:     model.Macro(c.chi).Map(c.annotations.Annotate(model.AnnotateConfigMapCommon)),
+			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelConfigMapCommonUsers)),
+			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommonUsers)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFilesGroupUsers(),
 	}
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -92,16 +93,16 @@ func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 func (c *Creator) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            model.CreateConfigMapHostName(host),
+			Name:            namer.CreateConfigMapHostName(host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          model.Macro(host).Map(c.labels.GetConfigMapHost(host)),
-			Annotations:     model.Macro(host).Map(c.annotations.Annotate(model.AnnotateConfigMapHost, host)),
+			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelConfigMapHost, host)),
+			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateConfigMapHost, host)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFilesGroupHost(host),
 	}
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }

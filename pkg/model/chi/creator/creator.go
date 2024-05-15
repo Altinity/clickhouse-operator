@@ -17,44 +17,21 @@ package creator
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	core "k8s.io/api/core/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
-type labeler interface {
-	GetConfigMapCHICommon() map[string]string
-	GetConfigMapCHICommonUsers() map[string]string
-	GetConfigMapHost(host *api.Host) map[string]string
-	GetServiceCHI(chi api.IChi) map[string]string
-	GetServiceCluster(cluster api.ICluster) map[string]string
-	GetServiceHost(host *api.Host) map[string]string
-	GetServiceShard(shard api.IShard) map[string]string
-
-	GetPV(pv *core.PersistentVolume, host *api.Host) map[string]string
-	GetPVC(
-		pvc *core.PersistentVolumeClaim,
-		host *api.Host,
-		template *api.VolumeClaimTemplate,
-	) map[string]string
-
-	GetClusterScope(cluster api.ICluster) map[string]string
-	GetHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string
-	GetHostScopeReady(host *api.Host, applySupplementaryServiceLabels bool) map[string]string
-
-	GetSelectorCHIScopeReady() map[string]string
-}
-
-type annotator interface {
-	Annotate(what model.AnnotateType, params ...any) map[string]string
+type tagger interface {
+	Annotate(what tags.AnnotateType, params ...any) map[string]string
+	Label(what tags.LabelType, params ...any) map[string]string
+	Selector(what tags.SelectorType, params ...any) map[string]string
 }
 
 // Creator specifies creator object
 type Creator struct {
 	chi                  api.IChi
 	configFilesGenerator *config.ClickHouseConfigFilesGenerator
-	labels               labeler
-	annotations          annotator
+	tagger               tagger
 	a                    log.Announcer
 }
 
@@ -63,8 +40,7 @@ func NewCreator(chi api.IChi, configFilesGenerator *config.ClickHouseConfigFiles
 	return &Creator{
 		chi:                  chi,
 		configFilesGenerator: configFilesGenerator,
-		labels:               model.NewLabeler(chi),
-		annotations:          model.NewAnnotator(chi),
+		tagger:               tags.NewTagger(chi),
 		a:                    log.M(chi),
 	}
 }

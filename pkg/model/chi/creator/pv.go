@@ -18,14 +18,15 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
 // preparePersistentVolume prepares PV labels
 func (c *Creator) preparePersistentVolume(pv *core.PersistentVolume, host *api.Host) *core.PersistentVolume {
-	pv.SetLabels(model.Macro(host).Map(c.labels.GetPV(pv, host)))
-	pv.SetAnnotations(model.Macro(host).Map(c.annotations.Annotate(model.AnnotateExistingPV, pv, host)))
+	pv.SetLabels(namer.Macro(host).Map(c.tagger.Label(tags.LabelExistingPV, pv, host)))
+	pv.SetAnnotations(namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateExistingPV, pv, host)))
 	// And after the object is ready we can put version label
-	model.MakeObjectVersion(&pv.ObjectMeta, pv)
+	tags.MakeObjectVersion(&pv.ObjectMeta, pv)
 	return pv
 }

@@ -16,6 +16,7 @@ package schemer
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -25,8 +26,8 @@ import (
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
 func shouldCreateReplicatedObjects(host *api.Host) bool {
-	shard := model.CreateFQDNs(host, api.ChiShard{}, false)
-	cluster := model.CreateFQDNs(host, api.Cluster{}, false)
+	shard := namer.CreateFQDNs(host, api.ChiShard{}, false)
+	cluster := namer.CreateFQDNs(host, api.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard
@@ -66,21 +67,21 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			namer.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateDatabaseReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			namer.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateTableReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			namer.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)

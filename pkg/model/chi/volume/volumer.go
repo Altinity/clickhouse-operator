@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package volume
 
 import (
 	core "k8s.io/api/core/v1"
@@ -28,7 +28,7 @@ func GetVolumeClaimTemplate(host *api.Host, volumeMount *core.VolumeMount) (*api
 	return volumeClaimTemplate, ok
 }
 
-func getPVCReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate) api.PVCReclaimPolicy {
+func GetPVCReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate) api.PVCReclaimPolicy {
 	// Order by priority
 
 	// VolumeClaimTemplate.PVCReclaimPolicy, in case specified

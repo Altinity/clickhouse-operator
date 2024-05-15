@@ -17,6 +17,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -529,7 +530,7 @@ func (c *ClickHouseConfigGenerator) getHostMacros(host *api.Host) string {
 	util.Iline(b, 8, "<shard>%s</shard>", host.Runtime.Address.ShardName)
 	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
-	util.Iline(b, 8, "<replica>%s</replica>", chi.CreatePodHostname(host))
+	util.Iline(b, 8, "<replica>%s</replica>", namer.CreatePodHostname(host))
 
 	// 		</macros>
 	// </yandex>
@@ -601,7 +602,7 @@ func (c *ClickHouseConfigGenerator) getDistributedDDLPath() string {
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *ClickHouseConfigGenerator) getRemoteServersReplicaHostname(host *api.Host) string {
-	return chi.CreateInstanceHostname(host)
+	return namer.CreateInstanceHostname(host)
 }
 
 // getSecure gets config-usable value for host or node secure flag

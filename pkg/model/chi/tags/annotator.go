@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package tags
 
 import (
 	core "k8s.io/api/core/v1"
@@ -25,8 +25,9 @@ import (
 type AnnotateType string
 
 const (
-	AnnotateConfigMapCommon AnnotateType = "annotate cm common"
-	AnnotateConfigMapHost   AnnotateType = "annotate cm host"
+	AnnotateConfigMapCommon      AnnotateType = "annotate cm common"
+	AnnotateConfigMapCommonUsers AnnotateType = "annotate cm common users"
+	AnnotateConfigMapHost        AnnotateType = "annotate cm host"
 
 	AnnotateServiceCHI     AnnotateType = "annotate svc chi"
 	AnnotateServiceCluster AnnotateType = "annotate svc cluster"
@@ -40,6 +41,8 @@ const (
 	AnnotatePDB AnnotateType = "annotate pdb"
 
 	AnnotateSTS AnnotateType = "annotate STS"
+
+	AnnotatePodTemplate AnnotateType = "annotate PodTemplate"
 )
 
 // Annotator is an entity which can annotate CHI artifacts
@@ -57,6 +60,8 @@ func NewAnnotator(chi api.IChi) *Annotator {
 func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string {
 	switch what {
 	case AnnotateConfigMapCommon:
+		return a.getCHIScope()
+	case AnnotateConfigMapCommonUsers:
 		return a.getCHIScope()
 	case AnnotateConfigMapHost:
 		var host *api.Host
@@ -129,6 +134,13 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 		return a.getClusterScope(cluster)
 
 	case AnnotateSTS:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+		}
+		return a.getHostScope(host)
+
+	case AnnotatePodTemplate:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)

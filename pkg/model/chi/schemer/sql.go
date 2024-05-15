@@ -18,11 +18,11 @@ import (
 	"context"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 
 	"github.com/MakeNowJust/heredoc"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
 )
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
@@ -60,7 +60,7 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.Host) ([]st
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.Host{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, namer.CreateFQDNs(host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -77,7 +77,7 @@ func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.Host) ([]st
 		`,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.Host{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, namer.CreateFQDNs(host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 

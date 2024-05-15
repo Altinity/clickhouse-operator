@@ -16,6 +16,7 @@ package schemer
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -25,7 +26,7 @@ import (
 
 // shouldCreateDistributedObjects determines whether distributed objects should be created
 func shouldCreateDistributedObjects(host *api.Host) bool {
-	hosts := model.CreateFQDNs(host, api.Cluster{}, false)
+	hosts := namer.CreateFQDNs(host, api.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
@@ -56,21 +57,21 @@ func (s *ClusterSchemer) getDistributedObjectsSQLs(ctx context.Context, host *ap
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			namer.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateDatabaseDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			namer.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateTableDistributed(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			model.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
+			namer.CreateFQDNs(host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)

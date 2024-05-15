@@ -22,7 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
 // CreatePodDisruptionBudget creates new PodDisruptionBudget
@@ -31,13 +32,13 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 		ObjectMeta: meta.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetRootName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.chi.GetNamespace(),
-			Labels:          model.Macro(c.chi).Map(c.labels.GetClusterScope(cluster)),
-			Annotations:     model.Macro(c.chi).Map(c.annotations.Annotate(model.AnnotatePDB, cluster)),
+			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelPDB, cluster)),
+			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotatePDB, cluster)),
 			OwnerReferences: createOwnerReferences(c.chi),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector: &meta.LabelSelector{
-				MatchLabels: model.GetSelectorClusterScope(cluster),
+				MatchLabels: c.tagger.Selector(tags.SelectorClusterScope, cluster),
 			},
 			MaxUnavailable: &intstr.IntOrString{
 				Type:   intstr.Int,

@@ -12,94 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package namer
 
 import (
 	"fmt"
 	"strconv"
-	"strings"
 
 	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-)
-
-const (
-	// Names context length
-	namePartChiMaxLenNamesCtx     = 60
-	namePartClusterMaxLenNamesCtx = 15
-	namePartShardMaxLenNamesCtx   = 15
-	namePartReplicaMaxLenNamesCtx = 15
-
-	// Labels context length
-	namePartChiMaxLenLabelsCtx     = 63
-	namePartClusterMaxLenLabelsCtx = 63
-	namePartShardMaxLenLabelsCtx   = 63
-	namePartReplicaMaxLenLabelsCtx = 63
-)
-
-const (
-	// chiServiceNamePattern is a template of CHI Service name. "clickhouse-{chi}"
-	chiServiceNamePattern = "clickhouse-" + macrosChiName
-
-	// clusterServiceNamePattern is a template of cluster Service name. "cluster-{chi}-{cluster}"
-	clusterServiceNamePattern = "cluster-" + macrosChiName + "-" + macrosClusterName
-
-	// shardServiceNamePattern is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
-	shardServiceNamePattern = "shard-" + macrosChiName + "-" + macrosClusterName + "-" + macrosShardName
-
-	// replicaServiceNamePattern is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
-	replicaServiceNamePattern = "shard-" + macrosChiName + "-" + macrosClusterName + "-" + macrosReplicaName
-
-	// statefulSetNamePattern is a template of hosts's StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
-	statefulSetNamePattern = "chi-" + macrosChiName + "-" + macrosClusterName + "-" + macrosHostName
-
-	// statefulSetServiceNamePattern is a template of hosts's StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
-	statefulSetServiceNamePattern = "chi-" + macrosChiName + "-" + macrosClusterName + "-" + macrosHostName
-
-	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
-	configMapCommonNamePattern = "chi-" + macrosChiName + "-common-configd"
-
-	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
-	configMapCommonUsersNamePattern = "chi-" + macrosChiName + "-common-usersd"
-
-	// configMapHostNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	configMapHostNamePattern = "chi-" + macrosChiName + "-deploy-confd-" + macrosClusterName + "-" + macrosHostName
-
-	// configMapHostMigrationNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-{cluster}-{shard}-{host}"
-	//configMapHostMigrationNamePattern = "chi-" + macrosChiName + "-migration-" + macrosClusterName + "-" + macrosHostName
-
-	// namespaceDomainPattern presents Domain Name pattern of a namespace
-	// In this pattern "%s" is substituted namespace name's value
-	// Ex.: my-dev-namespace.svc.cluster.local
-	namespaceDomainPattern = "%s.svc.cluster.local"
-
-	// ServiceName.domain.name
-	serviceFQDNPattern = "%s" + "." + namespaceDomainPattern
-
-	// podFQDNPattern consists of 3 parts:
-	// 1. nameless service of of stateful set
-	// 2. namespace name
-	// Hostname.domain.name
-	podFQDNPattern = "%s" + "." + namespaceDomainPattern
-
-	// podNamePattern is a name of a Pod within StatefulSet. In our setup each StatefulSet has only 1 pod,
-	// so all pods would have '-0' suffix after StatefulSet name
-	// Ex.: StatefulSetName-0
-	podNamePattern = "%s-0"
-)
-
-// sanitize makes string fulfil kubernetes naming restrictions
-// String can't end with '-', '_' and '.'
-func sanitize(s string) string {
-	return strings.Trim(s, "-_.")
-}
-
-const (
-	namerContextLabels = "labels"
-	namerContextNames  = "names"
 )
 
 type namerContext string
@@ -107,15 +29,15 @@ type namer struct {
 	ctx namerContext
 }
 
-// newNamer creates new namer with specified context
-func newNamer(ctx namerContext) *namer {
+// NewNamer creates new namer with specified context
+func NewNamer(ctx namerContext) *namer {
 	return &namer{
 		ctx: ctx,
 	}
 }
 
 func (n *namer) lenCHI() int {
-	if n.ctx == namerContextLabels {
+	if n.ctx == NamerContextLabels {
 		return namePartChiMaxLenLabelsCtx
 	} else {
 		return namePartChiMaxLenNamesCtx
@@ -138,7 +60,7 @@ func (n *namer) namePartChiNameID(name string) string {
 }
 
 func (n *namer) lenCluster() int {
-	if n.ctx == namerContextLabels {
+	if n.ctx == NamerContextLabels {
 		return namePartClusterMaxLenLabelsCtx
 	} else {
 		return namePartClusterMaxLenNamesCtx
@@ -156,7 +78,7 @@ func (n *namer) namePartClusterNameID(name string) string {
 }
 
 func (n *namer) lenShard() int {
-	if n.ctx == namerContextLabels {
+	if n.ctx == NamerContextLabels {
 		return namePartShardMaxLenLabelsCtx
 	} else {
 		return namePartShardMaxLenNamesCtx
@@ -175,7 +97,7 @@ func (n *namer) namePartShardNameID(name string) string {
 }
 
 func (n *namer) lenReplica() int {
-	if n.ctx == namerContextLabels {
+	if n.ctx == NamerContextLabels {
 		return namePartReplicaMaxLenLabelsCtx
 	} else {
 		return namePartReplicaMaxLenNamesCtx
@@ -203,8 +125,8 @@ func (n *namer) namePartHostNameID(name string) string {
 	return util.CreateStringID(name, n.lenReplica())
 }
 
-// getNamePartNamespace
-func (n *namer) getNamePartNamespace(obj interface{}) string {
+// GetNamePartNamespace
+func (n *namer) GetNamePartNamespace(obj interface{}) string {
 	switch obj.(type) {
 	case *api.ClickHouseInstallation:
 		chi := obj.(*api.ClickHouseInstallation)
@@ -223,8 +145,8 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 	return "ERROR"
 }
 
-// getNamePartCHIName
-func (n *namer) getNamePartCHIName(obj interface{}) string {
+// GetNamePartCHIName
+func (n *namer) GetNamePartCHIName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.ClickHouseInstallation:
 		chi := obj.(*api.ClickHouseInstallation)
@@ -243,8 +165,8 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 	return "ERROR"
 }
 
-// getNamePartClusterName
-func (n *namer) getNamePartClusterName(obj interface{}) string {
+// GetNamePartClusterName
+func (n *namer) GetNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.Cluster:
 		cluster := obj.(*api.Cluster)
@@ -260,8 +182,8 @@ func (n *namer) getNamePartClusterName(obj interface{}) string {
 	return "ERROR"
 }
 
-// getNamePartShardName
-func (n *namer) getNamePartShardName(obj interface{}) string {
+// GetNamePartShardName
+func (n *namer) GetNamePartShardName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.ChiShard:
 		shard := obj.(*api.ChiShard)
@@ -274,8 +196,8 @@ func (n *namer) getNamePartShardName(obj interface{}) string {
 	return "ERROR"
 }
 
-// getNamePartReplicaName
-func (n *namer) getNamePartReplicaName(host *api.Host) string {
+// GetNamePartReplicaName
+func (n *namer) GetNamePartReplicaName(host *api.Host) string {
 	return n.namePartReplicaName(host.Runtime.Address.ReplicaName)
 }
 
@@ -284,53 +206,53 @@ func (n *namer) getNamePartHostName(host *api.Host) string {
 	return n.namePartHostName(host.Runtime.Address.HostName)
 }
 
-// getNamePartCHIScopeCycleSize
-func getNamePartCHIScopeCycleSize(host *api.Host) string {
+// GetNamePartCHIScopeCycleSize
+func GetNamePartCHIScopeCycleSize(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleSize)
 }
 
-// getNamePartCHIScopeCycleIndex
-func getNamePartCHIScopeCycleIndex(host *api.Host) string {
+// GetNamePartCHIScopeCycleIndex
+func GetNamePartCHIScopeCycleIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleIndex)
 }
 
-// getNamePartCHIScopeCycleOffset
-func getNamePartCHIScopeCycleOffset(host *api.Host) string {
+// GetNamePartCHIScopeCycleOffset
+func GetNamePartCHIScopeCycleOffset(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleOffset)
 }
 
-// getNamePartClusterScopeCycleSize
-func getNamePartClusterScopeCycleSize(host *api.Host) string {
+// GetNamePartClusterScopeCycleSize
+func GetNamePartClusterScopeCycleSize(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleSize)
 }
 
-// getNamePartClusterScopeCycleIndex
-func getNamePartClusterScopeCycleIndex(host *api.Host) string {
+// GetNamePartClusterScopeCycleIndex
+func GetNamePartClusterScopeCycleIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleIndex)
 }
 
-// getNamePartClusterScopeCycleOffset
-func getNamePartClusterScopeCycleOffset(host *api.Host) string {
+// GetNamePartClusterScopeCycleOffset
+func GetNamePartClusterScopeCycleOffset(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleOffset)
 }
 
-// getNamePartCHIScopeIndex
-func getNamePartCHIScopeIndex(host *api.Host) string {
+// GetNamePartCHIScopeIndex
+func GetNamePartCHIScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeIndex)
 }
 
-// getNamePartClusterScopeIndex
-func getNamePartClusterScopeIndex(host *api.Host) string {
+// GetNamePartClusterScopeIndex
+func GetNamePartClusterScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeIndex)
 }
 
-// getNamePartShardScopeIndex
-func getNamePartShardScopeIndex(host *api.Host) string {
+// GetNamePartShardScopeIndex
+func GetNamePartShardScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ShardScopeIndex)
 }
 
-// getNamePartReplicaScopeIndex
-func getNamePartReplicaScopeIndex(host *api.Host) string {
+// GetNamePartReplicaScopeIndex
+func GetNamePartReplicaScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ReplicaScopeIndex)
 }
 
@@ -443,22 +365,12 @@ func CreateShardName(shard api.IShard, index int) string {
 	return strconv.Itoa(index)
 }
 
-// IsAutoGeneratedShardName checks whether provided name is auto-generated
-func IsAutoGeneratedShardName(name string, shard api.IShard, index int) bool {
-	return name == CreateShardName(shard, index)
-}
-
 // CreateReplicaName returns a name of a replica.
 // Here replica is a CHOp-internal replica - i.e. a vertical slice of hosts field.
 // In case you are looking for replica name in terms of a hostname to address particular host as in remote_servers.xml
 // you need to take a look on CreateInstanceHostname function
 func CreateReplicaName(replica api.IReplica, index int) string {
 	return strconv.Itoa(index)
-}
-
-// IsAutoGeneratedReplicaName checks whether provided name is auto-generated
-func IsAutoGeneratedReplicaName(name string, replica api.IReplica, index int) bool {
-	return name == CreateReplicaName(replica, index)
 }
 
 // CreateHostName returns a name of a host
@@ -486,33 +398,6 @@ func CreateInstanceHostname(host *api.Host) string {
 	}
 
 	return CreatePodHostname(host)
-}
-
-// IsAutoGeneratedHostName checks whether name is auto-generated
-func IsAutoGeneratedHostName(
-	name string,
-	host *api.Host,
-	shard api.IShard,
-	shardIndex int,
-	replica api.IReplica,
-	replicaIndex int,
-) bool {
-	switch {
-	case name == CreateHostName(host, shard, shardIndex, replica, replicaIndex):
-		// Current version of the name
-		return true
-	case name == fmt.Sprintf("%d-%d", shardIndex, replicaIndex):
-		// old version - index-index
-		return true
-	case name == fmt.Sprintf("%d", shardIndex):
-		// old version - index
-		return true
-	case name == fmt.Sprintf("%d", replicaIndex):
-		// old version - index
-		return true
-	default:
-		return false
-	}
 }
 
 // CreateStatefulSetName creates a name of a StatefulSet for ClickHouse instance
@@ -720,17 +605,6 @@ func createPodNamesOfCHI(chi api.IChi) (names []string) {
 // CreatePVCNameByVolumeClaimTemplate creates PVC name
 func CreatePVCNameByVolumeClaimTemplate(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) string {
 	return createPVCName(host, volumeClaimTemplate.Name)
-}
-
-// CreatePVCNameByVolumeMount creates PVC name
-func CreatePVCNameByVolumeMount(host *api.Host, volumeMount *core.VolumeMount) (string, bool) {
-	volumeClaimTemplate, ok := GetVolumeClaimTemplate(host, volumeMount)
-	if !ok {
-		// Unable to find VolumeClaimTemplate related to this volumeMount.
-		// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
-		return "", false
-	}
-	return createPVCName(host, volumeClaimTemplate.Name), true
 }
 
 // createPVCName is an internal function

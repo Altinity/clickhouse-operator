@@ -16,6 +16,8 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -142,7 +144,7 @@ func (w *worker) purgePVC(
 	m meta.Object,
 ) {
 	if shouldPurgePVC(chi, reconcileFailedObjs, m) {
-		if model.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
+		if tags.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
 			w.a.V(1).M(m).F().Info("Delete PVC: %s/%s", m.GetNamespace(), m.GetName())
 			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
 				w.a.V(1).M(m).F().Error("FAILED to delete PVC: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
@@ -341,7 +343,7 @@ func (w *worker) canDropReplica(host *api.Host, opts ...*dropReplicaOptions) (ca
 	w.c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
-		if model.GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
+		if tags.GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
 			w.a.V(1).F().Info("PVC: %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
 			can = false
 		}
@@ -429,7 +431,7 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 		return nil
 	}
 
-	if !model.HostCanDeleteAllPVCs(host) {
+	if !volume.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
 	err := w.ensureClusterSchemer(host).HostDropTables(ctx, host)

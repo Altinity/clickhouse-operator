@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -32,7 +33,7 @@ func (c *Controller) discovery(ctx context.Context, chi *api.ClickHouseInstallat
 		return nil
 	}
 
-	opts := controller.NewListOptions(model.NewLabeler(chi).GetSelectorCHIScope())
+	opts := controller.NewListOptions(tags.NewLabeler(chi).GetSelectorCHIScope())
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, chi, opts)
 	c.discoveryConfigMaps(ctx, r, chi, opts)
