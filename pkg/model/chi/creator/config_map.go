@@ -57,7 +57,7 @@ func (c *Creator) CreateConfigMap(what ConfigMapType, params ...any) *core.Confi
 func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateConfigMapCommonName(c.cr),
+			Name:            namer.Name(namer.NameConfigMapCommon, c.cr),
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelConfigMapCommon)),
 			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommon)),
@@ -75,7 +75,7 @@ func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFiles
 func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateConfigMapCommonUsersName(c.cr),
+			Name:            namer.Name(namer.NameConfigMapCommonUsers, c.cr),
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelConfigMapCommonUsers)),
 			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommonUsers)),
@@ -93,7 +93,7 @@ func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 func (c *Creator) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateConfigMapHostName(host),
+			Name:            namer.Name(namer.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelConfigMapHost, host)),
 			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateConfigMapHost, host)),

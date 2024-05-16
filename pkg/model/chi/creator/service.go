@@ -72,7 +72,7 @@ func (c *Creator) createServiceCHI() *core.Service {
 		return c.createServiceFromTemplate(
 			template,
 			c.cr.GetNamespace(),
-			namer.CreateCHIServiceName(c.cr),
+			namer.Name(namer.NameCHIService, c.cr),
 			c.tagger.Label(tags.LabelServiceCHI, c.cr),
 			c.tagger.Annotate(tags.AnnotateServiceCHI, c.cr),
 			c.tagger.Selector(tags.SelectorCHIScopeReady),
@@ -85,7 +85,7 @@ func (c *Creator) createServiceCHI() *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateCHIServiceName(c.cr),
+			Name:            namer.Name(namer.NameCHIService, c.cr),
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelServiceCHI, c.cr)),
 			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotateServiceCHI, c.cr)),
@@ -118,7 +118,7 @@ func (c *Creator) createServiceCHI() *core.Service {
 
 // createServiceCluster creates new core.Service for specified Cluster
 func (c *Creator) createServiceCluster(cluster api.ICluster) *core.Service {
-	serviceName := namer.CreateClusterServiceName(cluster)
+	serviceName := namer.Name(namer.NameClusterService, cluster)
 	ownerReferences := createOwnerReferences(c.cr)
 
 	c.a.V(1).F().Info("%s/%s", cluster.GetRuntime().GetAddress().GetNamespace(), serviceName)
@@ -146,7 +146,7 @@ func (c *Creator) createServiceShard(shard api.IShard) *core.Service {
 		return c.createServiceFromTemplate(
 			template,
 			shard.GetRuntime().GetAddress().GetNamespace(),
-			namer.CreateShardServiceName(shard),
+			namer.Name(namer.NameShardService, shard),
 			c.tagger.Label(tags.LabelServiceShard, shard),
 			c.tagger.Annotate(tags.AnnotateServiceShard, shard),
 			c.tagger.Selector(tags.SelectorShardScopeReady, shard),
@@ -165,7 +165,7 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 		return c.createServiceFromTemplate(
 			template,
 			host.Runtime.Address.Namespace,
-			namer.CreateStatefulSetServiceName(host),
+			namer.Name(namer.NameStatefulSetService, host),
 			c.tagger.Label(tags.LabelServiceHost, host),
 			c.tagger.Annotate(tags.AnnotateServiceHost, host),
 			c.tagger.Selector(tags.SelectorHostScope, host),
@@ -178,7 +178,7 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateStatefulSetServiceName(host),
+			Name:            namer.Name(namer.NameStatefulSetService, host),
 			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelServiceHost, host)),
 			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateServiceHost, host)),

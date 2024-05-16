@@ -756,7 +756,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 			cluster.WalkHosts(func(host *api.Host) error {
 
 				// Name of the StatefulSet for this host
-				name := namer.CreateStatefulSetName(host)
+				name := namer.Name(namer.NameStatefulSet, host)
 				// Have we found this StatefulSet
 				found := false
 
@@ -948,7 +948,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
-		host.GetCR().EnsureStatus().PushHostTablesCreated(namer.CreateFQDN(host))
+		host.GetCR().EnsureStatus().PushHostTablesCreated(namer.Name(namer.NameFQDN, host))
 	} else {
 		w.a.V(1).
 			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).

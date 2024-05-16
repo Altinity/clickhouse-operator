@@ -46,16 +46,16 @@ func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels b
 	labels := GetSelectorHostScope(host)
 	if chop.Config().Label.Runtime.AppendScope {
 		// Optional labels
-		labels[LabelShardScopeIndex] = namer.GetNamePartShardScopeIndex(host)
-		labels[LabelReplicaScopeIndex] = namer.GetNamePartReplicaScopeIndex(host)
-		labels[LabelCHIScopeIndex] = namer.GetNamePartCHIScopeIndex(host)
-		labels[LabelCHIScopeCycleSize] = namer.GetNamePartCHIScopeCycleSize(host)
-		labels[LabelCHIScopeCycleIndex] = namer.GetNamePartCHIScopeCycleIndex(host)
-		labels[LabelCHIScopeCycleOffset] = namer.GetNamePartCHIScopeCycleOffset(host)
-		labels[LabelClusterScopeIndex] = namer.GetNamePartClusterScopeIndex(host)
-		labels[LabelClusterScopeCycleSize] = namer.GetNamePartClusterScopeCycleSize(host)
-		labels[LabelClusterScopeCycleIndex] = namer.GetNamePartClusterScopeCycleIndex(host)
-		labels[LabelClusterScopeCycleOffset] = namer.GetNamePartClusterScopeCycleOffset(host)
+		labels[LabelShardScopeIndex] = namer.NamePartLabel(namer.NamePartShardScopeIndex, host)
+		labels[LabelReplicaScopeIndex] = namer.NamePartLabel(namer.NamePartReplicaScopeIndex, host)
+		labels[LabelCHIScopeIndex] = namer.NamePartLabel(namer.NamePartCHIScopeIndex, host)
+		labels[LabelCHIScopeCycleSize] = namer.NamePartLabel(namer.NamePartCHIScopeCycleSize, host)
+		labels[LabelCHIScopeCycleIndex] = namer.NamePartLabel(namer.NamePartCHIScopeCycleIndex, host)
+		labels[LabelCHIScopeCycleOffset] = namer.NamePartLabel(namer.NamePartCHIScopeCycleOffset, host)
+		labels[LabelClusterScopeIndex] = namer.NamePartLabel(namer.NamePartClusterScopeIndex, host)
+		labels[LabelClusterScopeCycleSize] = namer.NamePartLabel(namer.NamePartClusterScopeCycleSize, host)
+		labels[LabelClusterScopeCycleIndex] = namer.NamePartLabel(namer.NamePartClusterScopeCycleIndex, host)
+		labels[LabelClusterScopeCycleOffset] = namer.NamePartLabel(namer.NamePartClusterScopeCycleOffset, host)
 	}
 	if applySupplementaryServiceLabels {
 		// Optional labels

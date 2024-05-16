@@ -30,7 +30,7 @@ func newDefaultPodTemplate(host *api.Host) *api.PodTemplate {
 // newDefaultClickHousePodTemplate returns default Pod Template to be used with StatefulSet
 func newDefaultClickHousePodTemplate(host *api.Host) *api.PodTemplate {
 	podTemplate := &api.PodTemplate{
-		Name: namer.CreateStatefulSetName(host),
+		Name: namer.Name(namer.NameStatefulSet, host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
 			Volumes:    []core.Volume{},

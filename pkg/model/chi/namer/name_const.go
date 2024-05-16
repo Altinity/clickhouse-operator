@@ -15,20 +15,6 @@
 package namer
 
 const (
-	// Names context length
-	namePartChiMaxLenNamesCtx     = 60
-	namePartClusterMaxLenNamesCtx = 15
-	namePartShardMaxLenNamesCtx   = 15
-	namePartReplicaMaxLenNamesCtx = 15
-
-	// Labels context length
-	namePartChiMaxLenLabelsCtx     = 63
-	namePartClusterMaxLenLabelsCtx = 63
-	namePartShardMaxLenLabelsCtx   = 63
-	namePartReplicaMaxLenLabelsCtx = 63
-)
-
-const (
 	// chiServiceNamePattern is a template of CHI Service name. "clickhouse-{chi}"
 	chiServiceNamePattern = "clickhouse-" + MacrosChiName
 
@@ -79,7 +65,28 @@ const (
 	podNamePattern = "%s-0"
 )
 
+type NameType string
+
 const (
-	NamerContextLabels = "labels"
-	NamerContextNames  = "names"
+	NameConfigMapHost                NameType = "ConfigMapHost"
+	NameConfigMapCommon              NameType = "ConfigMapCommon"
+	NameConfigMapCommonUsers         NameType = "NameConfigMapCommonUsers"
+	NameCHIService                   NameType = "NameCHIService"
+	NameCHIServiceFQDN               NameType = "NameCHIServiceFQDN"
+	NameClusterService               NameType = "NameClusterService"
+	NameShardService                 NameType = "NameShardService"
+	NameShard                        NameType = "NameShard"
+	NameReplica                      NameType = "NameReplica"
+	NameHost                         NameType = "NameHost"
+	NameHostTemplate                 NameType = "NameHostTemplate"
+	NameInstanceHostname             NameType = "NameInstanceHostname"
+	NameStatefulSet                  NameType = "NameStatefulSet"
+	NameStatefulSetService           NameType = "NameStatefulSetService"
+	NamePodHostname                  NameType = "NamePodHostname"
+	NameFQDN                         NameType = "NameFQDN"
+	NameFQDNs                        NameType = "NameFQDNs"
+	NamePodHostnameRegexp            NameType = "NamePodHostnameRegexp"
+	NamePod                          NameType = "NamePod"
+	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
+	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
 )

@@ -29,5 +29,5 @@ func HostIsNewOne(host *api.Host) bool {
 
 // HostHasTablesCreated checks whether host has tables listed as already created
 func HostHasTablesCreated(host *api.Host) bool {
-	return util.InArray(namer.CreateFQDN(host), host.GetCR().EnsureStatus().GetHostsWithTablesCreated())
+	return util.InArray(namer.Name(namer.NameFQDN, host), host.GetCR().EnsureStatus().GetHostsWithTablesCreated())
 }

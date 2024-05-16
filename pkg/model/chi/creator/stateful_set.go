@@ -34,7 +34,7 @@ import (
 func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet {
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateStatefulSetName(host),
+			Name:            namer.Name(namer.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelSTS, host)),
 			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateSTS, host)),
@@ -42,7 +42,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
-			ServiceName: namer.CreateStatefulSetServiceName(host),
+			ServiceName: namer.Name(namer.NameStatefulSetService, host),
 			Selector: &meta.LabelSelector{
 				MatchLabels: c.tagger.Selector(tags.SelectorHostScope, host),
 			},
@@ -128,7 +128,7 @@ func (c *Creator) stsPersonalizeSpecTemplate(statefulSet *apps.StatefulSet, host
 		{
 			IP: "127.0.0.1",
 			Hostnames: []string{
-				namer.CreatePodHostname(host),
+				namer.Name(namer.NamePodHostname, host),
 			},
 		},
 	}
@@ -216,9 +216,9 @@ func (c *Creator) stsSetupVolumes(statefulSet *apps.StatefulSet, host *api.Host)
 
 // stsSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
 func (c *Creator) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
-	configMapHostName := namer.CreateConfigMapHostName(host)
-	configMapCommonName := namer.CreateConfigMapCommonName(c.cr)
-	configMapCommonUsersName := namer.CreateConfigMapCommonUsersName(c.cr)
+	configMapHostName := namer.Name(namer.NameConfigMapHost, host)
+	configMapCommonName := namer.Name(namer.NameConfigMapCommon, c.cr)
+	configMapCommonUsersName := namer.Name(namer.NameConfigMapCommonUsers, c.cr)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(
@@ -377,7 +377,7 @@ func (c *Creator) stsAppendPVCTemplate(
 	// so, let's add it
 
 	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-		claimName := namer.CreatePVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
+		claimName := namer.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
 		statefulSet.Spec.Template.Spec.Volumes = append(
 			statefulSet.Spec.Template.Spec.Volumes,
 			createVolumeForPVC(volumeClaimTemplate.Name, claimName),

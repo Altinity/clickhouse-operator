@@ -103,28 +103,28 @@ func (c *Cluster) QueryUnzipAndApplyUUIDs(ctx context.Context, endpoints []strin
 
 // ExecCHI runs set of SQL queries over the whole CHI
 func (c *Cluster) ExecCHI(ctx context.Context, chi *api.ClickHouseInstallation, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := namer.CreateFQDNs(chi, nil, false)
+	hosts := namer.Names(namer.NameFQDNs, chi, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)
 }
 
 // ExecCluster runs set of SQL queries over the cluster
 func (c *Cluster) ExecCluster(ctx context.Context, cluster *api.Cluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := namer.CreateFQDNs(cluster, nil, false)
+	hosts := namer.Names(namer.NameFQDNs, cluster, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)
 }
 
 // ExecShard runs set of SQL queries over the shard replicas
 func (c *Cluster) ExecShard(ctx context.Context, shard *api.ChiShard, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := namer.CreateFQDNs(shard, nil, false)
+	hosts := namer.Names(namer.NameFQDNs, shard, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)
 }
 
 // ExecHost runs set of SQL queries over the replica
 func (c *Cluster) ExecHost(ctx context.Context, host *api.Host, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := namer.CreateFQDNs(host, api.Host{}, false)
+	hosts := namer.Names(namer.NameFQDNs, host, api.Host{}, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	c.SetHosts(hosts)
 	if opts.GetSilent() {
@@ -137,7 +137,7 @@ func (c *Cluster) ExecHost(ctx context.Context, host *api.Host, SQLs []string, _
 
 // QueryHost runs specified query on specified host
 func (c *Cluster) QueryHost(ctx context.Context, host *api.Host, sql string, _opts ...*clickhouse.QueryOptions) (*clickhouse.QueryResult, error) {
-	hosts := namer.CreateFQDNs(host, api.Host{}, false)
+	hosts := namer.Names(namer.NameFQDNs, host, api.Host{}, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	c.SetHosts(hosts)
 	if opts.GetSilent() {

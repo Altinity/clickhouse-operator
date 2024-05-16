@@ -19,15 +19,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 )
 
-var labelsNamer = namer.NewNamer(namer.NamerContextLabels)
-
 // GetSelectorCHIScope gets labels to select a CHI-scoped object
 func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace: labelsNamer.GetNamePartNamespace(l.chi),
+		LabelNamespace: namer.NamePartLabel(namer.NamePartNamespace, l.chi),
 		LabelAppName:   LabelAppValue,
-		LabelCHIName:   labelsNamer.GetNamePartCHIName(l.chi),
+		LabelCHIName:   namer.NamePartLabel(namer.NamePartCHIName, l.chi),
 	}
 }
 
@@ -40,10 +38,10 @@ func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
 func getSelectorClusterScope(cluster api.ICluster) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace:   labelsNamer.GetNamePartNamespace(cluster),
+		LabelNamespace:   namer.NamePartLabel(namer.NamePartNamespace, cluster),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     labelsNamer.GetNamePartCHIName(cluster),
-		LabelClusterName: labelsNamer.GetNamePartClusterName(cluster),
+		LabelCHIName:     namer.NamePartLabel(namer.NamePartCHIName, cluster),
+		LabelClusterName: namer.NamePartLabel(namer.NamePartClusterName, cluster),
 	}
 }
 
@@ -56,11 +54,11 @@ func getSelectorClusterScopeReady(cluster api.ICluster) map[string]string {
 func getSelectorShardScope(shard api.IShard) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace:   labelsNamer.GetNamePartNamespace(shard),
+		LabelNamespace:   namer.NamePartLabel(namer.NamePartNamespace, shard),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     labelsNamer.GetNamePartCHIName(shard),
-		LabelClusterName: labelsNamer.GetNamePartClusterName(shard),
-		LabelShardName:   labelsNamer.GetNamePartShardName(shard),
+		LabelCHIName:     namer.NamePartLabel(namer.NamePartCHIName, shard),
+		LabelClusterName: namer.NamePartLabel(namer.NamePartClusterName, shard),
+		LabelShardName:   namer.NamePartLabel(namer.NamePartShardName, shard),
 	}
 }
 
@@ -73,12 +71,12 @@ func getSelectorShardScopeReady(shard api.IShard) map[string]string {
 func GetSelectorHostScope(host *api.Host) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace:   labelsNamer.GetNamePartNamespace(host),
+		LabelNamespace:   namer.NamePartLabel(namer.NamePartNamespace, host),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     labelsNamer.GetNamePartCHIName(host),
-		LabelClusterName: labelsNamer.GetNamePartClusterName(host),
-		LabelShardName:   labelsNamer.GetNamePartShardName(host),
-		LabelReplicaName: labelsNamer.GetNamePartReplicaName(host),
+		LabelCHIName:     namer.NamePartLabel(namer.NamePartCHIName, host),
+		LabelClusterName: namer.NamePartLabel(namer.NamePartClusterName, host),
+		LabelShardName:   namer.NamePartLabel(namer.NamePartShardName, host),
+		LabelReplicaName: namer.NamePartLabel(namer.NamePartReplicaName, host),
 	}
 }
 

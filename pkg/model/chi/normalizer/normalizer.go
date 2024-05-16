@@ -166,8 +166,8 @@ func (n *Normalizer) finalize() {
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		host.Runtime.Address.StatefulSet = namer.CreateStatefulSetName(host)
-		host.Runtime.Address.FQDN = namer.CreateFQDN(host)
+		host.Runtime.Address.StatefulSet = namer.Name(namer.NameStatefulSet, host)
+		host.Runtime.Address.FQDN = namer.Name(namer.NameFQDN, host)
 		return nil
 	})
 }
@@ -189,13 +189,13 @@ func hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = creator.CreateHostTemplate(creator.HostTemplateHostNetwork, namer.CreateHostTemplateName(host))
+			hostTemplate = creator.CreateHostTemplate(creator.HostTemplateHostNetwork, namer.Name(namer.NameHostTemplate, host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = creator.CreateHostTemplate(creator.HostTemplateCommon, namer.CreateHostTemplateName(host))
+		hostTemplate = creator.CreateHostTemplate(creator.HostTemplateCommon, namer.Name(namer.NameHostTemplate, host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
@@ -322,12 +322,12 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := namer.CreateCHIServiceFQDN(n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
+	endpoint := namer.Name(namer.NameCHIServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		pods = append(pods, namer.CreatePodName(host))
-		fqdns = append(fqdns, namer.CreateFQDN(host))
+		pods = append(pods, namer.Name(namer.NamePod, host))
+		fqdns = append(fqdns, namer.Name(namer.NameFQDN, host))
 		return nil
 	})
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
@@ -812,7 +812,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 			core.EnvVar{
 				Name: model.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
-					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(namer.CreateClusterAutoSecretName(cluster)),
+					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(namer.Name(namer.NameClusterAutoSecret, cluster)),
 				},
 			},
 		)
@@ -979,7 +979,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 	profile := chop.Config().ClickHouse.Config.User.Default.Profile
 	quota := chop.Config().ClickHouse.Config.User.Default.Quota
 	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	hostRegexp := namer.CreatePodHostnameRegexp(n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+	hostRegexp := namer.Name(namer.NamePodHostnameRegexp, n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
 	// Some users may have special options for mandatory fields
 	switch user.Username() {
@@ -1453,7 +1453,7 @@ func (n *Normalizer) normalizeShardName(shard *api.ChiShard, index int) {
 		return
 	}
 
-	shard.Name = namer.CreateShardName(shard, index)
+	shard.Name = namer.Name(namer.NameShard, shard, index)
 }
 
 // normalizeReplicaName normalizes replica name
@@ -1463,7 +1463,7 @@ func (n *Normalizer) normalizeReplicaName(replica *api.ChiReplica, index int) {
 		return
 	}
 
-	replica.Name = namer.CreateReplicaName(replica, index)
+	replica.Name = namer.Name(namer.NameReplica, replica, index)
 }
 
 // normalizeShardName normalizes shard weight
@@ -1535,7 +1535,7 @@ func (n *Normalizer) normalizeHostName(
 		return
 	}
 
-	host.Name = namer.CreateHostName(host, shard, shardIndex, replica, replicaIndex)
+	host.Name = namer.Name(namer.NameHost, host, shard, shardIndex, replica, replicaIndex)
 }
 
 // normalizeShardInternalReplication ensures reasonable values in

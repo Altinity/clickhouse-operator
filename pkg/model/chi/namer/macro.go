@@ -22,60 +22,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-const (
-	// MacrosNamespace is a sanitized namespace name where ClickHouseInstallation runs
-	MacrosNamespace = "{namespace}"
-
-	// MacrosChiName is a sanitized ClickHouseInstallation name
-	MacrosChiName = "{chi}"
-	// MacrosChiID is a sanitized ID made of original ClickHouseInstallation name
-	MacrosChiID = "{chiID}"
-
-	// MacrosClusterName is a sanitized cluster name
-	MacrosClusterName = "{cluster}"
-	// MacrosClusterID is a sanitized ID made of original cluster name
-	MacrosClusterID = "{clusterID}"
-	// MacrosClusterIndex is an index of the cluster in the CHI - integer number, converted into string
-	MacrosClusterIndex = "{clusterIndex}"
-
-	// MacrosShardName is a sanitized shard name
-	MacrosShardName = "{shard}"
-	// MacrosShardID is a sanitized ID made of original shard name
-	MacrosShardID = "{shardID}"
-	// MacrosShardIndex is an index of the shard in the cluster - integer number, converted into string
-	MacrosShardIndex = "{shardIndex}"
-
-	// MacrosReplicaName is a sanitized replica name
-	MacrosReplicaName = "{replica}"
-	// MacrosReplicaID is a sanitized ID made of original replica name
-	MacrosReplicaID = "{replicaID}"
-	// MacrosReplicaIndex is an index of the replica in the cluster - integer number, converted into string
-	MacrosReplicaIndex = "{replicaIndex}"
-
-	// MacrosHostName is a sanitized host name
-	MacrosHostName = "{host}"
-	// MacrosHostID is a sanitized ID made of original host name
-	MacrosHostID = "{hostID}"
-	// MacrosChiScopeIndex is an index of the host on the CHI-scope
-	MacrosChiScopeIndex = "{chiScopeIndex}"
-	// MacrosChiScopeCycleIndex is an index of the host in the CHI-scope cycle - integer number, converted into string
-	MacrosChiScopeCycleIndex = "{chiScopeCycleIndex}"
-	// MacrosChiScopeCycleOffset is an offset of the host in the CHI-scope cycle - integer number, converted into string
-	MacrosChiScopeCycleOffset = "{chiScopeCycleOffset}"
-	// MacrosClusterScopeIndex is an index of the host on the cluster-scope
-	MacrosClusterScopeIndex = "{clusterScopeIndex}"
-	// MacrosClusterScopeCycleIndex is an index of the host in the Cluster-scope cycle - integer number, converted into string
-	MacrosClusterScopeCycleIndex = "{clusterScopeCycleIndex}"
-	// MacrosClusterScopeCycleOffset is an offset of the host in the Cluster-scope cycle - integer number, converted into string
-	MacrosClusterScopeCycleOffset = "{clusterScopeCycleOffset}"
-	// MacrosShardScopeIndex is an index of the host on the shard-scope
-	MacrosShardScopeIndex = "{shardScopeIndex}"
-	// MacrosReplicaScopeIndex is an index of the host on the replica-scope
-	MacrosReplicaScopeIndex = "{replicaScopeIndex}"
-	// MacrosClusterScopeCycleHeadPointsToPreviousCycleTail is {clusterScopeIndex} of previous Cycle Tail
-	MacrosClusterScopeCycleHeadPointsToPreviousCycleTail = "{clusterScopeCycleHeadPointsToPreviousCycleTail}"
-)
-
 // MacrosEngine
 type MacrosEngine struct {
 	names *namer
@@ -85,7 +31,7 @@ type MacrosEngine struct {
 // Macro
 func Macro(scope any) *MacrosEngine {
 	m := new(MacrosEngine)
-	m.names = NewNamer(NamerContextNames)
+	m.names = NewNamer(TargetNames)
 	m.scope = scope
 	return m
 }
@@ -94,7 +40,7 @@ func Macro(scope any) *MacrosEngine {
 func (m *MacrosEngine) Line(line string) string {
 	switch t := m.scope.(type) {
 	case api.ICustomResource:
-		return m.newLineMacroReplacerChi(t).Replace(line)
+		return m.newLineMacroReplacerCR(t).Replace(line)
 	case api.ICluster:
 		return m.newLineMacroReplacerCluster(t).Replace(line)
 	case api.IShard:
@@ -110,7 +56,7 @@ func (m *MacrosEngine) Line(line string) string {
 func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 	switch t := m.scope.(type) {
 	case api.ICustomResource:
-		return m.newMapMacroReplacerChi(t).Replace(_map)
+		return m.newMapMacroReplacerCR(t).Replace(_map)
 	case api.ICluster:
 		return m.newMapMacroReplacerCluster(t).Replace(_map)
 	case api.IShard:
@@ -124,18 +70,18 @@ func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 	}
 }
 
-// newLineMacroReplacerChi
-func (m *MacrosEngine) newLineMacroReplacerChi(chi api.ICustomResource) *strings.Replacer {
+// newLineMacroReplacerCR
+func (m *MacrosEngine) newLineMacroReplacerCR(cr api.ICustomResource) *strings.Replacer {
 	return strings.NewReplacer(
-		MacrosNamespace, m.names.namePartNamespace(chi.GetNamespace()),
-		MacrosChiName, m.names.namePartChiName(chi.GetName()),
-		MacrosChiID, m.names.namePartChiNameID(chi.GetName()),
+		MacrosNamespace, m.names.namePartNamespace(cr.GetNamespace()),
+		MacrosChiName, m.names.namePartChiName(cr.GetName()),
+		MacrosChiID, m.names.namePartChiNameID(cr.GetName()),
 	)
 }
 
-// newMapMacroReplacerChi
-func (m *MacrosEngine) newMapMacroReplacerChi(chi api.ICustomResource) *util.MapReplacer {
-	return util.NewMapReplacer(m.newLineMacroReplacerChi(chi))
+// newMapMacroReplacerCR
+func (m *MacrosEngine) newMapMacroReplacerCR(cr api.ICustomResource) *util.MapReplacer {
+	return util.NewMapReplacer(m.newLineMacroReplacerCR(cr))
 }
 
 // newLineMacroReplacerCluster
