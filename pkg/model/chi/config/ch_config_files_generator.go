@@ -36,8 +36,28 @@ func NewClickHouseConfigFilesGenerator(chi *api.ClickHouseInstallation, opts *Cl
 	}
 }
 
-// CreateConfigFilesGroupCommon creates common config files
-func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *ClickHouseConfigFilesGeneratorOptions) map[string]string {
+func (c *ClickHouseConfigFilesGenerator) CreateConfigFiles(what FilesGroupType, params ...any) map[string]string {
+	switch what {
+	case ConfigFilesGroupCommon:
+		var options *ClickHouseConfigFilesGeneratorOptions
+		if len(params) > 0 {
+			options = params[0].(*ClickHouseConfigFilesGeneratorOptions)
+			return c.createConfigFilesGroupCommon(options)
+		}
+	case ConfigFilesGroupUsers:
+		return c.createConfigFilesGroupUsers()
+	case ConfigFilesGroupHost:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+			return c.createConfigFilesGroupHost(host)
+		}
+	}
+	return nil
+}
+
+// createConfigFilesGroupCommon creates common config files
+func (c *ClickHouseConfigFilesGenerator) createConfigFilesGroupCommon(options *ClickHouseConfigFilesGeneratorOptions) map[string]string {
 	if options == nil {
 		options = defaultClickHouseConfigFilesGeneratorOptions()
 	}
@@ -55,8 +75,8 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupCommon(options *C
 	return commonConfigSections
 }
 
-// CreateConfigFilesGroupUsers creates users config files
-func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[string]string {
+// createConfigFilesGroupUsers creates users config files
+func (c *ClickHouseConfigFilesGenerator) createConfigFilesGroupUsers() map[string]string {
 	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
@@ -73,8 +93,8 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupUsers() map[strin
 	return commonUsersConfigSections
 }
 
-// CreateConfigFilesGroupHost creates host config files
-func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *api.Host) map[string]string {
+// createConfigFilesGroupHost creates host config files
+func (c *ClickHouseConfigFilesGenerator) createConfigFilesGroupHost(host *api.Host) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(host))
@@ -92,37 +112,4 @@ func (c *ClickHouseConfigFilesGenerator) CreateConfigFilesGroupHost(host *api.Ho
 // filename depends on a section which it will contain
 func createConfigSectionFilename(section string) string {
 	return "chop-generated-" + section + ".xml"
-}
-
-// ClickHouseConfigFilesGeneratorOptions specifies options for clickhouse configuration generator
-type ClickHouseConfigFilesGeneratorOptions struct {
-	RemoteServersGeneratorOptions *RemoteServersGeneratorOptions
-}
-
-// NewClickHouseConfigFilesGeneratorOptions creates new options for clickhouse configuration generator
-func NewClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
-	return &ClickHouseConfigFilesGeneratorOptions{}
-}
-
-// GetRemoteServersGeneratorOptions gets remote-servers generator options
-func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
-	if o == nil {
-		return nil
-	}
-	return o.RemoteServersGeneratorOptions
-}
-
-// SetRemoteServersGeneratorOptions sets remote-servers generator options
-func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *ClickHouseConfigFilesGeneratorOptions {
-	if o == nil {
-		return nil
-	}
-	o.RemoteServersGeneratorOptions = opts
-
-	return o
-}
-
-// defaultClickHouseConfigFilesGeneratorOptions creates new default options for clickhouse config generator
-func defaultClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
-	return NewClickHouseConfigFilesGeneratorOptions()
 }

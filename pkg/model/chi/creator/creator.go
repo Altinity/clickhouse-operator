@@ -27,10 +27,14 @@ type tagger interface {
 	Selector(what tags.SelectorType, params ...any) map[string]string
 }
 
+type configFileGenerator interface {
+	CreateConfigFiles(what config.FilesGroupType, params ...any) map[string]string
+}
+
 // Creator specifies creator object
 type Creator struct {
 	chi                  api.IChi
-	configFilesGenerator *config.ClickHouseConfigFilesGenerator
+	configFilesGenerator configFileGenerator
 	tagger               tagger
 	a                    log.Announcer
 	// namer
@@ -43,7 +47,7 @@ type Creator struct {
 }
 
 // NewCreator creates new Creator object
-func NewCreator(chi api.IChi, configFilesGenerator *config.ClickHouseConfigFilesGenerator) *Creator {
+func NewCreator(chi api.IChi, configFilesGenerator configFileGenerator) *Creator {
 	return &Creator{
 		chi:                  chi,
 		configFilesGenerator: configFilesGenerator,

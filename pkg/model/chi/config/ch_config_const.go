@@ -20,6 +20,14 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
+type FilesGroupType string
+
+const (
+	ConfigFilesGroupCommon FilesGroupType = "FilesGroupType common"
+	ConfigFilesGroupUsers  FilesGroupType = "FilesGroupType users"
+	ConfigFilesGroupHost   FilesGroupType = "FilesGroupType host"
+)
+
 const (
 	xmlTagYandex = "yandex"
 )
