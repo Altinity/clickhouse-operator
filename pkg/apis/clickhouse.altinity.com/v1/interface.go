@@ -18,7 +18,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type IChi interface {
+type ICustomResource interface {
 	GetNamespace() string
 	GetName() string
 	GetLabels() map[string]string

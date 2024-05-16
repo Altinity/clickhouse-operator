@@ -21,8 +21,8 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-type ClickHouseConfigGeneratorOptions struct {
-	DistributedDDL *api.ChiDistributedDDL
+type ConfigGeneratorOptions struct {
+	DistributedDDL *api.DistributedDDL
 	Users          *api.Settings
 	Profiles       *api.Settings
 	Quotas         *api.Settings

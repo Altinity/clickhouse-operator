@@ -93,7 +93,7 @@ func Macro(scope any) *MacrosEngine {
 // Line expands line with macros(es)
 func (m *MacrosEngine) Line(line string) string {
 	switch t := m.scope.(type) {
-	case api.IChi:
+	case api.ICustomResource:
 		return m.newLineMacroReplacerChi(t).Replace(line)
 	case api.ICluster:
 		return m.newLineMacroReplacerCluster(t).Replace(line)
@@ -109,7 +109,7 @@ func (m *MacrosEngine) Line(line string) string {
 // Map expands map with macros(es)
 func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 	switch t := m.scope.(type) {
-	case api.IChi:
+	case api.ICustomResource:
 		return m.newMapMacroReplacerChi(t).Replace(_map)
 	case api.ICluster:
 		return m.newMapMacroReplacerCluster(t).Replace(_map)
@@ -125,7 +125,7 @@ func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 }
 
 // newLineMacroReplacerChi
-func (m *MacrosEngine) newLineMacroReplacerChi(chi api.IChi) *strings.Replacer {
+func (m *MacrosEngine) newLineMacroReplacerChi(chi api.ICustomResource) *strings.Replacer {
 	return strings.NewReplacer(
 		MacrosNamespace, m.names.namePartNamespace(chi.GetNamespace()),
 		MacrosChiName, m.names.namePartChiName(chi.GetName()),
@@ -134,7 +134,7 @@ func (m *MacrosEngine) newLineMacroReplacerChi(chi api.IChi) *strings.Replacer {
 }
 
 // newMapMacroReplacerChi
-func (m *MacrosEngine) newMapMacroReplacerChi(chi api.IChi) *util.MapReplacer {
+func (m *MacrosEngine) newMapMacroReplacerChi(chi api.ICustomResource) *util.MapReplacer {
 	return util.NewMapReplacer(m.newLineMacroReplacerChi(chi))
 }
 

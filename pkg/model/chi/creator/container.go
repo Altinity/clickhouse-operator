@@ -61,10 +61,9 @@ func ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
 	)
 }
 
-func appendContainerPorts(container *core.Container, host *api.Host) {
+func containerAppendSpecifiedPorts(container *core.Container, host *api.Host) {
 	// Walk over all assigned ports of the host and append each port to the list of container's ports
-	config.HostWalkAssignedPorts(
-		host,
+	host.WalkAssignedPorts(
 		func(name string, port *api.Int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of container's ports
 			container.Ports = append(container.Ports,
@@ -88,7 +87,7 @@ func newDefaultClickHouseContainer(host *api.Host) core.Container {
 		LivenessProbe:  createDefaultClickHouseLivenessProbe(host),
 		ReadinessProbe: createDefaultClickHouseReadinessProbe(host),
 	}
-	appendContainerPorts(&container, host)
+	containerAppendSpecifiedPorts(&container, host)
 	return container
 }
 

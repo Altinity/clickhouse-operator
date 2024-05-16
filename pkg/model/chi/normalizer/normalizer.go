@@ -232,35 +232,35 @@ func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 			}
 		case deployment.PortDistributionClusterScopeIndex:
 			if !host.TCPPort.HasValue() {
-				base := config.ChDefaultTCPPortNumber
+				base := api.ChDefaultTCPPortNumber
 				if template.Spec.TCPPort.HasValue() {
 					base = template.Spec.TCPPort.Value()
 				}
 				host.TCPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 			if !host.TLSPort.HasValue() {
-				base := config.ChDefaultTLSPortNumber
+				base := api.ChDefaultTLSPortNumber
 				if template.Spec.TLSPort.HasValue() {
 					base = template.Spec.TLSPort.Value()
 				}
 				host.TLSPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 			if !host.HTTPPort.HasValue() {
-				base := config.ChDefaultHTTPPortNumber
+				base := api.ChDefaultHTTPPortNumber
 				if template.Spec.HTTPPort.HasValue() {
 					base = template.Spec.HTTPPort.Value()
 				}
 				host.HTTPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 			if !host.HTTPSPort.HasValue() {
-				base := config.ChDefaultHTTPSPortNumber
+				base := api.ChDefaultHTTPSPortNumber
 				if template.Spec.HTTPSPort.HasValue() {
 					base = template.Spec.HTTPSPort.Value()
 				}
 				host.HTTPSPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 			if !host.InterserverHTTPPort.HasValue() {
-				base := config.ChDefaultInterserverHTTPPortNumber
+				base := api.ChDefaultInterserverHTTPPortNumber
 				if template.Spec.InterserverHTTPPort.HasValue() {
 					base = template.Spec.InterserverHTTPPort.Value()
 				}
@@ -300,14 +300,14 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 	// On the other hand, for final setup we need to assign real numbers to ports
 	if final {
 		if host.IsInsecure() {
-			fallbackTCPPort = api.NewInt32(config.ChDefaultTCPPortNumber)
-			fallbackHTTPPort = api.NewInt32(config.ChDefaultHTTPPortNumber)
+			fallbackTCPPort = api.NewInt32(api.ChDefaultTCPPortNumber)
+			fallbackHTTPPort = api.NewInt32(api.ChDefaultHTTPPortNumber)
 		}
 		if host.IsSecure() {
-			fallbackTLSPort = api.NewInt32(config.ChDefaultTLSPortNumber)
-			fallbackHTTPSPort = api.NewInt32(config.ChDefaultHTTPSPortNumber)
+			fallbackTLSPort = api.NewInt32(api.ChDefaultTLSPortNumber)
+			fallbackHTTPSPort = api.NewInt32(api.ChDefaultHTTPSPortNumber)
 		}
-		fallbackInterserverHTTPPort = api.NewInt32(config.ChDefaultInterserverHTTPPortNumber)
+		fallbackInterserverHTTPPort = api.NewInt32(api.ChDefaultInterserverHTTPPortNumber)
 	}
 
 	//
@@ -403,7 +403,7 @@ func (n *Normalizer) normalizeDefaults(defaults *api.ChiDefaults) *api.ChiDefaul
 	defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.Normalize(false)
 	// Ensure field
 	if defaults.DistributedDDL == nil {
-		//defaults.DistributedDDL = api.NewChiDistributedDDL()
+		//defaults.DistributedDDL = api.NewDistributedDDL()
 	}
 	// Ensure field
 	if defaults.StorageManagement == nil {

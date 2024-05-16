@@ -829,8 +829,8 @@ type ServiceTemplate struct {
 	Spec         core.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
 }
 
-// ChiDistributedDDL defines distributedDDL section of .spec.defaults
-type ChiDistributedDDL struct {
+// DistributedDDL defines distributedDDL section of .spec.defaults
+type DistributedDDL struct {
 	Profile string `json:"profile,omitempty" yaml:"profile"`
 }
 

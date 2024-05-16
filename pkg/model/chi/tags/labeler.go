@@ -23,11 +23,11 @@ import (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	chi api.IChi
+	chi api.ICustomResource
 }
 
 // NewLabeler creates new labeler with context
-func NewLabeler(chi api.IChi) *Labeler {
+func NewLabeler(chi api.ICustomResource) *Labeler {
 	return &Labeler{
 		chi: chi,
 	}

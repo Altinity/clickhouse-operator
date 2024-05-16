@@ -64,7 +64,7 @@ func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFiles
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.configFilesGenerator.CreateConfigFiles(config.ConfigFilesGroupCommon, options),
+		Data: c.configFilesGenerator.CreateConfigFiles(config.FilesGroupCommon, options),
 	}
 	// And after the object is ready we can put version label
 	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
@@ -82,7 +82,7 @@ func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.configFilesGenerator.CreateConfigFiles(config.ConfigFilesGroupUsers),
+		Data: c.configFilesGenerator.CreateConfigFiles(config.FilesGroupUsers),
 	}
 	// And after the object is ready we can put version label
 	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
@@ -100,7 +100,7 @@ func (c *Creator) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: c.configFilesGenerator.CreateConfigFiles(config.ConfigFilesGroupHost, host),
+		Data: c.configFilesGenerator.CreateConfigFiles(config.FilesGroupHost, host),
 	}
 	// And after the object is ready we can put version label
 	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)

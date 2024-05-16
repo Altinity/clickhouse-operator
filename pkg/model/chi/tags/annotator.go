@@ -47,11 +47,11 @@ const (
 
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
-	chi api.IChi
+	chi api.ICustomResource
 }
 
 // NewAnnotator creates new annotator with context
-func NewAnnotator(chi api.IChi) *Annotator {
+func NewAnnotator(chi api.ICustomResource) *Annotator {
 	return &Annotator{
 		chi: chi,
 	}

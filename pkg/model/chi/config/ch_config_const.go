@@ -15,17 +15,15 @@
 package config
 
 import (
-	core "k8s.io/api/core/v1"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 type FilesGroupType string
 
 const (
-	ConfigFilesGroupCommon FilesGroupType = "FilesGroupType common"
-	ConfigFilesGroupUsers  FilesGroupType = "FilesGroupType users"
-	ConfigFilesGroupHost   FilesGroupType = "FilesGroupType host"
+	FilesGroupCommon FilesGroupType = "FilesGroupType common"
+	FilesGroupUsers  FilesGroupType = "FilesGroupType users"
+	FilesGroupHost   FilesGroupType = "FilesGroupType host"
 )
 
 const (
@@ -101,59 +99,8 @@ const (
 )
 
 const (
-	// ClickHouse open ports names and values
-	ChDefaultTCPPortName               = "tcp"
-	ChDefaultTCPPortNumber             = int32(9000)
-	ChDefaultTLSPortName               = "secureclient"
-	ChDefaultTLSPortNumber             = int32(9440)
-	ChDefaultHTTPPortName              = "http"
-	ChDefaultHTTPPortNumber            = int32(8123)
-	ChDefaultHTTPSPortName             = "https"
-	ChDefaultHTTPSPortNumber           = int32(8443)
-	ChDefaultInterserverHTTPPortName   = "interserver"
-	ChDefaultInterserverHTTPPortNumber = int32(9009)
-)
-
-const (
 	// ZkDefaultPort specifies Zookeeper default port
 	ZkDefaultPort = 2181
 	// ZkDefaultRootTemplate specifies default ZK root - /clickhouse/{namespace}/{chi name}
 	ZkDefaultRootTemplate = "/clickhouse/%s/%s"
 )
-
-func HostWalkPorts(host *api.Host, f func(name string, port *api.Int32, protocol core.Protocol) bool) {
-	if host == nil {
-		return
-	}
-	if f(ChDefaultTCPPortName, host.TCPPort, core.ProtocolTCP) {
-		return
-	}
-	if f(ChDefaultTLSPortName, host.TLSPort, core.ProtocolTCP) {
-		return
-	}
-	if f(ChDefaultHTTPPortName, host.HTTPPort, core.ProtocolTCP) {
-		return
-	}
-	if f(ChDefaultHTTPSPortName, host.HTTPSPort, core.ProtocolTCP) {
-		return
-	}
-	if f(ChDefaultInterserverHTTPPortName, host.InterserverHTTPPort, core.ProtocolTCP) {
-		return
-	}
-}
-
-func HostWalkAssignedPorts(host *api.Host, f func(name string, port *api.Int32, protocol core.Protocol) bool) {
-	if host == nil {
-		return
-	}
-	HostWalkPorts(
-		host,
-		func(_name string, _port *api.Int32, _protocol core.Protocol) bool {
-			if _port.HasValue() {
-				return f(_name, _port, _protocol)
-			}
-			// Do not break, continue iterating
-			return false
-		},
-	)
-}

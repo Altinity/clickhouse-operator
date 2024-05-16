@@ -19,7 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
 type ProbeType string
@@ -55,7 +54,7 @@ func createDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(config.ChDefaultHTTPPortName), // What if it is not a default?
+					Port: intstr.Parse(api.ChDefaultHTTPPortName), // What if it is not a default?
 				},
 			},
 			InitialDelaySeconds: 60,
@@ -70,7 +69,7 @@ func createDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path:   "/ping",
-					Port:   intstr.Parse(config.ChDefaultHTTPSPortName), // What if it is not a default?
+					Port:   intstr.Parse(api.ChDefaultHTTPSPortName), // What if it is not a default?
 					Scheme: core.URISchemeHTTPS,
 				},
 			},
@@ -92,7 +91,7 @@ func createDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path: "/ping",
-					Port: intstr.Parse(config.ChDefaultHTTPPortName), // What if port name is not a default?
+					Port: intstr.Parse(api.ChDefaultHTTPPortName), // What if port name is not a default?
 				},
 			},
 			InitialDelaySeconds: 10,
@@ -106,7 +105,7 @@ func createDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
 			ProbeHandler: core.ProbeHandler{
 				HTTPGet: &core.HTTPGetAction{
 					Path:   "/ping",
-					Port:   intstr.Parse(config.ChDefaultHTTPSPortName), // What if port name is not a default?
+					Port:   intstr.Parse(api.ChDefaultHTTPSPortName), // What if port name is not a default?
 					Scheme: core.URISchemeHTTPS,
 				},
 			},

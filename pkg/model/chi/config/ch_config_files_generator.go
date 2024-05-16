@@ -29,24 +29,24 @@ type ClickHouseConfigFilesGenerator struct {
 }
 
 // NewClickHouseConfigFilesGenerator creates new clickhouse configuration generator object
-func NewClickHouseConfigFilesGenerator(chi *api.ClickHouseInstallation, opts *ClickHouseConfigGeneratorOptions) *ClickHouseConfigFilesGenerator {
+func NewClickHouseConfigFilesGenerator(cr api.ICustomResource, opts *ConfigGeneratorOptions) *ClickHouseConfigFilesGenerator {
 	return &ClickHouseConfigFilesGenerator{
-		configGenerator: newClickHouseConfigGenerator(chi, opts),
+		configGenerator: newClickHouseConfigGenerator(cr, opts),
 		chopConfig:      chop.Config(),
 	}
 }
 
 func (c *ClickHouseConfigFilesGenerator) CreateConfigFiles(what FilesGroupType, params ...any) map[string]string {
 	switch what {
-	case ConfigFilesGroupCommon:
+	case FilesGroupCommon:
 		var options *ClickHouseConfigFilesGeneratorOptions
 		if len(params) > 0 {
 			options = params[0].(*ClickHouseConfigFilesGeneratorOptions)
 			return c.createConfigFilesGroupCommon(options)
 		}
-	case ConfigFilesGroupUsers:
+	case FilesGroupUsers:
 		return c.createConfigFilesGroupUsers()
-	case ConfigFilesGroupHost:
+	case FilesGroupHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)

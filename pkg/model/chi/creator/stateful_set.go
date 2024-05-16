@@ -338,8 +338,7 @@ func stsEnsureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.Host)
 		return
 	}
 	// Walk over all assigned ports of the host and ensure each port in container
-	config.HostWalkAssignedPorts(
-		host,
+	host.WalkAssignedPorts(
 		func(name string, port *api.Int32, protocol core.Protocol) bool {
 			k8s.ContainerEnsurePortByName(container, name, port.Value())
 			// Do not abort, continue iterating

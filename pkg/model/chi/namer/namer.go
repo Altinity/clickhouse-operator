@@ -267,17 +267,17 @@ func CreateConfigMapHostName(host *api.Host) string {
 //}
 
 // CreateConfigMapCommonName returns a name for a ConfigMap for replica's common config
-func CreateConfigMapCommonName(chi api.IChi) string {
+func CreateConfigMapCommonName(chi api.ICustomResource) string {
 	return Macro(chi).Line(configMapCommonNamePattern)
 }
 
 // CreateConfigMapCommonUsersName returns a name for a ConfigMap for replica's common users config
-func CreateConfigMapCommonUsersName(chi api.IChi) string {
+func CreateConfigMapCommonUsersName(chi api.ICustomResource) string {
 	return Macro(chi).Line(configMapCommonUsersNamePattern)
 }
 
 // CreateCHIServiceName creates a name of a root ClickHouseInstallation Service resource
-func CreateCHIServiceName(chi api.IChi) string {
+func CreateCHIServiceName(chi api.ICustomResource) string {
 	// Name can be generated either from default name pattern,
 	// or from personal name pattern provided in ServiceTemplate
 
@@ -298,7 +298,7 @@ func CreateCHIServiceName(chi api.IChi) string {
 }
 
 // CreateCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
-func CreateCHIServiceFQDN(chi api.IChi, namespaceDomainPattern *api.String) string {
+func CreateCHIServiceFQDN(chi api.ICustomResource, namespaceDomainPattern *api.String) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
@@ -491,7 +491,7 @@ func createPodFQDNsOfShard(shard api.IShard) (fqdns []string) {
 }
 
 // createPodFQDNsOfCHI creates fully qualified domain names of all pods in a CHI
-func createPodFQDNsOfCHI(chi api.IChi) (fqdns []string) {
+func createPodFQDNsOfCHI(chi api.ICustomResource) (fqdns []string) {
 	chi.WalkHosts(func(host *api.Host) error {
 		fqdns = append(fqdns, createPodFQDN(host))
 		return nil
@@ -510,7 +510,7 @@ func CreateFQDN(host *api.Host) string {
 // excludeSelf specifies whether to exclude the host itself from the result. Applicable only in case obj is a host
 func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string {
 	switch typed := obj.(type) {
-	case api.IChi:
+	case api.ICustomResource:
 		return createPodFQDNsOfCHI(typed)
 	case api.ICluster:
 		return createPodFQDNsOfCluster(typed)
@@ -529,7 +529,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 		case api.Cluster:
 			return util.RemoveFromArray(self, createPodFQDNsOfCluster(any(typed.GetCluster()).(api.ICluster)))
 		case api.ClickHouseInstallation:
-			return util.RemoveFromArray(self, createPodFQDNsOfCHI(any(typed.GetCR()).(api.IChi)))
+			return util.RemoveFromArray(self, createPodFQDNsOfCHI(any(typed.GetCR()).(api.ICustomResource)))
 		}
 	}
 	return nil
@@ -538,7 +538,7 @@ func CreateFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 // CreatePodHostnameRegexp creates pod hostname regexp.
 // For example, `template` can be defined in operator config:
 // HostRegexpTemplate: chi-{chi}-[^.]+\\d+-\\d+\\.{namespace}.svc.cluster.local$"
-func CreatePodHostnameRegexp(chi api.IChi, template string) string {
+func CreatePodHostnameRegexp(chi api.ICustomResource, template string) string {
 	return Macro(chi).Line(template)
 }
 
@@ -558,7 +558,7 @@ func CreatePodName(obj interface{}) string {
 // CreatePVCNameByVolumeClaimTemplate creates PVC name
 func CreatePVCNameByVolumeClaimTemplate(host *api.Host, volumeClaimTemplate *api.VolumeClaimTemplate) string {
 	return createPVCName(host, volumeClaimTemplate.Name)
-}
+}	
 
 // createPVCName is an internal function
 func createPVCName(host *api.Host, volumeMountName string) string {

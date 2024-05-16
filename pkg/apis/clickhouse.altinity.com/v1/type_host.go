@@ -415,3 +415,57 @@ func (host *Host) HasDesiredStatefulSet() bool {
 
 	return host.Runtime.DesiredStatefulSet != nil
 }
+
+const (
+	ChDefaultPortName   = "port"
+	ChDefaultPortNumber = int32(9000)
+
+	// ClickHouse open ports names and values
+	ChDefaultTCPPortName               = "tcp"
+	ChDefaultTCPPortNumber             = int32(9000)
+	ChDefaultTLSPortName               = "secureclient"
+	ChDefaultTLSPortNumber             = int32(9440)
+	ChDefaultHTTPPortName              = "http"
+	ChDefaultHTTPPortNumber            = int32(8123)
+	ChDefaultHTTPSPortName             = "https"
+	ChDefaultHTTPSPortNumber           = int32(8443)
+	ChDefaultInterserverHTTPPortName   = "interserver"
+	ChDefaultInterserverHTTPPortNumber = int32(9009)
+)
+
+func (host *Host) WalkPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+	if host == nil {
+		return
+	}
+	if f(ChDefaultPortName, host.Port, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultTCPPortName, host.TCPPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultTLSPortName, host.TLSPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultHTTPPortName, host.HTTPPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultHTTPSPortName, host.HTTPSPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultInterserverHTTPPortName, host.InterserverHTTPPort, core.ProtocolTCP) {
+		return
+	}
+}
+
+func (host *Host) WalkAssignedPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+	host.WalkPorts(
+		func(_name string, _port *Int32, _protocol core.Protocol) bool {
+			if _port.HasValue() {
+				// Port is assigned - call provided function on it
+				return f(_name, _port, _protocol)
+			}
+			// Do not break, continue iterating
+			return false
+		},
+	)
+}

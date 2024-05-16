@@ -23,7 +23,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -96,16 +95,16 @@ func (c *Creator) createServiceCHI() *core.Service {
 			ClusterIP: model.TemplateDefaultsServiceClusterIP,
 			Ports: []core.ServicePort{
 				{
-					Name:       config.ChDefaultHTTPPortName,
+					Name:       api.ChDefaultHTTPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       config.ChDefaultHTTPPortNumber,
-					TargetPort: intstr.FromString(config.ChDefaultHTTPPortName),
+					Port:       api.ChDefaultHTTPPortNumber,
+					TargetPort: intstr.FromString(api.ChDefaultHTTPPortName),
 				},
 				{
-					Name:       config.ChDefaultTCPPortName,
+					Name:       api.ChDefaultTCPPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       config.ChDefaultTCPPortNumber,
-					TargetPort: intstr.FromString(config.ChDefaultTCPPortName),
+					Port:       api.ChDefaultTCPPortNumber,
+					TargetPort: intstr.FromString(api.ChDefaultTCPPortName),
 				},
 			},
 			Selector: c.tagger.Selector(tags.SelectorCHIScopeReady),
@@ -192,15 +191,14 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 			PublishNotReadyAddresses: true,
 		},
 	}
-	appendServicePorts(svc, host)
+	svcAppendSpecifiedPorts(svc, host)
 	tags.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
-func appendServicePorts(service *core.Service, host *api.Host) {
+func svcAppendSpecifiedPorts(service *core.Service, host *api.Host) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
-	config.HostWalkAssignedPorts(
-		host,
+	host.WalkAssignedPorts(
 		func(name string, port *api.Int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of service's ports
 			service.Spec.Ports = append(service.Spec.Ports,

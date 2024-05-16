@@ -21,7 +21,7 @@ import (
 )
 
 // createOwnerReferences gets MULTIPLE owner references
-func createOwnerReferences(owner api.IChi) []meta.OwnerReference {
+func createOwnerReferences(owner api.ICustomResource) []meta.OwnerReference {
 	if owner.GetRuntime().GetAttributes().GetSkipOwnerRef() {
 		return nil
 	}

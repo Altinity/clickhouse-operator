@@ -17,6 +17,7 @@ package config
 import (
 	"bytes"
 	"fmt"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi"
@@ -41,12 +42,12 @@ const (
 // ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
 // which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
 type ClickHouseConfigGenerator struct {
-	chi  api.IChi
-	opts *ClickHouseConfigGeneratorOptions
+	chi  api.ICustomResource
+	opts *ConfigGeneratorOptions
 }
 
 // newClickHouseConfigGenerator returns new ClickHouseConfigGenerator struct
-func newClickHouseConfigGenerator(chi api.IChi, opts *ClickHouseConfigGeneratorOptions) *ClickHouseConfigGenerator {
+func newClickHouseConfigGenerator(chi api.ICustomResource, opts *ConfigGeneratorOptions) *ClickHouseConfigGenerator {
 	return &ClickHouseConfigGenerator{
 		chi:  chi,
 		opts: opts,
@@ -434,22 +435,22 @@ func (c *ClickHouseConfigGenerator) getHostHostnameAndPorts(host *api.Host) stri
 	// <yandex>
 	util.Iline(b, 0, "<"+xmlTagYandex+">")
 
-	if host.TCPPort.Value() != ChDefaultTCPPortNumber {
+	if host.TCPPort.Value() != api.ChDefaultTCPPortNumber {
 		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort.Value())
 	}
-	if host.TLSPort.Value() != ChDefaultTLSPortNumber {
+	if host.TLSPort.Value() != api.ChDefaultTLSPortNumber {
 		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort.Value())
 	}
-	if host.HTTPPort.Value() != ChDefaultHTTPPortNumber {
+	if host.HTTPPort.Value() != api.ChDefaultHTTPPortNumber {
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort.Value())
 	}
-	if host.HTTPSPort.Value() != ChDefaultHTTPSPortNumber {
+	if host.HTTPSPort.Value() != api.ChDefaultHTTPSPortNumber {
 		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort.Value())
 	}
 
 	// Interserver host and port
 	util.Iline(b, 4, "<interserver_http_host>%s</interserver_http_host>", c.getRemoteServersReplicaHostname(host))
-	if host.InterserverHTTPPort.Value() != ChDefaultInterserverHTTPPortNumber {
+	if host.InterserverHTTPPort.Value() != api.ChDefaultInterserverHTTPPortNumber {
 		util.Iline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort.Value())
 	}
 

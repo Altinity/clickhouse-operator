@@ -33,7 +33,7 @@ type configFileGenerator interface {
 
 // Creator specifies creator object
 type Creator struct {
-	cr                   api.IChi
+	cr                   api.ICustomResource
 	configFilesGenerator configFileGenerator
 	tagger               tagger
 	a                    log.Announcer
@@ -47,7 +47,7 @@ type Creator struct {
 }
 
 // NewCreator creates new Creator object
-func NewCreator(cr api.IChi, configFilesGenerator configFileGenerator) *Creator {
+func NewCreator(cr api.ICustomResource, configFilesGenerator configFileGenerator) *Creator {
 	return &Creator{
 		cr:                   cr,
 		configFilesGenerator: configFilesGenerator,
