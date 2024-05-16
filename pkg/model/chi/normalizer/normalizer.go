@@ -92,7 +92,7 @@ func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSub
 }
 
 func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
-	return creator.CreateCHI()
+	return creator.CreateCustomResource(creator.CustomResourceCHI)
 }
 
 func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {

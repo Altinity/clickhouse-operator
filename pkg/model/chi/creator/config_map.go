@@ -57,11 +57,11 @@ func (c *Creator) CreateConfigMap(what ConfigMapType, params ...any) *core.Confi
 func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateConfigMapCommonName(c.chi),
-			Namespace:       c.chi.GetNamespace(),
-			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelConfigMapCommon)),
-			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommon)),
-			OwnerReferences: createOwnerReferences(c.chi),
+			Name:            namer.CreateConfigMapCommonName(c.cr),
+			Namespace:       c.cr.GetNamespace(),
+			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelConfigMapCommon)),
+			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommon)),
+			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFiles(config.ConfigFilesGroupCommon, options),
@@ -75,11 +75,11 @@ func (c *Creator) createConfigMapCHICommon(options *config.ClickHouseConfigFiles
 func (c *Creator) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateConfigMapCommonUsersName(c.chi),
-			Namespace:       c.chi.GetNamespace(),
-			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelConfigMapCommonUsers)),
-			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommonUsers)),
-			OwnerReferences: createOwnerReferences(c.chi),
+			Name:            namer.CreateConfigMapCommonUsersName(c.cr),
+			Namespace:       c.cr.GetNamespace(),
+			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelConfigMapCommonUsers)),
+			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotateConfigMapCommonUsers)),
+			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFiles(config.ConfigFilesGroupUsers),
@@ -97,7 +97,7 @@ func (c *Creator) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelConfigMapHost, host)),
 			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateConfigMapHost, host)),
-			OwnerReferences: createOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: c.configFilesGenerator.CreateConfigFiles(config.ConfigFilesGroupHost, host),

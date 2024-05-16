@@ -33,7 +33,7 @@ type configFileGenerator interface {
 
 // Creator specifies creator object
 type Creator struct {
-	chi                  api.IChi
+	cr                   api.IChi
 	configFilesGenerator configFileGenerator
 	tagger               tagger
 	a                    log.Announcer
@@ -41,17 +41,17 @@ type Creator struct {
 	// container builder
 	// probes builder
 	// config map volumes
-	// statefulSetAppendVolumeMountsForDataAndLogVolumeClaimTemplates
+	// stsAppendVolumeMountsForDataAndLogVolumeClaimTemplates
 	// default pod template builder
 	// port walker
 }
 
 // NewCreator creates new Creator object
-func NewCreator(chi api.IChi, configFilesGenerator configFileGenerator) *Creator {
+func NewCreator(cr api.IChi, configFilesGenerator configFileGenerator) *Creator {
 	return &Creator{
-		chi:                  chi,
+		cr:                   cr,
 		configFilesGenerator: configFilesGenerator,
-		tagger:               tags.NewTagger(chi),
-		a:                    log.M(chi),
+		tagger:               tags.NewTagger(cr),
+		a:                    log.M(cr),
 	}
 }

@@ -68,17 +68,17 @@ func (c *Creator) CreateService(what ServiceType, params ...any) *core.Service {
 
 // createServiceCHI creates new core.Service for specified CHI
 func (c *Creator) createServiceCHI() *core.Service {
-	if template, ok := c.chi.GetRootServiceTemplate(); ok {
+	if template, ok := c.cr.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return c.createServiceFromTemplate(
 			template,
-			c.chi.GetNamespace(),
-			namer.CreateCHIServiceName(c.chi),
-			c.tagger.Label(tags.LabelServiceCHI, c.chi),
-			c.tagger.Annotate(tags.AnnotateServiceCHI, c.chi),
+			c.cr.GetNamespace(),
+			namer.CreateCHIServiceName(c.cr),
+			c.tagger.Label(tags.LabelServiceCHI, c.cr),
+			c.tagger.Annotate(tags.AnnotateServiceCHI, c.cr),
 			c.tagger.Selector(tags.SelectorCHIScopeReady),
-			createOwnerReferences(c.chi),
-			namer.Macro(c.chi),
+			createOwnerReferences(c.cr),
+			namer.Macro(c.cr),
 		)
 	}
 
@@ -86,11 +86,11 @@ func (c *Creator) createServiceCHI() *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.CreateCHIServiceName(c.chi),
-			Namespace:       c.chi.GetNamespace(),
-			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelServiceCHI, c.chi)),
-			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotateServiceCHI, c.chi)),
-			OwnerReferences: createOwnerReferences(c.chi),
+			Name:            namer.CreateCHIServiceName(c.cr),
+			Namespace:       c.cr.GetNamespace(),
+			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelServiceCHI, c.cr)),
+			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotateServiceCHI, c.cr)),
+			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		Spec: core.ServiceSpec{
 			ClusterIP: model.TemplateDefaultsServiceClusterIP,
@@ -120,7 +120,7 @@ func (c *Creator) createServiceCHI() *core.Service {
 // createServiceCluster creates new core.Service for specified Cluster
 func (c *Creator) createServiceCluster(cluster api.ICluster) *core.Service {
 	serviceName := namer.CreateClusterServiceName(cluster)
-	ownerReferences := createOwnerReferences(c.chi)
+	ownerReferences := createOwnerReferences(c.cr)
 
 	c.a.V(1).F().Info("%s/%s", cluster.GetRuntime().GetAddress().GetNamespace(), serviceName)
 	if template, ok := cluster.GetServiceTemplate(); ok {
@@ -151,7 +151,7 @@ func (c *Creator) createServiceShard(shard api.IShard) *core.Service {
 			c.tagger.Label(tags.LabelServiceShard, shard),
 			c.tagger.Annotate(tags.AnnotateServiceShard, shard),
 			c.tagger.Selector(tags.SelectorShardScopeReady, shard),
-			createOwnerReferences(c.chi),
+			createOwnerReferences(c.cr),
 			namer.Macro(shard),
 		)
 	}
@@ -170,7 +170,7 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 			c.tagger.Label(tags.LabelServiceHost, host),
 			c.tagger.Annotate(tags.AnnotateServiceHost, host),
 			c.tagger.Selector(tags.SelectorHostScope, host),
-			createOwnerReferences(c.chi),
+			createOwnerReferences(c.cr),
 			namer.Macro(host),
 		)
 	}
@@ -183,7 +183,7 @@ func (c *Creator) createServiceHost(host *api.Host) *core.Service {
 			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelServiceHost, host)),
 			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateServiceHost, host)),
-			OwnerReferences: createOwnerReferences(c.chi),
+			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		Spec: core.ServiceSpec{
 			Selector:                 c.tagger.Selector(tags.SelectorHostScope, host),

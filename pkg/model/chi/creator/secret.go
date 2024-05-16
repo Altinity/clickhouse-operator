@@ -25,7 +25,7 @@ import (
 func (c *Creator) CreateClusterSecret(name string) *core.Secret {
 	return &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
-			Namespace: c.chi.GetNamespace(),
+			Namespace: c.cr.GetNamespace(),
 			Name:      name,
 		},
 		StringData: map[string]string{

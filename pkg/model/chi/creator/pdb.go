@@ -31,10 +31,10 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetRootName(), cluster.GetRuntime().GetAddress().GetClusterName()),
-			Namespace:       c.chi.GetNamespace(),
-			Labels:          namer.Macro(c.chi).Map(c.tagger.Label(tags.LabelPDB, cluster)),
-			Annotations:     namer.Macro(c.chi).Map(c.tagger.Annotate(tags.AnnotatePDB, cluster)),
-			OwnerReferences: createOwnerReferences(c.chi),
+			Namespace:       c.cr.GetNamespace(),
+			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelPDB, cluster)),
+			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotatePDB, cluster)),
+			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector: &meta.LabelSelector{

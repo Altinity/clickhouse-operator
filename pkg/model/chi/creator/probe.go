@@ -22,18 +22,33 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 )
 
-// newDefaultLivenessProbe is a unification wrapper
-func newDefaultLivenessProbe(host *api.Host) *core.Probe {
-	return newDefaultClickHouseLivenessProbe(host)
+type ProbeType string
+
+const (
+	ProbeDefaultLiveness  ProbeType = "ProbeDefaultLiveness"
+	ProbeDefaultReadiness ProbeType = "ProbeDefaultReadiness"
+)
+
+func (c *Creator) CreateProbe(what ProbeType, params ...any) *core.Probe {
+	switch what {
+	case ProbeDefaultLiveness:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+			return createDefaultClickHouseLivenessProbe(host)
+		}
+	case ProbeDefaultReadiness:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+			return createDefaultClickHouseReadinessProbe(host)
+		}
+	}
+	return nil
 }
 
-// newDefaultReadinessProbe is a unification wrapper
-func newDefaultReadinessProbe(host *api.Host) *core.Probe {
-	return newDefaultClickHouseReadinessProbe(host)
-}
-
-// newDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
-func newDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
+// createDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
+func createDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{
@@ -69,8 +84,8 @@ func newDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
 	return nil
 }
 
-// newDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
-func newDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
+// createDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
+func createDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{

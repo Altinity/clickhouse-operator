@@ -20,7 +20,22 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func CreateCHI() *api.ClickHouseInstallation {
+type CustomResourceType string
+
+const (
+	CustomResourceCHI CustomResourceType = "chi"
+)
+
+func CreateCustomResource(what CustomResourceType) *api.ClickHouseInstallation {
+	switch what {
+	case CustomResourceCHI:
+		return createCHI()
+	default:
+		return nil
+	}
+}
+
+func createCHI() *api.ClickHouseInstallation {
 	return &api.ClickHouseInstallation{
 		TypeMeta: meta.TypeMeta{
 			Kind:       api.ClickHouseInstallationCRDResourceKind,
