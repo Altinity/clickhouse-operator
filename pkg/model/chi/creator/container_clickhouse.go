@@ -22,32 +22,44 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-
-type ContainerManager interface {
-
+type ContainerManagerClickHouse struct {
+	probe *ProbeManagerClickHouse
 }
 
-type ClickHouseContainerManager struct {
-
-}
-
-func NewClickHouseContainerManager() *ContainerManager {
-	return &ClickHouseContainerManager{
+func NewContainerManagerClickHouse(probe *ProbeManagerClickHouse) *ContainerManagerClickHouse {
+	return &ContainerManagerClickHouse{
+		probe: probe,
 	}
 }
 
+func (cm *ContainerManagerClickHouse) NewDefaultAppContainer(host *api.Host) core.Container {
+	return cm.newDefaultClickHouseContainer(host)
+}
+
+func (cm *ContainerManagerClickHouse) GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+	return cm.getClickHouseContainer(statefulSet)
+}
+
+func (cm *ContainerManagerClickHouse) EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host) {
+	cm.ensureClickHouseContainerSpecified(statefulSet, host)
+}
+
+func (cm *ContainerManagerClickHouse) EnsureLogContainer(statefulSet *apps.StatefulSet) {
+	cm.ensureClickHouseLogContainerSpecified(statefulSet)
+}
+
 // getClickHouseContainer
-func (cm *ClickHouseContainerManager) getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+func (cm *ContainerManagerClickHouse) getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
 }
 
 // getClickHouseLogContainer
-func (cm *ClickHouseContainerManager) getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+func (cm *ContainerManagerClickHouse) getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseLogContainerName, -1)
 }
 
 // ensureClickHouseContainerSpecified
-func (cm *ClickHouseContainerManager) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
+func (cm *ContainerManagerClickHouse) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
 	_, ok := cm.getClickHouseContainer(statefulSet)
 	if ok {
 		return
@@ -61,7 +73,7 @@ func (cm *ClickHouseContainerManager) ensureClickHouseContainerSpecified(statefu
 }
 
 // ensureClickHouseLogContainerSpecified
-func (cm *ClickHouseContainerManager) ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
+func (cm *ContainerManagerClickHouse) ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
 	_, ok := cm.getClickHouseLogContainer(statefulSet)
 	if ok {
 		return
@@ -75,38 +87,20 @@ func (cm *ClickHouseContainerManager) ensureClickHouseLogContainerSpecified(stat
 	)
 }
 
-func containerAppendSpecifiedPorts(container *core.Container, host *api.Host) {
-	// Walk over all assigned ports of the host and append each port to the list of container's ports
-	host.WalkAssignedPorts(
-		func(name string, port *api.Int32, protocol core.Protocol) bool {
-			// Append assigned port to the list of container's ports
-			container.Ports = append(container.Ports,
-				core.ContainerPort{
-					Name:          name,
-					ContainerPort: port.Value(),
-					Protocol:      protocol,
-				},
-			)
-			// Do not abort, continue iterating
-			return false
-		},
-	)
-}
-
 // newDefaultClickHouseContainer returns default ClickHouse Container
-func (cm *ClickHouseContainerManager) newDefaultClickHouseContainer(host *api.Host) core.Container {
+func (cm *ContainerManagerClickHouse) newDefaultClickHouseContainer(host *api.Host) core.Container {
 	container := core.Container{
 		Name:           config.ClickHouseContainerName,
 		Image:          config.DefaultClickHouseDockerImage,
-		LivenessProbe:  createDefaultClickHouseLivenessProbe(host),
-		ReadinessProbe: createDefaultClickHouseReadinessProbe(host),
+		LivenessProbe:  cm.probe.createDefaultClickHouseLivenessProbe(host),
+		ReadinessProbe: cm.probe.createDefaultClickHouseReadinessProbe(host),
 	}
 	containerAppendSpecifiedPorts(&container, host)
 	return container
 }
 
 // newDefaultLogContainer returns default ClickHouse Log Container
-func (cm *ClickHouseContainerManager) newDefaultLogContainer() core.Container {
+func (cm *ContainerManagerClickHouse) newDefaultLogContainer() core.Container {
 	return core.Container{
 		Name:  config.ClickHouseLogContainerName,
 		Image: config.DefaultUbiDockerImage,
