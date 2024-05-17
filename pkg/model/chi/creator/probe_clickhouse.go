@@ -28,22 +28,14 @@ const (
 	ProbeDefaultReadiness ProbeType = "ProbeDefaultReadiness"
 )
 
-func (c *Creator) CreateProbe(what ProbeType, params ...any) *core.Probe {
+func (c *Creator) CreateProbe(what ProbeType, host *api.Host) *core.Probe {
 	switch what {
 	case ProbeDefaultLiveness:
-		var host *api.Host
-		if len(params) > 0 {
-			host = params[0].(*api.Host)
-			return createDefaultClickHouseLivenessProbe(host)
-		}
+		return createDefaultClickHouseLivenessProbe(host)
 	case ProbeDefaultReadiness:
-		var host *api.Host
-		if len(params) > 0 {
-			host = params[0].(*api.Host)
-			return createDefaultClickHouseReadinessProbe(host)
-		}
+		return createDefaultClickHouseReadinessProbe(host)
 	}
-	return nil
+	panic("unknown probe type")
 }
 
 // createDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
