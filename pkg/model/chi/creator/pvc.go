@@ -23,8 +23,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
-// PreparePersistentVolumeClaim prepares PVC - labels and annotations
-func (c *Creator) PreparePersistentVolumeClaim(
+// AdjustPersistentVolumeClaim prepares PVC - labels and annotations
+func (c *Creator) AdjustPersistentVolumeClaim(
 	pvc *core.PersistentVolumeClaim,
 	host *api.Host,
 	template *api.VolumeClaimTemplate,
@@ -37,12 +37,12 @@ func (c *Creator) PreparePersistentVolumeClaim(
 }
 
 // createPVC
-func (c *Creator) createPVC(
+func (c *Creator) CreatePVC(
 	name string,
 	namespace string,
 	host *api.Host,
 	spec *core.PersistentVolumeClaimSpec,
-) core.PersistentVolumeClaim {
+) *core.PersistentVolumeClaim {
 	persistentVolumeClaim := core.PersistentVolumeClaim{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
@@ -68,11 +68,5 @@ func (c *Creator) createPVC(
 	volumeMode := core.PersistentVolumeFilesystem
 	persistentVolumeClaim.Spec.VolumeMode = &volumeMode
 
-	return persistentVolumeClaim
-}
-
-// CreatePVC creates PVC
-func (c *Creator) CreatePVC(name string, host *api.Host, spec *core.PersistentVolumeClaimSpec) *core.PersistentVolumeClaim {
-	pvc := c.createPVC(name, host.Runtime.Address.Namespace, host, spec)
-	return &pvc
+	return &persistentVolumeClaim
 }
