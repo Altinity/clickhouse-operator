@@ -1237,7 +1237,7 @@ func (w *worker) fetchPVC(
 	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		// Operator is in charge of PVCs
 		// Create PVC model.
-		pvc = w.task.creator.CreatePVC(pvcName, host, &volumeClaimTemplate.Spec)
+		pvc = w.task.creator.CreatePVC(pvcName, namespace, host, &volumeClaimTemplate.Spec)
 		w.a.V(1).M(host).Info("PVC (%s/%s/%s/%s) model provided by the operator", namespace, host.GetName(), volumeMount.Name, pvcName)
 		return pvc, volumeClaimTemplate, true, nil
 	}
@@ -1270,6 +1270,6 @@ func (w *worker) reconcilePVC(
 	}
 
 	w.applyPVCResourcesRequests(pvc, template)
-	pvc = w.task.creator.PreparePersistentVolumeClaim(pvc, host, template)
+	pvc = w.task.creator.AdjustPersistentVolumeClaim(pvc, host, template)
 	return w.c.updatePersistentVolumeClaim(ctx, pvc)
 }
