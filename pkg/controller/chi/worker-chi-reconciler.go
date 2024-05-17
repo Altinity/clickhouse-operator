@@ -1270,6 +1270,6 @@ func (w *worker) reconcilePVC(
 	}
 
 	w.applyPVCResourcesRequests(pvc, template)
-	pvc = w.task.creator.AdjustPersistentVolumeClaim(pvc, host, template)
+	pvc = w.task.creator.AdjustPVC(pvc, host, template)
 	return w.c.updatePersistentVolumeClaim(ctx, pvc)
 }
