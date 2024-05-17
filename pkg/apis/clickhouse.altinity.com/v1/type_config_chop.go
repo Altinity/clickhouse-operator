@@ -924,12 +924,18 @@ func (c *OperatorConfig) applyEnvVarParams() {
 
 // applyDefaultWatchNamespace applies default watch namespace in case none specified earlier
 func (c *OperatorConfig) applyDefaultWatchNamespace() {
+	// In case WATCH_ALL_NAMESPACES has been set to ture, watch all namespaces
 	// In case we have watched namespaces specified, all is fine
 	// In case we do not have watched namespaces specified, we need to decide, what namespace to watch.
 	// In this case, there are two options:
 	// 1. Operator runs in kube-system namespace - assume this is global installation, need to watch ALL namespaces
 	// 2. Operator runs in other (non kube-system) namespace - assume this is local installation, watch this namespace only
 	// Watch in own namespace only in case no other specified earlier
+
+	if strings.ToLower(os.Getenv(deployment.WATCH_ALL_NAMESPACES)) == "true" {
+		// Watch all namespaces
+		return
+	}
 
 	if len(c.Watch.Namespaces) > 0 {
 		// We have namespace(s) specified already
@@ -1008,8 +1014,11 @@ func (c *OperatorConfig) String(hideCredentials bool) string {
 // IsWatchedNamespace returns whether specified namespace is in a list of watched
 // TODO unify with GetInformerNamespace
 func (c *OperatorConfig) IsWatchedNamespace(namespace string) bool {
-	// In case no namespaces specified - watch all namespaces
-	if len(c.Watch.Namespaces) == 0 {
+	// Returns true if the controller should watch all namespaces. This occurs when:
+	// 1. The environment variable WATCH_ALL_NAMESPACES is set to "true". 
+	// 2. No specific namespaces are specified in the configuration (c.Watch.Namespaces is empty), 
+	//    which is only possible when Operator is running in the 'kube-system' namespace.
+	if strings.ToLower(os.Getenv(deployment.WATCH_ALL_NAMESPACES)) == "true" || len(c.Watch.Namespaces) == 0 {
 		return true
 	}
 
@@ -1215,3 +1224,4 @@ func (c *OperatorConfig) move() {
 	}
 
 }
+

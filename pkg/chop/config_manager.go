@@ -340,6 +340,7 @@ func (cm *ConfigManager) listSupportedEnvVarNames() []string {
 
 		deployment.WATCH_NAMESPACE,
 		deployment.WATCH_NAMESPACES,
+		deployment.WATCH_ALL_NAMESPACES,
 	}
 }
 
@@ -447,3 +448,4 @@ func (cm *ConfigManager) fetchSecretCredentials() {
 func (cm *ConfigManager) Postprocess() {
 	cm.config.Postprocess()
 }
+

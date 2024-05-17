@@ -48,7 +48,11 @@ const (
 	WATCH_NAMESPACE = "WATCH_NAMESPACE"
 	// WATCH_NAMESPACES and WATCH_NAMESPACE specifies what namespaces to watch
 	WATCH_NAMESPACES = "WATCH_NAMESPACES"
+	// WATCH_ALL_NAMESPACES enables watching all namespaces. When configured, 
+	// both WATCH_NAMESPACE and WATCH_NAMESPACES settings will be ignored.
+	WATCH_ALL_NAMESPACES = "WATCH_ALL_NAMESPACES"
 
 	// CHOP_CONFIG path to clickhouse operator configuration file
 	CHOP_CONFIG = "CHOP_CONFIG"
 )
+
