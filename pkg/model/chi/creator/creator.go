@@ -21,37 +21,51 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
-type tagger interface {
+type iTagger interface {
 	Annotate(what tags.AnnotateType, params ...any) map[string]string
 	Label(what tags.LabelType, params ...any) map[string]string
 	Selector(what tags.SelectorType, params ...any) map[string]string
 }
 
-type configFileGenerator interface {
+type iConfigFileGenerator interface {
 	CreateConfigFiles(what config.FilesGroupType, params ...any) map[string]string
 }
 
 // Creator specifies creator object
 type Creator struct {
 	cr                   api.ICustomResource
-	configFilesGenerator configFileGenerator
-	tagger               tagger
+	configFilesGenerator iConfigFileGenerator
+	tagger               iTagger
 	a                    log.Announcer
-	// namer
+	cm                   IContainerManager
+	pm                   IProbeManager
+	sm                   IServiceManager
 	// container builder
 	// probes builder
-	// config map volumes
-	// stsAppendVolumeMountsForDataAndLogVolumeClaimTemplates
 	// default pod template builder
+	// service builder
+
+	// namer
+	// config map-based system volumes
+	// fixed paths user volumes
 	// port walker
 }
 
 // NewCreator creates new Creator object
-func NewCreator(cr api.ICustomResource, configFilesGenerator configFileGenerator) *Creator {
+func NewCreator(
+	cr api.ICustomResource,
+	configFilesGenerator iConfigFileGenerator,
+	containerManager IContainerManager,
+	probeManager IProbeManager,
+	serviceManager IServiceManager,
+) *Creator {
 	return &Creator{
 		cr:                   cr,
 		configFilesGenerator: configFilesGenerator,
 		tagger:               tags.NewTagger(cr),
 		a:                    log.M(cr),
+		cm:                   containerManager,
+		pm:                   probeManager,
+		sm:                   serviceManager,
 	}
 }
