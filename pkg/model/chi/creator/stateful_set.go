@@ -22,7 +22,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
@@ -62,7 +61,8 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 	}
 
 	c.stsSetupPodTemplate(statefulSet, host)
-	c.stsSetVolumeClaimTemplates(statefulSet, host)
+	c.stsSetupVolumes(statefulSet, host)
+
 	tags.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
 
 	return statefulSet
@@ -70,36 +70,52 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 
 // stsSetupPodTemplate performs PodTemplate setup of StatefulSet
 func (c *Creator) stsSetupPodTemplate(statefulSet *apps.StatefulSet, host *api.Host) {
-	// Process Pod Template
+	// Apply Pod Template on the StatefulSet
 	podTemplate := c.getPodTemplate(host)
 	c.stsApplyPodTemplate(statefulSet, podTemplate, host)
 
 	// Post-process StatefulSet
-	c.stsEnsureIntegrity(statefulSet, host)
-	stsSetupEnvVars(statefulSet, host)
-	c.stsPersonalizeSpecTemplate(statefulSet, host)
+	// Setup application container
+	c.stsSetupAppContainer(statefulSet, host)
+	// Setup dedicated log container
+	c.stsSetupLogContainer(statefulSet, host)
+	// Setup additional host alias(es)
+	c.stsSetupHostAliases(statefulSet, host)
 }
 
-// stsEnsureIntegrity
-func (c *Creator) stsEnsureIntegrity(statefulSet *apps.StatefulSet, host *api.Host) {
-	stsEnsureMainContainerSpecified(statefulSet, host)
-	c.stsEnsureProbesSpecified(statefulSet, host)
-	stsEnsureNamedPortsSpecified(statefulSet, host)
+func (c *Creator) stsSetupVolumes(statefulSet *apps.StatefulSet, host *api.Host) {
+	// Setup system volumes - described by the operator
+	c.stsSetupVolumesSystem(statefulSet, host)
+	// Setup user data volumes - described by the manifest
+	c.stsSetupVolumesUserData(statefulSet, host)
 }
 
-// stsEnsureMainContainerSpecified is a unification wrapper
-func stsEnsureMainContainerSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
-	ensureClickHouseContainerSpecified(statefulSet, host)
+func (c *Creator) stsSetupAppContainer(statefulSet *apps.StatefulSet, host *api.Host) {
+	// We need to be sure app container is healthy
+	c.stsEnsureAppContainerSpecified(statefulSet, host)
+	c.stsEnsureAppContainerProbesSpecified(statefulSet, host)
+	c.stsEnsureAppContainerNamedPortsSpecified(statefulSet, host)
+	// Setup ENV vars for the app
+	c.stsAppContainerSetupEnvVars(statefulSet, host)
+	// Setup app according to troubleshoot mode (if any)
+	c.stsAppContainerSetupTroubleshootingMode(statefulSet, host)
+}
+
+// stsEnsureAppContainerSpecified is a unification wrapper.
+// Ensures main application container is specified
+func (c *Creator) stsEnsureAppContainerSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
+	c.cm.EnsureAppContainer(statefulSet, host)
 }
 
 // stsEnsureLogContainerSpecified is a unification wrapper
-func stsEnsureLogContainerSpecified(statefulSet *apps.StatefulSet) {
-	ensureClickHouseLogContainerSpecified(statefulSet)
+// Ensures log container is in place, if required
+func (c *Creator) stsEnsureLogContainerSpecified(statefulSet *apps.StatefulSet) {
+	c.cm.EnsureLogContainer(statefulSet)
 }
 
-// stsSetupEnvVars setup ENV vars for clickhouse container
-func stsSetupEnvVars(statefulSet *apps.StatefulSet, host *api.Host) {
-	container, ok := stsGetMainContainer(statefulSet)
+// stsAppContainerSetupEnvVars setup ENV vars for main application container
+func (c *Creator) stsAppContainerSetupEnvVars(statefulSet *apps.StatefulSet, host *api.Host) {
+	container, ok := c.stsGetAppContainer(statefulSet)
 	if !ok {
 		return
 	}
@@ -107,22 +123,22 @@ func stsSetupEnvVars(statefulSet *apps.StatefulSet, host *api.Host) {
 	container.Env = append(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
 }
 
-// stsEnsureProbesSpecified
-func (c *Creator) stsEnsureProbesSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
-	container, ok := stsGetMainContainer(statefulSet)
+// stsEnsureAppContainerProbesSpecified
+func (c *Creator) stsEnsureAppContainerProbesSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
+	container, ok := c.stsGetAppContainer(statefulSet)
 	if !ok {
 		return
 	}
 	if container.LivenessProbe == nil {
-		container.LivenessProbe = c.CreateProbe(ProbeDefaultLiveness, host)
+		container.LivenessProbe = c.pm.CreateProbe(ProbeDefaultLiveness, host)
 	}
 	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = c.CreateProbe(ProbeDefaultReadiness, host)
+		container.ReadinessProbe = c.pm.CreateProbe(ProbeDefaultReadiness, host)
 	}
 }
 
-// stsPersonalizeSpecTemplate
-func (c *Creator) stsPersonalizeSpecTemplate(statefulSet *apps.StatefulSet, host *api.Host) {
+// stsSetupHostAliases
+func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.Host) {
 	// Ensure pod created by this StatefulSet has alias 127.0.0.1
 	statefulSet.Spec.Template.Spec.HostAliases = []core.HostAlias{
 		{
@@ -132,23 +148,16 @@ func (c *Creator) stsPersonalizeSpecTemplate(statefulSet *apps.StatefulSet, host
 			},
 		},
 	}
-
-	// Setup volumes
-	c.stsSetupVolumes(statefulSet, host)
-	// Setup statefulSet according to troubleshoot mode (if any)
-	c.stsSetupTroubleshootingMode(statefulSet, host)
-	// Setup dedicated log container
-	c.stsSetupLogContainer(statefulSet, host)
 }
 
-// stsSetupTroubleshootingMode
-func (c *Creator) stsSetupTroubleshootingMode(statefulSet *apps.StatefulSet, host *api.Host) {
+// stsAppContainerSetupTroubleshootingMode
+func (c *Creator) stsAppContainerSetupTroubleshootingMode(statefulSet *apps.StatefulSet, host *api.Host) {
 	if !host.GetCR().IsTroubleshoot() {
 		// We are not troubleshooting
 		return
 	}
 
-	container, ok := stsGetMainContainer(statefulSet)
+	container, ok := c.stsGetAppContainer(statefulSet)
 	if !ok {
 		// Unable to locate ClickHouse container
 		return
@@ -170,7 +179,8 @@ func (c *Creator) stsSetupTroubleshootingMode(statefulSet *apps.StatefulSet, hos
 			"/entrypoint.sh" + sleep,
 		}
 	}
-	// Appended `sleep` command makes Pod unable to respond to probes and probes would fail, causing unexpected restart.
+	// Appended `sleep` command makes Pod unable to respond to probes and probes would fail all the time,
+	// causing repeated restarts of the Pod by k8s. Restart is triggered by probes failures.
 	// Thus we need to disable all probes in troubleshooting mode.
 	container.LivenessProbe = nil
 	container.ReadinessProbe = nil
@@ -180,36 +190,13 @@ func (c *Creator) stsSetupTroubleshootingMode(statefulSet *apps.StatefulSet, hos
 func (c *Creator) stsSetupLogContainer(statefulSet *apps.StatefulSet, host *api.Host) {
 	// In case we have default LogVolumeClaimTemplate specified - need to append log container to Pod Template
 	if host.Templates.HasLogVolumeClaimTemplate() {
-		stsEnsureLogContainerSpecified(statefulSet)
+		c.stsEnsureLogContainerSpecified(statefulSet)
 		c.a.V(1).F().Info("add log container for host: %s", host.Runtime.Address.HostName)
 	}
 }
 
-// getPodTemplate gets Pod Template to be used to create StatefulSet
-func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
-	// Which pod template should be used - either explicitly defined or a default one
-	podTemplate, ok := host.GetPodTemplate()
-	if ok {
-		// Host references known PodTemplate
-		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
-		podTemplate = podTemplate.DeepCopy()
-		c.a.V(3).F().Info("host: %s StatefulSet - use custom template: %s", host.Runtime.Address.HostName, podTemplate.Name)
-	} else {
-		// Host references UNKNOWN PodTemplate, will use default one
-		podTemplate = newDefaultPodTemplate(host)
-		c.a.V(3).F().Info("host: %s StatefulSet - use default generated template", host.Runtime.Address.HostName)
-	}
-
-	// Here we have local copy of Pod Template, to be used to create StatefulSet
-	// Now we can customize this Pod Template for particular host
-
-	model.PrepareAffinity(podTemplate, host)
-
-	return podTemplate
-}
-
-// stsSetupVolumes setup all volumes
-func (c *Creator) stsSetupVolumes(statefulSet *apps.StatefulSet, host *api.Host) {
+// stsSetupVolumesSystem setup all volumes
+func (c *Creator) stsSetupVolumesSystem(statefulSet *apps.StatefulSet, host *api.Host) {
 	c.stsSetupVolumesForConfigMaps(statefulSet, host)
 	c.stsSetupVolumesForSecrets(statefulSet, host)
 }
@@ -223,19 +210,19 @@ func (c *Creator) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		createVolumeForConfigMap(configMapCommonName),
-		createVolumeForConfigMap(configMapCommonUsersName),
-		createVolumeForConfigMap(configMapHostName),
+		k8s.CreateVolumeForConfigMap(configMapCommonName),
+		k8s.CreateVolumeForConfigMap(configMapCommonUsersName),
+		k8s.CreateVolumeForConfigMap(configMapHostName),
 		//createVolumeForConfigMap(configMapHostMigrationName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
-	// So Pod will have ConfigMaps mounted as Volumes
-	k8s.StatefulSetAppendVolumeMounts(
+	// So Pod will have ConfigMaps mounted as Volumes in each Container
+	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
-		createVolumeMount(configMapCommonName, config.DirPathCommonConfig),
-		createVolumeMount(configMapCommonUsersName, config.DirPathUsersConfig),
-		createVolumeMount(configMapHostName, config.DirPathHostConfig),
+		k8s.CreateVolumeMount(configMapCommonName, config.DirPathCommonConfig),
+		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathUsersConfig),
+		k8s.CreateVolumeMount(configMapHostName, config.DirPathHostConfig),
 	)
 }
 
@@ -249,106 +236,51 @@ func (c *Creator) stsSetupVolumesForSecrets(statefulSet *apps.StatefulSet, host 
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have additional volumes mounted as Volumes
-	k8s.StatefulSetAppendVolumeMounts(
+	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
 		host.GetCR().GetRuntime().GetAttributes().GetAdditionalVolumeMounts()...,
 	)
 }
 
-// stsAppendUsedPVCTemplates appends all PVC templates which are used (referenced by name) by containers
+// stsSetupVolumesUserData performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
+func (c *Creator) stsSetupVolumesUserData(statefulSet *apps.StatefulSet, host *api.Host) {
+	c.stsSetupVolumesUserDataWithFixedPaths(statefulSet, host)
+	c.stsSetupVolumesUserDataWithCustomPaths(statefulSet, host)
+}
+
+// stsSetupVolumesUserDataWithFixedPaths
+// appends VolumeMounts for Data and Log VolumeClaimTemplates on all containers.
+// Creates VolumeMounts for Data and Log volumes in case these volume templates are specified in `templates`.
+func (c *Creator) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.StatefulSet, host *api.Host) {
+	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
+	k8s.StatefulSetAppendVolumeMountsInAllContainers(
+		statefulSet,
+		k8s.CreateVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseData),
+		k8s.CreateVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseLog),
+	)
+}
+
+func (c *Creator) stsSetupVolumesUserDataWithCustomPaths(statefulSet *apps.StatefulSet, host *api.Host) {
+	c.stsSetupVolumesForUsedPVCTemplates(statefulSet, host)
+}
+
+// stsSetupVolumesForUsedPVCTemplates appends all PVC templates which are used (referenced by name) by containers
 // to the StatefulSet.Spec.VolumeClaimTemplates list
-func (c *Creator) stsAppendUsedPVCTemplates(statefulSet *apps.StatefulSet, host *api.Host) {
+func (c *Creator) stsSetupVolumesForUsedPVCTemplates(statefulSet *apps.StatefulSet, host *api.Host) {
 	// VolumeClaimTemplates, that are directly referenced in containers' VolumeMount object(s)
 	// are appended to StatefulSet's Spec.VolumeClaimTemplates slice
 	//
 	// Deal with `volumeMounts` of a `container`, located by the path:
 	// .spec.templates.podTemplates.*.spec.containers.volumeMounts.*
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		for j := range container.VolumeMounts {
-			// Convenience wrapper
-			volumeMount := &container.VolumeMounts[j]
-			if volumeClaimTemplate, ok := getVolumeClaimTemplate(volumeMount, host); ok {
-				c.stsAppendPVCTemplate(statefulSet, host, volumeClaimTemplate)
-			}
+	k8s.StatefulSetWalkVolumeMounts(statefulSet, func(volumeMount *core.VolumeMount) {
+		if volumeClaimTemplate, found := findVolumeClaimTemplateUsedForVolumeMount(volumeMount, host); found {
+			c.stsSetupVolumeForPVCTemplate(statefulSet, host, volumeClaimTemplate)
 		}
-	}
+	})
 }
 
-// stsAppendVolumeMountsForDataAndLogVolumeClaimTemplates
-// appends VolumeMounts for Data and Log VolumeClaimTemplates on all containers.
-// Creates VolumeMounts for Data and Log volumes in case these volume templates are specified in `templates`.
-func (c *Creator) stsAppendVolumeMountsForDataAndLogVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *api.Host) {
-	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
-	for i := range statefulSet.Spec.Template.Spec.Containers {
-		// Convenience wrapper
-		container := &statefulSet.Spec.Template.Spec.Containers[i]
-		k8s.ContainerAppendVolumeMounts(
-			container,
-			createVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseData),
-		)
-		k8s.ContainerAppendVolumeMounts(
-			container,
-			createVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseLog),
-		)
-	}
-}
-
-// stsSetVolumeClaimTemplates performs VolumeClaimTemplate setup for Containers in PodTemplate of a StatefulSet
-func (c *Creator) stsSetVolumeClaimTemplates(statefulSet *apps.StatefulSet, host *api.Host) {
-	c.stsAppendVolumeMountsForDataAndLogVolumeClaimTemplates(statefulSet, host)
-	c.stsAppendUsedPVCTemplates(statefulSet, host)
-}
-
-// stsApplyPodTemplate fills StatefulSet.Spec.Template with data from provided PodTemplate
-func (c *Creator) stsApplyPodTemplate(statefulSet *apps.StatefulSet, template *api.PodTemplate, host *api.Host) {
-	// StatefulSet's pod template is not directly compatible with PodTemplate,
-	// we need to extract some fields from PodTemplate and apply on StatefulSet
-	statefulSet.Spec.Template = core.PodTemplateSpec{
-		ObjectMeta: meta.ObjectMeta{
-			Name: template.Name,
-			Labels: namer.Macro(host).Map(util.MergeStringMapsOverwrite(
-				c.tagger.Label(tags.LabelPodTemplate, host),
-				template.ObjectMeta.GetLabels(),
-			)),
-			Annotations: namer.Macro(host).Map(util.MergeStringMapsOverwrite(
-				c.tagger.Annotate(tags.AnnotatePodTemplate, host),
-				template.ObjectMeta.GetAnnotations(),
-			)),
-		},
-		Spec: *template.Spec.DeepCopy(),
-	}
-
-	if statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
-		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = chop.Config().GetTerminationGracePeriod()
-	}
-}
-
-// stsGetMainContainer is a unification wrapper
-func stsGetMainContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return getClickHouseContainer(statefulSet)
-}
-
-// stsEnsureNamedPortsSpecified
-func stsEnsureNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
-	// Ensure ClickHouse container has all named ports specified
-	container, ok := stsGetMainContainer(statefulSet)
-	if !ok {
-		return
-	}
-	// Walk over all assigned ports of the host and ensure each port in container
-	host.WalkAssignedPorts(
-		func(name string, port *api.Int32, protocol core.Protocol) bool {
-			k8s.ContainerEnsurePortByName(container, name, port.Value())
-			// Do not abort, continue iterating
-			return false
-		},
-	)
-}
-
-// stsAppendPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' VolumeClaimTemplate
-func (c *Creator) stsAppendPVCTemplate(
+// stsSetupVolumeForPVCTemplate appends to StatefulSet.Spec.VolumeClaimTemplates new entry with data from provided 'src' VolumeClaimTemplate
+func (c *Creator) stsSetupVolumeForPVCTemplate(
 	statefulSet *apps.StatefulSet,
 	host *api.Host,
 	volumeClaimTemplate *api.VolumeClaimTemplate,
@@ -378,15 +310,65 @@ func (c *Creator) stsAppendPVCTemplate(
 
 	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		claimName := namer.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
-		statefulSet.Spec.Template.Spec.Volumes = append(
-			statefulSet.Spec.Template.Spec.Volumes,
-			createVolumeForPVC(volumeClaimTemplate.Name, claimName),
-		)
+		volume := k8s.CreateVolumeForPVC(volumeClaimTemplate.Name, claimName)
+		k8s.StatefulSetAppendVolumes(statefulSet, volume)
 	} else {
-		statefulSet.Spec.VolumeClaimTemplates = append(
-			statefulSet.Spec.VolumeClaimTemplates,
-			// For templates we should not specify namespace where PVC would be located
-			c.createPVC(volumeClaimTemplate.Name, "", host, &volumeClaimTemplate.Spec),
-		)
+		// For templates we should not specify namespace where PVC would be located
+		pvc := *c.CreatePVC(volumeClaimTemplate.Name, "", host, &volumeClaimTemplate.Spec)
+		k8s.StatefulSetAppendPersistentVolumeClaims(statefulSet, pvc)
 	}
+}
+
+// stsApplyPodTemplate fills StatefulSet.Spec.Template with data from provided PodTemplate
+func (c *Creator) stsApplyPodTemplate(statefulSet *apps.StatefulSet, template *api.PodTemplate, host *api.Host) {
+	statefulSet.Spec.Template = c.createPodTemplateSpec(template, host)
+
+	// Adjust TerminationGracePeriodSeconds
+	if statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds == nil {
+		statefulSet.Spec.Template.Spec.TerminationGracePeriodSeconds = chop.Config().GetTerminationGracePeriod()
+	}
+}
+
+func (c *Creator) createPodTemplateSpec(template *api.PodTemplate, host *api.Host) core.PodTemplateSpec {
+	// StatefulSet's pod template is not directly compatible with PodTemplate,
+	// we need to extract some fields from PodTemplate and apply on StatefulSet
+	labels := namer.Macro(host).Map(util.MergeStringMapsOverwrite(
+		c.tagger.Label(tags.LabelPodTemplate, host),
+		template.ObjectMeta.GetLabels(),
+	))
+	annotations := namer.Macro(host).Map(util.MergeStringMapsOverwrite(
+		c.tagger.Annotate(tags.AnnotatePodTemplate, host),
+		template.ObjectMeta.GetAnnotations(),
+	))
+
+	return core.PodTemplateSpec{
+		ObjectMeta: meta.ObjectMeta{
+			Name:        template.Name,
+			Labels:      labels,
+			Annotations: annotations,
+		},
+		Spec: *template.Spec.DeepCopy(),
+	}
+}
+
+// stsGetAppContainer is a unification wrapper
+func (c *Creator) stsGetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+	return c.cm.GetAppContainer(statefulSet)
+}
+
+// stsEnsureAppContainerNamedPortsSpecified
+func (c *Creator) stsEnsureAppContainerNamedPortsSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
+	// Ensure ClickHouse container has all named ports specified
+	container, ok := c.stsGetAppContainer(statefulSet)
+	if !ok {
+		return
+	}
+	// Walk over all assigned ports of the host and ensure each port in container
+	host.WalkAssignedPorts(
+		func(name string, port *api.Int32, protocol core.Protocol) bool {
+			k8s.ContainerEnsurePortByName(container, name, port.Value())
+			// Do not abort, continue iterating
+			return false
+		},
+	)
 }
