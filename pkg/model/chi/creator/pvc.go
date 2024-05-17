@@ -23,8 +23,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
-// AdjustPersistentVolumeClaim prepares PVC - labels and annotations
-func (c *Creator) AdjustPersistentVolumeClaim(
+// AdjustPVC prepares PVC - labels and annotations
+func (c *Creator) AdjustPVC(
 	pvc *core.PersistentVolumeClaim,
 	host *api.Host,
 	template *api.VolumeClaimTemplate,

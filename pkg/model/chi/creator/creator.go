@@ -40,14 +40,15 @@ type Creator struct {
 	cm                   IContainerManager
 	pm                   IProbeManager
 	sm                   IServiceManager
+	vm                   IVolumeManager
 	// container builder
 	// probes builder
 	// default pod template builder
 	// service builder
-
-	// namer
 	// config map-based system volumes
 	// fixed paths user volumes
+
+	// namer
 	// port walker
 }
 
@@ -58,6 +59,7 @@ func NewCreator(
 	containerManager IContainerManager,
 	probeManager IProbeManager,
 	serviceManager IServiceManager,
+	volumeManager IVolumeManager,
 ) *Creator {
 	return &Creator{
 		cr:                   cr,
@@ -67,5 +69,6 @@ func NewCreator(
 		cm:                   containerManager,
 		pm:                   probeManager,
 		sm:                   serviceManager,
+		vm:                   volumeManager,
 	}
 }

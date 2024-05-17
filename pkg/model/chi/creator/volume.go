@@ -15,10 +15,38 @@
 package creator
 
 import (
+	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
+
+type VolumeType string
+
+const (
+	VolumesForConfigMaps          VolumeType = "VolumesForConfigMaps"
+	VolumesUserDataWithFixedPaths VolumeType = "VolumesUserDataWithFixedPaths"
+)
+
+type IVolumeManager interface {
+	SetupVolumes(what VolumeType, statefulSet *apps.StatefulSet, host *api.Host)
+	SetCR(cr api.ICustomResource)
+}
+
+type VolumeManagerType string
+
+const (
+	VolumeManagerTypeClickHouse VolumeManagerType = "clickhouse"
+	VolumeManagerTypeKeeper     VolumeManagerType = "keeper"
+)
+
+func NewVolumeManager(what VolumeManagerType) IVolumeManager {
+	switch what {
+	case VolumeManagerTypeClickHouse:
+		return NewVolumeManagerClickHouse()
+	}
+	panic("unknown volume manager type")
+}
 
 // findVolumeClaimTemplateUsedForVolumeMount searches for possible VolumeClaimTemplate which was used to build volume,
 // mounted via provided 'volumeMount'. It is not necessarily that VolumeClaimTemplate would be found, because

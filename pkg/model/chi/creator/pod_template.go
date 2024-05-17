@@ -26,8 +26,8 @@ import (
 // getPodTemplate gets Pod Template to be used to create StatefulSet
 func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
 	// Which pod template should be used - either explicitly defined or a default one
-	podTemplate, ok := host.GetPodTemplate()
-	if ok {
+	podTemplate, found := host.GetPodTemplate()
+	if found {
 		// Host references known PodTemplate
 		// Make local copy of this PodTemplate, in order not to spoil the original common-used template
 		podTemplate = podTemplate.DeepCopy()

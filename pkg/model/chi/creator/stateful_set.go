@@ -15,16 +15,15 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -60,16 +59,16 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		},
 	}
 
-	c.stsSetupPodTemplate(statefulSet, host)
-	c.stsSetupVolumes(statefulSet, host)
+	c.stsSetupApplication(statefulSet, host)
+	c.stsSetupStorage(statefulSet, host)
 
 	tags.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
 
 	return statefulSet
 }
 
-// stsSetupPodTemplate performs PodTemplate setup of StatefulSet
-func (c *Creator) stsSetupPodTemplate(statefulSet *apps.StatefulSet, host *api.Host) {
+// stsSetupApplication performs PodTemplate setup of StatefulSet
+func (c *Creator) stsSetupApplication(statefulSet *apps.StatefulSet, host *api.Host) {
 	// Apply Pod Template on the StatefulSet
 	podTemplate := c.getPodTemplate(host)
 	c.stsApplyPodTemplate(statefulSet, podTemplate, host)
@@ -83,7 +82,7 @@ func (c *Creator) stsSetupPodTemplate(statefulSet *apps.StatefulSet, host *api.H
 	c.stsSetupHostAliases(statefulSet, host)
 }
 
-func (c *Creator) stsSetupVolumes(statefulSet *apps.StatefulSet, host *api.Host) {
+func (c *Creator) stsSetupStorage(statefulSet *apps.StatefulSet, host *api.Host) {
 	// Setup system volumes - described by the operator
 	c.stsSetupVolumesSystem(statefulSet, host)
 	// Setup user data volumes - described by the manifest
@@ -201,29 +200,8 @@ func (c *Creator) stsSetupVolumesSystem(statefulSet *apps.StatefulSet, host *api
 	c.stsSetupVolumesForSecrets(statefulSet, host)
 }
 
-// stsSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
 func (c *Creator) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
-	configMapHostName := namer.Name(namer.NameConfigMapHost, host)
-	configMapCommonName := namer.Name(namer.NameConfigMapCommon, c.cr)
-	configMapCommonUsersName := namer.Name(namer.NameConfigMapCommonUsers, c.cr)
-
-	// Add all ConfigMap objects as Volume objects of type ConfigMap
-	k8s.StatefulSetAppendVolumes(
-		statefulSet,
-		k8s.CreateVolumeForConfigMap(configMapCommonName),
-		k8s.CreateVolumeForConfigMap(configMapCommonUsersName),
-		k8s.CreateVolumeForConfigMap(configMapHostName),
-		//createVolumeForConfigMap(configMapHostMigrationName),
-	)
-
-	// And reference these Volumes in each Container via VolumeMount
-	// So Pod will have ConfigMaps mounted as Volumes in each Container
-	k8s.StatefulSetAppendVolumeMountsInAllContainers(
-		statefulSet,
-		k8s.CreateVolumeMount(configMapCommonName, config.DirPathCommonConfig),
-		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathUsersConfig),
-		k8s.CreateVolumeMount(configMapHostName, config.DirPathHostConfig),
-	)
+	c.stsSetupVolumes(VolumesForConfigMaps, statefulSet, host)
 }
 
 // stsSetupVolumesForSecrets adds to each container in the Pod VolumeMount objects
@@ -248,20 +226,17 @@ func (c *Creator) stsSetupVolumesUserData(statefulSet *apps.StatefulSet, host *a
 	c.stsSetupVolumesUserDataWithCustomPaths(statefulSet, host)
 }
 
-// stsSetupVolumesUserDataWithFixedPaths
-// appends VolumeMounts for Data and Log VolumeClaimTemplates on all containers.
-// Creates VolumeMounts for Data and Log volumes in case these volume templates are specified in `templates`.
 func (c *Creator) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.StatefulSet, host *api.Host) {
-	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
-	k8s.StatefulSetAppendVolumeMountsInAllContainers(
-		statefulSet,
-		k8s.CreateVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseData),
-		k8s.CreateVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseLog),
-	)
+	c.stsSetupVolumes(VolumesUserDataWithFixedPaths, statefulSet, host)
 }
 
 func (c *Creator) stsSetupVolumesUserDataWithCustomPaths(statefulSet *apps.StatefulSet, host *api.Host) {
 	c.stsSetupVolumesForUsedPVCTemplates(statefulSet, host)
+}
+
+func (c *Creator) stsSetupVolumes(what VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
+	c.vm.SetCR(c.cr)
+	c.vm.SetupVolumes(what, statefulSet, host)
 }
 
 // stsSetupVolumesForUsedPVCTemplates appends all PVC templates which are used (referenced by name) by containers
