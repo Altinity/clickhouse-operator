@@ -22,8 +22,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
-// preparePersistentVolume prepares PV labels
-func (c *Creator) preparePersistentVolume(pv *core.PersistentVolume, host *api.Host) *core.PersistentVolume {
+// adjustPersistentVolume prepares PV labels
+func (c *Creator) adjustPersistentVolume(pv *core.PersistentVolume, host *api.Host) *core.PersistentVolume {
 	pv.SetLabels(namer.Macro(host).Map(c.tagger.Label(tags.LabelExistingPV, pv, host)))
 	pv.SetAnnotations(namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateExistingPV, pv, host)))
 	// And after the object is ready we can put version label
