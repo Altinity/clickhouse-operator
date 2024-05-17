@@ -35,8 +35,10 @@ func (m *VolumeManagerClickHouse) SetupVolumes(what VolumeType, statefulSet *app
 	switch what {
 	case VolumesForConfigMaps:
 		m.stsSetupVolumesForConfigMaps(statefulSet, host)
+		return
 	case VolumesUserDataWithFixedPaths:
 		m.stsSetupVolumesUserDataWithFixedPaths(statefulSet, host)
+		return
 	}
 	panic("unknown volume type")
 }

@@ -50,6 +50,7 @@ type Creator struct {
 
 	// namer
 	// port walker
+	// config maps
 }
 
 // NewCreator creates new Creator object
