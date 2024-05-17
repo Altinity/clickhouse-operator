@@ -20,48 +20,14 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// createVolumeForPVC returns core.Volume object with defined name
-func createVolumeForPVC(name, claimName string) core.Volume {
-	return core.Volume{
-		Name: name,
-		VolumeSource: core.VolumeSource{
-			PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{
-				ClaimName: claimName,
-				ReadOnly:  false,
-			},
-		},
-	}
-}
-
-// createVolumeForConfigMap returns core.Volume object with defined name
-func createVolumeForConfigMap(name string) core.Volume {
-	var defaultMode int32 = 0644
-	return core.Volume{
-		Name: name,
-		VolumeSource: core.VolumeSource{
-			ConfigMap: &core.ConfigMapVolumeSource{
-				LocalObjectReference: core.LocalObjectReference{
-					Name: name,
-				},
-				DefaultMode: &defaultMode,
-			},
-		},
-	}
-}
-
-// createVolumeMount returns core.VolumeMount object with name and mount path
-func createVolumeMount(name, mountPath string) core.VolumeMount {
-	return core.VolumeMount{
-		Name:      name,
-		MountPath: mountPath,
-	}
-}
-
-func getVolumeClaimTemplate(volumeMount *core.VolumeMount, host *api.Host) (*api.VolumeClaimTemplate, bool) {
+// findVolumeClaimTemplateUsedForVolumeMount searches for possible VolumeClaimTemplate which was used to build volume,
+// mounted via provided 'volumeMount'. It is not necessarily that VolumeClaimTemplate would be found, because
+// some volumeMounts references volumes that were not created from VolumeClaimTemplate.
+func findVolumeClaimTemplateUsedForVolumeMount(volumeMount *core.VolumeMount, host *api.Host) (*api.VolumeClaimTemplate, bool) {
 	volumeClaimTemplateName := volumeMount.Name
 
-	volumeClaimTemplate, ok := host.GetCR().GetVolumeClaimTemplate(volumeClaimTemplateName)
+	volumeClaimTemplate, found := host.GetCR().GetVolumeClaimTemplate(volumeClaimTemplateName)
 	// Sometimes it is impossible to find VolumeClaimTemplate related to specified volumeMount.
 	// May be this volumeMount is not created from VolumeClaimTemplate, it may be a reference to a ConfigMap
-	return volumeClaimTemplate, ok
+	return volumeClaimTemplate, found
 }
