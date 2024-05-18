@@ -105,7 +105,8 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 	w.task = newTask(
 		chiCreator.NewCreator(
 			chi,
-			config.NewClickHouseConfigFilesGenerator(
+			config.NewConfigFilesGenerator(
+				config.FilesGeneratorTypeClickHouse,
 				chi,
 				&config.ConfigGeneratorOptions{
 					Users:          chi.GetSpec().Configuration.Users,
@@ -120,6 +121,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			chiCreator.NewProbeManager(chiCreator.ProbeManagerTypeClickHouse),
 			chiCreator.NewServiceManager(chiCreator.ServiceManagerTypeClickHouse),
 			chiCreator.NewVolumeManager(chiCreator.VolumeManagerTypeClickHouse),
+			chiCreator.NewConfigMapManager(chiCreator.ConfigMapManagerTypeClickHouse),
 		),
 	)
 }
@@ -860,11 +862,11 @@ func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersGenerat
 	)
 }
 
-// options build ClickHouseConfigFilesGeneratorOptions
-func (w *worker) options() *config.ClickHouseConfigFilesGeneratorOptions {
+// options build FilesGeneratorOptionsClickHouse
+func (w *worker) options() *config.FilesGeneratorOptionsClickHouse {
 	opts := w.getRemoteServersGeneratorOptions()
 	w.a.Info("RemoteServersGeneratorOptions: %s", opts)
-	return config.NewClickHouseConfigFilesGeneratorOptions().SetRemoteServersGeneratorOptions(opts)
+	return config.NewConfigFilesGeneratorOptionsClickHouse().SetRemoteServersGeneratorOptions(opts)
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status

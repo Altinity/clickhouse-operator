@@ -255,7 +255,7 @@ func (w *worker) reconcileCHIAuxObjectsFinal(ctx context.Context, chi *api.Click
 func (w *worker) reconcileCHIConfigMapCommon(
 	ctx context.Context,
 	chi *api.ClickHouseInstallation,
-	options *config.ClickHouseConfigFilesGeneratorOptions,
+	options *config.FilesGeneratorOptionsClickHouse,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
