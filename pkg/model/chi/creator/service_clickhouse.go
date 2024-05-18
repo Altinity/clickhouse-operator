@@ -42,20 +42,20 @@ func (m *ServiceManagerClickHouse) CreateService(what ServiceType, params ...any
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
+			return m.createServiceCluster(cluster)
 		}
-		return m.createServiceCluster(cluster)
 	case ServiceCHIShard:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
+			return m.createServiceShard(shard)
 		}
-		return m.createServiceShard(shard)
 	case ServiceCHIHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
+			return m.createServiceHost(host)
 		}
-		return m.createServiceHost(host)
 	}
 	panic("unknown service type")
 }
