@@ -14,18 +14,18 @@
 
 package config
 
-// ConfigFilesGeneratorOptionsClickHouse specifies options for clickhouse configuration generator
-type ConfigFilesGeneratorOptionsClickHouse struct {
+// FilesGeneratorOptionsClickHouse specifies options for clickhouse configuration generator
+type FilesGeneratorOptionsClickHouse struct {
 	RemoteServersGeneratorOptions *RemoteServersGeneratorOptions
 }
 
 // NewConfigFilesGeneratorOptionsClickHouse creates new options for clickhouse configuration generator
-func NewConfigFilesGeneratorOptionsClickHouse() *ConfigFilesGeneratorOptionsClickHouse {
-	return &ConfigFilesGeneratorOptionsClickHouse{}
+func NewConfigFilesGeneratorOptionsClickHouse() *FilesGeneratorOptionsClickHouse {
+	return &FilesGeneratorOptionsClickHouse{}
 }
 
 // GetRemoteServersGeneratorOptions gets remote-servers generator options
-func (o *ConfigFilesGeneratorOptionsClickHouse) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+func (o *FilesGeneratorOptionsClickHouse) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	if o == nil {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (o *ConfigFilesGeneratorOptionsClickHouse) GetRemoteServersGeneratorOptions
 }
 
 // SetRemoteServersGeneratorOptions sets remote-servers generator options
-func (o *ConfigFilesGeneratorOptionsClickHouse) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *ConfigFilesGeneratorOptionsClickHouse {
+func (o *FilesGeneratorOptionsClickHouse) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *FilesGeneratorOptionsClickHouse {
 	if o == nil {
 		return nil
 	}
@@ -43,6 +43,6 @@ func (o *ConfigFilesGeneratorOptionsClickHouse) SetRemoteServersGeneratorOptions
 }
 
 // defaultConfigFilesGeneratorOptionsClickHouse creates new default options for clickhouse config generator
-func defaultConfigFilesGeneratorOptionsClickHouse() *ConfigFilesGeneratorOptionsClickHouse {
+func defaultConfigFilesGeneratorOptionsClickHouse() *FilesGeneratorOptionsClickHouse {
 	return NewConfigFilesGeneratorOptionsClickHouse()
 }

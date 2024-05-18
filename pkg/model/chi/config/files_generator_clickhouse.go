@@ -20,8 +20,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// ConfigFilesGeneratorClickHouse specifies clickhouse configuration generator object
-type ConfigFilesGeneratorClickHouse struct {
+// FilesGeneratorClickHouse specifies clickhouse configuration generator object
+type FilesGeneratorClickHouse struct {
 	// ClickHouse config generator
 	configGenerator *ConfigGeneratorClickHouse
 	// clickhouse-operator configuration
@@ -29,19 +29,19 @@ type ConfigFilesGeneratorClickHouse struct {
 }
 
 // NewConfigFilesGeneratorClickHouse creates new clickhouse configuration generator object
-func NewConfigFilesGeneratorClickHouse(cr api.ICustomResource, opts *ConfigGeneratorOptions) *ConfigFilesGeneratorClickHouse {
-	return &ConfigFilesGeneratorClickHouse{
+func NewConfigFilesGeneratorClickHouse(cr api.ICustomResource, opts *ConfigGeneratorOptions) *FilesGeneratorClickHouse {
+	return &FilesGeneratorClickHouse{
 		configGenerator: newConfigGeneratorClickHouse(cr, opts),
 		chopConfig:      chop.Config(),
 	}
 }
 
-func (c *ConfigFilesGeneratorClickHouse) CreateConfigFiles(what FilesGroupType, params ...any) map[string]string {
+func (c *FilesGeneratorClickHouse) CreateConfigFiles(what FilesGroupType, params ...any) map[string]string {
 	switch what {
 	case FilesGroupCommon:
-		var options *ConfigFilesGeneratorOptionsClickHouse
+		var options *FilesGeneratorOptionsClickHouse
 		if len(params) > 0 {
-			options = params[0].(*ConfigFilesGeneratorOptionsClickHouse)
+			options = params[0].(*FilesGeneratorOptionsClickHouse)
 			return c.createConfigFilesGroupCommon(options)
 		}
 	case FilesGroupUsers:
@@ -57,7 +57,7 @@ func (c *ConfigFilesGeneratorClickHouse) CreateConfigFiles(what FilesGroupType, 
 }
 
 // createConfigFilesGroupCommon creates common config files
-func (c *ConfigFilesGeneratorClickHouse) createConfigFilesGroupCommon(options *ConfigFilesGeneratorOptionsClickHouse) map[string]string {
+func (c *FilesGeneratorClickHouse) createConfigFilesGroupCommon(options *FilesGeneratorOptionsClickHouse) map[string]string {
 	if options == nil {
 		options = defaultConfigFilesGeneratorOptionsClickHouse()
 	}
@@ -76,7 +76,7 @@ func (c *ConfigFilesGeneratorClickHouse) createConfigFilesGroupCommon(options *C
 }
 
 // createConfigFilesGroupUsers creates users config files
-func (c *ConfigFilesGeneratorClickHouse) createConfigFilesGroupUsers() map[string]string {
+func (c *FilesGeneratorClickHouse) createConfigFilesGroupUsers() map[string]string {
 	commonUsersConfigSections := make(map[string]string)
 	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
 	// 1. users
@@ -94,7 +94,7 @@ func (c *ConfigFilesGeneratorClickHouse) createConfigFilesGroupUsers() map[strin
 }
 
 // createConfigFilesGroupHost creates host config files
-func (c *ConfigFilesGeneratorClickHouse) createConfigFilesGroupHost(host *api.Host) map[string]string {
+func (c *FilesGeneratorClickHouse) createConfigFilesGroupHost(host *api.Host) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	hostConfigSections := make(map[string]string)
 	util.IncludeNonEmpty(hostConfigSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(host))
