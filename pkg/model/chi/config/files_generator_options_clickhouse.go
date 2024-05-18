@@ -14,18 +14,18 @@
 
 package config
 
-// ClickHouseConfigFilesGeneratorOptions specifies options for clickhouse configuration generator
-type ClickHouseConfigFilesGeneratorOptions struct {
+// ConfigFilesGeneratorOptionsClickHouse specifies options for clickhouse configuration generator
+type ConfigFilesGeneratorOptionsClickHouse struct {
 	RemoteServersGeneratorOptions *RemoteServersGeneratorOptions
 }
 
-// NewClickHouseConfigFilesGeneratorOptions creates new options for clickhouse configuration generator
-func NewClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
-	return &ClickHouseConfigFilesGeneratorOptions{}
+// NewConfigFilesGeneratorOptionsClickHouse creates new options for clickhouse configuration generator
+func NewConfigFilesGeneratorOptionsClickHouse() *ConfigFilesGeneratorOptionsClickHouse {
+	return &ConfigFilesGeneratorOptionsClickHouse{}
 }
 
 // GetRemoteServersGeneratorOptions gets remote-servers generator options
-func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
+func (o *ConfigFilesGeneratorOptionsClickHouse) GetRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
 	if o == nil {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (o *ClickHouseConfigFilesGeneratorOptions) GetRemoteServersGeneratorOptions
 }
 
 // SetRemoteServersGeneratorOptions sets remote-servers generator options
-func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *ClickHouseConfigFilesGeneratorOptions {
+func (o *ConfigFilesGeneratorOptionsClickHouse) SetRemoteServersGeneratorOptions(opts *RemoteServersGeneratorOptions) *ConfigFilesGeneratorOptionsClickHouse {
 	if o == nil {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (o *ClickHouseConfigFilesGeneratorOptions) SetRemoteServersGeneratorOptions
 	return o
 }
 
-// defaultClickHouseConfigFilesGeneratorOptions creates new default options for clickhouse config generator
-func defaultClickHouseConfigFilesGeneratorOptions() *ClickHouseConfigFilesGeneratorOptions {
-	return NewClickHouseConfigFilesGeneratorOptions()
+// defaultConfigFilesGeneratorOptionsClickHouse creates new default options for clickhouse config generator
+func defaultConfigFilesGeneratorOptionsClickHouse() *ConfigFilesGeneratorOptionsClickHouse {
+	return NewConfigFilesGeneratorOptionsClickHouse()
 }
