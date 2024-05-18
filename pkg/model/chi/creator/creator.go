@@ -27,20 +27,17 @@ type iTagger interface {
 	Selector(what tags.SelectorType, params ...any) map[string]string
 }
 
-type iConfigFileGenerator interface {
-	CreateConfigFiles(what config.FilesGroupType, params ...any) map[string]string
-}
-
 // Creator specifies creator object
 type Creator struct {
 	cr                   api.ICustomResource
-	configFilesGenerator iConfigFileGenerator
+	configFilesGenerator config.IConfigFileGenerator
 	tagger               iTagger
 	a                    log.Announcer
 	cm                   IContainerManager
 	pm                   IProbeManager
 	sm                   IServiceManager
 	vm                   IVolumeManager
+	cmm                  IConfigMapManager
 	// container builder
 	// probes builder
 	// default pod template builder
@@ -56,11 +53,12 @@ type Creator struct {
 // NewCreator creates new Creator object
 func NewCreator(
 	cr api.ICustomResource,
-	configFilesGenerator iConfigFileGenerator,
+	configFilesGenerator config.IConfigFileGenerator,
 	containerManager IContainerManager,
 	probeManager IProbeManager,
 	serviceManager IServiceManager,
 	volumeManager IVolumeManager,
+	configMapManager IConfigMapManager,
 ) *Creator {
 	return &Creator{
 		cr:                   cr,
@@ -71,5 +69,6 @@ func NewCreator(
 		pm:                   probeManager,
 		sm:                   serviceManager,
 		vm:                   volumeManager,
+		cmm:                  configMapManager,
 	}
 }
