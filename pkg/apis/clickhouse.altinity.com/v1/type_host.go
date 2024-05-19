@@ -57,6 +57,8 @@ type HostRuntime struct {
 	Address             HostAddress                `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
 	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
+	replicas            *Int32                     `json:"-" yaml:"-"`
+
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
@@ -191,6 +193,8 @@ func (host *Host) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 		num = 0
 	case host.IsStopped():
 		num = 0
+	case host.Runtime.replicas.HasValue():
+		num = host.Runtime.replicas.Value()
 	default:
 		num = 1
 	}
