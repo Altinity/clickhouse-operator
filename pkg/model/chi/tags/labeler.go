@@ -74,7 +74,7 @@ func (l *Labeler) Label(what LabelType, params ...any) map[string]string {
 // labelConfigMapCHICommon
 func (l *Labeler) labelConfigMapCHICommon() map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getCHIScope(),
+		l.getCRScope(),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueCHICommon,
 		})
@@ -83,7 +83,7 @@ func (l *Labeler) labelConfigMapCHICommon() map[string]string {
 // labelConfigMapCHICommonUsers
 func (l *Labeler) labelConfigMapCHICommonUsers() map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getCHIScope(),
+		l.getCRScope(),
 		map[string]string{
 			LabelConfigMap: labelConfigMapValueCHICommonUsers,
 		})
@@ -110,7 +110,7 @@ func (l *Labeler) _labelConfigMapHost(host *api.Host) map[string]string {
 // labelServiceCHI
 func (l *Labeler) labelServiceCHI() map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getCHIScope(),
+		l.getCRScope(),
 		map[string]string{
 			LabelService: labelServiceValueCHI,
 		})

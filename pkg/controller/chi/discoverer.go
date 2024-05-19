@@ -33,7 +33,7 @@ func (c *Controller) discovery(ctx context.Context, chi *api.ClickHouseInstallat
 		return nil
 	}
 
-	opts := controller.NewListOptions(tags.NewLabeler(chi).GetSelectorCHIScope())
+	opts := controller.NewListOptions(tags.NewLabeler(chi).GetSelectorCRScope())
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, chi, opts)
 	c.discoveryConfigMaps(ctx, r, chi, opts)

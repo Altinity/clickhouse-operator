@@ -70,8 +70,8 @@ func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string {
 	return util.CopyMapFilter(m, nil, []string{})
 }
 
-// appendCHIProvidedTo appends CHI-provided labels to labels set
-func (l *Labeler) appendCHIProvidedTo(dst map[string]string) map[string]string {
+// appendCRProvidedTo appends CHI-provided labels to labels set
+func (l *Labeler) appendCRProvidedTo(dst map[string]string) map[string]string {
 	sourceLabels := util.CopyMapFilter(l.cr.GetLabels(), chop.Config().Label.Include, chop.Config().Label.Exclude)
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }
@@ -129,8 +129,8 @@ func IsCHOPGeneratedObject(meta meta.Object) bool {
 	return labels[LabelAppName] == LabelAppValue
 }
 
-// GetCHINameFromObjectMeta extracts CHI name from ObjectMeta. Based on labels.
-func GetCHINameFromObjectMeta(meta meta.Object) (string, error) {
+// GetCRNameFromObjectMeta extracts CHI name from ObjectMeta. Based on labels.
+func GetCRNameFromObjectMeta(meta meta.Object) (string, error) {
 	labels := meta.GetLabels()
 	if !util.MapHasKeys(labels, LabelCHIName) {
 		return "", fmt.Errorf("can not find %s label in meta", LabelCHIName)

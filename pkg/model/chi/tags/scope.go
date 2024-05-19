@@ -22,22 +22,22 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// getCHIScope gets labels for CHI-scoped object
-func (l *Labeler) getCHIScope() map[string]string {
+// getCRScope gets labels for CR-scoped object
+func (l *Labeler) getCRScope() map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutPredefined(l.appendCHIProvidedTo(l.GetSelectorCHIScope()))
+	return l.filterOutPredefined(l.appendCRProvidedTo(l.GetSelectorCRScope()))
 }
 
 // getClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getClusterScope(cluster api.ICluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorClusterScope(cluster)))
+	return l.filterOutPredefined(l.appendCRProvidedTo(getSelectorClusterScope(cluster)))
 }
 
 // getShardScope gets labels for Shard-scoped object
 func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutPredefined(l.appendCHIProvidedTo(getSelectorShardScope(shard)))
+	return l.filterOutPredefined(l.appendCRProvidedTo(getSelectorShardScope(shard)))
 }
 
 // getHostScope gets labels for Host-scoped object
@@ -63,7 +63,7 @@ func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels b
 		// When we'll have ChkCluster Discovery functionality we can refactor this properly
 		labels = appendConfigLabels(host, labels)
 	}
-	return l.filterOutPredefined(l.appendCHIProvidedTo(labels))
+	return l.filterOutPredefined(l.appendCRProvidedTo(labels))
 }
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label

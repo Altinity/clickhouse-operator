@@ -19,8 +19,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 )
 
-// GetSelectorCHIScope gets labels to select a CHI-scoped object
-func (l *Labeler) GetSelectorCHIScope() map[string]string {
+// GetSelectorCRScope gets labels to select a CR-scoped object
+func (l *Labeler) GetSelectorCRScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace: namer.NamePartLabel(namer.NamePartNamespace, l.cr),
@@ -29,9 +29,9 @@ func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	}
 }
 
-// getSelectorCHIScopeReady gets labels to select a ready-labelled CHI-scoped object
-func (l *Labeler) getSelectorCHIScopeReady() map[string]string {
-	return appendKeyReady(l.GetSelectorCHIScope())
+// getSelectorCRScopeReady gets labels to select a ready-labelled CR-scoped object
+func (l *Labeler) getSelectorCRScopeReady() map[string]string {
+	return appendKeyReady(l.GetSelectorCRScope())
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
@@ -83,34 +83,32 @@ func GetSelectorHostScope(host *api.Host) map[string]string {
 func (l *Labeler) Selector(what SelectorType, params ...any) map[string]string {
 	switch what {
 	case SelectorCHIScopeReady:
-		return l.getSelectorCHIScopeReady()
+		return l.getSelectorCRScopeReady()
 	case SelectorClusterScope:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
+			return getSelectorClusterScope(cluster)
 		}
-		return getSelectorClusterScope(cluster)
 	case SelectorClusterScopeReady:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
+			return getSelectorClusterScopeReady(cluster)
 		}
-		return getSelectorClusterScopeReady(cluster)
 	case SelectorShardScopeReady:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
+			return getSelectorShardScopeReady(shard)
 		}
-		return getSelectorShardScopeReady(shard)
 
 	case SelectorHostScope:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
+			return GetSelectorHostScope(host)
 		}
-		return GetSelectorHostScope(host)
-
-	default:
-		return nil
 	}
+	panic("unknown selector type")
 }

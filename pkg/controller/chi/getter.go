@@ -269,7 +269,7 @@ func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCHI bool) (*api.Clic
 	if isCHI {
 		chiName = meta.GetName()
 	} else {
-		chiName, err = tags.GetCHINameFromObjectMeta(meta)
+		chiName, err = tags.GetCRNameFromObjectMeta(meta)
 		if err != nil {
 			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", meta.GetName(), err)
 		}
