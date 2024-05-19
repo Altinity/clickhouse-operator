@@ -222,62 +222,62 @@ func (n *Namer) getNamePartShardName(obj interface{}) string {
 
 // getNamePartReplicaName
 func (n *Namer) getNamePartReplicaName(host *api.Host) string {
-	return n.namePartReplicaName(host.Runtime.Address.ReplicaName)
+	return n.namePartReplicaName(host.GetRuntime().GetAddress().GetReplicaName())
 }
 
 // getNamePartHostName
 func (n *Namer) getNamePartHostName(host *api.Host) string {
-	return n.namePartHostName(host.Runtime.Address.HostName)
+	return n.namePartHostName(host.GetRuntime().GetAddress().GetHostName())
 }
 
 // getNamePartCHIScopeCycleSize
 func (n *Namer) getNamePartCHIScopeCycleSize(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleSize)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleSize())
 }
 
 // getNamePartCHIScopeCycleIndex
 func (n *Namer) getNamePartCHIScopeCycleIndex(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleIndex)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleIndex())
 }
 
 // getNamePartCHIScopeCycleOffset
 func (n *Namer) getNamePartCHIScopeCycleOffset(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleOffset)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleOffset())
 }
 
 // getNamePartClusterScopeCycleSize
 func (n *Namer) getNamePartClusterScopeCycleSize(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleSize)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleSize())
 }
 
 // getNamePartClusterScopeCycleIndex
 func (n *Namer) getNamePartClusterScopeCycleIndex(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleIndex)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleIndex())
 }
 
 // getNamePartClusterScopeCycleOffset
 func (n *Namer) getNamePartClusterScopeCycleOffset(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleOffset)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleOffset())
 }
 
 // getNamePartCHIScopeIndex
 func (n *Namer) getNamePartCHIScopeIndex(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.CHIScopeIndex)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeIndex())
 }
 
 // getNamePartClusterScopeIndex
 func (n *Namer) getNamePartClusterScopeIndex(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.ClusterScopeIndex)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeIndex())
 }
 
 // getNamePartShardScopeIndex
 func (n *Namer) getNamePartShardScopeIndex(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.ShardScopeIndex)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetShardScopeIndex())
 }
 
 // getNamePartReplicaScopeIndex
 func (n *Namer) getNamePartReplicaScopeIndex(host *api.Host) string {
-	return strconv.Itoa(host.Runtime.Address.ReplicaScopeIndex)
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaScopeIndex())
 }
 
 func (n *Namer) lenCR() int {

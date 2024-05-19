@@ -74,8 +74,8 @@ func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 // newLineMacroReplacerCR
 func (m *MacrosEngine) newLineMacroReplacerCR(cr api.ICustomResource) *strings.Replacer {
 	return strings.NewReplacer(
-		MacrosNamespace, m.namer.Name(short.Namespace, cr.GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CRName, cr.GetName()),
+		MacrosNamespace, m.namer.Name(short.Namespace, cr),
+		MacrosChiName, m.namer.Name(short.CRName, cr),
 	)
 }
 
@@ -87,9 +87,9 @@ func (m *MacrosEngine) newMapMacroReplacerCR(cr api.ICustomResource) *util.MapRe
 // newLineMacroReplacerCluster
 func (m *MacrosEngine) newLineMacroReplacerCluster(cluster api.ICluster) *strings.Replacer {
 	return strings.NewReplacer(
-		MacrosNamespace, m.namer.Name(short.Namespace, cluster.GetRuntime().GetAddress().GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CRName, cluster.GetRuntime().GetAddress().GetRootName()),
-		MacrosClusterName, m.namer.Name(short.ClusterName, cluster.GetRuntime().GetAddress().GetClusterName()),
+		MacrosNamespace, m.namer.Name(short.Namespace, cluster),
+		MacrosChiName, m.namer.Name(short.CRName, cluster),
+		MacrosClusterName, m.namer.Name(short.ClusterName, cluster),
 		MacrosClusterIndex, strconv.Itoa(cluster.GetRuntime().GetAddress().GetClusterIndex()),
 	)
 }
@@ -102,11 +102,11 @@ func (m *MacrosEngine) newMapMacroReplacerCluster(cluster api.ICluster) *util.Ma
 // newLineMacroReplacerShard
 func (m *MacrosEngine) newLineMacroReplacerShard(shard api.IShard) *strings.Replacer {
 	return strings.NewReplacer(
-		MacrosNamespace, m.namer.Name(short.Namespace, shard.GetRuntime().GetAddress().GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CRName, shard.GetRuntime().GetAddress().GetRootName()),
-		MacrosClusterName, m.namer.Name(short.ClusterName, shard.GetRuntime().GetAddress().GetClusterName()),
+		MacrosNamespace, m.namer.Name(short.Namespace, shard),
+		MacrosChiName, m.namer.Name(short.CRName, shard),
+		MacrosClusterName, m.namer.Name(short.ClusterName, shard),
 		MacrosClusterIndex, strconv.Itoa(shard.GetRuntime().GetAddress().GetClusterIndex()),
-		MacrosShardName, m.namer.Name(short.ShardName, shard.GetRuntime().GetAddress().GetShardName()),
+		MacrosShardName, m.namer.Name(short.ShardName, shard),
 		MacrosShardIndex, strconv.Itoa(shard.GetRuntime().GetAddress().GetShardIndex()),
 	)
 }
@@ -141,17 +141,17 @@ func clusterScopeIndexOfPreviousCycleTail(host api.IHost) int {
 // newLineMacroReplacerHost
 func (m *MacrosEngine) newLineMacroReplacerHost(host api.IHost) *strings.Replacer {
 	return strings.NewReplacer(
-		MacrosNamespace, m.namer.Name(short.Namespace, host.GetRuntime().GetAddress().GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CRName, host.GetRuntime().GetAddress().GetRootName()),
-		MacrosClusterName, m.namer.Name(short.ClusterName, host.GetRuntime().GetAddress().GetClusterName()),
+		MacrosNamespace, m.namer.Name(short.Namespace, host),
+		MacrosChiName, m.namer.Name(short.CRName, host),
+		MacrosClusterName, m.namer.Name(short.ClusterName, host),
 		MacrosClusterIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetClusterIndex()),
-		MacrosShardName, m.namer.Name(short.ShardName, host.GetRuntime().GetAddress().GetShardName()),
+		MacrosShardName, m.namer.Name(short.ShardName, host),
 		MacrosShardIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetShardIndex()),
 		MacrosShardScopeIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetShardScopeIndex()), // TODO use appropriate namePart function
-		MacrosReplicaName, m.namer.Name(short.ReplicaName, host.GetRuntime().GetAddress().GetReplicaName()),
+		MacrosReplicaName, m.namer.Name(short.ReplicaName, host),
 		MacrosReplicaIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaIndex()),
 		MacrosReplicaScopeIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaScopeIndex()), // TODO use appropriate namePart function
-		MacrosHostName, m.namer.Name(short.HostName, host.GetRuntime().GetAddress().GetHostName()),
+		MacrosHostName, m.namer.Name(short.HostName, host),
 		MacrosChiScopeIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeIndex()), // TODO use appropriate namePart function
 		MacrosChiScopeCycleIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleIndex()), // TODO use appropriate namePart function
 		MacrosChiScopeCycleOffset, strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleOffset()), // TODO use appropriate namePart function
