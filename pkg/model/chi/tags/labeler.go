@@ -23,13 +23,13 @@ import (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	chi api.ICustomResource
+	cr api.ICustomResource
 }
 
 // NewLabeler creates new labeler with context
-func NewLabeler(chi api.ICustomResource) *Labeler {
+func NewLabeler(cr api.ICustomResource) *Labeler {
 	return &Labeler{
-		chi: chi,
+		cr: cr,
 	}
 }
 
@@ -67,10 +67,8 @@ func (l *Labeler) Label(what LabelType, params ...any) map[string]string {
 
 	case LabelPodTemplate:
 		return l.labelPodTemplate(params...)
-
-	default:
-		return nil
 	}
+	panic("unknown label type")
 }
 
 // labelConfigMapCHICommon
@@ -97,7 +95,7 @@ func (l *Labeler) labelConfigMapHost(params ...any) map[string]string {
 		host = params[0].(*api.Host)
 		return l._labelConfigMapHost(host)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 // _labelConfigMapHost
@@ -125,7 +123,7 @@ func (l *Labeler) labelServiceCluster(params ...any) map[string]string {
 		cluster = params[0].(api.ICluster)
 		return l._labelServiceCluster(cluster)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 // _labelServiceCluster
@@ -144,7 +142,7 @@ func (l *Labeler) labelServiceShard(params ...any) map[string]string {
 		shard = params[0].(api.IShard)
 		return l._labelServiceShard(shard)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 // _labelServiceShard
@@ -163,7 +161,7 @@ func (l *Labeler) labelServiceHost(params ...any) map[string]string {
 		host = params[0].(*api.Host)
 		return l._labelServiceHost(host)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 // _labelServiceHost
@@ -183,7 +181,7 @@ func (l *Labeler) labelExistingPV(params ...any) map[string]string {
 		host = params[1].(*api.Host)
 		return l._labelExistingPV(pv, host)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 // _labelExistingPV
@@ -197,7 +195,7 @@ func (l *Labeler) labelNewPVC(params ...any) map[string]string {
 		host = params[0].(*api.Host)
 		return l._labelNewPVC(host)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 func (l *Labeler) _labelNewPVC(host *api.Host) map[string]string {
@@ -214,7 +212,7 @@ func (l *Labeler) labelExistingPVC(params ...any) map[string]string {
 		template = params[2].(*api.VolumeClaimTemplate)
 		return l._labelExistingPVC(pvc, host, template)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 // _labelExistingPVC
@@ -236,8 +234,9 @@ func (l *Labeler) labelPDB(params ...any) map[string]string {
 	var cluster api.ICluster
 	if len(params) > 0 {
 		cluster = params[0].(api.ICluster)
+		return l._labelPDB(cluster)
 	}
-	return l._labelPDB(cluster)
+	panic("not enough params for labeler")
 }
 
 func (l *Labeler) _labelPDB(cluster api.ICluster) map[string]string {
@@ -250,7 +249,7 @@ func (l *Labeler) labelSTS(params ...any) map[string]string {
 		host = params[0].(*api.Host)
 		return l._labelSTS(host)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 func (l *Labeler) _labelSTS(host *api.Host) map[string]string {
@@ -263,7 +262,7 @@ func (l *Labeler) labelPodTemplate(params ...any) map[string]string {
 		host = params[0].(*api.Host)
 		return l._labelPodTemplate(host)
 	}
-	return nil
+	panic("not enough params for labeler")
 }
 
 func (l *Labeler) _labelPodTemplate(host *api.Host) map[string]string {

@@ -29,7 +29,7 @@ const (
 	AnnotateConfigMapCommonUsers AnnotateType = "annotate cm common users"
 	AnnotateConfigMapHost        AnnotateType = "annotate cm host"
 
-	AnnotateServiceCHI     AnnotateType = "annotate svc chi"
+	AnnotateServiceCHI     AnnotateType = "annotate svc cr"
 	AnnotateServiceCluster AnnotateType = "annotate svc cluster"
 	AnnotateServiceShard   AnnotateType = "annotate svc shard"
 	AnnotateServiceHost    AnnotateType = "annotate svc host"
@@ -47,13 +47,13 @@ const (
 
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
-	chi api.ICustomResource
+	cr api.ICustomResource
 }
 
 // NewAnnotator creates new annotator with context
-func NewAnnotator(chi api.ICustomResource) *Annotator {
+func NewAnnotator(cr api.ICustomResource) *Annotator {
 	return &Annotator{
-		chi: chi,
+		cr: cr,
 	}
 }
 
@@ -67,8 +67,8 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
+			return a.getHostScope(host)
 		}
-		return a.getHostScope(host)
 
 	case AnnotateServiceCHI:
 		return a.getCHIScope()
@@ -76,20 +76,20 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
+			return a.getClusterScope(cluster)
 		}
-		return a.getClusterScope(cluster)
 	case AnnotateServiceShard:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
+			return a.getShardScope(shard)
 		}
-		return a.getShardScope(shard)
 	case AnnotateServiceHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
+			return a.getHostScope(host)
 		}
-		return a.getHostScope(host)
 
 	case AnnotateExistingPV:
 		var pv *core.PersistentVolume
@@ -97,18 +97,18 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 		if len(params) > 1 {
 			pv = params[0].(*core.PersistentVolume)
 			host = params[1].(*api.Host)
+			// Merge annotations from
+			// 1. Existing PV
+			// 2. Scope
+			return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.getHostScope(host))
 		}
-		// Merge annotations from
-		// 1. Existing PV
-		// 2. Scope
-		return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.getHostScope(host))
 
 	case AnnotateNewPVC:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
+			return a.getHostScope(host)
 		}
-		return a.getHostScope(host)
 
 	case AnnotateExistingPVC:
 		var pvc *core.PersistentVolumeClaim
@@ -118,38 +118,36 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 			pvc = params[0].(*core.PersistentVolumeClaim)
 			host = params[1].(*api.Host)
 			template = params[2].(*api.VolumeClaimTemplate)
+			// Merge annotations from
+			// 1. Template
+			// 2. Existing PVC
+			// 3. Scope
+			annotations := util.MergeStringMapsOverwrite(pvc.GetAnnotations(), template.ObjectMeta.GetAnnotations())
+			return util.MergeStringMapsOverwrite(annotations, a.getHostScope(host))
 		}
-		// Merge annotations from
-		// 1. Template
-		// 2. Existing PVC
-		// 3. Scope
-		annotations := util.MergeStringMapsOverwrite(pvc.GetAnnotations(), template.ObjectMeta.GetAnnotations())
-		return util.MergeStringMapsOverwrite(annotations, a.getHostScope(host))
 
 	case AnnotatePDB:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
+			return a.getClusterScope(cluster)
 		}
-		return a.getClusterScope(cluster)
 
 	case AnnotateSTS:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
+			return a.getHostScope(host)
 		}
-		return a.getHostScope(host)
 
 	case AnnotatePodTemplate:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
+			return a.getHostScope(host)
 		}
-		return a.getHostScope(host)
-
-	default:
-		return nil
 	}
+	panic("unknown annotate type")
 }
 
 // getCHIScope gets annotations for CHI-scoped object
@@ -182,6 +180,6 @@ func (a *Annotator) filterOutPredefined(m map[string]string) map[string]string {
 
 // appendCHIProvidedTo appends CHI-provided annotations to specified annotations
 func (a *Annotator) appendCHIProvidedTo(dst map[string]string) map[string]string {
-	source := util.CopyMapFilter(a.chi.GetAnnotations(), chop.Config().Annotation.Include, chop.Config().Annotation.Exclude)
+	source := util.CopyMapFilter(a.cr.GetAnnotations(), chop.Config().Annotation.Include, chop.Config().Annotation.Exclude)
 	return util.MergeStringMapsOverwrite(dst, source)
 }

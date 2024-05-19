@@ -72,7 +72,7 @@ func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string {
 
 // appendCHIProvidedTo appends CHI-provided labels to labels set
 func (l *Labeler) appendCHIProvidedTo(dst map[string]string) map[string]string {
-	sourceLabels := util.CopyMapFilter(l.chi.GetLabels(), chop.Config().Label.Include, chop.Config().Label.Exclude)
+	sourceLabels := util.CopyMapFilter(l.cr.GetLabels(), chop.Config().Label.Include, chop.Config().Label.Exclude)
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }
 

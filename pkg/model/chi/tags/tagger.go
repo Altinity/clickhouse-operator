@@ -21,10 +21,10 @@ type tagger struct {
 	labeler   *Labeler
 }
 
-func NewTagger(chi api.ICustomResource) *tagger {
+func NewTagger(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: NewAnnotator(chi),
-		labeler:   NewLabeler(chi),
+		annotator: NewAnnotator(cr),
+		labeler:   NewLabeler(cr),
 	}
 }
 

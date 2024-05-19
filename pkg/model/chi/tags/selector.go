@@ -23,9 +23,9 @@ import (
 func (l *Labeler) GetSelectorCHIScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
-		LabelNamespace: namer.NamePartLabel(namer.NamePartNamespace, l.chi),
+		LabelNamespace: namer.NamePartLabel(namer.NamePartNamespace, l.cr),
 		LabelAppName:   LabelAppValue,
-		LabelCHIName:   namer.NamePartLabel(namer.NamePartCHIName, l.chi),
+		LabelCHIName:   namer.NamePartLabel(namer.NamePartCHIName, l.cr),
 	}
 }
 
