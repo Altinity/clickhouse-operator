@@ -502,13 +502,3 @@ func (c *GeneratorClickHouse) getSecure(host api.Secured) int {
 	}
 	return 0
 }
-
-// getMacrosInstallation returns macros value for <installation-name> macros
-func (c *GeneratorClickHouse) getMacrosInstallation(name string) string {
-	return util.CreateStringID(name, 6)
-}
-
-// getMacrosCluster returns macros value for <cluster-name> macros
-func (c *GeneratorClickHouse) getMacrosCluster(name string) string {
-	return util.CreateStringID(name, 4)
-}

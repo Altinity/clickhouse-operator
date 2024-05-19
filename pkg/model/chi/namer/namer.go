@@ -14,48 +14,20 @@
 
 package namer
 
-type Target string
-
 type namer struct {
-	target Target
 }
 
 // NewNamer creates new namer with specified context
-func NewNamer(target Target) *namer {
-	return &namer{
-		target: target,
-	}
+func NewNamer() *namer {
+	return &namer{}
 }
 
-func (n *namer) lenCHI() int {
-	if n.target == TargetLabels {
-		return namePartChiMaxLenLabelsCtx
-	} else {
-		return namePartChiMaxLenNamesCtx
-	}
+var nmr = NewNamer()
+
+func Names(what NameType, params ...any) []string {
+	return nmr.Names(what, params...)
 }
 
-func (n *namer) lenCluster() int {
-	if n.target == TargetLabels {
-		return namePartClusterMaxLenLabelsCtx
-	} else {
-		return namePartClusterMaxLenNamesCtx
-	}
-}
-
-func (n *namer) lenShard() int {
-	if n.target == TargetLabels {
-		return namePartShardMaxLenLabelsCtx
-	} else {
-		return namePartShardMaxLenNamesCtx
-	}
-
-}
-
-func (n *namer) lenReplica() int {
-	if n.target == TargetLabels {
-		return namePartReplicaMaxLenLabelsCtx
-	} else {
-		return namePartReplicaMaxLenNamesCtx
-	}
+func Name(what NameType, params ...any) string {
+	return nmr.Name(what, params...)
 }

@@ -12,131 +12,145 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package namer
+package short
 
 import (
 	"strconv"
+	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+type Target string
+
+type Namer struct {
+	target Target
+}
+
+// NewNamer creates new namer with specified context
+func NewNamer(target Target) *Namer {
+	return &Namer{
+		target: target,
+	}
+}
+
+var labelNamer = NewNamer(TargetLabels)
+
+func NameLabel(what NameType, params ...any) string {
+	return labelNamer.Name(what, params...)
+}
+
 // namePartNamespace
-func (n *namer) namePartNamespace(name string) string {
+func (n *Namer) namePartNamespace(name string) string {
 	return sanitize(util.StringHead(name, n.lenCHI()))
 }
 
 // namePartChiName
-func (n *namer) namePartChiName(name string) string {
+func (n *Namer) namePartChiName(name string) string {
 	return sanitize(util.StringHead(name, n.lenCHI()))
 }
 
 // namePartChiNameID
-func (n *namer) namePartChiNameID(name string) string {
+func (n *Namer) namePartChiNameID(name string) string {
 	return util.CreateStringID(name, n.lenCHI())
 }
 
 // namePartClusterName
-func (n *namer) namePartClusterName(name string) string {
+func (n *Namer) namePartClusterName(name string) string {
 	return sanitize(util.StringHead(name, n.lenCluster()))
 }
 
 // namePartClusterNameID
-func (n *namer) namePartClusterNameID(name string) string {
+func (n *Namer) namePartClusterNameID(name string) string {
 	return util.CreateStringID(name, n.lenCluster())
 }
 
 // namePartShardName
-func (n *namer) namePartShardName(name string) string {
+func (n *Namer) namePartShardName(name string) string {
 	return sanitize(util.StringHead(name, n.lenShard()))
 }
 
 // namePartShardNameID
-func (n *namer) namePartShardNameID(name string) string {
+func (n *Namer) namePartShardNameID(name string) string {
 	return util.CreateStringID(name, n.lenShard())
 }
 
 // namePartReplicaName
-func (n *namer) namePartReplicaName(name string) string {
+func (n *Namer) namePartReplicaName(name string) string {
 	return sanitize(util.StringHead(name, n.lenReplica()))
 }
 
 // namePartReplicaNameID
-func (n *namer) namePartReplicaNameID(name string) string {
+func (n *Namer) namePartReplicaNameID(name string) string {
 	return util.CreateStringID(name, n.lenReplica())
 }
 
 // namePartHostName
-func (n *namer) namePartHostName(name string) string {
+func (n *Namer) namePartHostName(name string) string {
 	return sanitize(util.StringHead(name, n.lenReplica()))
 }
 
 // namePartHostNameID
-func (n *namer) namePartHostNameID(name string) string {
+func (n *Namer) namePartHostNameID(name string) string {
 	return util.CreateStringID(name, n.lenReplica())
 }
 
-var labelsNamer = NewNamer(TargetLabels)
-
-func NamePartLabel(what NamePartType, params ...any) string {
-	return labelsNamer.NamePart(what, params...)
-}
-
-func (n *namer) NamePart(what NamePartType, params ...any) string {
+func (n *Namer) Name(what NameType, params ...any) string {
 	switch what {
-	case NamePartNamespace:
+	case Namespace:
 		return n.getNamePartNamespace(params[0])
-	case NamePartCHIName:
+	case CHIName:
 		return n.getNamePartCHIName(params[0])
-	case NamePartClusterName:
+	case ClusterName:
 		return n.getNamePartClusterName(params[0])
-	case NamePartShardName:
+	case ShardName:
 		return n.getNamePartShardName(params[0])
-	case NamePartReplicaName:
+	case ReplicaName:
 		host := params[0].(*api.Host)
 		return n.getNamePartReplicaName(host)
-	case NamePartHostName:
+	case HostName:
 		host := params[0].(*api.Host)
 		return n.getNamePartHostName(host)
 
-	case NamePartCHIScopeCycleSize:
+	case CHIScopeCycleSize:
 		host := params[0].(*api.Host)
 		return n.getNamePartCHIScopeCycleSize(host)
-	case NamePartCHIScopeCycleIndex:
+	case CHIScopeCycleIndex:
 		host := params[0].(*api.Host)
 		return n.getNamePartCHIScopeCycleIndex(host)
-	case NamePartCHIScopeCycleOffset:
+	case CHIScopeCycleOffset:
 		host := params[0].(*api.Host)
 		return n.getNamePartCHIScopeCycleOffset(host)
 
-	case NamePartClusterScopeCycleSize:
+	case ClusterScopeCycleSize:
 		host := params[0].(*api.Host)
 		return n.getNamePartClusterScopeCycleSize(host)
-	case NamePartClusterScopeCycleIndex:
+	case ClusterScopeCycleIndex:
 		host := params[0].(*api.Host)
 		return n.getNamePartClusterScopeCycleIndex(host)
-	case NamePartClusterScopeCycleOffset:
+	case ClusterScopeCycleOffset:
 		host := params[0].(*api.Host)
 		return n.getNamePartClusterScopeCycleOffset(host)
 
-	case NamePartCHIScopeIndex:
+	case CHIScopeIndex:
 		host := params[0].(*api.Host)
 		return n.getNamePartCHIScopeIndex(host)
-	case NamePartClusterScopeIndex:
+	case ClusterScopeIndex:
 		host := params[0].(*api.Host)
 		return n.getNamePartClusterScopeIndex(host)
-	case NamePartShardScopeIndex:
+	case ShardScopeIndex:
 		host := params[0].(*api.Host)
 		return n.getNamePartShardScopeIndex(host)
-	case NamePartReplicaScopeIndex:
+	case ReplicaScopeIndex:
 		host := params[0].(*api.Host)
 		return n.getNamePartReplicaScopeIndex(host)
 	}
-	return "unknown part"
+	panic("unknown name part")
 }
 
 // getNamePartNamespace
-func (n *namer) getNamePartNamespace(obj interface{}) string {
+func (n *Namer) getNamePartNamespace(obj interface{}) string {
 	switch obj.(type) {
 	case *api.ClickHouseInstallation:
 		chi := obj.(*api.ClickHouseInstallation)
@@ -156,7 +170,7 @@ func (n *namer) getNamePartNamespace(obj interface{}) string {
 }
 
 // getNamePartCHIName
-func (n *namer) getNamePartCHIName(obj interface{}) string {
+func (n *Namer) getNamePartCHIName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.ClickHouseInstallation:
 		chi := obj.(*api.ClickHouseInstallation)
@@ -176,7 +190,7 @@ func (n *namer) getNamePartCHIName(obj interface{}) string {
 }
 
 // getNamePartClusterName
-func (n *namer) getNamePartClusterName(obj interface{}) string {
+func (n *Namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.Cluster:
 		cluster := obj.(*api.Cluster)
@@ -193,7 +207,7 @@ func (n *namer) getNamePartClusterName(obj interface{}) string {
 }
 
 // getNamePartShardName
-func (n *namer) getNamePartShardName(obj interface{}) string {
+func (n *Namer) getNamePartShardName(obj interface{}) string {
 	switch obj.(type) {
 	case *api.ChiShard:
 		shard := obj.(*api.ChiShard)
@@ -207,61 +221,100 @@ func (n *namer) getNamePartShardName(obj interface{}) string {
 }
 
 // getNamePartReplicaName
-func (n *namer) getNamePartReplicaName(host *api.Host) string {
+func (n *Namer) getNamePartReplicaName(host *api.Host) string {
 	return n.namePartReplicaName(host.Runtime.Address.ReplicaName)
 }
 
 // getNamePartHostName
-func (n *namer) getNamePartHostName(host *api.Host) string {
+func (n *Namer) getNamePartHostName(host *api.Host) string {
 	return n.namePartHostName(host.Runtime.Address.HostName)
 }
 
 // getNamePartCHIScopeCycleSize
-func (n *namer) getNamePartCHIScopeCycleSize(host *api.Host) string {
+func (n *Namer) getNamePartCHIScopeCycleSize(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleSize)
 }
 
 // getNamePartCHIScopeCycleIndex
-func (n *namer) getNamePartCHIScopeCycleIndex(host *api.Host) string {
+func (n *Namer) getNamePartCHIScopeCycleIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleIndex)
 }
 
 // getNamePartCHIScopeCycleOffset
-func (n *namer) getNamePartCHIScopeCycleOffset(host *api.Host) string {
+func (n *Namer) getNamePartCHIScopeCycleOffset(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeCycleOffset)
 }
 
 // getNamePartClusterScopeCycleSize
-func (n *namer) getNamePartClusterScopeCycleSize(host *api.Host) string {
+func (n *Namer) getNamePartClusterScopeCycleSize(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleSize)
 }
 
 // getNamePartClusterScopeCycleIndex
-func (n *namer) getNamePartClusterScopeCycleIndex(host *api.Host) string {
+func (n *Namer) getNamePartClusterScopeCycleIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleIndex)
 }
 
 // getNamePartClusterScopeCycleOffset
-func (n *namer) getNamePartClusterScopeCycleOffset(host *api.Host) string {
+func (n *Namer) getNamePartClusterScopeCycleOffset(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeCycleOffset)
 }
 
 // getNamePartCHIScopeIndex
-func (n *namer) getNamePartCHIScopeIndex(host *api.Host) string {
+func (n *Namer) getNamePartCHIScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.CHIScopeIndex)
 }
 
 // getNamePartClusterScopeIndex
-func (n *namer) getNamePartClusterScopeIndex(host *api.Host) string {
+func (n *Namer) getNamePartClusterScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ClusterScopeIndex)
 }
 
 // getNamePartShardScopeIndex
-func (n *namer) getNamePartShardScopeIndex(host *api.Host) string {
+func (n *Namer) getNamePartShardScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ShardScopeIndex)
 }
 
 // getNamePartReplicaScopeIndex
-func (n *namer) getNamePartReplicaScopeIndex(host *api.Host) string {
+func (n *Namer) getNamePartReplicaScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ReplicaScopeIndex)
+}
+
+func (n *Namer) lenCHI() int {
+	if n.target == TargetLabels {
+		return namePartChiMaxLenLabelsCtx
+	} else {
+		return namePartChiMaxLenNamesCtx
+	}
+}
+
+func (n *Namer) lenCluster() int {
+	if n.target == TargetLabels {
+		return namePartClusterMaxLenLabelsCtx
+	} else {
+		return namePartClusterMaxLenNamesCtx
+	}
+}
+
+func (n *Namer) lenShard() int {
+	if n.target == TargetLabels {
+		return namePartShardMaxLenLabelsCtx
+	} else {
+		return namePartShardMaxLenNamesCtx
+	}
+
+}
+
+func (n *Namer) lenReplica() int {
+	if n.target == TargetLabels {
+		return namePartReplicaMaxLenLabelsCtx
+	} else {
+		return namePartReplicaMaxLenNamesCtx
+	}
+}
+
+// sanitize makes string fulfil kubernetes naming restrictions
+// String can't end with '-', '_' and '.'
+func sanitize(s string) string {
+	return strings.Trim(s, "-_.")
 }

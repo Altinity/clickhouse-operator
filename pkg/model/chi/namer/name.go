@@ -21,12 +21,9 @@ import (
 	apps "k8s.io/api/apps/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	//	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/short"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
-
-func Names(what NameType, params ...any) []string {
-	return labelsNamer.Names(what, params...)
-}
 
 func (n *namer) Names(what NameType, params ...any) []string {
 	switch what {
@@ -37,10 +34,6 @@ func (n *namer) Names(what NameType, params ...any) []string {
 		return createFQDNs(obj, scope, excludeSelf)
 	}
 	panic("unknown names")
-}
-
-func Name(what NameType, params ...any) string {
-	return labelsNamer.Name(what, params...)
 }
 
 func (n *namer) Name(what NameType, params ...any) string {

@@ -16,7 +16,7 @@ package labeler
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/short"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -45,16 +45,16 @@ func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels b
 	labels := GetSelectorHostScope(host)
 	if l.AppendScope {
 		// Optional labels
-		labels[LabelShardScopeIndex] = namer.NamePartLabel(namer.NamePartShardScopeIndex, host)
-		labels[LabelReplicaScopeIndex] = namer.NamePartLabel(namer.NamePartReplicaScopeIndex, host)
-		labels[LabelCHIScopeIndex] = namer.NamePartLabel(namer.NamePartCHIScopeIndex, host)
-		labels[LabelCHIScopeCycleSize] = namer.NamePartLabel(namer.NamePartCHIScopeCycleSize, host)
-		labels[LabelCHIScopeCycleIndex] = namer.NamePartLabel(namer.NamePartCHIScopeCycleIndex, host)
-		labels[LabelCHIScopeCycleOffset] = namer.NamePartLabel(namer.NamePartCHIScopeCycleOffset, host)
-		labels[LabelClusterScopeIndex] = namer.NamePartLabel(namer.NamePartClusterScopeIndex, host)
-		labels[LabelClusterScopeCycleSize] = namer.NamePartLabel(namer.NamePartClusterScopeCycleSize, host)
-		labels[LabelClusterScopeCycleIndex] = namer.NamePartLabel(namer.NamePartClusterScopeCycleIndex, host)
-		labels[LabelClusterScopeCycleOffset] = namer.NamePartLabel(namer.NamePartClusterScopeCycleOffset, host)
+		labels[LabelShardScopeIndex] = short.NameLabel(short.ShardScopeIndex, host)
+		labels[LabelReplicaScopeIndex] = short.NameLabel(short.ReplicaScopeIndex, host)
+		labels[LabelCHIScopeIndex] = short.NameLabel(short.CHIScopeIndex, host)
+		labels[LabelCHIScopeCycleSize] = short.NameLabel(short.CHIScopeCycleSize, host)
+		labels[LabelCHIScopeCycleIndex] = short.NameLabel(short.CHIScopeCycleIndex, host)
+		labels[LabelCHIScopeCycleOffset] = short.NameLabel(short.CHIScopeCycleOffset, host)
+		labels[LabelClusterScopeIndex] = short.NameLabel(short.ClusterScopeIndex, host)
+		labels[LabelClusterScopeCycleSize] = short.NameLabel(short.ClusterScopeCycleSize, host)
+		labels[LabelClusterScopeCycleIndex] = short.NameLabel(short.ClusterScopeCycleIndex, host)
+		labels[LabelClusterScopeCycleOffset] = short.NameLabel(short.ClusterScopeCycleOffset, host)
 	}
 	if applySupplementaryServiceLabels {
 		// Optional labels
