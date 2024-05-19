@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -1576,8 +1576,8 @@ func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 // getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
 func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.Object) api.ObjectStatus {
 	// Try to perform label-based version comparison
-	curVersion, curHasLabel := tags.GetObjectVersion(curMeta)
-	newVersion, newHasLabel := tags.GetObjectVersion(newMeta)
+	curVersion, curHasLabel := labeler.GetObjectVersion(curMeta)
+	newVersion, newHasLabel := labeler.GetObjectVersion(newMeta)
 
 	if !curHasLabel || !newHasLabel {
 		w.a.M(newMeta).F().Warning(

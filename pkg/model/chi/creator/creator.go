@@ -20,12 +20,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 )
 
 type iTagger interface {
 	Annotate(what annotator.AnnotateType, params ...any) map[string]string
-	Label(what tags.LabelType, params ...any) map[string]string
-	Selector(what tags.SelectorType, params ...any) map[string]string
+	Label(what labeler.LabelType, params ...any) map[string]string
+	Selector(what labeler.SelectorType, params ...any) map[string]string
 }
 
 // Creator specifies creator object

@@ -18,7 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
@@ -240,10 +240,10 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 		labels,
 		// Add the following labels
 		map[string]string{
-			tags.LabelAppName:    tags.LabelAppValue,
-			tags.LabelCHOP:       chop.Get().Version,
-			tags.LabelCHOPCommit: chop.Get().Commit,
-			tags.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
+			labeler.LabelAppName:    labeler.LabelAppValue,
+			labeler.LabelCHOP:       chop.Get().Version,
+			labeler.LabelCHOPCommit: chop.Get().Commit,
+			labeler.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
 		},
 	)
 }
@@ -261,7 +261,7 @@ func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.Host) 
 		return err
 	}
 
-	if tags.AppendLabelReady(&pod.ObjectMeta) {
+	if labeler.AppendLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, controller.NewUpdateOptions())
 		if err != nil {
@@ -295,7 +295,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *api.Host) er
 		return err
 	}
 
-	if tags.DeleteLabelReady(&pod.ObjectMeta) {
+	if labeler.DeleteLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, controller.NewUpdateOptions())
 		return err
@@ -317,7 +317,7 @@ func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *a
 		return err
 	}
 
-	if tags.AppendAnnotationReady(&svc.ObjectMeta) {
+	if labeler.AppendAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 		if err != nil {
@@ -351,7 +351,7 @@ func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *api
 		return err
 	}
 
-	if tags.DeleteAnnotationReady(&svc.ObjectMeta) {
+	if labeler.DeleteAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 		return err

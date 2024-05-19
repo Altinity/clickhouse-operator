@@ -16,7 +16,8 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -33,7 +34,11 @@ func (c *Controller) discovery(ctx context.Context, chi *api.ClickHouseInstallat
 		return nil
 	}
 
-	opts := controller.NewListOptions(tags.NewLabeler(chi).GetSelectorCRScope())
+	opts := controller.NewListOptions(labeler.NewLabeler(chi, labeler.Config{
+		AppendScope: chop.Config().Label.Runtime.AppendScope,
+		Include:     chop.Config().Label.Include,
+		Exclude:     chop.Config().Label.Exclude,
+	}).GetSelectorCRScope())
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, chi, opts)
 	c.discoveryConfigMaps(ctx, r, chi, opts)

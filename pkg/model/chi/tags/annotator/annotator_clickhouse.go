@@ -29,9 +29,9 @@ type AnnotatorClickHouse struct {
 }
 
 // NewAnnotatorClickHouse creates new annotator with context
-func NewAnnotatorClickHouse(cr api.ICustomResource) *AnnotatorClickHouse {
+func NewAnnotatorClickHouse(cr api.ICustomResource, config Config) *AnnotatorClickHouse {
 	return &AnnotatorClickHouse{
-		Annotator: NewAnnotator(cr),
+		Annotator: NewAnnotator(cr, config),
 		cr:        cr,
 	}
 }

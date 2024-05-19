@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"gopkg.in/d4l3k/messagediff.v1"
 
 	core "k8s.io/api/core/v1"
@@ -23,7 +24,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -247,7 +247,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						tags.LabelNamespace: namer.MacrosNamespace,
+						labeler.LabelNamespace: namer.MacrosNamespace,
 					},
 				),
 			)
@@ -259,7 +259,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						tags.LabelCHIName: namer.MacrosChiName,
+						labeler.LabelCHIName: namer.MacrosChiName,
 					},
 				),
 			)
@@ -271,7 +271,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						tags.LabelClusterName: namer.MacrosClusterName,
+						labeler.LabelClusterName: namer.MacrosClusterName,
 					},
 				),
 			)
@@ -283,7 +283,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						tags.LabelShardName: namer.MacrosShardName,
+						labeler.LabelShardName: namer.MacrosShardName,
 					},
 				),
 			)
@@ -295,7 +295,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						tags.LabelReplicaName: namer.MacrosReplicaName,
+						labeler.LabelReplicaName: namer.MacrosReplicaName,
 					},
 				),
 			)
@@ -307,7 +307,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 				newPodAffinityTermWithMatchLabels(
 					podDistribution,
 					map[string]string{
-						tags.LabelClusterScopeIndex: namer.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
+						labeler.LabelClusterScopeIndex: namer.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
 					},
 				),
 			)
@@ -317,7 +317,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						tags.LabelClusterScopeIndex: namer.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
+						labeler.LabelClusterScopeIndex: namer.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
 					},
 				),
 			)
@@ -460,32 +460,32 @@ func newMatchLabels(
 	switch podDistribution.Scope {
 	case deployment.PodDistributionScopeShard:
 		scopeLabels = map[string]string{
-			tags.LabelNamespace:   namer.MacrosNamespace,
-			tags.LabelCHIName:     namer.MacrosChiName,
-			tags.LabelClusterName: namer.MacrosClusterName,
-			tags.LabelShardName:   namer.MacrosShardName,
+			labeler.LabelNamespace:   namer.MacrosNamespace,
+			labeler.LabelCHIName:     namer.MacrosChiName,
+			labeler.LabelClusterName: namer.MacrosClusterName,
+			labeler.LabelShardName:   namer.MacrosShardName,
 		}
 	case deployment.PodDistributionScopeReplica:
 		scopeLabels = map[string]string{
-			tags.LabelNamespace:   namer.MacrosNamespace,
-			tags.LabelCHIName:     namer.MacrosChiName,
-			tags.LabelClusterName: namer.MacrosClusterName,
-			tags.LabelReplicaName: namer.MacrosReplicaName,
+			labeler.LabelNamespace:   namer.MacrosNamespace,
+			labeler.LabelCHIName:     namer.MacrosChiName,
+			labeler.LabelClusterName: namer.MacrosClusterName,
+			labeler.LabelReplicaName: namer.MacrosReplicaName,
 		}
 	case deployment.PodDistributionScopeCluster:
 		scopeLabels = map[string]string{
-			tags.LabelNamespace:   namer.MacrosNamespace,
-			tags.LabelCHIName:     namer.MacrosChiName,
-			tags.LabelClusterName: namer.MacrosClusterName,
+			labeler.LabelNamespace:   namer.MacrosNamespace,
+			labeler.LabelCHIName:     namer.MacrosChiName,
+			labeler.LabelClusterName: namer.MacrosClusterName,
 		}
 	case deployment.PodDistributionScopeClickHouseInstallation:
 		scopeLabels = map[string]string{
-			tags.LabelNamespace: namer.MacrosNamespace,
-			tags.LabelCHIName:   namer.MacrosChiName,
+			labeler.LabelNamespace: namer.MacrosNamespace,
+			labeler.LabelCHIName:   namer.MacrosChiName,
 		}
 	case deployment.PodDistributionScopeNamespace:
 		scopeLabels = map[string]string{
-			tags.LabelNamespace: namer.MacrosNamespace,
+			labeler.LabelNamespace: namer.MacrosNamespace,
 		}
 	case deployment.PodDistributionScopeGlobal:
 		scopeLabels = map[string]string{}
@@ -513,7 +513,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					newMatchLabels(
 						podDistribution,
 						map[string]string{
-							tags.LabelAppName: tags.LabelAppValue,
+							labeler.LabelAppName: labeler.LabelAppValue,
 						},
 					),
 				),
@@ -527,7 +527,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					newMatchLabels(
 						podDistribution,
 						map[string]string{
-							tags.LabelClusterScopeCycleIndex: namer.MacrosClusterScopeCycleIndex,
+							labeler.LabelClusterScopeCycleIndex: namer.MacrosClusterScopeCycleIndex,
 						},
 					),
 				),
@@ -541,7 +541,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					newMatchLabels(
 						podDistribution,
 						map[string]string{
-							tags.LabelShardName: namer.MacrosShardName,
+							labeler.LabelShardName: namer.MacrosShardName,
 						},
 					),
 				),
@@ -555,7 +555,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					newMatchLabels(
 						podDistribution,
 						map[string]string{
-							tags.LabelReplicaName: namer.MacrosReplicaName,
+							labeler.LabelReplicaName: namer.MacrosReplicaName,
 						},
 					),
 				),
@@ -568,7 +568,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					podDistribution,
 					[]meta.LabelSelectorRequirement{
 						{
-							Key:      tags.LabelNamespace,
+							Key:      labeler.LabelNamespace,
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
 								namer.MacrosNamespace,
@@ -585,7 +585,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					podDistribution,
 					[]meta.LabelSelectorRequirement{
 						{
-							Key:      tags.LabelCHIName,
+							Key:      labeler.LabelCHIName,
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
 								namer.MacrosChiName,
@@ -602,7 +602,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					podDistribution,
 					[]meta.LabelSelectorRequirement{
 						{
-							Key:      tags.LabelClusterName,
+							Key:      labeler.LabelClusterName,
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
 								namer.MacrosClusterName,

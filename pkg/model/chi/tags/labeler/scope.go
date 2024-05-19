@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tags
+package labeler
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -44,7 +43,7 @@ func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := GetSelectorHostScope(host)
-	if chop.Config().Label.Runtime.AppendScope {
+	if l.AppendScope {
 		// Optional labels
 		labels[LabelShardScopeIndex] = namer.NamePartLabel(namer.NamePartShardScopeIndex, host)
 		labels[LabelReplicaScopeIndex] = namer.NamePartLabel(namer.NamePartReplicaScopeIndex, host)
@@ -89,8 +88,8 @@ func (l *Labeler) appendCRProvidedLabels(dst map[string]string) map[string]strin
 		// Start with CR-provided labels
 		l.cr.GetLabels(),
 		// Respect include-exclude policies
-		chop.Config().Label.Include,
-		chop.Config().Label.Exclude,
+		l.Include,
+		l.Exclude,
 	)
 	// Merge on top of provided dst
 	return util.MergeStringMapsOverwrite(dst, sourceLabels)

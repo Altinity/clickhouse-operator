@@ -16,13 +16,13 @@ package creator
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
 type ConfigMapManagerClickHouse struct {
@@ -71,7 +71,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(tags.LabelConfigMapCommon)),
+			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommon)),
 			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
@@ -79,7 +79,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 		Data: m.configFilesGenerator.CreateConfigFiles(config.FilesGroupCommon, options),
 	}
 	// And after the object is ready we can put version label
-	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -89,7 +89,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(tags.LabelConfigMapCommonUsers)),
+			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommonUsers)),
 			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
@@ -97,7 +97,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 		Data: m.configFilesGenerator.CreateConfigFiles(config.FilesGroupUsers),
 	}
 	// And after the object is ready we can put version label
-	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -107,7 +107,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          namer.Macro(host).Map(m.tagger.Label(tags.LabelConfigMapHost, host)),
+			Labels:          namer.Macro(host).Map(m.tagger.Label(labeler.LabelConfigMapHost, host)),
 			Annotations:     namer.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
@@ -115,6 +115,6 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 		Data: m.configFilesGenerator.CreateConfigFiles(config.FilesGroupHost, host),
 	}
 	// And after the object is ready we can put version label
-	tags.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }

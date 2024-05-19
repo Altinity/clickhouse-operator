@@ -16,6 +16,7 @@ package creator
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -23,7 +24,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
 type ServiceManagerClickHouse struct {
@@ -76,9 +76,9 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			template,
 			m.cr.GetNamespace(),
 			namer.Name(namer.NameCHIService, m.cr),
-			m.tagger.Label(tags.LabelServiceCHI, m.cr),
+			m.tagger.Label(labeler.LabelServiceCHI, m.cr),
 			m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr),
-			m.tagger.Selector(tags.SelectorCHIScopeReady),
+			m.tagger.Selector(labeler.SelectorCHIScopeReady),
 			createOwnerReferences(m.cr),
 			namer.Macro(m.cr),
 		)
@@ -90,7 +90,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameCHIService, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(tags.LabelServiceCHI, m.cr)),
+			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(labeler.LabelServiceCHI, m.cr)),
 			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
@@ -110,12 +110,12 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 					TargetPort: intstr.FromString(api.ChDefaultTCPPortName),
 				},
 			},
-			Selector: m.tagger.Selector(tags.SelectorCHIScopeReady),
+			Selector: m.tagger.Selector(labeler.SelectorCHIScopeReady),
 			Type:     core.ServiceTypeClusterIP,
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
-	tags.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
@@ -130,9 +130,9 @@ func (m *ServiceManagerClickHouse) createServiceCluster(cluster api.ICluster) *c
 			template,
 			cluster.GetRuntime().GetAddress().GetNamespace(),
 			serviceName,
-			m.tagger.Label(tags.LabelServiceCluster, cluster),
+			m.tagger.Label(labeler.LabelServiceCluster, cluster),
 			m.tagger.Annotate(annotator.AnnotateServiceCluster, cluster),
-			m.tagger.Selector(tags.SelectorClusterScopeReady, cluster),
+			m.tagger.Selector(labeler.SelectorClusterScopeReady, cluster),
 			ownerReferences,
 			namer.Macro(cluster),
 		)
@@ -149,9 +149,9 @@ func (m *ServiceManagerClickHouse) createServiceShard(shard api.IShard) *core.Se
 			template,
 			shard.GetRuntime().GetAddress().GetNamespace(),
 			namer.Name(namer.NameShardService, shard),
-			m.tagger.Label(tags.LabelServiceShard, shard),
+			m.tagger.Label(labeler.LabelServiceShard, shard),
 			m.tagger.Annotate(annotator.AnnotateServiceShard, shard),
-			m.tagger.Selector(tags.SelectorShardScopeReady, shard),
+			m.tagger.Selector(labeler.SelectorShardScopeReady, shard),
 			createOwnerReferences(m.cr),
 			namer.Macro(shard),
 		)
@@ -168,9 +168,9 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 			template,
 			host.Runtime.Address.Namespace,
 			namer.Name(namer.NameStatefulSetService, host),
-			m.tagger.Label(tags.LabelServiceHost, host),
+			m.tagger.Label(labeler.LabelServiceHost, host),
 			m.tagger.Annotate(annotator.AnnotateServiceHost, host),
-			m.tagger.Selector(tags.SelectorHostScope, host),
+			m.tagger.Selector(labeler.SelectorHostScope, host),
 			createOwnerReferences(m.cr),
 			namer.Macro(host),
 		)
@@ -182,18 +182,18 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameStatefulSetService, host),
 			Namespace:       host.Runtime.Address.Namespace,
-			Labels:          namer.Macro(host).Map(m.tagger.Label(tags.LabelServiceHost, host)),
+			Labels:          namer.Macro(host).Map(m.tagger.Label(labeler.LabelServiceHost, host)),
 			Annotations:     namer.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateServiceHost, host)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
-			Selector:                 m.tagger.Selector(tags.SelectorHostScope, host),
+			Selector:                 m.tagger.Selector(labeler.SelectorHostScope, host),
 			ClusterIP:                model.TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
 		},
 	}
 	svcAppendSpecifiedPorts(svc, host)
-	tags.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }

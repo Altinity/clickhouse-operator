@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tags
+package labeler
 
 import (
 	core "k8s.io/api/core/v1"
@@ -23,13 +23,21 @@ import (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
+	Config
 	cr api.ICustomResource
 }
 
+type Config struct {
+	AppendScope bool
+	Include     []string
+	Exclude     []string
+}
+
 // NewLabeler creates new labeler with context
-func NewLabeler(cr api.ICustomResource) *Labeler {
+func NewLabeler(cr api.ICustomResource, config Config) *Labeler {
 	return &Labeler{
-		cr: cr,
+		Config: config,
+		cr:     cr,
 	}
 }
 

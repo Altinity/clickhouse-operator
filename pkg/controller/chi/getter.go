@@ -17,7 +17,7 @@ package chi
 import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -59,7 +59,7 @@ func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.Conf
 	// Try to find by labels
 
 	var selector k8sLabels.Selector
-	if selector, err = tags.MakeSelectorFromObjectMeta(meta); err != nil {
+	if selector, err = labeler.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
@@ -141,7 +141,7 @@ func (c *Controller) getStatefulSetByMeta(meta meta.Object, byNameOnly bool) (*a
 	}
 
 	var selector k8sLabels.Selector
-	if selector, err = tags.MakeSelectorFromObjectMeta(meta); err != nil {
+	if selector, err = labeler.MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
@@ -269,7 +269,7 @@ func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCHI bool) (*api.Clic
 	if isCHI {
 		chiName = meta.GetName()
 	} else {
-		chiName, err = tags.GetCRNameFromObjectMeta(meta)
+		chiName, err = labeler.GetCRNameFromObjectMeta(meta)
 		if err != nil {
 			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", meta.GetName(), err)
 		}

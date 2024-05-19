@@ -18,7 +18,6 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -43,13 +42,20 @@ const (
 
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
+	Config
 	cr api.ICustomResource
 }
 
+type Config struct {
+	Include []string
+	Exclude []string
+}
+
 // NewAnnotator creates new annotator with context
-func NewAnnotator(cr api.ICustomResource) *Annotator {
+func NewAnnotator(cr api.ICustomResource, config Config) *Annotator {
 	return &Annotator{
-		cr: cr,
+		Config: config,
+		cr:     cr,
 	}
 }
 
@@ -171,8 +177,8 @@ func (a *Annotator) appendCRProvidedAnnotations(dst map[string]string) map[strin
 		// Start with CR-provided annotations
 		a.cr.GetAnnotations(),
 		// Respect include-exclude policies
-		chop.Config().Annotation.Include,
-		chop.Config().Annotation.Exclude,
+		a.Include,
+		a.Exclude,
 	)
 	// Merge on top of provided dst
 	return util.MergeStringMapsOverwrite(dst, source)

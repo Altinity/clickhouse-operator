@@ -16,12 +16,12 @@ package creator
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
 // AdjustPVC prepares PVC - labels and annotations
@@ -30,10 +30,10 @@ func (c *Creator) AdjustPVC(
 	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) *core.PersistentVolumeClaim {
-	pvc.SetLabels(namer.Macro(host).Map(c.tagger.Label(tags.LabelExistingPVC, pvc, host, template)))
+	pvc.SetLabels(namer.Macro(host).Map(c.tagger.Label(labeler.LabelExistingPVC, pvc, host, template)))
 	pvc.SetAnnotations(namer.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateExistingPVC, pvc, host, template)))
 	// And after the object is ready we can put version label
-	tags.MakeObjectVersion(&pvc.ObjectMeta, pvc)
+	labeler.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
 }
 
@@ -58,7 +58,7 @@ func (c *Creator) CreatePVC(
 			//  we are close to proper disk inheritance
 			// Right now we hit the following error:
 			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-			Labels:      namer.Macro(host).Map(c.tagger.Label(tags.LabelNewPVC, host, false)),
+			Labels:      namer.Macro(host).Map(c.tagger.Label(labeler.LabelNewPVC, host, false)),
 			Annotations: namer.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateNewPVC, host)),
 		},
 		// Append copy of PersistentVolumeClaimSpec

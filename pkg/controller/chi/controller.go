@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -457,7 +457,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(meta meta.Object) bool {
-	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && tags.IsCHOPGeneratedObject(meta)
+	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && labeler.IsCHOPGeneratedObject(meta)
 }
 
 // Run syncs caches, starts workers

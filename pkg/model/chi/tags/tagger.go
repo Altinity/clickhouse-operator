@@ -16,7 +16,9 @@ package tags
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 )
 
 type iAnnotator interface {
@@ -24,8 +26,8 @@ type iAnnotator interface {
 }
 
 type iLabeler interface {
-	Label(what LabelType, params ...any) map[string]string
-	Selector(what SelectorType, params ...any) map[string]string
+	Label(what labeler.LabelType, params ...any) map[string]string
+	Selector(what labeler.SelectorType, params ...any) map[string]string
 }
 
 type tagger struct {
@@ -35,8 +37,15 @@ type tagger struct {
 
 func NewTagger(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: annotator.NewAnnotatorClickHouse(cr),
-		labeler:   NewLabeler(cr),
+		annotator: annotator.NewAnnotatorClickHouse(cr, annotator.Config{
+			Include: chop.Config().Annotation.Include,
+			Exclude: chop.Config().Annotation.Exclude,
+		}),
+		labeler: labeler.NewLabeler(cr, labeler.Config{
+			AppendScope: chop.Config().Label.Runtime.AppendScope,
+			Include:     chop.Config().Label.Include,
+			Exclude:     chop.Config().Label.Exclude,
+		}),
 	}
 }
 
@@ -44,10 +53,10 @@ func (t *tagger) Annotate(what annotator.AnnotateType, params ...any) map[string
 	return t.annotator.Annotate(what, params...)
 }
 
-func (t *tagger) Label(what LabelType, params ...any) map[string]string {
+func (t *tagger) Label(what labeler.LabelType, params ...any) map[string]string {
 	return t.labeler.Label(what, params...)
 }
 
-func (t *tagger) Selector(what SelectorType, params ...any) map[string]string {
+func (t *tagger) Selector(what labeler.SelectorType, params ...any) map[string]string {
 	return t.labeler.Selector(what, params...)
 }

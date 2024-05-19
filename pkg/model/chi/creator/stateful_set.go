@@ -16,6 +16,7 @@ package creator
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +24,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -35,7 +35,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelSTS, host)),
+			Labels:          namer.Macro(host).Map(c.tagger.Label(labeler.LabelSTS, host)),
 			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
@@ -43,7 +43,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
 			ServiceName: namer.Name(namer.NameStatefulSetService, host),
 			Selector: &meta.LabelSelector{
-				MatchLabels: c.tagger.Selector(tags.SelectorHostScope, host),
+				MatchLabels: c.tagger.Selector(labeler.SelectorHostScope, host),
 			},
 
 			// IMPORTANT
@@ -63,7 +63,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 	c.stsSetupApplication(statefulSet, host)
 	c.stsSetupStorage(statefulSet, host)
 
-	tags.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
+	labeler.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
 
 	return statefulSet
 }
@@ -309,7 +309,7 @@ func (c *Creator) createPodTemplateSpec(template *api.PodTemplate, host *api.Hos
 	// StatefulSet's pod template is not directly compatible with PodTemplate,
 	// we need to extract some fields from PodTemplate and apply on StatefulSet
 	labels := namer.Macro(host).Map(util.MergeStringMapsOverwrite(
-		c.tagger.Label(tags.LabelPodTemplate, host),
+		c.tagger.Label(labeler.LabelPodTemplate, host),
 		template.ObjectMeta.GetLabels(),
 	))
 	annotations := namer.Macro(host).Map(util.MergeStringMapsOverwrite(

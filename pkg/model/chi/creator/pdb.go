@@ -17,6 +17,7 @@ package creator
 import (
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 
 	policy "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,7 +25,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 )
 
 // CreatePodDisruptionBudget creates new PodDisruptionBudget
@@ -33,13 +33,13 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 		ObjectMeta: meta.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetRootName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.cr.GetNamespace(),
-			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelPDB, cluster)),
+			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(labeler.LabelPDB, cluster)),
 			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(annotator.AnnotatePDB, cluster)),
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector: &meta.LabelSelector{
-				MatchLabels: c.tagger.Selector(tags.SelectorClusterScope, cluster),
+				MatchLabels: c.tagger.Selector(labeler.SelectorClusterScope, cluster),
 			},
 			MaxUnavailable: &intstr.IntOrString{
 				Type:   intstr.Int,
