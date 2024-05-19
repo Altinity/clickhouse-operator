@@ -21,7 +21,6 @@ import (
 	k8sLabels "k8s.io/apimachinery/pkg/labels"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -63,17 +62,6 @@ func GetReclaimPolicy(meta meta.Object) api.PVCReclaimPolicy {
 	}
 
 	return defaultReclaimPolicy
-}
-
-// filterOutPredefined filters out predefined values
-func (l *Labeler) filterOutPredefined(m map[string]string) map[string]string {
-	return util.CopyMapFilter(m, nil, []string{})
-}
-
-// appendCRProvidedTo appends CHI-provided labels to labels set
-func (l *Labeler) appendCRProvidedTo(dst map[string]string) map[string]string {
-	sourceLabels := util.CopyMapFilter(l.cr.GetLabels(), chop.Config().Label.Include, chop.Config().Label.Exclude)
-	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }
 
 // makeSetFromObjectMeta makes k8sLabels.Set from ObjectMeta

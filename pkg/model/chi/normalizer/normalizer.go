@@ -799,7 +799,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 		// Set the password for internode communication using an ENV VAR
 		n.appendAdditionalEnvVar(
 			core.EnvVar{
-				Name: model.InternodeClusterSecretEnvName,
+				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
 					SecretKeyRef: cluster.GetSecret().GetSecretKeyRef(),
 				},
@@ -810,7 +810,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 		// Set the password for internode communication using an ENV VAR
 		n.appendAdditionalEnvVar(
 			core.EnvVar{
-				Name: model.InternodeClusterSecretEnvName,
+				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
 					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(namer.Name(namer.NameClusterAutoSecret, cluster)),
 				},

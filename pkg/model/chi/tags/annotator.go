@@ -25,11 +25,7 @@ import (
 type AnnotateType string
 
 const (
-	AnnotateConfigMapCommon      AnnotateType = "annotate cm common"
-	AnnotateConfigMapCommonUsers AnnotateType = "annotate cm common users"
-	AnnotateConfigMapHost        AnnotateType = "annotate cm host"
-
-	AnnotateServiceCHI     AnnotateType = "annotate svc cr"
+	AnnotateServiceCR      AnnotateType = "annotate svc cr"
 	AnnotateServiceCluster AnnotateType = "annotate svc cluster"
 	AnnotateServiceShard   AnnotateType = "annotate svc shard"
 	AnnotateServiceHost    AnnotateType = "annotate svc host"
@@ -59,18 +55,8 @@ func NewAnnotator(cr api.ICustomResource) *Annotator {
 
 func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string {
 	switch what {
-	case AnnotateConfigMapCommon:
-		return a.getCRScope()
-	case AnnotateConfigMapCommonUsers:
-		return a.getCRScope()
-	case AnnotateConfigMapHost:
-		var host *api.Host
-		if len(params) > 0 {
-			host = params[0].(*api.Host)
-			return a.getHostScope(host)
-		}
 
-	case AnnotateServiceCHI:
+	case AnnotateServiceCR:
 		return a.getCRScope()
 	case AnnotateServiceCluster:
 		var cluster api.ICluster
@@ -153,34 +139,41 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 // getCRScope gets annotations for CR-scoped object
 func (a *Annotator) getCRScope() map[string]string {
 	// Combine generated annotations and CR-provided annotations
-	return a.filterOutPredefined(a.appendCRProvidedTo(nil))
+	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }
 
 // getClusterScope gets annotations for Cluster-scoped object
 func (a *Annotator) getClusterScope(cluster api.ICluster) map[string]string {
 	// Combine generated annotations and CR-provided annotations
-	return a.filterOutPredefined(a.appendCRProvidedTo(nil))
+	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }
 
 // getShardScope gets annotations for Shard-scoped object
 func (a *Annotator) getShardScope(shard api.IShard) map[string]string {
 	// Combine generated annotations and CR-provided annotations
-	return a.filterOutPredefined(a.appendCRProvidedTo(nil))
+	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }
 
 // getHostScope gets annotations for Host-scoped object
 func (a *Annotator) getHostScope(host *api.Host) map[string]string {
 	// Combine generated annotations and CR-provided annotations
-	return a.filterOutPredefined(a.appendCRProvidedTo(nil))
+	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }
 
-// filterOutPredefined filters out predefined values
-func (a *Annotator) filterOutPredefined(m map[string]string) map[string]string {
-	return util.CopyMapFilter(m, nil, util.AnnotationsTobeSkipped)
+// filterOutAnnotationsToBeSkipped filters out annotations that have to be skipped
+func (a *Annotator) filterOutAnnotationsToBeSkipped(m map[string]string) map[string]string {
+	return util.CopyMapFilter(m, nil, util.AnnotationsToBeSkipped)
 }
 
-// appendCRProvidedTo appends CHI-provided annotations to specified annotations
-func (a *Annotator) appendCRProvidedTo(dst map[string]string) map[string]string {
-	source := util.CopyMapFilter(a.cr.GetAnnotations(), chop.Config().Annotation.Include, chop.Config().Annotation.Exclude)
+// appendCRProvidedAnnotations appends CR-provided annotations to specified annotations
+func (a *Annotator) appendCRProvidedAnnotations(dst map[string]string) map[string]string {
+	source := util.CopyMapFilter(
+		// Start with CR-provided annotations
+		a.cr.GetAnnotations(),
+		// Respect include-exclude policies
+		chop.Config().Annotation.Include,
+		chop.Config().Annotation.Exclude,
+	)
+	// Merge on top of provided dst
 	return util.MergeStringMapsOverwrite(dst, source)
 }

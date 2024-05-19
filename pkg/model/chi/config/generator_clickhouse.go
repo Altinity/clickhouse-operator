@@ -20,10 +20,13 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/xml"
+)
+
+const (
+	InternodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
 )
 
 const (
@@ -260,7 +263,7 @@ func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) st
 			util.Iline(b, 12, "<secret>%s</secret>", cluster.GetSecret().Value)
 		case api.ClusterSecretSourceSecretRef, api.ClusterSecretSourceAuto:
 			// Use secret via ENV var from secret
-			util.Iline(b, 12, `<secret from_env="%s" />`, chi.InternodeClusterSecretEnvName)
+			util.Iline(b, 12, `<secret from_env="%s" />`, InternodeClusterSecretEnvName)
 		}
 
 		// Build each shard XML

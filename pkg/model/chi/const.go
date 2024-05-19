@@ -19,10 +19,6 @@ const (
 	TemplateDefaultsServiceClusterIP = "None"
 )
 
-const (
-	InternodeClusterSecretEnvName = "CLICKHOUSE_INTERNODE_CLUSTER_SECRET"
-)
-
 // Values for Schema Policy
 const (
 	SchemaPolicyReplicaNone                = "None"

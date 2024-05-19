@@ -25,19 +25,19 @@ import (
 // getCRScope gets labels for CR-scoped object
 func (l *Labeler) getCRScope() map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutPredefined(l.appendCRProvidedTo(l.GetSelectorCRScope()))
+	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(l.GetSelectorCRScope()))
 }
 
 // getClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getClusterScope(cluster api.ICluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutPredefined(l.appendCRProvidedTo(getSelectorClusterScope(cluster)))
+	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(getSelectorClusterScope(cluster)))
 }
 
 // getShardScope gets labels for Shard-scoped object
 func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutPredefined(l.appendCRProvidedTo(getSelectorShardScope(shard)))
+	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(getSelectorShardScope(shard)))
 }
 
 // getHostScope gets labels for Host-scoped object
@@ -63,7 +63,7 @@ func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels b
 		// When we'll have ChkCluster Discovery functionality we can refactor this properly
 		labels = appendConfigLabels(host, labels)
 	}
-	return l.filterOutPredefined(l.appendCRProvidedTo(labels))
+	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(labels))
 }
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
@@ -76,4 +76,22 @@ func (l *Labeler) getHostScopeReclaimPolicy(host *api.Host, template *api.Volume
 	return util.MergeStringMapsOverwrite(l.getHostScope(host, applySupplementaryServiceLabels), map[string]string{
 		LabelPVCReclaimPolicyName: volume.GetPVCReclaimPolicy(host, template).String(),
 	})
+}
+
+// filterOutLabelsToBeSkipped filters out predefined values
+func (l *Labeler) filterOutLabelsToBeSkipped(m map[string]string) map[string]string {
+	return util.CopyMapFilter(m, nil, []string{})
+}
+
+// appendCRProvidedLabels appends CHI-provided labels to labels set
+func (l *Labeler) appendCRProvidedLabels(dst map[string]string) map[string]string {
+	sourceLabels := util.CopyMapFilter(
+		// Start with CR-provided labels
+		l.cr.GetLabels(),
+		// Respect include-exclude policies
+		chop.Config().Label.Include,
+		chop.Config().Label.Exclude,
+	)
+	// Merge on top of provided dst
+	return util.MergeStringMapsOverwrite(dst, sourceLabels)
 }

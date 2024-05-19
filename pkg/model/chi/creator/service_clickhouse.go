@@ -76,7 +76,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			m.cr.GetNamespace(),
 			namer.Name(namer.NameCHIService, m.cr),
 			m.tagger.Label(tags.LabelServiceCHI, m.cr),
-			m.tagger.Annotate(tags.AnnotateServiceCHI, m.cr),
+			m.tagger.Annotate(tags.AnnotateServiceCR, m.cr),
 			m.tagger.Selector(tags.SelectorCHIScopeReady),
 			createOwnerReferences(m.cr),
 			namer.Macro(m.cr),
@@ -90,7 +90,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			Name:            namer.Name(namer.NameCHIService, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(tags.LabelServiceCHI, m.cr)),
-			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(tags.AnnotateServiceCHI, m.cr)),
+			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(tags.AnnotateServiceCR, m.cr)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{

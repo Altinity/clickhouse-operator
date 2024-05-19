@@ -16,14 +16,23 @@ package tags
 
 import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
+type iAnnotator interface {
+	Annotate(what AnnotateType, params ...any) map[string]string
+}
+
+type iLabeler interface {
+	Label(what LabelType, params ...any) map[string]string
+	Selector(what SelectorType, params ...any) map[string]string
+}
+
 type tagger struct {
-	annotator *Annotator
-	labeler   *Labeler
+	annotator iAnnotator
+	labeler   iLabeler
 }
 
 func NewTagger(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: NewAnnotator(cr),
+		annotator: NewAnnotatorClickHouse(cr),
 		labeler:   NewLabeler(cr),
 	}
 }
