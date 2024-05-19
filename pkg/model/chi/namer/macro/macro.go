@@ -75,7 +75,7 @@ func (m *MacrosEngine) Map(_map map[string]string) map[string]string {
 func (m *MacrosEngine) newLineMacroReplacerCR(cr api.ICustomResource) *strings.Replacer {
 	return strings.NewReplacer(
 		MacrosNamespace, m.namer.Name(short.Namespace, cr.GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CHIName, cr.GetName()),
+		MacrosChiName, m.namer.Name(short.CRName, cr.GetName()),
 	)
 }
 
@@ -88,7 +88,7 @@ func (m *MacrosEngine) newMapMacroReplacerCR(cr api.ICustomResource) *util.MapRe
 func (m *MacrosEngine) newLineMacroReplacerCluster(cluster api.ICluster) *strings.Replacer {
 	return strings.NewReplacer(
 		MacrosNamespace, m.namer.Name(short.Namespace, cluster.GetRuntime().GetAddress().GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CHIName, cluster.GetRuntime().GetAddress().GetRootName()),
+		MacrosChiName, m.namer.Name(short.CRName, cluster.GetRuntime().GetAddress().GetRootName()),
 		MacrosClusterName, m.namer.Name(short.ClusterName, cluster.GetRuntime().GetAddress().GetClusterName()),
 		MacrosClusterIndex, strconv.Itoa(cluster.GetRuntime().GetAddress().GetClusterIndex()),
 	)
@@ -103,7 +103,7 @@ func (m *MacrosEngine) newMapMacroReplacerCluster(cluster api.ICluster) *util.Ma
 func (m *MacrosEngine) newLineMacroReplacerShard(shard api.IShard) *strings.Replacer {
 	return strings.NewReplacer(
 		MacrosNamespace, m.namer.Name(short.Namespace, shard.GetRuntime().GetAddress().GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CHIName, shard.GetRuntime().GetAddress().GetRootName()),
+		MacrosChiName, m.namer.Name(short.CRName, shard.GetRuntime().GetAddress().GetRootName()),
 		MacrosClusterName, m.namer.Name(short.ClusterName, shard.GetRuntime().GetAddress().GetClusterName()),
 		MacrosClusterIndex, strconv.Itoa(shard.GetRuntime().GetAddress().GetClusterIndex()),
 		MacrosShardName, m.namer.Name(short.ShardName, shard.GetRuntime().GetAddress().GetShardName()),
@@ -142,7 +142,7 @@ func clusterScopeIndexOfPreviousCycleTail(host api.IHost) int {
 func (m *MacrosEngine) newLineMacroReplacerHost(host api.IHost) *strings.Replacer {
 	return strings.NewReplacer(
 		MacrosNamespace, m.namer.Name(short.Namespace, host.GetRuntime().GetAddress().GetNamespace()),
-		MacrosChiName, m.namer.Name(short.CHIName, host.GetRuntime().GetAddress().GetRootName()),
+		MacrosChiName, m.namer.Name(short.CRName, host.GetRuntime().GetAddress().GetRootName()),
 		MacrosClusterName, m.namer.Name(short.ClusterName, host.GetRuntime().GetAddress().GetClusterName()),
 		MacrosClusterIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetClusterIndex()),
 		MacrosShardName, m.namer.Name(short.ShardName, host.GetRuntime().GetAddress().GetShardName()),

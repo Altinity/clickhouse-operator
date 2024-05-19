@@ -16,13 +16,13 @@ package short
 
 const (
 	// Names context length
-	namePartChiMaxLenNamesCtx     = 60
+	namePartCRMaxLenNamesCtx      = 60
 	namePartClusterMaxLenNamesCtx = 15
 	namePartShardMaxLenNamesCtx   = 15
 	namePartReplicaMaxLenNamesCtx = 15
 
 	// Labels context length
-	namePartChiMaxLenLabelsCtx     = 63
+	namePartCRMaxLenLabelsCtx      = 63
 	namePartClusterMaxLenLabelsCtx = 63
 	namePartShardMaxLenLabelsCtx   = 63
 	namePartReplicaMaxLenLabelsCtx = 63
@@ -32,7 +32,7 @@ type NameType string
 
 const (
 	Namespace               NameType = "NamePartNamespace"
-	CHIName                 NameType = "NamePartCHIName"
+	CRName                  NameType = "NamePartCHIName"
 	ClusterName             NameType = "NamePartClusterName"
 	ShardName               NameType = "NamePartShardName"
 	ReplicaName             NameType = "NamePartReplicaName"

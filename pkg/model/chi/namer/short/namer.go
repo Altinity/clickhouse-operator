@@ -43,17 +43,17 @@ func NameLabel(what NameType, params ...any) string {
 
 // namePartNamespace
 func (n *Namer) namePartNamespace(name string) string {
-	return sanitize(util.StringHead(name, n.lenCHI()))
+	return sanitize(util.StringHead(name, n.lenCR()))
 }
 
-// namePartChiName
-func (n *Namer) namePartChiName(name string) string {
-	return sanitize(util.StringHead(name, n.lenCHI()))
+// namePartCRName
+func (n *Namer) namePartCRName(name string) string {
+	return sanitize(util.StringHead(name, n.lenCR()))
 }
 
-// namePartChiNameID
-func (n *Namer) namePartChiNameID(name string) string {
-	return util.CreateStringID(name, n.lenCHI())
+// namePartCRNameID
+func (n *Namer) namePartCRNameID(name string) string {
+	return util.CreateStringID(name, n.lenCR())
 }
 
 // namePartClusterName
@@ -100,8 +100,8 @@ func (n *Namer) Name(what NameType, params ...any) string {
 	switch what {
 	case Namespace:
 		return n.getNamePartNamespace(params[0])
-	case CHIName:
-		return n.getNamePartCHIName(params[0])
+	case CRName:
+		return n.getNamePartCRName(params[0])
 	case ClusterName:
 		return n.getNamePartClusterName(params[0])
 	case ShardName:
@@ -152,38 +152,38 @@ func (n *Namer) Name(what NameType, params ...any) string {
 // getNamePartNamespace
 func (n *Namer) getNamePartNamespace(obj interface{}) string {
 	switch obj.(type) {
-	case *api.ClickHouseInstallation:
-		chi := obj.(*api.ClickHouseInstallation)
-		return n.namePartChiName(chi.Namespace)
-	case *api.Cluster:
-		cluster := obj.(*api.Cluster)
-		return n.namePartChiName(cluster.Runtime.Address.Namespace)
-	case *api.ChiShard:
-		shard := obj.(*api.ChiShard)
-		return n.namePartChiName(shard.Runtime.Address.Namespace)
+	case api.ICustomResource:
+		cr := obj.(api.ICustomResource)
+		return n.namePartCRName(cr.GetNamespace())
+	case api.ICluster:
+		cluster := obj.(api.ICluster)
+		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetNamespace())
+	case api.IShard:
+		shard := obj.(api.IShard)
+		return n.namePartCRName(shard.GetRuntime().GetAddress().GetNamespace())
 	case *api.Host:
 		host := obj.(*api.Host)
-		return n.namePartChiName(host.Runtime.Address.Namespace)
+		return n.namePartCRName(host.GetRuntime().GetAddress().GetNamespace())
 	}
 
 	return "ERROR"
 }
 
-// getNamePartCHIName
-func (n *Namer) getNamePartCHIName(obj interface{}) string {
+// getNamePartCRName
+func (n *Namer) getNamePartCRName(obj interface{}) string {
 	switch obj.(type) {
-	case *api.ClickHouseInstallation:
-		chi := obj.(*api.ClickHouseInstallation)
-		return n.namePartChiName(chi.Name)
-	case *api.Cluster:
-		cluster := obj.(*api.Cluster)
-		return n.namePartChiName(cluster.Runtime.Address.CHIName)
-	case *api.ChiShard:
-		shard := obj.(*api.ChiShard)
-		return n.namePartChiName(shard.Runtime.Address.CHIName)
+	case api.ICustomResource:
+		cr := obj.(api.ICustomResource)
+		return n.namePartCRName(cr.GetName())
+	case api.ICluster:
+		cluster := obj.(api.ICluster)
+		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetRootName())
+	case api.IShard:
+		shard := obj.(api.IShard)
+		return n.namePartCRName(shard.GetRuntime().GetAddress().GetRootName())
 	case *api.Host:
 		host := obj.(*api.Host)
-		return n.namePartChiName(host.Runtime.Address.CHIName)
+		return n.namePartCRName(host.GetRuntime().GetAddress().GetRootName())
 	}
 
 	return "ERROR"
@@ -192,15 +192,15 @@ func (n *Namer) getNamePartCHIName(obj interface{}) string {
 // getNamePartClusterName
 func (n *Namer) getNamePartClusterName(obj interface{}) string {
 	switch obj.(type) {
-	case *api.Cluster:
-		cluster := obj.(*api.Cluster)
-		return n.namePartClusterName(cluster.Runtime.Address.ClusterName)
-	case *api.ChiShard:
-		shard := obj.(*api.ChiShard)
-		return n.namePartClusterName(shard.Runtime.Address.ClusterName)
+	case api.ICluster:
+		cluster := obj.(api.ICluster)
+		return n.namePartClusterName(cluster.GetRuntime().GetAddress().GetClusterName())
+	case api.IShard:
+		shard := obj.(api.IShard)
+		return n.namePartClusterName(shard.GetRuntime().GetAddress().GetClusterName())
 	case *api.Host:
 		host := obj.(*api.Host)
-		return n.namePartClusterName(host.Runtime.Address.ClusterName)
+		return n.namePartClusterName(host.GetRuntime().GetAddress().GetClusterName())
 	}
 
 	return "ERROR"
@@ -209,12 +209,12 @@ func (n *Namer) getNamePartClusterName(obj interface{}) string {
 // getNamePartShardName
 func (n *Namer) getNamePartShardName(obj interface{}) string {
 	switch obj.(type) {
-	case *api.ChiShard:
-		shard := obj.(*api.ChiShard)
-		return n.namePartShardName(shard.Runtime.Address.ShardName)
+	case api.IShard:
+		shard := obj.(api.IShard)
+		return n.namePartShardName(shard.GetRuntime().GetAddress().GetShardName())
 	case *api.Host:
 		host := obj.(*api.Host)
-		return n.namePartShardName(host.Runtime.Address.ShardName)
+		return n.namePartShardName(host.GetRuntime().GetAddress().GetShardName())
 	}
 
 	return "ERROR"
@@ -280,11 +280,11 @@ func (n *Namer) getNamePartReplicaScopeIndex(host *api.Host) string {
 	return strconv.Itoa(host.Runtime.Address.ReplicaScopeIndex)
 }
 
-func (n *Namer) lenCHI() int {
+func (n *Namer) lenCR() int {
 	if n.target == TargetLabels {
-		return namePartChiMaxLenLabelsCtx
+		return namePartCRMaxLenLabelsCtx
 	} else {
-		return namePartChiMaxLenNamesCtx
+		return namePartCRMaxLenNamesCtx
 	}
 }
 
