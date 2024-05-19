@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -71,7 +72,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 			Name:            namer.Name(namer.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(tags.LabelConfigMapCommon)),
-			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(tags.AnnotateConfigMapCommon)),
+			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -89,7 +90,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 			Name:            namer.Name(namer.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(tags.LabelConfigMapCommonUsers)),
-			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(tags.AnnotateConfigMapCommonUsers)),
+			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -107,7 +108,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 			Name:            namer.Name(namer.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          namer.Macro(host).Map(m.tagger.Label(tags.LabelConfigMapHost, host)),
-			Annotations:     namer.Macro(host).Map(m.tagger.Annotate(tags.AnnotateConfigMapHost, host)),
+			Annotations:     namer.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files

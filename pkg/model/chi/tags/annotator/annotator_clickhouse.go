@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tags
+package annotator
 
 import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 

@@ -19,10 +19,11 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 )
 
 type iTagger interface {
-	Annotate(what tags.AnnotateType, params ...any) map[string]string
+	Annotate(what annotator.AnnotateType, params ...any) map[string]string
 	Label(what tags.LabelType, params ...any) map[string]string
 	Selector(what tags.SelectorType, params ...any) map[string]string
 }

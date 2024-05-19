@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -25,7 +26,7 @@ import (
 // adjustPersistentVolume prepares PV labels
 func (c *Creator) adjustPersistentVolume(pv *core.PersistentVolume, host *api.Host) *core.PersistentVolume {
 	pv.SetLabels(namer.Macro(host).Map(c.tagger.Label(tags.LabelExistingPV, pv, host)))
-	pv.SetAnnotations(namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateExistingPV, pv, host)))
+	pv.SetAnnotations(namer.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateExistingPV, pv, host)))
 	// And after the object is ready we can put version label
 	tags.MakeObjectVersion(&pv.ObjectMeta, pv)
 	return pv

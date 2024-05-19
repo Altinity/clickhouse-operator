@@ -16,6 +16,7 @@ package creator
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 
 	policy "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,7 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetRootName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          namer.Macro(c.cr).Map(c.tagger.Label(tags.LabelPDB, cluster)),
-			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(tags.AnnotatePDB, cluster)),
+			Annotations:     namer.Macro(c.cr).Map(c.tagger.Annotate(annotator.AnnotatePDB, cluster)),
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{

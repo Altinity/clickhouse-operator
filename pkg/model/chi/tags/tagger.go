@@ -14,10 +14,13 @@
 
 package tags
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+)
 
 type iAnnotator interface {
-	Annotate(what AnnotateType, params ...any) map[string]string
+	Annotate(what annotator.AnnotateType, params ...any) map[string]string
 }
 
 type iLabeler interface {
@@ -32,12 +35,12 @@ type tagger struct {
 
 func NewTagger(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: NewAnnotatorClickHouse(cr),
+		annotator: annotator.NewAnnotatorClickHouse(cr),
 		labeler:   NewLabeler(cr),
 	}
 }
 
-func (t *tagger) Annotate(what AnnotateType, params ...any) map[string]string {
+func (t *tagger) Annotate(what annotator.AnnotateType, params ...any) map[string]string {
 	return t.annotator.Annotate(what, params...)
 }
 

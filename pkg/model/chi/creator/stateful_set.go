@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +36,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 			Name:            namer.Name(namer.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          namer.Macro(host).Map(c.tagger.Label(tags.LabelSTS, host)),
-			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(tags.AnnotateSTS, host)),
+			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		Spec: apps.StatefulSetSpec{
@@ -312,7 +313,7 @@ func (c *Creator) createPodTemplateSpec(template *api.PodTemplate, host *api.Hos
 		template.ObjectMeta.GetLabels(),
 	))
 	annotations := namer.Macro(host).Map(util.MergeStringMapsOverwrite(
-		c.tagger.Annotate(tags.AnnotatePodTemplate, host),
+		c.tagger.Annotate(annotator.AnnotatePodTemplate, host),
 		template.ObjectMeta.GetAnnotations(),
 	))
 
