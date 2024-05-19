@@ -15,18 +15,18 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 )
 
 // adjustPersistentVolume prepares PV labels
 func (c *Creator) adjustPersistentVolume(pv *core.PersistentVolume, host *api.Host) *core.PersistentVolume {
-	pv.SetLabels(namer.Macro(host).Map(c.tagger.Label(labeler.LabelExistingPV, pv, host)))
-	pv.SetAnnotations(namer.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateExistingPV, pv, host)))
+	pv.SetLabels(macro.Macro(host).Map(c.tagger.Label(labeler.LabelExistingPV, pv, host)))
+	pv.SetAnnotations(macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateExistingPV, pv, host)))
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(&pv.ObjectMeta, pv)
 	return pv

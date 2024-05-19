@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"gopkg.in/d4l3k/messagediff.v1"
 
@@ -23,7 +24,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -247,7 +247,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						labeler.LabelNamespace: namer.MacrosNamespace,
+						labeler.LabelNamespace: macro.MacrosNamespace,
 					},
 				),
 			)
@@ -259,7 +259,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						labeler.LabelCHIName: namer.MacrosChiName,
+						labeler.LabelCHIName: macro.MacrosChiName,
 					},
 				),
 			)
@@ -271,7 +271,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						labeler.LabelClusterName: namer.MacrosClusterName,
+						labeler.LabelClusterName: macro.MacrosClusterName,
 					},
 				),
 			)
@@ -283,7 +283,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						labeler.LabelShardName: namer.MacrosShardName,
+						labeler.LabelShardName: macro.MacrosShardName,
 					},
 				),
 			)
@@ -295,7 +295,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						labeler.LabelReplicaName: namer.MacrosReplicaName,
+						labeler.LabelReplicaName: macro.MacrosReplicaName,
 					},
 				),
 			)
@@ -307,7 +307,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 				newPodAffinityTermWithMatchLabels(
 					podDistribution,
 					map[string]string{
-						labeler.LabelClusterScopeIndex: namer.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
+						labeler.LabelClusterScopeIndex: macro.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
 					},
 				),
 			)
@@ -317,7 +317,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						labeler.LabelClusterScopeIndex: namer.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
+						labeler.LabelClusterScopeIndex: macro.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail,
 					},
 				),
 			)
@@ -460,32 +460,32 @@ func newMatchLabels(
 	switch podDistribution.Scope {
 	case deployment.PodDistributionScopeShard:
 		scopeLabels = map[string]string{
-			labeler.LabelNamespace:   namer.MacrosNamespace,
-			labeler.LabelCHIName:     namer.MacrosChiName,
-			labeler.LabelClusterName: namer.MacrosClusterName,
-			labeler.LabelShardName:   namer.MacrosShardName,
+			labeler.LabelNamespace:   macro.MacrosNamespace,
+			labeler.LabelCHIName:     macro.MacrosChiName,
+			labeler.LabelClusterName: macro.MacrosClusterName,
+			labeler.LabelShardName:   macro.MacrosShardName,
 		}
 	case deployment.PodDistributionScopeReplica:
 		scopeLabels = map[string]string{
-			labeler.LabelNamespace:   namer.MacrosNamespace,
-			labeler.LabelCHIName:     namer.MacrosChiName,
-			labeler.LabelClusterName: namer.MacrosClusterName,
-			labeler.LabelReplicaName: namer.MacrosReplicaName,
+			labeler.LabelNamespace:   macro.MacrosNamespace,
+			labeler.LabelCHIName:     macro.MacrosChiName,
+			labeler.LabelClusterName: macro.MacrosClusterName,
+			labeler.LabelReplicaName: macro.MacrosReplicaName,
 		}
 	case deployment.PodDistributionScopeCluster:
 		scopeLabels = map[string]string{
-			labeler.LabelNamespace:   namer.MacrosNamespace,
-			labeler.LabelCHIName:     namer.MacrosChiName,
-			labeler.LabelClusterName: namer.MacrosClusterName,
+			labeler.LabelNamespace:   macro.MacrosNamespace,
+			labeler.LabelCHIName:     macro.MacrosChiName,
+			labeler.LabelClusterName: macro.MacrosClusterName,
 		}
 	case deployment.PodDistributionScopeClickHouseInstallation:
 		scopeLabels = map[string]string{
-			labeler.LabelNamespace: namer.MacrosNamespace,
-			labeler.LabelCHIName:   namer.MacrosChiName,
+			labeler.LabelNamespace: macro.MacrosNamespace,
+			labeler.LabelCHIName:   macro.MacrosChiName,
 		}
 	case deployment.PodDistributionScopeNamespace:
 		scopeLabels = map[string]string{
-			labeler.LabelNamespace: namer.MacrosNamespace,
+			labeler.LabelNamespace: macro.MacrosNamespace,
 		}
 	case deployment.PodDistributionScopeGlobal:
 		scopeLabels = map[string]string{}
@@ -527,7 +527,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					newMatchLabels(
 						podDistribution,
 						map[string]string{
-							labeler.LabelClusterScopeCycleIndex: namer.MacrosClusterScopeCycleIndex,
+							labeler.LabelClusterScopeCycleIndex: macro.MacrosClusterScopeCycleIndex,
 						},
 					),
 				),
@@ -541,7 +541,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					newMatchLabels(
 						podDistribution,
 						map[string]string{
-							labeler.LabelShardName: namer.MacrosShardName,
+							labeler.LabelShardName: macro.MacrosShardName,
 						},
 					),
 				),
@@ -555,7 +555,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					newMatchLabels(
 						podDistribution,
 						map[string]string{
-							labeler.LabelReplicaName: namer.MacrosReplicaName,
+							labeler.LabelReplicaName: macro.MacrosReplicaName,
 						},
 					),
 				),
@@ -571,7 +571,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 							Key:      labeler.LabelNamespace,
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
-								namer.MacrosNamespace,
+								macro.MacrosNamespace,
 							},
 						},
 					},
@@ -588,7 +588,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 							Key:      labeler.LabelCHIName,
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
-								namer.MacrosChiName,
+								macro.MacrosChiName,
 							},
 						},
 					},
@@ -605,7 +605,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 							Key:      labeler.LabelClusterName,
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
-								namer.MacrosClusterName,
+								macro.MacrosClusterName,
 							},
 						},
 					},
@@ -888,10 +888,10 @@ func processNodeSelectorRequirement(nodeSelectorRequirement *core.NodeSelectorRe
 	if nodeSelectorRequirement == nil {
 		return
 	}
-	nodeSelectorRequirement.Key = namer.Macro(host).Line(nodeSelectorRequirement.Key)
+	nodeSelectorRequirement.Key = macro.Macro(host).Line(nodeSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range nodeSelectorRequirement.Values {
-		nodeSelectorRequirement.Values[i] = namer.Macro(host).Line(nodeSelectorRequirement.Values[i])
+		nodeSelectorRequirement.Values[i] = macro.Macro(host).Line(nodeSelectorRequirement.Values[i])
 	}
 }
 
@@ -917,7 +917,7 @@ func processPodAffinityTerm(podAffinityTerm *core.PodAffinityTerm, host *api.Hos
 		return
 	}
 	processLabelSelector(podAffinityTerm.LabelSelector, host)
-	podAffinityTerm.TopologyKey = namer.Macro(host).Line(podAffinityTerm.TopologyKey)
+	podAffinityTerm.TopologyKey = macro.Macro(host).Line(podAffinityTerm.TopologyKey)
 }
 
 // processLabelSelector
@@ -927,7 +927,7 @@ func processLabelSelector(labelSelector *meta.LabelSelector, host *api.Host) {
 	}
 
 	for k := range labelSelector.MatchLabels {
-		labelSelector.MatchLabels[k] = namer.Macro(host).Line(labelSelector.MatchLabels[k])
+		labelSelector.MatchLabels[k] = macro.Macro(host).Line(labelSelector.MatchLabels[k])
 	}
 	for j := range labelSelector.MatchExpressions {
 		labelSelectorRequirement := &labelSelector.MatchExpressions[j]
@@ -940,9 +940,9 @@ func processLabelSelectorRequirement(labelSelectorRequirement *meta.LabelSelecto
 	if labelSelectorRequirement == nil {
 		return
 	}
-	labelSelectorRequirement.Key = namer.Macro(host).Line(labelSelectorRequirement.Key)
+	labelSelectorRequirement.Key = macro.Macro(host).Line(labelSelectorRequirement.Key)
 	// Update values only, keys are not macros-ed
 	for i := range labelSelectorRequirement.Values {
-		labelSelectorRequirement.Values[i] = namer.Macro(host).Line(labelSelectorRequirement.Values[i])
+		labelSelectorRequirement.Values[i] = macro.Macro(host).Line(labelSelectorRequirement.Values[i])
 	}
 }

@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	apps "k8s.io/api/apps/v1"
@@ -35,8 +36,8 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          namer.Macro(host).Map(c.tagger.Label(labeler.LabelSTS, host)),
-			Annotations:     namer.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
+			Labels:          macro.Macro(host).Map(c.tagger.Label(labeler.LabelSTS, host)),
+			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
 			OwnerReferences: createOwnerReferences(c.cr),
 		},
 		Spec: apps.StatefulSetSpec{
@@ -308,11 +309,11 @@ func (c *Creator) stsApplyPodTemplate(statefulSet *apps.StatefulSet, template *a
 func (c *Creator) createPodTemplateSpec(template *api.PodTemplate, host *api.Host) core.PodTemplateSpec {
 	// StatefulSet's pod template is not directly compatible with PodTemplate,
 	// we need to extract some fields from PodTemplate and apply on StatefulSet
-	labels := namer.Macro(host).Map(util.MergeStringMapsOverwrite(
+	labels := macro.Macro(host).Map(util.MergeStringMapsOverwrite(
 		c.tagger.Label(labeler.LabelPodTemplate, host),
 		template.ObjectMeta.GetLabels(),
 	))
-	annotations := namer.Macro(host).Map(util.MergeStringMapsOverwrite(
+	annotations := macro.Macro(host).Map(util.MergeStringMapsOverwrite(
 		c.tagger.Annotate(annotator.AnnotatePodTemplate, host),
 		template.ObjectMeta.GetAnnotations(),
 	))

@@ -14,33 +14,35 @@
 
 package namer
 
+import "github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
+
 const (
 	// chiServiceNamePattern is a template of CHI Service name. "clickhouse-{chi}"
-	chiServiceNamePattern = "clickhouse-" + MacrosChiName
+	chiServiceNamePattern = "clickhouse-" + macro.MacrosChiName
 
 	// clusterServiceNamePattern is a template of cluster Service name. "cluster-{chi}-{cluster}"
-	clusterServiceNamePattern = "cluster-" + MacrosChiName + "-" + MacrosClusterName
+	clusterServiceNamePattern = "cluster-" + macro.MacrosChiName + "-" + macro.MacrosClusterName
 
 	// shardServiceNamePattern is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
-	shardServiceNamePattern = "shard-" + MacrosChiName + "-" + MacrosClusterName + "-" + MacrosShardName
+	shardServiceNamePattern = "shard-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosShardName
 
 	// replicaServiceNamePattern is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
-	replicaServiceNamePattern = "shard-" + MacrosChiName + "-" + MacrosClusterName + "-" + MacrosReplicaName
+	replicaServiceNamePattern = "shard-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosReplicaName
 
 	// statefulSetNamePattern is a template of hosts's StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
-	statefulSetNamePattern = "chi-" + MacrosChiName + "-" + MacrosClusterName + "-" + MacrosHostName
+	statefulSetNamePattern = "chi-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 
 	// statefulSetServiceNamePattern is a template of hosts's StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
-	statefulSetServiceNamePattern = "chi-" + MacrosChiName + "-" + MacrosClusterName + "-" + MacrosHostName
+	statefulSetServiceNamePattern = "chi-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 
 	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
-	configMapCommonNamePattern = "chi-" + MacrosChiName + "-common-configd"
+	configMapCommonNamePattern = "chi-" + macro.MacrosChiName + "-common-configd"
 
 	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
-	configMapCommonUsersNamePattern = "chi-" + MacrosChiName + "-common-usersd"
+	configMapCommonUsersNamePattern = "chi-" + macro.MacrosChiName + "-common-usersd"
 
 	// configMapHostNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	configMapHostNamePattern = "chi-" + MacrosChiName + "-deploy-confd-" + MacrosClusterName + "-" + MacrosHostName
+	configMapHostNamePattern = "chi-" + macro.MacrosChiName + "-deploy-confd-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 
 	// configMapHostMigrationNamePattern is a template of macros ConfigMap. "chi-{chi}-migration-{cluster}-{shard}-{host}"
 	//configMapHostMigrationNamePattern = "chi-" + MacrosChiName + "-migration-" + MacrosClusterName + "-" + MacrosHostName

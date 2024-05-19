@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
@@ -71,8 +72,8 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommon)),
-			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
+			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommon)),
+			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -89,8 +90,8 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommonUsers)),
-			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
+			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommonUsers)),
+			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -107,8 +108,8 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          namer.Macro(host).Map(m.tagger.Label(labeler.LabelConfigMapHost, host)),
-			Annotations:     namer.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),
+			Labels:          macro.Macro(host).Map(m.tagger.Label(labeler.LabelConfigMapHost, host)),
+			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files

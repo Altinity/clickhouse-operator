@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
@@ -80,7 +81,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr),
 			m.tagger.Selector(labeler.SelectorCHIScopeReady),
 			createOwnerReferences(m.cr),
-			namer.Macro(m.cr),
+			macro.Macro(m.cr),
 		)
 	}
 
@@ -90,8 +91,8 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameCHIService, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          namer.Macro(m.cr).Map(m.tagger.Label(labeler.LabelServiceCHI, m.cr)),
-			Annotations:     namer.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr)),
+			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelServiceCHI, m.cr)),
+			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
@@ -134,7 +135,7 @@ func (m *ServiceManagerClickHouse) createServiceCluster(cluster api.ICluster) *c
 			m.tagger.Annotate(annotator.AnnotateServiceCluster, cluster),
 			m.tagger.Selector(labeler.SelectorClusterScopeReady, cluster),
 			ownerReferences,
-			namer.Macro(cluster),
+			macro.Macro(cluster),
 		)
 	}
 	// No template specified, no need to create service
@@ -153,7 +154,7 @@ func (m *ServiceManagerClickHouse) createServiceShard(shard api.IShard) *core.Se
 			m.tagger.Annotate(annotator.AnnotateServiceShard, shard),
 			m.tagger.Selector(labeler.SelectorShardScopeReady, shard),
 			createOwnerReferences(m.cr),
-			namer.Macro(shard),
+			macro.Macro(shard),
 		)
 	}
 	// No template specified, no need to create service
@@ -172,7 +173,7 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 			m.tagger.Annotate(annotator.AnnotateServiceHost, host),
 			m.tagger.Selector(labeler.SelectorHostScope, host),
 			createOwnerReferences(m.cr),
-			namer.Macro(host),
+			macro.Macro(host),
 		)
 	}
 
@@ -182,8 +183,8 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.Name(namer.NameStatefulSetService, host),
 			Namespace:       host.Runtime.Address.Namespace,
-			Labels:          namer.Macro(host).Map(m.tagger.Label(labeler.LabelServiceHost, host)),
-			Annotations:     namer.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateServiceHost, host)),
+			Labels:          macro.Macro(host).Map(m.tagger.Label(labeler.LabelServiceHost, host)),
+			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateServiceHost, host)),
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
