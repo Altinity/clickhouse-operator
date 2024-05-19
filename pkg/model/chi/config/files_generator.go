@@ -16,7 +16,7 @@ package config
 
 import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
-type IConfigFileGenerator interface {
+type IConfigFilesGenerator interface {
 	CreateConfigFiles(what FilesGroupType, params ...any) map[string]string
 }
 
@@ -27,7 +27,7 @@ const (
 	FilesGeneratorTypeKeeper     FilesGeneratorType = "keeper"
 )
 
-func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts *ConfigGeneratorOptions) IConfigFileGenerator {
+func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts *GeneratorOptions) IConfigFilesGenerator {
 	switch what {
 	case FilesGeneratorTypeClickHouse:
 		return NewConfigFilesGeneratorClickHouse(cr, opts)

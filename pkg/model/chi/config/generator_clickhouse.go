@@ -38,51 +38,51 @@ const (
 	AllClustersClusterName         = "all-clusters"
 )
 
-// ConfigGeneratorClickHouse generates ClickHouse configuration files content for specified CHI
+// GeneratorClickHouse generates ClickHouse configuration files content for specified CHI
 // ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
 // which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
-type ConfigGeneratorClickHouse struct {
+type GeneratorClickHouse struct {
 	chi  api.ICustomResource
-	opts *ConfigGeneratorOptions
+	opts *GeneratorOptions
 }
 
-// newConfigGeneratorClickHouse returns new ConfigGeneratorClickHouse struct
-func newConfigGeneratorClickHouse(chi api.ICustomResource, opts *ConfigGeneratorOptions) *ConfigGeneratorClickHouse {
-	return &ConfigGeneratorClickHouse{
+// newConfigGeneratorClickHouse returns new GeneratorClickHouse struct
+func newConfigGeneratorClickHouse(chi api.ICustomResource, opts *GeneratorOptions) *GeneratorClickHouse {
+	return &GeneratorClickHouse{
 		chi:  chi,
 		opts: opts,
 	}
 }
 
 // getUsers creates data for users section. Used as "users.xml"
-func (c *ConfigGeneratorClickHouse) getUsers() string {
+func (c *GeneratorClickHouse) getUsers() string {
 	return c.generateXMLConfig(c.opts.Users, configUsers)
 }
 
 // getProfiles creates data for profiles section. Used as "profiles.xml"
-func (c *ConfigGeneratorClickHouse) getProfiles() string {
+func (c *GeneratorClickHouse) getProfiles() string {
 	return c.generateXMLConfig(c.opts.Profiles, configProfiles)
 }
 
 // getQuotas creates data for "quotas.xml"
-func (c *ConfigGeneratorClickHouse) getQuotas() string {
+func (c *GeneratorClickHouse) getQuotas() string {
 	return c.generateXMLConfig(c.opts.Quotas, configQuotas)
 }
 
 // getSettingsGlobal creates data for "settings.xml"
-func (c *ConfigGeneratorClickHouse) getSettingsGlobal() string {
+func (c *GeneratorClickHouse) getSettingsGlobal() string {
 	// No host specified means request to generate common config
 	return c.generateXMLConfig(c.opts.Settings, "")
 }
 
 // getSettings creates data for "settings.xml"
-func (c *ConfigGeneratorClickHouse) getSettings(host *api.Host) string {
+func (c *GeneratorClickHouse) getSettings(host *api.Host) string {
 	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }
 
 // getSectionFromFiles creates data for custom common config files
-func (c *ConfigGeneratorClickHouse) getSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.Host) map[string]string {
+func (c *GeneratorClickHouse) getSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.Host) map[string]string {
 	var files *api.Settings
 	if host == nil {
 		// We are looking into Common files
@@ -98,7 +98,7 @@ func (c *ConfigGeneratorClickHouse) getSectionFromFiles(section api.SettingsSect
 }
 
 // getHostZookeeper creates data for "zookeeper.xml"
-func (c *ConfigGeneratorClickHouse) getHostZookeeper(host *api.Host) string {
+func (c *GeneratorClickHouse) getHostZookeeper(host *api.Host) string {
 	zk := host.GetZookeeper()
 
 	if zk.IsEmpty() {
@@ -176,7 +176,7 @@ func (c *ConfigGeneratorClickHouse) getHostZookeeper(host *api.Host) string {
 }
 
 // chiHostsNum count hosts according to the options
-func (c *ConfigGeneratorClickHouse) chiHostsNum(options *RemoteServersGeneratorOptions) int {
+func (c *GeneratorClickHouse) chiHostsNum(options *RemoteServersOptions) int {
 	num := 0
 	c.chi.WalkHosts(func(host *api.Host) error {
 		if options.Include(host) {
@@ -188,7 +188,7 @@ func (c *ConfigGeneratorClickHouse) chiHostsNum(options *RemoteServersGeneratorO
 }
 
 // clusterHostsNum count hosts according to the options
-func (c *ConfigGeneratorClickHouse) clusterHostsNum(cluster api.ICluster, options *RemoteServersGeneratorOptions) int {
+func (c *GeneratorClickHouse) clusterHostsNum(cluster api.ICluster, options *RemoteServersOptions) int {
 	num := 0
 	// Build each shard XML
 	cluster.WalkShards(func(index int, shard api.IShard) error {
@@ -199,7 +199,7 @@ func (c *ConfigGeneratorClickHouse) clusterHostsNum(cluster api.ICluster, option
 }
 
 // shardHostsNum count hosts according to the options
-func (c *ConfigGeneratorClickHouse) shardHostsNum(shard api.IShard, options *RemoteServersGeneratorOptions) int {
+func (c *GeneratorClickHouse) shardHostsNum(shard api.IShard, options *RemoteServersOptions) int {
 	num := 0
 	shard.WalkHosts(func(host *api.Host) error {
 		if options.Include(host) {
@@ -210,7 +210,7 @@ func (c *ConfigGeneratorClickHouse) shardHostsNum(shard api.IShard, options *Rem
 	return num
 }
 
-func (c *ConfigGeneratorClickHouse) getRemoteServersReplica(host *api.Host, b *bytes.Buffer) {
+func (c *GeneratorClickHouse) getRemoteServersReplica(host *api.Host, b *bytes.Buffer) {
 	// <replica>
 	//		<host>XXX</host>
 	//		<port>XXX</port>
@@ -230,9 +230,9 @@ func (c *ConfigGeneratorClickHouse) getRemoteServersReplica(host *api.Host, b *b
 }
 
 // getRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func (c *ConfigGeneratorClickHouse) getRemoteServers(options *RemoteServersGeneratorOptions) string {
+func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) string {
 	if options == nil {
-		options = defaultRemoteServersGeneratorOptions()
+		options = defaultRemoteServersOptions()
 	}
 
 	b := &bytes.Buffer{}
@@ -390,7 +390,7 @@ func (c *ConfigGeneratorClickHouse) getRemoteServers(options *RemoteServersGener
 }
 
 // getHostMacros creates "macros.xml" content
-func (c *ConfigGeneratorClickHouse) getHostMacros(host *api.Host) string {
+func (c *GeneratorClickHouse) getHostMacros(host *api.Host) string {
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -428,7 +428,7 @@ func (c *ConfigGeneratorClickHouse) getHostMacros(host *api.Host) string {
 }
 
 // getHostHostnameAndPorts creates "ports.xml" content
-func (c *ConfigGeneratorClickHouse) getHostHostnameAndPorts(host *api.Host) string {
+func (c *GeneratorClickHouse) getHostHostnameAndPorts(host *api.Host) string {
 
 	b := &bytes.Buffer{}
 
@@ -461,7 +461,7 @@ func (c *ConfigGeneratorClickHouse) getHostHostnameAndPorts(host *api.Host) stri
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func (c *ConfigGeneratorClickHouse) generateXMLConfig(settings *api.Settings, prefix string) string {
+func (c *GeneratorClickHouse) generateXMLConfig(settings *api.Settings, prefix string) string {
 	if settings.Len() == 0 {
 		return ""
 	}
@@ -482,18 +482,18 @@ func (c *ConfigGeneratorClickHouse) generateXMLConfig(settings *api.Settings, pr
 //
 
 // getDistributedDDLPath returns string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
-func (c *ConfigGeneratorClickHouse) getDistributedDDLPath() string {
+func (c *GeneratorClickHouse) getDistributedDDLPath() string {
 	return fmt.Sprintf(DistributedDDLPathPattern, c.chi.GetName())
 }
 
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
-func (c *ConfigGeneratorClickHouse) getRemoteServersReplicaHostname(host *api.Host) string {
+func (c *GeneratorClickHouse) getRemoteServersReplicaHostname(host *api.Host) string {
 	return namer.Name(namer.NameInstanceHostname, host)
 }
 
 // getSecure gets config-usable value for host or node secure flag
-func (c *ConfigGeneratorClickHouse) getSecure(host api.Secured) int {
+func (c *GeneratorClickHouse) getSecure(host api.Secured) int {
 	if host.IsSecure() {
 		return 1
 	}
@@ -501,11 +501,11 @@ func (c *ConfigGeneratorClickHouse) getSecure(host api.Secured) int {
 }
 
 // getMacrosInstallation returns macros value for <installation-name> macros
-func (c *ConfigGeneratorClickHouse) getMacrosInstallation(name string) string {
+func (c *GeneratorClickHouse) getMacrosInstallation(name string) string {
 	return util.CreateStringID(name, 6)
 }
 
 // getMacrosCluster returns macros value for <cluster-name> macros
-func (c *ConfigGeneratorClickHouse) getMacrosCluster(name string) string {
+func (c *GeneratorClickHouse) getMacrosCluster(name string) string {
 	return util.CreateStringID(name, 4)
 }

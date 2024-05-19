@@ -23,13 +23,13 @@ import (
 // FilesGeneratorClickHouse specifies clickhouse configuration generator object
 type FilesGeneratorClickHouse struct {
 	// ClickHouse config generator
-	configGenerator *ConfigGeneratorClickHouse
+	configGenerator *GeneratorClickHouse
 	// clickhouse-operator configuration
 	chopConfig *api.OperatorConfig
 }
 
 // NewConfigFilesGeneratorClickHouse creates new clickhouse configuration generator object
-func NewConfigFilesGeneratorClickHouse(cr api.ICustomResource, opts *ConfigGeneratorOptions) *FilesGeneratorClickHouse {
+func NewConfigFilesGeneratorClickHouse(cr api.ICustomResource, opts *GeneratorOptions) *FilesGeneratorClickHouse {
 	return &FilesGeneratorClickHouse{
 		configGenerator: newConfigGeneratorClickHouse(cr, opts),
 		chopConfig:      chop.Config(),
@@ -66,7 +66,7 @@ func (c *FilesGeneratorClickHouse) createConfigFilesGroupCommon(options *FilesGe
 	// 1. remote servers
 	// 2. common settings
 	// 3. common files
-	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.configGenerator.getRemoteServers(options.GetRemoteServersGeneratorOptions()))
+	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configRemoteServers), c.configGenerator.getRemoteServers(options.GetRemoteServersOptions()))
 	util.IncludeNonEmpty(commonConfigSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettingsGlobal())
 	util.MergeStringMapsOverwrite(commonConfigSections, c.configGenerator.getSectionFromFiles(api.SectionCommon, true, nil))
 	// Extra user-specified config files

@@ -33,7 +33,7 @@ type IConfigMapManager interface {
 	CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap
 	SetCR(cr api.ICustomResource)
 	SetTagger(tagger iTagger)
-	SetConfigFilesGenerator(configFilesGenerator config.IConfigFileGenerator)
+	SetConfigFilesGenerator(configFilesGenerator config.IConfigFilesGenerator)
 }
 
 type ConfigMapManagerType string

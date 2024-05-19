@@ -27,7 +27,7 @@ import (
 type ConfigMapManagerClickHouse struct {
 	cr                   api.ICustomResource
 	tagger               iTagger
-	configFilesGenerator config.IConfigFileGenerator
+	configFilesGenerator config.IConfigFilesGenerator
 }
 
 func NewConfigMapManagerClickHouse() *ConfigMapManagerClickHouse {
@@ -60,7 +60,7 @@ func (m *ConfigMapManagerClickHouse) SetCR(cr api.ICustomResource) {
 func (m *ConfigMapManagerClickHouse) SetTagger(tagger iTagger) {
 	m.tagger = tagger
 }
-func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator config.IConfigFileGenerator) {
+func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator config.IConfigFilesGenerator) {
 	m.configFilesGenerator = configFilesGenerator
 }
 

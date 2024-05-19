@@ -30,7 +30,7 @@ type iTagger interface {
 // Creator specifies creator object
 type Creator struct {
 	cr                   api.ICustomResource
-	configFilesGenerator config.IConfigFileGenerator
+	configFilesGenerator config.IConfigFilesGenerator
 	tagger               iTagger
 	a                    log.Announcer
 	cm                   IContainerManager
@@ -53,7 +53,7 @@ type Creator struct {
 // NewCreator creates new Creator object
 func NewCreator(
 	cr api.ICustomResource,
-	configFilesGenerator config.IConfigFileGenerator,
+	configFilesGenerator config.IConfigFilesGenerator,
 	containerManager IContainerManager,
 	probeManager IProbeManager,
 	serviceManager IServiceManager,

@@ -108,7 +108,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			config.NewConfigFilesGenerator(
 				config.FilesGeneratorTypeClickHouse,
 				chi,
-				&config.ConfigGeneratorOptions{
+				&config.GeneratorOptions{
 					Users:          chi.GetSpec().Configuration.Users,
 					Profiles:       chi.GetSpec().Configuration.Profiles,
 					Quotas:         chi.GetSpec().Configuration.Quotas,
@@ -849,13 +849,13 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 	})
 }
 
-// getRemoteServersGeneratorOptions build base set of RemoteServersGeneratorOptions
+// getRemoteServersGeneratorOptions build base set of RemoteServersOptions
 // which are applied on each of `remote_servers` reconfiguration during reconcile cycle
-func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersGeneratorOptions {
-	// Base model.RemoteServersGeneratorOptions specifies to exclude:
+func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersOptions {
+	// Base model.RemoteServersOptions specifies to exclude:
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
-	return config.NewRemoteServersGeneratorOptions().ExcludeReconcileAttributes(
+	return config.NewRemoteServersOptions().ExcludeReconcileAttributes(
 		api.NewChiHostReconcileAttributes().
 			SetAdd().
 			SetExclude(),
@@ -865,8 +865,8 @@ func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersGenerat
 // options build FilesGeneratorOptionsClickHouse
 func (w *worker) options() *config.FilesGeneratorOptionsClickHouse {
 	opts := w.getRemoteServersGeneratorOptions()
-	w.a.Info("RemoteServersGeneratorOptions: %s", opts)
-	return config.NewConfigFilesGeneratorOptionsClickHouse().SetRemoteServersGeneratorOptions(opts)
+	w.a.Info("RemoteServersOptions: %s", opts)
+	return config.NewConfigFilesGeneratorOptionsClickHouse().SetRemoteServersOptions(opts)
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status

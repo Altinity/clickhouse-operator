@@ -21,7 +21,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-type ConfigGeneratorOptions struct {
+type GeneratorOptions struct {
 	DistributedDDL *api.DistributedDDL
 	Users          *api.Settings
 	Profiles       *api.Settings
@@ -30,21 +30,21 @@ type ConfigGeneratorOptions struct {
 	Files          *api.Settings
 }
 
-// RemoteServersGeneratorOptions specifies options for remote-servers generator
-type RemoteServersGeneratorOptions struct {
+// RemoteServersOptions specifies options for remote-servers generator
+type RemoteServersOptions struct {
 	exclude struct {
 		attributes *api.HostReconcileAttributes
 		hosts      []*api.Host
 	}
 }
 
-// NewRemoteServersGeneratorOptions creates new remote-servers generator options
-func NewRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
-	return &RemoteServersGeneratorOptions{}
+// NewRemoteServersOptions creates new remote-servers generator options
+func NewRemoteServersOptions() *RemoteServersOptions {
+	return &RemoteServersOptions{}
 }
 
 // ExcludeHost specifies to exclude a host
-func (o *RemoteServersGeneratorOptions) ExcludeHost(host *api.Host) *RemoteServersGeneratorOptions {
+func (o *RemoteServersOptions) ExcludeHost(host *api.Host) *RemoteServersOptions {
 	if (o == nil) || (host == nil) {
 		return o
 	}
@@ -54,7 +54,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeHost(host *api.Host) *RemoteServe
 }
 
 // ExcludeHosts specifies to exclude list of hosts
-func (o *RemoteServersGeneratorOptions) ExcludeHosts(hosts ...*api.Host) *RemoteServersGeneratorOptions {
+func (o *RemoteServersOptions) ExcludeHosts(hosts ...*api.Host) *RemoteServersOptions {
 	if (o == nil) || (len(hosts) == 0) {
 		return o
 	}
@@ -64,7 +64,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeHosts(hosts ...*api.Host) *Remote
 }
 
 // ExcludeReconcileAttributes specifies to exclude reconcile attributes
-func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *api.HostReconcileAttributes) *RemoteServersGeneratorOptions {
+func (o *RemoteServersOptions) ExcludeReconcileAttributes(attrs *api.HostReconcileAttributes) *RemoteServersOptions {
 	if (o == nil) || (attrs == nil) {
 		return o
 	}
@@ -74,7 +74,7 @@ func (o *RemoteServersGeneratorOptions) ExcludeReconcileAttributes(attrs *api.Ho
 }
 
 // Exclude tells whether to exclude the host
-func (o *RemoteServersGeneratorOptions) Exclude(host *api.Host) bool {
+func (o *RemoteServersOptions) Exclude(host *api.Host) bool {
 	if o == nil {
 		return false
 	}
@@ -95,7 +95,7 @@ func (o *RemoteServersGeneratorOptions) Exclude(host *api.Host) bool {
 }
 
 // Include tells whether to include the host
-func (o *RemoteServersGeneratorOptions) Include(host *api.Host) bool {
+func (o *RemoteServersOptions) Include(host *api.Host) bool {
 	if o == nil {
 		return false
 	}
@@ -116,7 +116,7 @@ func (o *RemoteServersGeneratorOptions) Include(host *api.Host) bool {
 }
 
 // String returns string representation
-func (o *RemoteServersGeneratorOptions) String() string {
+func (o *RemoteServersOptions) String() string {
 	if o == nil {
 		return "(nil)"
 	}
@@ -128,7 +128,7 @@ func (o *RemoteServersGeneratorOptions) String() string {
 	return fmt.Sprintf("exclude hosts: %s, attributes: %s", "["+strings.Join(hostnames, ",")+"]", o.exclude.attributes)
 }
 
-// defaultRemoteServersGeneratorOptions
-func defaultRemoteServersGeneratorOptions() *RemoteServersGeneratorOptions {
-	return NewRemoteServersGeneratorOptions()
+// defaultRemoteServersOptions
+func defaultRemoteServersOptions() *RemoteServersOptions {
+	return NewRemoteServersOptions()
 }
