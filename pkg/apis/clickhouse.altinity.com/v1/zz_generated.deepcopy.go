@@ -1333,6 +1333,11 @@ func (in *HostRuntime) DeepCopyInto(out *HostRuntime) {
 		*out = new(HostReconcileAttributes)
 		**out = **in
 	}
+	if in.replicas != nil {
+		in, out := &in.replicas, &out.replicas
+		*out = new(Int32)
+		**out = **in
+	}
 	if in.CurStatefulSet != nil {
 		in, out := &in.CurStatefulSet, &out.CurStatefulSet
 		*out = new(appsv1.StatefulSet)
