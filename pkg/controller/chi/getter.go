@@ -90,7 +90,7 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 		name = typedObj.Name
 		namespace = typedObj.Namespace
 	case *api.Host:
-		name = namer.Name(namer.NameStatefulSetService, typedObj)
+		name = c.namer.Name(namer.NameStatefulSetService, typedObj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
 	return c.serviceLister.Services(namespace).Get(name)
@@ -165,7 +165,7 @@ func (c *Controller) getStatefulSetByMeta(meta meta.Object, byNameOnly bool) (*a
 // getStatefulSetByHost finds StatefulSet of a specified host
 func (c *Controller) getStatefulSetByHost(host *api.Host) (*apps.StatefulSet, error) {
 	// Namespaced name
-	name := namer.Name(namer.NameStatefulSet, host)
+	name := c.namer.Name(namer.NameStatefulSet, host)
 	namespace := host.Runtime.Address.Namespace
 
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
@@ -183,10 +183,10 @@ func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *apps.StatefulSet:
-		name = namer.Name(namer.NamePod, obj)
+		name = c.namer.Name(namer.NamePod, obj)
 		namespace = typedObj.Namespace
 	case *api.Host:
-		name = namer.Name(namer.NamePod, obj)
+		name = c.namer.Name(namer.NamePod, obj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
 	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())

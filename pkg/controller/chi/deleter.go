@@ -60,8 +60,8 @@ func (c *Controller) deleteConfigMapsCHI(ctx context.Context, chi *api.ClickHous
 
 	var err error
 
-	configMapCommon := namer.Name(namer.NameConfigMapCommon, chi)
-	configMapCommonUsersName := namer.Name(namer.NameConfigMapCommonUsers, chi)
+	configMapCommon := c.namer.Name(namer.NameConfigMapCommon, chi)
+	configMapCommonUsersName := c.namer.Name(namer.NameConfigMapCommonUsers, chi)
 
 	// Delete ConfigMap
 	err = c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).Delete(ctx, configMapCommon, controller.NewDeleteOptions())
@@ -95,7 +95,7 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 		return nil
 	}
 
-	name := namer.Name(namer.NamePod, statefulSet)
+	name := c.namer.Name(namer.NamePod, statefulSet)
 	log.V(1).M(host).Info("Delete Pod %s/%s", statefulSet.Namespace, name)
 	err := c.kubeClient.CoreV1().Pods(statefulSet.Namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	if err == nil {
@@ -123,7 +123,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.Host) erro
 	// it is possible to scale the StatefulSet down to 0 prior to deletion.
 
 	// Namespaced name
-	name := namer.Name(namer.NameStatefulSet, host)
+	name := c.namer.Name(namer.NameStatefulSet, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -229,7 +229,7 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *api.Host) error 
 		return nil
 	}
 
-	name := namer.Name(namer.NameConfigMapHost, host)
+	name := c.namer.Name(namer.NameConfigMapHost, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
@@ -263,7 +263,7 @@ func (c *Controller) deleteServiceHost(ctx context.Context, host *api.Host) erro
 		return nil
 	}
 
-	serviceName := namer.Name(namer.NameStatefulSetService, host)
+	serviceName := c.namer.Name(namer.NameStatefulSetService, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -276,7 +276,7 @@ func (c *Controller) deleteServiceShard(ctx context.Context, shard *api.ChiShard
 		return nil
 	}
 
-	serviceName := namer.Name(namer.NameShardService, shard)
+	serviceName := c.namer.Name(namer.NameShardService, shard)
 	namespace := shard.Runtime.Address.Namespace
 	log.V(1).M(shard).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -289,7 +289,7 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *api.Clus
 		return nil
 	}
 
-	serviceName := namer.Name(namer.NameClusterService, cluster)
+	serviceName := c.namer.Name(namer.NameClusterService, cluster)
 	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -302,7 +302,7 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *api.ClickHouseIn
 		return nil
 	}
 
-	serviceName := namer.Name(namer.NameCHIService, chi)
+	serviceName := c.namer.Name(namer.NameCHIService, chi)
 	namespace := chi.Namespace
 	log.V(1).M(chi).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
@@ -342,7 +342,7 @@ func (c *Controller) deleteSecretCluster(ctx context.Context, cluster *api.Clust
 		return nil
 	}
 
-	secretName := namer.Name(namer.NameClusterAutoSecret, cluster)
+	secretName := c.namer.Name(namer.NameClusterAutoSecret, cluster)
 	namespace := cluster.Runtime.Address.Namespace
 	log.V(1).M(cluster).F().Info("%s/%s", namespace, secretName)
 	return c.deleteSecretIfExists(ctx, namespace, secretName)

@@ -29,14 +29,16 @@ import (
 // ClusterSchemer specifies cluster schema manager
 type ClusterSchemer struct {
 	*Cluster
+	namer.INameManager
 	version *swversion.SoftWareVersion
 }
 
 // NewClusterSchemer creates new Schemer object
 func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *swversion.SoftWareVersion) *ClusterSchemer {
 	return &ClusterSchemer{
-		Cluster: NewCluster().SetClusterConnectionParams(clusterConnectionParams),
-		version: version,
+		Cluster:      NewCluster().SetClusterConnectionParams(clusterConnectionParams),
+		INameManager: namer.NewNameManager(namer.NameManagerTypeClickHouse),
+		version:      version,
 	}
 }
 
@@ -51,7 +53,7 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.Host) err
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
-	replica := namer.Name(namer.NameInstanceHostname, hostToDrop)
+	replica := s.Name(namer.NameInstanceHostname, hostToDrop)
 	shard := hostToRunOn.Runtime.Address.ShardIndex
 	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
 	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica), clickhouse.NewQueryOptions().SetRetry(false))

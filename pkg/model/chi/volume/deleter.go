@@ -34,7 +34,7 @@ func HostCanDeletePVC(host *api.Host, pvcName string) bool {
 			return
 		}
 
-		if pvcName == namer.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate) {
+		if pvcName == namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate) {
 			// This PVC is made from these host, VolumeMount and VolumeClaimTemplate
 			// So, what policy does this PVC have?
 			policy = GetPVCReclaimPolicy(host, volumeClaimTemplate)

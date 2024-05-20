@@ -44,12 +44,14 @@ type secretGet func(namespace, name string) (*core.Secret, error)
 type Normalizer struct {
 	secretGet secretGet
 	ctx       *Context
+	namer     namer.INameManager
 }
 
 // NewNormalizer creates new normalizer
 func NewNormalizer(secretGet secretGet) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
+		namer:     namer.NewNameManager(namer.NameManagerTypeClickHouse),
 	}
 }
 
@@ -156,7 +158,7 @@ func (n *Normalizer) normalizeSpec() {
 func (n *Normalizer) finalize() {
 	n.ctx.GetTarget().Fill()
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		hostTemplate := hostGetHostTemplate(host)
+		hostTemplate := n.hostGetHostTemplate(host)
 		hostApplyHostTemplate(host, hostTemplate)
 		return nil
 	})
@@ -166,14 +168,14 @@ func (n *Normalizer) finalize() {
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		host.Runtime.Address.StatefulSet = namer.Name(namer.NameStatefulSet, host)
-		host.Runtime.Address.FQDN = namer.Name(namer.NameFQDN, host)
+		host.Runtime.Address.StatefulSet = n.namer.Name(namer.NameStatefulSet, host)
+		host.Runtime.Address.FQDN = n.namer.Name(namer.NameFQDN, host)
 		return nil
 	})
 }
 
 // hostGetHostTemplate gets Host Template to be used to normalize Host
-func hostGetHostTemplate(host *api.Host) *api.HostTemplate {
+func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	// Which host template would be used - either explicitly defined in or a default one
 	hostTemplate, ok := host.GetHostTemplate()
 	if ok {
@@ -189,13 +191,13 @@ func hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = creator.CreateHostTemplate(creator.HostTemplateHostNetwork, namer.Name(namer.NameHostTemplate, host))
+			hostTemplate = creator.CreateHostTemplate(creator.HostTemplateHostNetwork, n.namer.Name(namer.NameHostTemplate, host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = creator.CreateHostTemplate(creator.HostTemplateCommon, namer.Name(namer.NameHostTemplate, host))
+		hostTemplate = creator.CreateHostTemplate(creator.HostTemplateCommon, n.namer.Name(namer.NameHostTemplate, host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
@@ -322,12 +324,12 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := namer.Name(namer.NameCHIServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
+	endpoint := n.namer.Name(namer.NameCHIServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		pods = append(pods, namer.Name(namer.NamePod, host))
-		fqdns = append(fqdns, namer.Name(namer.NameFQDN, host))
+		pods = append(pods, n.namer.Name(namer.NamePod, host))
+		fqdns = append(fqdns, n.namer.Name(namer.NameFQDN, host))
 		return nil
 	})
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
@@ -812,7 +814,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 			core.EnvVar{
 				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
-					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(namer.Name(namer.NameClusterAutoSecret, cluster)),
+					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(n.namer.Name(namer.NameClusterAutoSecret, cluster)),
 				},
 			},
 		)
@@ -979,7 +981,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 	profile := chop.Config().ClickHouse.Config.User.Default.Profile
 	quota := chop.Config().ClickHouse.Config.User.Default.Quota
 	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	hostRegexp := namer.Name(namer.NamePodHostnameRegexp, n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+	hostRegexp := n.namer.Name(namer.NamePodHostnameRegexp, n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
 	// Some users may have special options for mandatory fields
 	switch user.Username() {
@@ -1453,7 +1455,7 @@ func (n *Normalizer) normalizeShardName(shard *api.ChiShard, index int) {
 		return
 	}
 
-	shard.Name = namer.Name(namer.NameShard, shard, index)
+	shard.Name = n.namer.Name(namer.NameShard, shard, index)
 }
 
 // normalizeReplicaName normalizes replica name
@@ -1463,7 +1465,7 @@ func (n *Normalizer) normalizeReplicaName(replica *api.ChiReplica, index int) {
 		return
 	}
 
-	replica.Name = namer.Name(namer.NameReplica, replica, index)
+	replica.Name = n.namer.Name(namer.NameReplica, replica, index)
 }
 
 // normalizeShardName normalizes shard weight
@@ -1535,7 +1537,7 @@ func (n *Normalizer) normalizeHostName(
 		return
 	}
 
-	host.Name = namer.Name(namer.NameHost, host, shard, shardIndex, replica, replicaIndex)
+	host.Name = n.namer.Name(namer.NameHost, host, shard, shardIndex, replica, replicaIndex)
 }
 
 // normalizeShardInternalReplication ensures reasonable values in

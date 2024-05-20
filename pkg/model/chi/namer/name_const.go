@@ -66,29 +66,3 @@ const (
 	// Ex.: StatefulSetName-0
 	podNamePattern = "%s-0"
 )
-
-type NameType string
-
-const (
-	NameConfigMapHost                NameType = "ConfigMapHost"
-	NameConfigMapCommon              NameType = "ConfigMapCommon"
-	NameConfigMapCommonUsers         NameType = "NameConfigMapCommonUsers"
-	NameCHIService                   NameType = "NameCHIService"
-	NameCHIServiceFQDN               NameType = "NameCHIServiceFQDN"
-	NameClusterService               NameType = "NameClusterService"
-	NameShardService                 NameType = "NameShardService"
-	NameShard                        NameType = "NameShard"
-	NameReplica                      NameType = "NameReplica"
-	NameHost                         NameType = "NameHost"
-	NameHostTemplate                 NameType = "NameHostTemplate"
-	NameInstanceHostname             NameType = "NameInstanceHostname"
-	NameStatefulSet                  NameType = "NameStatefulSet"
-	NameStatefulSetService           NameType = "NameStatefulSetService"
-	NamePodHostname                  NameType = "NamePodHostname"
-	NameFQDN                         NameType = "NameFQDN"
-	NameFQDNs                        NameType = "NameFQDNs"
-	NamePodHostnameRegexp            NameType = "NamePodHostnameRegexp"
-	NamePod                          NameType = "NamePod"
-	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
-	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
-)

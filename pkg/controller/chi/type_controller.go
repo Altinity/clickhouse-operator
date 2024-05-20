@@ -15,6 +15,7 @@
 package chi
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"time"
 
 	kube "k8s.io/client-go/kubernetes"
@@ -72,6 +73,8 @@ type Controller struct {
 	queues []queue.PriorityQueue
 	// not used explicitly
 	recorder record.EventRecorder
+
+	namer namer.INameManager
 }
 
 const (

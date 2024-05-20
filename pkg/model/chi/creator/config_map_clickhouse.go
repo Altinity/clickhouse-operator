@@ -70,7 +70,7 @@ func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerato
 func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.FilesGeneratorOptionsClickHouse) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.Name(namer.NameConfigMapCommon, m.cr),
+			Name:            namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommon)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
@@ -88,7 +88,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.Name(namer.NameConfigMapCommonUsers, m.cr),
+			Name:            namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommonUsers)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
@@ -106,7 +106,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.Name(namer.NameConfigMapHost, host),
+			Name:            namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(m.tagger.Label(labeler.LabelConfigMapHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),

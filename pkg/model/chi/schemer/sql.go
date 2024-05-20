@@ -60,7 +60,7 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.Host) ([]st
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, namer.Names(namer.NameFQDNs, host, api.Host{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, s.Names(namer.NameFQDNs, host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -77,7 +77,7 @@ func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.Host) ([]st
 		`,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, namer.Names(namer.NameFQDNs, host, api.Host{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, s.Names(namer.NameFQDNs, host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 

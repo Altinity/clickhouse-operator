@@ -25,9 +25,9 @@ import (
 )
 
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
-func shouldCreateReplicatedObjects(host *api.Host) bool {
-	shard := namer.Names(namer.NameFQDNs, host, api.ChiShard{}, false)
-	cluster := namer.Names(namer.NameFQDNs, host, api.Cluster{}, false)
+func (s *ClusterSchemer) shouldCreateReplicatedObjects(host *api.Host) bool {
+	shard := s.Names(namer.NameFQDNs, host, api.ChiShard{}, false)
+	cluster := s.Names(namer.NameFQDNs, host, api.Cluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard
@@ -59,7 +59,7 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api
 		return nil, nil, nil
 	}
 
-	if !shouldCreateReplicatedObjects(host) {
+	if !s.shouldCreateReplicatedObjects(host) {
 		log.V(1).M(host).F().Info("Should not create replicated objects")
 		return nil, nil, nil
 	}
@@ -67,21 +67,21 @@ func (s *ClusterSchemer) getReplicatedObjectsSQLs(ctx context.Context, host *api
 	databaseNames, createDatabaseSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			namer.Names(namer.NameFQDNs, host, api.ClickHouseInstallation{}, false),
+			s.Names(namer.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateDatabaseReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	tableNames, createTableSQLs := debugCreateSQLs(
 		s.QueryUnzipAndApplyUUIDs(
 			ctx,
-			namer.Names(namer.NameFQDNs, host, api.ClickHouseInstallation{}, false),
+			s.Names(namer.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateTableReplicated(host.Runtime.Address.ClusterName),
 		),
 	)
 	functionNames, createFunctionSQLs := debugCreateSQLs(
 		s.QueryUnzip2Columns(
 			ctx,
-			namer.Names(namer.NameFQDNs, host, api.ClickHouseInstallation{}, false),
+			s.Names(namer.NameFQDNs, host, api.ClickHouseInstallation{}, false),
 			s.sqlCreateFunction(host.Runtime.Address.ClusterName),
 		),
 	)

@@ -24,11 +24,14 @@ import (
 )
 
 type VolumeManagerClickHouse struct {
-	cr api.ICustomResource
+	cr    api.ICustomResource
+	namer namer.INameManager
 }
 
 func NewVolumeManagerClickHouse() *VolumeManagerClickHouse {
-	return &VolumeManagerClickHouse{}
+	return &VolumeManagerClickHouse{
+		namer: namer.NewNameManager(namer.NameManagerTypeClickHouse),
+	}
 }
 
 func (m *VolumeManagerClickHouse) SetupVolumes(what VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
@@ -49,9 +52,9 @@ func (m *VolumeManagerClickHouse) SetCR(cr api.ICustomResource) {
 
 // stsSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
 func (m *VolumeManagerClickHouse) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
-	configMapHostName := namer.Name(namer.NameConfigMapHost, host)
-	configMapCommonName := namer.Name(namer.NameConfigMapCommon, m.cr)
-	configMapCommonUsersName := namer.Name(namer.NameConfigMapCommonUsers, m.cr)
+	configMapHostName := m.namer.Name(namer.NameConfigMapHost, host)
+	configMapCommonName := m.namer.Name(namer.NameConfigMapCommon, m.cr)
+	configMapCommonUsersName := m.namer.Name(namer.NameConfigMapCommonUsers, m.cr)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(

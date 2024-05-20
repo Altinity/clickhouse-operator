@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"time"
 
@@ -100,6 +101,7 @@ func NewController(
 		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
 		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
 		recorder:                recorder,
+		namer:                   namer.NewNameManager(namer.NameManagerTypeClickHouse),
 	}
 	controller.initQueues()
 	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)

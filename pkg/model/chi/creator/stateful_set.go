@@ -34,7 +34,7 @@ import (
 func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet {
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.Name(namer.NameStatefulSet, host),
+			Name:            c.nm.Name(namer.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(c.tagger.Label(labeler.LabelSTS, host)),
 			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
@@ -42,7 +42,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
-			ServiceName: namer.Name(namer.NameStatefulSetService, host),
+			ServiceName: c.nm.Name(namer.NameStatefulSetService, host),
 			Selector: &meta.LabelSelector{
 				MatchLabels: c.tagger.Selector(labeler.SelectorHostScope, host),
 			},
@@ -145,7 +145,7 @@ func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.H
 		{
 			IP: "127.0.0.1",
 			Hostnames: []string{
-				namer.Name(namer.NamePodHostname, host),
+				c.nm.Name(namer.NamePodHostname, host),
 			},
 		},
 	}
@@ -286,7 +286,7 @@ func (c *Creator) stsSetupVolumeForPVCTemplate(
 	// so, let's add it
 
 	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-		claimName := namer.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
+		claimName := c.nm.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
 		volume := k8s.CreateVolumeForPVC(volumeClaimTemplate.Name, claimName)
 		k8s.StatefulSetAppendVolumes(statefulSet, volume)
 	} else {
