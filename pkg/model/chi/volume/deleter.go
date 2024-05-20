@@ -15,10 +15,10 @@
 package volume
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 )
 
 // HostCanDeletePVC checks whether PVC on a host can be deleted

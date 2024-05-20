@@ -41,7 +41,7 @@ func NewTagger(cr api.ICustomResource) *tagger {
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
-		labeler: labeler.NewLabeler(cr, labeler.Config{
+		labeler: labeler.NewLabelerClickHouse(cr, labeler.Config{
 			AppendScope: chop.Config().Label.Runtime.AppendScope,
 			Include:     chop.Config().Label.Include,
 			Exclude:     chop.Config().Label.Exclude,

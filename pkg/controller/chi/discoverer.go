@@ -28,8 +28,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) labeler(chi *api.ClickHouseInstallation) *labeler.Labeler {
-	return labeler.NewLabeler(chi, labeler.Config{
+func (c *Controller) labeler(chi *api.ClickHouseInstallation) *labeler.LabelerClickHouse {
+	return labeler.NewLabelerClickHouse(chi, labeler.Config{
 		AppendScope: chop.Config().Label.Runtime.AppendScope,
 		Include:     chop.Config().Label.Include,
 		Exclude:     chop.Config().Label.Exclude,

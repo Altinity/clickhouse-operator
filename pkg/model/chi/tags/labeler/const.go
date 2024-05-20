@@ -63,37 +63,3 @@ const (
 	LabelClusterScopeCycleIndex  = clickhouse_altinity_com.APIGroupName + "/" + "clusterScopeCycleIndex"
 	LabelClusterScopeCycleOffset = clickhouse_altinity_com.APIGroupName + "/" + "clusterScopeCycleOffset"
 )
-
-type LabelType string
-
-const (
-	LabelConfigMapCommon      LabelType = "Label cm common"
-	LabelConfigMapCommonUsers LabelType = "Label cm common users"
-	LabelConfigMapHost        LabelType = "Label cm host"
-
-	LabelServiceCHI     LabelType = "Label svc chi"
-	LabelServiceCluster LabelType = "Label svc cluster"
-	LabelServiceShard   LabelType = "Label svc shard"
-	LabelServiceHost    LabelType = "Label svc host"
-
-	LabelExistingPV  LabelType = "Label existing pv"
-	LabelNewPVC      LabelType = "Label new pvc"
-	LabelExistingPVC LabelType = "Label existing pvc"
-
-	LabelPDB LabelType = "Label pdb"
-
-	LabelSTS LabelType = "Label STS"
-
-	LabelPodTemplate LabelType = "Label PodTemplate"
-)
-
-type SelectorType string
-
-const (
-	SelectorCHIScope          SelectorType = "SelectorCHIScope"
-	SelectorCHIScopeReady     SelectorType = "SelectorCHIScopeReady"
-	SelectorClusterScope      SelectorType = "SelectorClusterScope"
-	SelectorClusterScopeReady SelectorType = "SelectorClusterScopeReady"
-	SelectorShardScopeReady   SelectorType = "SelectorShardScopeReady"
-	SelectorHostScope         SelectorType = "getSelectorHostScope"
-)

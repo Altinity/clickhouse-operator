@@ -30,13 +30,13 @@ func (l *Labeler) getCRScope() map[string]string {
 // getClusterScope gets labels for Cluster-scoped object
 func (l *Labeler) getClusterScope(cluster api.ICluster) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(getSelectorClusterScope(cluster)))
+	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(l.getSelectorClusterScope(cluster)))
 }
 
 // getShardScope gets labels for Shard-scoped object
 func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(getSelectorShardScope(shard)))
+	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(l.getSelectorShardScope(shard)))
 }
 
 // getHostScope gets labels for Host-scoped object
