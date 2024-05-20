@@ -68,7 +68,7 @@ func getSelectorShardScopeReady(shard api.IShard) map[string]string {
 }
 
 // GetSelectorHostScope gets labels to select a Host-scoped object
-func GetSelectorHostScope(host *api.Host) map[string]string {
+func (l *Labeler) GetSelectorHostScope(host *api.Host) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   short.NameLabel(short.Namespace, host),
@@ -107,7 +107,7 @@ func (l *Labeler) Selector(what SelectorType, params ...any) map[string]string {
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			return GetSelectorHostScope(host)
+			return l.GetSelectorHostScope(host)
 		}
 	}
 	panic("unknown selector type")

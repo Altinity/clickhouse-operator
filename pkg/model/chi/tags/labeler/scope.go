@@ -42,7 +42,7 @@ func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 // getHostScope gets labels for Host-scoped object
 func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	labels := GetSelectorHostScope(host)
+	labels := l.GetSelectorHostScope(host)
 	if l.AppendScope {
 		// Optional labels
 		labels[LabelShardScopeIndex] = short.NameLabel(short.ShardScopeIndex, host)

@@ -28,17 +28,21 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+func (c *Controller) labeler(chi *api.ClickHouseInstallation) *labeler.Labeler {
+	return labeler.NewLabeler(chi, labeler.Config{
+		AppendScope: chop.Config().Label.Runtime.AppendScope,
+		Include:     chop.Config().Label.Include,
+		Exclude:     chop.Config().Label.Exclude,
+	})
+}
+
 func (c *Controller) discovery(ctx context.Context, chi *api.ClickHouseInstallation) *model.Registry {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	opts := controller.NewListOptions(labeler.NewLabeler(chi, labeler.Config{
-		AppendScope: chop.Config().Label.Runtime.AppendScope,
-		Include:     chop.Config().Label.Include,
-		Exclude:     chop.Config().Label.Exclude,
-	}).GetSelectorCRScope())
+	opts := controller.NewListOptions(c.labeler(chi).GetSelectorCRScope())
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, chi, opts)
 	c.discoveryConfigMaps(ctx, r, chi, opts)
