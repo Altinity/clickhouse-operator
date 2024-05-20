@@ -16,15 +16,15 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -42,7 +42,7 @@ func (c *Controller) discovery(ctx context.Context, chi *api.ClickHouseInstallat
 		return nil
 	}
 
-	opts := controller.NewListOptions(c.labeler(chi).GetSelectorCRScope())
+	opts := controller.NewListOptions(c.labeler(chi).Selector(labeler.SelectorCHIScope))
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, chi, opts)
 	c.discoveryConfigMaps(ctx, r, chi, opts)

@@ -24,7 +24,7 @@ import (
 // getCRScope gets labels for CR-scoped object
 func (l *Labeler) getCRScope() map[string]string {
 	// Combine generated labels and CHI-provided labels
-	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(l.GetSelectorCRScope()))
+	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(l.getSelectorCRScope()))
 }
 
 // getClusterScope gets labels for Cluster-scoped object
@@ -42,7 +42,7 @@ func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 // getHostScope gets labels for Host-scoped object
 func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
-	labels := l.GetSelectorHostScope(host)
+	labels := l.getSelectorHostScope(host)
 	if l.AppendScope {
 		// Optional labels
 		labels[LabelShardScopeIndex] = short.NameLabel(short.ShardScopeIndex, host)

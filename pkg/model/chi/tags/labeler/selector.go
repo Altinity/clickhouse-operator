@@ -19,8 +19,42 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/short"
 )
 
-// GetSelectorCRScope gets labels to select a CR-scoped object
-func (l *Labeler) GetSelectorCRScope() map[string]string {
+func (l *Labeler) Selector(what SelectorType, params ...any) map[string]string {
+	switch what {
+	case SelectorCHIScope:
+		return l.getSelectorCRScope()
+	case SelectorCHIScopeReady:
+		return l.getSelectorCRScopeReady()
+	case SelectorClusterScope:
+		var cluster api.ICluster
+		if len(params) > 0 {
+			cluster = params[0].(api.ICluster)
+			return getSelectorClusterScope(cluster)
+		}
+	case SelectorClusterScopeReady:
+		var cluster api.ICluster
+		if len(params) > 0 {
+			cluster = params[0].(api.ICluster)
+			return getSelectorClusterScopeReady(cluster)
+		}
+	case SelectorShardScopeReady:
+		var shard api.IShard
+		if len(params) > 0 {
+			shard = params[0].(api.IShard)
+			return getSelectorShardScopeReady(shard)
+		}
+	case SelectorHostScope:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+			return l.getSelectorHostScope(host)
+		}
+	}
+	panic("unknown selector type")
+}
+
+// getSelectorCRScope gets labels to select a CR-scoped object
+func (l *Labeler) getSelectorCRScope() map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace: short.NameLabel(short.Namespace, l.cr),
@@ -31,7 +65,7 @@ func (l *Labeler) GetSelectorCRScope() map[string]string {
 
 // getSelectorCRScopeReady gets labels to select a ready-labelled CR-scoped object
 func (l *Labeler) getSelectorCRScopeReady() map[string]string {
-	return appendKeyReady(l.GetSelectorCRScope())
+	return appendKeyReady(l.getSelectorCRScope())
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
@@ -67,8 +101,8 @@ func getSelectorShardScopeReady(shard api.IShard) map[string]string {
 	return appendKeyReady(getSelectorShardScope(shard))
 }
 
-// GetSelectorHostScope gets labels to select a Host-scoped object
-func (l *Labeler) GetSelectorHostScope(host *api.Host) map[string]string {
+// getSelectorHostScope gets labels to select a Host-scoped object
+func (l *Labeler) getSelectorHostScope(host *api.Host) map[string]string {
 	// Do not include CHI-provided labels
 	return map[string]string{
 		LabelNamespace:   short.NameLabel(short.Namespace, host),
@@ -78,37 +112,4 @@ func (l *Labeler) GetSelectorHostScope(host *api.Host) map[string]string {
 		LabelShardName:   short.NameLabel(short.ShardName, host),
 		LabelReplicaName: short.NameLabel(short.ReplicaName, host),
 	}
-}
-
-func (l *Labeler) Selector(what SelectorType, params ...any) map[string]string {
-	switch what {
-	case SelectorCHIScopeReady:
-		return l.getSelectorCRScopeReady()
-	case SelectorClusterScope:
-		var cluster api.ICluster
-		if len(params) > 0 {
-			cluster = params[0].(api.ICluster)
-			return getSelectorClusterScope(cluster)
-		}
-	case SelectorClusterScopeReady:
-		var cluster api.ICluster
-		if len(params) > 0 {
-			cluster = params[0].(api.ICluster)
-			return getSelectorClusterScopeReady(cluster)
-		}
-	case SelectorShardScopeReady:
-		var shard api.IShard
-		if len(params) > 0 {
-			shard = params[0].(api.IShard)
-			return getSelectorShardScopeReady(shard)
-		}
-
-	case SelectorHostScope:
-		var host *api.Host
-		if len(params) > 0 {
-			host = params[0].(*api.Host)
-			return l.GetSelectorHostScope(host)
-		}
-	}
-	panic("unknown selector type")
 }

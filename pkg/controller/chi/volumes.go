@@ -15,12 +15,13 @@
 package chi
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	core "k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 )
 
 func (c *Controller) walkPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
@@ -55,7 +56,7 @@ func (c *Controller) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.Persist
 	pvcList, err := c.kubeClient.
 		CoreV1().
 		PersistentVolumeClaims(namespace).
-		List(controller.NewContext(), controller.NewListOptions(c.labeler(host.GetCR()).GetSelectorHostScope(host)))
+		List(controller.NewContext(), controller.NewListOptions(c.labeler(host.GetCR()).Selector(labeler.SelectorHostScope, host)))
 	if err != nil {
 		log.M(host).F().Error("FAIL get list of PVCs for the host %s/%s err:%v", namespace, host.GetName(), err)
 		return

@@ -90,9 +90,10 @@ const (
 type SelectorType string
 
 const (
+	SelectorCHIScope          SelectorType = "SelectorCHIScope"
 	SelectorCHIScopeReady     SelectorType = "SelectorCHIScopeReady"
 	SelectorClusterScope      SelectorType = "SelectorClusterScope"
 	SelectorClusterScopeReady SelectorType = "SelectorClusterScopeReady"
 	SelectorShardScopeReady   SelectorType = "SelectorShardScopeReady"
-	SelectorHostScope         SelectorType = "GetSelectorHostScope"
+	SelectorHostScope         SelectorType = "getSelectorHostScope"
 )
