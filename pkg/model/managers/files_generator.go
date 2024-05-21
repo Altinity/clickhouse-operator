@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package managers
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
+)
 
 type IConfigFilesGenerator interface {
-	CreateConfigFiles(what FilesGroupType, params ...any) map[string]string
+	CreateConfigFiles(what commonConfig.FilesGroupType, params ...any) map[string]string
 }
 
 type FilesGeneratorType string
@@ -27,10 +31,10 @@ const (
 	FilesGeneratorTypeKeeper     FilesGeneratorType = "keeper"
 )
 
-func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts *GeneratorOptions) IConfigFilesGenerator {
+func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts *chiConfig.GeneratorOptions) IConfigFilesGenerator {
 	switch what {
 	case FilesGeneratorTypeClickHouse:
-		return NewConfigFilesGeneratorClickHouse(cr, opts)
+		return chiConfig.NewConfigFilesGeneratorClickHouse(cr, opts)
 	}
 	panic("unknown config files generator type")
 }

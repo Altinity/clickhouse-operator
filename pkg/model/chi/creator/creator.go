@@ -17,11 +17,11 @@ package creator
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 type iTagger interface {
@@ -33,7 +33,7 @@ type iTagger interface {
 // Creator specifies creator object
 type Creator struct {
 	cr                   api.ICustomResource
-	configFilesGenerator config.IConfigFilesGenerator
+	configFilesGenerator managers.IConfigFilesGenerator
 	tagger               iTagger
 	a                    log.Announcer
 	cm                   IContainerManager
@@ -57,7 +57,7 @@ type Creator struct {
 // NewCreator creates new Creator object
 func NewCreator(
 	cr api.ICustomResource,
-	configFilesGenerator config.IConfigFilesGenerator,
+	configFilesGenerator managers.IConfigFilesGenerator,
 	containerManager IContainerManager,
 	probeManager IProbeManager,
 	serviceManager IServiceManager,

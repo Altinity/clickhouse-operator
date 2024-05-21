@@ -15,21 +15,23 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 type ConfigMapManagerClickHouse struct {
 	cr                   api.ICustomResource
 	tagger               iTagger
-	configFilesGenerator config.IConfigFilesGenerator
+	configFilesGenerator managers.IConfigFilesGenerator
 }
 
 func NewConfigMapManagerClickHouse() *ConfigMapManagerClickHouse {
@@ -62,7 +64,7 @@ func (m *ConfigMapManagerClickHouse) SetCR(cr api.ICustomResource) {
 func (m *ConfigMapManagerClickHouse) SetTagger(tagger iTagger) {
 	m.tagger = tagger
 }
-func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator config.IConfigFilesGenerator) {
+func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator managers.IConfigFilesGenerator) {
 	m.configFilesGenerator = configFilesGenerator
 }
 
@@ -77,7 +79,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: m.configFilesGenerator.CreateConfigFiles(config.FilesGroupCommon, options),
+		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupCommon, options),
 	}
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
@@ -95,7 +97,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: m.configFilesGenerator.CreateConfigFiles(config.FilesGroupUsers),
+		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupUsers),
 	}
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
@@ -113,7 +115,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: m.configFilesGenerator.CreateConfigFiles(config.FilesGroupHost, host),
+		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupHost, host),
 	}
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)

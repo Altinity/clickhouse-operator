@@ -36,7 +36,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
@@ -44,6 +44,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -106,10 +107,10 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 	w.task = newTask(
 		chiCreator.NewCreator(
 			chi,
-			config.NewConfigFilesGenerator(
-				config.FilesGeneratorTypeClickHouse,
+			managers.NewConfigFilesGenerator(
+				managers.FilesGeneratorTypeClickHouse,
 				chi,
-				&config.GeneratorOptions{
+				&chiConfig.GeneratorOptions{
 					Users:          chi.GetSpec().Configuration.Users,
 					Profiles:       chi.GetSpec().Configuration.Profiles,
 					Quotas:         chi.GetSpec().Configuration.Quotas,
@@ -853,11 +854,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 
 // getRemoteServersGeneratorOptions build base set of RemoteServersOptions
 // which are applied on each of `remote_servers` reconfiguration during reconcile cycle
-func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersOptions {
+func (w *worker) getRemoteServersGeneratorOptions() *chiConfig.RemoteServersOptions {
 	// Base chiModel.RemoteServersOptions specifies to exclude:
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
-	return config.NewRemoteServersOptions().ExcludeReconcileAttributes(
+	return chiConfig.NewRemoteServersOptions().ExcludeReconcileAttributes(
 		api.NewChiHostReconcileAttributes().
 			SetAdd().
 			SetExclude(),
@@ -865,10 +866,10 @@ func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersOptions
 }
 
 // options build FilesGeneratorOptionsClickHouse
-func (w *worker) options() *config.FilesGeneratorOptionsClickHouse {
+func (w *worker) options() *chiConfig.FilesGeneratorOptionsClickHouse {
 	opts := w.getRemoteServersGeneratorOptions()
 	w.a.Info("RemoteServersOptions: %s", opts)
-	return config.NewConfigFilesGeneratorOptionsClickHouse().SetRemoteServersOptions(opts)
+	return chiConfig.NewConfigFilesGeneratorOptionsClickHouse().SetRemoteServersOptions(opts)
 }
 
 // prepareHostStatefulSetWithStatus prepares host's StatefulSet status
