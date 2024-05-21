@@ -727,7 +727,7 @@ type ChiShardAddress struct {
 
 type IShardAddress interface {
 	GetNamespace() string
-	GetRootName() string
+	GetCRName() string
 	GetClusterName() string
 	GetClusterIndex() int
 	GetShardName() string
@@ -737,7 +737,7 @@ type IShardAddress interface {
 func (a ChiShardAddress) GetNamespace() string {
 	return a.Namespace
 }
-func (a ChiShardAddress) GetRootName() string {
+func (a ChiShardAddress) GetCRName() string {
 	return a.CHIName
 }
 func (a ChiShardAddress) GetClusterName() string {

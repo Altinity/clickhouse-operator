@@ -31,7 +31,7 @@ import (
 func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDisruptionBudget {
 	return &policy.PodDisruptionBudget{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetRootName(), cluster.GetRuntime().GetAddress().GetClusterName()),
+			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetCRName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          macro.Macro(c.cr).Map(c.tagger.Label(labeler.LabelPDB, cluster)),
 			Annotations:     macro.Macro(c.cr).Map(c.tagger.Annotate(annotator.AnnotatePDB, cluster)),

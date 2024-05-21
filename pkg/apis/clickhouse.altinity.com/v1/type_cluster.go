@@ -69,7 +69,7 @@ type ChiClusterAddress struct {
 
 type IClusterAddress interface {
 	GetNamespace() string
-	GetRootName() string
+	GetCRName() string
 	GetClusterName() string
 	GetClusterIndex() int
 }
@@ -77,7 +77,7 @@ type IClusterAddress interface {
 func (a ChiClusterAddress) GetNamespace() string {
 	return a.Namespace
 }
-func (a ChiClusterAddress) GetRootName() string {
+func (a ChiClusterAddress) GetCRName() string {
 	return a.CHIName
 }
 func (a ChiClusterAddress) GetClusterName() string {

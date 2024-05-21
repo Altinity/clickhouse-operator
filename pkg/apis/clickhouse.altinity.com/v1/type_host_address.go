@@ -20,7 +20,7 @@ type IHostAddress interface {
 	GetNamespace() string
 	GetStatefulSet() string
 	GetFQDN() string
-	GetRootName() string
+	GetCRName() string
 	GetClusterName() string
 	GetClusterIndex() int
 	GetShardName() string
@@ -74,7 +74,7 @@ func (a HostAddress) GetStatefulSet() string {
 func (a HostAddress) GetFQDN() string {
 	return a.FQDN
 }
-func (a HostAddress) GetRootName() string {
+func (a HostAddress) GetCRName() string {
 	return a.CHIName
 }
 func (a HostAddress) GetClusterName() string {

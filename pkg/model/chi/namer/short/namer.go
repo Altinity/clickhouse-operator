@@ -177,13 +177,13 @@ func (n *Namer) getNamePartCRName(obj interface{}) string {
 		return n.namePartCRName(cr.GetName())
 	case api.ICluster:
 		cluster := obj.(api.ICluster)
-		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetRootName())
+		return n.namePartCRName(cluster.GetRuntime().GetAddress().GetCRName())
 	case api.IShard:
 		shard := obj.(api.IShard)
-		return n.namePartCRName(shard.GetRuntime().GetAddress().GetRootName())
+		return n.namePartCRName(shard.GetRuntime().GetAddress().GetCRName())
 	case *api.Host:
 		host := obj.(*api.Host)
-		return n.namePartCRName(host.GetRuntime().GetAddress().GetRootName())
+		return n.namePartCRName(host.GetRuntime().GetAddress().GetCRName())
 	}
 
 	return "ERROR"
