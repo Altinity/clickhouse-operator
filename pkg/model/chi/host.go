@@ -20,13 +20,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// HostIsNewOne checks whether host is a newly created
-// TODO there should be better way to detect newly created CHI
-// TODO unify with api host.IsNew
-func HostIsNewOne(host *api.Host) bool {
-	return host.GetCR().EnsureStatus().GetHostsCount() == host.GetCR().EnsureStatus().GetHostsAddedCount()
-}
-
 // HostHasTablesCreated checks whether host has tables listed as already created
 func HostHasTablesCreated(host *api.Host) bool {
 	return util.InArray(

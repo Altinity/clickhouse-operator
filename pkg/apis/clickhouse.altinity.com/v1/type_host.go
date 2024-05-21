@@ -286,7 +286,7 @@ func (host *Host) IsStopped() bool {
 // IsNewOne checks whether host is a new one
 // TODO unify with model HostIsNewOne
 func (host *Host) IsNewOne() bool {
-	return !host.HasAncestor()
+	return !host.HasAncestor() && (host.GetCR().EnsureStatus().GetHostsCount() == host.GetCR().EnsureStatus().GetHostsAddedCount())
 }
 
 // WhichStatefulSet specifies which StatefulSet we are going to process in host functions

@@ -993,7 +993,7 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
-	case model.HostIsNewOne(host):
+	case host.IsNewOne():
 		// CHI is new, all hosts were added
 		return false
 	}
