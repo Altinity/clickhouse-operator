@@ -12,24 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package managers
+package creator
 
-import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
-)
-
-type VolumeManagerType string
+type ConfigMapType string
 
 const (
-	VolumeManagerTypeClickHouse VolumeManagerType = "clickhouse"
-	VolumeManagerTypeKeeper     VolumeManagerType = "keeper"
+	ConfigMapCHICommon      ConfigMapType = "chi common"
+	ConfigMapCHICommonUsers ConfigMapType = "chi common users"
+	ConfigMapCHIHost        ConfigMapType = "chi host"
 )
-
-func NewVolumeManager(what VolumeManagerType) interfaces.IVolumeManager {
-	switch what {
-	case VolumeManagerTypeClickHouse:
-		return volume.NewVolumeManagerClickHouse()
-	}
-	panic("unknown volume manager type")
-}

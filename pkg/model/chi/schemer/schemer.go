@@ -23,6 +23,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -30,7 +31,7 @@ import (
 // ClusterSchemer specifies cluster schema manager
 type ClusterSchemer struct {
 	*Cluster
-	managers.INameManager
+	interfaces.INameManager
 	version *swversion.SoftWareVersion
 }
 

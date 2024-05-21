@@ -23,12 +23,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
 
 type ServiceManagerClickHouse struct {
 	cr     api.ICustomResource
-	tagger iTagger
+	tagger interfaces.ITagger
 }
 
 func NewServiceManagerClickHouse() *ServiceManagerClickHouse {
@@ -64,7 +65,7 @@ func (m *ServiceManagerClickHouse) CreateService(what ServiceType, params ...any
 func (m *ServiceManagerClickHouse) SetCR(cr api.ICustomResource) {
 	m.cr = cr
 }
-func (m *ServiceManagerClickHouse) SetTagger(tagger iTagger) {
+func (m *ServiceManagerClickHouse) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
 

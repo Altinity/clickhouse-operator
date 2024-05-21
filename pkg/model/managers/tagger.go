@@ -19,20 +19,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type iAnnotator interface {
-	Annotate(what annotator.AnnotateType, params ...any) map[string]string
-}
-
-type iLabeler interface {
-	Label(what labeler.LabelType, params ...any) map[string]string
-	Selector(what labeler.SelectorType, params ...any) map[string]string
-}
-
 type tagger struct {
-	annotator iAnnotator
-	labeler   iLabeler
+	annotator interfaces.IAnnotator
+	labeler   interfaces.ILabeler
 }
 
 func NewTagger(cr api.ICustomResource) *tagger {

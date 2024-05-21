@@ -24,30 +24,32 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
 
 type ConfigMapManagerClickHouse struct {
 	cr                   api.ICustomResource
-	tagger               iTagger
-	configFilesGenerator *config.FilesGeneratorClickHouse
+	tagger               interfaces.ITagger
+	configFilesGenerator interfaces.IConfigFilesGenerator
 }
 
 func NewConfigMapManagerClickHouse() *ConfigMapManagerClickHouse {
 	return &ConfigMapManagerClickHouse{}
 }
 
-func (m *ConfigMapManagerClickHouse) CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap {
+func (m *ConfigMapManagerClickHouse) CreateConfigMap(what creator.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
-	case ConfigMapCHICommon:
+	case creator.ConfigMapCHICommon:
 		var options *config.FilesGeneratorOptionsClickHouse
 		if len(params) > 0 {
 			options = params[0].(*config.FilesGeneratorOptionsClickHouse)
 			return m.createConfigMapCHICommon(options)
 		}
-	case ConfigMapCHICommonUsers:
+	case creator.ConfigMapCHICommonUsers:
 		return m.createConfigMapCHICommonUsers()
-	case ConfigMapCHIHost:
+	case creator.ConfigMapCHIHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
@@ -60,11 +62,11 @@ func (m *ConfigMapManagerClickHouse) CreateConfigMap(what ConfigMapType, params 
 func (m *ConfigMapManagerClickHouse) SetCR(cr api.ICustomResource) {
 	m.cr = cr
 }
-func (m *ConfigMapManagerClickHouse) SetTagger(tagger iTagger) {
+func (m *ConfigMapManagerClickHouse) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
-func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator any) {
-	m.configFilesGenerator = configFilesGenerator.(*config.FilesGeneratorClickHouse)
+func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator interfaces.IConfigFilesGenerator) {
+	m.configFilesGenerator = configFilesGenerator
 }
 
 // createConfigMapCHICommon creates new core.ConfigMap

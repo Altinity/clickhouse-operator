@@ -35,6 +35,7 @@ import (
 	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -45,7 +46,7 @@ type secretGet func(namespace, name string) (*core.Secret, error)
 type Normalizer struct {
 	secretGet secretGet
 	ctx       *Context
-	namer     managers.INameManager
+	namer     interfaces.INameManager
 }
 
 // NewNormalizer creates new normalizer

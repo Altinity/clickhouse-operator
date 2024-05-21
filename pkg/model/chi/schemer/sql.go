@@ -17,12 +17,12 @@ package schemer
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 
 	"github.com/MakeNowJust/heredoc"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 )
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`

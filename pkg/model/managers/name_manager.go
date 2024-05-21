@@ -14,12 +14,10 @@
 
 package managers
 
-import "github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-
-type INameManager interface {
-	Names(what namer.NameType, params ...any) []string
-	Name(what namer.NameType, params ...any) string
-}
+import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+)
 
 type NameManagerType string
 
@@ -28,7 +26,7 @@ const (
 	NameManagerTypeKeeper     NameManagerType = "keeper"
 )
 
-func NewNameManager(what NameManagerType) INameManager {
+func NewNameManager(what NameManagerType) interfaces.INameManager {
 	switch what {
 	case NameManagerTypeClickHouse:
 		return namer.NewClickHouse()

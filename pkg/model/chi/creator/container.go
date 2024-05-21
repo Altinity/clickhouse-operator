@@ -15,18 +15,11 @@
 package creator
 
 import (
-	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
-
-type IContainerManager interface {
-	NewDefaultAppContainer(host *api.Host) core.Container
-	GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool)
-	EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host)
-	EnsureLogContainer(statefulSet *apps.StatefulSet)
-}
 
 type ContainerManagerType string
 
@@ -35,7 +28,7 @@ const (
 	ContainerManagerTypeKeeper     ContainerManagerType = "keeper"
 )
 
-func NewContainerManager(what ContainerManagerType) IContainerManager {
+func NewContainerManager(what ContainerManagerType) interfaces.IContainerManager {
 	switch what {
 	case ContainerManagerTypeClickHouse:
 		return NewContainerManagerClickHouse(NewProbeManagerClickHouse())

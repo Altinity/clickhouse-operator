@@ -17,12 +17,8 @@ package managers
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
-
-type IConfigFilesGenerator interface {
-	CreateConfigFiles(what commonConfig.FilesGroupType, params ...any) map[string]string
-}
 
 type FilesGeneratorType string
 
@@ -31,7 +27,7 @@ const (
 	FilesGeneratorTypeKeeper     FilesGeneratorType = "keeper"
 )
 
-func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts *chiConfig.GeneratorOptions) IConfigFilesGenerator {
+func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts *chiConfig.GeneratorOptions) interfaces.IConfigFilesGenerator {
 	switch what {
 	case FilesGeneratorTypeClickHouse:
 		return chiConfig.NewConfigFilesGeneratorClickHouse(cr, NewNameManager(NameManagerTypeClickHouse), opts)

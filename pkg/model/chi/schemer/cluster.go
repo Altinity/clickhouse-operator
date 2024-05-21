@@ -22,6 +22,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -29,7 +30,7 @@ import (
 // Cluster specifies ClickHouse cluster
 type Cluster struct {
 	*clickhouse.Cluster
-	managers.INameManager
+	interfaces.INameManager
 }
 
 // NewCluster creates new cluster object

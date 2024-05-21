@@ -15,21 +15,21 @@
 package managers
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
+	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type VolumeManagerType string
+type ConfigMapManagerType string
 
 const (
-	VolumeManagerTypeClickHouse VolumeManagerType = "clickhouse"
-	VolumeManagerTypeKeeper     VolumeManagerType = "keeper"
+	ConfigMapManagerTypeClickHouse ConfigMapManagerType = "clickhouse"
+	ConfigMapManagerTypeKeeper     ConfigMapManagerType = "keeper"
 )
 
-func NewVolumeManager(what VolumeManagerType) interfaces.IVolumeManager {
+func NewConfigMapManager(what ConfigMapManagerType) interfaces.IConfigMapManager {
 	switch what {
-	case VolumeManagerTypeClickHouse:
-		return volume.NewVolumeManagerClickHouse()
+	case ConfigMapManagerTypeClickHouse:
+		return chiCreator.NewConfigMapManagerClickHouse()
 	}
-	panic("unknown volume manager type")
+	panic("unknown config map manager type")
 }

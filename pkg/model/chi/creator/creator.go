@@ -17,29 +17,21 @@ package creator
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
-
-type iTagger interface {
-	Annotate(what annotator.AnnotateType, params ...any) map[string]string
-	Label(what labeler.LabelType, params ...any) map[string]string
-	Selector(what labeler.SelectorType, params ...any) map[string]string
-}
 
 // Creator specifies creator object
 type Creator struct {
 	cr                   api.ICustomResource
-	configFilesGenerator managers.IConfigFilesGenerator
-	tagger               iTagger
+	configFilesGenerator interfaces.IConfigFilesGenerator
+	tagger               interfaces.ITagger
 	a                    log.Announcer
-	cm                   IContainerManager
+	cm                   interfaces.IContainerManager
 	pm                   IProbeManager
 	sm                   IServiceManager
-	vm                   managers.IVolumeManager
-	cmm                  IConfigMapManager
-	nm                   managers.INameManager
+	vm                   interfaces.IVolumeManager
+	cmm                  interfaces.IConfigMapManager
+	nm                   interfaces.INameManager
 	// container builder
 	// probes builder
 	// default pod template builder
@@ -55,18 +47,19 @@ type Creator struct {
 // NewCreator creates new Creator object
 func NewCreator(
 	cr api.ICustomResource,
-	configFilesGenerator managers.IConfigFilesGenerator,
-	containerManager IContainerManager,
+	configFilesGenerator interfaces.IConfigFilesGenerator,
+	containerManager interfaces.IContainerManager,
+	tagger interfaces.ITagger,
 	probeManager IProbeManager,
 	serviceManager IServiceManager,
-	volumeManager managers.IVolumeManager,
-	configMapManager IConfigMapManager,
-	nameManager managers.INameManager,
+	volumeManager interfaces.IVolumeManager,
+	configMapManager interfaces.IConfigMapManager,
+	nameManager interfaces.INameManager,
 ) *Creator {
 	return &Creator{
 		cr:                   cr,
 		configFilesGenerator: configFilesGenerator,
-		tagger:               managers.NewTagger(cr),
+		tagger:               tagger,
 		a:                    log.M(cr),
 		cm:                   containerManager,
 		pm:                   probeManager,

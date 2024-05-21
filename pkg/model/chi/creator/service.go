@@ -21,6 +21,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -38,7 +39,7 @@ const (
 type IServiceManager interface {
 	CreateService(what ServiceType, params ...any) *core.Service
 	SetCR(cr api.ICustomResource)
-	SetTagger(tagger iTagger)
+	SetTagger(tagger interfaces.ITagger)
 }
 
 type ServiceManagerType string

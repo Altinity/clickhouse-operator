@@ -21,6 +21,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
@@ -46,12 +47,12 @@ const (
 // which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
 type GeneratorClickHouse struct {
 	chi   api.ICustomResource
-	namer iNamer
+	namer interfaces.INameManager
 	opts  *GeneratorOptions
 }
 
 // newConfigGeneratorClickHouse returns new GeneratorClickHouse struct
-func newConfigGeneratorClickHouse(chi api.ICustomResource, namer iNamer, opts *GeneratorOptions) *GeneratorClickHouse {
+func newConfigGeneratorClickHouse(chi api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *GeneratorClickHouse {
 	return &GeneratorClickHouse{
 		chi:   chi,
 		namer: namer,

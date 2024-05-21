@@ -15,7 +15,6 @@
 package chi
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"time"
 
 	kube "k8s.io/client-go/kubernetes"
@@ -30,7 +29,8 @@ import (
 
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 )
 
 // Controller defines CRO controller
@@ -75,7 +75,7 @@ type Controller struct {
 	// not used explicitly
 	recorder record.EventRecorder
 
-	namer      managers.INameManager
+	namer      interfaces.INameManager
 	pvcDeleter *volume.PVCDeleter
 }
 
