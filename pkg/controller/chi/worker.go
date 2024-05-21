@@ -18,9 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -37,10 +34,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model"
+	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -136,7 +137,7 @@ func (w *worker) isJustStarted() bool {
 }
 
 func (w *worker) isConfigurationChangeRequiresReboot(host *api.Host) bool {
-	return model.IsConfigurationChangeRequiresReboot(host)
+	return chiModel.IsConfigurationChangeRequiresReboot(host)
 }
 
 // shouldForceRestartHost checks whether cluster requires hosts restart
@@ -595,7 +596,7 @@ func (w *worker) logCHI(name string, chi *api.ClickHouseInstallation) {
 }
 
 // logActionPlan logs action plan
-func (w *worker) logActionPlan(ap *model.ActionPlan) {
+func (w *worker) logActionPlan(ap *chiModel.ActionPlan) {
 	w.a.Info(
 		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
 		ap,
@@ -666,7 +667,7 @@ func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
 	w.c.updateWatch(chi)
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInstallation, ap *model.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInstallation, ap *chiModel.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -758,7 +759,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpec().GetTaskID())
 }
 
-func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation, ap *model.ActionPlan) {
+func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation, ap *chiModel.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -853,7 +854,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 // getRemoteServersGeneratorOptions build base set of RemoteServersOptions
 // which are applied on each of `remote_servers` reconfiguration during reconcile cycle
 func (w *worker) getRemoteServersGeneratorOptions() *config.RemoteServersOptions {
-	// Base model.RemoteServersOptions specifies to exclude:
+	// Base chiModel.RemoteServersOptions specifies to exclude:
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
 	return config.NewRemoteServersOptions().ExcludeReconcileAttributes(
@@ -989,7 +990,7 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// Force migration requested
 		return true
 
-	case model.HostHasTablesCreated(host):
+	case chiModel.HostHasTablesCreated(host):
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
