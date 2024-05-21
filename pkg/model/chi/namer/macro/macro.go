@@ -152,9 +152,9 @@ func (m *MacrosEngine) newLineMacroReplacerHost(host api.IHost) *strings.Replace
 		MacrosReplicaIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaIndex()),
 		MacrosReplicaScopeIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetReplicaScopeIndex()), // TODO use appropriate namePart function
 		MacrosHostName, m.namer.Name(short.HostName, host),
-		MacrosChiScopeIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeIndex()), // TODO use appropriate namePart function
-		MacrosChiScopeCycleIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleIndex()), // TODO use appropriate namePart function
-		MacrosChiScopeCycleOffset, strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleOffset()), // TODO use appropriate namePart function
+		MacrosChiScopeIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeIndex()), // TODO use appropriate namePart function
+		MacrosChiScopeCycleIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleIndex()), // TODO use appropriate namePart function
+		MacrosChiScopeCycleOffset, strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleOffset()), // TODO use appropriate namePart function
 		MacrosClusterScopeIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeIndex()), // TODO use appropriate namePart function
 		MacrosClusterScopeCycleIndex, strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleIndex()), // TODO use appropriate namePart function
 		MacrosClusterScopeCycleOffset, strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleOffset()), // TODO use appropriate namePart function

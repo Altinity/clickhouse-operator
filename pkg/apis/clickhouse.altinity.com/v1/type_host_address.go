@@ -30,10 +30,10 @@ type IHostAddress interface {
 	GetReplicaIndex() int
 	GetReplicaScopeIndex() int
 	GetHostName() string
-	GetRootScopeIndex() int
-	GetRootScopeCycleSize() int
-	GetRootScopeCycleIndex() int
-	GetRootScopeCycleOffset() int
+	GetCRScopeIndex() int
+	GetCRScopeCycleSize() int
+	GetCRScopeCycleIndex() int
+	GetCRScopeCycleOffset() int
 	GetClusterScopeIndex() int
 	GetClusterScopeCycleSize() int
 	GetClusterScopeCycleIndex() int
@@ -104,16 +104,16 @@ func (a HostAddress) GetReplicaScopeIndex() int {
 func (a HostAddress) GetHostName() string {
 	return a.HostName
 }
-func (a HostAddress) GetRootScopeIndex() int {
+func (a HostAddress) GetCRScopeIndex() int {
 	return a.CHIScopeIndex
 }
-func (a HostAddress) GetRootScopeCycleSize() int {
+func (a HostAddress) GetCRScopeCycleSize() int {
 	return a.CHIScopeCycleSize
 }
-func (a HostAddress) GetRootScopeCycleIndex() int {
+func (a HostAddress) GetCRScopeCycleIndex() int {
 	return a.CHIScopeCycleIndex
 }
-func (a HostAddress) GetRootScopeCycleOffset() int {
+func (a HostAddress) GetCRScopeCycleOffset() int {
 	return a.CHIScopeCycleOffset
 }
 func (a HostAddress) GetClusterScopeIndex() int {

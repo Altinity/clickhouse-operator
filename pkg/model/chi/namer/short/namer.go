@@ -113,15 +113,15 @@ func (n *Namer) Name(what NameType, params ...any) string {
 		host := params[0].(*api.Host)
 		return n.getNamePartHostName(host)
 
-	case CHIScopeCycleSize:
+	case CRScopeCycleSize:
 		host := params[0].(*api.Host)
-		return n.getNamePartCHIScopeCycleSize(host)
-	case CHIScopeCycleIndex:
+		return n.getNamePartCRScopeCycleSize(host)
+	case CRScopeCycleIndex:
 		host := params[0].(*api.Host)
-		return n.getNamePartCHIScopeCycleIndex(host)
-	case CHIScopeCycleOffset:
+		return n.getNamePartCRScopeCycleIndex(host)
+	case CRScopeCycleOffset:
 		host := params[0].(*api.Host)
-		return n.getNamePartCHIScopeCycleOffset(host)
+		return n.getNamePartCRScopeCycleOffset(host)
 
 	case ClusterScopeCycleSize:
 		host := params[0].(*api.Host)
@@ -133,9 +133,9 @@ func (n *Namer) Name(what NameType, params ...any) string {
 		host := params[0].(*api.Host)
 		return n.getNamePartClusterScopeCycleOffset(host)
 
-	case CHIScopeIndex:
+	case CRScopeIndex:
 		host := params[0].(*api.Host)
-		return n.getNamePartCHIScopeIndex(host)
+		return n.getNamePartCRScopeIndex(host)
 	case ClusterScopeIndex:
 		host := params[0].(*api.Host)
 		return n.getNamePartClusterScopeIndex(host)
@@ -230,19 +230,19 @@ func (n *Namer) getNamePartHostName(host *api.Host) string {
 	return n.namePartHostName(host.GetRuntime().GetAddress().GetHostName())
 }
 
-// getNamePartCHIScopeCycleSize
-func (n *Namer) getNamePartCHIScopeCycleSize(host *api.Host) string {
-	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleSize())
+// getNamePartCRScopeCycleSize
+func (n *Namer) getNamePartCRScopeCycleSize(host *api.Host) string {
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleSize())
 }
 
-// getNamePartCHIScopeCycleIndex
-func (n *Namer) getNamePartCHIScopeCycleIndex(host *api.Host) string {
-	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleIndex())
+// getNamePartCRScopeCycleIndex
+func (n *Namer) getNamePartCRScopeCycleIndex(host *api.Host) string {
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleIndex())
 }
 
-// getNamePartCHIScopeCycleOffset
-func (n *Namer) getNamePartCHIScopeCycleOffset(host *api.Host) string {
-	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeCycleOffset())
+// getNamePartCRScopeCycleOffset
+func (n *Namer) getNamePartCRScopeCycleOffset(host *api.Host) string {
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeCycleOffset())
 }
 
 // getNamePartClusterScopeCycleSize
@@ -260,9 +260,9 @@ func (n *Namer) getNamePartClusterScopeCycleOffset(host *api.Host) string {
 	return strconv.Itoa(host.GetRuntime().GetAddress().GetClusterScopeCycleOffset())
 }
 
-// getNamePartCHIScopeIndex
-func (n *Namer) getNamePartCHIScopeIndex(host *api.Host) string {
-	return strconv.Itoa(host.GetRuntime().GetAddress().GetRootScopeIndex())
+// getNamePartCRScopeIndex
+func (n *Namer) getNamePartCRScopeIndex(host *api.Host) string {
+	return strconv.Itoa(host.GetRuntime().GetAddress().GetCRScopeIndex())
 }
 
 // getNamePartClusterScopeIndex
