@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -250,7 +251,7 @@ func (c *Creator) stsSetupVolumesForUsedPVCTemplates(statefulSet *apps.StatefulS
 	// Deal with `volumeMounts` of a `container`, located by the path:
 	// .spec.templates.podTemplates.*.spec.containers.volumeMounts.*
 	k8s.StatefulSetWalkVolumeMounts(statefulSet, func(volumeMount *core.VolumeMount) {
-		if volumeClaimTemplate, found := findVolumeClaimTemplateUsedForVolumeMount(volumeMount, host); found {
+		if volumeClaimTemplate, found := model.HostFindVolumeClaimTemplateUsedForVolumeMount(host, volumeMount); found {
 			c.stsSetupVolumeForPVCTemplate(statefulSet, host, volumeClaimTemplate)
 		}
 	})
