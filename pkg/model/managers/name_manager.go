@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package namer
+package managers
+
+import "github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 
 type INameManager interface {
-	Names(what NameType, params ...any) []string
-	Name(what NameType, params ...any) string
+	Names(what namer.NameType, params ...any) []string
+	Name(what namer.NameType, params ...any) string
 }
 
 type NameManagerType string
@@ -29,7 +31,7 @@ const (
 func NewNameManager(what NameManagerType) INameManager {
 	switch what {
 	case NameManagerTypeClickHouse:
-		return NewClickHouse()
+		return namer.NewClickHouse()
 	}
 	panic("unknown name manager type")
 }

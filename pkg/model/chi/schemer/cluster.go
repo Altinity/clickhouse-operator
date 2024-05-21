@@ -16,26 +16,27 @@ package schemer
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"strings"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Cluster specifies ClickHouse cluster
 type Cluster struct {
 	*clickhouse.Cluster
-	namer.INameManager
+	managers.INameManager
 }
 
 // NewCluster creates new cluster object
 func NewCluster() *Cluster {
 	return &Cluster{
 		Cluster:      clickhouse.NewCluster(),
-		INameManager: namer.NewNameManager(namer.NameManagerTypeClickHouse),
+		INameManager: managers.NewNameManager(managers.NameManagerTypeClickHouse),
 	}
 }
 

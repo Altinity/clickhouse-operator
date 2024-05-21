@@ -21,16 +21,17 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 type VolumeManagerClickHouse struct {
 	cr    api.ICustomResource
-	namer namer.INameManager
+	namer managers.INameManager
 }
 
 func NewVolumeManagerClickHouse() *VolumeManagerClickHouse {
 	return &VolumeManagerClickHouse{
-		namer: namer.NewNameManager(namer.NameManagerTypeClickHouse),
+		namer: managers.NewNameManager(managers.NameManagerTypeClickHouse),
 	}
 }
 

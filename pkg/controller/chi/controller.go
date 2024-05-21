@@ -18,9 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -50,7 +48,10 @@ import (
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -101,7 +102,8 @@ func NewController(
 		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
 		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
 		recorder:                recorder,
-		namer:                   namer.NewNameManager(namer.NameManagerTypeClickHouse),
+		namer:                   managers.NewNameManager(managers.NameManagerTypeClickHouse),
+		pvcDeleter:              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
 	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)

@@ -21,8 +21,22 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 )
 
+type iNamer interface {
+	Name(what namer.NameType, params ...any) string
+}
+
+type PVCDeleter struct {
+	namer iNamer
+}
+
+func NewPVCDeleter(namer iNamer) *PVCDeleter {
+	return &PVCDeleter{
+		namer: namer,
+	}
+}
+
 // HostCanDeletePVC checks whether PVC on a host can be deleted
-func HostCanDeletePVC(host *api.Host, pvcName string) bool {
+func (d *PVCDeleter) HostCanDeletePVC(host *api.Host, pvcName string) bool {
 	// In any unknown cases just delete PVC with unclear bindings
 	policy := api.PVCReclaimPolicyDelete
 
@@ -34,7 +48,7 @@ func HostCanDeletePVC(host *api.Host, pvcName string) bool {
 			return
 		}
 
-		if pvcName == namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate) {
+		if pvcName == d.namer.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate) {
 			// This PVC is made from these host, VolumeMount and VolumeClaimTemplate
 			// So, what policy does this PVC have?
 			policy = GetPVCReclaimPolicy(host, volumeClaimTemplate)
@@ -47,7 +61,7 @@ func HostCanDeletePVC(host *api.Host, pvcName string) bool {
 }
 
 // HostCanDeleteAllPVCs checks whether all PVCs can be deleted
-func HostCanDeleteAllPVCs(host *api.Host) bool {
+func (d *PVCDeleter) HostCanDeleteAllPVCs(host *api.Host) bool {
 	canDeleteAllPVCs := true
 	host.GetCR().WalkVolumeClaimTemplates(func(template *api.VolumeClaimTemplate) {
 		if GetPVCReclaimPolicy(host, template) == api.PVCReclaimPolicyRetain {

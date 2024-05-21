@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
@@ -201,7 +200,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *api.Host) error {
 		}
 
 		// Check whether PVC can be deleted
-		if volume.HostCanDeletePVC(host, pvc.Name) {
+		if c.pvcDeleter.HostCanDeletePVC(host, pvc.Name) {
 			log.V(1).M(host).Info("PVC %s/%s would be deleted", namespace, pvc.Name)
 		} else {
 			log.V(1).M(host).Info("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)

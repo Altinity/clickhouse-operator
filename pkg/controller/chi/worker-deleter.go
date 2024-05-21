@@ -29,7 +29,6 @@ import (
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -432,7 +431,7 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 		return nil
 	}
 
-	if !volume.HostCanDeleteAllPVCs(host) {
+	if !w.c.pvcDeleter.HostCanDeleteAllPVCs(host) {
 		return nil
 	}
 	err := w.ensureClusterSchemer(host).HostDropTables(ctx, host)

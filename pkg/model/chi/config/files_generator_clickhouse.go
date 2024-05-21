@@ -17,9 +17,14 @@ package config
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+type iNamer interface {
+	Name(what namer.NameType, params ...any) string
+}
 
 // FilesGeneratorClickHouse specifies clickhouse configuration generator object
 type FilesGeneratorClickHouse struct {
@@ -27,13 +32,15 @@ type FilesGeneratorClickHouse struct {
 	configGenerator *GeneratorClickHouse
 	// clickhouse-operator configuration
 	chopConfig *api.OperatorConfig
+	namer      iNamer
 }
 
 // NewConfigFilesGeneratorClickHouse creates new clickhouse configuration generator object
-func NewConfigFilesGeneratorClickHouse(cr api.ICustomResource, opts *GeneratorOptions) *FilesGeneratorClickHouse {
+func NewConfigFilesGeneratorClickHouse(cr api.ICustomResource, namer iNamer, opts *GeneratorOptions) *FilesGeneratorClickHouse {
 	return &FilesGeneratorClickHouse{
-		configGenerator: newConfigGeneratorClickHouse(cr, opts),
+		configGenerator: newConfigGeneratorClickHouse(cr, namer, opts),
 		chopConfig:      chop.Config(),
+		namer:           namer,
 	}
 }
 

@@ -18,8 +18,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -34,7 +32,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -44,14 +45,14 @@ type secretGet func(namespace, name string) (*core.Secret, error)
 type Normalizer struct {
 	secretGet secretGet
 	ctx       *Context
-	namer     namer.INameManager
+	namer     managers.INameManager
 }
 
 // NewNormalizer creates new normalizer
 func NewNormalizer(secretGet secretGet) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
-		namer:     namer.NewNameManager(namer.NameManagerTypeClickHouse),
+		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),
 	}
 }
 

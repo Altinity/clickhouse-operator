@@ -45,15 +45,17 @@ const (
 // ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
 // which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
 type GeneratorClickHouse struct {
-	chi  api.ICustomResource
-	opts *GeneratorOptions
+	chi   api.ICustomResource
+	namer iNamer
+	opts  *GeneratorOptions
 }
 
 // newConfigGeneratorClickHouse returns new GeneratorClickHouse struct
-func newConfigGeneratorClickHouse(chi api.ICustomResource, opts *GeneratorOptions) *GeneratorClickHouse {
+func newConfigGeneratorClickHouse(chi api.ICustomResource, namer iNamer, opts *GeneratorOptions) *GeneratorClickHouse {
 	return &GeneratorClickHouse{
-		chi:  chi,
-		opts: opts,
+		chi:   chi,
+		namer: namer,
+		opts:  opts,
 	}
 }
 
@@ -420,7 +422,7 @@ func (c *GeneratorClickHouse) getHostMacros(host *api.Host) string {
 	util.Iline(b, 8, "<shard>%s</shard>", host.Runtime.Address.ShardName)
 	// <replica>replica id = full deployment id</replica>
 	// full deployment id is unique to identify replica within the cluster
-	util.Iline(b, 8, "<replica>%s</replica>", namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NamePodHostname, host))
+	util.Iline(b, 8, "<replica>%s</replica>", c.namer.Name(namer.NamePodHostname, host))
 
 	// 		</macros>
 	// </yandex>
@@ -492,7 +494,7 @@ func (c *GeneratorClickHouse) getDistributedDDLPath() string {
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
 func (c *GeneratorClickHouse) getRemoteServersReplicaHostname(host *api.Host) string {
-	return namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NameInstanceHostname, host)
+	return c.namer.Name(namer.NameInstanceHostname, host)
 }
 
 // getSecure gets config-usable value for host or node secure flag

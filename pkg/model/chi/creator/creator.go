@@ -17,7 +17,6 @@ package creator
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -40,7 +39,7 @@ type Creator struct {
 	sm                   IServiceManager
 	vm                   IVolumeManager
 	cmm                  IConfigMapManager
-	nm                   namer.INameManager
+	nm                   managers.INameManager
 	// container builder
 	// probes builder
 	// default pod template builder
@@ -62,7 +61,7 @@ func NewCreator(
 	serviceManager IServiceManager,
 	volumeManager IVolumeManager,
 	configMapManager IConfigMapManager,
-	nameManager namer.INameManager,
+	nameManager managers.INameManager,
 ) *Creator {
 	return &Creator{
 		cr:                   cr,

@@ -17,13 +17,14 @@ package model
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // HostHasTablesCreated checks whether host has tables listed as already created
 func HostHasTablesCreated(host *api.Host) bool {
 	return util.InArray(
-		namer.NewNameManager(namer.NameManagerTypeClickHouse).Name(namer.NameFQDN, host),
+		managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(namer.NameFQDN, host),
 		host.GetCR().EnsureStatus().GetHostsWithTablesCreated(),
 	)
 }
