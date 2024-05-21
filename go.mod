@@ -1,6 +1,6 @@
 module github.com/altinity/clickhouse-operator
 
-go 1.19
+go 1.22
 
 replace (
 	github.com/golang/glog => github.com/sunsingerus/glog v1.0.1-0.20220103184348-48242e35873d
