@@ -990,7 +990,7 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// Force migration requested
 		return true
 
-	case chiModel.HostHasTablesCreated(host):
+	case model.HostHasTablesCreated(host):
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 

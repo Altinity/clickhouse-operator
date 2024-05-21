@@ -18,9 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"math"
 	"sync"
 	"time"
@@ -37,8 +34,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model"
+	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -85,7 +86,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	new.SetAncestor(old)
 	w.logOldAndNew("normalized", old, new)
 
-	actionPlan := model.NewActionPlan(old, new)
+	actionPlan := chiModel.NewActionPlan(old, new)
 	w.logActionPlan(actionPlan)
 
 	switch {
