@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package volume
 
 import (
 	apps "k8s.io/api/apps/v1"
@@ -20,27 +20,27 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 type VolumeManagerClickHouse struct {
 	cr    api.ICustomResource
-	namer managers.INameManager
+	namer *namer.NamerClickHouse
 }
 
 func NewVolumeManagerClickHouse() *VolumeManagerClickHouse {
 	return &VolumeManagerClickHouse{
-		namer: managers.NewNameManager(managers.NameManagerTypeClickHouse),
+		namer: namer.NewClickHouse(),
 	}
 }
 
-func (m *VolumeManagerClickHouse) SetupVolumes(what VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
+func (m *VolumeManagerClickHouse) SetupVolumes(what creator.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
 	switch what {
-	case VolumesForConfigMaps:
+	case creator.VolumesForConfigMaps:
 		m.stsSetupVolumesForConfigMaps(statefulSet, host)
 		return
-	case VolumesUserDataWithFixedPaths:
+	case creator.VolumesUserDataWithFixedPaths:
 		m.stsSetupVolumesUserDataWithFixedPaths(statefulSet, host)
 		return
 	}

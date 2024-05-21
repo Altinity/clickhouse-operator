@@ -12,30 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package namer
+package creator
 
-type NamerClickHouse struct {
-	namer
-}
+type VolumeType string
 
-// NewClickHouse creates new namer with specified context
-func NewClickHouse() *NamerClickHouse {
-	return &NamerClickHouse{}
-}
-
-func (n *NamerClickHouse) Names(what NameType, params ...any) []string {
-	switch what {
-	default:
-		return n.namer.Names(what, params...)
-	}
-	panic("unknown names type")
-}
-
-func (n *NamerClickHouse) Name(what NameType, params ...any) string {
-	switch what {
-	default:
-		return n.namer.Name(what, params...)
-	}
-
-	panic("unknown name type")
-}
+const (
+	VolumesForConfigMaps          VolumeType = "VolumesForConfigMaps"
+	VolumesUserDataWithFixedPaths VolumeType = "VolumesUserDataWithFixedPaths"
+)

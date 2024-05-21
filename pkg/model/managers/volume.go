@@ -12,23 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package managers
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
 	apps "k8s.io/api/apps/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-)
-
-type VolumeType string
-
-const (
-	VolumesForConfigMaps          VolumeType = "VolumesForConfigMaps"
-	VolumesUserDataWithFixedPaths VolumeType = "VolumesUserDataWithFixedPaths"
+	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 )
 
 type IVolumeManager interface {
-	SetupVolumes(what VolumeType, statefulSet *apps.StatefulSet, host *api.Host)
+	SetupVolumes(what commonCreator.VolumeType, statefulSet *apps.StatefulSet, host *api.Host)
 	SetCR(cr api.ICustomResource)
 }
 
@@ -42,7 +37,7 @@ const (
 func NewVolumeManager(what VolumeManagerType) IVolumeManager {
 	switch what {
 	case VolumeManagerTypeClickHouse:
-		return NewVolumeManagerClickHouse()
+		return volume.NewVolumeManagerClickHouse()
 	}
 	panic("unknown volume manager type")
 }

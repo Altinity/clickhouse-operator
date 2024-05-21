@@ -15,16 +15,17 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -204,7 +205,7 @@ func (c *Creator) stsSetupVolumesSystem(statefulSet *apps.StatefulSet, host *api
 }
 
 func (c *Creator) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
-	c.stsSetupVolumes(VolumesForConfigMaps, statefulSet, host)
+	c.stsSetupVolumes(creator.VolumesForConfigMaps, statefulSet, host)
 }
 
 // stsSetupVolumesForSecrets adds to each container in the Pod VolumeMount objects
@@ -230,14 +231,14 @@ func (c *Creator) stsSetupVolumesUserData(statefulSet *apps.StatefulSet, host *a
 }
 
 func (c *Creator) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.StatefulSet, host *api.Host) {
-	c.stsSetupVolumes(VolumesUserDataWithFixedPaths, statefulSet, host)
+	c.stsSetupVolumes(creator.VolumesUserDataWithFixedPaths, statefulSet, host)
 }
 
 func (c *Creator) stsSetupVolumesUserDataWithCustomPaths(statefulSet *apps.StatefulSet, host *api.Host) {
 	c.stsSetupVolumesForUsedPVCTemplates(statefulSet, host)
 }
 
-func (c *Creator) stsSetupVolumes(what VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
+func (c *Creator) stsSetupVolumes(what creator.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
 	c.vm.SetCR(c.cr)
 	c.vm.SetupVolumes(what, statefulSet, host)
 }

@@ -21,7 +21,6 @@ import (
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 // getPodTemplate gets Pod Template to be used to create StatefulSet
@@ -50,7 +49,7 @@ func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
 // newAppPodTemplateDefault is a unification wrapper
 func (c *Creator) newAppPodTemplateDefault(host *api.Host) *api.PodTemplate {
 	podTemplate := &api.PodTemplate{
-		Name: managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(namer.NameStatefulSet, host),
+		Name: namer.NewClickHouse().Name(namer.NameStatefulSet, host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
 			Volumes:    []core.Volume{},

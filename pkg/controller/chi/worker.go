@@ -122,7 +122,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			chiCreator.NewContainerManager(chiCreator.ContainerManagerTypeClickHouse),
 			chiCreator.NewProbeManager(chiCreator.ProbeManagerTypeClickHouse),
 			chiCreator.NewServiceManager(chiCreator.ServiceManagerTypeClickHouse),
-			chiCreator.NewVolumeManager(chiCreator.VolumeManagerTypeClickHouse),
+			managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
 			chiCreator.NewConfigMapManager(chiCreator.ConfigMapManagerTypeClickHouse),
 			managers.NewNameManager(managers.NameManagerTypeClickHouse),
 		),
@@ -977,6 +977,10 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	return err
 }
 
+func (w *worker) hostIsListedAsTablesCrteated(host *api.Host) bool {
+	return host.HasListedTablesCreated(w.c.namer.Name(namer.NameFQDN, host))
+}
+
 // shouldMigrateTables
 func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOptions) bool {
 	o := NewMigrateTableOptionsArr(opts...).First()
@@ -991,7 +995,7 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// Force migration requested
 		return true
 
-	case model.HostHasTablesCreated(host):
+	case w.hostIsListedAsTablesCrteated(host):
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 

@@ -18,7 +18,6 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 type ConfigMapType string
@@ -33,7 +32,7 @@ type IConfigMapManager interface {
 	CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap
 	SetCR(cr api.ICustomResource)
 	SetTagger(tagger iTagger)
-	SetConfigFilesGenerator(configFilesGenerator managers.IConfigFilesGenerator)
+	SetConfigFilesGenerator(configFilesGenerator any)
 }
 
 type ConfigMapManagerType string

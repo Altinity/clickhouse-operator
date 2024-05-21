@@ -34,7 +34,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
@@ -1106,8 +1105,8 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *api.Host, which api.Wh
 	return
 }
 
-func isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
-	if !model.HostHasTablesCreated(host) {
+func (w *worker) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
+	if !w.hostIsListedAsTablesCrteated(host) {
 		// No data to loose
 		return false
 	}
@@ -1159,7 +1158,7 @@ func (w *worker) reconcilePVCFromVolumeMount(
 
 	// Check scenario 1 - no PVC available
 	// Such a PVC should be re-created
-	if isLostPVC(pvc, isModelCreated, host) {
+	if w.isLostPVC(pvc, isModelCreated, host) {
 		// Looks like data loss detected
 		w.a.V(1).M(host).Warning("PVC is either newly added to the host or was lost earlier (%s/%s/%s/%s)", namespace, host.GetName(), volumeMount.Name, pvcName)
 		res = errPVCIsLost

@@ -37,7 +37,7 @@ type Creator struct {
 	cm                   IContainerManager
 	pm                   IProbeManager
 	sm                   IServiceManager
-	vm                   IVolumeManager
+	vm                   managers.IVolumeManager
 	cmm                  IConfigMapManager
 	nm                   managers.INameManager
 	// container builder
@@ -59,7 +59,7 @@ func NewCreator(
 	containerManager IContainerManager,
 	probeManager IProbeManager,
 	serviceManager IServiceManager,
-	volumeManager IVolumeManager,
+	volumeManager managers.IVolumeManager,
 	configMapManager IConfigMapManager,
 	nameManager managers.INameManager,
 ) *Creator {

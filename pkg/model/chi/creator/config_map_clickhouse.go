@@ -25,13 +25,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 type ConfigMapManagerClickHouse struct {
 	cr                   api.ICustomResource
 	tagger               iTagger
-	configFilesGenerator managers.IConfigFilesGenerator
+	configFilesGenerator *config.FilesGeneratorClickHouse
 }
 
 func NewConfigMapManagerClickHouse() *ConfigMapManagerClickHouse {
@@ -64,15 +63,15 @@ func (m *ConfigMapManagerClickHouse) SetCR(cr api.ICustomResource) {
 func (m *ConfigMapManagerClickHouse) SetTagger(tagger iTagger) {
 	m.tagger = tagger
 }
-func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator managers.IConfigFilesGenerator) {
-	m.configFilesGenerator = configFilesGenerator
+func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator any) {
+	m.configFilesGenerator = configFilesGenerator.(*config.FilesGeneratorClickHouse)
 }
 
 // createConfigMapCHICommon creates new core.ConfigMap
 func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.FilesGeneratorOptionsClickHouse) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(namer.NameConfigMapCommon, m.cr),
+			Name:            namer.NewClickHouse().Name(namer.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommon)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
@@ -90,7 +89,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(namer.NameConfigMapCommonUsers, m.cr),
+			Name:            namer.NewClickHouse().Name(namer.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommonUsers)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
@@ -108,7 +107,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(namer.NameConfigMapHost, host),
+			Name:            namer.NewClickHouse().Name(namer.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(m.tagger.Label(labeler.LabelConfigMapHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),

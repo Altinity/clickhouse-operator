@@ -15,11 +15,12 @@
 package creator
 
 import (
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
-	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
 )
 
 type ContainerManagerClickHouse struct {

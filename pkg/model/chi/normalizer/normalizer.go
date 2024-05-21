@@ -31,10 +31,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -95,7 +95,7 @@ func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSub
 }
 
 func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
-	return creator.CreateCustomResource(creator.CustomResourceCHI)
+	return managers.CreateCustomResource(managers.CustomResourceCHI)
 }
 
 func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
@@ -192,13 +192,13 @@ func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = creator.CreateHostTemplate(creator.HostTemplateHostNetwork, n.namer.Name(namer.NameHostTemplate, host))
+			hostTemplate = commonCreator.CreateHostTemplate(commonCreator.HostTemplateHostNetwork, n.namer.Name(namer.NameHostTemplate, host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = creator.CreateHostTemplate(creator.HostTemplateCommon, n.namer.Name(namer.NameHostTemplate, host))
+		hostTemplate = commonCreator.CreateHostTemplate(commonCreator.HostTemplateCommon, n.namer.Name(namer.NameHostTemplate, host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
@@ -616,7 +616,7 @@ func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 	// In case no clusters available, we may want to create a default one
 	if n.ctx.Options().WithDefaultCluster {
 		return []*api.Cluster{
-			creator.CreateCluster(creator.ClusterCHIDefault),
+			commonCreator.CreateCluster(commonCreator.ClusterCHIDefault),
 		}
 	}
 
@@ -1163,7 +1163,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	if cluster == nil {
-		cluster = creator.CreateCluster(creator.ClusterCHIDefault)
+		cluster = commonCreator.CreateCluster(commonCreator.ClusterCHIDefault)
 	}
 
 	// Runtime has to be prepared first

@@ -16,6 +16,7 @@ package v1
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 )
@@ -472,4 +473,12 @@ func (host *Host) WalkAssignedPorts(f func(name string, port *Int32, protocol co
 			return false
 		},
 	)
+}
+
+func (host *Host) HasListedTablesCreated(name string) bool {
+	return util.InArray(
+		name,
+		host.GetCR().EnsureStatus().GetHostsWithTablesCreated(),
+	)
+
 }

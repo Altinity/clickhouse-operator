@@ -18,18 +18,7 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 )
-
-// HostHasTablesCreated checks whether host has tables listed as already created
-func HostHasTablesCreated(host *api.Host) bool {
-	return util.InArray(
-		managers.NewNameManager(managers.NameManagerTypeClickHouse).Name(namer.NameFQDN, host),
-		host.GetCR().EnsureStatus().GetHostsWithTablesCreated(),
-	)
-}
 
 // HostFindVolumeClaimTemplateUsedForVolumeMount searches for possible VolumeClaimTemplate which was used to build volume,
 // mounted via provided 'volumeMount'. It is not necessarily that VolumeClaimTemplate would be found, because
