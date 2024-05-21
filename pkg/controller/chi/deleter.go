@@ -17,7 +17,7 @@ package chi
 import (
 	"context"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"time"
 
 	apps "k8s.io/api/apps/v1"
