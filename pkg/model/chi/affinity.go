@@ -15,14 +15,14 @@
 package chi
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"gopkg.in/d4l3k/messagediff.v1"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )

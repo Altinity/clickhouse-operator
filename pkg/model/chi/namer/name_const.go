@@ -14,7 +14,7 @@
 
 package namer
 
-import "github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
+import "github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 
 const (
 	// chiServiceNamePattern is a template of CHI Service name. "clickhouse-{chi}"

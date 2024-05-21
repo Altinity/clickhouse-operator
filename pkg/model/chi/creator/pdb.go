@@ -16,15 +16,15 @@ package creator
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 
 	policy "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
 
 // CreatePodDisruptionBudget creates new PodDisruptionBudget

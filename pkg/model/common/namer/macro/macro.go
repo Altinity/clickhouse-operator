@@ -15,11 +15,11 @@
 package macro
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/short"
 	"strconv"
 	"strings"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/short"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
