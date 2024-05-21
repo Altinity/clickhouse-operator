@@ -18,7 +18,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -68,7 +67,7 @@ func NewCreator(
 	return &Creator{
 		cr:                   cr,
 		configFilesGenerator: configFilesGenerator,
-		tagger:               tags.NewTagger(cr),
+		tagger:               managers.NewTagger(cr),
 		a:                    log.M(cr),
 		cm:                   containerManager,
 		pm:                   probeManager,
