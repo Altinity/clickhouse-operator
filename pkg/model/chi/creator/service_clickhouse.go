@@ -15,16 +15,15 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 )
 
 type ServiceManagerClickHouse struct {
@@ -96,7 +95,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			OwnerReferences: createOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
-			ClusterIP: model.TemplateDefaultsServiceClusterIP,
+			ClusterIP: TemplateDefaultsServiceClusterIP,
 			Ports: []core.ServicePort{
 				{
 					Name:       api.ChDefaultHTTPPortName,
@@ -189,7 +188,7 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 		},
 		Spec: core.ServiceSpec{
 			Selector:                 m.tagger.Selector(labeler.SelectorHostScope, host),
-			ClusterIP:                model.TemplateDefaultsServiceClusterIP,
+			ClusterIP:                TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,
 		},

@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -31,7 +32,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
@@ -1238,30 +1238,30 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *api.SchemaPolicy) *api
 	}
 
 	switch strings.ToLower(policy.Replica) {
-	case strings.ToLower(model.SchemaPolicyReplicaNone):
+	case strings.ToLower(schemer.SchemaPolicyReplicaNone):
 		// Known value, overwrite it to ensure case-ness
-		policy.Replica = model.SchemaPolicyReplicaNone
-	case strings.ToLower(model.SchemaPolicyReplicaAll):
+		policy.Replica = schemer.SchemaPolicyReplicaNone
+	case strings.ToLower(schemer.SchemaPolicyReplicaAll):
 		// Known value, overwrite it to ensure case-ness
-		policy.Replica = model.SchemaPolicyReplicaAll
+		policy.Replica = schemer.SchemaPolicyReplicaAll
 	default:
 		// Unknown value, fallback to default
-		policy.Replica = model.SchemaPolicyReplicaAll
+		policy.Replica = schemer.SchemaPolicyReplicaAll
 	}
 
 	switch strings.ToLower(policy.Shard) {
-	case strings.ToLower(model.SchemaPolicyShardNone):
+	case strings.ToLower(schemer.SchemaPolicyShardNone):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = model.SchemaPolicyShardNone
-	case strings.ToLower(model.SchemaPolicyShardAll):
+		policy.Shard = schemer.SchemaPolicyShardNone
+	case strings.ToLower(schemer.SchemaPolicyShardAll):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = model.SchemaPolicyShardAll
-	case strings.ToLower(model.SchemaPolicyShardDistributedTablesOnly):
+		policy.Shard = schemer.SchemaPolicyShardAll
+	case strings.ToLower(schemer.SchemaPolicyShardDistributedTablesOnly):
 		// Known value, overwrite it to ensure case-ness
-		policy.Shard = model.SchemaPolicyShardDistributedTablesOnly
+		policy.Shard = schemer.SchemaPolicyShardDistributedTablesOnly
 	default:
 		// unknown value, fallback to default
-		policy.Shard = model.SchemaPolicyShardAll
+		policy.Shard = schemer.SchemaPolicyShardAll
 	}
 
 	return policy

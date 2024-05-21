@@ -12,12 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
-
-const (
-	// Default value for ClusterIP service
-	TemplateDefaultsServiceClusterIP = "None"
-)
+package schemer
 
 // Values for Schema Policy
 const (

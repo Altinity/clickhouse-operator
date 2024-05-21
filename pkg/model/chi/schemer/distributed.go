@@ -20,7 +20,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -28,7 +27,7 @@ import (
 func (s *ClusterSchemer) shouldCreateDistributedObjects(host *api.Host) bool {
 	hosts := s.Names(namer.NameFQDNs, host, api.Cluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == model.SchemaPolicyShardNone {
+	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")
 		return false
 	}
