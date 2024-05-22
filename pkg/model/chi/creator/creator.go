@@ -27,7 +27,7 @@ type Creator struct {
 	tagger               interfaces.ITagger
 	a                    log.Announcer
 	cm                   interfaces.IContainerManager
-	pm                   IProbeManager
+	pm                   interfaces.IProbeManager
 	sm                   IServiceManager
 	vm                   interfaces.IVolumeManager
 	cmm                  interfaces.IConfigMapManager
@@ -50,7 +50,7 @@ func NewCreator(
 	configFilesGenerator interfaces.IConfigFilesGenerator,
 	containerManager interfaces.IContainerManager,
 	tagger interfaces.ITagger,
-	probeManager IProbeManager,
+	probeManager interfaces.IProbeManager,
 	serviceManager IServiceManager,
 	volumeManager interfaces.IVolumeManager,
 	configMapManager interfaces.IConfigMapManager,

@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 )
 
 type ProbeManagerClickHouse struct {
@@ -28,11 +29,11 @@ func NewProbeManagerClickHouse() *ProbeManagerClickHouse {
 	return &ProbeManagerClickHouse{}
 }
 
-func (m *ProbeManagerClickHouse) CreateProbe(what ProbeType, host *api.Host) *core.Probe {
+func (m *ProbeManagerClickHouse) CreateProbe(what commonCreator.ProbeType, host *api.Host) *core.Probe {
 	switch what {
-	case ProbeDefaultLiveness:
+	case commonCreator.ProbeDefaultLiveness:
 		return m.createDefaultClickHouseLivenessProbe(host)
-	case ProbeDefaultReadiness:
+	case commonCreator.ProbeDefaultReadiness:
 		return m.createDefaultClickHouseReadinessProbe(host)
 	}
 	panic("unknown probe type")

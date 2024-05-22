@@ -12,24 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package managers
 
 import (
-	core "k8s.io/api/core/v1"
-
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
-
-type ProbeType string
-
-const (
-	ProbeDefaultLiveness  ProbeType = "ProbeDefaultLiveness"
-	ProbeDefaultReadiness ProbeType = "ProbeDefaultReadiness"
-)
-
-type IProbeManager interface {
-	CreateProbe(what ProbeType, host *api.Host) *core.Probe
-}
 
 type ProbeManagerType string
 
@@ -38,10 +26,10 @@ const (
 	ProbeManagerTypeKeeper     ProbeManagerType = "keeper"
 )
 
-func NewProbeManager(what ProbeManagerType) IProbeManager {
+func NewProbeManager(what ProbeManagerType) interfaces.IProbeManager {
 	switch what {
 	case ProbeManagerTypeClickHouse:
-		return NewProbeManagerClickHouse()
+		return creator.NewProbeManagerClickHouse()
 	}
 	panic("unknown probe manager type")
 }

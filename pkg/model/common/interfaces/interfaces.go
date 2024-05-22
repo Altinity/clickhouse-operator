@@ -15,14 +15,14 @@
 package interfaces
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 )
 
@@ -67,4 +67,8 @@ type IContainerManager interface {
 	GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool)
 	EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host)
 	EnsureLogContainer(statefulSet *apps.StatefulSet)
+}
+
+type IProbeManager interface {
+	CreateProbe(what commonCreator.ProbeType, host *api.Host) *core.Probe
 }

@@ -133,10 +133,10 @@ func (c *Creator) stsEnsureAppContainerProbesSpecified(statefulSet *apps.Statefu
 		return
 	}
 	if container.LivenessProbe == nil {
-		container.LivenessProbe = c.pm.CreateProbe(ProbeDefaultLiveness, host)
+		container.LivenessProbe = c.pm.CreateProbe(creator.ProbeDefaultLiveness, host)
 	}
 	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = c.pm.CreateProbe(ProbeDefaultReadiness, host)
+		container.ReadinessProbe = c.pm.CreateProbe(creator.ProbeDefaultReadiness, host)
 	}
 }
 
