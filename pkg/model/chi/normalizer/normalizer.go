@@ -573,7 +573,7 @@ func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	if len(n.ctx.GetTarget().GetSpec().Configuration.Clusters) > 0 {
 		replicasCount = n.ctx.GetTarget().GetSpec().Configuration.Clusters[0].Layout.ReplicasCount
 	}
-	templatesNormalizer.NormalizePodTemplate(replicasCount, template)
+	templates.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
 	n.ctx.GetTarget().GetSpec().Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }

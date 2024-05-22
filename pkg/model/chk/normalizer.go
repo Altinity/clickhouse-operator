@@ -15,6 +15,7 @@
 package chk
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"strings"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -161,7 +162,7 @@ func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 	if len(n.ctx.chk.Spec.Configuration.Clusters) > 0 {
 		replicasCount = n.ctx.chk.Spec.Configuration.Clusters[0].Layout.ReplicasCount
 	}
-	templatesNormalizer.NormalizePodTemplate(replicasCount, template)
+	templates.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
