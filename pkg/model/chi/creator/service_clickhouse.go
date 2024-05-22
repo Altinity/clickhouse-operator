@@ -28,6 +28,11 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
 
+const (
+	// Default value for ClusterIP service
+	TemplateDefaultsServiceClusterIP = "None"
+)
+
 type ServiceManagerClickHouse struct {
 	cr     api.ICustomResource
 	tagger interfaces.ITagger
