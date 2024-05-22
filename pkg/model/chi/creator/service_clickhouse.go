@@ -43,7 +43,7 @@ func NewServiceManagerClickHouse() *ServiceManagerClickHouse {
 
 func (m *ServiceManagerClickHouse) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
 	switch what {
-	case interfaces.ServiceCHI:
+	case interfaces.ServiceCR:
 		return m.createServiceCHI()
 	case interfaces.ServiceCHICluster:
 		var cluster api.ICluster
@@ -84,7 +84,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			namer.NewClickHouse().Name(interfaces.NameCRService, m.cr),
 			m.tagger.Label(interfaces.LabelServiceCR, m.cr),
 			m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr),
-			m.tagger.Selector(interfaces.SelectorCHIScopeReady),
+			m.tagger.Selector(interfaces.SelectorCRScopeReady),
 			creator.CreateOwnerReferences(m.cr),
 			macro.Macro(m.cr),
 		)
@@ -116,7 +116,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 					TargetPort: intstr.FromString(api.ChDefaultTCPPortName),
 				},
 			},
-			Selector: m.tagger.Selector(interfaces.SelectorCHIScopeReady),
+			Selector: m.tagger.Selector(interfaces.SelectorCRScopeReady),
 			Type:     core.ServiceTypeClusterIP,
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},

@@ -17,9 +17,11 @@ package interfaces
 type NameType string
 
 const (
-	NameConfigMapHost                NameType = "ConfigMapHost"
-	NameConfigMapCommon              NameType = "ConfigMapCommon"
-	NameConfigMapCommonUsers         NameType = "NameConfigMapCommonUsers"
+	NameConfigMapHost        NameType = "ConfigMapHost"
+	NameConfigMapCommon      NameType = "ConfigMapCommon"
+	NameConfigMapCommonUsers NameType = "NameConfigMapCommonUsers"
+)
+const (
 	NameCRService                    NameType = "NameCRService"
 	NameCRServiceFQDN                NameType = "NameCRServiceFQDN"
 	NameClusterService               NameType = "NameClusterService"

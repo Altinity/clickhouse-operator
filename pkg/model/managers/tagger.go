@@ -24,12 +24,27 @@ import (
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
+type TagManagerType string
+
+const (
+	TagManagerTypeClickHouse TagManagerType = "clickhouse"
+	TagManagerTypeKeeper     TagManagerType = "keeper"
+)
+
+func NewTagManager(what TagManagerType, cr api.ICustomResource) interfaces.ITagger {
+	switch what {
+	case TagManagerTypeClickHouse:
+		return newTaggerClickHouse(cr)
+	}
+	panic("unknown volume manager type")
+}
+
 type tagger struct {
 	annotator interfaces.IAnnotator
 	labeler   interfaces.ILabeler
 }
 
-func NewTagger(cr api.ICustomResource) *tagger {
+func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 	return &tagger{
 		annotator: annotator.NewAnnotatorClickHouse(cr, commonAnnotator.Config{
 			Include: chop.Config().Annotation.Include,

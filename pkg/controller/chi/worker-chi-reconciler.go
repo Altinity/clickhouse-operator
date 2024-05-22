@@ -93,7 +93,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	case w.isAfterFinalizerInstalled(old, new):
 		w.a.M(new).F().Info("isAfterFinalizerInstalled - continue reconcile-2")
 	default:
-		w.a.M(new).F().Info("ActionPlan has no actions and not finalizer - nothing to do")
+		w.a.M(new).F().Info("ActionPlan has no actions and no need to install finalizer - nothing to do")
 		return nil
 	}
 
@@ -221,7 +221,7 @@ func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *api.ClickHou
 	}
 
 	// Create entry point for the whole CHI
-	if service := w.task.creator.CreateService(interfaces.ServiceCHI); service != nil {
+	if service := w.task.creator.CreateService(interfaces.ServiceCR); service != nil {
 		if err := w.reconcileService(ctx, chi, service); err != nil {
 			// Service not reconciled
 			w.task.registryFailed.RegisterService(service.GetObjectMeta())

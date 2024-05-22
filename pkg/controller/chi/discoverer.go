@@ -30,41 +30,41 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) labeler(chi *api.ClickHouseInstallation) *labeler.LabelerClickHouse {
-	return labeler.NewLabelerClickHouse(chi, commonLabeler.Config{
+func (c *Controller) labeler(cr api.ICustomResource) *labeler.LabelerClickHouse {
+	return labeler.NewLabelerClickHouse(cr, commonLabeler.Config{
 		AppendScope: chop.Config().Label.Runtime.AppendScope,
 		Include:     chop.Config().Label.Include,
 		Exclude:     chop.Config().Label.Exclude,
 	})
 }
 
-func (c *Controller) discovery(ctx context.Context, chi *api.ClickHouseInstallation) *model.Registry {
+func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *model.Registry {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	opts := controller.NewListOptions(c.labeler(chi).Selector(interfaces.SelectorCHIScope))
+	opts := controller.NewListOptions(c.labeler(cr).Selector(interfaces.SelectorCRScope))
 	r := model.NewRegistry()
-	c.discoveryStatefulSets(ctx, r, chi, opts)
-	c.discoveryConfigMaps(ctx, r, chi, opts)
-	c.discoveryServices(ctx, r, chi, opts)
-	c.discoverySecrets(ctx, r, chi, opts)
-	c.discoveryPVCs(ctx, r, chi, opts)
+	c.discoveryStatefulSets(ctx, r, cr, opts)
+	c.discoveryConfigMaps(ctx, r, cr, opts)
+	c.discoveryServices(ctx, r, cr, opts)
+	c.discoverySecrets(ctx, r, cr, opts)
+	c.discoveryPVCs(ctx, r, cr, opts)
 	// Comment out PV
 	//c.discoveryPVs(ctx, r, chi, opts)
-	c.discoveryPDBs(ctx, r, chi, opts)
+	c.discoveryPDBs(ctx, r, cr, opts)
 	return r
 }
 
-func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registry, chi *api.ClickHouseInstallation, opts meta.ListOptions) {
-	list, err := c.kubeClient.AppsV1().StatefulSets(chi.Namespace).List(ctx, opts)
+func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
+	list, err := c.kubeClient.AppsV1().StatefulSets(cr.GetNamespace()).List(ctx, opts)
 	if err != nil {
-		log.M(chi).F().Error("FAIL list StatefulSet err: %v", err)
+		log.M(cr).F().Error("FAIL to list StatefulSet - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).F().Error("FAIL list StatefulSet list is nil")
+		log.M(cr).F().Error("FAIL to list StatefulSet - list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -72,14 +72,14 @@ func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registr
 	}
 }
 
-func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry, chi *api.ClickHouseInstallation, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().ConfigMaps(chi.Namespace).List(ctx, opts)
+func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
+	list, err := c.kubeClient.CoreV1().ConfigMaps(cr.GetNamespace()).List(ctx, opts)
 	if err != nil {
-		log.M(chi).F().Error("FAIL list ConfigMap err: %v", err)
+		log.M(cr).F().Error("FAIL to list ConfigMap - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).F().Error("FAIL list ConfigMap list is nil")
+		log.M(cr).F().Error("FAIL to list ConfigMap - list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -87,14 +87,14 @@ func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry,
 	}
 }
 
-func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, chi *api.ClickHouseInstallation, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().Services(chi.Namespace).List(ctx, opts)
+func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
+	list, err := c.kubeClient.CoreV1().Services(cr.GetNamespace()).List(ctx, opts)
 	if err != nil {
-		log.M(chi).F().Error("FAIL list Service err: %v", err)
+		log.M(cr).F().Error("FAIL to list Service - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).F().Error("FAIL list Service list is nil")
+		log.M(cr).F().Error("FAIL to list Service - list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -102,14 +102,14 @@ func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, c
 	}
 }
 
-func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, chi *api.ClickHouseInstallation, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().Secrets(chi.Namespace).List(ctx, opts)
+func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
+	list, err := c.kubeClient.CoreV1().Secrets(cr.GetNamespace()).List(ctx, opts)
 	if err != nil {
-		log.M(chi).F().Error("FAIL list Secret err: %v", err)
+		log.M(cr).F().Error("FAIL to list Secret - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).F().Error("FAIL list Secret list is nil")
+		log.M(cr).F().Error("FAIL to list Secret - list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -117,14 +117,14 @@ func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, ch
 	}
 }
 
-func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, chi *api.ClickHouseInstallation, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(chi.Namespace).List(ctx, opts)
+func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
+	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(cr.GetNamespace()).List(ctx, opts)
 	if err != nil {
-		log.M(chi).F().Error("FAIL list PVC err: %v", err)
+		log.M(cr).F().Error("FAIL to list PVC - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).F().Error("FAIL list PVC list is nil")
+		log.M(cr).F().Error("FAIL to list PVC - list is nil")
 		return
 	}
 	for _, obj := range list.Items {
@@ -133,14 +133,14 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, chi *
 }
 
 // Comment out PV
-//func (c *Controller) discoveryPVs(ctx context.Context, r *chopModel.Registry, chi *api.ClickHouseInstallation, opts meta.ListOptions) {
+//func (c *Controller) discoveryPVs(ctx context.Context, r *chopModel.Registry, cr api.ICustomResource, opts meta.ListOptions) {
 //	list, err := c.kubeClient.CoreV1().PersistentVolumes().List(ctx, opts)
 //	if err != nil {
-//		log.M(chi).F().Error("FAIL list PV err: %v", err)
+//		log.M(cr).F().Error("FAIL list PV err: %v", err)
 //		return
 //	}
 //	if list == nil {
-//		log.M(chi).F().Error("FAIL list PV list is nil")
+//		log.M(cr).F().Error("FAIL list PV list is nil")
 //		return
 //	}
 //	for _, obj := range list.Items {
@@ -148,14 +148,14 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, chi *
 //	}
 //}
 
-func (c *Controller) discoveryPDBs(ctx context.Context, r *model.Registry, chi *api.ClickHouseInstallation, opts meta.ListOptions) {
-	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(chi.Namespace).List(ctx, opts)
+func (c *Controller) discoveryPDBs(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
+	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(cr.GetNamespace()).List(ctx, opts)
 	if err != nil {
-		log.M(chi).F().Error("FAIL list PDB err: %v", err)
+		log.M(cr).F().Error("FAIL to list PDB - err: %v", err)
 		return
 	}
 	if list == nil {
-		log.M(chi).F().Error("FAIL list PDB list is nil")
+		log.M(cr).F().Error("FAIL to list PDB - list is nil")
 		return
 	}
 	for _, obj := range list.Items {

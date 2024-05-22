@@ -72,9 +72,9 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 
 func (l *Labeler) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	switch what {
-	case interfaces.SelectorCHIScope:
+	case interfaces.SelectorCRScope:
 		return l.getSelectorCRScope()
-	case interfaces.SelectorCHIScopeReady:
+	case interfaces.SelectorCRScopeReady:
 		return l.getSelectorCRScopeReady()
 	case interfaces.SelectorClusterScope:
 		var cluster api.ICluster

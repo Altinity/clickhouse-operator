@@ -17,8 +17,8 @@ package interfaces
 type SelectorType string
 
 const (
-	SelectorCHIScope          SelectorType = "SelectorCHIScope"
-	SelectorCHIScopeReady     SelectorType = "SelectorCHIScopeReady"
+	SelectorCRScope           SelectorType = "SelectorCRScope"
+	SelectorCRScopeReady      SelectorType = "SelectorCRScopeReady"
 	SelectorClusterScope      SelectorType = "SelectorClusterScope"
 	SelectorClusterScopeReady SelectorType = "SelectorClusterScopeReady"
 	SelectorShardScopeReady   SelectorType = "SelectorShardScopeReady"
