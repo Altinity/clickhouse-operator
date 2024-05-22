@@ -16,6 +16,7 @@ package namer
 
 import (
 	"fmt"
+
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 

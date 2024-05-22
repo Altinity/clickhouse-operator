@@ -15,18 +15,18 @@
 package volume
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	apps "k8s.io/api/apps/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
 type VolumeManagerClickHouse struct {
 	cr    api.ICustomResource
-	namer *namer.NamerClickHouse
+	namer *namer.ClickHouse
 }
 
 func NewVolumeManagerClickHouse() *VolumeManagerClickHouse {

@@ -19,15 +19,15 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type namer struct {
+type Namer struct {
 }
 
-// New creates new namer with specified context
-func New() *namer {
-	return &namer{}
+// New creates new Namer with specified context
+func New() *Namer {
+	return &Namer{}
 }
 
-func (n *namer) Names(what interfaces.NameType, params ...any) []string {
+func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
 	switch what {
 	case interfaces.NameFQDNs:
 		obj := params[0]
@@ -38,7 +38,7 @@ func (n *namer) Names(what interfaces.NameType, params ...any) []string {
 	panic("unknown names type")
 }
 
-func (n *namer) Name(what interfaces.NameType, params ...any) string {
+func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	switch what {
 	case interfaces.NameCRService:
 		cr := params[0].(api.ICustomResource)

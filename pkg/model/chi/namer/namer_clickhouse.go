@@ -17,28 +17,29 @@ package namer
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
-type NamerClickHouse struct {
-	*namer
+type ClickHouse struct {
+	*commonNamer.Namer
 }
 
 // NewClickHouse creates new namer with specified context
-func NewClickHouse() *NamerClickHouse {
-	return &NamerClickHouse{
-		namer: New(),
+func NewClickHouse() *ClickHouse {
+	return &ClickHouse{
+		Namer: commonNamer.New(),
 	}
 }
 
-func (n *NamerClickHouse) Names(what interfaces.NameType, params ...any) []string {
+func (n *ClickHouse) Names(what interfaces.NameType, params ...any) []string {
 	switch what {
 	default:
-		return n.namer.Names(what, params...)
+		return n.Namer.Names(what, params...)
 	}
 	panic("unknown names type")
 }
 
-func (n *NamerClickHouse) Name(what interfaces.NameType, params ...any) string {
+func (n *ClickHouse) Name(what interfaces.NameType, params ...any) string {
 	switch what {
 	case interfaces.NameConfigMapHost:
 		host := params[0].(*api.Host)
@@ -50,7 +51,7 @@ func (n *NamerClickHouse) Name(what interfaces.NameType, params ...any) string {
 		cr := params[0].(api.ICustomResource)
 		return createConfigMapCommonUsersName(cr)
 	default:
-		return n.namer.Name(what, params...)
+		return n.Namer.Name(what, params...)
 	}
 
 	panic("unknown name type")
