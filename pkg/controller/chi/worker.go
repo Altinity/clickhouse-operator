@@ -982,7 +982,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	return err
 }
 
-func (w *worker) hostIsListedAsTablesCrteated(host *api.Host) bool {
+func (w *worker) hostIsListedAsHavingTablesCreated(host *api.Host) bool {
 	return host.HasListedTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 }
 
@@ -1000,7 +1000,7 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// Force migration requested
 		return true
 
-	case w.hostIsListedAsTablesCrteated(host):
+	case w.hostIsListedAsHavingTablesCreated(host):
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
@@ -1110,8 +1110,8 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *api.Host) err
 		return nil
 	}
 
-	_ = w.c.deleteLabelReadyPod(ctx, host)
-	_ = w.c.deleteAnnotationReadyService(ctx, host)
+	_ = w.c.deleteLabelReadyOnPod(ctx, host)
+	_ = w.c.deleteAnnotationReadyOnService(ctx, host)
 	return nil
 }
 

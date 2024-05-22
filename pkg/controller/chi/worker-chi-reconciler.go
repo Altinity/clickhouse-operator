@@ -1105,7 +1105,7 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *api.Host, which api.Wh
 }
 
 func (w *worker) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
-	if !w.hostIsListedAsTablesCrteated(host) {
+	if !w.hostIsListedAsHavingTablesCreated(host) {
 		// No data to loose
 		return false
 	}

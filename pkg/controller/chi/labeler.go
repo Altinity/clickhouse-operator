@@ -273,8 +273,8 @@ func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.Host) 
 	return nil
 }
 
-// deleteLabelReadyPod deletes Label "Ready" from the pod of the specified host
-func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *api.Host) error {
+// deleteLabelReadyOnPod deletes Label "Ready" from the pod of the specified host
+func (c *Controller) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -329,8 +329,8 @@ func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *a
 	return nil
 }
 
-// deleteAnnotationReadyService deletes Annotation "Ready" from the service of the specified host
-func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *api.Host) error {
+// deleteAnnotationReadyOnService deletes Annotation "Ready" from the service of the specified host
+func (c *Controller) deleteAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

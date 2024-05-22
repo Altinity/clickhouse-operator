@@ -64,13 +64,13 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.Host) error {
 			if sts == nil {
 				return false
 			}
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 			return k8s.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func(_ctx context.Context) {
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 		},
 	)
 	if err != nil {
@@ -83,13 +83,13 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.Host) error {
 		host,
 		nil, // rely on default options
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 			return k8s.IsStatefulSetReady(sts)
 		},
 		func(_ctx context.Context) {
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 		},
 	)
 
