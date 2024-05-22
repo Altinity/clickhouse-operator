@@ -23,7 +23,6 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
-	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 )
 
 // NormalizerContext specifies CHI-related normalization context
@@ -169,7 +168,7 @@ func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTemplate) {
-	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
+	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
