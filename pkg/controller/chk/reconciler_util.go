@@ -16,7 +16,6 @@ package chk
 
 import (
 	"context"
-	"encoding/json"
 	"reflect"
 	"runtime"
 	"time"
@@ -41,15 +40,6 @@ func getNamespacedName(obj meta.Object) types.NamespacedName {
 
 func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
-}
-
-func getKeeperFromAnnotationLastAppliedConfiguration(chk *api.ClickHouseKeeperInstallation) *api.ClickHouseKeeperInstallation {
-	lastApplied := chk.Annotations["kubectl.kubernetes.io/last-applied-configuration"]
-
-	tmp := api.ClickHouseKeeperInstallation{}
-
-	json.Unmarshal([]byte(lastApplied), &tmp)
-	return &tmp
 }
 
 func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]string, error) {
