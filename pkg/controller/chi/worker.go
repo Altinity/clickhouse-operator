@@ -767,7 +767,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		return
 	}
 
-	objs := w.c.discovery(ctx, chi)
+	existingObjects := w.c.discovery(ctx, chi)
 	ap.WalkAdded(
 		// Walk over added clusters
 		func(cluster *api.Cluster) {
@@ -778,7 +778,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 				// Have we found this StatefulSet
 				found := false
 
-				objs.WalkStatefulSet(func(meta meta.Object) {
+				existingObjects.WalkStatefulSet(func(meta meta.Object) {
 					if name == meta.GetName() {
 						// StatefulSet of this host already exist
 						found = true
@@ -789,11 +789,11 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 					// StatefulSet of this host already exist, we can't ADD it for sure
 					// It looks like FOUND is the most correct approach
 					host.GetReconcileAttributes().SetFound()
-					w.a.V(1).M(chi).Info("Add host as FOUND. Host was found as sts %s", host.GetName())
+					w.a.V(1).M(chi).Info("Add host as FOUND via cluster. Host was found as sts. Host: %s", host.GetName())
 				} else {
 					// StatefulSet of this host does not exist, looks like we need to ADD it
 					host.GetReconcileAttributes().SetAdd()
-					w.a.V(1).M(chi).Info("Add host as ADD. Host was not found as sts %s", host.GetName())
+					w.a.V(1).M(chi).Info("Add host as ADD via cluster. Host was not found as sts. Host: %s", host.GetName())
 				}
 
 				return nil
@@ -804,12 +804,14 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 			// Mark all hosts of the shard as newly added
 			shard.WalkHosts(func(host *api.Host) error {
 				host.GetReconcileAttributes().SetAdd()
+				w.a.V(1).M(chi).Info("Add host as ADD via shard. Host: %s", host.GetName())
 				return nil
 			})
 		},
 		// Walk over added hosts
 		func(host *api.Host) {
 			host.GetReconcileAttributes().SetAdd()
+			w.a.V(1).M(chi).Info("Add host as ADD via host. Host: %s", host.GetName())
 		},
 	)
 
@@ -819,6 +821,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 		func(shard *api.ChiShard) {
 		},
 		func(host *api.Host) {
+			w.a.V(1).M(chi).Info("Add host as MODIFIED via host. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetModify()
 		},
 	)
@@ -833,6 +836,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 			return nil
 		default:
 			// Not clear yet
+			w.a.V(1).M(chi).Info("Add host as FOUND via host. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetFound()
 		}
 		return nil
