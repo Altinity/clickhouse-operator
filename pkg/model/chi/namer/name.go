@@ -25,31 +25,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// createConfigMapHostName returns a name for a ConfigMap for replica's personal config
-func createConfigMapHostName(host *api.Host) string {
-	return macro.Macro(host).Line(configMapHostNamePattern)
-}
-
-// createConfigMapCommonName returns a name for a ConfigMap for replica's common config
-func createConfigMapCommonName(chi api.ICustomResource) string {
-	return macro.Macro(chi).Line(configMapCommonNamePattern)
-}
-
-// createConfigMapCommonUsersName returns a name for a ConfigMap for replica's common users config
-func createConfigMapCommonUsersName(chi api.ICustomResource) string {
-	return macro.Macro(chi).Line(configMapCommonUsersNamePattern)
-}
-
-// createCHIServiceName creates a name of a root ClickHouseInstallation Service resource
-func createCHIServiceName(chi api.ICustomResource) string {
+// createCRServiceName creates a name of a root ClickHouseInstallation Service resource
+func createCRServiceName(cr api.ICustomResource) string {
 	// Name can be generated either from default name pattern,
 	// or from personal name pattern provided in ServiceTemplate
 
 	// Start with default name pattern
-	pattern := chiServiceNamePattern
+	pattern := crServiceNamePattern
 
 	// ServiceTemplate may have personal name pattern specified
-	if template, ok := chi.GetRootServiceTemplate(); ok {
+	if template, ok := cr.GetRootServiceTemplate(); ok {
 		// ServiceTemplate available
 		if template.GenerateName != "" {
 			// ServiceTemplate has explicitly specified name pattern
@@ -58,11 +43,11 @@ func createCHIServiceName(chi api.ICustomResource) string {
 	}
 
 	// Create Service name based on name pattern available
-	return macro.Macro(chi).Line(pattern)
+	return macro.Macro(cr).Line(pattern)
 }
 
-// createCHIServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
-func createCHIServiceFQDN(chi api.ICustomResource, namespaceDomainPattern *api.String) string {
+// createCRServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
+func createCRServiceFQDN(cr api.ICustomResource, namespaceDomainPattern *api.String) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
@@ -77,8 +62,8 @@ func createCHIServiceFQDN(chi api.ICustomResource, namespaceDomainPattern *api.S
 	// Create FQDN based on pattern available
 	return fmt.Sprintf(
 		pattern,
-		createCHIServiceName(chi),
-		chi.GetNamespace(),
+		createCRServiceName(cr),
+		cr.GetNamespace(),
 	)
 }
 

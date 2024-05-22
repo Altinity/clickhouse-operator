@@ -301,7 +301,7 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *api.ClickHouseIn
 		return nil
 	}
 
-	serviceName := c.namer.Name(namer.NameCHIService, chi)
+	serviceName := c.namer.Name(namer.NameCRService, chi)
 	namespace := chi.Namespace
 	log.V(1).M(chi).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)

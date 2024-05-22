@@ -14,13 +14,17 @@
 
 package namer
 
+import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
 type NamerClickHouse struct {
-	namer
+	*namer
 }
 
 // NewClickHouse creates new namer with specified context
 func NewClickHouse() *NamerClickHouse {
-	return &NamerClickHouse{}
+	return &NamerClickHouse{
+		namer: New(),
+	}
 }
 
 func (n *NamerClickHouse) Names(what NameType, params ...any) []string {
@@ -33,6 +37,15 @@ func (n *NamerClickHouse) Names(what NameType, params ...any) []string {
 
 func (n *NamerClickHouse) Name(what NameType, params ...any) string {
 	switch what {
+	case NameConfigMapHost:
+		host := params[0].(*api.Host)
+		return createConfigMapHostName(host)
+	case NameConfigMapCommon:
+		cr := params[0].(api.ICustomResource)
+		return createConfigMapCommonName(cr)
+	case NameConfigMapCommonUsers:
+		cr := params[0].(api.ICustomResource)
+		return createConfigMapCommonUsersName(cr)
 	default:
 		return n.namer.Name(what, params...)
 	}

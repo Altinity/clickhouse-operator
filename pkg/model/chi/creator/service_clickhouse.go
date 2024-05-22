@@ -82,7 +82,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 		return creator.CreateServiceFromTemplate(
 			template,
 			m.cr.GetNamespace(),
-			namer.NewClickHouse().Name(namer.NameCHIService, m.cr),
+			namer.NewClickHouse().Name(namer.NameCRService, m.cr),
 			m.tagger.Label(labeler.LabelServiceCR, m.cr),
 			m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr),
 			m.tagger.Selector(labeler.SelectorCHIScopeReady),
@@ -95,7 +95,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.NewClickHouse().Name(namer.NameCHIService, m.cr),
+			Name:            namer.NewClickHouse().Name(namer.NameCRService, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelServiceCR, m.cr)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr)),

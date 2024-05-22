@@ -16,32 +16,6 @@ package namer
 
 import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
-type NameType string
-
-const (
-	NameConfigMapHost                NameType = "ConfigMapHost"
-	NameConfigMapCommon              NameType = "ConfigMapCommon"
-	NameConfigMapCommonUsers         NameType = "NameConfigMapCommonUsers"
-	NameCHIService                   NameType = "NameCHIService"
-	NameCHIServiceFQDN               NameType = "NameCHIServiceFQDN"
-	NameClusterService               NameType = "NameClusterService"
-	NameShardService                 NameType = "NameShardService"
-	NameShard                        NameType = "NameShard"
-	NameReplica                      NameType = "NameReplica"
-	NameHost                         NameType = "NameHost"
-	NameHostTemplate                 NameType = "NameHostTemplate"
-	NameInstanceHostname             NameType = "NameInstanceHostname"
-	NameStatefulSet                  NameType = "NameStatefulSet"
-	NameStatefulSetService           NameType = "NameStatefulSetService"
-	NamePodHostname                  NameType = "NamePodHostname"
-	NameFQDN                         NameType = "NameFQDN"
-	NameFQDNs                        NameType = "NameFQDNs"
-	NamePodHostnameRegexp            NameType = "NamePodHostnameRegexp"
-	NamePod                          NameType = "NamePod"
-	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
-	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
-)
-
 type namer struct {
 }
 
@@ -63,22 +37,13 @@ func (n *namer) Names(what NameType, params ...any) []string {
 
 func (n *namer) Name(what NameType, params ...any) string {
 	switch what {
-	case NameConfigMapHost:
-		host := params[0].(*api.Host)
-		return createConfigMapHostName(host)
-	case NameConfigMapCommon:
+	case NameCRService:
 		cr := params[0].(api.ICustomResource)
-		return createConfigMapCommonName(cr)
-	case NameConfigMapCommonUsers:
-		cr := params[0].(api.ICustomResource)
-		return createConfigMapCommonUsersName(cr)
-	case NameCHIService:
-		cr := params[0].(api.ICustomResource)
-		return createCHIServiceName(cr)
-	case NameCHIServiceFQDN:
+		return createCRServiceName(cr)
+	case NameCRServiceFQDN:
 		cr := params[0].(api.ICustomResource)
 		namespaceDomainPattern := params[1].(*api.String)
-		return createCHIServiceFQDN(cr, namespaceDomainPattern)
+		return createCRServiceFQDN(cr, namespaceDomainPattern)
 	case NameClusterService:
 		cluster := params[0].(api.ICluster)
 		return createClusterServiceName(cluster)

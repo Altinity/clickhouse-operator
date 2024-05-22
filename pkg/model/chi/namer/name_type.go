@@ -1,0 +1,41 @@
+// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package namer
+
+type NameType string
+
+const (
+	NameConfigMapHost                NameType = "ConfigMapHost"
+	NameConfigMapCommon              NameType = "ConfigMapCommon"
+	NameConfigMapCommonUsers         NameType = "NameConfigMapCommonUsers"
+	NameCRService                    NameType = "NameCRService"
+	NameCRServiceFQDN                NameType = "NameCRServiceFQDN"
+	NameClusterService               NameType = "NameClusterService"
+	NameShardService                 NameType = "NameShardService"
+	NameShard                        NameType = "NameShard"
+	NameReplica                      NameType = "NameReplica"
+	NameHost                         NameType = "NameHost"
+	NameHostTemplate                 NameType = "NameHostTemplate"
+	NameInstanceHostname             NameType = "NameInstanceHostname"
+	NameStatefulSet                  NameType = "NameStatefulSet"
+	NameStatefulSetService           NameType = "NameStatefulSetService"
+	NamePodHostname                  NameType = "NamePodHostname"
+	NameFQDN                         NameType = "NameFQDN"
+	NameFQDNs                        NameType = "NameFQDNs"
+	NamePodHostnameRegexp            NameType = "NamePodHostnameRegexp"
+	NamePod                          NameType = "NamePod"
+	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
+	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
+)

@@ -326,7 +326,7 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := n.namer.Name(namer.NameCHIServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
+	endpoint := n.namer.Name(namer.NameCRServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
