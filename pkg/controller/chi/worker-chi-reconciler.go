@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model"
 	"math"
 	"sync"
 	"time"
@@ -1268,7 +1269,7 @@ func (w *worker) reconcilePVC(
 		return nil, fmt.Errorf("task is done")
 	}
 
-	w.applyPVCResourcesRequests(pvc, template)
+	model.VolumeClaimTemplateApplyResourcesRequestsOnPVC(template, pvc)
 	pvc = w.task.creator.AdjustPVC(pvc, host, template)
 	return w.c.updatePersistentVolumeClaim(ctx, pvc)
 }

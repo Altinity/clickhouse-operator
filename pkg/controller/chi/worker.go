@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/juliangruber/go-intersect"
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -1804,66 +1802,6 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.Host, regist
 	_ = w.c.deleteStatefulSet(ctx, host)
 	_ = w.reconcilePVCs(ctx, host, api.DesiredStatefulSet)
 	return w.createStatefulSet(ctx, host, register)
-}
-
-// applyPVCResourcesRequests
-func (w *worker) applyPVCResourcesRequests(pvc *core.PersistentVolumeClaim, template *api.VolumeClaimTemplate) bool {
-	return w.applyResourcesList(pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
-}
-
-// applyResourcesList
-func (w *worker) applyResourcesList(curResourceList core.ResourceList, desiredResourceList core.ResourceList) bool {
-	// Prepare lists of resource names
-	var curResourceNames []core.ResourceName
-	for resourceName := range curResourceList {
-		curResourceNames = append(curResourceNames, resourceName)
-	}
-	var desiredResourceNames []core.ResourceName
-	for resourceName := range desiredResourceList {
-		desiredResourceNames = append(desiredResourceNames, resourceName)
-	}
-
-	resourceNames := intersect.Simple(curResourceNames, desiredResourceNames)
-	updated := false
-	for _, resourceName := range resourceNames.([]interface{}) {
-		updated = updated || w.applyResource(curResourceList, desiredResourceList, resourceName.(core.ResourceName))
-	}
-	return updated
-}
-
-// applyResource
-func (w *worker) applyResource(
-	curResourceList core.ResourceList,
-	desiredResourceList core.ResourceList,
-	resourceName core.ResourceName,
-) bool {
-	if (curResourceList == nil) || (desiredResourceList == nil) {
-		// Nowhere or nothing to apply
-		return false
-	}
-
-	var ok bool
-	var curResourceQuantity resource.Quantity
-	var desiredResourceQuantity resource.Quantity
-
-	if curResourceQuantity, ok = curResourceList[resourceName]; !ok {
-		// No such resource in target list
-		return false
-	}
-
-	if desiredResourceQuantity, ok = desiredResourceList[resourceName]; !ok {
-		// No such resource in desired list
-		return false
-	}
-
-	if curResourceQuantity.Equal(desiredResourceQuantity) {
-		// No need to apply
-		return false
-	}
-
-	// Update resource
-	curResourceList[resourceName] = desiredResourceList[resourceName]
-	return true
 }
 
 func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {
