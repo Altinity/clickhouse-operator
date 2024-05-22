@@ -603,6 +603,10 @@ func (t *ChiReconciling) SetPolicy(p string) {
 	t.Policy = p
 }
 
+func (t *ChiReconciling) HasConfigMapPropagationTimeout() bool {
+	return t.GetConfigMapPropagationTimeout() > 0
+}
+
 // GetConfigMapPropagationTimeout gets config map propagation timeout
 func (t *ChiReconciling) GetConfigMapPropagationTimeout() int {
 	if t == nil {

@@ -1697,11 +1697,12 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) b
 
 	// What timeout is expected to be enough for ConfigMap propagation?
 	// In case timeout is not specified, no need to wait
-	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
-	if timeout == 0 {
+	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
 		return false
 	}
+
+	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
 
 	// How much time has elapsed since last ConfigMap update?
 	// May be there is not need to wait already
@@ -1806,18 +1807,12 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.Host, regist
 }
 
 // applyPVCResourcesRequests
-func (w *worker) applyPVCResourcesRequests(
-	pvc *core.PersistentVolumeClaim,
-	template *api.VolumeClaimTemplate,
-) bool {
+func (w *worker) applyPVCResourcesRequests(pvc *core.PersistentVolumeClaim, template *api.VolumeClaimTemplate) bool {
 	return w.applyResourcesList(pvc.Spec.Resources.Requests, template.Spec.Resources.Requests)
 }
 
 // applyResourcesList
-func (w *worker) applyResourcesList(
-	curResourceList core.ResourceList,
-	desiredResourceList core.ResourceList,
-) bool {
+func (w *worker) applyResourcesList(curResourceList core.ResourceList, desiredResourceList core.ResourceList) bool {
 	// Prepare lists of resource names
 	var curResourceNames []core.ResourceName
 	for resourceName := range curResourceList {
