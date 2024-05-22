@@ -77,7 +77,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommon)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
-			OwnerReferences: createOwnerReferences(m.cr),
+			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupCommon, options),
@@ -95,7 +95,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommonUsers)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
-			OwnerReferences: createOwnerReferences(m.cr),
+			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupUsers),
@@ -113,7 +113,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(m.tagger.Label(labeler.LabelConfigMapHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),
-			OwnerReferences: createOwnerReferences(m.cr),
+			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupHost, host),

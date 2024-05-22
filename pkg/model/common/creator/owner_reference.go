@@ -1,4 +1,3 @@
-// Copyright 2019 Altinity Ltd and/or its affiliates. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,8 +19,8 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// createOwnerReferences gets MULTIPLE owner references
-func createOwnerReferences(owner api.ICustomResource) []meta.OwnerReference {
+// CreateOwnerReferences gets MULTIPLE owner references
+func CreateOwnerReferences(owner api.ICustomResource) []meta.OwnerReference {
 	if owner.GetRuntime().GetAttributes().GetSkipOwnerRef() {
 		return nil
 	}

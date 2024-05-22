@@ -40,7 +40,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(c.tagger.Label(labeler.LabelSTS, host)),
 			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
-			OwnerReferences: createOwnerReferences(c.cr),
+			OwnerReferences: creator.CreateOwnerReferences(c.cr),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
