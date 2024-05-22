@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -50,7 +49,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -461,7 +461,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(meta meta.Object) bool {
-	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && labeler.IsCHOPGeneratedObject(meta)
+	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && commonLabeler.IsCHOPGeneratedObject(meta)
 }
 
 // Run syncs caches, starts workers

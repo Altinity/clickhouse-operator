@@ -15,16 +15,16 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 const (
@@ -121,7 +121,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
-	labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	commonLabeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
@@ -200,6 +200,6 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 		},
 	}
 	creator.SvcAppendSpecifiedPorts(svc, host)
-	labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	commonLabeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }

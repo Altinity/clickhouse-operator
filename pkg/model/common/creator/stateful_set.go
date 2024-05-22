@@ -15,6 +15,7 @@
 package creator
 
 import (
+	labeler2 "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +24,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
@@ -65,7 +65,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 	c.stsSetupApplication(statefulSet, host)
 	c.stsSetupStorage(statefulSet, host)
 
-	labeler.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
+	labeler2.MakeObjectVersion(statefulSet.GetObjectMeta(), statefulSet)
 
 	return statefulSet
 }

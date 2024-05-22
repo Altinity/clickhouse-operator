@@ -21,8 +21,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// getCRScope gets labels for CR-scoped object
-func (l *Labeler) getCRScope() map[string]string {
+// GetCRScope gets labels for CR-scoped object
+func (l *Labeler) GetCRScope() map[string]string {
 	// Combine generated labels and CHI-provided labels
 	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(l.getSelectorCRScope()))
 }
@@ -39,8 +39,8 @@ func (l *Labeler) getShardScope(shard api.IShard) map[string]string {
 	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(l.getSelectorShardScope(shard)))
 }
 
-// getHostScope gets labels for Host-scoped object
-func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
+// GetHostScope gets labels for Host-scoped object
+func (l *Labeler) GetHostScope(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
 	// Combine generated labels and CHI-provided labels
 	labels := l.getSelectorHostScope(host)
 	if l.AppendScope {
@@ -67,12 +67,12 @@ func (l *Labeler) getHostScope(host *api.Host, applySupplementaryServiceLabels b
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getHostScopeReady(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
-	return appendKeyReady(l.getHostScope(host, applySupplementaryServiceLabels))
+	return appendKeyReady(l.GetHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getHostScopeReclaimPolicy gets host scope labels with PVCReclaimPolicy from template
 func (l *Labeler) getHostScopeReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
-	return util.MergeStringMapsOverwrite(l.getHostScope(host, applySupplementaryServiceLabels), map[string]string{
+	return util.MergeStringMapsOverwrite(l.GetHostScope(host, applySupplementaryServiceLabels), map[string]string{
 		LabelPVCReclaimPolicyName: volume.GetPVCReclaimPolicy(host, template).String(),
 	})
 }

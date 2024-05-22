@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	creator2 "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -41,8 +40,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -65,7 +65,7 @@ type worker struct {
 
 // task represents context of a worker. This also can be called "a reconcile task"
 type task struct {
-	creator            *creator2.Creator
+	creator            *commonCreator.Creator
 	registryReconciled *model.Registry
 	registryFailed     *model.Registry
 	cmUpdate           time.Time
@@ -73,7 +73,7 @@ type task struct {
 }
 
 // newTask creates new context
-func newTask(creator *creator2.Creator) task {
+func newTask(creator *commonCreator.Creator) task {
 	return task{
 		creator:            creator,
 		registryReconciled: model.NewRegistry(),
@@ -105,7 +105,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 	w.task = newTask(
-		creator2.NewCreator(
+		commonCreator.NewCreator(
 			chi,
 			managers.NewConfigFilesGenerator(
 				managers.FilesGeneratorTypeClickHouse,
@@ -1584,8 +1584,8 @@ func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 // getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
 func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.Object) api.ObjectStatus {
 	// Try to perform label-based version comparison
-	curVersion, curHasLabel := labeler.GetObjectVersion(curMeta)
-	newVersion, newHasLabel := labeler.GetObjectVersion(newMeta)
+	curVersion, curHasLabel := commonLabeler.GetObjectVersion(curMeta)
+	newVersion, newHasLabel := commonLabeler.GetObjectVersion(newMeta)
 
 	if !curHasLabel || !newHasLabel {
 		w.a.M(newMeta).F().Warning(

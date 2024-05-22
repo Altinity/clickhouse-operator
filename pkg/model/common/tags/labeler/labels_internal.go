@@ -24,7 +24,7 @@ import (
 // labelServiceCR
 func (l *Labeler) labelServiceCR() map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getCRScope(),
+		l.GetCRScope(),
 		map[string]string{
 			LabelService: labelServiceValueCR,
 		})
@@ -81,7 +81,7 @@ func (l *Labeler) labelServiceHost(params ...any) map[string]string {
 // _labelServiceHost
 func (l *Labeler) _labelServiceHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getHostScope(host, false),
+		l.GetHostScope(host, false),
 		map[string]string{
 			LabelService: labelServiceValueHost,
 		})
@@ -100,7 +100,7 @@ func (l *Labeler) labelExistingPV(params ...any) map[string]string {
 
 // _labelExistingPV
 func (l *Labeler) _labelExistingPV(pv *core.PersistentVolume, host *api.Host) map[string]string {
-	return util.MergeStringMapsOverwrite(pv.GetLabels(), l.getHostScope(host, false))
+	return util.MergeStringMapsOverwrite(pv.GetLabels(), l.GetHostScope(host, false))
 }
 
 func (l *Labeler) labelNewPVC(params ...any) map[string]string {
@@ -113,7 +113,7 @@ func (l *Labeler) labelNewPVC(params ...any) map[string]string {
 }
 
 func (l *Labeler) _labelNewPVC(host *api.Host) map[string]string {
-	return l.getHostScope(host, false)
+	return l.GetHostScope(host, false)
 }
 
 func (l *Labeler) labelExistingPVC(params ...any) map[string]string {
@@ -167,7 +167,7 @@ func (l *Labeler) labelSTS(params ...any) map[string]string {
 }
 
 func (l *Labeler) _labelSTS(host *api.Host) map[string]string {
-	return l.getHostScope(host, true)
+	return l.GetHostScope(host, true)
 }
 
 func (l *Labeler) labelPodTemplate(params ...any) map[string]string {

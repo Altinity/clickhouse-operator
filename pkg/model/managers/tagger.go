@@ -20,7 +20,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
-	annotator2 "github.com/altinity/clickhouse-operator/pkg/model/common/tags/annotator"
+	commonAnnotator "github.com/altinity/clickhouse-operator/pkg/model/common/tags/annotator"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type tagger struct {
@@ -30,11 +31,11 @@ type tagger struct {
 
 func NewTagger(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: annotator.NewAnnotatorClickHouse(cr, annotator2.Config{
+		annotator: annotator.NewAnnotatorClickHouse(cr, commonAnnotator.Config{
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
-		labeler: labeler.NewLabelerClickHouse(cr, labeler.Config{
+		labeler: labeler.NewLabelerClickHouse(cr, commonLabeler.Config{
 			AppendScope: chop.Config().Label.Runtime.AppendScope,
 			Include:     chop.Config().Label.Include,
 			Exclude:     chop.Config().Label.Exclude,

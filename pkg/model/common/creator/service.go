@@ -16,12 +16,12 @@ package creator
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	labeler2 "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -88,7 +88,7 @@ func CreateServiceFromTemplate(
 	service.Spec.Selector = util.MergeStringMapsOverwrite(service.Spec.Selector, selector)
 
 	// And after the object is ready we can put version label
-	labeler.MakeObjectVersion(service.GetObjectMeta(), service)
+	labeler2.MakeObjectVersion(service.GetObjectMeta(), service)
 
 	return service
 }

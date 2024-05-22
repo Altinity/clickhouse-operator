@@ -16,7 +16,6 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -26,11 +25,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (c *Controller) labeler(chi *api.ClickHouseInstallation) *labeler.LabelerClickHouse {
-	return labeler.NewLabelerClickHouse(chi, labeler.Config{
+	return labeler.NewLabelerClickHouse(chi, commonLabeler.Config{
 		AppendScope: chop.Config().Label.Runtime.AppendScope,
 		Include:     chop.Config().Label.Include,
 		Exclude:     chop.Config().Label.Exclude,

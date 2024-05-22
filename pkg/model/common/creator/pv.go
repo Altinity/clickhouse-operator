@@ -16,10 +16,10 @@ package creator
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	labeler2 "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
 
@@ -28,6 +28,6 @@ func (c *Creator) adjustPersistentVolume(pv *core.PersistentVolume, host *api.Ho
 	pv.SetLabels(macro.Macro(host).Map(c.tagger.Label(interfaces.LabelExistingPV, pv, host)))
 	pv.SetAnnotations(macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPV, pv, host)))
 	// And after the object is ready we can put version label
-	labeler.MakeObjectVersion(&pv.ObjectMeta, pv)
+	labeler2.MakeObjectVersion(&pv.ObjectMeta, pv)
 	return pv
 }

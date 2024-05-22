@@ -17,18 +17,19 @@ package labeler
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Labeler is an entity which can label CHI artifacts
 type LabelerClickHouse struct {
-	*Labeler
+	*labeler.Labeler
 }
 
 // NewLabelerClickHouse creates new labeler with context
-func NewLabelerClickHouse(cr api.ICustomResource, config Config) *LabelerClickHouse {
+func NewLabelerClickHouse(cr api.ICustomResource, config labeler.Config) *LabelerClickHouse {
 	return &LabelerClickHouse{
-		Labeler: NewLabeler(cr, config),
+		Labeler: labeler.NewLabeler(cr, config),
 	}
 }
 
@@ -54,18 +55,18 @@ func (l *LabelerClickHouse) Selector(what interfaces.SelectorType, params ...any
 // labelConfigMapCHICommon
 func (l *LabelerClickHouse) labelConfigMapCHICommon() map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getCRScope(),
+		l.GetCRScope(),
 		map[string]string{
-			LabelConfigMap: labelConfigMapValueCHICommon,
+			labeler.LabelConfigMap: labeler.LabelConfigMapValueCHICommon,
 		})
 }
 
 // labelConfigMapCHICommonUsers
 func (l *LabelerClickHouse) labelConfigMapCHICommonUsers() map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getCRScope(),
+		l.GetCRScope(),
 		map[string]string{
-			LabelConfigMap: labelConfigMapValueCHICommonUsers,
+			labeler.LabelConfigMap: labeler.LabelConfigMapValueCHICommonUsers,
 		})
 }
 
@@ -81,8 +82,8 @@ func (l *LabelerClickHouse) labelConfigMapHost(params ...any) map[string]string 
 // _labelConfigMapHost
 func (l *LabelerClickHouse) _labelConfigMapHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
-		l.getHostScope(host, false),
+		l.GetHostScope(host, false),
 		map[string]string{
-			LabelConfigMap: labelConfigMapValueHost,
+			labeler.LabelConfigMap: labeler.LabelConfigMapValueHost,
 		})
 }

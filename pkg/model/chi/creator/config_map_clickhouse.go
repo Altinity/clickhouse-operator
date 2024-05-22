@@ -21,10 +21,10 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type ConfigMapManagerClickHouse struct {
@@ -81,7 +81,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupCommon, options),
 	}
 	// And after the object is ready we can put version label
-	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	commonLabeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -99,7 +99,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupUsers),
 	}
 	// And after the object is ready we can put version label
-	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	commonLabeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
 
@@ -117,6 +117,6 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, host),
 	}
 	// And after the object is ready we can put version label
-	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	commonLabeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
