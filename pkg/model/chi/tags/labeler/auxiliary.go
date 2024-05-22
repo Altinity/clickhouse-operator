@@ -67,10 +67,10 @@ func GetReclaimPolicy(meta meta.Object) api.PVCReclaimPolicy {
 // makeSetFromObjectMeta makes k8sLabels.Set from ObjectMeta
 func makeSetFromObjectMeta(meta meta.Object) (k8sLabels.Set, error) {
 	// Check mandatory labels are in place
-	if !util.MapHasKeys(meta.GetLabels(), LabelNamespace, LabelAppName, LabelCHIName) {
+	if !util.MapHasKeys(meta.GetLabels(), LabelNamespace, LabelAppName, LabelCRName) {
 		return nil, fmt.Errorf(
 			"UNABLE to make set from object. Need to have at least labels '%s', '%s' and '%s'. Available Labels: %v",
-			LabelNamespace, LabelAppName, LabelCHIName, meta.GetLabels(),
+			LabelNamespace, LabelAppName, LabelCRName, meta.GetLabels(),
 		)
 	}
 
@@ -78,7 +78,7 @@ func makeSetFromObjectMeta(meta meta.Object) (k8sLabels.Set, error) {
 		// Mandatory labels
 		LabelNamespace,
 		LabelAppName,
-		LabelCHIName,
+		LabelCRName,
 
 		// Optional labels
 		LabelClusterName,
@@ -120,10 +120,10 @@ func IsCHOPGeneratedObject(meta meta.Object) bool {
 // GetCRNameFromObjectMeta extracts CHI name from ObjectMeta. Based on labels.
 func GetCRNameFromObjectMeta(meta meta.Object) (string, error) {
 	labels := meta.GetLabels()
-	if !util.MapHasKeys(labels, LabelCHIName) {
-		return "", fmt.Errorf("can not find %s label in meta", LabelCHIName)
+	if !util.MapHasKeys(labels, LabelCRName) {
+		return "", fmt.Errorf("can not find %s label in meta", LabelCRName)
 	}
-	return labels[LabelCHIName], nil
+	return labels[LabelCRName], nil
 }
 
 // GetClusterNameFromObjectMeta extracts cluster name from ObjectMeta. Based on labels.

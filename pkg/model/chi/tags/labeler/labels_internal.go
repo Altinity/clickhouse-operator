@@ -21,48 +21,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// labelConfigMapCHICommon
-func (l *Labeler) labelConfigMapCHICommon() map[string]string {
-	return util.MergeStringMapsOverwrite(
-		l.getCRScope(),
-		map[string]string{
-			LabelConfigMap: labelConfigMapValueCHICommon,
-		})
-}
-
-// labelConfigMapCHICommonUsers
-func (l *Labeler) labelConfigMapCHICommonUsers() map[string]string {
-	return util.MergeStringMapsOverwrite(
-		l.getCRScope(),
-		map[string]string{
-			LabelConfigMap: labelConfigMapValueCHICommonUsers,
-		})
-}
-
-func (l *Labeler) labelConfigMapHost(params ...any) map[string]string {
-	var host *api.Host
-	if len(params) > 0 {
-		host = params[0].(*api.Host)
-		return l._labelConfigMapHost(host)
-	}
-	panic("not enough params for labeler")
-}
-
-// _labelConfigMapHost
-func (l *Labeler) _labelConfigMapHost(host *api.Host) map[string]string {
-	return util.MergeStringMapsOverwrite(
-		l.getHostScope(host, false),
-		map[string]string{
-			LabelConfigMap: labelConfigMapValueHost,
-		})
-}
-
 // labelServiceCR
 func (l *Labeler) labelServiceCR() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getCRScope(),
 		map[string]string{
-			LabelService: labelServiceValueCHI,
+			LabelService: labelServiceValueCR,
 		})
 }
 

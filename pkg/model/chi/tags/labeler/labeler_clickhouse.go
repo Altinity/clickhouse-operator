@@ -17,6 +17,7 @@ package labeler
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Labeler is an entity which can label CHI artifacts
@@ -48,4 +49,40 @@ func (l *LabelerClickHouse) Label(what interfaces.LabelType, params ...any) map[
 
 func (l *LabelerClickHouse) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	return l.Labeler.Selector(what, params...)
+}
+
+// labelConfigMapCHICommon
+func (l *LabelerClickHouse) labelConfigMapCHICommon() map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.getCRScope(),
+		map[string]string{
+			LabelConfigMap: labelConfigMapValueCHICommon,
+		})
+}
+
+// labelConfigMapCHICommonUsers
+func (l *LabelerClickHouse) labelConfigMapCHICommonUsers() map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.getCRScope(),
+		map[string]string{
+			LabelConfigMap: labelConfigMapValueCHICommonUsers,
+		})
+}
+
+func (l *LabelerClickHouse) labelConfigMapHost(params ...any) map[string]string {
+	var host *api.Host
+	if len(params) > 0 {
+		host = params[0].(*api.Host)
+		return l._labelConfigMapHost(host)
+	}
+	panic("not enough params for labeler")
+}
+
+// _labelConfigMapHost
+func (l *LabelerClickHouse) _labelConfigMapHost(host *api.Host) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.getHostScope(host, false),
+		map[string]string{
+			LabelConfigMap: labelConfigMapValueHost,
+		})
 }

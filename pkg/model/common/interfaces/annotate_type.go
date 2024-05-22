@@ -32,3 +32,9 @@ const (
 
 	AnnotatePodTemplate AnnotateType = "annotate PodTemplate"
 )
+
+const (
+	AnnotateConfigMapCommon      AnnotateType = "annotate cm common"
+	AnnotateConfigMapCommonUsers AnnotateType = "annotate cm common users"
+	AnnotateConfigMapHost        AnnotateType = "annotate cm host"
+)

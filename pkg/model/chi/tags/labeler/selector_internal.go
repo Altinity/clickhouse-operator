@@ -25,7 +25,7 @@ func (l *Labeler) getSelectorCRScope() map[string]string {
 	return map[string]string{
 		LabelNamespace: short.NameLabel(short.Namespace, l.cr),
 		LabelAppName:   LabelAppValue,
-		LabelCHIName:   short.NameLabel(short.CRName, l.cr),
+		LabelCRName:    short.NameLabel(short.CRName, l.cr),
 	}
 }
 
@@ -40,7 +40,7 @@ func (l *Labeler) getSelectorClusterScope(cluster api.ICluster) map[string]strin
 	return map[string]string{
 		LabelNamespace:   short.NameLabel(short.Namespace, cluster),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     short.NameLabel(short.CRName, cluster),
+		LabelCRName:      short.NameLabel(short.CRName, cluster),
 		LabelClusterName: short.NameLabel(short.ClusterName, cluster),
 	}
 }
@@ -56,7 +56,7 @@ func (l *Labeler) getSelectorShardScope(shard api.IShard) map[string]string {
 	return map[string]string{
 		LabelNamespace:   short.NameLabel(short.Namespace, shard),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     short.NameLabel(short.CRName, shard),
+		LabelCRName:      short.NameLabel(short.CRName, shard),
 		LabelClusterName: short.NameLabel(short.ClusterName, shard),
 		LabelShardName:   short.NameLabel(short.ShardName, shard),
 	}
@@ -73,7 +73,7 @@ func (l *Labeler) getSelectorHostScope(host *api.Host) map[string]string {
 	return map[string]string{
 		LabelNamespace:   short.NameLabel(short.Namespace, host),
 		LabelAppName:     LabelAppValue,
-		LabelCHIName:     short.NameLabel(short.CRName, host),
+		LabelCRName:      short.NameLabel(short.CRName, host),
 		LabelClusterName: short.NameLabel(short.ClusterName, host),
 		LabelShardName:   short.NameLabel(short.ShardName, host),
 		LabelReplicaName: short.NameLabel(short.ReplicaName, host),

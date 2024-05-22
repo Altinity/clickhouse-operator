@@ -259,7 +259,7 @@ func newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						labeler.LabelCHIName: macro.MacrosChiName,
+						labeler.LabelCRName: macro.MacrosChiName,
 					},
 				),
 			)
@@ -461,27 +461,27 @@ func newMatchLabels(
 	case deployment.PodDistributionScopeShard:
 		scopeLabels = map[string]string{
 			labeler.LabelNamespace:   macro.MacrosNamespace,
-			labeler.LabelCHIName:     macro.MacrosChiName,
+			labeler.LabelCRName:      macro.MacrosChiName,
 			labeler.LabelClusterName: macro.MacrosClusterName,
 			labeler.LabelShardName:   macro.MacrosShardName,
 		}
 	case deployment.PodDistributionScopeReplica:
 		scopeLabels = map[string]string{
 			labeler.LabelNamespace:   macro.MacrosNamespace,
-			labeler.LabelCHIName:     macro.MacrosChiName,
+			labeler.LabelCRName:      macro.MacrosChiName,
 			labeler.LabelClusterName: macro.MacrosClusterName,
 			labeler.LabelReplicaName: macro.MacrosReplicaName,
 		}
 	case deployment.PodDistributionScopeCluster:
 		scopeLabels = map[string]string{
 			labeler.LabelNamespace:   macro.MacrosNamespace,
-			labeler.LabelCHIName:     macro.MacrosChiName,
+			labeler.LabelCRName:      macro.MacrosChiName,
 			labeler.LabelClusterName: macro.MacrosClusterName,
 		}
 	case deployment.PodDistributionScopeClickHouseInstallation:
 		scopeLabels = map[string]string{
 			labeler.LabelNamespace: macro.MacrosNamespace,
-			labeler.LabelCHIName:   macro.MacrosChiName,
+			labeler.LabelCRName:    macro.MacrosChiName,
 		}
 	case deployment.PodDistributionScopeNamespace:
 		scopeLabels = map[string]string{
@@ -585,7 +585,7 @@ func newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAffinity {
 					podDistribution,
 					[]meta.LabelSelectorRequirement{
 						{
-							Key:      labeler.LabelCHIName,
+							Key:      labeler.LabelCRName,
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
 								macro.MacrosChiName,

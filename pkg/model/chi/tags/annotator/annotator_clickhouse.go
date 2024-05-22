@@ -19,12 +19,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-const (
-	AnnotateConfigMapCommon      interfaces.AnnotateType = "annotate cm common"
-	AnnotateConfigMapCommonUsers interfaces.AnnotateType = "annotate cm common users"
-	AnnotateConfigMapHost        interfaces.AnnotateType = "annotate cm host"
-)
-
 // Annotator is an entity which can annotate CHI artifacts
 type AnnotatorClickHouse struct {
 	*Annotator
@@ -41,11 +35,11 @@ func NewAnnotatorClickHouse(cr api.ICustomResource, config Config) *AnnotatorCli
 
 func (a *AnnotatorClickHouse) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
 	switch what {
-	case AnnotateConfigMapCommon:
+	case interfaces.AnnotateConfigMapCommon:
 		return a.getCRScope()
-	case AnnotateConfigMapCommonUsers:
+	case interfaces.AnnotateConfigMapCommonUsers:
 		return a.getCRScope()
-	case AnnotateConfigMapHost:
+	case interfaces.AnnotateConfigMapHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
