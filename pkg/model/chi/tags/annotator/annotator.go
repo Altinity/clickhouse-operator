@@ -21,25 +21,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type AnnotateType string
-
-const (
-	AnnotateServiceCR      AnnotateType = "annotate svc cr"
-	AnnotateServiceCluster AnnotateType = "annotate svc cluster"
-	AnnotateServiceShard   AnnotateType = "annotate svc shard"
-	AnnotateServiceHost    AnnotateType = "annotate svc host"
-
-	AnnotateExistingPV  AnnotateType = "annotate existing pv"
-	AnnotateNewPVC      AnnotateType = "annotate new pvc"
-	AnnotateExistingPVC AnnotateType = "annotate existing pvc"
-
-	AnnotatePDB AnnotateType = "annotate pdb"
-
-	AnnotateSTS AnnotateType = "annotate STS"
-
-	AnnotatePodTemplate AnnotateType = "annotate PodTemplate"
-)
-
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
 	Config
