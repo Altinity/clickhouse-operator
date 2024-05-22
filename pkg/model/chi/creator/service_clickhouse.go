@@ -22,7 +22,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
@@ -83,9 +82,9 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 			template,
 			m.cr.GetNamespace(),
 			namer.NewClickHouse().Name(namer.NameCRService, m.cr),
-			m.tagger.Label(labeler.LabelServiceCR, m.cr),
-			m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr),
-			m.tagger.Selector(labeler.SelectorCHIScopeReady),
+			m.tagger.Label(interfaces.LabelServiceCR, m.cr),
+			m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr),
+			m.tagger.Selector(interfaces.SelectorCHIScopeReady),
 			creator.CreateOwnerReferences(m.cr),
 			macro.Macro(m.cr),
 		)
@@ -97,8 +96,8 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.NewClickHouse().Name(namer.NameCRService, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelServiceCR, m.cr)),
-			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateServiceCR, m.cr)),
+			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelServiceCR, m.cr)),
+			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr)),
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
@@ -117,7 +116,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 					TargetPort: intstr.FromString(api.ChDefaultTCPPortName),
 				},
 			},
-			Selector: m.tagger.Selector(labeler.SelectorCHIScopeReady),
+			Selector: m.tagger.Selector(interfaces.SelectorCHIScopeReady),
 			Type:     core.ServiceTypeClusterIP,
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
@@ -137,9 +136,9 @@ func (m *ServiceManagerClickHouse) createServiceCluster(cluster api.ICluster) *c
 			template,
 			cluster.GetRuntime().GetAddress().GetNamespace(),
 			serviceName,
-			m.tagger.Label(labeler.LabelServiceCluster, cluster),
-			m.tagger.Annotate(annotator.AnnotateServiceCluster, cluster),
-			m.tagger.Selector(labeler.SelectorClusterScopeReady, cluster),
+			m.tagger.Label(interfaces.LabelServiceCluster, cluster),
+			m.tagger.Annotate(interfaces.AnnotateServiceCluster, cluster),
+			m.tagger.Selector(interfaces.SelectorClusterScopeReady, cluster),
 			ownerReferences,
 			macro.Macro(cluster),
 		)
@@ -156,9 +155,9 @@ func (m *ServiceManagerClickHouse) createServiceShard(shard api.IShard) *core.Se
 			template,
 			shard.GetRuntime().GetAddress().GetNamespace(),
 			namer.NewClickHouse().Name(namer.NameShardService, shard),
-			m.tagger.Label(labeler.LabelServiceShard, shard),
-			m.tagger.Annotate(annotator.AnnotateServiceShard, shard),
-			m.tagger.Selector(labeler.SelectorShardScopeReady, shard),
+			m.tagger.Label(interfaces.LabelServiceShard, shard),
+			m.tagger.Annotate(interfaces.AnnotateServiceShard, shard),
+			m.tagger.Selector(interfaces.SelectorShardScopeReady, shard),
 			creator.CreateOwnerReferences(m.cr),
 			macro.Macro(shard),
 		)
@@ -175,9 +174,9 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 			template,
 			host.Runtime.Address.Namespace,
 			namer.NewClickHouse().Name(namer.NameStatefulSetService, host),
-			m.tagger.Label(labeler.LabelServiceHost, host),
-			m.tagger.Annotate(annotator.AnnotateServiceHost, host),
-			m.tagger.Selector(labeler.SelectorHostScope, host),
+			m.tagger.Label(interfaces.LabelServiceHost, host),
+			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
+			m.tagger.Selector(interfaces.SelectorHostScope, host),
 			creator.CreateOwnerReferences(m.cr),
 			macro.Macro(host),
 		)
@@ -189,12 +188,12 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.NewClickHouse().Name(namer.NameStatefulSetService, host),
 			Namespace:       host.Runtime.Address.Namespace,
-			Labels:          macro.Macro(host).Map(m.tagger.Label(labeler.LabelServiceHost, host)),
-			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateServiceHost, host)),
+			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
+			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
-			Selector:                 m.tagger.Selector(labeler.SelectorHostScope, host),
+			Selector:                 m.tagger.Selector(interfaces.SelectorHostScope, host),
 			ClusterIP:                TemplateDefaultsServiceClusterIP,
 			Type:                     "ClusterIP",
 			PublishNotReadyAddresses: true,

@@ -15,6 +15,7 @@
 package annotator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -40,31 +41,31 @@ func NewAnnotator(cr api.ICustomResource, config Config) *Annotator {
 	}
 }
 
-func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string {
+func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
 	switch what {
 
-	case AnnotateServiceCR:
+	case interfaces.AnnotateServiceCR:
 		return a.getCRScope()
-	case AnnotateServiceCluster:
+	case interfaces.AnnotateServiceCluster:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
 			return a.getClusterScope(cluster)
 		}
-	case AnnotateServiceShard:
+	case interfaces.AnnotateServiceShard:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
 			return a.getShardScope(shard)
 		}
-	case AnnotateServiceHost:
+	case interfaces.AnnotateServiceHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
 			return a.getHostScope(host)
 		}
 
-	case AnnotateExistingPV:
+	case interfaces.AnnotateExistingPV:
 		var pv *core.PersistentVolume
 		var host *api.Host
 		if len(params) > 1 {
@@ -76,14 +77,14 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 			return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.getHostScope(host))
 		}
 
-	case AnnotateNewPVC:
+	case interfaces.AnnotateNewPVC:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
 			return a.getHostScope(host)
 		}
 
-	case AnnotateExistingPVC:
+	case interfaces.AnnotateExistingPVC:
 		var pvc *core.PersistentVolumeClaim
 		var host *api.Host
 		var template *api.VolumeClaimTemplate
@@ -99,21 +100,21 @@ func (a *Annotator) Annotate(what AnnotateType, params ...any) map[string]string
 			return util.MergeStringMapsOverwrite(annotations, a.getHostScope(host))
 		}
 
-	case AnnotatePDB:
+	case interfaces.AnnotatePDB:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
 			return a.getClusterScope(cluster)
 		}
 
-	case AnnotateSTS:
+	case interfaces.AnnotateSTS:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
 			return a.getHostScope(host)
 		}
 
-	case AnnotatePodTemplate:
+	case interfaces.AnnotatePodTemplate:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)

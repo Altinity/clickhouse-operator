@@ -12,23 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package annotator
+package interfaces
 
-type AnnotateType string
+type SelectorType string
 
 const (
-	AnnotateServiceCR      AnnotateType = "annotate svc cr"
-	AnnotateServiceCluster AnnotateType = "annotate svc cluster"
-	AnnotateServiceShard   AnnotateType = "annotate svc shard"
-	AnnotateServiceHost    AnnotateType = "annotate svc host"
-
-	AnnotateExistingPV  AnnotateType = "annotate existing pv"
-	AnnotateNewPVC      AnnotateType = "annotate new pvc"
-	AnnotateExistingPVC AnnotateType = "annotate existing pvc"
-
-	AnnotatePDB AnnotateType = "annotate pdb"
-
-	AnnotateSTS AnnotateType = "annotate STS"
-
-	AnnotatePodTemplate AnnotateType = "annotate PodTemplate"
+	SelectorCHIScope          SelectorType = "SelectorCHIScope"
+	SelectorCHIScopeReady     SelectorType = "SelectorCHIScopeReady"
+	SelectorClusterScope      SelectorType = "SelectorClusterScope"
+	SelectorClusterScopeReady SelectorType = "SelectorClusterScopeReady"
+	SelectorShardScopeReady   SelectorType = "SelectorShardScopeReady"
+	SelectorHostScope         SelectorType = "getSelectorHostScope"
 )

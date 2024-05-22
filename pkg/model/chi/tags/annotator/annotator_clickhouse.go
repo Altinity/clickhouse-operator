@@ -14,12 +14,15 @@
 
 package annotator
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+)
 
 const (
-	AnnotateConfigMapCommon      AnnotateType = "annotate cm common"
-	AnnotateConfigMapCommonUsers AnnotateType = "annotate cm common users"
-	AnnotateConfigMapHost        AnnotateType = "annotate cm host"
+	AnnotateConfigMapCommon      interfaces.AnnotateType = "annotate cm common"
+	AnnotateConfigMapCommonUsers interfaces.AnnotateType = "annotate cm common users"
+	AnnotateConfigMapHost        interfaces.AnnotateType = "annotate cm host"
 )
 
 // Annotator is an entity which can annotate CHI artifacts
@@ -36,7 +39,7 @@ func NewAnnotatorClickHouse(cr api.ICustomResource, config Config) *AnnotatorCli
 	}
 }
 
-func (a *AnnotatorClickHouse) Annotate(what AnnotateType, params ...any) map[string]string {
+func (a *AnnotatorClickHouse) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
 	switch what {
 	case AnnotateConfigMapCommon:
 		return a.getCRScope()

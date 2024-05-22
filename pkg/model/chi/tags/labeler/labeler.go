@@ -14,7 +14,10 @@
 
 package labeler
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+)
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
@@ -36,62 +39,62 @@ func NewLabeler(cr api.ICustomResource, config Config) *Labeler {
 	}
 }
 
-func (l *Labeler) Label(what LabelType, params ...any) map[string]string {
+func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]string {
 	switch what {
-	case LabelServiceCR:
+	case interfaces.LabelServiceCR:
 		return l.labelServiceCR()
-	case LabelServiceCluster:
+	case interfaces.LabelServiceCluster:
 		return l.labelServiceCluster(params...)
-	case LabelServiceShard:
+	case interfaces.LabelServiceShard:
 		return l.labelServiceShard(params...)
-	case LabelServiceHost:
+	case interfaces.LabelServiceHost:
 		return l.labelServiceHost(params...)
 
-	case LabelExistingPV:
+	case interfaces.LabelExistingPV:
 		return l.labelExistingPV(params...)
 
-	case LabelNewPVC:
+	case interfaces.LabelNewPVC:
 		return l.labelNewPVC(params...)
-	case LabelExistingPVC:
+	case interfaces.LabelExistingPVC:
 		return l.labelExistingPVC(params...)
 
-	case LabelPDB:
+	case interfaces.LabelPDB:
 		return l.labelPDB(params...)
 
-	case LabelSTS:
+	case interfaces.LabelSTS:
 		return l.labelSTS(params...)
 
-	case LabelPodTemplate:
+	case interfaces.LabelPodTemplate:
 		return l.labelPodTemplate(params...)
 	}
 	panic("unknown label type")
 }
 
-func (l *Labeler) Selector(what SelectorType, params ...any) map[string]string {
+func (l *Labeler) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	switch what {
-	case SelectorCHIScope:
+	case interfaces.SelectorCHIScope:
 		return l.getSelectorCRScope()
-	case SelectorCHIScopeReady:
+	case interfaces.SelectorCHIScopeReady:
 		return l.getSelectorCRScopeReady()
-	case SelectorClusterScope:
+	case interfaces.SelectorClusterScope:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
 			return l.getSelectorClusterScope(cluster)
 		}
-	case SelectorClusterScopeReady:
+	case interfaces.SelectorClusterScopeReady:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
 			return l.getSelectorClusterScopeReady(cluster)
 		}
-	case SelectorShardScopeReady:
+	case interfaces.SelectorShardScopeReady:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
 			return l.getSelectorShardScopeReady(shard)
 		}
-	case SelectorHostScope:
+	case interfaces.SelectorHostScope:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)

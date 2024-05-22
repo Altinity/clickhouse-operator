@@ -20,8 +20,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 )
 
@@ -42,18 +40,18 @@ type INameManager interface {
 }
 
 type IAnnotator interface {
-	Annotate(what annotator.AnnotateType, params ...any) map[string]string
+	Annotate(what AnnotateType, params ...any) map[string]string
 }
 
 type ILabeler interface {
-	Label(what labeler.LabelType, params ...any) map[string]string
-	Selector(what labeler.SelectorType, params ...any) map[string]string
+	Label(what LabelType, params ...any) map[string]string
+	Selector(what SelectorType, params ...any) map[string]string
 }
 
 type ITagger interface {
-	Annotate(what annotator.AnnotateType, params ...any) map[string]string
-	Label(what labeler.LabelType, params ...any) map[string]string
-	Selector(what labeler.SelectorType, params ...any) map[string]string
+	Annotate(what AnnotateType, params ...any) map[string]string
+	Label(what LabelType, params ...any) map[string]string
+	Selector(what SelectorType, params ...any) map[string]string
 }
 
 type IVolumeManager interface {

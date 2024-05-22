@@ -41,14 +41,14 @@ func NewTagger(cr api.ICustomResource) *tagger {
 	}
 }
 
-func (t *tagger) Annotate(what annotator.AnnotateType, params ...any) map[string]string {
+func (t *tagger) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
 	return t.annotator.Annotate(what, params...)
 }
 
-func (t *tagger) Label(what labeler.LabelType, params ...any) map[string]string {
+func (t *tagger) Label(what interfaces.LabelType, params ...any) map[string]string {
 	return t.labeler.Label(what, params...)
 }
 
-func (t *tagger) Selector(what labeler.SelectorType, params ...any) map[string]string {
+func (t *tagger) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	return t.labeler.Selector(what, params...)
 }

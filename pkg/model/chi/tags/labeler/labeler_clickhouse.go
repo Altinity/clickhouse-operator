@@ -14,7 +14,10 @@
 
 package labeler
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+)
 
 // Labeler is an entity which can label CHI artifacts
 type LabelerClickHouse struct {
@@ -28,13 +31,13 @@ func NewLabelerClickHouse(cr api.ICustomResource, config Config) *LabelerClickHo
 	}
 }
 
-func (l *LabelerClickHouse) Label(what LabelType, params ...any) map[string]string {
+func (l *LabelerClickHouse) Label(what interfaces.LabelType, params ...any) map[string]string {
 	switch what {
-	case LabelConfigMapCommon:
+	case interfaces.LabelConfigMapCommon:
 		return l.labelConfigMapCHICommon()
-	case LabelConfigMapCommonUsers:
+	case interfaces.LabelConfigMapCommonUsers:
 		return l.labelConfigMapCHICommonUsers()
-	case LabelConfigMapHost:
+	case interfaces.LabelConfigMapHost:
 		return l.labelConfigMapHost(params...)
 
 	default:
@@ -43,6 +46,6 @@ func (l *LabelerClickHouse) Label(what LabelType, params ...any) map[string]stri
 	panic("unknown label type")
 }
 
-func (l *LabelerClickHouse) Selector(what SelectorType, params ...any) map[string]string {
+func (l *LabelerClickHouse) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	return l.Labeler.Selector(what, params...)
 }

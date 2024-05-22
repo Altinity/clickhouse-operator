@@ -75,7 +75,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.NewClickHouse().Name(namer.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommon)),
+			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommon)),
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
@@ -93,7 +93,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.NewClickHouse().Name(namer.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(labeler.LabelConfigMapCommonUsers)),
+			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommonUsers)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(annotator.AnnotateConfigMapCommonUsers)),
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
@@ -111,7 +111,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.NewClickHouse().Name(namer.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          macro.Macro(host).Map(m.tagger.Label(labeler.LabelConfigMapHost, host)),
+			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelConfigMapHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(annotator.AnnotateConfigMapHost, host)),
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},

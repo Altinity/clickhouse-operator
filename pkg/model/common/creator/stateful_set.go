@@ -15,7 +15,6 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,8 +23,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -38,15 +37,15 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		ObjectMeta: meta.ObjectMeta{
 			Name:            c.nm.Name(namer.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          macro.Macro(host).Map(c.tagger.Label(labeler.LabelSTS, host)),
-			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
+			Labels:          macro.Macro(host).Map(c.tagger.Label(interfaces.LabelSTS, host)),
+			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateSTS, host)),
 			OwnerReferences: CreateOwnerReferences(c.cr),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
 			ServiceName: c.nm.Name(namer.NameStatefulSetService, host),
 			Selector: &meta.LabelSelector{
-				MatchLabels: c.tagger.Selector(labeler.SelectorHostScope, host),
+				MatchLabels: c.tagger.Selector(interfaces.SelectorHostScope, host),
 			},
 
 			// IMPORTANT
@@ -312,11 +311,11 @@ func (c *Creator) createPodTemplateSpec(template *api.PodTemplate, host *api.Hos
 	// StatefulSet's pod template is not directly compatible with PodTemplate,
 	// we need to extract some fields from PodTemplate and apply on StatefulSet
 	labels := macro.Macro(host).Map(util.MergeStringMapsOverwrite(
-		c.tagger.Label(labeler.LabelPodTemplate, host),
+		c.tagger.Label(interfaces.LabelPodTemplate, host),
 		template.ObjectMeta.GetLabels(),
 	))
 	annotations := macro.Macro(host).Map(util.MergeStringMapsOverwrite(
-		c.tagger.Annotate(annotator.AnnotatePodTemplate, host),
+		c.tagger.Annotate(interfaces.AnnotatePodTemplate, host),
 		template.ObjectMeta.GetAnnotations(),
 	))
 

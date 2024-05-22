@@ -15,11 +15,11 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
@@ -30,8 +30,8 @@ func (c *Creator) AdjustPVC(
 	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) *core.PersistentVolumeClaim {
-	pvc.SetLabels(macro.Macro(host).Map(c.tagger.Label(labeler.LabelExistingPVC, pvc, host, template)))
-	pvc.SetAnnotations(macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateExistingPVC, pvc, host, template)))
+	pvc.SetLabels(macro.Macro(host).Map(c.tagger.Label(interfaces.LabelExistingPVC, pvc, host, template)))
+	pvc.SetAnnotations(macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPVC, pvc, host, template)))
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
@@ -58,8 +58,8 @@ func (c *Creator) CreatePVC(
 			//  we are close to proper disk inheritance
 			// Right now we hit the following error:
 			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-			Labels:      macro.Macro(host).Map(c.tagger.Label(labeler.LabelNewPVC, host, false)),
-			Annotations: macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateNewPVC, host)),
+			Labels:      macro.Macro(host).Map(c.tagger.Label(interfaces.LabelNewPVC, host, false)),
+			Annotations: macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateNewPVC, host)),
 		},
 		// Append copy of PersistentVolumeClaimSpec
 		Spec: *spec.DeepCopy(),

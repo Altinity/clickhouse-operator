@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -42,7 +43,7 @@ func (c *Controller) discovery(ctx context.Context, chi *api.ClickHouseInstallat
 		return nil
 	}
 
-	opts := controller.NewListOptions(c.labeler(chi).Selector(labeler.SelectorCHIScope))
+	opts := controller.NewListOptions(c.labeler(chi).Selector(interfaces.SelectorCHIScope))
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, chi, opts)
 	c.discoveryConfigMaps(ctx, r, chi, opts)
