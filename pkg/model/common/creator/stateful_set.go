@@ -23,7 +23,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
@@ -35,7 +34,7 @@ import (
 func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet {
 	statefulSet := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            c.nm.Name(namer.NameStatefulSet, host),
+			Name:            c.nm.Name(interfaces.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(c.tagger.Label(interfaces.LabelSTS, host)),
 			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateSTS, host)),
@@ -43,7 +42,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
-			ServiceName: c.nm.Name(namer.NameStatefulSetService, host),
+			ServiceName: c.nm.Name(interfaces.NameStatefulSetService, host),
 			Selector: &meta.LabelSelector{
 				MatchLabels: c.tagger.Selector(interfaces.SelectorHostScope, host),
 			},
@@ -146,7 +145,7 @@ func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.H
 		{
 			IP: "127.0.0.1",
 			Hostnames: []string{
-				c.nm.Name(namer.NamePodHostname, host),
+				c.nm.Name(interfaces.NamePodHostname, host),
 			},
 		},
 	}
@@ -287,7 +286,7 @@ func (c *Creator) stsSetupVolumeForPVCTemplate(
 	// so, let's add it
 
 	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
-		claimName := c.nm.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
+		claimName := c.nm.Name(interfaces.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
 		volume := k8s.CreateVolumeForPVC(volumeClaimTemplate.Name, claimName)
 		k8s.StatefulSetAppendVolumes(statefulSet, volume)
 	} else {

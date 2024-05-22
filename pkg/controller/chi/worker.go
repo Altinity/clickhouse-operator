@@ -37,11 +37,11 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -774,7 +774,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 			cluster.WalkHosts(func(host *api.Host) error {
 
 				// Name of the StatefulSet for this host
-				name := w.c.namer.Name(namer.NameStatefulSet, host)
+				name := w.c.namer.Name(interfaces.NameStatefulSet, host)
 				// Have we found this StatefulSet
 				found := false
 
@@ -966,7 +966,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
-		host.GetCR().EnsureStatus().PushHostTablesCreated(w.c.namer.Name(namer.NameFQDN, host))
+		host.GetCR().EnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 	} else {
 		w.a.V(1).
 			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
@@ -979,7 +979,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 }
 
 func (w *worker) hostIsListedAsTablesCrteated(host *api.Host) bool {
-	return host.HasListedTablesCreated(w.c.namer.Name(namer.NameFQDN, host))
+	return host.HasListedTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 }
 
 // shouldMigrateTables

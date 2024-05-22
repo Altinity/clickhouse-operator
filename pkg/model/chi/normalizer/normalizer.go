@@ -170,8 +170,8 @@ func (n *Normalizer) finalize() {
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		host.Runtime.Address.StatefulSet = n.namer.Name(namer.NameStatefulSet, host)
-		host.Runtime.Address.FQDN = n.namer.Name(namer.NameFQDN, host)
+		host.Runtime.Address.StatefulSet = n.namer.Name(interfaces.NameStatefulSet, host)
+		host.Runtime.Address.FQDN = n.namer.Name(interfaces.NameFQDN, host)
 		return nil
 	})
 }
@@ -193,13 +193,13 @@ func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateHostNetwork, n.namer.Name(namer.NameHostTemplate, host))
+			hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateHostNetwork, n.namer.Name(interfaces.NameHostTemplate, host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateCommon, n.namer.Name(namer.NameHostTemplate, host))
+		hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateCommon, n.namer.Name(interfaces.NameHostTemplate, host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
@@ -326,12 +326,12 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := n.namer.Name(namer.NameCRServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
+	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		pods = append(pods, n.namer.Name(namer.NamePod, host))
-		fqdns = append(fqdns, n.namer.Name(namer.NameFQDN, host))
+		pods = append(pods, n.namer.Name(interfaces.NamePod, host))
+		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
 		return nil
 	})
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
@@ -816,7 +816,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 			core.EnvVar{
 				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
-					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(n.namer.Name(namer.NameClusterAutoSecret, cluster)),
+					SecretKeyRef: cluster.GetSecret().GetAutoSecretKeyRef(n.namer.Name(interfaces.NameClusterAutoSecret, cluster)),
 				},
 			},
 		)
@@ -983,7 +983,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 	profile := chop.Config().ClickHouse.Config.User.Default.Profile
 	quota := chop.Config().ClickHouse.Config.User.Default.Quota
 	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	hostRegexp := n.namer.Name(namer.NamePodHostnameRegexp, n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+	hostRegexp := n.namer.Name(interfaces.NamePodHostnameRegexp, n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
 	// Some users may have special options for mandatory fields
 	switch user.Username() {
@@ -1457,7 +1457,7 @@ func (n *Normalizer) normalizeShardName(shard *api.ChiShard, index int) {
 		return
 	}
 
-	shard.Name = n.namer.Name(namer.NameShard, shard, index)
+	shard.Name = n.namer.Name(interfaces.NameShard, shard, index)
 }
 
 // normalizeReplicaName normalizes replica name
@@ -1467,7 +1467,7 @@ func (n *Normalizer) normalizeReplicaName(replica *api.ChiReplica, index int) {
 		return
 	}
 
-	replica.Name = n.namer.Name(namer.NameReplica, replica, index)
+	replica.Name = n.namer.Name(interfaces.NameReplica, replica, index)
 }
 
 // normalizeShardName normalizes shard weight
@@ -1539,7 +1539,7 @@ func (n *Normalizer) normalizeHostName(
 		return
 	}
 
-	host.Name = n.namer.Name(namer.NameHost, host, shard, shardIndex, replica, replicaIndex)
+	host.Name = n.namer.Name(interfaces.NameHost, host, shard, shardIndex, replica, replicaIndex)
 }
 
 // normalizeShardInternalReplication ensures reasonable values in

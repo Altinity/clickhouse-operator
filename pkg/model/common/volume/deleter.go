@@ -18,11 +18,11 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
 type iNamer interface {
-	Name(what namer.NameType, params ...any) string
+	Name(what interfaces.NameType, params ...any) string
 }
 
 type PVCDeleter struct {
@@ -48,7 +48,7 @@ func (d *PVCDeleter) HostCanDeletePVC(host *api.Host, pvcName string) bool {
 			return
 		}
 
-		if pvcName == d.namer.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate) {
+		if pvcName == d.namer.Name(interfaces.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate) {
 			// This PVC is made from these host, VolumeMount and VolumeClaimTemplate
 			// So, what policy does this PVC have?
 			policy = GetPVCReclaimPolicy(host, volumeClaimTemplate)

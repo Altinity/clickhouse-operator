@@ -19,7 +19,6 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 )
 
 type IConfigMapManager interface {
@@ -34,8 +33,8 @@ type IConfigFilesGenerator interface {
 }
 
 type INameManager interface {
-	Names(what namer.NameType, params ...any) []string
-	Name(what namer.NameType, params ...any) string
+	Names(what NameType, params ...any) []string
+	Name(what NameType, params ...any) string
 }
 
 type IAnnotator interface {

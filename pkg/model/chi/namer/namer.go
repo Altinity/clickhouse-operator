@@ -14,7 +14,10 @@
 
 package namer
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+)
 
 type namer struct {
 }
@@ -24,9 +27,9 @@ func New() *namer {
 	return &namer{}
 }
 
-func (n *namer) Names(what NameType, params ...any) []string {
+func (n *namer) Names(what interfaces.NameType, params ...any) []string {
 	switch what {
-	case NameFQDNs:
+	case interfaces.NameFQDNs:
 		obj := params[0]
 		scope := params[1]
 		excludeSelf := params[2].(bool)
@@ -35,65 +38,65 @@ func (n *namer) Names(what NameType, params ...any) []string {
 	panic("unknown names type")
 }
 
-func (n *namer) Name(what NameType, params ...any) string {
+func (n *namer) Name(what interfaces.NameType, params ...any) string {
 	switch what {
-	case NameCRService:
+	case interfaces.NameCRService:
 		cr := params[0].(api.ICustomResource)
 		return createCRServiceName(cr)
-	case NameCRServiceFQDN:
+	case interfaces.NameCRServiceFQDN:
 		cr := params[0].(api.ICustomResource)
 		namespaceDomainPattern := params[1].(*api.String)
 		return createCRServiceFQDN(cr, namespaceDomainPattern)
-	case NameClusterService:
+	case interfaces.NameClusterService:
 		cluster := params[0].(api.ICluster)
 		return createClusterServiceName(cluster)
-	case NameShardService:
+	case interfaces.NameShardService:
 		shard := params[0].(api.IShard)
 		return createShardServiceName(shard)
-	case NameShard:
+	case interfaces.NameShard:
 		shard := params[0].(api.IShard)
 		index := params[1].(int)
 		return createShardName(shard, index)
-	case NameReplica:
+	case interfaces.NameReplica:
 		replica := params[0].(api.IReplica)
 		index := params[1].(int)
 		return createReplicaName(replica, index)
-	case NameHost:
+	case interfaces.NameHost:
 		host := params[0].(*api.Host)
 		shard := params[1].(api.IShard)
 		shardIndex := params[2].(int)
 		replica := params[3].(api.IReplica)
 		replicaIndex := params[4].(int)
 		return createHostName(host, shard, shardIndex, replica, replicaIndex)
-	case NameHostTemplate:
+	case interfaces.NameHostTemplate:
 		host := params[0].(*api.Host)
 		return createHostTemplateName(host)
-	case NameInstanceHostname:
+	case interfaces.NameInstanceHostname:
 		host := params[0].(*api.Host)
 		return createInstanceHostname(host)
-	case NameStatefulSet:
+	case interfaces.NameStatefulSet:
 		host := params[0].(*api.Host)
 		return createStatefulSetName(host)
-	case NameStatefulSetService:
+	case interfaces.NameStatefulSetService:
 		host := params[0].(*api.Host)
 		return createStatefulSetServiceName(host)
-	case NamePodHostname:
+	case interfaces.NamePodHostname:
 		host := params[0].(*api.Host)
 		return createPodHostname(host)
-	case NameFQDN:
+	case interfaces.NameFQDN:
 		host := params[0].(*api.Host)
 		return createFQDN(host)
-	case NamePodHostnameRegexp:
+	case interfaces.NamePodHostnameRegexp:
 		cr := params[0].(api.ICustomResource)
 		template := params[1].(string)
 		return createPodHostnameRegexp(cr, template)
-	case NamePod:
+	case interfaces.NamePod:
 		return createPodName(params[0])
-	case NamePVCNameByVolumeClaimTemplate:
+	case interfaces.NamePVCNameByVolumeClaimTemplate:
 		host := params[0].(*api.Host)
 		volumeClaimTemplate := params[1].(*api.VolumeClaimTemplate)
 		return createPVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
-	case NameClusterAutoSecret:
+	case interfaces.NameClusterAutoSecret:
 		cluster := params[0].(api.ICluster)
 		return createClusterAutoSecretName(cluster)
 	}

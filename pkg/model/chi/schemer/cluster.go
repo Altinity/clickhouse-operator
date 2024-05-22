@@ -20,7 +20,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -107,28 +106,28 @@ func (c *Cluster) QueryUnzipAndApplyUUIDs(ctx context.Context, endpoints []strin
 
 // ExecCHI runs set of SQL queries over the whole CHI
 func (c *Cluster) ExecCHI(ctx context.Context, chi *api.ClickHouseInstallation, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := c.Names(namer.NameFQDNs, chi, nil, false)
+	hosts := c.Names(interfaces.NameFQDNs, chi, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)
 }
 
 // ExecCluster runs set of SQL queries over the cluster
 func (c *Cluster) ExecCluster(ctx context.Context, cluster *api.Cluster, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := c.Names(namer.NameFQDNs, cluster, nil, false)
+	hosts := c.Names(interfaces.NameFQDNs, cluster, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)
 }
 
 // ExecShard runs set of SQL queries over the shard replicas
 func (c *Cluster) ExecShard(ctx context.Context, shard *api.ChiShard, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := c.Names(namer.NameFQDNs, shard, nil, false)
+	hosts := c.Names(interfaces.NameFQDNs, shard, nil, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	return c.SetHosts(hosts).ExecAll(ctx, SQLs, opts)
 }
 
 // ExecHost runs set of SQL queries over the replica
 func (c *Cluster) ExecHost(ctx context.Context, host *api.Host, SQLs []string, _opts ...*clickhouse.QueryOptions) error {
-	hosts := c.Names(namer.NameFQDNs, host, api.Host{}, false)
+	hosts := c.Names(interfaces.NameFQDNs, host, api.Host{}, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	c.SetHosts(hosts)
 	if opts.GetSilent() {
@@ -141,7 +140,7 @@ func (c *Cluster) ExecHost(ctx context.Context, host *api.Host, SQLs []string, _
 
 // QueryHost runs specified query on specified host
 func (c *Cluster) QueryHost(ctx context.Context, host *api.Host, sql string, _opts ...*clickhouse.QueryOptions) (*clickhouse.QueryResult, error) {
-	hosts := c.Names(namer.NameFQDNs, host, api.Host{}, false)
+	hosts := c.Names(interfaces.NameFQDNs, host, api.Host{}, false)
 	opts := clickhouse.QueryOptionsNormalize(_opts...)
 	c.SetHosts(hosts)
 	if opts.GetSilent() {

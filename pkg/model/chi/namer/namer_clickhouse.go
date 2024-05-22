@@ -14,7 +14,10 @@
 
 package namer
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+)
 
 type NamerClickHouse struct {
 	*namer
@@ -27,7 +30,7 @@ func NewClickHouse() *NamerClickHouse {
 	}
 }
 
-func (n *NamerClickHouse) Names(what NameType, params ...any) []string {
+func (n *NamerClickHouse) Names(what interfaces.NameType, params ...any) []string {
 	switch what {
 	default:
 		return n.namer.Names(what, params...)
@@ -35,15 +38,15 @@ func (n *NamerClickHouse) Names(what NameType, params ...any) []string {
 	panic("unknown names type")
 }
 
-func (n *NamerClickHouse) Name(what NameType, params ...any) string {
+func (n *NamerClickHouse) Name(what interfaces.NameType, params ...any) string {
 	switch what {
-	case NameConfigMapHost:
+	case interfaces.NameConfigMapHost:
 		host := params[0].(*api.Host)
 		return createConfigMapHostName(host)
-	case NameConfigMapCommon:
+	case interfaces.NameConfigMapCommon:
 		cr := params[0].(api.ICustomResource)
 		return createConfigMapCommonName(cr)
-	case NameConfigMapCommonUsers:
+	case interfaces.NameConfigMapCommonUsers:
 		cr := params[0].(api.ICustomResource)
 		return createConfigMapCommonUsersName(cr)
 	default:

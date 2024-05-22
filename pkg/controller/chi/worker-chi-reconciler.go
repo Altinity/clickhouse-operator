@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"math"
 	"sync"
 	"time"
@@ -37,7 +36,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -492,7 +491,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 
 	// Add ChkCluster's Auto Secret
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
-		if secret := w.task.creator.CreateClusterSecret(w.c.namer.Name(namer.NameClusterAutoSecret, cluster)); secret != nil {
+		if secret := w.task.creator.CreateClusterSecret(w.c.namer.Name(interfaces.NameClusterAutoSecret, cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
 				w.task.registryReconciled.RegisterSecret(secret.GetObjectMeta())
 			} else {
@@ -1211,7 +1210,7 @@ func (w *worker) fetchPVC(
 		// No this is not a reference to VolumeClaimTemplate, it may be reference to ConfigMap
 		return nil, nil, false, fmt.Errorf("unable to find VolumeClaimTemplate from volume mount")
 	}
-	pvcName := w.c.namer.Name(namer.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
+	pvcName := w.c.namer.Name(interfaces.NamePVCNameByVolumeClaimTemplate, host, volumeClaimTemplate)
 
 	// We have a VolumeClaimTemplate for this VolumeMount
 	// Treat it as persistent storage mount

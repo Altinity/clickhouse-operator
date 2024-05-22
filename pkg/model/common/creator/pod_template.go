@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -49,7 +50,7 @@ func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
 // newAppPodTemplateDefault is a unification wrapper
 func (c *Creator) newAppPodTemplateDefault(host *api.Host) *api.PodTemplate {
 	podTemplate := &api.PodTemplate{
-		Name: namer.NewClickHouse().Name(namer.NameStatefulSet, host),
+		Name: namer.NewClickHouse().Name(interfaces.NameStatefulSet, host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
 			Volumes:    []core.Volume{},
