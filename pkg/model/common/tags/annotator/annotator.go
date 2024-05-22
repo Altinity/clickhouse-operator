@@ -45,7 +45,7 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 	switch what {
 
 	case interfaces.AnnotateServiceCR:
-		return a.getCRScope()
+		return a.GetCRScope()
 	case interfaces.AnnotateServiceCluster:
 		var cluster api.ICluster
 		if len(params) > 0 {
@@ -62,7 +62,7 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			return a.getHostScope(host)
+			return a.GetHostScope(host)
 		}
 
 	case interfaces.AnnotateExistingPV:
@@ -74,14 +74,14 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 			// Merge annotations from
 			// 1. Existing PV
 			// 2. Scope
-			return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.getHostScope(host))
+			return util.MergeStringMapsOverwrite(pv.GetAnnotations(), a.GetHostScope(host))
 		}
 
 	case interfaces.AnnotateNewPVC:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			return a.getHostScope(host)
+			return a.GetHostScope(host)
 		}
 
 	case interfaces.AnnotateExistingPVC:
@@ -97,7 +97,7 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 			// 2. Existing PVC
 			// 3. Scope
 			annotations := util.MergeStringMapsOverwrite(pvc.GetAnnotations(), template.ObjectMeta.GetAnnotations())
-			return util.MergeStringMapsOverwrite(annotations, a.getHostScope(host))
+			return util.MergeStringMapsOverwrite(annotations, a.GetHostScope(host))
 		}
 
 	case interfaces.AnnotatePDB:
@@ -111,21 +111,21 @@ func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[st
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			return a.getHostScope(host)
+			return a.GetHostScope(host)
 		}
 
 	case interfaces.AnnotatePodTemplate:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			return a.getHostScope(host)
+			return a.GetHostScope(host)
 		}
 	}
 	panic("unknown annotate type")
 }
 
-// getCRScope gets annotations for CR-scoped object
-func (a *Annotator) getCRScope() map[string]string {
+// GetCRScope gets annotations for CR-scoped object
+func (a *Annotator) GetCRScope() map[string]string {
 	// Combine generated annotations and CR-provided annotations
 	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }
@@ -142,8 +142,8 @@ func (a *Annotator) getShardScope(shard api.IShard) map[string]string {
 	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }
 
-// getHostScope gets annotations for Host-scoped object
-func (a *Annotator) getHostScope(host *api.Host) map[string]string {
+// GetHostScope gets annotations for Host-scoped object
+func (a *Annotator) GetHostScope(host *api.Host) map[string]string {
 	// Combine generated annotations and CR-provided annotations
 	return a.filterOutAnnotationsToBeSkipped(a.appendCRProvidedAnnotations(nil))
 }

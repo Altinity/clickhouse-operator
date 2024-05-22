@@ -17,18 +17,19 @@ package annotator
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/annotator"
 )
 
 // Annotator is an entity which can annotate CHI artifacts
 type AnnotatorClickHouse struct {
-	*Annotator
+	*annotator.Annotator
 	cr api.ICustomResource
 }
 
 // NewAnnotatorClickHouse creates new annotator with context
-func NewAnnotatorClickHouse(cr api.ICustomResource, config Config) *AnnotatorClickHouse {
+func NewAnnotatorClickHouse(cr api.ICustomResource, config annotator.Config) *AnnotatorClickHouse {
 	return &AnnotatorClickHouse{
-		Annotator: NewAnnotator(cr, config),
+		Annotator: annotator.NewAnnotator(cr, config),
 		cr:        cr,
 	}
 }
@@ -36,14 +37,14 @@ func NewAnnotatorClickHouse(cr api.ICustomResource, config Config) *AnnotatorCli
 func (a *AnnotatorClickHouse) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
 	switch what {
 	case interfaces.AnnotateConfigMapCommon:
-		return a.getCRScope()
+		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapCommonUsers:
-		return a.getCRScope()
+		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			return a.getHostScope(host)
+			return a.GetHostScope(host)
 		}
 	default:
 		return a.Annotator.Annotate(what, params...)
