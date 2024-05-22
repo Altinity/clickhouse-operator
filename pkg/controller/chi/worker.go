@@ -122,7 +122,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
 			managers.NewTagger(chi),
 			managers.NewProbeManager(managers.ProbeManagerTypeClickHouse),
-			chiCreator.NewServiceManager(chiCreator.ServiceManagerTypeClickHouse),
+			managers.NewServiceManager(managers.ServiceManagerTypeClickHouse),
 			managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
 			managers.NewConfigMapManager(managers.ConfigMapManagerTypeClickHouse),
 			managers.NewNameManager(managers.NameManagerTypeClickHouse),

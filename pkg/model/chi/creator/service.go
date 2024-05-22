@@ -21,43 +21,13 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type ServiceType string
-
-const (
-	ServiceCHI        ServiceType = "svc chi"
-	ServiceCHICluster ServiceType = "svc chi cluster"
-	ServiceCHIShard   ServiceType = "svc chi shard"
-	ServiceCHIHost    ServiceType = "svc chi host"
-)
-
-type IServiceManager interface {
-	CreateService(what ServiceType, params ...any) *core.Service
-	SetCR(cr api.ICustomResource)
-	SetTagger(tagger interfaces.ITagger)
-}
-
-type ServiceManagerType string
-
-const (
-	ServiceManagerTypeClickHouse ServiceManagerType = "clickhouse"
-	ServiceManagerTypeKeeper     ServiceManagerType = "keeper"
-)
-
-func NewServiceManager(what ServiceManagerType) IServiceManager {
-	switch what {
-	case ServiceManagerTypeClickHouse:
-		return NewServiceManagerClickHouse()
-	}
-	panic("unknown service manager type")
-}
-
-func (c *Creator) CreateService(what ServiceType, params ...any) *core.Service {
+func (c *Creator) CreateService(what creator.ServiceType, params ...any) *core.Service {
 	c.sm.SetCR(c.cr)
 	c.sm.SetTagger(c.tagger)
 	return c.sm.CreateService(what, params...)

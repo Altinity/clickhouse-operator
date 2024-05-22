@@ -36,7 +36,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
@@ -223,7 +222,7 @@ func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *api.ClickHou
 	}
 
 	// Create entry point for the whole CHI
-	if service := w.task.creator.CreateService(creator.ServiceCHI); service != nil {
+	if service := w.task.creator.CreateService(commonCreator.ServiceCHI); service != nil {
 		if err := w.reconcileService(ctx, chi, service); err != nil {
 			// Service not reconciled
 			w.task.registryFailed.RegisterService(service.GetObjectMeta())
@@ -456,7 +455,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		log.V(2).Info("task is done")
 		return nil
 	}
-	service := w.task.creator.CreateService(creator.ServiceCHIHost, host)
+	service := w.task.creator.CreateService(commonCreator.ServiceCHIHost, host)
 	if service == nil {
 		// This is not a problem, service may be omitted
 		return nil
@@ -483,7 +482,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	defer w.a.V(2).M(cluster).E().P()
 
 	// Add ChkCluster's Service
-	if service := w.task.creator.CreateService(creator.ServiceCHICluster, cluster); service != nil {
+	if service := w.task.creator.CreateService(commonCreator.ServiceCHICluster, cluster); service != nil {
 		if err := w.reconcileService(ctx, cluster.Runtime.CHI, service); err == nil {
 			w.task.registryReconciled.RegisterService(service.GetObjectMeta())
 		} else {
@@ -643,7 +642,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 	defer w.a.V(2).M(shard).E().P()
 
 	// Add Shard's Service
-	service := w.task.creator.CreateService(creator.ServiceCHIShard, shard)
+	service := w.task.creator.CreateService(commonCreator.ServiceCHIShard, shard)
 	if service == nil {
 		// This is not a problem, ServiceShard may be omitted
 		return nil

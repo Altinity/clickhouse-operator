@@ -37,23 +37,23 @@ func NewServiceManagerClickHouse() *ServiceManagerClickHouse {
 	return &ServiceManagerClickHouse{}
 }
 
-func (m *ServiceManagerClickHouse) CreateService(what ServiceType, params ...any) *core.Service {
+func (m *ServiceManagerClickHouse) CreateService(what creator.ServiceType, params ...any) *core.Service {
 	switch what {
-	case ServiceCHI:
+	case creator.ServiceCHI:
 		return m.createServiceCHI()
-	case ServiceCHICluster:
+	case creator.ServiceCHICluster:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
 			return m.createServiceCluster(cluster)
 		}
-	case ServiceCHIShard:
+	case creator.ServiceCHIShard:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
 			return m.createServiceShard(shard)
 		}
-	case ServiceCHIHost:
+	case creator.ServiceCHIHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)

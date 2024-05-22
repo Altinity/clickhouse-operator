@@ -72,3 +72,9 @@ type IContainerManager interface {
 type IProbeManager interface {
 	CreateProbe(what commonCreator.ProbeType, host *api.Host) *core.Probe
 }
+
+type IServiceManager interface {
+	CreateService(what commonCreator.ServiceType, params ...any) *core.Service
+	SetCR(cr api.ICustomResource)
+	SetTagger(tagger ITagger)
+}

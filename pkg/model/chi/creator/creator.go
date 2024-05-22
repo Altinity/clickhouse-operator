@@ -28,7 +28,7 @@ type Creator struct {
 	a                    log.Announcer
 	cm                   interfaces.IContainerManager
 	pm                   interfaces.IProbeManager
-	sm                   IServiceManager
+	sm                   interfaces.IServiceManager
 	vm                   interfaces.IVolumeManager
 	cmm                  interfaces.IConfigMapManager
 	nm                   interfaces.INameManager
@@ -51,7 +51,7 @@ func NewCreator(
 	containerManager interfaces.IContainerManager,
 	tagger interfaces.ITagger,
 	probeManager interfaces.IProbeManager,
-	serviceManager IServiceManager,
+	serviceManager interfaces.IServiceManager,
 	volumeManager interfaces.IVolumeManager,
 	configMapManager interfaces.IConfigMapManager,
 	nameManager interfaces.INameManager,
