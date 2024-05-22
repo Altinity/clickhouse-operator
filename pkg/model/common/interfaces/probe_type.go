@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package interfaces
 
-type ServiceType string
+type ProbeType string
 
 const (
-	ServiceCHI        ServiceType = "svc chi"
-	ServiceCHICluster ServiceType = "svc chi cluster"
-	ServiceCHIShard   ServiceType = "svc chi shard"
-	ServiceCHIHost    ServiceType = "svc chi host"
+	ProbeDefaultLiveness  ProbeType = "ProbeDefaultLiveness"
+	ProbeDefaultReadiness ProbeType = "ProbeDefaultReadiness"
 )

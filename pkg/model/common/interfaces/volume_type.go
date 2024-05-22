@@ -12,17 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package interfaces
 
-import (
-	core "k8s.io/api/core/v1"
+type VolumeType string
 
-	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+const (
+	VolumesForConfigMaps          VolumeType = "VolumesForConfigMaps"
+	VolumesUserDataWithFixedPaths VolumeType = "VolumesUserDataWithFixedPaths"
 )
-
-func (c *Creator) CreateConfigMap(what creator.ConfigMapType, params ...any) *core.ConfigMap {
-	c.cmm.SetCR(c.cr)
-	c.cmm.SetTagger(c.tagger)
-	c.cmm.SetConfigFilesGenerator(c.configFilesGenerator)
-	return c.cmm.CreateConfigMap(what, params...)
-}

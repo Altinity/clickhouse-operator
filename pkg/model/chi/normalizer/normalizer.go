@@ -193,13 +193,13 @@ func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 	if podTemplate, ok := host.GetPodTemplate(); ok {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
-			hostTemplate = commonCreator.CreateHostTemplate(commonCreator.HostTemplateHostNetwork, n.namer.Name(namer.NameHostTemplate, host))
+			hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateHostNetwork, n.namer.Name(namer.NameHostTemplate, host))
 		}
 	}
 
 	// In case hostTemplate still is not picked - use default one
 	if hostTemplate == nil {
-		hostTemplate = commonCreator.CreateHostTemplate(commonCreator.HostTemplateCommon, n.namer.Name(namer.NameHostTemplate, host))
+		hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateCommon, n.namer.Name(namer.NameHostTemplate, host))
 	}
 
 	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
@@ -617,7 +617,7 @@ func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 	// In case no clusters available, we may want to create a default one
 	if n.ctx.Options().WithDefaultCluster {
 		return []*api.Cluster{
-			commonCreator.CreateCluster(commonCreator.ClusterCHIDefault),
+			commonCreator.CreateCluster(interfaces.ClusterCHIDefault),
 		}
 	}
 
@@ -1164,7 +1164,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	if cluster == nil {
-		cluster = commonCreator.CreateCluster(commonCreator.ClusterCHIDefault)
+		cluster = commonCreator.CreateCluster(interfaces.ClusterCHIDefault)
 	}
 
 	// Runtime has to be prepared first

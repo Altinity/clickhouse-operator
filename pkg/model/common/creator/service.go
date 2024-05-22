@@ -15,25 +15,25 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Creator) CreateService(what creator.ServiceType, params ...any) *core.Service {
+func (c *Creator) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
 	c.sm.SetCR(c.cr)
 	c.sm.SetTagger(c.tagger)
 	return c.sm.CreateService(what, params...)
 }
 
-func svcAppendSpecifiedPorts(service *core.Service, host *api.Host) {
+func SvcAppendSpecifiedPorts(service *core.Service, host *api.Host) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
 	host.WalkSpecifiedPorts(
 		func(name string, port *api.Int32, protocol core.Protocol) bool {
@@ -52,8 +52,8 @@ func svcAppendSpecifiedPorts(service *core.Service, host *api.Host) {
 	)
 }
 
-// createServiceFromTemplate create Service from ServiceTemplate and additional info
-func createServiceFromTemplate(
+// CreateServiceFromTemplate create Service from ServiceTemplate and additional info
+func CreateServiceFromTemplate(
 	template *api.ServiceTemplate,
 	namespace string,
 	name string,

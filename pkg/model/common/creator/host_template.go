@@ -17,20 +17,14 @@ package creator
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type HostTemplateType string
-
-const (
-	HostTemplateCommon      HostTemplateType = "ht common"
-	HostTemplateHostNetwork HostTemplateType = "ht host net"
-)
-
-func CreateHostTemplate(what HostTemplateType, name string) *api.HostTemplate {
+func CreateHostTemplate(what interfaces.HostTemplateType, name string) *api.HostTemplate {
 	switch what {
-	case HostTemplateCommon:
+	case interfaces.HostTemplateCommon:
 		return newDefaultHostTemplate(name)
-	case HostTemplateHostNetwork:
+	case interfaces.HostTemplateHostNetwork:
 		return newDefaultHostTemplateForHostNetwork(name)
 	default:
 		return nil

@@ -42,23 +42,23 @@ func NewServiceManagerClickHouse() *ServiceManagerClickHouse {
 	return &ServiceManagerClickHouse{}
 }
 
-func (m *ServiceManagerClickHouse) CreateService(what creator.ServiceType, params ...any) *core.Service {
+func (m *ServiceManagerClickHouse) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
 	switch what {
-	case creator.ServiceCHI:
+	case interfaces.ServiceCHI:
 		return m.createServiceCHI()
-	case creator.ServiceCHICluster:
+	case interfaces.ServiceCHICluster:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
 			return m.createServiceCluster(cluster)
 		}
-	case creator.ServiceCHIShard:
+	case interfaces.ServiceCHIShard:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
 			return m.createServiceShard(shard)
 		}
-	case creator.ServiceCHIHost:
+	case interfaces.ServiceCHIHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
@@ -79,7 +79,7 @@ func (m *ServiceManagerClickHouse) SetTagger(tagger interfaces.ITagger) {
 func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 	if template, ok := m.cr.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
 			m.cr.GetNamespace(),
 			namer.NewClickHouse().Name(namer.NameCHIService, m.cr),
@@ -133,7 +133,7 @@ func (m *ServiceManagerClickHouse) createServiceCluster(cluster api.ICluster) *c
 
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
 			cluster.GetRuntime().GetAddress().GetNamespace(),
 			serviceName,
@@ -152,7 +152,7 @@ func (m *ServiceManagerClickHouse) createServiceCluster(cluster api.ICluster) *c
 func (m *ServiceManagerClickHouse) createServiceShard(shard api.IShard) *core.Service {
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
 			shard.GetRuntime().GetAddress().GetNamespace(),
 			namer.NewClickHouse().Name(namer.NameShardService, shard),
@@ -171,7 +171,7 @@ func (m *ServiceManagerClickHouse) createServiceShard(shard api.IShard) *core.Se
 func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Service {
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
-		return createServiceFromTemplate(
+		return creator.CreateServiceFromTemplate(
 			template,
 			host.Runtime.Address.Namespace,
 			namer.NewClickHouse().Name(namer.NameStatefulSetService, host),
@@ -200,7 +200,7 @@ func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Servi
 			PublishNotReadyAddresses: true,
 		},
 	}
-	svcAppendSpecifiedPorts(svc, host)
+	creator.SvcAppendSpecifiedPorts(svc, host)
 	labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }

@@ -12,25 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package interfaces
 
-import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+type ClusterType string
+
+const (
+	ClusterCHIDefault ClusterType = "chi cluster default"
 )
-
-func CreateCluster(what interfaces.ClusterType) *api.Cluster {
-	switch what {
-	case interfaces.ClusterCHIDefault:
-		return createDefaultCluster()
-	default:
-		return nil
-	}
-}
-
-// createDefaultCluster
-func createDefaultCluster() *api.Cluster {
-	return &api.Cluster{
-		Name: "cluster",
-	}
-}

@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,7 +26,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -40,7 +40,7 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(c.tagger.Label(labeler.LabelSTS, host)),
 			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(annotator.AnnotateSTS, host)),
-			OwnerReferences: creator.CreateOwnerReferences(c.cr),
+			OwnerReferences: CreateOwnerReferences(c.cr),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
@@ -133,10 +133,10 @@ func (c *Creator) stsEnsureAppContainerProbesSpecified(statefulSet *apps.Statefu
 		return
 	}
 	if container.LivenessProbe == nil {
-		container.LivenessProbe = c.pm.CreateProbe(creator.ProbeDefaultLiveness, host)
+		container.LivenessProbe = c.pm.CreateProbe(interfaces.ProbeDefaultLiveness, host)
 	}
 	if container.ReadinessProbe == nil {
-		container.ReadinessProbe = c.pm.CreateProbe(creator.ProbeDefaultReadiness, host)
+		container.ReadinessProbe = c.pm.CreateProbe(interfaces.ProbeDefaultReadiness, host)
 	}
 }
 
@@ -205,7 +205,7 @@ func (c *Creator) stsSetupVolumesSystem(statefulSet *apps.StatefulSet, host *api
 }
 
 func (c *Creator) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
-	c.stsSetupVolumes(creator.VolumesForConfigMaps, statefulSet, host)
+	c.stsSetupVolumes(interfaces.VolumesForConfigMaps, statefulSet, host)
 }
 
 // stsSetupVolumesForSecrets adds to each container in the Pod VolumeMount objects
@@ -231,14 +231,14 @@ func (c *Creator) stsSetupVolumesUserData(statefulSet *apps.StatefulSet, host *a
 }
 
 func (c *Creator) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.StatefulSet, host *api.Host) {
-	c.stsSetupVolumes(creator.VolumesUserDataWithFixedPaths, statefulSet, host)
+	c.stsSetupVolumes(interfaces.VolumesUserDataWithFixedPaths, statefulSet, host)
 }
 
 func (c *Creator) stsSetupVolumesUserDataWithCustomPaths(statefulSet *apps.StatefulSet, host *api.Host) {
 	c.stsSetupVolumesForUsedPVCTemplates(statefulSet, host)
 }
 
-func (c *Creator) stsSetupVolumes(what creator.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
+func (c *Creator) stsSetupVolumes(what interfaces.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
 	c.vm.SetCR(c.cr)
 	c.vm.SetupVolumes(what, statefulSet, host)
 }

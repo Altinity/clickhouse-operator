@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package interfaces
 
-type ConfigMapType string
+type ServiceType string
 
 const (
-	ConfigMapCHICommon      ConfigMapType = "chi common"
-	ConfigMapCHICommonUsers ConfigMapType = "chi common users"
-	ConfigMapCHIHost        ConfigMapType = "chi host"
+	ServiceCHI        ServiceType = "svc chi"
+	ServiceCHICluster ServiceType = "svc chi cluster"
+	ServiceCHIShard   ServiceType = "svc chi shard"
+	ServiceCHIHost    ServiceType = "svc chi host"
 )

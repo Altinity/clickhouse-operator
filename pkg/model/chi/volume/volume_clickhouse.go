@@ -15,12 +15,12 @@
 package volume
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	apps "k8s.io/api/apps/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
@@ -35,12 +35,12 @@ func NewVolumeManagerClickHouse() *VolumeManagerClickHouse {
 	}
 }
 
-func (m *VolumeManagerClickHouse) SetupVolumes(what creator.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
+func (m *VolumeManagerClickHouse) SetupVolumes(what interfaces.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
 	switch what {
-	case creator.VolumesForConfigMaps:
+	case interfaces.VolumesForConfigMaps:
 		m.stsSetupVolumesForConfigMaps(statefulSet, host)
 		return
-	case creator.VolumesUserDataWithFixedPaths:
+	case interfaces.VolumesUserDataWithFixedPaths:
 		m.stsSetupVolumesUserDataWithFixedPaths(statefulSet, host)
 		return
 	}

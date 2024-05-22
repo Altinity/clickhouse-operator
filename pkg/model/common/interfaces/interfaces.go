@@ -23,11 +23,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
-	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 )
 
 type IConfigMapManager interface {
-	CreateConfigMap(what commonCreator.ConfigMapType, params ...any) *core.ConfigMap
+	CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap
 	SetCR(cr api.ICustomResource)
 	SetTagger(tagger ITagger)
 	SetConfigFilesGenerator(configFilesGenerator IConfigFilesGenerator)
@@ -58,7 +57,7 @@ type ITagger interface {
 }
 
 type IVolumeManager interface {
-	SetupVolumes(what commonCreator.VolumeType, statefulSet *apps.StatefulSet, host *api.Host)
+	SetupVolumes(what VolumeType, statefulSet *apps.StatefulSet, host *api.Host)
 	SetCR(cr api.ICustomResource)
 }
 
@@ -70,11 +69,11 @@ type IContainerManager interface {
 }
 
 type IProbeManager interface {
-	CreateProbe(what commonCreator.ProbeType, host *api.Host) *core.Probe
+	CreateProbe(what ProbeType, host *api.Host) *core.Probe
 }
 
 type IServiceManager interface {
-	CreateService(what commonCreator.ServiceType, params ...any) *core.Service
+	CreateService(what ServiceType, params ...any) *core.Service
 	SetCR(cr api.ICustomResource)
 	SetTagger(tagger ITagger)
 }

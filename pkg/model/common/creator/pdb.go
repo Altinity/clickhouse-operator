@@ -16,8 +16,6 @@ package creator
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-
 	policy "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -36,7 +34,7 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          macro.Macro(c.cr).Map(c.tagger.Label(labeler.LabelPDB, cluster)),
 			Annotations:     macro.Macro(c.cr).Map(c.tagger.Annotate(annotator.AnnotatePDB, cluster)),
-			OwnerReferences: creator.CreateOwnerReferences(c.cr),
+			OwnerReferences: CreateOwnerReferences(c.cr),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector: &meta.LabelSelector{

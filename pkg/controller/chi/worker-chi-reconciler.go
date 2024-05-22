@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"math"
 	"sync"
 	"time"
@@ -37,7 +38,6 @@ import (
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -222,7 +222,7 @@ func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *api.ClickHou
 	}
 
 	// Create entry point for the whole CHI
-	if service := w.task.creator.CreateService(commonCreator.ServiceCHI); service != nil {
+	if service := w.task.creator.CreateService(interfaces.ServiceCHI); service != nil {
 		if err := w.reconcileService(ctx, chi, service); err != nil {
 			// Service not reconciled
 			w.task.registryFailed.RegisterService(service.GetObjectMeta())
@@ -265,7 +265,7 @@ func (w *worker) reconcileCHIConfigMapCommon(
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.task.creator.CreateConfigMap(commonCreator.ConfigMapCHICommon, options)
+	configMapCommon := w.task.creator.CreateConfigMap(interfaces.ConfigMapCHICommon, options)
 	err := w.reconcileConfigMap(ctx, chi, configMapCommon)
 	if err == nil {
 		w.task.registryReconciled.RegisterConfigMap(configMapCommon.GetObjectMeta())
@@ -284,7 +284,7 @@ func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *api.ClickH
 	}
 
 	// ConfigMap common for all users resources in CHI
-	configMapUsers := w.task.creator.CreateConfigMap(commonCreator.ConfigMapCHICommonUsers)
+	configMapUsers := w.task.creator.CreateConfigMap(interfaces.ConfigMapCHICommonUsers)
 	err := w.reconcileConfigMap(ctx, chi, configMapUsers)
 	if err == nil {
 		w.task.registryReconciled.RegisterConfigMap(configMapUsers.GetObjectMeta())
@@ -302,7 +302,7 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.Host) err
 	}
 
 	// ConfigMap for a host
-	configMap := w.task.creator.CreateConfigMap(commonCreator.ConfigMapCHIHost, host)
+	configMap := w.task.creator.CreateConfigMap(interfaces.ConfigMapCHIHost, host)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.registryReconciled.RegisterConfigMap(configMap.GetObjectMeta())
@@ -455,7 +455,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		log.V(2).Info("task is done")
 		return nil
 	}
-	service := w.task.creator.CreateService(commonCreator.ServiceCHIHost, host)
+	service := w.task.creator.CreateService(interfaces.ServiceCHIHost, host)
 	if service == nil {
 		// This is not a problem, service may be omitted
 		return nil
@@ -482,7 +482,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	defer w.a.V(2).M(cluster).E().P()
 
 	// Add ChkCluster's Service
-	if service := w.task.creator.CreateService(commonCreator.ServiceCHICluster, cluster); service != nil {
+	if service := w.task.creator.CreateService(interfaces.ServiceCHICluster, cluster); service != nil {
 		if err := w.reconcileService(ctx, cluster.Runtime.CHI, service); err == nil {
 			w.task.registryReconciled.RegisterService(service.GetObjectMeta())
 		} else {
@@ -642,7 +642,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 	defer w.a.V(2).M(shard).E().P()
 
 	// Add Shard's Service
-	service := w.task.creator.CreateService(commonCreator.ServiceCHIShard, shard)
+	service := w.task.creator.CreateService(interfaces.ServiceCHIShard, shard)
 	if service == nil {
 		// This is not a problem, ServiceShard may be omitted
 		return nil

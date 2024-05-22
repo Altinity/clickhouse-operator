@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	creator2 "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"time"
 
 	"github.com/juliangruber/go-intersect"
@@ -37,7 +38,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
@@ -65,7 +65,7 @@ type worker struct {
 
 // task represents context of a worker. This also can be called "a reconcile task"
 type task struct {
-	creator            *chiCreator.Creator
+	creator            *creator2.Creator
 	registryReconciled *model.Registry
 	registryFailed     *model.Registry
 	cmUpdate           time.Time
@@ -73,7 +73,7 @@ type task struct {
 }
 
 // newTask creates new context
-func newTask(creator *chiCreator.Creator) task {
+func newTask(creator *creator2.Creator) task {
 	return task{
 		creator:            creator,
 		registryReconciled: model.NewRegistry(),
@@ -105,7 +105,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 	w.task = newTask(
-		chiCreator.NewCreator(
+		creator2.NewCreator(
 			chi,
 			managers.NewConfigFilesGenerator(
 				managers.FilesGeneratorTypeClickHouse,

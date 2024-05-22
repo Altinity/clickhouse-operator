@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package interfaces
 
-type ProbeType string
+type ConfigMapType string
 
 const (
-	ProbeDefaultLiveness  ProbeType = "ProbeDefaultLiveness"
-	ProbeDefaultReadiness ProbeType = "ProbeDefaultReadiness"
+	ConfigMapCHICommon      ConfigMapType = "chi common"
+	ConfigMapCHICommonUsers ConfigMapType = "chi common users"
+	ConfigMapCHIHost        ConfigMapType = "chi host"
 )

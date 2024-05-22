@@ -14,9 +14,14 @@
 
 package creator
 
-type VolumeType string
-
-const (
-	VolumesForConfigMaps          VolumeType = "VolumesForConfigMaps"
-	VolumesUserDataWithFixedPaths VolumeType = "VolumesUserDataWithFixedPaths"
+import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	core "k8s.io/api/core/v1"
 )
+
+func (c *Creator) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
+	c.cmm.SetCR(c.cr)
+	c.cmm.SetTagger(c.tagger)
+	c.cmm.SetConfigFilesGenerator(c.configFilesGenerator)
+	return c.cmm.CreateConfigMap(what, params...)
+}
