@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package creator
+package managers
 
 import (
-	core "k8s.io/api/core/v1"
-
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
@@ -31,25 +29,7 @@ const (
 func NewContainerManager(what ContainerManagerType) interfaces.IContainerManager {
 	switch what {
 	case ContainerManagerTypeClickHouse:
-		return NewContainerManagerClickHouse(NewProbeManagerClickHouse())
+		return creator.NewContainerManagerClickHouse(creator.NewProbeManagerClickHouse())
 	}
 	panic("unknown container manager type")
-}
-
-func containerAppendSpecifiedPorts(container *core.Container, host *api.Host) {
-	// Walk over all assigned ports of the host and append each port to the list of container's ports
-	host.WalkAssignedPorts(
-		func(name string, port *api.Int32, protocol core.Protocol) bool {
-			// Append assigned port to the list of container's ports
-			container.Ports = append(container.Ports,
-				core.ContainerPort{
-					Name:          name,
-					ContainerPort: port.Value(),
-					Protocol:      protocol,
-				},
-			)
-			// Do not abort, continue iterating
-			return false
-		},
-	)
 }

@@ -15,10 +15,11 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Host defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
@@ -462,14 +463,32 @@ func (host *Host) WalkPorts(f func(name string, port *Int32, protocol core.Proto
 	}
 }
 
-func (host *Host) WalkAssignedPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+func (host *Host) WalkSpecifiedPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
 	host.WalkPorts(
 		func(_name string, _port *Int32, _protocol core.Protocol) bool {
 			if _port.HasValue() {
-				// Port is assigned - call provided function on it
+				// Port is explicitly specified - call provided function on it
 				return f(_name, _port, _protocol)
 			}
 			// Do not break, continue iterating
+			return false
+		},
+	)
+}
+
+func (host *Host) AppendSpecifiedPortsToContainer(container *core.Container) {
+	// Walk over all assigned ports of the host and append each port to the list of container's ports
+	host.WalkSpecifiedPorts(
+		func(name string, port *Int32, protocol core.Protocol) bool {
+			// Append assigned port to the list of container's ports
+			container.Ports = append(container.Ports,
+				core.ContainerPort{
+					Name:          name,
+					ContainerPort: port.Value(),
+					Protocol:      protocol,
+				},
+			)
+			// Do not abort, continue iterating
 			return false
 		},
 	)
@@ -480,5 +499,4 @@ func (host *Host) HasListedTablesCreated(name string) bool {
 		name,
 		host.GetCR().EnsureStatus().GetHostsWithTablesCreated(),
 	)
-
 }

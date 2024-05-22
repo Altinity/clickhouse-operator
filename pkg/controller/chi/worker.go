@@ -119,7 +119,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 					DistributedDDL: chi.GetSpec().Defaults.DistributedDDL,
 				},
 			),
-			chiCreator.NewContainerManager(chiCreator.ContainerManagerTypeClickHouse),
+			managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
 			managers.NewTagger(chi),
 			chiCreator.NewProbeManager(chiCreator.ProbeManagerTypeClickHouse),
 			chiCreator.NewServiceManager(chiCreator.ServiceManagerTypeClickHouse),

@@ -65,7 +65,7 @@ func (c *Creator) CreateService(what ServiceType, params ...any) *core.Service {
 
 func svcAppendSpecifiedPorts(service *core.Service, host *api.Host) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
-	host.WalkAssignedPorts(
+	host.WalkSpecifiedPorts(
 		func(name string, port *api.Int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of service's ports
 			service.Spec.Ports = append(service.Spec.Ports,

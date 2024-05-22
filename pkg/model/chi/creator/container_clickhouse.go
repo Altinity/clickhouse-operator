@@ -96,7 +96,7 @@ func (cm *ContainerManagerClickHouse) newDefaultClickHouseContainer(host *api.Ho
 		LivenessProbe:  cm.probe.createDefaultClickHouseLivenessProbe(host),
 		ReadinessProbe: cm.probe.createDefaultClickHouseReadinessProbe(host),
 	}
-	containerAppendSpecifiedPorts(&container, host)
+	host.AppendSpecifiedPortsToContainer(&container)
 	return container
 }
 
