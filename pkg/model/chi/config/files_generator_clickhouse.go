@@ -17,7 +17,6 @@ package config
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -40,17 +39,17 @@ func NewConfigFilesGeneratorClickHouse(cr api.ICustomResource, namer interfaces.
 	}
 }
 
-func (c *FilesGeneratorClickHouse) CreateConfigFiles(what commonConfig.FilesGroupType, params ...any) map[string]string {
+func (c *FilesGeneratorClickHouse) CreateConfigFiles(what interfaces.FilesGroupType, params ...any) map[string]string {
 	switch what {
-	case commonConfig.FilesGroupCommon:
+	case interfaces.FilesGroupCommon:
 		var options *FilesGeneratorOptionsClickHouse
 		if len(params) > 0 {
 			options = params[0].(*FilesGeneratorOptionsClickHouse)
 			return c.createConfigFilesGroupCommon(options)
 		}
-	case commonConfig.FilesGroupUsers:
+	case interfaces.FilesGroupUsers:
 		return c.createConfigFilesGroupUsers()
-	case commonConfig.FilesGroupHost:
+	case interfaces.FilesGroupHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)

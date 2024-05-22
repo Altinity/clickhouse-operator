@@ -20,7 +20,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 )
 
 type IConfigMapManager interface {
@@ -31,7 +30,7 @@ type IConfigMapManager interface {
 }
 
 type IConfigFilesGenerator interface {
-	CreateConfigFiles(what commonConfig.FilesGroupType, params ...any) map[string]string
+	CreateConfigFiles(what FilesGroupType, params ...any) map[string]string
 }
 
 type INameManager interface {

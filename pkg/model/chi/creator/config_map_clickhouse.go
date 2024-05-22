@@ -23,7 +23,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	commonConfig "github.com/altinity/clickhouse-operator/pkg/model/common/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
@@ -80,7 +79,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupCommon, options),
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupCommon, options),
 	}
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
@@ -98,7 +97,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupUsers),
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupUsers),
 	}
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
@@ -116,7 +115,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *cor
 			OwnerReferences: creator.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
-		Data: m.configFilesGenerator.CreateConfigFiles(commonConfig.FilesGroupHost, host),
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, host),
 	}
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
