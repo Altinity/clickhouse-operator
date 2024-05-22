@@ -1105,30 +1105,6 @@ func (w *worker) reconcilePVCs(ctx context.Context, host *api.Host, which api.Wh
 	return
 }
 
-func (w *worker) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
-	if !w.hostIsListedAsHavingTablesCreated(host) {
-		// No data to loose
-		return false
-	}
-
-	// Now we assume that this PVC has had some data in the past, since tables were created on it
-
-	if pvc == nil {
-		// No PVC available at all, was it deleted?
-		// Lost PVC
-		return true
-	}
-
-	if isJustCreated {
-		// PVC was just created by the operator, not fetched
-		// Lost PVC
-		return true
-	}
-
-	// PVC is in place
-	return false
-}
-
 func (w *worker) reconcilePVCFromVolumeMount(
 	ctx context.Context,
 	host *api.Host,
@@ -1192,6 +1168,30 @@ func (w *worker) reconcilePVCFromVolumeMount(
 
 	// It still may return data loss errors
 	return res
+}
+
+func (w *worker) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
+	if !w.hostIsListedAsHavingTablesCreated(host) {
+		// No data to loose
+		return false
+	}
+
+	// Now we assume that this PVC has had some data in the past, since tables were created on it
+
+	if pvc == nil {
+		// No PVC available at all, was it deleted?
+		// Lost PVC
+		return true
+	}
+
+	if isJustCreated {
+		// PVC was just created by the operator, not fetched
+		// Lost PVC
+		return true
+	}
+
+	// PVC is in place
+	return false
 }
 
 func (w *worker) fetchPVC(
