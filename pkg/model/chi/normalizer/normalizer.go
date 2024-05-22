@@ -36,6 +36,7 @@ import (
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -560,7 +561,7 @@ func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
 func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
-	templatesNormalizer.NormalizeHostTemplate(template)
+	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
 	n.ctx.GetTarget().GetSpec().Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
 }
