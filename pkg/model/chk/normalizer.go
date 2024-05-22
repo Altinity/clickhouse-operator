@@ -176,7 +176,7 @@ func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTe
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ServiceTemplate) {
-	templatesNormalizer.NormalizeServiceTemplate(template)
+	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
