@@ -33,16 +33,4 @@ spec:
           containers:
             - name: clickhouse-pod
               image: clickhouse/clickhouse-server:23.8
-              command:
-                - "/bin/bash"
-                - "-c"
-                - "sleep 600 && /entrypoint.sh"
-              livenessProbe:
-                exec:
-                  command:
-                    - bash
-                    - -xc
-                    - 'echo 1'
-                initialDelaySeconds: 700
-                timeoutSeconds: 15
 

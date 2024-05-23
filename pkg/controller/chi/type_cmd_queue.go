@@ -200,7 +200,7 @@ func NewReconcileEndpoints(cmd string, old, new *core.Endpoints) *ReconcileEndpo
 // DropDns specifies drop dns queue item
 type DropDns struct {
 	PriorityQueueItem
-	initiator *meta.ObjectMeta
+	initiator meta.Object
 }
 
 var _ queue.PriorityQueueItem = &DropDns{}
@@ -208,13 +208,13 @@ var _ queue.PriorityQueueItem = &DropDns{}
 // Handle returns handle of the queue item
 func (r DropDns) Handle() queue.T {
 	if r.initiator != nil {
-		return "DropDNS" + ":" + r.initiator.Namespace + "/" + r.initiator.Name
+		return "DropDNS" + ":" + r.initiator.GetNamespace() + "/" + r.initiator.GetName()
 	}
 	return ""
 }
 
 // NewDropDns creates new drop dns queue item
-func NewDropDns(initiator *meta.ObjectMeta) *DropDns {
+func NewDropDns(initiator meta.Object) *DropDns {
 	return &DropDns{
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityDropDNS,

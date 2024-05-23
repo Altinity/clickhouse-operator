@@ -58,7 +58,7 @@ function main() {
   for dashboard in "${dashboards_path}"/*.json; do
     local dashboard_name
     dashboard_name=$(basename "${dashboard}")
-    echo "${dashboard_name}"
+    #echo "${dashboard_name}"
     jq '(.templating.list) |= ['"${prom_ds}"'] + .' "${dashboard}" >"${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\${DS_PROMETHEUS}"/"datasource": {"type":"prometheus","uid":"\${ds_prometheus}"}/g' "${files_dir}/${dashboard_name}"
     perl -pi -e 's/"datasource": "\$db"/"datasource": {"type":"vertamedia-clickhouse-datasource","uid":"\${db}"}/g' "${files_dir}/${dashboard_name}"
@@ -93,7 +93,7 @@ function process() {
     local templates_dir="${chart_path}/templates/generated"
     processed_file="${templates_dir}/${processed_file}"
   fi
-  echo $(basename "${processed_file}")
+  #echo $(basename "${processed_file}")
   mkdir -p "$(dirname "${processed_file}")"
   mv -f "${file}" "${processed_file}"
 

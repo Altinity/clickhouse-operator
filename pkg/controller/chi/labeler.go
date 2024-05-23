@@ -29,7 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -240,16 +240,16 @@ func (c *Controller) addLabels(labels map[string]string) map[string]string {
 		labels,
 		// Add the following labels
 		map[string]string{
-			model.LabelAppName:    model.LabelAppValue,
-			model.LabelCHOP:       chop.Get().Version,
-			model.LabelCHOPCommit: chop.Get().Commit,
-			model.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
+			commonLabeler.LabelAppName:    commonLabeler.LabelAppValue,
+			commonLabeler.LabelCHOP:       chop.Get().Version,
+			commonLabeler.LabelCHOPCommit: chop.Get().Commit,
+			commonLabeler.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
 		},
 	)
 }
 
 // appendLabelReadyOnPod appends Label "Ready" to the pod of the specified host
-func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -261,7 +261,7 @@ func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.ChiHos
 		return err
 	}
 
-	if model.AppendLabelReady(&pod.ObjectMeta) {
+	if commonLabeler.AppendLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, controller.NewUpdateOptions())
 		if err != nil {
@@ -273,8 +273,8 @@ func (c *Controller) appendLabelReadyOnPod(ctx context.Context, host *api.ChiHos
 	return nil
 }
 
-// deleteLabelReadyPod deletes Label "Ready" from the pod of the specified host
-func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *api.ChiHost) error {
+// deleteLabelReadyOnPod deletes Label "Ready" from the pod of the specified host
+func (c *Controller) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -295,7 +295,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *api.ChiHost)
 		return err
 	}
 
-	if model.DeleteLabelReady(&pod.ObjectMeta) {
+	if commonLabeler.DeleteLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Pods(pod.Namespace).Update(ctx, pod, controller.NewUpdateOptions())
 		return err
@@ -305,7 +305,7 @@ func (c *Controller) deleteLabelReadyPod(ctx context.Context, host *api.ChiHost)
 }
 
 // appendAnnotationReadyOnService appends Annotation "Ready" to the service of the specified host
-func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -317,7 +317,7 @@ func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *a
 		return err
 	}
 
-	if model.AppendAnnotationReady(&svc.ObjectMeta) {
+	if commonLabeler.AppendAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 		if err != nil {
@@ -329,8 +329,8 @@ func (c *Controller) appendAnnotationReadyOnService(ctx context.Context, host *a
 	return nil
 }
 
-// deleteAnnotationReadyService deletes Annotation "Ready" from the service of the specified host
-func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *api.ChiHost) error {
+// deleteAnnotationReadyOnService deletes Annotation "Ready" from the service of the specified host
+func (c *Controller) deleteAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -351,7 +351,7 @@ func (c *Controller) deleteAnnotationReadyService(ctx context.Context, host *api
 		return err
 	}
 
-	if model.DeleteAnnotationReady(&svc.ObjectMeta) {
+	if commonLabeler.DeleteAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
 		_, err = c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 		return err

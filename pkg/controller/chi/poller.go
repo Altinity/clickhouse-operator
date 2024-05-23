@@ -31,7 +31,7 @@ import (
 )
 
 // waitHostNotReady polls host's StatefulSet for not exists or not ready
-func (c *Controller) waitHostNotReady(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) waitHostNotReady(ctx context.Context, host *api.Host) error {
 	err := c.pollHostStatefulSet(
 		ctx,
 		host,
@@ -54,7 +54,7 @@ func (c *Controller) waitHostNotReady(ctx context.Context, host *api.ChiHost) er
 }
 
 // waitHostReady polls host's StatefulSet until it is ready
-func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error {
+func (c *Controller) waitHostReady(ctx context.Context, host *api.Host) error {
 	// Wait for StatefulSet to reach generation
 	err := c.pollHostStatefulSet(
 		ctx,
@@ -64,13 +64,13 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 			if sts == nil {
 				return false
 			}
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 			return k8s.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func(_ctx context.Context) {
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 		},
 	)
 	if err != nil {
@@ -83,13 +83,13 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 		host,
 		nil, // rely on default options
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 			return k8s.IsStatefulSetReady(sts)
 		},
 		func(_ctx context.Context) {
-			_ = c.deleteLabelReadyPod(_ctx, host)
-			_ = c.deleteAnnotationReadyService(_ctx, host)
+			_ = c.deleteLabelReadyOnPod(_ctx, host)
+			_ = c.deleteAnnotationReadyOnService(_ctx, host)
 		},
 	)
 
@@ -97,7 +97,7 @@ func (c *Controller) waitHostReady(ctx context.Context, host *api.ChiHost) error
 }
 
 // waitHostDeleted polls host's StatefulSet until it is not available
-func (c *Controller) waitHostDeleted(host *api.ChiHost) {
+func (c *Controller) waitHostDeleted(host *api.Host) {
 	for {
 		// TODO
 		// Probably there would be better way to wait until k8s reported StatefulSet deleted
@@ -114,9 +114,9 @@ func (c *Controller) waitHostDeleted(host *api.ChiHost) {
 // pollHost polls host
 func (c *Controller) pollHost(
 	ctx context.Context,
-	host *api.ChiHost,
+	host *api.Host,
 	opts *controller.PollerOptions,
-	isDoneFn func(ctx context.Context, host *api.ChiHost) bool,
+	isDoneFn func(ctx context.Context, host *api.Host) bool,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -143,7 +143,7 @@ func (c *Controller) pollHost(
 // pollHostStatefulSet polls host's StatefulSet
 func (c *Controller) pollHostStatefulSet(
 	ctx context.Context,
-	host *api.ChiHost,
+	host *api.Host,
 	opts *controller.PollerOptions,
 	isDoneFn func(context.Context, *apps.StatefulSet) bool,
 	backFn func(context.Context),

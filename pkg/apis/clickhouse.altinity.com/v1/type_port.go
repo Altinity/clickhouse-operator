@@ -44,9 +44,9 @@ func IsPortInvalid(port int32) bool {
 // - already has own value assigned
 // - or has provided value
 // - or value is fell back to default
-func EnsurePortValue(port int32, value, _default int32) int32 {
+func EnsurePortValue(port, value, _default *Int32) *Int32 {
 	// Port may already be explicitly specified in podTemplate or by portDistribution
-	if IsPortAssigned(port) {
+	if port.HasValue() {
 		// Port has a value already
 		return port
 	}
@@ -54,7 +54,7 @@ func EnsurePortValue(port int32, value, _default int32) int32 {
 	// Port has no explicitly assigned value
 
 	// Let's use provided value real value
-	if IsPortAssigned(value) {
+	if value.HasValue() {
 		// Provided value is a real value, use it
 		return value
 	}

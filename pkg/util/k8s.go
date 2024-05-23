@@ -14,26 +14,28 @@
 
 package util
 
-import "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // NamespaceName returns namespace and anme from the meta
-func NamespaceName(meta v1.ObjectMeta) (string, string) {
-	return meta.Namespace, meta.Name
+func NamespaceName(meta meta.Object) (string, string) {
+	return meta.GetNamespace(), meta.GetName()
 }
 
 // NamespaceNameString returns namespace and name as one string
-func NamespaceNameString(meta v1.ObjectMeta) string {
-	return meta.Namespace + "/" + meta.Name
+func NamespaceNameString(meta meta.Object) string {
+	return meta.GetNamespace() + "/" + meta.GetName()
 }
 
-// AnnotationsTobeSkipped kubectl service annotation that we'd like to skip
-var AnnotationsTobeSkipped = []string{
+// AnnotationsToBeSkipped kubectl service annotation that we'd like to skip
+var AnnotationsToBeSkipped = []string{
 	"kubectl.kubernetes.io/last-applied-configuration",
 }
 
 // IsAnnotationToBeSkipped checks whether an annotation should be skipped
 func IsAnnotationToBeSkipped(annotation string) bool {
-	for _, a := range AnnotationsTobeSkipped {
+	for _, a := range AnnotationsToBeSkipped {
 		if a == annotation {
 			return true
 		}
@@ -43,5 +45,5 @@ func IsAnnotationToBeSkipped(annotation string) bool {
 
 // ListSkippedAnnotations provides list of annotations that should be skipped
 func ListSkippedAnnotations() []string {
-	return AnnotationsTobeSkipped
+	return AnnotationsToBeSkipped
 }

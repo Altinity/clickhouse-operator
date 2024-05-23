@@ -61,7 +61,7 @@ func (chi *WatchedCHI) readFrom(c *api.ClickHouseInstallation) {
 	chi.Labels = c.Labels
 	chi.Annotations = c.Annotations
 
-	c.WalkClusters(func(cl *api.Cluster) error {
+	c.WalkClusters(func(cl api.ICluster) error {
 		cluster := &WatchedCluster{}
 		cluster.readFrom(cl)
 		chi.Clusters = append(chi.Clusters, cluster)
@@ -69,7 +69,7 @@ func (chi *WatchedCHI) readFrom(c *api.ClickHouseInstallation) {
 	})
 }
 
-func (chi *WatchedCHI) isValid() bool {
+func (chi *WatchedCHI) IsValid() bool {
 	return !chi.empty()
 }
 
@@ -77,11 +77,11 @@ func (chi *WatchedCHI) empty() bool {
 	return (len(chi.Namespace) == 0) && (len(chi.Name) == 0) && (len(chi.Clusters) == 0)
 }
 
-func (chi *WatchedCHI) indexKey() string {
+func (chi *WatchedCHI) IndexKey() string {
 	return chi.Namespace + ":" + chi.Name
 }
 
-func (chi *WatchedCHI) walkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHost)) {
+func (chi *WatchedCHI) WalkHosts(f func(*WatchedCHI, *WatchedCluster, *WatchedHost)) {
 	if chi == nil {
 		return
 	}
@@ -129,13 +129,13 @@ func (chi *WatchedCHI) String() string {
 	return string(bytes)
 }
 
-func (cluster *WatchedCluster) readFrom(c *api.Cluster) {
+func (cluster *WatchedCluster) readFrom(c api.ICluster) {
 	if cluster == nil {
 		return
 	}
-	cluster.Name = c.Name
+	cluster.Name = c.GetName()
 
-	c.WalkHosts(func(h *api.ChiHost) error {
+	c.WalkHosts(func(h *api.Host) error {
 		host := &WatchedHost{}
 		host.readFrom(h)
 		cluster.Hosts = append(cluster.Hosts, host)
@@ -143,14 +143,14 @@ func (cluster *WatchedCluster) readFrom(c *api.Cluster) {
 	})
 }
 
-func (host *WatchedHost) readFrom(h *api.ChiHost) {
+func (host *WatchedHost) readFrom(h *api.Host) {
 	if host == nil {
 		return
 	}
 	host.Name = h.Name
 	host.Hostname = h.Runtime.Address.FQDN
-	host.TCPPort = h.TCPPort
-	host.TLSPort = h.TLSPort
-	host.HTTPPort = h.HTTPPort
-	host.HTTPSPort = h.HTTPSPort
+	host.TCPPort = h.TCPPort.Value()
+	host.TLSPort = h.TLSPort.Value()
+	host.HTTPPort = h.HTTPPort.Value()
+	host.HTTPSPort = h.HTTPSPort.Value()
 }

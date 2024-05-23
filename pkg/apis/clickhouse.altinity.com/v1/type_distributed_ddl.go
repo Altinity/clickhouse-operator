@@ -14,13 +14,13 @@
 
 package v1
 
-// NewChiDistributedDDL creates new ChiDistributedDDL
-func NewChiDistributedDDL() *ChiDistributedDDL {
-	return new(ChiDistributedDDL)
+// NewDistributedDDL creates new DistributedDDL
+func NewDistributedDDL() *DistributedDDL {
+	return new(DistributedDDL)
 }
 
 // HasProfile checks whether profile is present
-func (d *ChiDistributedDDL) HasProfile() bool {
+func (d *DistributedDDL) HasProfile() bool {
 	if d == nil {
 		return false
 	}
@@ -28,7 +28,7 @@ func (d *ChiDistributedDDL) HasProfile() bool {
 }
 
 // GetProfile gets profile
-func (d *ChiDistributedDDL) GetProfile() string {
+func (d *DistributedDDL) GetProfile() string {
 	if d == nil {
 		return ""
 	}
@@ -36,13 +36,13 @@ func (d *ChiDistributedDDL) GetProfile() string {
 }
 
 // MergeFrom merges from specified source
-func (d *ChiDistributedDDL) MergeFrom(from *ChiDistributedDDL, _type MergeType) *ChiDistributedDDL {
+func (d *DistributedDDL) MergeFrom(from *DistributedDDL, _type MergeType) *DistributedDDL {
 	if from == nil {
 		return d
 	}
 
 	if d == nil {
-		d = NewChiDistributedDDL()
+		d = NewDistributedDDL()
 	}
 
 	switch _type {

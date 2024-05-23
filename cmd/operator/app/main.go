@@ -18,12 +18,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/version"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/version"
 )
 
 // CLI parameter variables

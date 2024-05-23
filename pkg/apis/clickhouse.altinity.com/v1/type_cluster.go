@@ -16,23 +16,41 @@ package v1
 
 // Cluster defines item of a clusters section of .configuration
 type Cluster struct {
-	Name         string              `json:"name,omitempty"         yaml:"name,omitempty"`
-	Zookeeper    *ChiZookeeperConfig `json:"zookeeper,omitempty"    yaml:"zookeeper,omitempty"`
-	Settings     *Settings           `json:"settings,omitempty"     yaml:"settings,omitempty"`
-	Files        *Settings           `json:"files,omitempty"        yaml:"files,omitempty"`
-	Templates    *TemplatesList      `json:"templates,omitempty"    yaml:"templates,omitempty"`
-	SchemaPolicy *SchemaPolicy       `json:"schemaPolicy,omitempty" yaml:"schemaPolicy,omitempty"`
-	Insecure     *StringBool         `json:"insecure,omitempty"     yaml:"insecure,omitempty"`
-	Secure       *StringBool         `json:"secure,omitempty"       yaml:"secure,omitempty"`
-	Secret       *ClusterSecret      `json:"secret,omitempty"       yaml:"secret,omitempty"`
-	Layout       *ChiClusterLayout   `json:"layout,omitempty"       yaml:"layout,omitempty"`
+	Name              string              `json:"name,omitempty"              yaml:"name,omitempty"`
+	Zookeeper         *ChiZookeeperConfig `json:"zookeeper,omitempty"         yaml:"zookeeper,omitempty"`
+	Settings          *Settings           `json:"settings,omitempty"          yaml:"settings,omitempty"`
+	Files             *Settings           `json:"files,omitempty"             yaml:"files,omitempty"`
+	Templates         *TemplatesList      `json:"templates,omitempty"         yaml:"templates,omitempty"`
+	SchemaPolicy      *SchemaPolicy       `json:"schemaPolicy,omitempty"      yaml:"schemaPolicy,omitempty"`
+	Insecure          *StringBool         `json:"insecure,omitempty"          yaml:"insecure,omitempty"`
+	Secure            *StringBool         `json:"secure,omitempty"            yaml:"secure,omitempty"`
+	Secret            *ClusterSecret      `json:"secret,omitempty"            yaml:"secret,omitempty"`
+	PDBMaxUnavailable *Int32              `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
+	Layout            *ChiClusterLayout   `json:"layout,omitempty"            yaml:"layout,omitempty"`
 
 	Runtime ClusterRuntime `json:"-" yaml:"-"`
+}
+
+func (c *Cluster) GetSecret() *ClusterSecret {
+	return c.Secret
 }
 
 type ClusterRuntime struct {
 	Address ChiClusterAddress       `json:"-" yaml:"-"`
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+type IClusterRuntime interface {
+	GetAddress() IClusterAddress
+	GetRoot() IRoot
+}
+
+func (r ClusterRuntime) GetAddress() IClusterAddress {
+	return r.Address
+}
+
+func (r ClusterRuntime) GetRoot() IRoot {
+	return r.CHI
 }
 
 // SchemaPolicy defines schema management policy - replica or shard-based
@@ -49,12 +67,55 @@ type ChiClusterAddress struct {
 	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
 }
 
+type IClusterAddress interface {
+	GetNamespace() string
+	GetCRName() string
+	GetClusterName() string
+	GetClusterIndex() int
+}
+
+func (a ChiClusterAddress) GetNamespace() string {
+	return a.Namespace
+}
+func (a ChiClusterAddress) GetCRName() string {
+	return a.CHIName
+}
+func (a ChiClusterAddress) GetClusterName() string {
+	return a.ClusterName
+}
+func (a ChiClusterAddress) GetClusterIndex() int {
+	return a.ClusterIndex
+}
+
+// ClusterLayout defines layout section of .spec.configuration.clusters
+type ClusterLayout struct {
+	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
+	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
+}
+
+// NewClusterLayout creates new cluster layout
+func NewClusterLayout() *ClusterLayout {
+	return new(ClusterLayout)
+}
+
+func (c *ClusterLayout) GetShardsCount() int {
+	if c == nil {
+		return 0
+	}
+	return c.ShardsCount
+}
+
+func (c *ClusterLayout) GetReplicasCount() int {
+	if c == nil {
+		return 0
+	}
+	return c.ReplicasCount
+}
+
 // ChiClusterLayout defines layout section of .spec.configuration.clusters
 type ChiClusterLayout struct {
-	// DEPRECATED - to be removed soon
-	Type          string `json:"type,omitempty"          yaml:"type,omitempty"`
-	ShardsCount   int    `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
-	ReplicasCount int    `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
+	ClusterLayout `json:",inline" yaml:",inline"`
+
 	// TODO refactor into map[string]ChiShard
 	Shards   []ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
 	Replicas []ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
@@ -74,6 +135,14 @@ func NewClusterSchemaPolicy() *SchemaPolicy {
 // NewChiClusterLayout creates new cluster layout
 func NewChiClusterLayout() *ChiClusterLayout {
 	return new(ChiClusterLayout)
+}
+
+func (cluster *Cluster) GetRuntime() IClusterRuntime {
+	return cluster.Runtime
+}
+
+func (cluster *Cluster) GetPDBMaxUnavailable() *Int32 {
+	return cluster.PDBMaxUnavailable
 }
 
 // FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
@@ -163,6 +232,10 @@ func (cluster *Cluster) GetServiceTemplate() (*ServiceTemplate, bool) {
 	return cluster.Runtime.CHI.GetServiceTemplate(name)
 }
 
+func (cluster *Cluster) GetName() string {
+	return cluster.Name
+}
+
 // GetCHI gets parent CHI
 func (cluster *Cluster) GetCHI() *ClickHouseInstallation {
 	return cluster.Runtime.CHI
@@ -174,7 +247,7 @@ func (cluster *Cluster) GetShard(shard int) *ChiShard {
 }
 
 // GetOrCreateHost gets or creates host on specified coordinates
-func (cluster *Cluster) GetOrCreateHost(shard, replica int) *ChiHost {
+func (cluster *Cluster) GetOrCreateHost(shard, replica int) *Host {
 	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
 }
 
@@ -187,15 +260,15 @@ func (cluster *Cluster) GetReplica(replica int) *ChiReplica {
 // Expectations: name is expected to be a string, index is expected to be an int.
 func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 	var resultShard *ChiShard
-	cluster.WalkShards(func(index int, shard *ChiShard) error {
+	cluster.WalkShards(func(index int, shard IShard) error {
 		switch v := needle.(type) {
 		case string:
-			if shard.Name == v {
-				resultShard = shard
+			if shard.GetName() == v {
+				resultShard = shard.(*ChiShard)
 			}
 		case int:
 			if index == v {
-				resultShard = shard
+				resultShard = shard.(*ChiShard)
 			}
 		}
 		return nil
@@ -205,14 +278,14 @@ func (cluster *Cluster) FindShard(needle interface{}) *ChiShard {
 
 // FindHost finds host by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (cluster *Cluster) FindHost(needleShard interface{}, needleHost interface{}) *ChiHost {
+func (cluster *Cluster) FindHost(needleShard interface{}, needleHost interface{}) *Host {
 	return cluster.FindShard(needleShard).FindHost(needleHost)
 }
 
 // FirstHost finds first host in the cluster
-func (cluster *Cluster) FirstHost() *ChiHost {
-	var result *ChiHost
-	cluster.WalkHosts(func(host *ChiHost) error {
+func (cluster *Cluster) FirstHost() *Host {
+	var result *Host
+	cluster.WalkHosts(func(host *Host) error {
 		if result == nil {
 			result = host
 		}
@@ -222,9 +295,7 @@ func (cluster *Cluster) FirstHost() *ChiHost {
 }
 
 // WalkShards walks shards
-func (cluster *Cluster) WalkShards(
-	f func(index int, shard *ChiShard) error,
-) []error {
+func (cluster *Cluster) WalkShards(f func(index int, shard IShard) error) []error {
 	if cluster == nil {
 		return nil
 	}
@@ -251,7 +322,7 @@ func (cluster *Cluster) WalkReplicas(f func(index int, replica *ChiReplica) erro
 }
 
 // WalkHosts walks hosts
-func (cluster *Cluster) WalkHosts(f func(host *ChiHost) error) []error {
+func (cluster *Cluster) WalkHosts(f func(host *Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -267,7 +338,7 @@ func (cluster *Cluster) WalkHosts(f func(host *ChiHost) error) []error {
 }
 
 // WalkHostsByShards walks hosts by shards
-func (cluster *Cluster) WalkHostsByShards(f func(shard, replica int, host *ChiHost) error) []error {
+func (cluster *Cluster) WalkHostsByShards(f func(shard, replica int, host *Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -283,7 +354,7 @@ func (cluster *Cluster) WalkHostsByShards(f func(shard, replica int, host *ChiHo
 }
 
 // WalkHostsByReplicas walks hosts by replicas
-func (cluster *Cluster) WalkHostsByReplicas(f func(shard, replica int, host *ChiHost) error) []error {
+func (cluster *Cluster) WalkHostsByReplicas(f func(shard, replica int, host *Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -301,7 +372,7 @@ func (cluster *Cluster) WalkHostsByReplicas(f func(shard, replica int, host *Chi
 // HostsCount counts hosts
 func (cluster *Cluster) HostsCount() int {
 	count := 0
-	cluster.WalkHosts(func(host *ChiHost) error {
+	cluster.WalkHosts(func(host *Host) error {
 		count++
 		return nil
 	})

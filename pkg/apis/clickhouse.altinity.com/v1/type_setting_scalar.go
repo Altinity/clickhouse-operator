@@ -127,6 +127,18 @@ func (s *Setting) ScalarInt() int {
 	return 0
 }
 
+// ScalarInt gets int scalar value of a setting
+func (s *Setting) ScalarInt32Ptr() *Int32 {
+	if s == nil {
+		return nil
+	}
+	if value, err := strconv.Atoi(s.scalar); err == nil {
+		return NewInt32(int32(value))
+	}
+
+	return nil
+}
+
 // scalarAsAny gets scalar value of a setting as any
 func (s *Setting) scalarAsAny() any {
 	if s == nil {

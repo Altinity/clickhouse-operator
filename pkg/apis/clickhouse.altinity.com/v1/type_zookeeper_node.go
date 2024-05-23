@@ -16,8 +16,8 @@ package v1
 
 // ChiZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ChiZookeeperNode struct {
-	Host   string      `json:"host,omitempty" yaml:"host,omitempty"`
-	Port   int32       `json:"port,omitempty" yaml:"port,omitempty"`
+	Host   string      `json:"host,omitempty"   yaml:"host,omitempty"`
+	Port   *Int32      `json:"port,omitempty"   yaml:"port,omitempty"`
 	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
 }
 
@@ -27,7 +27,19 @@ func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 		return false
 	}
 
-	return (zkNode.Host == to.Host) && (zkNode.Port == to.Port) && (zkNode.Secure.Value() == zkNode.Secure.Value())
+	return zkNode.hostEqual(to) && zkNode.portEqual(to) && zkNode.secureEqual(to)
+}
+
+func (zkNode *ChiZookeeperNode) hostEqual(to *ChiZookeeperNode) bool {
+	return zkNode.Host == to.Host
+}
+
+func (zkNode *ChiZookeeperNode) portEqual(to *ChiZookeeperNode) bool {
+	return zkNode.Port.Equal(to.Port)
+}
+
+func (zkNode *ChiZookeeperNode) secureEqual(to *ChiZookeeperNode) bool {
+	return zkNode.Secure.Value() == to.Secure.Value()
 }
 
 // IsSecure checks whether zookeeper node is secure

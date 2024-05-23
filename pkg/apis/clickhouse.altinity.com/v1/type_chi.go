@@ -23,12 +23,27 @@ import (
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
+type IRoot interface {
+	GetName() string
+	WalkHosts(f func(host *Host) error) []error
+}
+
+func (chi *ClickHouseInstallation) GetObjectMeta() meta.Object {
+	return &chi.ObjectMeta
+}
+
 func (chi *ClickHouseInstallation) GetSpec() *ChiSpec {
 	return &chi.Spec
+}
+
+func (chi *ClickHouseInstallation) GetUsedTemplates() []*TemplateRef {
+	return chi.GetSpec().UseTemplates
 }
 
 // FillStatus fills .Status
@@ -114,7 +129,7 @@ func (chi *ClickHouseInstallation) FillSelfCalculatedAddressInfo() {
 			cluster *Cluster,
 			shard *ChiShard,
 			replica *ChiReplica,
-			host *ChiHost,
+			host *Host,
 			address *HostScopeAddress,
 		) error {
 			cluster.Runtime.Address.Namespace = chi.Namespace
@@ -171,16 +186,21 @@ func (chi *ClickHouseInstallation) FillCHIPointer() {
 			cluster *Cluster,
 			shard *ChiShard,
 			replica *ChiReplica,
-			host *ChiHost,
+			host *Host,
 			address *HostScopeAddress,
 		) error {
 			cluster.Runtime.CHI = chi
 			shard.Runtime.CHI = chi
 			replica.Runtime.CHI = chi
-			host.Runtime.CHI = chi
+			host.SetCR(chi)
 			return nil
 		},
 	)
+}
+
+func (chi *ClickHouseInstallation) Fill() {
+	chi.FillSelfCalculatedAddressInfo()
+	chi.FillCHIPointer()
 }
 
 // WalkClustersFullPath walks clusters with full path
@@ -200,7 +220,7 @@ func (chi *ClickHouseInstallation) WalkClustersFullPath(
 }
 
 // WalkClusters walks clusters
-func (chi *ClickHouseInstallation) WalkClusters(f func(cluster *Cluster) error) []error {
+func (chi *ClickHouseInstallation) WalkClusters(f func(i ICluster) error) []error {
 	if chi == nil {
 		return nil
 	}
@@ -270,7 +290,7 @@ func (chi *ClickHouseInstallation) WalkHostsFullPath(f WalkHostsAddressFn) []err
 }
 
 // WalkHosts walks hosts with a function
-func (chi *ClickHouseInstallation) WalkHosts(f func(host *ChiHost) error) []error {
+func (chi *ClickHouseInstallation) WalkHosts(f func(host *Host) error) []error {
 	if chi == nil {
 		return nil
 	}
@@ -350,7 +370,7 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	chi.GetSpec().MergeFrom(from.GetSpec(), _type)
 
 	// Copy service attributes
-	chi.EnsureRuntime().attributes = from.EnsureRuntime().attributes
+	chi.ensureRuntime().attributes = from.ensureRuntime().attributes
 
 	chi.EnsureStatus().CopyFrom(from.Status, CopyCHIStatusOptions{
 		InheritableFields: true,
@@ -359,24 +379,12 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 
 // HasTaskID checks whether task id is specified
 func (spec *ChiSpec) HasTaskID() bool {
-	switch {
-	case spec == nil:
-		return false
-	case spec.TaskID == nil:
-		return false
-	case len(*spec.TaskID) == 0:
-		return false
-	default:
-		return true
-	}
+	return len(spec.TaskID.Value()) > 0
 }
 
 // GetTaskID gets task id as a string
 func (spec *ChiSpec) GetTaskID() string {
-	if spec.HasTaskID() {
-		return *spec.TaskID
-	}
-	return ""
+	return spec.TaskID.Value()
 }
 
 // MergeFrom merges from spec
@@ -388,38 +396,38 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	switch _type {
 	case MergeTypeFillEmptyValues:
 		if !spec.HasTaskID() {
-			spec.TaskID = from.TaskID
+			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
 		}
 		if !spec.Stop.HasValue() {
 			spec.Stop = spec.Stop.MergeFrom(from.Stop)
 		}
-		if spec.Restart == "" {
-			spec.Restart = from.Restart
+		if !spec.Restart.HasValue() {
+			spec.Restart = spec.Restart.MergeFrom(from.Restart)
 		}
 		if !spec.Troubleshoot.HasValue() {
 			spec.Troubleshoot = spec.Troubleshoot.MergeFrom(from.Troubleshoot)
 		}
-		if spec.NamespaceDomainPattern == "" {
-			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
+		if !spec.NamespaceDomainPattern.HasValue() {
+			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
 		}
 	case MergeTypeOverrideByNonEmptyValues:
 		if from.HasTaskID() {
-			spec.TaskID = from.TaskID
+			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
 		}
 		if from.Stop.HasValue() {
 			// Override by non-empty values only
 			spec.Stop = from.Stop
 		}
-		if from.Restart != "" {
+		if from.Restart.HasValue() {
 			// Override by non-empty values only
-			spec.Restart = from.Restart
+			spec.Restart = spec.Restart.MergeFrom(from.Restart)
 		}
 		if from.Troubleshoot.HasValue() {
 			// Override by non-empty values only
 			spec.Troubleshoot = from.Troubleshoot
 		}
-		if from.NamespaceDomainPattern != "" {
-			spec.NamespaceDomainPattern = from.NamespaceDomainPattern
+		if from.NamespaceDomainPattern.HasValue() {
+			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
 		}
 	}
 
@@ -460,14 +468,14 @@ func (chi *ClickHouseInstallation) FindShard(needleCluster interface{}, needleSh
 
 // FindHost finds shard by name or index
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (chi *ClickHouseInstallation) FindHost(needleCluster interface{}, needleShard interface{}, needleHost interface{}) *ChiHost {
+func (chi *ClickHouseInstallation) FindHost(needleCluster interface{}, needleShard interface{}, needleHost interface{}) *Host {
 	return chi.FindCluster(needleCluster).FindHost(needleShard, needleHost)
 }
 
 // ClustersCount counts clusters
 func (chi *ClickHouseInstallation) ClustersCount() int {
 	count := 0
-	chi.WalkClusters(func(cluster *Cluster) error {
+	chi.WalkClusters(func(cluster ICluster) error {
 		count++
 		return nil
 	})
@@ -487,7 +495,7 @@ func (chi *ClickHouseInstallation) ShardsCount() int {
 // HostsCount counts hosts
 func (chi *ClickHouseInstallation) HostsCount() int {
 	count := 0
-	chi.WalkHosts(func(host *ChiHost) error {
+	chi.WalkHosts(func(host *Host) error {
 		count++
 		return nil
 	})
@@ -497,7 +505,7 @@ func (chi *ClickHouseInstallation) HostsCount() int {
 // HostsCountAttributes counts hosts by attributes
 func (chi *ClickHouseInstallation) HostsCountAttributes(a *HostReconcileAttributes) int {
 	count := 0
-	chi.WalkHosts(func(host *ChiHost) error {
+	chi.WalkHosts(func(host *Host) error {
 		if host.GetReconcileAttributes().Any(a) {
 			count++
 		}
@@ -551,8 +559,8 @@ func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ServiceTemp
 	return chi.GetSpec().Templates.GetServiceTemplatesIndex().Get(name), true
 }
 
-// GetCHIServiceTemplate gets ServiceTemplate of a CHI
-func (chi *ClickHouseInstallation) GetCHIServiceTemplate() (*ServiceTemplate, bool) {
+// GetRootServiceTemplate gets ServiceTemplate of a CHI
+func (chi *ClickHouseInstallation) GetRootServiceTemplate() (*ServiceTemplate, bool) {
 	if !chi.GetSpec().Defaults.Templates.HasServiceTemplate() {
 		return nil, false
 	}
@@ -629,7 +637,7 @@ func (chi *ClickHouseInstallation) IsRollingUpdate() bool {
 	if chi == nil {
 		return false
 	}
-	return chi.GetSpec().Restart == RestartRollingUpdate
+	return chi.GetSpec().Restart.Value() == RestartRollingUpdate
 }
 
 // IsTroubleshoot checks whether CHI is in troubleshoot mode
@@ -666,7 +674,7 @@ func (chi *ClickHouseInstallation) Copy(opts CopyCHIOptions) *ClickHouseInstalla
 		return nil
 	}
 
-	var chi2 ClickHouseInstallation
+	var chi2 *ClickHouseInstallation
 	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
 		return nil
 	}
@@ -676,10 +684,10 @@ func (chi *ClickHouseInstallation) Copy(opts CopyCHIOptions) *ClickHouseInstalla
 	}
 
 	if opts.SkipManagedFields {
-		chi2.ObjectMeta.ManagedFields = nil
+		chi2.GetObjectMeta().SetManagedFields(nil)
 	}
 
-	return &chi2
+	return chi2
 }
 
 // JSON returns JSON string
@@ -711,7 +719,11 @@ func (chi *ClickHouseInstallation) YAML(opts CopyCHIOptions) string {
 	return string(yamlBytes)
 }
 
-func (chi *ClickHouseInstallation) EnsureRuntime() *ClickHouseInstallationRuntime {
+func (chi *ClickHouseInstallation) GetRuntime() ICustomResourceRuntime {
+	return chi.ensureRuntime()
+}
+
+func (chi *ClickHouseInstallation) ensureRuntime() *ClickHouseInstallationRuntime {
 	if chi == nil {
 		return nil
 	}
@@ -817,9 +829,9 @@ func (chi *ClickHouseInstallation) SetTarget(a *ClickHouseInstallation) {
 }
 
 // FirstHost returns first host of the CHI
-func (chi *ClickHouseInstallation) FirstHost() *ChiHost {
-	var result *ChiHost
-	chi.WalkHosts(func(host *ChiHost) error {
+func (chi *ClickHouseInstallation) FirstHost() *Host {
+	var result *Host
+	chi.WalkHosts(func(host *Host) error {
 		if result == nil {
 			result = host
 		}

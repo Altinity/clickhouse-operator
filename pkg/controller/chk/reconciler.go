@@ -277,7 +277,7 @@ func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInsta
 			cur.Status.ReadyReplicas = append(cur.Status.ReadyReplicas,
 				apiChi.ChiZookeeperNode{
 					Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, chk.Namespace),
-					Port:   int32(chk.Spec.GetClientPort()),
+					Port:   apiChi.NewInt32(int32(chk.Spec.GetClientPort())),
 					Secure: apiChi.NewStringBool(false),
 				})
 		}

@@ -47,7 +47,11 @@ import (
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -98,6 +102,8 @@ func NewController(
 		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
 		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
 		recorder:                recorder,
+		namer:                   managers.NewNameManager(managers.NameManagerTypeClickHouse),
+		pvcDeleter:              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
 	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
@@ -222,7 +228,7 @@ func (c *Controller) addEventHandlersService(
 	kubeInformerFactory.Core().V1().Services().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			service := obj.(*core.Service)
-			if !c.isTrackedObject(&service.ObjectMeta) {
+			if !c.isTrackedObject(service.GetObjectMeta()) {
 				return
 			}
 			log.V(3).M(service).Info("serviceInformer.AddFunc")
@@ -454,8 +460,8 @@ func (c *Controller) addEventHandlers(
 }
 
 // isTrackedObject checks whether operator is interested in changes of this object
-func (c *Controller) isTrackedObject(objectMeta *meta.ObjectMeta) bool {
-	return chop.Config().IsWatchedNamespace(objectMeta.Namespace) && model.IsCHOPGeneratedObject(objectMeta)
+func (c *Controller) isTrackedObject(meta meta.Object) bool {
+	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && commonLabeler.IsCHOPGeneratedObject(meta)
 }
 
 // Run syncs caches, starts workers
@@ -611,7 +617,7 @@ func (c *Controller) updateWatch(chi *api.ClickHouseInstallation) {
 
 // updateWatchAsync
 func (c *Controller) updateWatchAsync(chi *metrics.WatchedCHI) {
-	if err := metrics.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
+	if err := clickhouse.InformMetricsExporterAboutWatchedCHI(chi); err != nil {
 		log.V(1).F().Info("FAIL update watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
 		log.V(1).Info("OK update watch (%s/%s): %s", chi.Namespace, chi.Name, chi)
@@ -626,7 +632,7 @@ func (c *Controller) deleteWatch(chi *api.ClickHouseInstallation) {
 
 // deleteWatchAsync
 func (c *Controller) deleteWatchAsync(chi *metrics.WatchedCHI) {
-	if err := metrics.InformMetricsExporterToDeleteWatchedCHI(chi); err != nil {
+	if err := clickhouse.InformMetricsExporterToDeleteWatchedCHI(chi); err != nil {
 		log.V(1).F().Info("FAIL delete watch (%s/%s): %q", chi.Namespace, chi.Name, err)
 	} else {
 		log.V(1).Info("OK delete watch (%s/%s)", chi.Namespace, chi.Name)
@@ -649,13 +655,13 @@ func (c *Controller) addChopConfig(chopConfig *api.ClickHouseOperatorConfigurati
 
 // updateChopConfig
 func (c *Controller) updateChopConfig(old, new *api.ClickHouseOperatorConfiguration) error {
-	if old.ObjectMeta.ResourceVersion == new.ObjectMeta.ResourceVersion {
-		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.ObjectMeta.ResourceVersion)
+	if old.GetObjectMeta().GetResourceVersion() == new.GetObjectMeta().GetResourceVersion() {
+		log.V(2).M(old).F().Info("ResourceVersion did not change: %s", old.GetObjectMeta().GetResourceVersion())
 		// No need to react
 		return nil
 	}
 
-	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.ObjectMeta.ResourceVersion, new.ObjectMeta.ResourceVersion)
+	log.V(2).M(new).F().Info("ResourceVersion change: %s to %s", old.GetObjectMeta().GetResourceVersion(), new.GetObjectMeta().GetResourceVersion())
 	// TODO
 	// NEED REFACTORING
 	//os.Exit(0)
@@ -698,7 +704,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 	payload, _ := json.Marshal([]patchFinalizers{{
 		Op:    "replace",
 		Path:  "/metadata/finalizers",
-		Value: chi.ObjectMeta.Finalizers,
+		Value: chi.GetObjectMeta().GetFinalizers(),
 	}})
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, controller.NewPatchOptions())
@@ -708,10 +714,10 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 		return err
 	}
 
-	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
+	if chi.GetObjectMeta().GetResourceVersion() != _new.GetObjectMeta().GetResourceVersion() {
 		// Updated
-		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
-		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
+		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetObjectMeta().GetResourceVersion(), _new.GetObjectMeta().GetResourceVersion())
+		chi.GetObjectMeta().SetResourceVersion(_new.GetObjectMeta().GetResourceVersion())
 		return nil
 	}
 
@@ -760,7 +766,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 		return nil
 	}
 
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.GetObjectMeta())
 	log.V(3).M(chi).F().Info("Update CHI status")
 
 	podIPs := c.getPodsIPs(chi)
@@ -778,7 +784,7 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 			return nil
 		}
 		log.V(1).M(chi).F().Error("NULL returned")
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", namespace, name)
+		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
 	}
 
 	// Update status of a real object.
@@ -793,9 +799,9 @@ func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.Click
 	}
 
 	// Propagate updated ResourceVersion into chi
-	if chi.ObjectMeta.ResourceVersion != _new.ObjectMeta.ResourceVersion {
-		log.V(3).M(chi).F().Info("ResourceVersion change: %s to %s", chi.ObjectMeta.ResourceVersion, _new.ObjectMeta.ResourceVersion)
-		chi.ObjectMeta.ResourceVersion = _new.ObjectMeta.ResourceVersion
+	if chi.GetObjectMeta().GetResourceVersion() != _new.GetObjectMeta().GetResourceVersion() {
+		log.V(3).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetObjectMeta().GetResourceVersion(), _new.GetObjectMeta().GetResourceVersion())
+		chi.GetObjectMeta().SetResourceVersion(_new.GetObjectMeta().GetResourceVersion())
 		return nil
 	}
 
@@ -810,7 +816,7 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 		return
 	}
 
-	namespace, name := util.NamespaceName(chi.ObjectMeta)
+	namespace, name := util.NamespaceName(chi.GetObjectMeta())
 
 	for {
 		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
@@ -843,16 +849,16 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseIn
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
+		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
-	if util.InArray(FinalizerName, cur.ObjectMeta.Finalizers) {
+	if util.InArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()) {
 		// Already installed
 		return nil
 	}
 	log.V(3).M(chi).F().Info("no finalizer found, need to install one")
 
-	cur.ObjectMeta.Finalizers = append(cur.ObjectMeta.Finalizers, FinalizerName)
+	cur.GetObjectMeta().SetFinalizers(append(cur.GetObjectMeta().GetFinalizers(), FinalizerName))
 	return c.patchCHIFinalizers(ctx, cur)
 }
 
@@ -871,10 +877,10 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 		return err
 	}
 	if cur == nil {
-		return fmt.Errorf("ERROR GetCHI (%s/%s): NULL returned", chi.Namespace, chi.Name)
+		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
-	cur.ObjectMeta.Finalizers = util.RemoveFromArray(FinalizerName, cur.ObjectMeta.Finalizers)
+	cur.GetObjectMeta().SetFinalizers(util.RemoveFromArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()))
 
 	return c.patchCHIFinalizers(ctx, cur)
 }

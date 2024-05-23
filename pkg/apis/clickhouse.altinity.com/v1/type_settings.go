@@ -350,33 +350,33 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 	return json.Marshal(raw)
 }
 
-// fetchPort is the base function to fetch int32 port value
-func (s *Settings) fetchPort(name string) int32 {
-	return int32(s.Get(name).ScalarInt())
+// fetchPort is the base function to fetch *Int32 port value
+func (s *Settings) fetchPort(name string) *Int32 {
+	return s.Get(name).ScalarInt32Ptr()
 }
 
 // GetTCPPort gets TCP port from settings
-func (s *Settings) GetTCPPort() int32 {
+func (s *Settings) GetTCPPort() *Int32 {
 	return s.fetchPort("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
-func (s *Settings) GetTCPPortSecure() int32 {
+func (s *Settings) GetTCPPortSecure() *Int32 {
 	return s.fetchPort("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
-func (s *Settings) GetHTTPPort() int32 {
+func (s *Settings) GetHTTPPort() *Int32 {
 	return s.fetchPort("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
-func (s *Settings) GetHTTPSPort() int32 {
+func (s *Settings) GetHTTPSPort() *Int32 {
 	return s.fetchPort("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
-func (s *Settings) GetInterserverHTTPPort() int32 {
+func (s *Settings) GetInterserverHTTPPort() *Int32 {
 	return s.fetchPort("interserver_http_port")
 }
 

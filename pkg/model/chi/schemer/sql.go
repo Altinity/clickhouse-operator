@@ -21,14 +21,15 @@ import (
 	"github.com/MakeNowJust/heredoc"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
 const ignoredDBs = `'system', 'information_schema', 'INFORMATION_SCHEMA'`
 const createTableDBEngines = `'Ordinary','Atomic','Memory','Lazy'`
 
 // sqlDropTable returns set of 'DROP TABLE ...' SQLs
-func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	// There isn't a separate query for deleting views. To delete a view, use DROP TABLE
 	// See https://clickhouse.yandex/docs/en/query_language/create/
 	sql := heredoc.Docf(`
@@ -41,16 +42,16 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 	    UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP TABLE IF EXISTS "', database, '"."', name, '"') AS drop_table_query
+			concat('DROP TABLE IF EXISTS "', database, '"."', name, '" SYNC') AS drop_table_query
 		FROM
 			system.tables
 		WHERE
 			database NOT IN (%s) AND
-			(engine like 'Replicated%%' OR engine like '%%View%%')
+			(engine like '%%MergeTree%%' OR engine like '%%View%%')
 		UNION ALL
 		SELECT
 			DISTINCT name,
-			concat('DROP DATABASE IF EXISTS "', name, '"') AS drop_table_query
+			concat('DROP DATABASE IF EXISTS "', name, '" SYNC') AS drop_table_query
 		FROM
 			system.databases
 		WHERE
@@ -59,12 +60,12 @@ func (s *ClusterSchemer) sqlDropTable(ctx context.Context, host *api.ChiHost) ([
 		ignoredDBs,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, s.Names(interfaces.NameFQDNs, host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 
 // sqlSyncTable returns set of 'SYSTEM SYNC REPLICA database.table ...' SQLs
-func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([]string, []string, error) {
+func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.Host) ([]string, []string, error) {
 	sql := heredoc.Doc(`
 		SELECT
 			DISTINCT name,
@@ -76,7 +77,7 @@ func (s *ClusterSchemer) sqlSyncTable(ctx context.Context, host *api.ChiHost) ([
 		`,
 	)
 
-	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, chi.CreateFQDNs(host, api.ChiHost{}, false), sql)
+	names, sqlStatements, _ := s.QueryUnzip2Columns(ctx, s.Names(interfaces.NameFQDNs, host, api.Host{}, false), sql)
 	return names, sqlStatements, nil
 }
 
@@ -251,13 +252,13 @@ func (s *ClusterSchemer) sqlVersion() string {
 func (s *ClusterSchemer) sqlHostInCluster() string {
 	// TODO: Change to select count() query to avoid exception in operator and ClickHouse logs
 	return heredoc.Docf(`
-		SELECT 
-			throwIf(count()=0) 
-		FROM 
-			system.clusters 
-		WHERE 
+		SELECT
+			throwIf(count()=0)
+		FROM
+			system.clusters
+		WHERE
 			cluster='%s' AND is_local
 		`,
-		chi.AllShardsOneReplicaClusterName,
+		config.AllShardsOneReplicaClusterName,
 	)
 }

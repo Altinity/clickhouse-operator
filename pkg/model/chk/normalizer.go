@@ -15,6 +15,7 @@
 package chk
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"strings"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,7 +23,6 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
-	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 )
 
 // NormalizerContext specifies CHI-related normalization context
@@ -101,7 +101,7 @@ func (n *Normalizer) fillStatus() {
 	//endpoint := CreateCHIServiceFQDN(n.ctx.chi)
 	//pods := make([]string, 0)
 	//fqdns := make([]string, 0)
-	//n.ctx.chi.WalkHosts(func(host *apiChi.ChiHost) error {
+	//n.ctx.chi.WalkHosts(func(host *apiChi.Host) error {
 	//	pods = append(pods, CreatePodName(host))
 	//	fqdns = append(fqdns, CreateFQDN(host))
 	//	return nil
@@ -161,21 +161,21 @@ func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 	if len(n.ctx.chk.Spec.Configuration.Clusters) > 0 {
 		replicasCount = n.ctx.chk.Spec.Configuration.Clusters[0].Layout.ReplicasCount
 	}
-	templatesNormalizer.NormalizePodTemplate(replicasCount, template)
+	templates.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTemplate) {
-	templatesNormalizer.NormalizeVolumeClaimTemplate(template)
+	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ServiceTemplate) {
-	templatesNormalizer.NormalizeServiceTemplate(template)
+	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
 	n.ctx.chk.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
@@ -232,7 +232,7 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 
 	// Ensure layout
 	if cluster.Layout == nil {
-		cluster.Layout = apiChk.NewChkClusterLayout()
+		cluster.Layout = apiChi.NewClusterLayout()
 	}
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
 
@@ -240,10 +240,10 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *apiChk.ChkClusterLayout) *apiChk.ChkClusterLayout {
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *apiChi.ClusterLayout) *apiChi.ClusterLayout {
 	// Ensure layout
 	if layout == nil {
-		layout = apiChk.NewChkClusterLayout()
+		layout = apiChi.NewClusterLayout()
 	}
 
 	// Layout.ShardsCount and

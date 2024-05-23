@@ -14,6 +14,14 @@
 
 package v1
 
+func (shard *ChiShard) GetName() string {
+	return shard.Name
+}
+
+func (shard *ChiShard) GetInternalReplication() *StringBool {
+	return shard.InternalReplication
+}
+
 // InheritSettingsFrom inherits settings from specified cluster
 func (shard *ChiShard) InheritSettingsFrom(cluster *Cluster) {
 	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
@@ -49,7 +57,7 @@ func (shard *ChiShard) HasReplicasCount() bool {
 }
 
 // WalkHosts runs specified function on each host
-func (shard *ChiShard) WalkHosts(f func(host *ChiHost) error) []error {
+func (shard *ChiShard) WalkHosts(f func(host *Host) error) []error {
 	if shard == nil {
 		return nil
 	}
@@ -66,8 +74,8 @@ func (shard *ChiShard) WalkHosts(f func(host *ChiHost) error) []error {
 
 // FindHost finds host by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (shard *ChiShard) FindHost(needle interface{}) (res *ChiHost) {
-	shard.WalkHosts(func(host *ChiHost) error {
+func (shard *ChiShard) FindHost(needle interface{}) (res *Host) {
+	shard.WalkHosts(func(host *Host) error {
 		switch v := needle.(type) {
 		case string:
 			if host.Runtime.Address.HostName == v {
@@ -84,9 +92,9 @@ func (shard *ChiShard) FindHost(needle interface{}) (res *ChiHost) {
 }
 
 // FirstHost finds first host in the shard
-func (shard *ChiShard) FirstHost() *ChiHost {
-	var result *ChiHost
-	shard.WalkHosts(func(host *ChiHost) error {
+func (shard *ChiShard) FirstHost() *Host {
+	var result *Host
+	shard.WalkHosts(func(host *Host) error {
 		if result == nil {
 			result = host
 		}
@@ -98,7 +106,7 @@ func (shard *ChiShard) FirstHost() *ChiHost {
 // HostsCount returns count of hosts in the shard
 func (shard *ChiShard) HostsCount() int {
 	count := 0
-	shard.WalkHosts(func(host *ChiHost) error {
+	shard.WalkHosts(func(host *Host) error {
 		count++
 		return nil
 	})
@@ -132,4 +140,12 @@ func (shard *ChiShard) GetWeight() int {
 		return *shard.Weight
 	}
 	return 0
+}
+
+type IShardRuntime interface {
+	GetAddress() IShardAddress
+}
+
+func (shard *ChiShard) GetRuntime() IShardRuntime {
+	return shard.Runtime
 }

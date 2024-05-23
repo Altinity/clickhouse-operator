@@ -5,7 +5,7 @@ metadata:
 spec:
   configuration:
     clusters:
-      - name: "simple-1"
+      - name: "extended-1"
         layout:
           replicasCount: 1
     settings:
@@ -30,7 +30,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:head-alpine"
+              image: "clickhouse/clickhouse-keeper:latest"
               resources:
                 requests:
                   memory: "256M"

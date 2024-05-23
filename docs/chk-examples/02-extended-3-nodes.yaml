@@ -5,7 +5,7 @@ metadata:
 spec:
   configuration:
     clusters:
-      - name: "simple-3"
+      - name: "extended-3"
         layout:
           replicasCount: 3
     settings:
@@ -41,7 +41,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:head-alpine"
+              image: "clickhouse/clickhouse-keeper:latest"
               resources:
                 requests:
                   memory: "256M"
@@ -50,7 +50,7 @@ spec:
                   memory: "4Gi"
                   cpu: "2"
     volumeClaimTemplates:
-      - name: default
+      - name: log-storage-path
         spec:
           accessModes:
             - ReadWriteOnce

@@ -24,7 +24,7 @@ metadata:
 spec:
   configuration:
     clusters:
-      - name: "simple-1"
+      - name: "test-only"
         layout:
           replicasCount: 1
     settings:
@@ -42,3 +42,12 @@ spec:
       prometheus/events: "true"
       prometheus/asynchronous_metrics: "true"
       prometheus/status_info: "false"
+  templates:
+    volumeClaimTemplates:
+      - name: both-paths
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 5Gi

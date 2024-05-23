@@ -59,6 +59,12 @@ func newClickHouseInstallationRuntime() *ClickHouseInstallationRuntime {
 	}
 }
 
+type ICustomResourceRuntime interface {
+	GetAttributes() *ComparableAttributes
+	LockCommonConfig()
+	UnlockCommonConfig()
+}
+
 func (runtime *ClickHouseInstallationRuntime) GetAttributes() *ComparableAttributes {
 	return runtime.attributes
 }
@@ -77,6 +83,62 @@ type ComparableAttributes struct {
 	AdditionalVolumes      []core.Volume      `json:"-" yaml:"-"`
 	AdditionalVolumeMounts []core.VolumeMount `json:"-" yaml:"-"`
 	SkipOwnerRef           bool               `json:"-" yaml:"-"`
+}
+
+func (a *ComparableAttributes) GetAdditionalEnvVars() []core.EnvVar {
+	if a == nil {
+		return nil
+	}
+	return a.AdditionalEnvVars
+}
+
+func (a *ComparableAttributes) AppendAdditionalEnvVars(envVars ...core.EnvVar) {
+	if a == nil {
+		return
+	}
+	a.AdditionalEnvVars = append(a.AdditionalEnvVars, envVars...)
+}
+
+func (a *ComparableAttributes) GetAdditionalVolumes() []core.Volume {
+	if a == nil {
+		return nil
+	}
+	return a.AdditionalVolumes
+}
+
+func (a *ComparableAttributes) AppendAdditionalVolumes(volumes ...core.Volume) {
+	if a == nil {
+		return
+	}
+	a.AdditionalVolumes = append(a.AdditionalVolumes, volumes...)
+}
+
+func (a *ComparableAttributes) GetAdditionalVolumeMounts() []core.VolumeMount {
+	if a == nil {
+		return nil
+	}
+	return a.AdditionalVolumeMounts
+}
+
+func (a *ComparableAttributes) AppendAdditionalVolumeMounts(volumeMounts ...core.VolumeMount) {
+	if a == nil {
+		return
+	}
+	a.AdditionalVolumeMounts = append(a.AdditionalVolumeMounts, volumeMounts...)
+}
+
+func (a *ComparableAttributes) GetSkipOwnerRef() bool {
+	if a == nil {
+		return false
+	}
+	return a.SkipOwnerRef
+}
+
+func (a *ComparableAttributes) SetSkipOwnerRef(skip bool) {
+	if a == nil {
+		return
+	}
+	a.SkipOwnerRef = skip
 }
 
 // +genclient
@@ -100,17 +162,25 @@ type ClickHouseOperatorConfiguration struct {
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {
-	TaskID                 *string         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	TaskID                 *String         `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
 	Stop                   *StringBool     `json:"stop,omitempty"                   yaml:"stop,omitempty"`
-	Restart                string          `json:"restart,omitempty"                yaml:"restart,omitempty"`
+	Restart                *String         `json:"restart,omitempty"                yaml:"restart,omitempty"`
 	Troubleshoot           *StringBool     `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
-	NamespaceDomainPattern string          `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	NamespaceDomainPattern *String         `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating  `json:"templating,omitempty"             yaml:"templating,omitempty"`
 	Reconciling            *ChiReconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
 	Defaults               *ChiDefaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration  `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *Templates      `json:"templates,omitempty"              yaml:"templates,omitempty"`
 	UseTemplates           []*TemplateRef  `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
+}
+
+func (s *ChiSpec) GetNamespaceDomainPattern() *String {
+	return s.NamespaceDomainPattern
+}
+
+type ICHISpec interface {
+	GetNamespaceDomainPattern() *String
 }
 
 // TemplateRef defines UseTemplate section of ClickHouseInstallation resource
@@ -122,41 +192,8 @@ type TemplateRef struct {
 
 // ChiTemplating defines templating policy struct
 type ChiTemplating struct {
-	Policy      string      `json:"policy,omitempty"      yaml:"policy,omitempty"`
-	CHISelector CHISelector `json:"chiSelector,omitempty" yaml:"chiSelector,omitempty"`
-}
-
-// CHISelector specifies CHI label selector
-type CHISelector map[string]string
-
-// Matches checks whether CHISelector matches provided set of labels
-func (s CHISelector) Matches(labels map[string]string) bool {
-	if s == nil {
-		// Empty selector matches all labels
-		return true
-	}
-
-	// Walk over selector keys
-	for key, selectorValue := range s {
-		if labelValue, ok := labels[key]; !ok {
-			// Labels have no key specified in selector.
-			// Selector does not match the labels
-			return false
-		} else if selectorValue != labelValue {
-			// Labels have the key specified in selector, but selector value is not the same as labels value
-			// Selector does not match the labels
-			return false
-		} else {
-			// Selector value and label value are equal
-			// So far label matches selector
-			// Continue iteration to next value
-		}
-	}
-
-	// All keys are in place with the same values
-	// Selector matches the labels
-
-	return true
+	Policy      string         `json:"policy,omitempty"      yaml:"policy,omitempty"`
+	CHISelector TargetSelector `json:"chiSelector,omitempty" yaml:"chiSelector,omitempty"`
 }
 
 // NewChiTemplating creates new templating
@@ -181,7 +218,7 @@ func (t *ChiTemplating) SetPolicy(p string) {
 }
 
 // GetSelector gets CHI selector
-func (t *ChiTemplating) GetSelector() CHISelector {
+func (t *ChiTemplating) GetSelector() TargetSelector {
 	if t == nil {
 		return nil
 	}
@@ -218,6 +255,39 @@ func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemp
 	}
 
 	return t
+}
+
+// TargetSelector specifies target selector based on labels
+type TargetSelector map[string]string
+
+// Matches checks whether TargetSelector matches provided set of labels
+func (s TargetSelector) Matches(labels map[string]string) bool {
+	if s == nil {
+		// Empty selector matches all labels
+		return true
+	}
+
+	// Walk over selector keys
+	for key, selectorValue := range s {
+		if labelValue, ok := labels[key]; !ok {
+			// Labels have no key specified in selector.
+			// Selector does not match the labels
+			return false
+		} else if selectorValue != labelValue {
+			// Labels have the key specified in selector, but selector value is not the same as labels value
+			// Selector does not match the labels
+			return false
+		} else {
+			// Selector value and label value are equal
+			// So far label matches selector
+			// Continue iteration to next value
+		}
+	}
+
+	// All keys are in place with the same values
+	// Selector matches the labels
+
+	return true
 }
 
 // Possible objects cleanup options
@@ -533,6 +603,10 @@ func (t *ChiReconciling) SetPolicy(p string) {
 	t.Policy = p
 }
 
+func (t *ChiReconciling) HasConfigMapPropagationTimeout() bool {
+	return t.GetConfigMapPropagationTimeout() > 0
+}
+
 // GetConfigMapPropagationTimeout gets config map propagation timeout
 func (t *ChiReconciling) GetConfigMapPropagationTimeout() int {
 	if t == nil {
@@ -608,8 +682,8 @@ type ChiShard struct {
 	Files               *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
 	Templates           *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
 	ReplicasCount       int            `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
-	// TODO refactor into map[string]ChiHost
-	Hosts []*ChiHost `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*Host `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
 	Runtime ChiShardRuntime `json:"-" yaml:"-"`
 
@@ -622,6 +696,10 @@ type ChiShardRuntime struct {
 	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+func (r ChiShardRuntime) GetAddress() IShardAddress {
+	return r.Address
+}
+
 // ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
 // TODO unify with ChiShard based on HostsSet
 type ChiReplica struct {
@@ -630,8 +708,8 @@ type ChiReplica struct {
 	Files       *Settings      `json:"files,omitempty"       yaml:"files,omitempty"`
 	Templates   *TemplatesList `json:"templates,omitempty"   yaml:"templates,omitempty"`
 	ShardsCount int            `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
-	// TODO refactor into map[string]ChiHost
-	Hosts []*ChiHost `json:"shards,omitempty" yaml:"shards,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*Host `json:"shards,omitempty" yaml:"shards,omitempty"`
 
 	Runtime ChiReplicaRuntime `json:"-" yaml:"-"`
 }
@@ -651,6 +729,34 @@ type ChiShardAddress struct {
 	ShardIndex   int    `json:"shardIndex,omitempty"   yaml:"shardIndex,omitempty"`
 }
 
+type IShardAddress interface {
+	GetNamespace() string
+	GetCRName() string
+	GetClusterName() string
+	GetClusterIndex() int
+	GetShardName() string
+	GetShardIndex() int
+}
+
+func (a ChiShardAddress) GetNamespace() string {
+	return a.Namespace
+}
+func (a ChiShardAddress) GetCRName() string {
+	return a.CHIName
+}
+func (a ChiShardAddress) GetClusterName() string {
+	return a.ClusterName
+}
+func (a ChiShardAddress) GetClusterIndex() int {
+	return a.ClusterIndex
+}
+func (a ChiShardAddress) GetShardName() string {
+	return a.ShardName
+}
+func (a ChiShardAddress) GetShardIndex() int {
+	return a.ShardIndex
+}
+
 // ChiReplicaAddress defines address of a replica within ClickHouseInstallation
 type ChiReplicaAddress struct {
 	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
@@ -665,7 +771,7 @@ type ChiReplicaAddress struct {
 type HostTemplate struct {
 	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
 	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
-	Spec             ChiHost            `json:"spec,omitempty"             yaml:"spec,omitempty"`
+	Spec             Host               `json:"spec,omitempty"             yaml:"spec,omitempty"`
 }
 
 // PortDistribution defines port distribution
@@ -727,8 +833,8 @@ type ServiceTemplate struct {
 	Spec         core.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
 }
 
-// ChiDistributedDDL defines distributedDDL section of .spec.defaults
-type ChiDistributedDDL struct {
+// DistributedDDL defines distributedDDL section of .spec.defaults
+type DistributedDDL struct {
 	Profile string `json:"profile,omitempty" yaml:"profile"`
 }
 

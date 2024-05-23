@@ -19,33 +19,49 @@ import (
 	core "k8s.io/api/core/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// ChiHost defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
-type ChiHost struct {
-	Name string `json:"name,omitempty" yaml:"name,omitempty"`
-	// DEPRECATED - to be removed soon
-	Port int32 `json:"port,omitempty"  yaml:"port,omitempty"`
+// Host defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
+type Host struct {
+	Name         string `json:"name,omitempty" yaml:"name,omitempty"`
+	HostSecure   `json:",inline" yaml:",inline"`
+	HostPorts    `json:",inline" yaml:",inline"`
+	HostSettings `json:",inline" yaml:",inline"`
+	Templates    *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
 
-	Insecure            *StringBool    `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
-	Secure              *StringBool    `json:"secure,omitempty"              yaml:"secure,omitempty"`
-	TCPPort             int32          `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
-	TLSPort             int32          `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
-	HTTPPort            int32          `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
-	HTTPSPort           int32          `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
-	InterserverHTTPPort int32          `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
-	Settings            *Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files               *Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates           *TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
-
-	Runtime ChiHostRuntime `json:"-" yaml:"-"`
+	Runtime HostRuntime `json:"-" yaml:"-"`
 }
 
-type ChiHostRuntime struct {
+type HostSecure struct {
+	Insecure *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
+	Secure   *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
+}
+
+type HostPorts struct {
+	// DEPRECATED - to be removed soon
+	Port *Int32 `json:"port,omitempty"  yaml:"port,omitempty"`
+
+	TCPPort             *Int32 `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	TLSPort             *Int32 `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
+	HTTPPort            *Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	HTTPSPort           *Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
+	InterserverHTTPPort *Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+}
+
+type HostSettings struct {
+	Settings *Settings `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files    *Settings `json:"files,omitempty"               yaml:"files,omitempty"`
+}
+
+type HostRuntime struct {
 	// Internal data
 	Address             HostAddress                `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
 	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
+	replicas            *Int32                     `json:"-" yaml:"-"`
+	hasData             bool                       `json:"-" yaml:"-"`
+
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
@@ -54,8 +70,20 @@ type ChiHostRuntime struct {
 	CHI *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
+func (r HostRuntime) GetAddress() IHostAddress {
+	return r.Address
+}
+
+type IHostRuntime interface {
+	GetAddress() IHostAddress
+}
+
+func (host *Host) GetRuntime() IHostRuntime {
+	return host.Runtime
+}
+
 // GetReconcileAttributes is an ensurer getter
-func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
+func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
 	if host == nil {
 		return nil
 	}
@@ -66,7 +94,7 @@ func (host *ChiHost) GetReconcileAttributes() *HostReconcileAttributes {
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
-func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
+func (host *Host) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
 		host.Settings = host.Settings.MergeFrom(shard.Settings)
 	}
@@ -77,7 +105,7 @@ func (host *ChiHost) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
 }
 
 // InheritFilesFrom inherits files from specified shard and replica
-func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
+func (host *Host) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 	if shard != nil {
 		host.Files = host.Files.MergeFrom(shard.Files)
 	}
@@ -88,7 +116,7 @@ func (host *ChiHost) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
 }
 
 // InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
+func (host *Host) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
 	if shard != nil {
 		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
 	}
@@ -104,72 +132,72 @@ func (host *ChiHost) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, 
 	host.Templates.HandleDeprecatedFields()
 }
 
-func isUnassigned(port int32) bool {
-	return port == PortMayBeAssignedLaterOrLeftUnused
-}
-
 // MergeFrom merges from specified host
-func (host *ChiHost) MergeFrom(from *ChiHost) {
+func (host *Host) MergeFrom(from *Host) {
 	if (host == nil) || (from == nil) {
 		return
 	}
 
 	host.Insecure = host.Insecure.MergeFrom(from.Insecure)
 	host.Secure = host.Secure.MergeFrom(from.Secure)
-	if isUnassigned(host.TCPPort) {
-		host.TCPPort = from.TCPPort
+
+	if !host.TCPPort.HasValue() {
+		host.TCPPort.MergeFrom(from.TCPPort)
 	}
-	if isUnassigned(host.TLSPort) {
-		host.TLSPort = from.TLSPort
+	if !host.TLSPort.HasValue() {
+		host.TLSPort.MergeFrom(from.TLSPort)
 	}
-	if isUnassigned(host.HTTPPort) {
-		host.HTTPPort = from.HTTPPort
+	if !host.HTTPPort.HasValue() {
+		host.HTTPPort.MergeFrom(from.HTTPPort)
 	}
-	if isUnassigned(host.HTTPSPort) {
-		host.HTTPSPort = from.HTTPSPort
+	if !host.HTTPSPort.HasValue() {
+		host.HTTPSPort.MergeFrom(from.HTTPSPort)
 	}
-	if isUnassigned(host.InterserverHTTPPort) {
-		host.InterserverHTTPPort = from.InterserverHTTPPort
+	if !host.InterserverHTTPPort.HasValue() {
+		host.InterserverHTTPPort.MergeFrom(from.InterserverHTTPPort)
 	}
+
 	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
 	host.Templates.HandleDeprecatedFields()
 }
 
 // GetHostTemplate gets host template
-func (host *ChiHost) GetHostTemplate() (*HostTemplate, bool) {
+func (host *Host) GetHostTemplate() (*HostTemplate, bool) {
 	if !host.Templates.HasHostTemplate() {
 		return nil, false
 	}
 	name := host.Templates.GetHostTemplate()
-	return host.Runtime.CHI.GetHostTemplate(name)
+	return host.GetCR().GetHostTemplate(name)
 }
 
 // GetPodTemplate gets pod template
-func (host *ChiHost) GetPodTemplate() (*PodTemplate, bool) {
+func (host *Host) GetPodTemplate() (*PodTemplate, bool) {
 	if !host.Templates.HasPodTemplate() {
 		return nil, false
 	}
 	name := host.Templates.GetPodTemplate()
-	return host.Runtime.CHI.GetPodTemplate(name)
+	return host.GetCR().GetPodTemplate(name)
 }
 
 // GetServiceTemplate gets service template
-func (host *ChiHost) GetServiceTemplate() (*ServiceTemplate, bool) {
+func (host *Host) GetServiceTemplate() (*ServiceTemplate, bool) {
 	if !host.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}
 	name := host.Templates.GetReplicaServiceTemplate()
-	return host.Runtime.CHI.GetServiceTemplate(name)
+	return host.GetCR().GetServiceTemplate(name)
 }
 
 // GetStatefulSetReplicasNum gets stateful set replica num
-func (host *ChiHost) GetStatefulSetReplicasNum(shutdown bool) *int32 {
+func (host *Host) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 	var num int32 = 0
 	switch {
 	case shutdown:
 		num = 0
 	case host.IsStopped():
 		num = 0
+	case host.Runtime.replicas.HasValue():
+		num = host.Runtime.replicas.Value()
 	default:
 		num = 1
 	}
@@ -177,52 +205,56 @@ func (host *ChiHost) GetStatefulSetReplicasNum(shutdown bool) *int32 {
 }
 
 // GetSettings gets settings
-func (host *ChiHost) GetSettings() *Settings {
+func (host *Host) GetSettings() *Settings {
 	return host.Settings
 }
 
 // GetZookeeper gets zookeeper
-func (host *ChiHost) GetZookeeper() *ChiZookeeperConfig {
+func (host *Host) GetZookeeper() *ChiZookeeperConfig {
 	cluster := host.GetCluster()
 	return cluster.Zookeeper
 }
 
 // GetName gets name
-func (host *ChiHost) GetName() string {
+func (host *Host) GetName() string {
 	if host == nil {
 		return "host-is-nil"
 	}
 	return host.Name
 }
 
-// GetCHI gets CHI
-func (host *ChiHost) GetCHI() *ClickHouseInstallation {
+// GetCR gets CHI
+func (host *Host) GetCR() *ClickHouseInstallation {
 	if host == nil {
 		return nil
 	}
 	return host.Runtime.CHI
 }
 
-// HasCHI checks whether host has CHI
-func (host *ChiHost) HasCHI() bool {
-	return host.GetCHI() != nil
+// HasCR checks whether host has CHI
+func (host *Host) HasCR() bool {
+	return host.GetCR() != nil
+}
+
+func (host *Host) SetCR(chi *ClickHouseInstallation) {
+	host.Runtime.CHI = chi
 }
 
 // GetCluster gets cluster
-func (host *ChiHost) GetCluster() *Cluster {
+func (host *Host) GetCluster() *Cluster {
 	// Host has to have filled Address
-	return host.GetCHI().FindCluster(host.Runtime.Address.ClusterName)
+	return host.GetCR().FindCluster(host.Runtime.Address.ClusterName)
 }
 
 // GetShard gets shard
-func (host *ChiHost) GetShard() *ChiShard {
+func (host *Host) GetShard() *ChiShard {
 	// Host has to have filled Address
-	return host.GetCHI().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
+	return host.GetCR().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
 }
 
 // GetAncestor gets ancestor of a host
-func (host *ChiHost) GetAncestor() *ChiHost {
-	return host.GetCHI().GetAncestor().FindHost(
+func (host *Host) GetAncestor() *Host {
+	return host.GetCR().GetAncestor().FindHost(
 		host.Runtime.Address.ClusterName,
 		host.Runtime.Address.ShardName,
 		host.Runtime.Address.HostName,
@@ -230,34 +262,34 @@ func (host *ChiHost) GetAncestor() *ChiHost {
 }
 
 // HasAncestor checks whether host has an ancestor
-func (host *ChiHost) HasAncestor() bool {
+func (host *Host) HasAncestor() bool {
 	return host.GetAncestor() != nil
 }
 
 // GetAncestorCHI gets ancestor of a host
-func (host *ChiHost) GetAncestorCHI() *ClickHouseInstallation {
-	return host.GetCHI().GetAncestor()
+func (host *Host) GetAncestorCHI() *ClickHouseInstallation {
+	return host.GetCR().GetAncestor()
 }
 
 // HasAncestorCHI checks whether host has an ancestor
-func (host *ChiHost) HasAncestorCHI() bool {
+func (host *Host) HasAncestorCHI() bool {
 	return host.GetAncestorCHI() != nil
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
-func (host *ChiHost) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
-	host.GetCHI().WalkVolumeClaimTemplates(f)
+func (host *Host) WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate)) {
+	host.GetCR().WalkVolumeClaimTemplates(f)
 }
 
 // IsStopped checks whether host is stopped
-func (host *ChiHost) IsStopped() bool {
-	return host.GetCHI().IsStopped()
+func (host *Host) IsStopped() bool {
+	return host.GetCR().IsStopped()
 }
 
 // IsNewOne checks whether host is a new one
 // TODO unify with model HostIsNewOne
-func (host *ChiHost) IsNewOne() bool {
-	return !host.HasAncestor()
+func (host *Host) IsNewOne() bool {
+	return !host.HasAncestor() && (host.GetCR().EnsureStatus().GetHostsCount() == host.GetCR().EnsureStatus().GetHostsAddedCount())
 }
 
 // WhichStatefulSet specifies which StatefulSet we are going to process in host functions
@@ -281,7 +313,7 @@ func (w WhichStatefulSet) DesiredStatefulSet() bool {
 }
 
 // WalkVolumeMounts walks VolumeMount(s)
-func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *core.VolumeMount)) {
+func (host *Host) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount *core.VolumeMount)) {
 	if host == nil {
 		return
 	}
@@ -314,7 +346,7 @@ func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount
 }
 
 // GetVolumeMount gets VolumeMount by the name
-//func (host *ChiHost) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
+//func (host *Host) GetVolumeMount(volumeMountName string) (vm *corev1.VolumeMount, ok bool) {
 //	host.WalkVolumeMounts(func(volumeMount *corev1.VolumeMount) {
 //		if volumeMount.Name == volumeMountName {
 //			vm = volumeMount
@@ -325,7 +357,7 @@ func (host *ChiHost) WalkVolumeMounts(which WhichStatefulSet, f func(volumeMount
 //}
 
 // IsSecure checks whether the host requires secure communication
-func (host *ChiHost) IsSecure() bool {
+func (host *Host) IsSecure() bool {
 	if host == nil {
 		return false
 	}
@@ -345,7 +377,7 @@ func (host *ChiHost) IsSecure() bool {
 }
 
 // IsInsecure checks whether the host requires insecure communication
-func (host *ChiHost) IsInsecure() bool {
+func (host *Host) IsInsecure() bool {
 	if host == nil {
 		return false
 	}
@@ -365,7 +397,7 @@ func (host *ChiHost) IsInsecure() bool {
 }
 
 // IsFirst checks whether the host is the first host of the whole CHI
-func (host *ChiHost) IsFirst() bool {
+func (host *Host) IsFirst() bool {
 	if host == nil {
 		return false
 	}
@@ -374,7 +406,7 @@ func (host *ChiHost) IsFirst() bool {
 }
 
 // HasCurStatefulSet checks whether host has CurStatefulSet
-func (host *ChiHost) HasCurStatefulSet() bool {
+func (host *Host) HasCurStatefulSet() bool {
 	if host == nil {
 		return false
 	}
@@ -383,10 +415,103 @@ func (host *ChiHost) HasCurStatefulSet() bool {
 }
 
 // HasDesiredStatefulSet checks whether host has DesiredStatefulSet
-func (host *ChiHost) HasDesiredStatefulSet() bool {
+func (host *Host) HasDesiredStatefulSet() bool {
 	if host == nil {
 		return false
 	}
 
 	return host.Runtime.DesiredStatefulSet != nil
+}
+
+const (
+	ChDefaultPortName   = "port"
+	ChDefaultPortNumber = int32(9000)
+
+	// ClickHouse open ports names and values
+	ChDefaultTCPPortName               = "tcp"
+	ChDefaultTCPPortNumber             = int32(9000)
+	ChDefaultTLSPortName               = "secureclient"
+	ChDefaultTLSPortNumber             = int32(9440)
+	ChDefaultHTTPPortName              = "http"
+	ChDefaultHTTPPortNumber            = int32(8123)
+	ChDefaultHTTPSPortName             = "https"
+	ChDefaultHTTPSPortNumber           = int32(8443)
+	ChDefaultInterserverHTTPPortName   = "interserver"
+	ChDefaultInterserverHTTPPortNumber = int32(9009)
+)
+
+func (host *Host) WalkPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+	if host == nil {
+		return
+	}
+	if f(ChDefaultPortName, host.Port, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultTCPPortName, host.TCPPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultTLSPortName, host.TLSPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultHTTPPortName, host.HTTPPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultHTTPSPortName, host.HTTPSPort, core.ProtocolTCP) {
+		return
+	}
+	if f(ChDefaultInterserverHTTPPortName, host.InterserverHTTPPort, core.ProtocolTCP) {
+		return
+	}
+}
+
+func (host *Host) WalkSpecifiedPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+	host.WalkPorts(
+		func(_name string, _port *Int32, _protocol core.Protocol) bool {
+			if _port.HasValue() {
+				// Port is explicitly specified - call provided function on it
+				return f(_name, _port, _protocol)
+			}
+			// Do not break, continue iterating
+			return false
+		},
+	)
+}
+
+func (host *Host) AppendSpecifiedPortsToContainer(container *core.Container) {
+	// Walk over all assigned ports of the host and append each port to the list of container's ports
+	host.WalkSpecifiedPorts(
+		func(name string, port *Int32, protocol core.Protocol) bool {
+			// Append assigned port to the list of container's ports
+			container.Ports = append(container.Ports,
+				core.ContainerPort{
+					Name:          name,
+					ContainerPort: port.Value(),
+					Protocol:      protocol,
+				},
+			)
+			// Do not abort, continue iterating
+			return false
+		},
+	)
+}
+
+func (host *Host) HasListedTablesCreated(name string) bool {
+	return util.InArray(
+		name,
+		host.GetCR().EnsureStatus().GetHostsWithTablesCreated(),
+	)
+}
+
+func (host *Host) HasData() bool {
+	if host == nil {
+		return false
+	}
+	return host.Runtime.hasData
+}
+
+func (host *Host) SetHasData(hasData bool) {
+	if host == nil {
+		return
+	}
+	host.Runtime.hasData = hasData
 }
