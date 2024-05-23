@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -38,7 +39,7 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api
 
 // prepareDesiredStatefulSet prepares desired StatefulSet
 func (w *worker) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
-	host.Runtime.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
+	host.Runtime.DesiredStatefulSet = w.task.Creator.CreateStatefulSet(host, shutdown)
 }
 
 // reconcileStatefulSet reconciles StatefulSet of a host
@@ -109,7 +110,7 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.Host, regist
 	}
 
 	_ = w.c.deleteStatefulSet(ctx, host)
-	_ = NewStorageReconciler(w.a, w.task, w.c).reconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	_ = common.NewStorageReconciler(w.task, w.c.namer, NewKubePVCClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 	return w.createStatefulSet(ctx, host, register)
 }
 

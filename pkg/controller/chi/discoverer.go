@@ -24,14 +24,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) labeler(cr api.ICustomResource) *labeler.LabelerClickHouse {
-	return labeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+func labeler(cr api.ICustomResource) interfaces.ILabeler {
+	return chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
 		AppendScope: chop.Config().Label.Runtime.AppendScope,
 		Include:     chop.Config().Label.Include,
 		Exclude:     chop.Config().Label.Exclude,
@@ -44,7 +44,7 @@ func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *mod
 		return nil
 	}
 
-	opts := controller.NewListOptions(c.labeler(cr).Selector(interfaces.SelectorCRScope))
+	opts := controller.NewListOptions(labeler(cr).Selector(interfaces.SelectorCRScope))
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, cr, opts)
 	c.discoveryConfigMaps(ctx, r, cr, opts)

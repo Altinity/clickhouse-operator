@@ -17,37 +17,71 @@ package chi
 import (
 	"context"
 	"fmt"
+
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (c *Controller) kubePVCGet(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
+type KubePVCClickHouse struct {
+	kubeClient kube.Interface
+	pvcDeleter *volume.PVCDeleter
+}
+
+func NewKubePVCClickHouse(kubeClient kube.Interface) *KubePVCClickHouse {
+	return &KubePVCClickHouse{
+		kubeClient: kubeClient,
+		pvcDeleter: volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
+	}
+}
+
+func (c *KubePVCClickHouse) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+	return c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, controller.NewCreateOptions())
+}
+
+func (c *KubePVCClickHouse) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
-func (c *Controller) kubePVCDelete(ctx context.Context, namespace, name string) error {
+func (c *KubePVCClickHouse) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+	return c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, controller.NewUpdateOptions())
+}
+
+func (c *KubePVCClickHouse) Delete(ctx context.Context, namespace, name string) error {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 }
 
-// updateOrCreatePVC
-func (c *Controller) updateOrCreatePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+func (c *KubePVCClickHouse) kubePVCListForHost(host *api.Host) (*core.PersistentVolumeClaimList, error) {
+	return c.kubeClient.
+		CoreV1().
+		PersistentVolumeClaims(host.Runtime.Address.Namespace).
+		List(
+			controller.NewContext(),
+			controller.NewListOptions(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
+		)
+}
+
+// UpdateOrCreate
+func (c *KubePVCClickHouse) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil, fmt.Errorf("task is done")
 	}
 
-	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, controller.NewGetOptions())
+	_, err := c.Get(ctx, pvc.Namespace, pvc.Name)
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
 			// This is not an error per se, means PVC is not created (yet)?
-			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, controller.NewCreateOptions())
+			_, err = c.Create(ctx, pvc)
 			if err != nil {
 				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)
 			}
@@ -58,7 +92,7 @@ func (c *Controller) updateOrCreatePVC(ctx context.Context, pvc *core.Persistent
 		return nil, err
 	}
 
-	pvcUpdated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, controller.NewUpdateOptions())
+	pvcUpdated, err := c.Update(ctx, pvc)
 	if err == nil {
 		return pvcUpdated, err
 	}
@@ -73,7 +107,7 @@ func (c *Controller) updateOrCreatePVC(ctx context.Context, pvc *core.Persistent
 }
 
 // deletePVC deletes PersistentVolumeClaim
-func (c *Controller) deletePVC(ctx context.Context, host *api.Host) error {
+func (c *KubePVCClickHouse) deletePVC(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -99,7 +133,7 @@ func (c *Controller) deletePVC(ctx context.Context, host *api.Host) error {
 		}
 
 		// Delete PVC
-		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, controller.NewDeleteOptions()); err == nil {
+		if err := c.Delete(ctx, pvc.Namespace, pvc.Name); err == nil {
 			log.V(1).M(host).Info("OK delete PVC %s/%s", namespace, pvc.Name)
 		} else if apiErrors.IsNotFound(err) {
 			log.V(1).M(host).Info("NEUTRAL not found PVC %s/%s", namespace, pvc.Name)
@@ -111,59 +145,10 @@ func (c *Controller) deletePVC(ctx context.Context, host *api.Host) error {
 	return nil
 }
 
-// Comment out PV
-// updatePersistentVolume
-//func (c *Controller) updatePersistentVolume(ctx context.Context, pv *core.PersistentVolume) (*core.PersistentVolume, error) {
-//	log.V(2).M(pv).F().P()
-//	if util.IsContextDone(ctx) {
-//		log.V(2).Info("task is done")
-//		return nil, fmt.Errorf("task is done")
-//	}
-//
-//	var err error
-//	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(ctx, pv, newUpdateOptions())
-//	if err != nil {
-//		// Update failed
-//		log.V(1).M(pv).F().Error("%v", err)
-//		return nil, err
-//	}
-//
-//	return pv, err
-//}
-
-func (c *Controller) walkPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
-	namespace := host.Runtime.Address.Namespace
-	name := c.namer.Name(interfaces.NamePod, host)
-	pod, err := c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
-	if err != nil {
-		log.M(host).F().Error("FAIL get pod for host %s/%s err:%v", namespace, host.GetName(), err)
-		return
-	}
-
-	for i := range pod.Spec.Volumes {
-		volume := &pod.Spec.Volumes[i]
-		if volume.PersistentVolumeClaim == nil {
-			continue
-		}
-
-		pvcName := volume.PersistentVolumeClaim.ClaimName
-		pvc, err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(controller.NewContext(), pvcName, controller.NewGetOptions())
-		if err != nil {
-			log.M(host).F().Error("FAIL get PVC %s/%s for the host %s/%s with err:%v", namespace, pvcName, namespace, host.GetName(), err)
-			continue
-		}
-
-		f(pvc)
-	}
-}
-
-func (c *Controller) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
+func (c *KubePVCClickHouse) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
 	namespace := host.Runtime.Address.Namespace
 
-	pvcList, err := c.kubeClient.
-		CoreV1().
-		PersistentVolumeClaims(namespace).
-		List(controller.NewContext(), controller.NewListOptions(c.labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)))
+	pvcList, err := c.kubePVCListForHost(host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get list of PVCs for the host %s/%s err:%v", namespace, host.GetName(), err)
 		return
@@ -176,15 +161,3 @@ func (c *Controller) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.Persist
 		f(pvc)
 	}
 }
-
-// Comment out PV
-//func (c *Controller) walkPVs(host *api.Host, f func(pv *core.PersistentVolume)) {
-//	c.walkPVCs(host, func(pvc *core.PersistentVolumeClaim) {
-//		pv, err := c.kubeClient.CoreV1().PersistentVolumes().Get(newContext(), pvc.Spec.VolumeName, newGetOptions())
-//		if err != nil {
-//			log.M(host).F().Error("FAIL get PV %s err:%v", pvc.Spec.VolumeName, err)
-//			return
-//		}
-//		f(pv)
-//	})
-//}

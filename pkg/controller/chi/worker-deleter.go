@@ -44,14 +44,14 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 		Info("remove items scheduled for deletion")
 
 	// Remove deleted items
-	w.a.V(1).M(chi).F().Info("List of objects which have failed to reconcile:\n%s", w.task.registryFailed)
-	w.a.V(1).M(chi).F().Info("List of successfully reconciled objects:\n%s", w.task.registryReconciled)
+	w.a.V(1).M(chi).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed)
+	w.a.V(1).M(chi).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled)
 	objs := w.c.discovery(ctx, chi)
-	need := w.task.registryReconciled
+	need := w.task.RegistryReconciled
 	w.a.V(1).M(chi).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(chi).F().Info("Non-reconciled objects:\n%s", objs)
-	if w.purge(ctx, chi, objs, w.task.registryFailed) > 0 {
+	if w.purge(ctx, chi, objs, w.task.RegistryFailed) > 0 {
 		w.c.enqueueObject(NewDropDns(chi.GetObjectMeta()))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
@@ -339,7 +339,7 @@ func (w *worker) canDropReplica(host *api.Host, opts ...*dropReplicaOptions) (ca
 	}
 
 	can = true
-	w.c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
+	NewKubePVCClickHouse(w.c.kubeClient).walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if commonLabeler.GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {

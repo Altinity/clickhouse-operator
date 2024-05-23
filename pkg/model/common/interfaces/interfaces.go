@@ -15,8 +15,11 @@
 package interfaces
 
 import (
+	"context"
+
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
@@ -72,4 +75,32 @@ type IServiceManager interface {
 	CreateService(what ServiceType, params ...any) *core.Service
 	SetCR(cr api.ICustomResource)
 	SetTagger(tagger ITagger)
+}
+
+type ICreator interface {
+	CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap
+	CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDisruptionBudget
+	CreatePVC(
+		name string,
+		namespace string,
+		host *api.Host,
+		spec *core.PersistentVolumeClaimSpec,
+	) *core.PersistentVolumeClaim
+	AdjustPVC(
+		pvc *core.PersistentVolumeClaim,
+		host *api.Host,
+		template *api.VolumeClaimTemplate,
+	) *core.PersistentVolumeClaim
+	CreateClusterSecret(name string) *core.Secret
+	CreateService(what ServiceType, params ...any) *core.Service
+	CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet
+}
+
+type IKubePVC interface {
+	Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
+	Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error)
+	Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
+	Delete(ctx context.Context, namespace, name string) error
+
+	UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 }

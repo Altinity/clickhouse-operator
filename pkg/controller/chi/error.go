@@ -27,21 +27,3 @@ var (
 	errCRUDRecreate       ErrorCRUD = errors.New("crud error - should recreate")
 	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
 )
-
-// ErrorDataPersistence specifies errors of the PVCs and PVs
-type ErrorDataPersistence error
-
-var (
-	errPVCWithLostPVDeleted ErrorDataPersistence = errors.New("pvc with lost pv deleted")
-	errPVCIsLost            ErrorDataPersistence = errors.New("pvc is lost")
-)
-
-func errIsDataLoss(err error) bool {
-	switch err {
-	case errPVCWithLostPVDeleted:
-		return true
-	case errPVCIsLost:
-		return true
-	}
-	return false
-}

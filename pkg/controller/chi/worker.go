@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -57,27 +58,7 @@ type worker struct {
 	normalizer *normalizer.Normalizer
 	schemer    *schemer.ClusterSchemer
 	start      time.Time
-	task       *task
-}
-
-// task represents context of a worker. This also can be called "a reconcile task"
-type task struct {
-	creator            *commonCreator.Creator
-	registryReconciled *model.Registry
-	registryFailed     *model.Registry
-	cmUpdate           time.Time
-	start              time.Time
-}
-
-// newTask creates new context
-func newTask(creator *commonCreator.Creator) *task {
-	return &task{
-		creator:            creator,
-		registryReconciled: model.NewRegistry(),
-		registryFailed:     model.NewRegistry(),
-		cmUpdate:           time.Time{},
-		start:              time.Now(),
-	}
+	task       *common.Task
 }
 
 // newWorker
@@ -101,7 +82,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *api.ClickHouseInstallation) {
-	w.task = newTask(
+	w.task = common.NewTask(
 		commonCreator.NewCreator(
 			chi,
 			managers.NewConfigFilesGenerator(
@@ -1337,7 +1318,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 			M(chi).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		if updatedConfigMap.ResourceVersion != configMap.ResourceVersion {
-			w.task.cmUpdate = time.Now()
+			w.task.CmUpdate = time.Now()
 		}
 	} else {
 		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
@@ -1609,7 +1590,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) b
 	}
 
 	// No need to wait on unchanged ConfigMap
-	if w.task.cmUpdate.IsZero() {
+	if w.task.CmUpdate.IsZero() {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
 		return false
 	}
@@ -1625,7 +1606,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) b
 
 	// How much time has elapsed since last ConfigMap update?
 	// May be there is not need to wait already
-	elapsed := time.Now().Sub(w.task.cmUpdate)
+	elapsed := time.Now().Sub(w.task.CmUpdate)
 	if elapsed >= timeout {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
 		return false

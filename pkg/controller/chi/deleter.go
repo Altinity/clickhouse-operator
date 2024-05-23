@@ -34,7 +34,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *api.Host) error {
 
 	// Each host consists of:
 	_ = c.deleteStatefulSet(ctx, host)
-	_ = c.deletePVC(ctx, host)
+	_ = NewKubePVCClickHouse(c.kubeClient).deletePVC(ctx, host)
 	_ = c.deleteConfigMap(ctx, host)
 	_ = c.deleteServiceHost(ctx, host)
 
