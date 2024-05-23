@@ -100,14 +100,10 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 // getStatefulSet gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.Host
-func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.StatefulSet, error) {
+func (c *Controller) getStatefulSet(obj interface{}) (*apps.StatefulSet, error) {
 	switch typedObj := obj.(type) {
-	case *meta.ObjectMeta:
-		var b bool
-		if len(byName) > 0 {
-			b = byName[0]
-		}
-		return c.getStatefulSetByMeta(typedObj, b)
+	case meta.Object:
+		return c.getStatefulSetByMeta(typedObj)
 	case *api.Host:
 		return c.getStatefulSetByHost(typedObj)
 	}
@@ -115,51 +111,8 @@ func (c *Controller) getStatefulSet(obj interface{}, byName ...bool) (*apps.Stat
 }
 
 // getStatefulSet gets StatefulSet either by namespaced name or by labels
-// TODO review byNameOnly params
-func (c *Controller) getStatefulSetByMeta(meta meta.Object, byNameOnly bool) (*apps.StatefulSet, error) {
-	get := c.statefulSetLister.StatefulSets(meta.GetNamespace()).Get
-	list := c.statefulSetLister.StatefulSets(meta.GetNamespace()).List
-	var objects []*apps.StatefulSet
-
-	// Check whether object with such name already exists
-	obj, err := get(meta.GetName())
-
-	if (obj != nil) && (err == nil) {
-		// Object found by name
-		return obj, nil
-	}
-
-	if !apiErrors.IsNotFound(err) {
-		// Error, which is not related to "Object not found"
-		return nil, err
-	}
-
-	// Object not found by name. Try to find by labels
-
-	if byNameOnly {
-		return nil, fmt.Errorf("object not found by name %s/%s and no label search allowed ", meta.GetNamespace(), meta.GetName())
-	}
-
-	var selector k8sLabels.Selector
-	if selector, err = commonLabeler.MakeSelectorFromObjectMeta(meta); err != nil {
-		return nil, err
-	}
-
-	if objects, err = list(selector); err != nil {
-		return nil, err
-	}
-
-	if len(objects) == 0 {
-		return nil, apiErrors.NewNotFound(apps.Resource("StatefulSet"), meta.GetName())
-	}
-
-	if len(objects) == 1 {
-		// Exactly one object found by labels
-		return objects[0], nil
-	}
-
-	// Too much objects found by labels
-	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
+func (c *Controller) getStatefulSetByMeta(meta meta.Object) (*apps.StatefulSet, error) {
+	return c.kubeClient.AppsV1().StatefulSets(meta.GetNamespace()).Get(controller.NewContext(), meta.GetName(), controller.NewGetOptions())
 }
 
 // getStatefulSetByHost finds StatefulSet of a specified host

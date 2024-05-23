@@ -43,7 +43,7 @@ func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
 	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
 
-	curStatefulSet, err := w.c.getStatefulSet(&meta, false)
+	curStatefulSet, err := w.c.getStatefulSet(meta)
 	switch {
 	case curStatefulSet != nil:
 		w.a.V(2).M(meta).Info("Have StatefulSet available, try to perform label-based comparison for %s/%s", meta.GetNamespace(), meta.GetName())
@@ -102,7 +102,7 @@ func (w *worker) reconcileStatefulSet(
 	}
 
 	// Check whether this object already exists in k8s
-	host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(newStatefulSet.GetObjectMeta(), false)
+	host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(newStatefulSet.GetObjectMeta())
 
 	// Report diff to trace
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
@@ -126,7 +126,7 @@ func (w *worker) reconcileStatefulSet(
 	}
 
 	// Host has to know current StatefulSet and Pod
-	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(newStatefulSet.GetObjectMeta(), false)
+	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(newStatefulSet.GetObjectMeta())
 
 	return err
 }
