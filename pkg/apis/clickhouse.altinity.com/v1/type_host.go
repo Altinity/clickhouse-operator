@@ -60,6 +60,7 @@ type HostRuntime struct {
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
 	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
 	replicas            *Int32                     `json:"-" yaml:"-"`
+	hasData             bool                       `json:"-" yaml:"-"`
 
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
@@ -499,4 +500,18 @@ func (host *Host) HasListedTablesCreated(name string) bool {
 		name,
 		host.GetCR().EnsureStatus().GetHostsWithTablesCreated(),
 	)
+}
+
+func (host *Host) HasData() bool {
+	if host == nil {
+		return false
+	}
+	return host.Runtime.hasData
+}
+
+func (host *Host) SetHasData(hasData bool) {
+	if host == nil {
+		return
+	}
+	host.Runtime.hasData = hasData
 }

@@ -16,12 +16,10 @@ package chi
 
 import (
 	"context"
-	"fmt"
 
 	"gopkg.in/d4l3k/messagediff.v1"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -122,63 +120,6 @@ func (c *Controller) updateStatefulSet(
 
 	log.V(2).M(host).F().Info("Target generation reached, StatefulSet updated successfully")
 	return nil
-}
-
-// Comment out PV
-// updatePersistentVolume
-//func (c *Controller) updatePersistentVolume(ctx context.Context, pv *core.PersistentVolume) (*core.PersistentVolume, error) {
-//	log.V(2).M(pv).F().P()
-//	if util.IsContextDone(ctx) {
-//		log.V(2).Info("task is done")
-//		return nil, fmt.Errorf("task is done")
-//	}
-//
-//	var err error
-//	pv, err = c.kubeClient.CoreV1().PersistentVolumes().Update(ctx, pv, newUpdateOptions())
-//	if err != nil {
-//		// Update failed
-//		log.V(1).M(pv).F().Error("%v", err)
-//		return nil, err
-//	}
-//
-//	return pv, err
-//}
-
-// updatePersistentVolumeClaim
-func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
-	log.V(2).M(pvc).F().P()
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil, fmt.Errorf("task is done")
-	}
-
-	_, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, controller.NewGetOptions())
-	if err != nil {
-		if apiErrors.IsNotFound(err) {
-			// This is not an error per se, means PVC is not created (yet)?
-			_, err = c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, controller.NewCreateOptions())
-			if err != nil {
-				log.V(1).M(pvc).F().Error("unable to Create PVC err: %v", err)
-			}
-			return pvc, err
-		}
-		// In case of any non-NotFound API error - unable to proceed
-		log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
-		return nil, err
-	}
-
-	pvcUpdated, err := c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, controller.NewUpdateOptions())
-	if err == nil {
-		return pvcUpdated, err
-	}
-
-	// Update failed
-	// May want to suppress special case of an error
-	//if strings.Contains(err.Error(), "field can not be less than previous value") {
-	//	return pvc, nil
-	//}
-	log.V(1).M(pvc).F().Error("unable to Update PVC err: %v", err)
-	return nil, err
 }
 
 // onStatefulSetCreateFailed handles situation when StatefulSet create failed

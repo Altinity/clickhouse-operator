@@ -41,7 +41,6 @@ import (
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -875,22 +874,6 @@ func (w *worker) options() *chiConfig.FilesGeneratorOptionsClickHouse {
 	return chiConfig.NewConfigFilesGeneratorOptionsClickHouse().SetRemoteServersOptions(opts)
 }
 
-// prepareHostStatefulSetWithStatus prepares host's StatefulSet status
-func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api.Host, shutdown bool) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return
-	}
-
-	w.prepareDesiredStatefulSet(host, shutdown)
-	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host))
-}
-
-// prepareDesiredStatefulSet prepares desired StatefulSet
-func (w *worker) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
-	host.Runtime.DesiredStatefulSet = w.task.creator.CreateStatefulSet(host, shutdown)
-}
-
 type migrateTableOptions struct {
 	forceMigrate bool
 	dropReplica  bool
@@ -980,8 +963,8 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	return err
 }
 
-func (w *worker) hostIsListedAsHavingTablesCreated(host *api.Host) bool {
-	return host.HasListedTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
+func (w *worker) setHasData(host *api.Host) {
+	host.SetHasData(host.HasListedTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host)))
 }
 
 // shouldMigrateTables
@@ -998,7 +981,7 @@ func (w *worker) shouldMigrateTables(host *api.Host, opts ...*migrateTableOption
 		// Force migration requested
 		return true
 
-	case w.hostIsListedAsHavingTablesCreated(host):
+	case host.HasData():
 		// This host is listed as having tables created already, no need to migrate again
 		return false
 
@@ -1617,68 +1600,6 @@ func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.Object) api.Obje
 	return api.ObjectStatusModified
 }
 
-// createStatefulSet
-func (w *worker) createStatefulSet(ctx context.Context, host *api.Host, register bool) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	statefulSet := host.Runtime.DesiredStatefulSet
-
-	w.a.V(2).M(host).S().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
-	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
-
-	w.a.V(1).
-		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
-		WithStatusAction(host.GetCR()).
-		M(host).F().
-		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
-
-	action := w.c.createStatefulSet(ctx, host)
-
-	if register {
-		host.GetCR().EnsureStatus().HostAdded()
-		_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
-			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
-				MainFields: true,
-			},
-		})
-	}
-
-	switch action {
-	case nil:
-		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateCompleted).
-			WithStatusAction(host.GetCR()).
-			M(host).F().
-			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
-		return nil
-	case errCRUDAbort:
-		w.a.WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
-			WithStatusAction(host.GetCR()).
-			WithStatusError(host.GetCR()).
-			M(host).F().
-			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, action)
-		return action
-	case errCRUDIgnore:
-		w.a.WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
-			WithStatusAction(host.GetCR()).
-			M(host).F().
-			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
-		return nil
-	case errCRUDRecreate:
-		w.a.V(1).M(host).Warning("Got recreate action. Ignore and continue for now")
-		return nil
-	case errCRUDUnexpectedFlow:
-		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
-		return nil
-	}
-
-	w.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
-	return nil
-}
-
 // waitConfigMapPropagation
 func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) bool {
 	// No need to wait for ConfigMap propagation on stopped host
@@ -1719,89 +1640,6 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) b
 	}
 
 	return false
-}
-
-// updateStatefulSet
-func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register bool) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	// Helpers
-	newStatefulSet := host.Runtime.DesiredStatefulSet
-	curStatefulSet := host.Runtime.CurStatefulSet
-
-	w.a.V(2).M(host).S().Info(newStatefulSet.Name)
-	defer w.a.V(2).M(host).E().Info(newStatefulSet.Name)
-
-	namespace := newStatefulSet.Namespace
-	name := newStatefulSet.Name
-
-	w.a.V(1).
-		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
-		WithStatusAction(host.GetCR()).
-		M(host).F().
-		Info("Update StatefulSet(%s/%s) - started", namespace, name)
-
-	if w.waitConfigMapPropagation(ctx, host) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	action := errCRUDRecreate
-	if k8s.IsStatefulSetReady(curStatefulSet) {
-		action = w.c.updateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
-	}
-
-	switch action {
-	case nil:
-		if register {
-			host.GetCR().EnsureStatus().HostUpdated()
-			_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
-					MainFields: true,
-				},
-			})
-		}
-		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionUpdate, eventReasonUpdateCompleted).
-			WithStatusAction(host.GetCR()).
-			M(host).F().
-			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
-		return nil
-	case errCRUDAbort:
-		w.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got abort. Abort", namespace, name)
-		return errCRUDAbort
-	case errCRUDIgnore:
-		w.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
-		return nil
-	case errCRUDRecreate:
-		w.a.WithEvent(host.GetCR(), eventActionUpdate, eventReasonUpdateInProgress).
-			WithStatusAction(host.GetCR()).
-			M(host).F().
-			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
-		w.dumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
-		return w.recreateStatefulSet(ctx, host, register)
-	case errCRUDUnexpectedFlow:
-		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
-		return nil
-	}
-
-	w.a.V(1).M(host).Warning("Got unexpected flow. This is strange. Ignore and continue for now")
-	return nil
-}
-
-// recreateStatefulSet
-func (w *worker) recreateStatefulSet(ctx context.Context, host *api.Host, register bool) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	_ = w.c.deleteStatefulSet(ctx, host)
-	_ = w.reconcilePVCs(ctx, host, api.DesiredStatefulSet)
-	return w.createStatefulSet(ctx, host, register)
 }
 
 func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {

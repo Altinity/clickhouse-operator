@@ -19,7 +19,6 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -180,45 +179,6 @@ func (c *Controller) syncStatefulSet(ctx context.Context, host *api.Host) {
 			return
 		}
 	}
-}
-
-// deletePVC deletes PersistentVolumeClaim
-func (c *Controller) deletePVC(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	log.V(2).M(host).S().P()
-	defer log.V(2).M(host).E().P()
-
-	namespace := host.Runtime.Address.Namespace
-	c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
-		if util.IsContextDone(ctx) {
-			log.V(2).Info("task is done")
-			return
-		}
-
-		// Check whether PVC can be deleted
-		if c.pvcDeleter.HostCanDeletePVC(host, pvc.Name) {
-			log.V(1).M(host).Info("PVC %s/%s would be deleted", namespace, pvc.Name)
-		} else {
-			log.V(1).M(host).Info("PVC %s/%s should not be deleted, leave it intact", namespace, pvc.Name)
-			// Move to the next PVC
-			return
-		}
-
-		// Delete PVC
-		if err := c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, pvc.Name, controller.NewDeleteOptions()); err == nil {
-			log.V(1).M(host).Info("OK delete PVC %s/%s", namespace, pvc.Name)
-		} else if apiErrors.IsNotFound(err) {
-			log.V(1).M(host).Info("NEUTRAL not found PVC %s/%s", namespace, pvc.Name)
-		} else {
-			log.M(host).F().Error("FAIL to delete PVC %s/%s err:%v", namespace, pvc.Name, err)
-		}
-	})
-
-	return nil
 }
 
 // deleteConfigMap deletes ConfigMap
