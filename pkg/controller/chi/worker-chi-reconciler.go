@@ -409,7 +409,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
 	version, _ := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true})
-	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(host, false)
+	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. ClickHouse version: %s", host.GetName(), version)
 	// In case we have to force-restart host

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -41,7 +40,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -1516,69 +1514,6 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 	}
 
 	return err
-}
-
-// getStatefulSetStatus gets StatefulSet status
-func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
-	meta := host.Runtime.DesiredStatefulSet.GetObjectMeta()
-	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
-	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
-
-	curStatefulSet, err := w.c.getStatefulSet(&meta, false)
-	switch {
-	case curStatefulSet != nil:
-		w.a.V(2).M(meta).Info("Have StatefulSet available, try to perform label-based comparison for %s/%s", meta.GetNamespace(), meta.GetName())
-		return w.getObjectStatusFromMetas(curStatefulSet.GetObjectMeta(), meta)
-
-	case apiErrors.IsNotFound(err):
-		// StatefulSet is not found at the moment.
-		// However, it may be just deleted
-		w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found. Either new one or deleted for %s/%s", meta.GetNamespace(), meta.GetName())
-		if host.IsNewOne() {
-			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is a new one. New one for %s/%s", meta.GetNamespace(), meta.GetName())
-			return api.ObjectStatusNew
-		}
-		w.a.V(1).M(meta).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for %s/%s", meta.GetNamespace(), meta.GetName())
-		return api.ObjectStatusModified
-
-	default:
-		w.a.V(2).M(meta).Warning("Have no StatefulSet available, nor it is not found for %s/%s err: %v", meta.GetNamespace(), meta.GetName(), err)
-		return api.ObjectStatusUnknown
-	}
-}
-
-// getObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
-func (w *worker) getObjectStatusFromMetas(curMeta, newMeta meta.Object) api.ObjectStatus {
-	// Try to perform label-based version comparison
-	curVersion, curHasLabel := commonLabeler.GetObjectVersion(curMeta)
-	newVersion, newHasLabel := commonLabeler.GetObjectVersion(newMeta)
-
-	if !curHasLabel || !newHasLabel {
-		w.a.M(newMeta).F().Warning(
-			"Not enough labels to compare objects, can not say for sure what exactly is going on. Object: %s",
-			util.NamespaceNameString(newMeta),
-		)
-		return api.ObjectStatusUnknown
-	}
-
-	//
-	// We have both set of labels, can compare them
-	//
-
-	if curVersion == newVersion {
-		w.a.M(newMeta).F().Info(
-			"cur and new objects are equal based on object version label. Update of the object is not required. Object: %s",
-			util.NamespaceNameString(newMeta),
-		)
-		return api.ObjectStatusSame
-	}
-
-	w.a.M(newMeta).F().Info(
-		"cur and new objects ARE DIFFERENT based on object version label: Update of the object is required. Object: %s",
-		util.NamespaceNameString(newMeta),
-	)
-
-	return api.ObjectStatusModified
 }
 
 // waitConfigMapPropagation

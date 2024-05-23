@@ -37,6 +37,35 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api
 	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host))
 }
 
+// getStatefulSetStatus gets StatefulSet status
+func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
+	meta := host.Runtime.DesiredStatefulSet.GetObjectMeta()
+	w.a.V(2).M(meta).S().Info(util.NamespaceNameString(meta))
+	defer w.a.V(2).M(meta).E().Info(util.NamespaceNameString(meta))
+
+	curStatefulSet, err := w.c.getStatefulSet(&meta, false)
+	switch {
+	case curStatefulSet != nil:
+		w.a.V(2).M(meta).Info("Have StatefulSet available, try to perform label-based comparison for %s/%s", meta.GetNamespace(), meta.GetName())
+		return common.GetObjectStatusFromMetas(curStatefulSet.GetObjectMeta(), meta)
+
+	case apiErrors.IsNotFound(err):
+		// StatefulSet is not found at the moment.
+		// However, it may be just deleted
+		w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found. Either new one or deleted for %s/%s", meta.GetNamespace(), meta.GetName())
+		if host.IsNewOne() {
+			w.a.V(2).M(meta).Info("No cur StatefulSet available and it is not found and is a new one. New one for %s/%s", meta.GetNamespace(), meta.GetName())
+			return api.ObjectStatusNew
+		}
+		w.a.V(1).M(meta).Warning("No cur StatefulSet available but host has an ancestor. Found deleted StatefulSet. for %s/%s", meta.GetNamespace(), meta.GetName())
+		return api.ObjectStatusModified
+
+	default:
+		w.a.V(2).M(meta).Warning("Have no StatefulSet available, nor it is not found for %s/%s err: %v", meta.GetNamespace(), meta.GetName(), err)
+		return api.ObjectStatusUnknown
+	}
+}
+
 // prepareDesiredStatefulSet prepares desired StatefulSet
 func (w *worker) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
 	host.Runtime.DesiredStatefulSet = w.task.Creator.CreateStatefulSet(host, shutdown)
