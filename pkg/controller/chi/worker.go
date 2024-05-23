@@ -57,7 +57,7 @@ type worker struct {
 	normalizer *normalizer.Normalizer
 	schemer    *schemer.ClusterSchemer
 	start      time.Time
-	task       task
+	task       *task
 }
 
 // task represents context of a worker. This also can be called "a reconcile task"
@@ -70,8 +70,8 @@ type task struct {
 }
 
 // newTask creates new context
-func newTask(creator *commonCreator.Creator) task {
-	return task{
+func newTask(creator *commonCreator.Creator) *task {
+	return &task{
 		creator:            creator,
 		registryReconciled: model.NewRegistry(),
 		registryFailed:     model.NewRegistry(),

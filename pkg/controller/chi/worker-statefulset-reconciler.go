@@ -109,7 +109,7 @@ func (w *worker) recreateStatefulSet(ctx context.Context, host *api.Host, regist
 	}
 
 	_ = w.c.deleteStatefulSet(ctx, host)
-	_ = w.reconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	_ = NewStorageReconciler(w.a, w.task, w.c).reconcilePVCs(ctx, host, api.DesiredStatefulSet)
 	return w.createStatefulSet(ctx, host, register)
 }
 

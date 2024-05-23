@@ -17,7 +17,6 @@ package chi
 import (
 	"context"
 	"fmt"
-
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -28,8 +27,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// updatePersistentVolumeClaim
-func (c *Controller) updatePersistentVolumeClaim(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+func (c *Controller) kubePVCGet(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
+	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, controller.NewGetOptions())
+}
+
+func (c *Controller) kubePVCDelete(ctx context.Context, namespace, name string) error {
+	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
+// updateOrCreatePVC
+func (c *Controller) updateOrCreatePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
