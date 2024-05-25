@@ -37,6 +37,11 @@ func (w *worker) prepareHostStatefulSetWithStatus(ctx context.Context, host *api
 	host.GetReconcileAttributes().SetStatus(w.getStatefulSetStatus(host))
 }
 
+// prepareDesiredStatefulSet prepares desired StatefulSet
+func (w *worker) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
+	host.Runtime.DesiredStatefulSet = w.task.Creator.CreateStatefulSet(host, shutdown)
+}
+
 // getStatefulSetStatus gets StatefulSet status
 func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	meta := host.Runtime.DesiredStatefulSet.GetObjectMeta()
@@ -66,17 +71,12 @@ func (w *worker) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	}
 }
 
-// prepareDesiredStatefulSet prepares desired StatefulSet
-func (w *worker) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
-	host.Runtime.DesiredStatefulSet = w.task.Creator.CreateStatefulSet(host, shutdown)
-}
-
 // reconcileStatefulSet reconciles StatefulSet of a host
 func (w *worker) reconcileStatefulSet(
 	ctx context.Context,
 	host *api.Host,
 	register bool,
-	opts ...*reconcileHostStatefulSetOptions,
+	opts ...*common.ReconcileStatefulSetOptions,
 ) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -107,10 +107,10 @@ func (w *worker) reconcileStatefulSet(
 	// Report diff to trace
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
 		w.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet.GetObjectMeta()))
-		w.dumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
+		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}
 
-	opt := NewReconcileHostStatefulSetOptionsArr(opts...).First()
+	opt := common.NewReconcileStatefulSetOptionsArr(opts...).First()
 	switch {
 	case opt.ForceRecreate():
 		// Force recreate prevails over all other requests
@@ -203,7 +203,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
-		w.dumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
+		common.DumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
 		return w.recreateStatefulSet(ctx, host, register)
 	case errCRUDUnexpectedFlow:
 		w.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")

@@ -1540,7 +1540,7 @@ func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) b
 	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
 
 	// How much time has elapsed since last ConfigMap update?
-	// May be there is not need to wait already
+	// May be there is no need to wait already
 	elapsed := time.Now().Sub(w.task.CmUpdate)
 	if elapsed >= timeout {
 		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)

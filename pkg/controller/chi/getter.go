@@ -97,33 +97,6 @@ func (c *Controller) getService(obj interface{}) (*core.Service, error) {
 	//return c.kubeClient.CoreV1().Services(namespace).Get(newTask(), name, newGetOptions())
 }
 
-// getStatefulSet gets StatefulSet. Accepted types:
-//  1. *meta.ObjectMeta
-//  2. *chop.Host
-func (c *Controller) getStatefulSet(obj interface{}) (*apps.StatefulSet, error) {
-	switch typedObj := obj.(type) {
-	case meta.Object:
-		return c.getStatefulSetByMeta(typedObj)
-	case *api.Host:
-		return c.getStatefulSetByHost(typedObj)
-	}
-	return nil, fmt.Errorf("unknown type")
-}
-
-// getStatefulSet gets StatefulSet either by namespaced name or by labels
-func (c *Controller) getStatefulSetByMeta(meta meta.Object) (*apps.StatefulSet, error) {
-	return c.kubeClient.AppsV1().StatefulSets(meta.GetNamespace()).Get(controller.NewContext(), meta.GetName(), controller.NewGetOptions())
-}
-
-// getStatefulSetByHost finds StatefulSet of a specified host
-func (c *Controller) getStatefulSetByHost(host *api.Host) (*apps.StatefulSet, error) {
-	// Namespaced name
-	name := c.namer.Name(interfaces.NameStatefulSet, host)
-	namespace := host.Runtime.Address.Namespace
-
-	return c.kubeClient.AppsV1().StatefulSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
-}
-
 // getSecret gets secret
 func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
 	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(controller.NewContext(), secret.Name, controller.NewGetOptions())

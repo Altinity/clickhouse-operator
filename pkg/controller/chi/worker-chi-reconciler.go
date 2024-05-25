@@ -17,14 +17,10 @@ package chi
 import (
 	"context"
 	"errors"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"math"
 	"sync"
 	"time"
 
-	"gopkg.in/d4l3k/messagediff.v1"
-
-	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +30,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
@@ -372,34 +369,8 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 	return
 }
 
-type reconcileHostStatefulSetOptions struct {
-	forceRecreate bool
-}
-
-func (o *reconcileHostStatefulSetOptions) ForceRecreate() bool {
-	if o == nil {
-		return false
-	}
-	return o.forceRecreate
-}
-
-type reconcileHostStatefulSetOptionsArr []*reconcileHostStatefulSetOptions
-
-// NewReconcileHostStatefulSetOptionsArr creates new reconcileHostStatefulSetOptions array
-func NewReconcileHostStatefulSetOptionsArr(opts ...*reconcileHostStatefulSetOptions) (res reconcileHostStatefulSetOptionsArr) {
-	return append(res, opts...)
-}
-
-// First gets first option
-func (a reconcileHostStatefulSetOptionsArr) First() *reconcileHostStatefulSetOptions {
-	if len(a) > 0 {
-		return a[0]
-	}
-	return nil
-}
-
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*reconcileHostStatefulSetOptions) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*common.ReconcileStatefulSetOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -657,8 +628,8 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	var (
-		reconcileHostStatefulSetOpts *reconcileHostStatefulSetOptions
-		migrateTableOpts             *migrateTableOptions
+		reconcileStatefulSetOpts *common.ReconcileStatefulSetOptions
+		migrateTableOpts         *migrateTableOptions
 	)
 
 	if util.IsContextDone(ctx) {
@@ -719,9 +690,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
-		reconcileHostStatefulSetOpts = &reconcileHostStatefulSetOptions{
-			forceRecreate: true,
-		}
+		reconcileStatefulSetOpts = common.NewReconcileStatefulSetOptions(true)
 		migrateTableOpts = &migrateTableOptions{
 			forceMigrate: true,
 			dropReplica:  true,
@@ -731,7 +700,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 			Info("Data loss detected for host: %s. Will do force migrate", host.GetName())
 	}
 
-	if err := w.reconcileHostStatefulSet(ctx, host, reconcileHostStatefulSetOpts); err != nil {
+	if err := w.reconcileHostStatefulSet(ctx, host, reconcileStatefulSetOpts); err != nil {
 		metricsHostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
@@ -960,50 +929,4 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *api.ClickHouseInstall
 	}
 
 	return err
-}
-
-func (w *worker) dumpStatefulSetDiff(host *api.Host, cur, new *apps.StatefulSet) {
-	if cur == nil {
-		w.a.V(1).M(host).Info("Cur StatefulSet is not available, nothing to compare to")
-		return
-	}
-	if new == nil {
-		w.a.V(1).M(host).Info("New StatefulSet is not available, nothing to compare to")
-		return
-	}
-
-	if diff, equal := messagediff.DeepDiff(cur.Spec, new.Spec); equal {
-		w.a.V(1).M(host).Info("StatefulSet.Spec ARE EQUAL")
-	} else {
-		w.a.V(1).Info(
-			"StatefulSet.Spec ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-			util.MessageDiffItemString("added .spec items", "none", "", diff.Added),
-			util.MessageDiffItemString("modified .spec items", "none", "", diff.Modified),
-			util.MessageDiffItemString("removed .spec items", "none", "", diff.Removed),
-		)
-	}
-	if diff, equal := messagediff.DeepDiff(cur.Labels, new.Labels); equal {
-		w.a.V(1).M(host).Info("StatefulSet.Labels ARE EQUAL")
-	} else {
-		if len(cur.Labels)+len(new.Labels) > 0 {
-			w.a.V(1).Info(
-				"StatefulSet.Labels ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-				util.MessageDiffItemString("added .labels items", "none", "", diff.Added),
-				util.MessageDiffItemString("modified .labels items", "none", "", diff.Modified),
-				util.MessageDiffItemString("removed .labels items", "none", "", diff.Removed),
-			)
-		}
-	}
-	if diff, equal := messagediff.DeepDiff(cur.Annotations, new.Annotations); equal {
-		w.a.V(1).M(host).Info("StatefulSet.Annotations ARE EQUAL")
-	} else {
-		if len(cur.Annotations)+len(new.Annotations) > 0 {
-			w.a.V(1).Info(
-				"StatefulSet.Annotations ARE DIFFERENT:\nadded:\n%s\nmodified:\n%s\nremoved:\n%s",
-				util.MessageDiffItemString("added .annotations items", "none", "", diff.Added),
-				util.MessageDiffItemString("modified .annotations items", "none", "", diff.Modified),
-				util.MessageDiffItemString("removed .annotations items", "none", "", diff.Removed),
-			)
-		}
-	}
 }
