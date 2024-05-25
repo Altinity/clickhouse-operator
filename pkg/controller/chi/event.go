@@ -98,7 +98,7 @@ func (c *Controller) EventError(
 // reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
 func (c *Controller) emitEvent(
-	chi *api.ClickHouseInstallation,
+	obj meta.Object,
 	_type string,
 	action string,
 	reason string,
@@ -106,14 +106,17 @@ func (c *Controller) emitEvent(
 ) {
 	now := time.Now()
 	kind := "ClickHouseInstallation"
-	namespace := chi.Namespace
-	name := chi.Name
-	uid := chi.UID
-	resourceVersion := chi.ResourceVersion
+	generateName := "chop-chi-"
+	component := componentName
+
+	namespace := obj.GetNamespace()
+	name := obj.GetName()
+	uid := obj.GetUID()
+	resourceVersion := obj.GetResourceVersion()
 
 	event := &core.Event{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: "chop-chi-",
+			GenerateName: generateName,
 		},
 		InvolvedObject: core.ObjectReference{
 			Kind:            kind,
@@ -126,7 +129,7 @@ func (c *Controller) emitEvent(
 		Reason:  reason,
 		Message: message,
 		Source: core.EventSource{
-			Component: componentName,
+			Component: component,
 		},
 		FirstTimestamp: meta.Time{
 			Time: now,
@@ -137,15 +140,15 @@ func (c *Controller) emitEvent(
 		Count:               1,
 		Type:                _type,
 		Action:              action,
-		ReportingController: componentName,
+		ReportingController: component,
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
 	_, err := c.kubeClient.CoreV1().Events(namespace).Create(controller.NewContext(), event, controller.NewCreateOptions())
 
 	if err != nil {
-		log.M(chi).F().Error("Create Event failed: %v", err)
+		log.M(obj).F().Error("Create Event failed: %v", err)
 	}
 
-	log.V(2).M(chi).Info("Wrote event at: %s type: %s action: %s reason: %s message: %s", now, _type, action, reason, message)
+	log.V(2).M(obj).Info("Wrote event at: %s type: %s action: %s reason: %s message: %s", now, _type, action, reason, message)
 }
