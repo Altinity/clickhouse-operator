@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package common
 
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
 	"time"
 
 	log "github.com/golang/glog"
@@ -29,8 +30,9 @@ import (
 type Announcer struct {
 	a.Announcer
 
-	ctrl *Controller
-	chi  *api.ClickHouseInstallation
+	eventEmitter  *EventEmitter
+	statusUpdater *chi.KubeStatusClickHouse
+	cr            api.ICustomResource
 
 	// writeEvent specifies whether to produce k8s event into chi, therefore requires chi to be specified
 	// See k8s event for details.
@@ -53,9 +55,11 @@ type Announcer struct {
 }
 
 // NewAnnouncer creates new announcer
-func NewAnnouncer() Announcer {
+func NewAnnouncer(eventEmitter *EventEmitter, statusUpdater *chi.KubeStatusClickHouse) Announcer {
 	return Announcer{
-		Announcer: a.New(),
+		Announcer:     a.New(),
+		eventEmitter:  eventEmitter,
+		statusUpdater: statusUpdater,
 	}
 }
 
@@ -135,9 +139,9 @@ func (a Announcer) Info(format string, args ...interface{}) {
 	// Produce k8s event
 	if a.writeEvent && a.chiCapable() {
 		if len(args) > 0 {
-			a.ctrl.EventInfo(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+			a.eventEmitter.EventInfo(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
-			a.ctrl.EventInfo(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+			a.eventEmitter.EventInfo(a.cr, a.eventAction, a.eventReason, fmt.Sprint(format))
 		}
 	}
 
@@ -153,9 +157,9 @@ func (a Announcer) Warning(format string, args ...interface{}) {
 	// Produce k8s event
 	if a.writeEvent && a.chiCapable() {
 		if len(args) > 0 {
-			a.ctrl.EventWarning(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+			a.eventEmitter.EventWarning(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
-			a.ctrl.EventWarning(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+			a.eventEmitter.EventWarning(a.cr, a.eventAction, a.eventReason, fmt.Sprint(format))
 		}
 	}
 
@@ -171,9 +175,9 @@ func (a Announcer) Error(format string, args ...interface{}) {
 	// Produce k8s event
 	if a.writeEvent && a.chiCapable() {
 		if len(args) > 0 {
-			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+			a.eventEmitter.EventError(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
-			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+			a.eventEmitter.EventError(a.cr, a.eventAction, a.eventReason, fmt.Sprint(format))
 		}
 	}
 
@@ -186,9 +190,9 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 	// Produce k8s event
 	if a.writeEvent && a.chiCapable() {
 		if len(args) > 0 {
-			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
+			a.eventEmitter.EventError(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
-			a.ctrl.EventError(a.chi, a.eventAction, a.eventReason, fmt.Sprint(format))
+			a.eventEmitter.EventError(a.cr, a.eventAction, a.eventReason, fmt.Sprint(format))
 		}
 	}
 
@@ -199,28 +203,21 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 	a.Announcer.Fatal(format, args...)
 }
 
-// WithController specifies controller to be used in case `chi`-related announces need to be done
-func (a Announcer) WithController(ctrl *Controller) Announcer {
-	b := a
-	b.ctrl = ctrl
-	return b
-}
-
 // WithEvent is used in chained calls in order to produce event into `chi`
 func (a Announcer) WithEvent(
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	action string,
 	reason string,
 ) Announcer {
 	b := a
-	if chi == nil {
+	if cr == nil {
 		b.writeEvent = false
-		b.chi = nil
+		b.cr = nil
 		b.eventAction = ""
 		b.eventReason = ""
 	} else {
 		b.writeEvent = true
-		b.chi = chi
+		b.cr = cr
 		b.eventAction = action
 		b.eventReason = reason
 	}
@@ -228,39 +225,39 @@ func (a Announcer) WithEvent(
 }
 
 // WithStatusAction is used in chained calls in order to produce action into `ClickHouseInstallation.Status.Action`
-func (a Announcer) WithStatusAction(chi *api.ClickHouseInstallation) Announcer {
+func (a Announcer) WithStatusAction(cr api.ICustomResource) Announcer {
 	b := a
-	if chi == nil {
-		b.chi = nil
+	if cr == nil {
+		b.cr = nil
 		b.writeStatusAction = false
 	} else {
-		b.chi = chi
+		b.cr = cr
 		b.writeStatusAction = true
 	}
 	return b
 }
 
 // WithStatusActions is used in chained calls in order to produce action in ClickHouseInstallation.Status.Actions
-func (a Announcer) WithStatusActions(chi *api.ClickHouseInstallation) Announcer {
+func (a Announcer) WithStatusActions(cr api.ICustomResource) Announcer {
 	b := a
-	if chi == nil {
-		b.chi = nil
+	if cr == nil {
+		b.cr = nil
 		b.writeStatusActions = false
 	} else {
-		b.chi = chi
+		b.cr = cr
 		b.writeStatusActions = true
 	}
 	return b
 }
 
 // WithStatusError is used in chained calls in order to produce error in ClickHouseInstallation.Status.Error
-func (a Announcer) WithStatusError(chi *api.ClickHouseInstallation) Announcer {
+func (a Announcer) WithStatusError(cr api.ICustomResource) Announcer {
 	b := a
-	if chi == nil {
-		b.chi = nil
+	if cr == nil {
+		b.cr = nil
 		b.writeStatusError = false
 	} else {
-		b.chi = chi
+		b.cr = cr
 		b.writeStatusError = true
 	}
 	return b
@@ -268,7 +265,7 @@ func (a Announcer) WithStatusError(chi *api.ClickHouseInstallation) Announcer {
 
 // chiCapable checks whether announcer is capable to produce chi-based announcements
 func (a Announcer) chiCapable() bool {
-	return (a.ctrl != nil) && (a.chi != nil)
+	return (a.eventEmitter != nil) && (a.cr != nil)
 }
 
 // writeCHIStatus is internal function which writes ClickHouseInstallation.Status
@@ -279,35 +276,39 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	now := time.Now()
 	prefix := now.Format(time.RFC3339Nano) + " "
+	shouldUpdateStatus := false
 
 	if a.writeStatusAction {
+		shouldUpdateStatus = true
 		if len(args) > 0 {
-			a.chi.EnsureStatus().SetAction(fmt.Sprintf(format, args...))
+			a.cr.IEnsureStatus().SetAction(fmt.Sprintf(format, args...))
 		} else {
-			a.chi.EnsureStatus().SetAction(fmt.Sprint(format))
+			a.cr.IEnsureStatus().SetAction(fmt.Sprint(format))
 		}
 	}
 	if a.writeStatusActions {
+		shouldUpdateStatus = true
 		if len(args) > 0 {
-			a.chi.EnsureStatus().PushAction(prefix + fmt.Sprintf(format, args...))
+			a.cr.IEnsureStatus().PushAction(prefix + fmt.Sprintf(format, args...))
 		} else {
-			a.chi.EnsureStatus().PushAction(prefix + fmt.Sprint(format))
+			a.cr.IEnsureStatus().PushAction(prefix + fmt.Sprint(format))
 		}
 	}
 	if a.writeStatusError {
+		shouldUpdateStatus = true
 		if len(args) > 0 {
 			// PR review question: should we prefix the string in the SetError call? If so, we can SetAndPushError.
-			a.chi.EnsureStatus().SetError(fmt.Sprintf(format, args...))
-			a.chi.EnsureStatus().PushError(prefix + fmt.Sprintf(format, args...))
+			a.cr.IEnsureStatus().SetError(fmt.Sprintf(format, args...))
+			a.cr.IEnsureStatus().PushError(prefix + fmt.Sprintf(format, args...))
 		} else {
-			a.chi.EnsureStatus().SetError(fmt.Sprint(format))
-			a.chi.EnsureStatus().PushError(prefix + fmt.Sprint(format))
+			a.cr.IEnsureStatus().SetError(fmt.Sprint(format))
+			a.cr.IEnsureStatus().PushError(prefix + fmt.Sprint(format))
 		}
 	}
 
 	// Propagate status updates into object
-	if a.writeStatusAction || a.writeStatusActions || a.writeStatusError {
-		_ = a.ctrl.updateCHIObjectStatus(context.Background(), a.chi, UpdateCHIStatusOptions{
+	if shouldUpdateStatus {
+		_ = a.statusUpdater.Update(context.Background(), a.cr, chi.UpdateCHIStatusOptions{
 			TolerateAbsence: true,
 			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
 				Actions: true,

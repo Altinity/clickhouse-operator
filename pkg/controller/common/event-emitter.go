@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package common
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -34,36 +35,62 @@ const (
 
 const (
 	// Event action describes what action was taken
-	eventActionReconcile = "Reconcile"
-	eventActionCreate    = "Create"
-	eventActionUpdate    = "Update"
-	eventActionDelete    = "Delete"
-	eventActionProgress  = "Progress"
+	EventActionReconcile = "Reconcile"
+	EventActionCreate    = "Create"
+	EventActionUpdate    = "Update"
+	EventActionDelete    = "Delete"
+	EventActionProgress  = "Progress"
 )
 
 const (
 	// Short, machine understandable string that gives the reason for the transition into the object's current status
-	eventReasonReconcileStarted       = "ReconcileStarted"
-	eventReasonReconcileInProgress    = "ReconcileInProgress"
-	eventReasonReconcileCompleted     = "ReconcileCompleted"
-	eventReasonReconcileFailed        = "ReconcileFailed"
-	eventReasonCreateStarted          = "CreateStarted"
-	eventReasonCreateInProgress       = "CreateInProgress"
-	eventReasonCreateCompleted        = "CreateCompleted"
-	eventReasonCreateFailed           = "CreateFailed"
-	eventReasonUpdateStarted          = "UpdateStarted"
-	eventReasonUpdateInProgress       = "UpdateInProgress"
-	eventReasonUpdateCompleted        = "UpdateCompleted"
-	eventReasonUpdateFailed           = "UpdateFailed"
-	eventReasonDeleteStarted          = "DeleteStarted"
-	eventReasonDeleteInProgress       = "DeleteInProgress"
-	eventReasonDeleteCompleted        = "DeleteCompleted"
-	eventReasonDeleteFailed           = "DeleteFailed"
-	eventReasonProgressHostsCompleted = "ProgressHostsCompleted"
+	EventReasonReconcileStarted       = "ReconcileStarted"
+	EventReasonReconcileInProgress    = "ReconcileInProgress"
+	EventReasonReconcileCompleted     = "ReconcileCompleted"
+	EventReasonReconcileFailed        = "ReconcileFailed"
+	EventReasonCreateStarted          = "CreateStarted"
+	EventReasonCreateInProgress       = "CreateInProgress"
+	EventReasonCreateCompleted        = "CreateCompleted"
+	EventReasonCreateFailed           = "CreateFailed"
+	EventReasonUpdateStarted          = "UpdateStarted"
+	EventReasonUpdateInProgress       = "UpdateInProgress"
+	EventReasonUpdateCompleted        = "UpdateCompleted"
+	EventReasonUpdateFailed           = "UpdateFailed"
+	EventReasonDeleteStarted          = "DeleteStarted"
+	EventReasonDeleteInProgress       = "DeleteInProgress"
+	EventReasonDeleteCompleted        = "DeleteCompleted"
+	EventReasonDeleteFailed           = "DeleteFailed"
+	EventReasonProgressHostsCompleted = "ProgressHostsCompleted"
 )
 
+type EventEmitter struct {
+	kubeEvent interfaces.IKubeEvent
+	kind string
+	generateName string
+	component string
+}
+
+//kind := "ClickHouseInstallation"
+//generateName := "chop-chi-"
+//component := chi.componentName
+
+
+func NewEventEmitter(
+	kubeEvent interfaces.IKubeEvent,
+	kind string,
+	generateName string,
+component string,
+	) *EventEmitter{
+	return &EventEmitter{
+		kubeEvent: kubeEvent,
+		kind: kind,
+		generateName: generateName,
+		component: component,
+	}
+}
+
 // EventInfo emits event Info
-func (c *Controller) EventInfo(
+func (c *EventEmitter) EventInfo(
 	chi *api.ClickHouseInstallation,
 	action string,
 	reason string,
@@ -73,7 +100,7 @@ func (c *Controller) EventInfo(
 }
 
 // EventWarning emits event Warning
-func (c *Controller) EventWarning(
+func (c *EventEmitter) EventWarning(
 	chi *api.ClickHouseInstallation,
 	action string,
 	reason string,
@@ -83,7 +110,7 @@ func (c *Controller) EventWarning(
 }
 
 // EventError emits event Error
-func (c *Controller) EventError(
+func (c *EventEmitter) EventError(
 	chi *api.ClickHouseInstallation,
 	action string,
 	reason string,
@@ -97,7 +124,7 @@ func (c *Controller) EventError(
 // action - what action was attempted, and then succeeded/failed regarding to the Involved Object. One of eventAction*
 // reason - short, machine understandable string, one of eventReason*
 // message - human-readable description
-func (c *Controller) emitEvent(
+func (c *EventEmitter) emitEvent(
 	obj meta.Object,
 	_type string,
 	action string,
@@ -105,10 +132,6 @@ func (c *Controller) emitEvent(
 	message string,
 ) {
 	now := time.Now()
-	kind := "ClickHouseInstallation"
-	generateName := "chop-chi-"
-	component := componentName
-
 	namespace := obj.GetNamespace()
 	name := obj.GetName()
 	uid := obj.GetUID()
@@ -116,10 +139,11 @@ func (c *Controller) emitEvent(
 
 	event := &core.Event{
 		ObjectMeta: meta.ObjectMeta{
-			GenerateName: generateName,
+			GenerateName: c.generateName,
+			Namespace: namespace,
 		},
 		InvolvedObject: core.ObjectReference{
-			Kind:            kind,
+			Kind:            c.kind,
 			Namespace:       namespace,
 			Name:            name,
 			UID:             uid,
@@ -129,7 +153,7 @@ func (c *Controller) emitEvent(
 		Reason:  reason,
 		Message: message,
 		Source: core.EventSource{
-			Component: component,
+			Component: c.component,
 		},
 		FirstTimestamp: meta.Time{
 			Time: now,
@@ -140,11 +164,11 @@ func (c *Controller) emitEvent(
 		Count:               1,
 		Type:                _type,
 		Action:              action,
-		ReportingController: component,
+		ReportingController: c.component,
 		// ID of the controller instance, e.g. `kubelet-xyzf`.
 		// ReportingInstance:
 	}
-	_, err := c.kubeClient.CoreV1().Events(namespace).Create(controller.NewContext(), event, controller.NewCreateOptions())
+	_, err := c.kubeEvent.Create(controller.NewContext(), event)
 
 	if err != nil {
 		log.M(obj).F().Error("Create Event failed: %v", err)
