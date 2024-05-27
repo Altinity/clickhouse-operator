@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -38,7 +39,7 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 	}
 
 	w.a.V(1).
-		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
 		WithStatusAction(chi).
 		M(chi).F().
 		Info("remove items scheduled for deletion")
@@ -52,7 +53,7 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 	objs.Subtract(need)
 	w.a.V(1).M(chi).F().Info("Non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, chi, objs, w.task.RegistryFailed) > 0 {
-		w.c.enqueueObject(NewDropDns(chi.GetObjectMeta()))
+		w.c.enqueueObject(NewDropDns(chi))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 
@@ -270,7 +271,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	var err error
 	chi, err = w.normalizer.CreateTemplatedCHI(chi, normalizer.NewOptions())
 	if err != nil {
-		w.a.WithEvent(chi, eventActionDelete, eventReasonDeleteFailed).
+		w.a.WithEvent(chi, common.EventActionDelete, common.EventReasonDeleteFailed).
 			WithStatusError(chi).
 			M(chi).F().
 			Error("Delete CHI failed - unable to normalize: %q", err)
@@ -279,7 +280,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 
 	// Announce delete procedure
 	w.a.V(1).
-		WithEvent(chi, eventActionDelete, eventReasonDeleteStarted).
+		WithEvent(chi, common.EventActionDelete, common.EventReasonDeleteStarted).
 		WithStatusAction(chi).
 		M(chi).F().
 		Info("Delete CHI started")
@@ -322,7 +323,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	_ = w.c.deleteConfigMapsCHI(ctx, chi)
 
 	w.a.V(1).
-		WithEvent(chi, eventActionDelete, eventReasonDeleteCompleted).
+		WithEvent(chi, common.EventActionDelete, common.EventReasonDeleteCompleted).
 		WithStatusAction(chi).
 		M(chi).F().
 		Info("Delete CHI completed")
@@ -409,12 +410,12 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(hostToRunOn.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+			WithEvent(hostToRunOn.GetCR(), common.EventActionDelete, common.EventReasonDeleteCompleted).
 			WithStatusAction(hostToRunOn.GetCR()).
 			M(hostToRunOn).F().
 			Info("Drop replica host: %s in cluster: %s", hostToDrop.GetName(), hostToDrop.Runtime.Address.ClusterName)
 	} else {
-		w.a.WithEvent(hostToRunOn.GetCR(), eventActionDelete, eventReasonDeleteFailed).
+		w.a.WithEvent(hostToRunOn.GetCR(), common.EventActionDelete, common.EventReasonDeleteFailed).
 			WithStatusError(hostToRunOn.GetCR()).
 			M(hostToRunOn).F().
 			Error("FAILED to drop replica on host: %s with error: %v", hostToDrop.GetName(), err)
@@ -437,13 +438,13 @@ func (w *worker) deleteTables(ctx context.Context, host *api.Host) error {
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+			WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Deleted tables on host: %s replica: %d to shard: %d in cluster: %s",
 				host.GetName(), host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
 	} else {
-		w.a.WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteFailed).
+		w.a.WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteFailed).
 			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("FAILED to delete tables on host: %s with error: %v", host.GetName(), err)
@@ -464,14 +465,14 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 	defer w.a.V(2).M(host).E().Info(host.Runtime.Address.HostName)
 
 	w.a.V(1).
-		WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteStarted).
+		WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteStarted).
 		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Delete host: %s/%s - started", host.Runtime.Address.ClusterName, host.GetName())
 
 	var err error
 	if host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
-		w.a.WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+		w.a.WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Delete host: %s/%s - completed StatefulSet not found - already deleted? err: %v",
@@ -500,12 +501,12 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteCompleted).
+			WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Delete host: %s/%s - completed", host.Runtime.Address.ClusterName, host.GetName())
 	} else {
-		w.a.WithEvent(host.GetCR(), eventActionDelete, eventReasonDeleteFailed).
+		w.a.WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteFailed).
 			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("FAILED Delete host: %s/%s - completed", host.Runtime.Address.ClusterName, host.GetName())
@@ -526,7 +527,7 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 	defer w.a.V(2).M(shard).E().P()
 
 	w.a.V(1).
-		WithEvent(shard.Runtime.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithEvent(shard.Runtime.CHI, common.EventActionDelete, common.EventReasonDeleteStarted).
 		WithStatusAction(shard.Runtime.CHI).
 		M(shard).F().
 		Info("Delete shard: %s/%s - started", shard.Runtime.Address.Namespace, shard.Name)
@@ -540,7 +541,7 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 	})
 
 	w.a.V(1).
-		WithEvent(shard.Runtime.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithEvent(shard.Runtime.CHI, common.EventActionDelete, common.EventReasonDeleteCompleted).
 		WithStatusAction(shard.Runtime.CHI).
 		M(shard).F().
 		Info("Delete shard: %s/%s - completed", shard.Runtime.Address.Namespace, shard.Name)
@@ -560,7 +561,7 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 	defer w.a.V(2).M(cluster).E().P()
 
 	w.a.V(1).
-		WithEvent(cluster.Runtime.CHI, eventActionDelete, eventReasonDeleteStarted).
+		WithEvent(cluster.Runtime.CHI, common.EventActionDelete, common.EventReasonDeleteStarted).
 		WithStatusAction(cluster.Runtime.CHI).
 		M(cluster).F().
 		Info("Delete cluster: %s/%s - started", cluster.Runtime.Address.Namespace, cluster.Name)
@@ -580,7 +581,7 @@ func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallat
 	})
 
 	w.a.V(1).
-		WithEvent(cluster.Runtime.CHI, eventActionDelete, eventReasonDeleteCompleted).
+		WithEvent(cluster.Runtime.CHI, common.EventActionDelete, common.EventReasonDeleteCompleted).
 		WithStatusAction(cluster.Runtime.CHI).
 		M(cluster).F().
 		Info("Delete cluster: %s/%s - completed", cluster.Runtime.Address.Namespace, cluster.Name)
@@ -596,7 +597,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	// Do we have pending request for CHI to be deleted?
-	if new.GetObjectMeta().GetDeletionTimestamp().IsZero() {
+	if new.GetDeletionTimestamp().IsZero() {
 		// CHI is not being deleted and operator has not deleted anything.
 		return false
 	}
@@ -642,7 +643,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 			return false
 		}
 
-		if !util.InArray(FinalizerName, new.GetObjectMeta().GetFinalizers()) {
+		if !util.InArray(FinalizerName, new.GetFinalizers()) {
 			// No finalizer found, unexpected behavior
 			return false
 		}

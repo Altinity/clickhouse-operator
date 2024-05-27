@@ -105,7 +105,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 
 	if err := w.reconcile(ctx, new); err != nil {
 		// Something went wrong
-		w.a.WithEvent(new, eventActionReconcile, eventReasonReconcileFailed).
+		w.a.WithEvent(new, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(new).
 			M(new).F().
 			Error("FAILED to reconcile CHI err: %v", err)
@@ -408,7 +408,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		}
 
 		host.GetCR().EnsureStatus().HostFailed()
-		w.a.WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileFailed).
+		w.a.WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusAction(host.GetCR()).
 			WithStatusError(host.GetCR()).
 			M(host).F().
@@ -651,13 +651,13 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// Check whether ClickHouse is running and accessible and what version is available
 	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileStarted).
+			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileStarted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host start. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileStarted).
+			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileStarted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
@@ -740,13 +740,13 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// Sometimes service needs some time to start after creation|modification before being accessible for usage
 	if version, err := w.pollHostForClickHouseVersion(ctx, host); err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileCompleted).
+			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Reconcile Host completed. Host: %s ClickHouse version running: %s", host.GetName(), version)
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionReconcile, eventReasonReconcileCompleted).
+			WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Warning("Reconcile Host completed. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
@@ -761,10 +761,10 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		hostsCount = host.GetCR().Status.GetHostsCount()
 	}
 	w.a.V(1).
-		WithEvent(host.GetCR(), eventActionProgress, eventReasonProgressHostsCompleted).
+		WithEvent(host.GetCR(), common.EventActionProgress, common.EventReasonProgressHostsCompleted).
 		WithStatusAction(host.GetCR()).
 		M(host).F().
-		Info("[now: %s] %s: %d of %d", now, eventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
 	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
 		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
@@ -835,7 +835,7 @@ func (w *worker) reconcileConfigMap(
 	}
 
 	if err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().
@@ -877,7 +877,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *api.ClickHouseInstal
 			w.a.V(1).M(chi).F().Info("Service: %s/%s not found. err: %v", service.Namespace, service.Name, err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+			w.a.WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateFailed).
 				WithStatusAction(chi).
 				WithStatusError(chi).
 				M(chi).F().
@@ -891,7 +891,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *api.ClickHouseInstal
 	if err == nil {
 		w.a.V(1).M(chi).F().Info("Service reconcile successful: %s/%s", service.Namespace, service.Name)
 	} else {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().
@@ -921,7 +921,7 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *api.ClickHouseInstall
 	_ = w.c.deleteSecretIfExists(ctx, secret.Namespace, secret.Name)
 	err := w.createSecret(ctx, chi, secret)
 	if err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().

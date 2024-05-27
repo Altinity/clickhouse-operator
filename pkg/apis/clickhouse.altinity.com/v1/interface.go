@@ -19,16 +19,20 @@ import (
 )
 
 type ICustomResource interface {
-	GetNamespace() string
-	GetName() string
-	GetLabels() map[string]string
-	GetAnnotations() map[string]string
+	meta.Object
+
 	GetRuntime() ICustomResourceRuntime
 	GetRootServiceTemplate() (*ServiceTemplate, bool)
-	GetObjectMeta() meta.Object
-
 	WalkClusters(f func(cluster ICluster) error) []error
 	WalkHosts(func(host *Host) error) []error
+	IEnsureStatus() IStatus
+}
+
+type IStatus interface {
+	SetAction(string)
+	PushAction(string)
+	SetError(string)
+	PushError(string)
 }
 
 type ICluster interface {

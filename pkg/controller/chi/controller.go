@@ -704,7 +704,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 	payload, _ := json.Marshal([]patchFinalizers{{
 		Op:    "replace",
 		Path:  "/metadata/finalizers",
-		Value: chi.GetObjectMeta().GetFinalizers(),
+		Value: chi.GetFinalizers(),
 	}})
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, controller.NewPatchOptions())
@@ -714,10 +714,10 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 		return err
 	}
 
-	if chi.GetObjectMeta().GetResourceVersion() != _new.GetObjectMeta().GetResourceVersion() {
+	if chi.GetResourceVersion() != _new.GetResourceVersion() {
 		// Updated
-		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetObjectMeta().GetResourceVersion(), _new.GetObjectMeta().GetResourceVersion())
-		chi.GetObjectMeta().SetResourceVersion(_new.GetObjectMeta().GetResourceVersion())
+		log.V(2).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetResourceVersion(), _new.GetResourceVersion())
+		chi.SetResourceVersion(_new.GetResourceVersion())
 		return nil
 	}
 
@@ -734,80 +734,7 @@ type UpdateCHIStatusOptions struct {
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
 func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *api.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	for retry, attempt := true, 1; retry; attempt++ {
-		if attempt >= 5 {
-			retry = false
-		}
-
-		err = c.doUpdateCHIObjectStatus(ctx, chi, opts)
-		if err == nil {
-			return nil
-		}
-
-		if retry {
-			log.V(2).M(chi).F().Warning("got error, will retry. err: %q", err)
-			time.Sleep(1 * time.Second)
-		} else {
-			log.V(1).M(chi).F().Error("got error, all retries are exhausted. err: %q", err)
-		}
-	}
-	return
-}
-
-// doUpdateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) doUpdateCHIObjectStatus(ctx context.Context, chi *api.ClickHouseInstallation, opts UpdateCHIStatusOptions) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	namespace, name := util.NamespaceName(chi.GetObjectMeta())
-	log.V(3).M(chi).F().Info("Update CHI status")
-
-	podIPs := c.getPodsIPs(chi)
-
-	cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
-	if err != nil {
-		if opts.TolerateAbsence {
-			return nil
-		}
-		log.V(1).M(chi).F().Error("%q", err)
-		return err
-	}
-	if cur == nil {
-		if opts.TolerateAbsence {
-			return nil
-		}
-		log.V(1).M(chi).F().Error("NULL returned")
-		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
-	}
-
-	// Update status of a real object.
-	cur.EnsureStatus().CopyFrom(chi.Status, opts.CopyCHIStatusOptions)
-	cur.EnsureStatus().SetPodIPs(podIPs)
-
-	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, controller.NewUpdateOptions())
-	if err != nil {
-		// Error update
-		log.V(2).M(chi).F().Info("Got error upon update, may retry. err: %q", err)
-		return err
-	}
-
-	// Propagate updated ResourceVersion into chi
-	if chi.GetObjectMeta().GetResourceVersion() != _new.GetObjectMeta().GetResourceVersion() {
-		log.V(3).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetObjectMeta().GetResourceVersion(), _new.GetObjectMeta().GetResourceVersion())
-		chi.GetObjectMeta().SetResourceVersion(_new.GetObjectMeta().GetResourceVersion())
-		return nil
-	}
-
-	// ResourceVersion not changed - no update performed?
-
-	return nil
+	return NewKubeStatusClickHouse(c.chopClient).Update(ctx, chi, opts)
 }
 
 func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, f func(c *api.ClickHouseInstallation, e error) bool) {
@@ -816,7 +743,7 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 		return
 	}
 
-	namespace, name := util.NamespaceName(chi.GetObjectMeta())
+	namespace, name := util.NamespaceName(chi)
 
 	for {
 		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
@@ -852,13 +779,13 @@ func (c *Controller) installFinalizer(ctx context.Context, chi *api.ClickHouseIn
 		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
-	if util.InArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()) {
+	if util.InArray(FinalizerName, cur.GetFinalizers()) {
 		// Already installed
 		return nil
 	}
 	log.V(3).M(chi).F().Info("no finalizer found, need to install one")
 
-	cur.GetObjectMeta().SetFinalizers(append(cur.GetObjectMeta().GetFinalizers(), FinalizerName))
+	cur.SetFinalizers(append(cur.GetFinalizers(), FinalizerName))
 	return c.patchCHIFinalizers(ctx, cur)
 }
 
@@ -880,7 +807,7 @@ func (c *Controller) uninstallFinalizer(ctx context.Context, chi *api.ClickHouse
 		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", chi.Namespace, chi.Name)
 	}
 
-	cur.GetObjectMeta().SetFinalizers(util.RemoveFromArray(FinalizerName, cur.GetObjectMeta().GetFinalizers()))
+	cur.SetFinalizers(util.RemoveFromArray(FinalizerName, cur.GetFinalizers()))
 
 	return c.patchCHIFinalizers(ctx, cur)
 }

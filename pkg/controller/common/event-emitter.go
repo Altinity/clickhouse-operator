@@ -15,15 +15,14 @@
 package common
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"time"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
 const (
@@ -64,59 +63,54 @@ const (
 )
 
 type EventEmitter struct {
-	kubeEvent interfaces.IKubeEvent
-	kind string
+	kubeEvent    interfaces.IKubeEvent
+	kind         string
 	generateName string
-	component string
+	component    string
 }
-
-//kind := "ClickHouseInstallation"
-//generateName := "chop-chi-"
-//component := chi.componentName
-
 
 func NewEventEmitter(
 	kubeEvent interfaces.IKubeEvent,
 	kind string,
 	generateName string,
-component string,
-	) *EventEmitter{
+	component string,
+) *EventEmitter {
 	return &EventEmitter{
-		kubeEvent: kubeEvent,
-		kind: kind,
+		kubeEvent:    kubeEvent,
+		kind:         kind,
 		generateName: generateName,
-		component: component,
+		component:    component,
 	}
 }
 
 // EventInfo emits event Info
 func (c *EventEmitter) EventInfo(
-	chi *api.ClickHouseInstallation,
+	obj meta.Object,
 	action string,
 	reason string,
 	message string,
 ) {
-	c.emitEvent(chi, eventTypeInfo, action, reason, message)
+	c.emitEvent(obj, eventTypeInfo, action, reason, message)
 }
 
 // EventWarning emits event Warning
 func (c *EventEmitter) EventWarning(
-	chi *api.ClickHouseInstallation,
+	obj meta.Object,
 	action string,
 	reason string,
 	message string,
 ) {
-	c.emitEvent(chi, eventTypeWarning, action, reason, message)
+	c.emitEvent(obj, eventTypeWarning, action, reason, message)
 }
 
 // EventError emits event Error
 func (c *EventEmitter) EventError(
-	chi *api.ClickHouseInstallation,
+	obj meta.Object,
 	action string,
 	reason string,
 	message string,
 ) {
-	c.emitEvent(chi, eventTypeError, action, reason, message)
+	c.emitEvent(obj, eventTypeError, action, reason, message)
 }
 
 // emitEvent creates CHI-related event
@@ -140,7 +134,7 @@ func (c *EventEmitter) emitEvent(
 	event := &core.Event{
 		ObjectMeta: meta.ObjectMeta{
 			GenerateName: c.generateName,
-			Namespace: namespace,
+			Namespace:    namespace,
 		},
 		InvolvedObject: core.ObjectReference{
 			Kind:            c.kind,

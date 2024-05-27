@@ -66,9 +66,16 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	if !sys {
 		start = start.Add(api.DefaultReconcileThreadsWarmup)
 	}
+	kind := "ClickHouseInstallation"
+	generateName := "chop-chi-"
+	component := componentName
+
 	return &worker{
-		c:     c,
-		a:     NewAnnouncer().WithController(c),
+		c: c,
+		a: NewAnnouncer(
+			common.NewEventEmitter(NewKubeEventClickHouse(c.kubeClient), kind, generateName, component),
+			NewKubeStatusClickHouse(c.chopClient),
+		),
 		queue: q,
 		normalizer: normalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
 			return c.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
@@ -333,7 +340,7 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	chi, err := w.normalizer.CreateTemplatedCHI(c, normalizer.NewOptions())
 	if err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CHI 1: %v", err)
@@ -346,7 +353,7 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	chi, err = w.normalizer.CreateTemplatedCHI(c, opts)
 	if err != nil {
-		w.a.WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(chi).
 			M(chi).F().
 			Error("FAILED to normalize CHI 2: %v", err)
@@ -363,12 +370,12 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 	}
 
 	// In case CHI is being deleted already, no need to meddle with finalizers
-	if !chi.GetObjectMeta().GetDeletionTimestamp().IsZero() {
+	if !chi.GetDeletionTimestamp().IsZero() {
 		return false
 	}
 
 	// Finalizer can already be listed in CHI, do nothing in this case
-	if util.InArray(FinalizerName, chi.GetObjectMeta().GetFinalizers()) {
+	if util.InArray(FinalizerName, chi.GetFinalizers()) {
 		w.a.V(2).M(chi).F().Info("finalizer already installed")
 		return false
 	}
@@ -426,9 +433,9 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 
 	update := (old != nil) && (new != nil)
 
-	if update && (old.GetObjectMeta().GetResourceVersion() == new.GetObjectMeta().GetResourceVersion()) {
+	if update && (old.GetResourceVersion() == new.GetResourceVersion()) {
 		// No need to react
-		w.a.V(3).M(new).F().Info("ResourceVersion did not change: %s", new.GetObjectMeta().GetResourceVersion())
+		w.a.V(3).M(new).F().Info("ResourceVersion did not change: %s", new.GetResourceVersion())
 		return nil
 	}
 
@@ -599,7 +606,15 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chi *api.ClickHouseInst
 	w.a.V(1).M(chi).F().S().Info("wait for IP addresses to be assigned to all pods")
 	start := time.Now()
 	w.c.poll(ctx, chi, func(c *api.ClickHouseInstallation, e error) bool {
-		if len(c.Status.GetPodIPs()) >= len(c.Status.GetPods()) {
+		// TODO fix later
+		// status IPs list can be empty
+		// Instead of doing in status:
+		// 	podIPs := c.getPodsIPs(chi)
+		//	cur.EnsureStatus().SetPodIPs(podIPs)
+		// and here
+		// c.Status.GetPodIPs()
+		podIPs := w.c.getPodsIPs(chi)
+		if len(podIPs) >= len(c.Status.GetPods()) {
 			// Stop polling
 			w.a.V(1).M(c).Info("all IP addresses are in place")
 			return false
@@ -623,7 +638,7 @@ func (w *worker) excludeStoppedCHIFromMonitoring(chi *api.ClickHouseInstallation
 	}
 
 	w.a.V(1).
-		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
 		WithStatusAction(chi).
 		M(chi).F().
 		Info("exclude CHI from monitoring")
@@ -638,7 +653,7 @@ func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
 	}
 
 	w.a.V(1).
-		WithEvent(chi, eventActionReconcile, eventReasonReconcileInProgress).
+		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
 		WithStatusAction(chi).
 		M(chi).F().
 		Info("add CHI to monitoring")
@@ -660,7 +675,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInst
 	})
 
 	w.a.V(1).
-		WithEvent(chi, eventActionReconcile, eventReasonReconcileStarted).
+		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileStarted).
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
@@ -677,13 +692,13 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	w.a.V(1).M(_chi).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(_chi.GetObjectMeta(), true, normalizer.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(_chi, true, normalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := normalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCHIFromObjectMeta(_chi.GetObjectMeta(), true, opts); err == nil {
+		if chi, err := w.createCHIFromObjectMeta(_chi, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
 			chi.SetAncestor(chi.GetTarget())
 			chi.SetTarget(nil)
@@ -697,14 +712,14 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 				},
 			})
 		} else {
-			w.a.M(_chi.GetObjectMeta()).F().Error("internal unable to find CHI by %v err: %v", _chi.GetLabels(), err)
+			w.a.M(_chi).F().Error("internal unable to find CHI by %v err: %v", _chi.GetLabels(), err)
 		}
 	} else {
-		w.a.M(_chi.GetObjectMeta()).F().Error("external unable to find CHI by %v err %v", _chi.GetLabels(), err)
+		w.a.M(_chi).F().Error("external unable to find CHI by %v err %v", _chi.GetLabels(), err)
 	}
 
 	w.a.V(1).
-		WithEvent(_chi, eventActionReconcile, eventReasonReconcileCompleted).
+		WithEvent(_chi, common.EventActionReconcile, common.EventReasonReconcileCompleted).
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
@@ -730,7 +745,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	})
 
 	w.a.V(1).
-		WithEvent(chi, eventActionReconcile, eventReasonReconcileFailed).
+		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
@@ -915,7 +930,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	}
 
 	w.a.V(1).
-		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
+		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
 		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info(
@@ -925,7 +940,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 	err := w.ensureClusterSchemer(host).HostCreateTables(ctx, host)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateCompleted).
+			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
@@ -933,7 +948,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 		host.GetCR().EnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 	} else {
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
+			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Error("ERROR add tables added successfully on shard/host:%d/%d cluster:%s err:%v",
@@ -1311,7 +1326,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 	updatedConfigMap, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, controller.NewUpdateOptions())
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
@@ -1319,7 +1334,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 			w.task.CmUpdate = time.Now()
 		}
 	} else {
-		w.a.WithEvent(chi, eventActionUpdate, eventReasonUpdateFailed).
+		w.a.WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().
@@ -1339,12 +1354,12 @@ func (w *worker) createConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(ctx, configMap, controller.NewCreateOptions())
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 	} else {
-		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+		w.a.WithEvent(chi, common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().
@@ -1455,7 +1470,7 @@ func (w *worker) updateService(
 	_, err := w.c.kubeClient.CoreV1().Services(newService.GetNamespace()).Update(ctx, newService, controller.NewUpdateOptions())
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, eventActionUpdate, eventReasonUpdateCompleted).
+			WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("Update Service success: %s/%s", newService.GetNamespace(), newService.GetName())
@@ -1476,12 +1491,12 @@ func (w *worker) createService(ctx context.Context, chi *api.ClickHouseInstallat
 	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(ctx, service, controller.NewCreateOptions())
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("OK Create Service: %s/%s", service.Namespace, service.Name)
 	} else {
-		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+		w.a.WithEvent(chi, common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().
@@ -1501,12 +1516,12 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 	_, err := w.c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, controller.NewCreateOptions())
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, eventActionCreate, eventReasonCreateCompleted).
+			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
 			Info("Create Secret %s/%s", secret.Namespace, secret.Name)
 	} else {
-		w.a.WithEvent(chi, eventActionCreate, eventReasonCreateFailed).
+		w.a.WithEvent(chi, common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().

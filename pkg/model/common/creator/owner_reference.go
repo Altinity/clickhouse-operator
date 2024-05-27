@@ -25,7 +25,7 @@ func CreateOwnerReferences(owner api.ICustomResource) []meta.OwnerReference {
 		return nil
 	}
 	return []meta.OwnerReference{
-		createOwnerReference(owner.GetObjectMeta()),
+		createOwnerReference(owner),
 	}
 }
 

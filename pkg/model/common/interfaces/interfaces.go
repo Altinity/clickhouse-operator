@@ -104,3 +104,7 @@ type IKubePVC interface {
 
 	UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 }
+
+type IKubeEvent interface {
+	Create(ctx context.Context, event *core.Event) (*core.Event, error)
+}

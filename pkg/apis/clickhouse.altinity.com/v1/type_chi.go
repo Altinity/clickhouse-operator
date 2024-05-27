@@ -23,8 +23,6 @@ import (
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
 
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -32,10 +30,6 @@ import (
 type IRoot interface {
 	GetName() string
 	WalkHosts(f func(host *Host) error) []error
-}
-
-func (chi *ClickHouseInstallation) GetObjectMeta() meta.Object {
-	return &chi.ObjectMeta
 }
 
 func (chi *ClickHouseInstallation) GetSpec() *ChiSpec {
@@ -684,7 +678,7 @@ func (chi *ClickHouseInstallation) Copy(opts CopyCHIOptions) *ClickHouseInstalla
 	}
 
 	if opts.SkipManagedFields {
-		chi2.GetObjectMeta().SetManagedFields(nil)
+		chi2.SetManagedFields(nil)
 	}
 
 	return chi2
@@ -741,6 +735,10 @@ func (chi *ClickHouseInstallation) ensureRuntime() *ClickHouseInstallationRuntim
 		chi.runtime = newClickHouseInstallationRuntime()
 	}
 	return chi.runtime
+}
+
+func (chi *ClickHouseInstallation) IEnsureStatus() IStatus {
+	return any(chi.EnsureStatus()).(IStatus)
 }
 
 // EnsureStatus ensures status

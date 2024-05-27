@@ -161,7 +161,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 	name := newStatefulSet.Name
 
 	w.a.V(1).
-		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
+		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
 		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
@@ -187,7 +187,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 			})
 		}
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionUpdate, eventReasonUpdateCompleted).
+			WithEvent(host.GetCR(), common.EventActionUpdate, common.EventReasonUpdateCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
@@ -199,7 +199,7 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 		w.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
 		return nil
 	case errCRUDRecreate:
-		w.a.WithEvent(host.GetCR(), eventActionUpdate, eventReasonUpdateInProgress).
+		w.a.WithEvent(host.GetCR(), common.EventActionUpdate, common.EventReasonUpdateInProgress).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
@@ -227,7 +227,7 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.Host, register
 	defer w.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
 
 	w.a.V(1).
-		WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateStarted).
+		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
 		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
@@ -246,20 +246,20 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.Host, register
 	switch action {
 	case nil:
 		w.a.V(1).
-			WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateCompleted).
+			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
 		return nil
 	case errCRUDAbort:
-		w.a.WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
+		w.a.WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(host.GetCR()).
 			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, action)
 		return action
 	case errCRUDIgnore:
-		w.a.WithEvent(host.GetCR(), eventActionCreate, eventReasonCreateFailed).
+		w.a.WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)

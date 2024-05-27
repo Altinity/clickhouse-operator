@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package chi
 
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"time"
 
 	log "github.com/golang/glog"
@@ -30,8 +30,8 @@ import (
 type Announcer struct {
 	a.Announcer
 
-	eventEmitter  *EventEmitter
-	statusUpdater *chi.KubeStatusClickHouse
+	eventEmitter  *common.EventEmitter
+	statusUpdater *KubeStatusClickHouse
 	cr            api.ICustomResource
 
 	// writeEvent specifies whether to produce k8s event into chi, therefore requires chi to be specified
@@ -55,7 +55,7 @@ type Announcer struct {
 }
 
 // NewAnnouncer creates new announcer
-func NewAnnouncer(eventEmitter *EventEmitter, statusUpdater *chi.KubeStatusClickHouse) Announcer {
+func NewAnnouncer(eventEmitter *common.EventEmitter, statusUpdater *KubeStatusClickHouse) Announcer {
 	return Announcer{
 		Announcer:     a.New(),
 		eventEmitter:  eventEmitter,
@@ -308,7 +308,7 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if shouldUpdateStatus {
-		_ = a.statusUpdater.Update(context.Background(), a.cr, chi.UpdateCHIStatusOptions{
+		_ = a.statusUpdater.Update(context.Background(), a.cr, UpdateCHIStatusOptions{
 			TolerateAbsence: true,
 			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
 				Actions: true,
