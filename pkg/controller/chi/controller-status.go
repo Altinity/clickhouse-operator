@@ -23,6 +23,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -37,7 +38,7 @@ func NewKubeStatusClickHouse(chopClient chopClientSet.Interface) *KubeStatusClic
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *KubeStatusClickHouse) Update(ctx context.Context, chi api.ICustomResource, opts UpdateCHIStatusOptions) (err error) {
+func (c *KubeStatusClickHouse) Update(ctx context.Context, chi api.ICustomResource, opts common.UpdateStatusOptions) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -64,7 +65,7 @@ func (c *KubeStatusClickHouse) Update(ctx context.Context, chi api.ICustomResour
 }
 
 // doUpdateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *KubeStatusClickHouse) doUpdateCHIObjectStatus(ctx context.Context, _chi api.ICustomResource, opts UpdateCHIStatusOptions) error {
+func (c *KubeStatusClickHouse) doUpdateCHIObjectStatus(ctx context.Context, _chi api.ICustomResource, opts common.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -91,7 +92,7 @@ func (c *KubeStatusClickHouse) doUpdateCHIObjectStatus(ctx context.Context, _chi
 	}
 
 	// Update status of a real object.
-	cur.EnsureStatus().CopyFrom(chi.Status, opts.CopyCHIStatusOptions)
+	cur.EnsureStatus().CopyFrom(chi.Status, opts.CopyStatusOptions)
 
 	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).UpdateStatus(ctx, cur, controller.NewUpdateOptions())
 	if err != nil {

@@ -78,8 +78,8 @@ type ChiStatus struct {
 	mu sync.RWMutex `json:"-" yaml:"-"`
 }
 
-// CopyCHIStatusOptions specifies what to copy in CHI status options
-type CopyCHIStatusOptions struct {
+// CopyStatusOptions specifies what parts to copy in status
+type CopyStatusOptions struct {
 	Actions           bool
 	Errors            bool
 	Normalized        bool
@@ -331,7 +331,7 @@ func (s *ChiStatus) DeleteStart() {
 }
 
 // CopyFrom copies the state of a given ChiStatus f into the receiver ChiStatus of the call.
-func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyCHIStatusOptions) {
+func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyStatusOptions) {
 	doWithWriteLock(s, func(s *ChiStatus) {
 		doWithReadLock(f, func(from *ChiStatus) {
 			if s == nil || from == nil {

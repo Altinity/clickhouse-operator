@@ -17,12 +17,12 @@ package v1
 import (
 	"sync"
 
-	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/imdario/mergo"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -152,7 +152,7 @@ func (chk *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstall
 	// Do actual merge for Spec
 	(&chk.Spec).MergeFrom(&from.Spec, _type)
 
-	chk.EnsureStatus().CopyFrom(from.Status, apiChi.CopyCHIStatusOptions{
+	chk.EnsureStatus().CopyFrom(from.Status, apiChi.CopyStatusOptions{
 		InheritableFields: true,
 	})
 }

@@ -766,8 +766,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		M(host).F().
 		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
-	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
-		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), common.UpdateStatusOptions{
+		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,
 		},
 	})

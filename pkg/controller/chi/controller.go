@@ -47,6 +47,7 @@ import (
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
@@ -726,14 +727,8 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 	return nil
 }
 
-// UpdateCHIStatusOptions defines how to update CHI status
-type UpdateCHIStatusOptions struct {
-	api.CopyCHIStatusOptions
-	TolerateAbsence bool
-}
-
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *api.ClickHouseInstallation, opts UpdateCHIStatusOptions) (err error) {
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *api.ClickHouseInstallation, opts common.UpdateStatusOptions) (err error) {
 	return NewKubeStatusClickHouse(c.chopClient).Update(ctx, chi, opts)
 }
 

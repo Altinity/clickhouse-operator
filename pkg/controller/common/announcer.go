@@ -12,26 +12,42 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package common
 
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"time"
 
 	log "github.com/golang/glog"
 
 	a "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type IEventEmitter interface {
+	EventInfo(obj meta.Object, action string, reason string, message string)
+	EventWarning(obj meta.Object, action string, reason string, message string)
+	EventError(obj meta.Object, action string, reason string, message string)
+}
+
+// UpdateStatusOptions defines how to update CHI status
+type UpdateStatusOptions struct {
+	api.CopyStatusOptions
+	TolerateAbsence bool
+}
+
+type IKubeStatusUpdater interface {
+	Update(ctx context.Context, chi api.ICustomResource, opts UpdateStatusOptions) (err error)
+}
 
 // Announcer handler all log/event/status messages going outside of controller/worker
 type Announcer struct {
 	a.Announcer
 
-	eventEmitter  *common.EventEmitter
-	statusUpdater *KubeStatusClickHouse
+	eventEmitter  IEventEmitter
+	statusUpdater IKubeStatusUpdater
 	cr            api.ICustomResource
 
 	// writeEvent specifies whether to produce k8s event into chi, therefore requires chi to be specified
@@ -55,7 +71,7 @@ type Announcer struct {
 }
 
 // NewAnnouncer creates new announcer
-func NewAnnouncer(eventEmitter *common.EventEmitter, statusUpdater *KubeStatusClickHouse) Announcer {
+func NewAnnouncer(eventEmitter IEventEmitter, statusUpdater IKubeStatusUpdater) Announcer {
 	return Announcer{
 		Announcer:     a.New(),
 		eventEmitter:  eventEmitter,
@@ -137,7 +153,7 @@ func (a Announcer) Info(format string, args ...interface{}) {
 	a.Announcer.Info(format, args...)
 
 	// Produce k8s event
-	if a.writeEvent && a.chiCapable() {
+	if a.writeEvent && a.capable() {
 		if len(args) > 0 {
 			a.eventEmitter.EventInfo(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
@@ -146,7 +162,7 @@ func (a Announcer) Info(format string, args ...interface{}) {
 	}
 
 	// Produce chi status record
-	a.writeCHIStatus(format, args...)
+	a.writeStatus(format, args...)
 }
 
 // Warning is inspired by log.Warningf()
@@ -155,7 +171,7 @@ func (a Announcer) Warning(format string, args ...interface{}) {
 	a.Announcer.Warning(format, args...)
 
 	// Produce k8s event
-	if a.writeEvent && a.chiCapable() {
+	if a.writeEvent && a.capable() {
 		if len(args) > 0 {
 			a.eventEmitter.EventWarning(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
@@ -164,7 +180,7 @@ func (a Announcer) Warning(format string, args ...interface{}) {
 	}
 
 	// Produce chi status record
-	a.writeCHIStatus(format, args...)
+	a.writeStatus(format, args...)
 }
 
 // Error is inspired by log.Errorf()
@@ -173,7 +189,7 @@ func (a Announcer) Error(format string, args ...interface{}) {
 	a.Announcer.Error(format, args...)
 
 	// Produce k8s event
-	if a.writeEvent && a.chiCapable() {
+	if a.writeEvent && a.capable() {
 		if len(args) > 0 {
 			a.eventEmitter.EventError(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
@@ -182,13 +198,13 @@ func (a Announcer) Error(format string, args ...interface{}) {
 	}
 
 	// Produce chi status record
-	a.writeCHIStatus(format, args...)
+	a.writeStatus(format, args...)
 }
 
 // Fatal is inspired by log.Fatalf()
 func (a Announcer) Fatal(format string, args ...interface{}) {
 	// Produce k8s event
-	if a.writeEvent && a.chiCapable() {
+	if a.writeEvent && a.capable() {
 		if len(args) > 0 {
 			a.eventEmitter.EventError(a.cr, a.eventAction, a.eventReason, fmt.Sprintf(format, args...))
 		} else {
@@ -197,7 +213,7 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 	}
 
 	// Produce chi status record
-	a.writeCHIStatus(format, args...)
+	a.writeStatus(format, args...)
 
 	// Write and exit
 	a.Announcer.Fatal(format, args...)
@@ -263,14 +279,14 @@ func (a Announcer) WithStatusError(cr api.ICustomResource) Announcer {
 	return b
 }
 
-// chiCapable checks whether announcer is capable to produce chi-based announcements
-func (a Announcer) chiCapable() bool {
+// capable checks whether announcer is capable to produce chi-based announcements
+func (a Announcer) capable() bool {
 	return (a.eventEmitter != nil) && (a.cr != nil)
 }
 
-// writeCHIStatus is internal function which writes ClickHouseInstallation.Status
-func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
-	if !a.chiCapable() {
+// writeStatus is internal function which writes ClickHouseInstallation.Status
+func (a Announcer) writeStatus(format string, args ...interface{}) {
+	if !a.capable() {
 		return
 	}
 
@@ -308,9 +324,9 @@ func (a Announcer) writeCHIStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if shouldUpdateStatus {
-		_ = a.statusUpdater.Update(context.Background(), a.cr, UpdateCHIStatusOptions{
+		_ = a.statusUpdater.Update(context.Background(), a.cr, UpdateStatusOptions{
 			TolerateAbsence: true,
-			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+			CopyStatusOptions: api.CopyStatusOptions{
 				Actions: true,
 				Errors:  true,
 			},

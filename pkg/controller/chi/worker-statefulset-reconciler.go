@@ -16,12 +16,12 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -92,8 +92,8 @@ func (w *worker) reconcileStatefulSet(
 		w.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet.GetObjectMeta()))
 		if register {
 			host.GetCR().EnsureStatus().HostUnchanged()
-			_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+			_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), common.UpdateStatusOptions{
+				CopyStatusOptions: api.CopyStatusOptions{
 					MainFields: true,
 				},
 			})
@@ -180,8 +180,8 @@ func (w *worker) updateStatefulSet(ctx context.Context, host *api.Host, register
 	case nil:
 		if register {
 			host.GetCR().EnsureStatus().HostUpdated()
-			_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+			_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), common.UpdateStatusOptions{
+				CopyStatusOptions: api.CopyStatusOptions{
 					MainFields: true,
 				},
 			})
@@ -236,8 +236,8 @@ func (w *worker) createStatefulSet(ctx context.Context, host *api.Host, register
 
 	if register {
 		host.GetCR().EnsureStatus().HostAdded()
-		_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), UpdateCHIStatusOptions{
-			CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+		_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), common.UpdateStatusOptions{
+			CopyStatusOptions: api.CopyStatusOptions{
 				MainFields: true,
 			},
 		})

@@ -158,7 +158,7 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 			name: "CopyFrom",
 			goRoutineA: func(s *ChiStatus) {
 				s.PushAction("always-present-action") // CopyFrom preserves existing actions (does not clobber)
-				s.CopyFrom(copyTestStatusFrom, CopyCHIStatusOptions{
+				s.CopyFrom(copyTestStatusFrom, CopyStatusOptions{
 					Actions:           true,
 					Errors:            true,
 					MainFields:        true,

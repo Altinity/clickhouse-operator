@@ -366,7 +366,7 @@ func (chi *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type
 	// Copy service attributes
 	chi.ensureRuntime().attributes = from.ensureRuntime().attributes
 
-	chi.EnsureStatus().CopyFrom(from.Status, CopyCHIStatusOptions{
+	chi.EnsureStatus().CopyFrom(from.Status, CopyStatusOptions{
 		InheritableFields: true,
 	})
 }

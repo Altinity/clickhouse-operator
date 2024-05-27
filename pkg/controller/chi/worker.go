@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -32,6 +31,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
@@ -50,7 +50,7 @@ const FinalizerName = "finalizer.clickhouseinstallation.altinity.com"
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
 	c *Controller
-	a Announcer
+	a common.Announcer
 	//queue workqueue.RateLimitingInterface
 	queue      queue.PriorityQueue
 	normalizer *normalizer.Normalizer
@@ -72,7 +72,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 	return &worker{
 		c: c,
-		a: NewAnnouncer(
+		a: common.NewAnnouncer(
 			common.NewEventEmitter(NewKubeEventClickHouse(c.kubeClient), kind, generateName, component),
 			NewKubeStatusClickHouse(c.chopClient),
 		),
@@ -406,9 +406,9 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			// TODO unify with finalize reconcile
 			w.newTask(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
+			w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
 				TolerateAbsence: true,
-				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+				CopyStatusOptions: api.CopyStatusOptions{
 					Normalized: true,
 				},
 			})
@@ -668,8 +668,8 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInst
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	chi.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,
 		},
 	})
@@ -706,8 +706,8 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			// TODO unify with update endpoints
 			w.newTask(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-				CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+			w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+				CopyStatusOptions: api.CopyStatusOptions{
 					WholeStatus: true,
 				},
 			})
@@ -738,8 +738,8 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	case errors.Is(err, errCRUDAbort):
 		chi.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCHIObjectStatus(ctx, chi, UpdateCHIStatusOptions{
-		CopyCHIStatusOptions: api.CopyCHIStatusOptions{
+	w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,
 		},
 	})

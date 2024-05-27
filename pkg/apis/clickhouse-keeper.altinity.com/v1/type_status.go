@@ -41,7 +41,7 @@ type ChkStatus struct {
 }
 
 // CopyFrom copies the state of a given ChiStatus f into the receiver ChiStatus of the call.
-func (s *ChkStatus) CopyFrom(from *ChkStatus, opts apiChi.CopyCHIStatusOptions) {
+func (s *ChkStatus) CopyFrom(from *ChkStatus, opts apiChi.CopyStatusOptions) {
 	if s == nil || from == nil {
 		return
 	}

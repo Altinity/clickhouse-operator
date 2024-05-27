@@ -84,32 +84,17 @@ func NewEventEmitter(
 }
 
 // EventInfo emits event Info
-func (c *EventEmitter) EventInfo(
-	obj meta.Object,
-	action string,
-	reason string,
-	message string,
-) {
+func (c *EventEmitter) EventInfo(obj meta.Object, action string, reason string, message string) {
 	c.emitEvent(obj, eventTypeInfo, action, reason, message)
 }
 
 // EventWarning emits event Warning
-func (c *EventEmitter) EventWarning(
-	obj meta.Object,
-	action string,
-	reason string,
-	message string,
-) {
+func (c *EventEmitter) EventWarning(obj meta.Object, action string, reason string, message string) {
 	c.emitEvent(obj, eventTypeWarning, action, reason, message)
 }
 
 // EventError emits event Error
-func (c *EventEmitter) EventError(
-	obj meta.Object,
-	action string,
-	reason string,
-	message string,
-) {
+func (c *EventEmitter) EventError(obj meta.Object, action string, reason string, message string) {
 	c.emitEvent(obj, eventTypeError, action, reason, message)
 }
 
