@@ -23,7 +23,7 @@ import (
 
 // walkContainers walks with specified func over all containers of the specified host
 func (c *Controller) walkContainers(host *api.Host, f func(container *v1.Container)) {
-	pod, err := c.getPod(host)
+	pod, err := c.kube.Pod().Get(host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host '%s' err: %v", host.Runtime.Address.NamespaceNameString(), err)
 		return
@@ -37,7 +37,7 @@ func (c *Controller) walkContainers(host *api.Host, f func(container *v1.Contain
 
 // walkContainerStatuses walks with specified func over all statuses of the specified host
 func (c *Controller) walkContainerStatuses(host *api.Host, f func(status *v1.ContainerStatus)) {
-	pod, err := c.getPod(host)
+	pod, err := c.kube.Pod().Get(host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return

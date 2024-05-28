@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package kube
 
 import (
 	"context"
@@ -23,22 +23,22 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type KubeStatusClickHouse struct {
+type KubeCRStatusClickHouse struct {
 	chopClient chopClientSet.Interface
 }
 
-func NewKubeStatusClickHouse(chopClient chopClientSet.Interface) *KubeStatusClickHouse {
-	return &KubeStatusClickHouse{
+func NewKubeCRStatusClickHouse(chopClient chopClientSet.Interface) *KubeCRStatusClickHouse {
+	return &KubeCRStatusClickHouse{
 		chopClient: chopClient,
 	}
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *KubeStatusClickHouse) Update(ctx context.Context, chi api.ICustomResource, opts common.UpdateStatusOptions) (err error) {
+func (c *KubeCRStatusClickHouse) Update(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -49,29 +49,29 @@ func (c *KubeStatusClickHouse) Update(ctx context.Context, chi api.ICustomResour
 			retry = false
 		}
 
-		err = c.doUpdateCHIObjectStatus(ctx, chi, opts)
+		err = c.doUpdateCRStatus(ctx, cr, opts)
 		if err == nil {
 			return nil
 		}
 
 		if retry {
-			log.V(2).M(chi).F().Warning("got error, will retry. err: %q", err)
+			log.V(2).M(cr).F().Warning("got error, will retry. err: %q", err)
 			time.Sleep(1 * time.Second)
 		} else {
-			log.V(1).M(chi).F().Error("got error, all retries are exhausted. err: %q", err)
+			log.V(1).M(cr).F().Error("got error, all retries are exhausted. err: %q", err)
 		}
 	}
 	return
 }
 
-// doUpdateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *KubeStatusClickHouse) doUpdateCHIObjectStatus(ctx context.Context, _chi api.ICustomResource, opts common.UpdateStatusOptions) error {
+// doUpdateCRStatus updates ClickHouseInstallation object's Status
+func (c *KubeCRStatusClickHouse) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	chi := _chi.(*api.ClickHouseInstallation)
+	chi := cr.(*api.ClickHouseInstallation)
 	namespace, name := util.NamespaceName(chi)
 	log.V(3).M(chi).F().Info("Update CHI status")
 

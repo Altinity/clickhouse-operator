@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package kube
 
 import (
 	"context"
@@ -24,8 +24,11 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -57,16 +60,6 @@ func (c *KubePVCClickHouse) Update(ctx context.Context, pvc *core.PersistentVolu
 
 func (c *KubePVCClickHouse) Delete(ctx context.Context, namespace, name string) error {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, controller.NewDeleteOptions())
-}
-
-func (c *KubePVCClickHouse) kubePVCListForHost(host *api.Host) (*core.PersistentVolumeClaimList, error) {
-	return c.kubeClient.
-		CoreV1().
-		PersistentVolumeClaims(host.Runtime.Address.Namespace).
-		List(
-			controller.NewContext(),
-			controller.NewListOptions(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
-		)
 }
 
 // UpdateOrCreate
@@ -107,7 +100,7 @@ func (c *KubePVCClickHouse) UpdateOrCreate(ctx context.Context, pvc *core.Persis
 }
 
 // deletePVC deletes PersistentVolumeClaim
-func (c *KubePVCClickHouse) deletePVC(ctx context.Context, host *api.Host) error {
+func (c *KubePVCClickHouse) DeletePVC(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -117,7 +110,7 @@ func (c *KubePVCClickHouse) deletePVC(ctx context.Context, host *api.Host) error
 	defer log.V(2).M(host).E().P()
 
 	namespace := host.Runtime.Address.Namespace
-	c.walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
+	c.WalkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("task is done")
 			return
@@ -145,7 +138,7 @@ func (c *KubePVCClickHouse) deletePVC(ctx context.Context, host *api.Host) error
 	return nil
 }
 
-func (c *KubePVCClickHouse) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
+func (c *KubePVCClickHouse) WalkDiscoveredPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
 	namespace := host.Runtime.Address.Namespace
 
 	pvcList, err := c.kubePVCListForHost(host)
@@ -160,4 +153,22 @@ func (c *KubePVCClickHouse) walkDiscoveredPVCs(host *api.Host, f func(pvc *core.
 
 		f(pvc)
 	}
+}
+
+func (c *KubePVCClickHouse) kubePVCListForHost(host *api.Host) (*core.PersistentVolumeClaimList, error) {
+	return c.kubeClient.
+		CoreV1().
+		PersistentVolumeClaims(host.Runtime.Address.Namespace).
+		List(
+			controller.NewContext(),
+			controller.NewListOptions(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
+		)
+}
+
+func labeler(cr api.ICustomResource) interfaces.ILabeler {
+	return chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+		AppendScope: chop.Config().Label.Runtime.AppendScope,
+		Include:     chop.Config().Label.Include,
+		Exclude:     chop.Config().Label.Exclude,
+	})
 }

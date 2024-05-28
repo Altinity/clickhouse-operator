@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package common
 
 import (
 	"errors"
@@ -22,8 +22,8 @@ import (
 type ErrorCRUD error
 
 var (
-	errCRUDAbort          ErrorCRUD = errors.New("crud error - should abort")
-	errCRUDIgnore         ErrorCRUD = errors.New("crud error - should ignore")
-	errCRUDRecreate       ErrorCRUD = errors.New("crud error - should recreate")
-	errCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
+	ErrCRUDAbort          ErrorCRUD = errors.New("crud error - should abort")
+	ErrCRUDIgnore         ErrorCRUD = errors.New("crud error - should ignore")
+	ErrCRUDRecreate       ErrorCRUD = errors.New("crud error - should recreate")
+	ErrCRUDUnexpectedFlow ErrorCRUD = errors.New("crud error - unexpected flow")
 )

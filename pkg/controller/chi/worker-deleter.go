@@ -16,6 +16,7 @@ package chi
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -28,6 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -286,7 +288,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 		Info("Delete CHI started")
 
 	chi.EnsureStatus().DeleteStart()
-	if err := w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+	if err := w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 		TolerateAbsence: true,
 		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,
@@ -340,7 +342,7 @@ func (w *worker) canDropReplica(host *api.Host, opts ...*dropReplicaOptions) (ca
 	}
 
 	can = true
-	NewKubePVCClickHouse(w.c.kubeClient).walkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
+	kube.NewKubePVCClickHouse(w.c.kubeClient).WalkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if commonLabeler.GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
@@ -471,7 +473,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 		Info("Delete host: %s/%s - started", host.Runtime.Address.ClusterName, host.GetName())
 
 	var err error
-	if host.Runtime.CurStatefulSet, err = w.c.getStatefulSet(host); err != nil {
+	if host.Runtime.CurStatefulSet, err = w.c.kube.STS().Get(host); err != nil {
 		w.a.WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
@@ -492,7 +494,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	chi.EnsureStatus().HostDeleted()
-	_ = w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 		TolerateAbsence: true,
 		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,

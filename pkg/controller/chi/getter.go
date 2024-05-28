@@ -26,7 +26,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
@@ -80,96 +79,9 @@ func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.Conf
 	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
 }
 
-// getService gets Service. Accepted types:
-//  1. *core.Service
-//  2. *chop.Host
-func (c *Controller) getService(obj interface{}) (*core.Service, error) {
-	var name, namespace string
-	switch typedObj := obj.(type) {
-	case *core.Service:
-		name = typedObj.Name
-		namespace = typedObj.Namespace
-	case *api.Host:
-		name = c.namer.Name(interfaces.NameStatefulSetService, typedObj)
-		namespace = typedObj.Runtime.Address.Namespace
-	}
-	return c.serviceLister.Services(namespace).Get(name)
-	//return c.kubeClient.CoreV1().Services(namespace).Get(newTask(), name, newGetOptions())
-}
-
 // getSecret gets secret
 func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
 	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(controller.NewContext(), secret.Name, controller.NewGetOptions())
-}
-
-// getPod gets pod. Accepted types:
-//  1. *apps.StatefulSet
-//  2. *chop.Host
-func (c *Controller) getPod(obj interface{}) (*core.Pod, error) {
-	var name, namespace string
-	switch typedObj := obj.(type) {
-	case *apps.StatefulSet:
-		name = c.namer.Name(interfaces.NamePod, obj)
-		namespace = typedObj.Namespace
-	case *api.Host:
-		name = c.namer.Name(interfaces.NamePod, obj)
-		namespace = typedObj.Runtime.Address.Namespace
-	}
-	return c.kubeClient.CoreV1().Pods(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
-}
-
-// getPods gets all pods for provided entity
-func (c *Controller) getPods(obj interface{}) []*core.Pod {
-	switch typed := obj.(type) {
-	case *api.ClickHouseInstallation:
-		return c.getPodsOfCHI(typed)
-	case *api.Cluster:
-		return c.getPodsOfCluster(typed)
-	case *api.ChiShard:
-		return c.getPodsOfShard(typed)
-	case
-		*api.Host,
-		*apps.StatefulSet:
-		if pod, err := c.getPod(typed); err == nil {
-			return []*core.Pod{
-				pod,
-			}
-		}
-	}
-	return nil
-}
-
-// getPodsOfCluster gets all pods in a cluster
-func (c *Controller) getPodsOfCluster(cluster *api.Cluster) (pods []*core.Pod) {
-	cluster.WalkHosts(func(host *api.Host) error {
-		if pod, err := c.getPod(host); err == nil {
-			pods = append(pods, pod)
-		}
-		return nil
-	})
-	return pods
-}
-
-// getPodsOfShard gets all pods in a shard
-func (c *Controller) getPodsOfShard(shard *api.ChiShard) (pods []*core.Pod) {
-	shard.WalkHosts(func(host *api.Host) error {
-		if pod, err := c.getPod(host); err == nil {
-			pods = append(pods, pod)
-		}
-		return nil
-	})
-	return pods
-}
-
-// getPodsOfCHI gets all pods in a CHI
-func (c *Controller) getPodsOfCHI(chi *api.ClickHouseInstallation) (pods []*core.Pod) {
-	chi.WalkHosts(func(host *api.Host) error {
-		if pod, err := c.getPod(host); err == nil {
-			pods = append(pods, pod)
-		}
-		return nil
-	})
-	return pods
 }
 
 // getPodsIPs gets all pod IPs
@@ -177,7 +89,7 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 	log.V(3).M(obj).F().S().Info("looking for pods IPs")
 	defer log.V(3).M(obj).F().E().Info("looking for pods IPs")
 
-	for _, pod := range c.getPods(obj) {
+	for _, pod := range c.kube.Pod().GetAll(obj) {
 		if ip := pod.Status.PodIP; ip == "" {
 			log.V(3).M(pod).F().Warning("Pod NO IP address found. Pod: %s/%s", pod.Namespace, pod.Name)
 		} else {

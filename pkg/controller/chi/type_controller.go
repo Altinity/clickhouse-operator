@@ -76,6 +76,8 @@ type Controller struct {
 	recorder record.EventRecorder
 
 	namer      interfaces.INameManager
+	kube       interfaces.IKube
+	labeler    *Labeler
 	pvcDeleter *volume.PVCDeleter
 }
 

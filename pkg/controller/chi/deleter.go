@@ -16,8 +16,7 @@ package chi
 
 import (
 	"context"
-	"time"
-
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -34,7 +33,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *api.Host) error {
 
 	// Each host consists of:
 	_ = c.deleteStatefulSet(ctx, host)
-	_ = NewKubePVCClickHouse(c.kubeClient).deletePVC(ctx, host)
+	_ = kube.NewKubePVCClickHouse(c.kubeClient).DeletePVC(ctx, host)
 	_ = c.deleteConfigMap(ctx, host)
 	_ = c.deleteServiceHost(ctx, host)
 
@@ -108,77 +107,16 @@ func (c *Controller) statefulSetDeletePod(ctx context.Context, statefulSet *apps
 	return err
 }
 
-// deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	// IMPORTANT
-	// StatefulSets do not provide any guarantees on the termination of pods when a StatefulSet is deleted.
-	// To achieve ordered and graceful termination of the pods in the StatefulSet,
-	// it is possible to scale the StatefulSet down to 0 prior to deletion.
-
-	// Namespaced name
 	name := c.namer.Name(interfaces.NameStatefulSet, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
-
-	var err error
-	host.Runtime.CurStatefulSet, err = c.getStatefulSet(host)
-	if err != nil {
-		// Unable to fetch cur StatefulSet, but this is not necessarily an error yet
-		if apiErrors.IsNotFound(err) {
-			log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
-		} else {
-			log.V(1).M(host).F().Error("FAIL get StatefulSet %s/%s err:%v", namespace, name, err)
-		}
-		return err
-	}
-
-	// Scale StatefulSet down to 0 pods count.
-	// This is the proper and graceful way to delete StatefulSet
-	var zero int32 = 0
-	host.Runtime.CurStatefulSet.Spec.Replicas = &zero
-	if _, err := c.kubeClient.AppsV1().StatefulSets(namespace).Update(ctx, host.Runtime.CurStatefulSet, controller.NewUpdateOptions()); err != nil {
-		log.V(1).M(host).Error("UNABLE to update StatefulSet %s/%s", namespace, name)
-		return err
-	}
-
-	// Wait until StatefulSet scales down to 0 pods count.
-	_ = c.waitHostReady(ctx, host)
-
-	// And now delete empty StatefulSet
-	if err := c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, controller.NewDeleteOptions()); err == nil {
-		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
-		c.waitHostDeleted(host)
-	} else if apiErrors.IsNotFound(err) {
-		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
-	} else {
-		log.V(1).M(host).F().Error("FAIL delete StatefulSet %s/%s err: %v", namespace, name, err)
-	}
-
-	return nil
-}
-
-// syncStatefulSet
-func (c *Controller) syncStatefulSet(ctx context.Context, host *api.Host) {
-	for {
-		if util.IsContextDone(ctx) {
-			log.V(2).Info("task is done")
-			return
-		}
-		// TODO
-		// There should be better way to sync cache
-		if sts, err := c.getStatefulSetByHost(host); err == nil {
-			log.V(2).Info("cache NOT yet synced sts %s/%s is scheduled for deletion on %s", sts.Namespace, sts.Name, sts.DeletionTimestamp)
-			util.WaitContextDoneOrTimeout(ctx, 15*time.Second)
-		} else {
-			log.V(1).Info("cache synced")
-			return
-		}
-	}
+	return c.kube.STS().Delete(namespace, name)
 }
 
 // deleteConfigMap deletes ConfigMap
@@ -199,19 +137,6 @@ func (c *Controller) deleteConfigMap(ctx context.Context, host *api.Host) error 
 	} else {
 		log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
 	}
-
-	//name = chopmodel.CreateConfigMapHostMigrationName(host)
-	//namespace = host.Address.Namespace
-	//log.V(1).M(host).F().Info("%s/%s", namespace, name)
-	//
-	//if err := c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(task, name, newDeleteOptions()); err == nil {
-	//	log.V(1).M(host).Info("OK delete ConfigMap %s/%s", namespace, name)
-	//} else if apierrors.IsNotFound(err) {
-	//	log.V(1).M(host).Info("NEUTRAL not found ConfigMap %s/%s", namespace, name)
-	//} else {
-	//	log.V(1).M(host).F().Error("FAIL delete ConfigMap %s/%s err:%v", namespace, name, err)
-	//}
-
 	return nil
 }
 

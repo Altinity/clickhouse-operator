@@ -52,11 +52,12 @@ type worker struct {
 	c *Controller
 	a common.Announcer
 	//queue workqueue.RateLimitingInterface
-	queue      queue.PriorityQueue
-	normalizer *normalizer.Normalizer
-	schemer    *schemer.ClusterSchemer
-	start      time.Time
-	task       *common.Task
+	queue         queue.PriorityQueue
+	normalizer    *normalizer.Normalizer
+	schemer       *schemer.ClusterSchemer
+	start         time.Time
+	task          *common.Task
+	stsReconciler *common.StatefulSetReconciler
 }
 
 // newWorker
@@ -70,18 +71,21 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	generateName := "chop-chi-"
 	component := componentName
 
+	announcer := common.NewAnnouncer(
+		common.NewEventEmitter(c.kube.Event(), kind, generateName, component),
+		c.kube.CRStatus(),
+	)
+
 	return &worker{
-		c: c,
-		a: common.NewAnnouncer(
-			common.NewEventEmitter(NewKubeEventClickHouse(c.kubeClient), kind, generateName, component),
-			NewKubeStatusClickHouse(c.chopClient),
-		),
+		c:     c,
+		a:     announcer,
 		queue: q,
 		normalizer: normalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
 			return c.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 		}),
 		schemer: nil,
 		start:   start,
+		task:    nil,
 	}
 }
 
@@ -110,6 +114,16 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			managers.NewConfigMapManager(managers.ConfigMapManagerTypeClickHouse),
 			managers.NewNameManager(managers.NameManagerTypeClickHouse),
 		),
+	)
+
+	w.stsReconciler = common.NewStatefulSetReconciler(
+		w.a,
+		w.task,
+		NewHostPoller(common.NewStatefulSetPoller(w.c.kube), w.c.labeler, w.c.kube),
+		w.c.namer,
+		common.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
+		w.c.kube,
+		w.c,
 	)
 }
 
@@ -152,7 +166,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 
 	podIsCrushed := false
 	// pod.Status.ContainerStatuses[0].State.Waiting.Reason
-	if pod, err := w.c.getPod(host); err == nil {
+	if pod, err := w.c.kube.Pod().Get(host); err == nil {
 		if len(pod.Status.ContainerStatuses) > 0 {
 			if pod.Status.ContainerStatuses[0].State.Waiting != nil {
 				if pod.Status.ContainerStatuses[0].State.Waiting.Reason == "CrashLoopBackOff" {
@@ -406,7 +420,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			// TODO unify with finalize reconcile
 			w.newTask(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+			w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 				TolerateAbsence: true,
 				CopyStatusOptions: api.CopyStatusOptions{
 					Normalized: true,
@@ -668,7 +682,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInst
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	chi.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,
 		},
@@ -706,7 +720,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			// TODO unify with update endpoints
 			w.newTask(chi)
 			w.reconcileCHIConfigMapUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+			w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 				CopyStatusOptions: api.CopyStatusOptions{
 					WholeStatus: true,
 				},
@@ -735,10 +749,10 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	switch {
 	case err == nil:
 		chi.EnsureStatus().ReconcileComplete()
-	case errors.Is(err, errCRUDAbort):
+	case errors.Is(err, common.ErrCRUDAbort):
 		chi.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCHIObjectStatus(ctx, chi, common.UpdateStatusOptions{
+	w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,
 		},
@@ -1085,8 +1099,8 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *api.Host) err
 		return nil
 	}
 
-	_ = w.c.deleteLabelReadyOnPod(ctx, host)
-	_ = w.c.deleteAnnotationReadyOnService(ctx, host)
+	_ = w.c.labeler.deleteLabelReadyOnPod(ctx, host)
+	_ = w.c.labeler.deleteAnnotationReadyOnService(ctx, host)
 	return nil
 }
 
@@ -1097,8 +1111,8 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *api.Host) err
 		return nil
 	}
 
-	_ = w.c.appendLabelReadyOnPod(ctx, host)
-	_ = w.c.appendAnnotationReadyOnService(ctx, host)
+	_ = w.c.labeler.appendLabelReadyOnPod(ctx, host)
+	_ = w.c.labeler.appendAnnotationReadyOnService(ctx, host)
 	return nil
 }
 
@@ -1280,19 +1294,19 @@ func (w *worker) shouldWaitIncludeHost(host *api.Host) bool {
 
 // waitHostInCluster
 func (w *worker) waitHostInCluster(ctx context.Context, host *api.Host) error {
-	return w.c.pollHost(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
+	return common.PollHost(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
 }
 
 // waitHostNotInCluster
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *api.Host) error {
-	return w.c.pollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
+	return common.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
 		return !w.ensureClusterSchemer(host).IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) error {
-	return w.c.pollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
+	return common.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
 		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})
@@ -1529,48 +1543,6 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 	}
 
 	return err
-}
-
-// waitConfigMapPropagation
-func (w *worker) waitConfigMapPropagation(ctx context.Context, host *api.Host) bool {
-	// No need to wait for ConfigMap propagation on stopped host
-	if host.IsStopped() {
-		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
-		return false
-	}
-
-	// No need to wait on unchanged ConfigMap
-	if w.task.CmUpdate.IsZero() {
-		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
-		return false
-	}
-
-	// What timeout is expected to be enough for ConfigMap propagation?
-	// In case timeout is not specified, no need to wait
-	if !host.GetCR().GetReconciling().HasConfigMapPropagationTimeout() {
-		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - not applicable")
-		return false
-	}
-
-	timeout := host.GetCR().GetReconciling().GetConfigMapPropagationTimeoutDuration()
-
-	// How much time has elapsed since last ConfigMap update?
-	// May be there is no need to wait already
-	elapsed := time.Now().Sub(w.task.CmUpdate)
-	if elapsed >= timeout {
-		w.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
-		return false
-	}
-
-	// Looks like we need to wait for Configmap propagation, after all
-	wait := timeout - elapsed
-	w.a.V(1).M(host).F().Info("Wait for ConfigMap propagation for %s %s/%s", wait, elapsed, timeout)
-	if util.WaitContextDoneOrTimeout(ctx, wait) {
-		log.V(2).Info("task is done")
-		return true
-	}
-
-	return false
 }
 
 func (w *worker) ensureClusterSchemer(host *api.Host) *schemer.ClusterSchemer {

@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"math"
 	"sync"
 	"time"
@@ -110,7 +111,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 			M(new).F().
 			Error("FAILED to reconcile CHI err: %v", err)
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
-		if errors.Is(err, errCRUDAbort) {
+		if errors.Is(err, common.ErrCRUDAbort) {
 			metricsCHIReconcilesAborted(ctx, new)
 		}
 	} else {
@@ -352,7 +353,7 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host, o
 }
 
 func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version string, err error) {
-	err = w.c.pollHost(
+	err = common.PollHost(
 		ctx,
 		host,
 		nil,
@@ -380,15 +381,15 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
 	version, _ := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true})
-	host.Runtime.CurStatefulSet, _ = w.c.getStatefulSet(host)
+	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. ClickHouse version: %s", host.GetName(), version)
 	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
 	if w.shouldForceRestartHost(host) {
 		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
-		w.prepareHostStatefulSetWithStatus(ctx, host, true)
-		_ = w.reconcileStatefulSet(ctx, host, false)
+		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
+		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false)
 		metricsHostReconcilesRestart(ctx, host.GetCR())
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
@@ -396,13 +397,13 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 
 	// We are in place, where we can  reconcile StatefulSet to desired configuration.
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. Reconcile StatefulSet", host.GetName())
-	w.prepareHostStatefulSetWithStatus(ctx, host, false)
-	err := w.reconcileStatefulSet(ctx, host, true, opts...)
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+	err := w.stsReconciler.ReconcileStatefulSet(ctx, host, true, opts...)
 	if err == nil {
 		w.task.RegistryReconciled.RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
 	} else {
 		w.task.RegistryFailed.RegisterStatefulSet(host.Runtime.DesiredStatefulSet.GetObjectMeta())
-		if err == errCRUDIgnore {
+		if err == common.ErrCRUDIgnore {
 			// Pretend nothing happened in case of ignore
 			err = nil
 		}
@@ -664,7 +665,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 
 	// Create artifacts
-	w.prepareHostStatefulSetWithStatus(ctx, host, false)
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if w.excludeHost(ctx, host) {
 		// Need to wait to complete queries only in case host is excluded from the cluster
@@ -686,7 +687,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(1).
 		M(host).F().
 		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
-	if common.ErrIsDataLoss(common.NewStorageReconciler(w.task, w.c.namer, NewKubePVCClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)) {
+	if common.ErrIsDataLoss(common.NewStorageReconciler(w.task, w.c.namer, kube.NewKubePVCClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)) {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
@@ -708,7 +709,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Polish all new volumes that operator has to create
-	_ = common.NewStorageReconciler(w.task, w.c.namer, NewKubePVCClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	_ = common.NewStorageReconciler(w.task, w.c.namer, kube.NewKubePVCClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 
 	_ = w.reconcileHostService(ctx, host)
 
@@ -766,7 +767,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		M(host).F().
 		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
-	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), common.UpdateStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), interfaces.UpdateStatusOptions{
 		CopyStatusOptions: api.CopyStatusOptions{
 			MainFields: true,
 		},
@@ -848,7 +849,7 @@ func (w *worker) reconcileConfigMap(
 // hasService checks whether specified service exists
 func (w *worker) hasService(ctx context.Context, chi *api.ClickHouseInstallation, service *core.Service) bool {
 	// Check whether this object already exists
-	curService, _ := w.c.getService(service)
+	curService, _ := w.c.kube.Service().Get(service)
 	return curService != nil
 }
 
@@ -863,7 +864,7 @@ func (w *worker) reconcileService(ctx context.Context, chi *api.ClickHouseInstal
 	defer w.a.V(2).M(chi).E().Info(service.Name)
 
 	// Check whether this object already exists
-	curService, err := w.c.getService(service)
+	curService, err := w.c.kube.Service().Get(service)
 
 	if curService != nil {
 		// We have the Service - try to update it

@@ -18,6 +18,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	kube2 "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -47,7 +49,6 @@ import (
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
@@ -83,6 +84,9 @@ func NewController(
 		},
 	)
 
+	namer := managers.NewNameManager(managers.NameManagerTypeClickHouse)
+	kube := kube2.NewKubeClickHouse(kubeClient, chopClient, namer)
+
 	// Create Controller instance
 	controller := &Controller{
 		kubeClient:              kubeClient,
@@ -103,7 +107,9 @@ func NewController(
 		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
 		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
 		recorder:                recorder,
-		namer:                   managers.NewNameManager(managers.NameManagerTypeClickHouse),
+		namer:                   namer,
+		kube:                    kube,
+		labeler:                 NewLabeler(kube),
 		pvcDeleter:              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
@@ -491,7 +497,7 @@ func (c *Controller) Run(ctx context.Context) {
 	// Label controller runtime objects with proper labels
 	max := 10
 	for cnt := 0; cnt < max; cnt++ {
-		switch err := c.labelMyObjectsTree(ctx); err {
+		switch err := c.labeler.labelMyObjectsTree(ctx); err {
 		case nil:
 			cnt = max
 		case ErrOperatorPodNotSpecified:
@@ -728,8 +734,8 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, chi *api.ClickHouseInstallation, opts common.UpdateStatusOptions) (err error) {
-	return NewKubeStatusClickHouse(c.chopClient).Update(ctx, chi, opts)
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) (err error) {
+	return c.kube.CRStatus().Update(ctx, cr, opts)
 }
 
 func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, f func(c *api.ClickHouseInstallation, e error) bool) {

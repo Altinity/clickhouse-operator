@@ -23,31 +23,15 @@ import (
 
 	a "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
-
-type IEventEmitter interface {
-	EventInfo(obj meta.Object, action string, reason string, message string)
-	EventWarning(obj meta.Object, action string, reason string, message string)
-	EventError(obj meta.Object, action string, reason string, message string)
-}
-
-// UpdateStatusOptions defines how to update CHI status
-type UpdateStatusOptions struct {
-	api.CopyStatusOptions
-	TolerateAbsence bool
-}
-
-type IKubeStatusUpdater interface {
-	Update(ctx context.Context, chi api.ICustomResource, opts UpdateStatusOptions) (err error)
-}
 
 // Announcer handler all log/event/status messages going outside of controller/worker
 type Announcer struct {
 	a.Announcer
 
-	eventEmitter  IEventEmitter
-	statusUpdater IKubeStatusUpdater
+	eventEmitter  interfaces.IEventEmitter
+	statusUpdater interfaces.IKubeCRStatus
 	cr            api.ICustomResource
 
 	// writeEvent specifies whether to produce k8s event into chi, therefore requires chi to be specified
@@ -71,7 +55,7 @@ type Announcer struct {
 }
 
 // NewAnnouncer creates new announcer
-func NewAnnouncer(eventEmitter IEventEmitter, statusUpdater IKubeStatusUpdater) Announcer {
+func NewAnnouncer(eventEmitter interfaces.IEventEmitter, statusUpdater interfaces.IKubeCRStatus) Announcer {
 	return Announcer{
 		Announcer:     a.New(),
 		eventEmitter:  eventEmitter,
@@ -220,11 +204,7 @@ func (a Announcer) Fatal(format string, args ...interface{}) {
 }
 
 // WithEvent is used in chained calls in order to produce event into `chi`
-func (a Announcer) WithEvent(
-	cr api.ICustomResource,
-	action string,
-	reason string,
-) Announcer {
+func (a Announcer) WithEvent(cr api.ICustomResource, action string, reason string) Announcer {
 	b := a
 	if cr == nil {
 		b.writeEvent = false
@@ -324,7 +304,7 @@ func (a Announcer) writeStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if shouldUpdateStatus {
-		_ = a.statusUpdater.Update(context.Background(), a.cr, UpdateStatusOptions{
+		_ = a.statusUpdater.Update(context.Background(), a.cr, interfaces.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: api.CopyStatusOptions{
 				Actions: true,

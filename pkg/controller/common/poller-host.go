@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package common
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -174,6 +175,35 @@ func Poll(
 		log.V(2).M(namespace, name).F().P()
 		sleepAndRunBackgroundProcess(ctx, opts, background)
 	} // for
+}
+
+// PollHost polls host
+func PollHost(
+	ctx context.Context,
+	host *api.Host,
+	opts *PollerOptions,
+	isDoneFn func(ctx context.Context, host *api.Host) bool,
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	opts = opts.Ensure().FromConfig(chop.Config())
+	namespace := host.Runtime.Address.Namespace
+	name := host.Runtime.Address.HostName
+
+	return Poll(
+		ctx,
+		namespace, name,
+		opts,
+		&PollerFunctions{
+			IsDone: func(_ctx context.Context, _ any) bool {
+				return isDoneFn(_ctx, host)
+			},
+		},
+		nil,
+	)
 }
 
 func sleepAndRunBackgroundProcess(ctx context.Context, opts *PollerOptions, background *PollerBackgroundFunctions) {

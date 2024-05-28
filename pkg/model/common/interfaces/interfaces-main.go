@@ -15,11 +15,10 @@
 package interfaces
 
 import (
-	"context"
-
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
@@ -96,15 +95,8 @@ type ICreator interface {
 	CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet
 }
 
-type IKubePVC interface {
-	Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
-	Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error)
-	Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
-	Delete(ctx context.Context, namespace, name string) error
-
-	UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
-}
-
-type IKubeEvent interface {
-	Create(ctx context.Context, event *core.Event) (*core.Event, error)
+type IEventEmitter interface {
+	EventInfo(obj meta.Object, action string, reason string, message string)
+	EventWarning(obj meta.Object, action string, reason string, message string)
+	EventError(obj meta.Object, action string, reason string, message string)
 }
