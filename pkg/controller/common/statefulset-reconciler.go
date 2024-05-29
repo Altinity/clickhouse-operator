@@ -218,7 +218,7 @@ func (r *StatefulSetReconciler) updateStatefulSet(ctx context.Context, host *api
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
 
-	if r.waitTimeForConfigMapPropagation(ctx, host) {
+	if r.waitForConfigMapPropagation(ctx, host) {
 		log.V(2).Info("task is done")
 		return nil
 	}
@@ -328,8 +328,8 @@ func (r *StatefulSetReconciler) createStatefulSet(ctx context.Context, host *api
 	return nil
 }
 
-// waitTimeForConfigMapPropagation
-func (r *StatefulSetReconciler) waitTimeForConfigMapPropagation(ctx context.Context, host *api.Host) bool {
+// waitForConfigMapPropagation
+func (r *StatefulSetReconciler) waitForConfigMapPropagation(ctx context.Context, host *api.Host) bool {
 	// No need to wait for ConfigMap propagation on stopped host
 	if host.IsStopped() {
 		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - on stopped host")
