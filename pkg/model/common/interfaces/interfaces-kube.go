@@ -31,7 +31,7 @@ type IKube interface {
 	Service() IKubeService
 	STS() IKubeSTS
 	CRStatus() IKubeCRStatus
-	Storage() IKubePVC
+	Storage() IKubeStorage
 }
 
 type IKubePVC interface {
@@ -39,7 +39,9 @@ type IKubePVC interface {
 	Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error)
 	Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 	Delete(ctx context.Context, namespace, name string) error
-
+}
+type IKubeStorage interface {
+	IKubePVC
 	UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
 }
 

@@ -26,13 +26,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type KubePodClickHouse struct {
+type PodClickHouse struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 }
 
-func NewKubePodClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *KubePodClickHouse {
-	return &KubePodClickHouse{
+func NewPodClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *PodClickHouse {
+	return &PodClickHouse{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -41,7 +41,7 @@ func NewKubePodClickHouse(kubeClient kube.Interface, namer interfaces.INameManag
 // getPod gets pod. Accepted types:
 //  1. *apps.StatefulSet
 //  2. *chop.Host
-func (c *KubePodClickHouse) Get(params ...any) (*core.Pod, error) {
+func (c *PodClickHouse) Get(params ...any) (*core.Pod, error) {
 	var name, namespace string
 	switch len(params) {
 	case 2:
@@ -68,7 +68,7 @@ func (c *KubePodClickHouse) Get(params ...any) (*core.Pod, error) {
 }
 
 // GetAll gets all pods for provided entity
-func (c *KubePodClickHouse) GetAll(obj any) []*core.Pod {
+func (c *PodClickHouse) GetAll(obj any) []*core.Pod {
 	switch typed := obj.(type) {
 	case api.ICustomResource:
 		return c.getPodsOfCHI(typed)
@@ -88,12 +88,12 @@ func (c *KubePodClickHouse) GetAll(obj any) []*core.Pod {
 	return nil
 }
 
-func (c *KubePodClickHouse) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
+func (c *PodClickHouse) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
 	return c.kubeClient.CoreV1().Pods(pod.GetNamespace()).Update(ctx, pod, controller.NewUpdateOptions())
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *KubePodClickHouse) getPodsOfCluster(cluster api.ICluster) (pods []*core.Pod) {
+func (c *PodClickHouse) getPodsOfCluster(cluster api.ICluster) (pods []*core.Pod) {
 	cluster.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.Get(host); err == nil {
 			pods = append(pods, pod)
@@ -104,7 +104,7 @@ func (c *KubePodClickHouse) getPodsOfCluster(cluster api.ICluster) (pods []*core
 }
 
 // getPodsOfShard gets all pods in a shard
-func (c *KubePodClickHouse) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
+func (c *PodClickHouse) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
 	shard.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.Get(host); err == nil {
 			pods = append(pods, pod)
@@ -115,7 +115,7 @@ func (c *KubePodClickHouse) getPodsOfShard(shard api.IShard) (pods []*core.Pod) 
 }
 
 // getPodsOfCHI gets all pods in a CHI
-func (c *KubePodClickHouse) getPodsOfCHI(cr api.ICustomResource) (pods []*core.Pod) {
+func (c *PodClickHouse) getPodsOfCHI(cr api.ICustomResource) (pods []*core.Pod) {
 	cr.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.Get(host); err == nil {
 			pods = append(pods, pod)

@@ -33,7 +33,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *api.Host) error {
 
 	// Each host consists of:
 	_ = c.deleteStatefulSet(ctx, host)
-	_ = kube.NewKubePVCClickHouse(c.kubeClient).DeletePVC(ctx, host)
+	_ = kube.NewStorageClickHouse(c.kubeClient).DeletePVC(ctx, host)
 	_ = c.deleteConfigMap(ctx, host)
 	_ = c.deleteServiceHost(ctx, host)
 

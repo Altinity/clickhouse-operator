@@ -26,13 +26,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type KubeSTSClickHouse struct {
+type STSClickHouse struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 }
 
-func NewKubeSTSClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *KubeSTSClickHouse {
-	return &KubeSTSClickHouse{
+func NewSTSClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *STSClickHouse {
+	return &STSClickHouse{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -41,7 +41,7 @@ func NewKubeSTSClickHouse(kubeClient kube.Interface, namer interfaces.INameManag
 // getStatefulSet gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.Host
-func (c *KubeSTSClickHouse) Get(obj any) (*apps.StatefulSet, error) {
+func (c *STSClickHouse) Get(obj any) (*apps.StatefulSet, error) {
 	switch obj := obj.(type) {
 	case meta.Object:
 		return c.kubeClient.AppsV1().StatefulSets(obj.GetNamespace()).Get(controller.NewContext(), obj.GetName(), controller.NewGetOptions())
@@ -55,16 +55,16 @@ func (c *KubeSTSClickHouse) Get(obj any) (*apps.StatefulSet, error) {
 	return nil, fmt.Errorf("unknown type")
 }
 
-func (c *KubeSTSClickHouse) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STSClickHouse) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
 	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(controller.NewContext(), statefulSet, controller.NewCreateOptions())
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *KubeSTSClickHouse) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STSClickHouse) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	return c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Update(controller.NewContext(), sts, controller.NewUpdateOptions())
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
-func (c *KubeSTSClickHouse) Delete(namespace, name string) error {
+func (c *STSClickHouse) Delete(namespace, name string) error {
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Delete(controller.NewContext(), name, controller.NewDeleteOptions())
 }

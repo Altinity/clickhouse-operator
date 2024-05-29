@@ -687,7 +687,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(1).
 		M(host).F().
 		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
-	if common.ErrIsDataLoss(common.NewStorageReconciler(w.task, w.c.namer, kube.NewKubePVCClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)) {
+	if common.ErrIsDataLoss(common.NewStorageReconciler(w.task, w.c.namer, kube.NewStorageClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)) {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
@@ -709,7 +709,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Polish all new volumes that operator has to create
-	_ = common.NewStorageReconciler(w.task, w.c.namer, kube.NewKubePVCClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	_ = common.NewStorageReconciler(w.task, w.c.namer, kube.NewStorageClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 
 	_ = w.reconcileHostService(ctx, host)
 

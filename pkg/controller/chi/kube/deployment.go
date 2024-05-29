@@ -22,22 +22,22 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type KubeReplicaSetClickHouse struct {
+type DeploymentClickHouse struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 }
 
-func NewKubeReplicaSetClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *KubeReplicaSetClickHouse {
-	return &KubeReplicaSetClickHouse{
+func NewDeploymentClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *DeploymentClickHouse {
+	return &DeploymentClickHouse{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
 }
 
-func (c *KubeReplicaSetClickHouse) Get(namespace, name string) (*apps.ReplicaSet, error) {
-	return c.kubeClient.AppsV1().ReplicaSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
+func (c *DeploymentClickHouse) Get(namespace, name string) (*apps.Deployment, error) {
+	return c.kubeClient.AppsV1().Deployments(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
-func (c *KubeReplicaSetClickHouse) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return c.kubeClient.AppsV1().ReplicaSets(replicaSet.Namespace).Update(controller.NewContext(), replicaSet, controller.NewUpdateOptions())
+func (c *DeploymentClickHouse) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
+	return c.kubeClient.AppsV1().Deployments(deployment.Namespace).Update(controller.NewContext(), deployment, controller.NewUpdateOptions())
 }

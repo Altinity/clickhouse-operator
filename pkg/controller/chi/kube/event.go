@@ -15,29 +15,24 @@
 package kube
 
 import (
-	apps "k8s.io/api/apps/v1"
+	"context"
+
+	core "k8s.io/api/core/v1"
 	kube "k8s.io/client-go/kubernetes"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type KubeDeploymentClickHouse struct {
+type EventClickHouse struct {
 	kubeClient kube.Interface
-	namer      interfaces.INameManager
 }
 
-func NewKubeDeploymentClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *KubeDeploymentClickHouse {
-	return &KubeDeploymentClickHouse{
+func NewEventClickHouse(kubeClient kube.Interface) *EventClickHouse {
+	return &EventClickHouse{
 		kubeClient: kubeClient,
-		namer:      namer,
 	}
 }
 
-func (c *KubeDeploymentClickHouse) Get(namespace, name string) (*apps.Deployment, error) {
-	return c.kubeClient.AppsV1().Deployments(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
-}
-
-func (c *KubeDeploymentClickHouse) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
-	return c.kubeClient.AppsV1().Deployments(deployment.Namespace).Update(controller.NewContext(), deployment, controller.NewUpdateOptions())
+func (c *EventClickHouse) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
+	return c.kubeClient.CoreV1().Events(event.Namespace).Create(ctx, event, controller.NewCreateOptions())
 }

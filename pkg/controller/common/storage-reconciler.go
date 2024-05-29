@@ -52,14 +52,14 @@ func ErrIsDataLoss(err error) bool {
 type StorageReconciler struct {
 	task    *Task
 	namer   interfaces.INameManager
-	kubePVC interfaces.IKubePVC
+	storage interfaces.IKubeStorage
 }
 
-func NewStorageReconciler(task *Task, namer interfaces.INameManager, kubePVC interfaces.IKubePVC) *StorageReconciler {
+func NewStorageReconciler(task *Task, namer interfaces.INameManager, storage interfaces.IKubeStorage) *StorageReconciler {
 	return &StorageReconciler{
 		task:    task,
 		namer:   namer,
-		kubePVC: kubePVC,
+		storage: storage,
 	}
 }
 
@@ -206,7 +206,7 @@ func (w *StorageReconciler) fetchPVC(
 	// We have a VolumeClaimTemplate for this VolumeMount
 	// Treat it as persistent storage mount
 
-	_pvc, e := w.kubePVC.Get(ctx, namespace, pvcName)
+	_pvc, e := w.storage.Get(ctx, namespace, pvcName)
 	if e == nil {
 		log.V(2).M(host).Info("PVC (%s/%s/%s/%s) found", namespace, host.GetName(), volumeMount.Name, pvcName)
 		return _pvc, volumeClaimTemplate, false, nil
@@ -261,7 +261,7 @@ func (w *StorageReconciler) reconcilePVC(
 
 	model.VolumeClaimTemplateApplyResourcesRequestsOnPVC(template, pvc)
 	pvc = w.task.Creator.AdjustPVC(pvc, host, template)
-	return w.kubePVC.UpdateOrCreate(ctx, pvc)
+	return w.storage.UpdateOrCreate(ctx, pvc)
 }
 
 func (w *StorageReconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
@@ -269,13 +269,13 @@ func (w *StorageReconciler) deletePVC(ctx context.Context, pvc *core.PersistentV
 	defer log.V(1).M(pvc).F().E().Info("delete PVC with lost PV end: %s/%s", pvc.Namespace, pvc.Name)
 
 	log.V(2).M(pvc).F().Info("PVC with lost PV about to be deleted: %s/%s", pvc.Namespace, pvc.Name)
-	w.kubePVC.Delete(ctx, pvc.Namespace, pvc.Name)
+	w.storage.Delete(ctx, pvc.Namespace, pvc.Name)
 
 	for i := 0; i < 360; i++ {
 
 		// Check availability
 		log.V(2).M(pvc).F().Info("check PVC with lost PV availability: %s/%s", pvc.Namespace, pvc.Name)
-		curPVC, err := w.kubePVC.Get(ctx, pvc.Namespace, pvc.Name)
+		curPVC, err := w.storage.Get(ctx, pvc.Namespace, pvc.Name)
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
 				// Not available - concider to bbe deleted
@@ -288,7 +288,7 @@ func (w *StorageReconciler) deletePVC(ctx context.Context, pvc *core.PersistentV
 		if len(curPVC.Finalizers) > 0 {
 			log.V(2).M(pvc).F().Info("clean finalizers for PVC with lost PV: %s/%s", pvc.Namespace, pvc.Name)
 			curPVC.Finalizers = nil
-			w.kubePVC.UpdateOrCreate(ctx, curPVC)
+			w.storage.UpdateOrCreate(ctx, curPVC)
 		}
 		time.Sleep(10 * time.Second)
 	}

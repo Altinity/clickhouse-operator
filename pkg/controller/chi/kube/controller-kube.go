@@ -21,57 +21,57 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type KubeClickHouse struct {
+type ClickHouse struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 
-	deployment *KubeDeploymentClickHouse
-	event      *KubeEventClickHouse
-	pod        *KubePodClickHouse
-	replicaSet *KubeReplicaSetClickHouse
-	service    *KubeServiceClickHouse
-	sts        *KubeSTSClickHouse
-	crStatus   *KubeCRStatusClickHouse
-	storage    *KubePVCClickHouse
+	deployment *DeploymentClickHouse
+	event      *EventClickHouse
+	pod        *PodClickHouse
+	replicaSet *ReplicaSetClickHouse
+	service    *ServiceClickHouse
+	sts        *STSClickHouse
+	crStatus   *CRStatusClickHouse
+	storage    *StorageClickHouse
 }
 
-func NewKubeClickHouse(kubeClient kube.Interface, chopClient chopClientSet.Interface, namer interfaces.INameManager) *KubeClickHouse {
-	return &KubeClickHouse{
+func NewClickHouse(kubeClient kube.Interface, chopClient chopClientSet.Interface, namer interfaces.INameManager) *ClickHouse {
+	return &ClickHouse{
 		kubeClient: kubeClient,
 		namer:      namer,
 
-		deployment: NewKubeDeploymentClickHouse(kubeClient, namer),
-		event:      NewKubeEventClickHouse(kubeClient),
-		pod:        NewKubePodClickHouse(kubeClient, namer),
-		replicaSet: NewKubeReplicaSetClickHouse(kubeClient, namer),
-		service:    NewKubeServiceClickHouse(kubeClient, namer),
-		sts:        NewKubeSTSClickHouse(kubeClient, namer),
-		crStatus:   NewKubeCRStatusClickHouse(chopClient),
-		storage:    NewKubePVCClickHouse(kubeClient),
+		deployment: NewDeploymentClickHouse(kubeClient, namer),
+		event:      NewEventClickHouse(kubeClient),
+		pod:        NewPodClickHouse(kubeClient, namer),
+		replicaSet: NewReplicaSetClickHouse(kubeClient, namer),
+		service:    NewServiceClickHouse(kubeClient, namer),
+		sts:        NewSTSClickHouse(kubeClient, namer),
+		crStatus:   NewCRStatusClickHouse(chopClient),
+		storage:    NewStorageClickHouse(kubeClient),
 	}
 }
 
-func (k *KubeClickHouse) Deployment() interfaces.IKubeDeployment {
+func (k *ClickHouse) Deployment() interfaces.IKubeDeployment {
 	return k.deployment
 }
-func (k *KubeClickHouse) Event() interfaces.IKubeEvent {
+func (k *ClickHouse) Event() interfaces.IKubeEvent {
 	return k.event
 }
-func (k *KubeClickHouse) Pod() interfaces.IKubePod {
+func (k *ClickHouse) Pod() interfaces.IKubePod {
 	return k.pod
 }
-func (k *KubeClickHouse) ReplicaSet() interfaces.IKubeReplicaSet {
+func (k *ClickHouse) ReplicaSet() interfaces.IKubeReplicaSet {
 	return k.replicaSet
 }
-func (k *KubeClickHouse) Service() interfaces.IKubeService {
+func (k *ClickHouse) Service() interfaces.IKubeService {
 	return k.service
 }
-func (k *KubeClickHouse) STS() interfaces.IKubeSTS {
+func (k *ClickHouse) STS() interfaces.IKubeSTS {
 	return k.sts
 }
-func (k *KubeClickHouse) CRStatus() interfaces.IKubeCRStatus {
+func (k *ClickHouse) CRStatus() interfaces.IKubeCRStatus {
 	return k.crStatus
 }
-func (k *KubeClickHouse) Storage() interfaces.IKubePVC {
+func (k *ClickHouse) Storage() interfaces.IKubeStorage {
 	return k.storage
 }

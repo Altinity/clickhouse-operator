@@ -23,13 +23,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
-type KubeServiceClickHouse struct {
+type ServiceClickHouse struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 }
 
-func NewKubeServiceClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *KubeServiceClickHouse {
-	return &KubeServiceClickHouse{
+func NewServiceClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *ServiceClickHouse {
+	return &ServiceClickHouse{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -38,7 +38,7 @@ func NewKubeServiceClickHouse(kubeClient kube.Interface, namer interfaces.INameM
 // getService gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
-func (c *KubeServiceClickHouse) Get(obj any) (*core.Service, error) {
+func (c *ServiceClickHouse) Get(obj any) (*core.Service, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *core.Service:
@@ -51,6 +51,6 @@ func (c *KubeServiceClickHouse) Get(obj any) (*core.Service, error) {
 	return c.kubeClient.CoreV1().Services(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
-func (c *KubeServiceClickHouse) Update(svc *core.Service) (*core.Service, error) {
+func (c *ServiceClickHouse) Update(svc *core.Service) (*core.Service, error) {
 	return c.kubeClient.CoreV1().Services(svc.Namespace).Update(controller.NewContext(), svc, controller.NewUpdateOptions())
 }

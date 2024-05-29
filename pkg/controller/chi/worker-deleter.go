@@ -342,7 +342,7 @@ func (w *worker) canDropReplica(host *api.Host, opts ...*dropReplicaOptions) (ca
 	}
 
 	can = true
-	kube.NewKubePVCClickHouse(w.c.kubeClient).WalkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
+	kube.NewStorageClickHouse(w.c.kubeClient).WalkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if commonLabeler.GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {

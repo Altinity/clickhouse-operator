@@ -85,7 +85,7 @@ func NewController(
 	)
 
 	namer := managers.NewNameManager(managers.NameManagerTypeClickHouse)
-	kube := kube2.NewKubeClickHouse(kubeClient, chopClient, namer)
+	kube := kube2.NewClickHouse(kubeClient, chopClient, namer)
 
 	// Create Controller instance
 	controller := &Controller{
