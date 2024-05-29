@@ -20,7 +20,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 type ServiceClickHouse struct {

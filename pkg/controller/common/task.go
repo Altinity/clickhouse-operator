@@ -17,8 +17,8 @@ package common
 import (
 	"time"
 
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
 // task represents context of a worker. This also can be called "a reconcile task"

@@ -32,6 +32,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
@@ -39,7 +40,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )

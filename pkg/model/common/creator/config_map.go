@@ -15,7 +15,7 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	core "k8s.io/api/core/v1"
 )
 

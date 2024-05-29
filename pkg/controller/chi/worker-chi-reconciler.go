@@ -32,9 +32,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 

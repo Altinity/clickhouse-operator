@@ -16,7 +16,7 @@ package namer
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 

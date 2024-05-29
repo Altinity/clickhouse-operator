@@ -17,7 +17,7 @@ package creator
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 func CreateHostTemplate(what interfaces.HostTemplateType, name string) *api.HostTemplate {

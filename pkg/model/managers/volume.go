@@ -15,8 +15,8 @@
 package managers
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
 type VolumeManagerType string

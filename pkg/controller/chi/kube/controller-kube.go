@@ -18,7 +18,7 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 type ClickHouse struct {

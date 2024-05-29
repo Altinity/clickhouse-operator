@@ -15,8 +15,8 @@
 package managers
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 )
 
 type ConfigMapManagerType string

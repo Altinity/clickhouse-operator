@@ -19,7 +19,7 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 type DeploymentClickHouse struct {

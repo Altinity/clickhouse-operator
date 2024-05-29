@@ -17,9 +17,9 @@ package managers
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
 	commonAnnotator "github.com/altinity/clickhouse-operator/pkg/model/common/tags/annotator"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )

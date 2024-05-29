@@ -19,7 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"strings"
 
 	apps "k8s.io/api/apps/v1"

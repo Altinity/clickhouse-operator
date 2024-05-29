@@ -19,7 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	kube2 "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"time"
 
 	"github.com/sanity-io/litter"
