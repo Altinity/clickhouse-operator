@@ -17,12 +17,12 @@ package namer
 import "github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 
 const (
-	// configMapCommonNamePattern is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
-	configMapCommonNamePattern = "chi-" + macro.MacrosChiName + "-common-configd"
+	// configMapNamePatternCommon is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
+	configMapNamePatternCommon = "chi-" + macro.MacrosChiName + "-common-configd"
 
-	// configMapCommonUsersNamePattern is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
-	configMapCommonUsersNamePattern = "chi-" + macro.MacrosChiName + "-common-usersd"
+	// configMapNamePatternCommonUsers is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
+	configMapNamePatternCommonUsers = "chi-" + macro.MacrosChiName + "-common-usersd"
 
-	// configMapHostNamePattern is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	configMapHostNamePattern = "chi-" + macro.MacrosChiName + "-deploy-confd-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
+	// configMapNamePatternHost is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
+	configMapNamePatternHost = "chi-" + macro.MacrosChiName + "-deploy-confd-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 )

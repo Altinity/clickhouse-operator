@@ -43,13 +43,13 @@ func (n *ClickHouse) Name(what interfaces.NameType, params ...any) string {
 	switch what {
 	case interfaces.NameConfigMapHost:
 		host := params[0].(*api.Host)
-		return createConfigMapHostName(host)
+		return createConfigMapNameHost(host)
 	case interfaces.NameConfigMapCommon:
 		cr := params[0].(api.ICustomResource)
-		return createConfigMapCommonName(cr)
+		return createConfigMapNameCommon(cr)
 	case interfaces.NameConfigMapCommonUsers:
 		cr := params[0].(api.ICustomResource)
-		return createConfigMapCommonUsersName(cr)
+		return createConfigMapNameCommonUsers(cr)
 	default:
 		return n.Namer.Name(what, params...)
 	}
