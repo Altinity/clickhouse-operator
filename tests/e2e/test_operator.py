@@ -4655,13 +4655,14 @@ def test_047(self):
 
 @TestScenario
 @Name("test_048. Clickhouse-keeper")
-@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"),
+              RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates("1.0"))
 def test_048(self):
-    """Check clickhouse-operator support ClickHouseKeeperInstallation."""
+    """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
 
     create_shell_namespace_clickhouse_template()
     util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
+                        keeper_manifest="clickhouse-keeper-3-node-with-volume-for-test-only.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
@@ -4691,7 +4692,7 @@ def test_048(self):
             "CREATE TABLE test_distr_048 ON CLUSTER 'default' AS test_local_048 "
             "Engine = Distributed('default', default, test_local_048, a%2)",
         )
-
+        
     with And("Give CH some time to propagate new table"):
         time.sleep(30)
     with And("I insert data in the distributed table"):
@@ -4717,6 +4718,7 @@ def test_048(self):
             kubectl.delete_chi(chi)
         with And("deleting test namespace"):
             delete_test_namespace()
+
 
 
 @TestModule
