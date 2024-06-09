@@ -4653,71 +4653,169 @@ def test_047(self):
             delete_test_namespace()
 
 
-# @TestScenario
-# @Name("test_048. Clickhouse-keeper")
-# @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
-# def test_048(self):
-#     """Check clickhouse-operator support ClickHouseKeeperInstallation."""
-#
-#     create_shell_namespace_clickhouse_template()
-#     util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
-#                         keeper_manifest="clickhouse-keeper-3-node-for-test-only.yaml")
-#     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
-#     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
-#     cluster = "default"
-#     with Given("CHI with 2 shards"):
-#         kubectl.create_and_check(
-#             manifest=manifest,
-#             check={
-#                 "pod_count": 2,
-#                 "do_not_delete": 1,
-#                 },
-#             )
-#     numbers = 100
-#     with When("I create distributed table"):
-#         create_table = """
-#             CREATE TABLE test_local_048 ON CLUSTER 'default' (a UInt32)
-#             Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-#             PARTITION BY tuple()
-#             ORDER BY a
-#             """.replace(
-#             "\r", ""
-#         ).replace(
-#             "\n", ""
-#         )
-#         clickhouse.query(chi, create_table)
-#         clickhouse.query(
-#             chi,
-#             "CREATE TABLE test_distr_048 ON CLUSTER 'default' AS test_local_048 "
-#             "Engine = Distributed('default', default, test_local_048, a%2)",
-#         )
-#
-#     with And("Give CH some time to propagate new table"):
-#         time.sleep(30)
-#     with And("I insert data in the distributed table"):
-#         clickhouse.query(chi, f"INSERT INTO test_distr_048 select * from numbers({numbers})")
-#     with And("Give data some time to propagate among CH instances"):
-#         time.sleep(30)
-#
-#     with Then("Check local table on host 0 has 1/2 of all rows"):
-#         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
-#         assert out == f"{numbers // 2}", error()
-#     with Then("Check local table on host 1 has 1/2 of all rows"):
-#         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
-#         assert out == f"{numbers // 2}", error()
-#     with Then("Check dist table on host 0 has all rows"):
-#         out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-0-0-0")
-#         assert out == f"{numbers}", error()
-#     with Then("Check dist table on host 1 has all rows"):
-#         out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-1-0-0")
-#         assert out == f"{numbers}", error()
-#
-#     with Finally("I clean up"):
-#         with By("deleting chi"):
-#             kubectl.delete_chi(chi)
-#         with And("deleting test namespace"):
-#             delete_test_namespace()
+@TestScenario
+@Name("test_048. Clickhouse-keeper")
+@Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"),
+              RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates("1.0"))
+def test_048(self):
+    """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
 
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
+                        keeper_manifest="clickhouse-keeper-3-node-with-volume-for-test-only.yaml")
+    manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "default"
+    with Given("CHI with 2 shards"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+                },
+            )
+    numbers = 100
+    with When("I create distributed table"):
+        create_table = """
+            CREATE TABLE test_local_048 ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace(
+            "\r", ""
+        ).replace(
+            "\n", ""
+        )
+        clickhouse.query(chi, create_table)
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_distr_048 ON CLUSTER 'default' AS test_local_048 "
+            "Engine = Distributed('default', default, test_local_048, a%2)",
+        )
+        
+    with And("Give CH some time to propagate new table"):
+        time.sleep(30)
+    with And("I insert data in the distributed table"):
+        clickhouse.query(chi, f"INSERT INTO test_distr_048 select * from numbers({numbers})")
+    with And("Give data some time to propagate among CH instances"):
+        time.sleep(30)
+
+    with Then("Check local table on host 0 has 1/2 of all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers // 2}", error()
+    with Then("Check local table on host 1 has 1/2 of all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers // 2}", error()
+    with Then("Check dist table on host 0 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers}", error()
+    with Then("Check dist table on host 1 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-1-0-0")
+        assert out == f"{numbers}", error()
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
+
+
+@TestScenario
+@Name("test_049. Clickhouse-keeper upgrade")
+def test_049(self):
+    """Check that clickhouse-operator support upgrading clickhouse-keeper version
+     when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
+
+    create_shell_namespace_clickhouse_template()
+    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-23.yaml")
+    manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    cluster = "default"
+    keeper_version_from = "23.8.8.20"
+    keeper_version_to = "24.3.2.23"
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+    numbers = 100
+    with When("I create replicated table"):
+        create_table = """
+            CREATE TABLE test_local_049 ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace(
+            "\r", ""
+        ).replace(
+            "\n", ""
+        )
+        clickhouse.query(chi, create_table, host=f"chi-{chi}-{cluster}-0-0-0")
+        clickhouse.query(
+            chi,
+            "CREATE TABLE test_distr_049 ON CLUSTER 'default' AS test_local_049 "
+            "Engine = Distributed('default', default, test_local_049, a%2)",
+        )
+
+    with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
+        for attempt in retries(timeout=60, delay=5):
+            with attempt:
+                assert keeper_version_from in \
+                       kubectl.get(kind='pod', name='clickhouse-keeper-0')["spec"]["containers"][0]["image"], error()
+                assert keeper_version_from in \
+                       kubectl.get(kind='pod', name='clickhouse-keeper-1')["spec"]["containers"][0]["image"], error()
+                assert keeper_version_from in \
+                       kubectl.get(kind='pod', name='clickhouse-keeper-2')["spec"]["containers"][0]["image"], error()
+
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number from numbers({numbers})",
+                         host=f"chi-{chi}-{cluster}-0-0-0")
+        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number + 100 from numbers({numbers})",
+                         host=f"chi-{chi}-{cluster}-0-1-0")
+
+    with Then("I check clickhouse-keeper properly works"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers * 2}", error()
+        out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-1-0")
+        assert out == f"{numbers * 2}", error()
+
+    with Then("I change keeper version"):
+        util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
+                            keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
+
+    with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
+        for attempt in retries(timeout=60, delay=5):
+            with attempt:
+                assert keeper_version_to in \
+                       kubectl.get(kind='pod', name='clickhouse-keeper-0')["spec"]["containers"][0]["image"], error()
+                assert keeper_version_to in \
+                       kubectl.get(kind='pod', name='clickhouse-keeper-1')["spec"]["containers"][0]["image"], error()
+                assert keeper_version_to in \
+                       kubectl.get(kind='pod', name='clickhouse-keeper-2')["spec"]["containers"][0]["image"], error()
+
+    with And("I insert data in the replicated table after clickhouse-keeper upgrade"):
+        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number + 200 from numbers({numbers})",
+                         host=f"chi-{chi}-{cluster}-0-0-0")
+        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number + 300 from numbers({numbers})",
+                         host=f"chi-{chi}-{cluster}-0-1-0")
+
+    with Then("I check clickhouse-keeper properly works"):
+        for attempt in retries(timeout=60, delay=5):
+            with attempt:
+                out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-0-0")
+                assert out == f"{numbers * 4}", error()
+                out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-1-0")
+                assert out == f"{numbers * 4}", error()
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
 
 @TestModule
 @Name("e2e.test_operator")
