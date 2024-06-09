@@ -16,23 +16,20 @@ package chk
 
 import (
 	"fmt"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 
 	core "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 )
 
 func (r *Reconciler) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) error {
 	return r.reconcile(
 		chk,
 		&core.ConfigMap{},
-		r.task.Creator.CreateConfigMap(interfaces.ConfigMapConfig, &config.GeneratorOptions{
-			RaftPort:      chk.GetSpec().GetRaftPort(),
-			ReplicasCount: 1,
-		}),
+		r.task.Creator.CreateConfigMap(interfaces.ConfigMapConfig, chkConfig.NewConfigFilesGeneratorOptionsKeeper().SetSettings(chk.GetSpec().GetConfiguration().GetSettings())),
 		"ConfigMap",
 		func(_cur, _new client.Object) error {
 			cur, ok1 := _cur.(*core.ConfigMap)

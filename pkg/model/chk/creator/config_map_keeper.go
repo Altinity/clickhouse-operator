@@ -36,9 +36,9 @@ func NewConfigMapManagerKeeper() *ConfigMapManagerKeeper {
 func (m *ConfigMapManagerKeeper) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
 	case interfaces.ConfigMapConfig:
-		var options *config.GeneratorOptions
+		var options *config.FilesGeneratorOptionsKeeper
 		if len(params) > 0 {
-			options = params[0].(*config.GeneratorOptions)
+			options = params[0].(*config.FilesGeneratorOptionsKeeper)
 			return m.common(options)
 		}
 	}
@@ -56,7 +56,7 @@ func (m *ConfigMapManagerKeeper) SetConfigFilesGenerator(configFilesGenerator in
 }
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
-func (m *ConfigMapManagerKeeper) common(options *config.GeneratorOptions) *core.ConfigMap {
+func (m *ConfigMapManagerKeeper) common(options *config.FilesGeneratorOptionsKeeper) *core.ConfigMap {
 	return &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",

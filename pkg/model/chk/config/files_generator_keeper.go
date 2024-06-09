@@ -35,15 +35,19 @@ func NewConfigFilesGeneratorKeeper(cr api.ICustomResource, opts *GeneratorOption
 func (c *FilesGeneratorKeeper) CreateConfigFiles(what interfaces.FilesGroupType, params ...any) map[string]string {
 	switch what {
 	case interfaces.FilesGroupCommon:
-		return c.createConfigFilesGroupCommon(nil)
+		var options *FilesGeneratorOptionsKeeper
+		if len(params) > 0 {
+			options = params[0].(*FilesGeneratorOptionsKeeper)
+			return c.createConfigFilesGroupCommon(options)
+		}
 	}
 	return nil
 }
 
 // createConfigFilesGroupCommon creates common config files
-func (c *FilesGeneratorKeeper) createConfigFilesGroupCommon(settings *api.Settings) map[string]string {
+func (c *FilesGeneratorKeeper) createConfigFilesGroupCommon(options *FilesGeneratorOptionsKeeper) map[string]string {
 	configSections := make(map[string]string)
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configMain), c.configGenerator.getConfig(settings))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configMain), c.configGenerator.getConfig(options.GetSettings()))
 
 	return configSections
 }
