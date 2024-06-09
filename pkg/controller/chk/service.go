@@ -26,7 +26,7 @@ func (r *Reconciler) reconcileClientService(chk *apiChk.ClickHouseKeeperInstalla
 	return r.reconcile(
 		chk,
 		&core.Service{},
-		r.task.Creator.CreateService(interfaces.ServiceCR),
+		r.task.Creator.CreateService(interfaces.ServiceCR, chk),
 		"Client Service",
 		reconcileUpdaterService,
 	)
