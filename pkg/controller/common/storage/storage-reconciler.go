@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package storage
 
 import (
 	"context"
@@ -25,6 +25,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
@@ -49,22 +50,22 @@ func ErrIsDataLoss(err error) bool {
 	return false
 }
 
-type StorageReconciler struct {
-	task    *Task
-	namer   interfaces.INameManager
-	storage interfaces.IKubeStorage
+type Reconciler struct {
+	task  *common.Task
+	namer interfaces.INameManager
+	pvc   interfaces.IKubeStoragePVC
 }
 
-func NewStorageReconciler(task *Task, namer interfaces.INameManager, storage interfaces.IKubeStorage) *StorageReconciler {
-	return &StorageReconciler{
-		task:    task,
-		namer:   namer,
-		storage: storage,
+func NewStorageReconciler(task *common.Task, namer interfaces.INameManager, pvc interfaces.IKubeStoragePVC) *Reconciler {
+	return &Reconciler{
+		task:  task,
+		namer: namer,
+		pvc:   pvc,
 	}
 }
 
 // ReconcilePVCs reconciles all PVCs of a host
-func (w *StorageReconciler) ReconcilePVCs(ctx context.Context, host *api.Host, which api.WhichStatefulSet) (res ErrorDataPersistence) {
+func (w *Reconciler) ReconcilePVCs(ctx context.Context, host *api.Host, which api.WhichStatefulSet) (res ErrorDataPersistence) {
 	if util.IsContextDone(ctx) {
 		return nil
 	}
@@ -87,7 +88,7 @@ func (w *StorageReconciler) ReconcilePVCs(ctx context.Context, host *api.Host, w
 	return
 }
 
-func (w *StorageReconciler) reconcilePVCFromVolumeMount(
+func (w *Reconciler) reconcilePVCFromVolumeMount(
 	ctx context.Context,
 	host *api.Host,
 	volumeMount *core.VolumeMount,
@@ -152,7 +153,7 @@ func (w *StorageReconciler) reconcilePVCFromVolumeMount(
 	return reconcileError
 }
 
-func (w *StorageReconciler) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
+func (w *Reconciler) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCreated bool, host *api.Host) bool {
 	if !host.HasData() {
 		// No data to loose
 		return false
@@ -176,7 +177,7 @@ func (w *StorageReconciler) isLostPVC(pvc *core.PersistentVolumeClaim, isJustCre
 	return false
 }
 
-func (w *StorageReconciler) isLostPV(pvc *core.PersistentVolumeClaim) bool {
+func (w *Reconciler) isLostPV(pvc *core.PersistentVolumeClaim) bool {
 	if pvc == nil {
 		return false
 	}
@@ -184,7 +185,7 @@ func (w *StorageReconciler) isLostPV(pvc *core.PersistentVolumeClaim) bool {
 	return pvc.Status.Phase == core.ClaimLost
 }
 
-func (w *StorageReconciler) fetchPVC(
+func (w *Reconciler) fetchPVC(
 	ctx context.Context,
 	host *api.Host,
 	volumeMount *core.VolumeMount,
@@ -206,7 +207,7 @@ func (w *StorageReconciler) fetchPVC(
 	// We have a VolumeClaimTemplate for this VolumeMount
 	// Treat it as persistent storage mount
 
-	_pvc, e := w.storage.Get(ctx, namespace, pvcName)
+	_pvc, e := w.pvc.Get(ctx, namespace, pvcName)
 	if e == nil {
 		log.V(2).M(host).Info("PVC (%s/%s/%s/%s) found", namespace, host.GetName(), volumeMount.Name, pvcName)
 		return _pvc, volumeClaimTemplate, false, nil
@@ -240,7 +241,7 @@ func (w *StorageReconciler) fetchPVC(
 var errNilPVC = fmt.Errorf("nil PVC, nothing to reconcile")
 
 // reconcilePVC reconciles specified PVC
-func (w *StorageReconciler) reconcilePVC(
+func (w *Reconciler) reconcilePVC(
 	ctx context.Context,
 	pvc *core.PersistentVolumeClaim,
 	host *api.Host,
@@ -261,21 +262,21 @@ func (w *StorageReconciler) reconcilePVC(
 
 	model.VolumeClaimTemplateApplyResourcesRequestsOnPVC(template, pvc)
 	pvc = w.task.Creator.AdjustPVC(pvc, host, template)
-	return w.storage.UpdateOrCreate(ctx, pvc)
+	return w.pvc.UpdateOrCreate(ctx, pvc)
 }
 
-func (w *StorageReconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
+func (w *Reconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
 	log.V(1).M(pvc).F().S().Info("delete PVC with lost PV start: %s/%s", pvc.Namespace, pvc.Name)
 	defer log.V(1).M(pvc).F().E().Info("delete PVC with lost PV end: %s/%s", pvc.Namespace, pvc.Name)
 
 	log.V(2).M(pvc).F().Info("PVC with lost PV about to be deleted: %s/%s", pvc.Namespace, pvc.Name)
-	w.storage.Delete(ctx, pvc.Namespace, pvc.Name)
+	w.pvc.Delete(ctx, pvc.Namespace, pvc.Name)
 
 	for i := 0; i < 360; i++ {
 
 		// Check availability
 		log.V(2).M(pvc).F().Info("check PVC with lost PV availability: %s/%s", pvc.Namespace, pvc.Name)
-		curPVC, err := w.storage.Get(ctx, pvc.Namespace, pvc.Name)
+		curPVC, err := w.pvc.Get(ctx, pvc.Namespace, pvc.Name)
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
 				// Not available - concider to bbe deleted
@@ -288,7 +289,7 @@ func (w *StorageReconciler) deletePVC(ctx context.Context, pvc *core.PersistentV
 		if len(curPVC.Finalizers) > 0 {
 			log.V(2).M(pvc).F().Info("clean finalizers for PVC with lost PV: %s/%s", pvc.Namespace, pvc.Name)
 			curPVC.Finalizers = nil
-			w.storage.UpdateOrCreate(ctx, curPVC)
+			w.pvc.UpdateOrCreate(ctx, curPVC)
 		}
 		time.Sleep(10 * time.Second)
 	}

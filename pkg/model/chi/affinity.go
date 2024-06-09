@@ -451,10 +451,7 @@ func mergePodAffinity(dst *core.PodAffinity, src *core.PodAffinity) *core.PodAff
 }
 
 // newMatchLabels
-func newMatchLabels(
-	podDistribution *api.PodDistribution,
-	matchLabels map[string]string,
-) map[string]string {
+func newMatchLabels(podDistribution *api.PodDistribution, matchLabels map[string]string) map[string]string {
 	var scopeLabels map[string]string
 
 	switch podDistribution.Scope {

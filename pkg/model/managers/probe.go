@@ -16,7 +16,8 @@ package managers
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	chkCreator "github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
 )
 
 type ProbeManagerType string
@@ -29,7 +30,9 @@ const (
 func NewProbeManager(what ProbeManagerType) interfaces.IProbeManager {
 	switch what {
 	case ProbeManagerTypeClickHouse:
-		return creator.NewProbeManagerClickHouse()
+		return chiCreator.NewProbeManagerClickHouse()
+	case ProbeManagerTypeKeeper:
+		return chkCreator.NewProbeManagerKeeper()
 	}
 	panic("unknown probe manager type")
 }

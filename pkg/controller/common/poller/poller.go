@@ -13,7 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package poller
 
 import (
 	"context"
@@ -21,106 +21,15 @@ import (
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
-
-const (
-	waitStatefulSetGenerationTimeoutBeforeStartBothering = 60
-	waitStatefulSetGenerationTimeoutToCreateStatefulSet  = 30
-)
-
-// PollerOptions specifies polling options
-type PollerOptions struct {
-	StartBotheringAfterTimeout time.Duration
-	GetErrorTimeout            time.Duration
-	Timeout                    time.Duration
-	MainInterval               time.Duration
-	BackgroundInterval         time.Duration
-}
-
-// NewPollerOptions creates new poll options
-func NewPollerOptions() *PollerOptions {
-	return &PollerOptions{}
-}
-
-// Ensure ensures poll options do exist
-func (o *PollerOptions) Ensure() *PollerOptions {
-	if o == nil {
-		return NewPollerOptions()
-	}
-	return o
-}
-
-// FromConfig makes poll options from config
-func (o *PollerOptions) FromConfig(config *api.OperatorConfig) *PollerOptions {
-	if o == nil {
-		return nil
-	}
-	o.StartBotheringAfterTimeout = time.Duration(waitStatefulSetGenerationTimeoutBeforeStartBothering) * time.Second
-	o.GetErrorTimeout = time.Duration(waitStatefulSetGenerationTimeoutToCreateStatefulSet) * time.Second
-	o.Timeout = time.Duration(config.Reconcile.StatefulSet.Update.Timeout) * time.Second
-	o.MainInterval = time.Duration(config.Reconcile.StatefulSet.Update.PollInterval) * time.Second
-	o.BackgroundInterval = 1 * time.Second
-	return o
-}
-
-// SetCreateTimeout sets create timeout
-func (o *PollerOptions) SetGetErrorTimeout(timeout time.Duration) *PollerOptions {
-	if o == nil {
-		return nil
-	}
-	o.GetErrorTimeout = timeout
-	return o
-}
-
-type PollerFunctions struct {
-	Get            func(context.Context) (any, error)
-	IsDone         func(context.Context, any) bool
-	ShouldContinue func(context.Context, any, error) bool
-}
-
-func (p *PollerFunctions) CallGet(c context.Context) (any, error) {
-	if p == nil {
-		return nil, nil
-	}
-	if p.Get == nil {
-		return nil, nil
-	}
-	return p.Get(c)
-}
-
-func (p *PollerFunctions) CallIsDone(c context.Context, a any) bool {
-	if p == nil {
-		return false
-	}
-	if p.IsDone == nil {
-		return false
-	}
-	return p.IsDone(c, a)
-}
-
-func (p *PollerFunctions) CallShouldContinue(c context.Context, a any, e error) bool {
-	if p == nil {
-		return false
-	}
-	if p.ShouldContinue == nil {
-		return false
-	}
-	return p.ShouldContinue(c, a, e)
-}
-
-type PollerBackgroundFunctions struct {
-	F func(context.Context)
-}
 
 func Poll(
 	ctx context.Context,
 	namespace, name string,
-	opts *PollerOptions,
-	main *PollerFunctions,
-	background *PollerBackgroundFunctions,
+	opts *Options,
+	main *Functions,
+	background *BackgroundFunctions,
 ) error {
 	opts = opts.Ensure()
 	start := time.Now()
@@ -177,36 +86,7 @@ func Poll(
 	} // for
 }
 
-// PollHost polls host
-func PollHost(
-	ctx context.Context,
-	host *api.Host,
-	opts *PollerOptions,
-	isDoneFn func(ctx context.Context, host *api.Host) bool,
-) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	opts = opts.Ensure().FromConfig(chop.Config())
-	namespace := host.Runtime.Address.Namespace
-	name := host.Runtime.Address.HostName
-
-	return Poll(
-		ctx,
-		namespace, name,
-		opts,
-		&PollerFunctions{
-			IsDone: func(_ctx context.Context, _ any) bool {
-				return isDoneFn(_ctx, host)
-			},
-		},
-		nil,
-	)
-}
-
-func sleepAndRunBackgroundProcess(ctx context.Context, opts *PollerOptions, background *PollerBackgroundFunctions) {
+func sleepAndRunBackgroundProcess(ctx context.Context, opts *Options, background *BackgroundFunctions) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

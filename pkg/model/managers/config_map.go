@@ -17,6 +17,7 @@ package managers
 import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	chkCreator "github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
 )
 
 type ConfigMapManagerType string
@@ -30,6 +31,8 @@ func NewConfigMapManager(what ConfigMapManagerType) interfaces.IConfigMapManager
 	switch what {
 	case ConfigMapManagerTypeClickHouse:
 		return chiCreator.NewConfigMapManagerClickHouse()
+	case ConfigMapManagerTypeKeeper:
+		return chkCreator.NewConfigMapManagerKeeper()
 	}
 	panic("unknown config map manager type")
 }

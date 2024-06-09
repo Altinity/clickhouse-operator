@@ -18,33 +18,30 @@ import (
 	"context"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
-
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
+	apps "k8s.io/api/apps/v1"
 )
 
-type HostPoller struct {
-	*common.StatefulSetPoller
+type HostStatefulSetPoller struct {
+	*poller.StatefulSetPoller
 	*Labeler
 	interfaces.IKubeSTS
 }
 
-func NewHostPoller(poller *common.StatefulSetPoller, labeler *Labeler, kube interfaces.IKube) *HostPoller {
-	return &HostPoller{
+func NewHostStatefulSetPoller(poller *poller.StatefulSetPoller, labeler *Labeler, kube interfaces.IKube) *HostStatefulSetPoller {
+	return &HostStatefulSetPoller{
 		StatefulSetPoller: poller,
 		Labeler:           labeler,
 		IKubeSTS:          kube.STS(),
 	}
 }
 
-// waitHostReady polls host's StatefulSet until it is ready
-func (c *HostPoller) WaitHostReady(ctx context.Context, host *api.Host) error {
+// WaitHostStatefulSetReady polls host's StatefulSet until it is ready
+func (c *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error {
 	// Wait for StatefulSet to reach generation
 	err := c.PollHostStatefulSet(
 		ctx,
@@ -86,31 +83,31 @@ func (c *HostPoller) WaitHostReady(ctx context.Context, host *api.Host) error {
 	return err
 }
 
-// waitHostNotReady polls host's StatefulSet for not exists or not ready
-func (c *HostPoller) WaitHostNotReady(ctx context.Context, host *api.Host) error {
-	err := c.PollHostStatefulSet(
-		ctx,
-		host,
-		// Since we are waiting for host to be nopt readylet's assyme that it should exist already
-		// and thus let's set GetErrorTimeout to zero, since we are not expecting getter function
-		// to return any errors
-		common.NewPollerOptions().
-			FromConfig(chop.Config()).
-			SetGetErrorTimeout(0),
-		func(_ context.Context, sts *apps.StatefulSet) bool {
-			return k8s.IsStatefulSetNotReady(sts)
-		},
-		nil,
-	)
-	if apiErrors.IsNotFound(err) {
-		err = nil
-	}
+//// waitHostNotReady polls host's StatefulSet for not exists or not ready
+//func (c *HostStatefulSetPoller) WaitHostNotReady(ctx context.Context, host *api.Host) error {
+//	err := c.PollHostStatefulSet(
+//		ctx,
+//		host,
+//		// Since we are waiting for host to be nopt readylet's assyme that it should exist already
+//		// and thus let's set GetErrorTimeout to zero, since we are not expecting getter function
+//		// to return any errors
+//		poller.NewPollerOptions().
+//			FromConfig(chop.Config()).
+//			SetGetErrorTimeout(0),
+//		func(_ context.Context, sts *apps.StatefulSet) bool {
+//			return k8s.IsStatefulSetNotReady(sts)
+//		},
+//		nil,
+//	)
+//	if apiErrors.IsNotFound(err) {
+//		err = nil
+//	}
+//
+//	return err
+//}
 
-	return err
-}
-
-// waitHostDeleted polls host's StatefulSet until it is not available
-func (c *HostPoller) WaitHostDeleted(host *api.Host) {
+// WaitHostStatefulSetDeleted polls host's StatefulSet until it is not available
+func (c *HostStatefulSetPoller) WaitHostStatefulSetDeleted(host *api.Host) {
 	for {
 		// TODO
 		// Probably there would be better way to wait until k8s reported StatefulSet deleted

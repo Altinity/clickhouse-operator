@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package poller
 
 import (
 	"context"
-
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -41,7 +40,7 @@ func NewStatefulSetPoller(kube interfaces.IKube) *StatefulSetPoller {
 func (poller *StatefulSetPoller) PollHostStatefulSet(
 	ctx context.Context,
 	host *api.Host,
-	opts *PollerOptions,
+	opts *Options,
 	isDoneFn func(context.Context, *apps.StatefulSet) bool,
 	backFn func(context.Context),
 ) error {
@@ -61,7 +60,7 @@ func (poller *StatefulSetPoller) PollHostStatefulSet(
 		ctx,
 		namespace, name,
 		opts,
-		&PollerFunctions{
+		&Functions{
 			Get: func(_ctx context.Context) (any, error) {
 				return poller.kubeSTS.Get(host)
 			},
@@ -72,7 +71,7 @@ func (poller *StatefulSetPoller) PollHostStatefulSet(
 				return apiErrors.IsNotFound(e)
 			},
 		},
-		&PollerBackgroundFunctions{
+		&BackgroundFunctions{
 			F: backFn,
 		},
 	)

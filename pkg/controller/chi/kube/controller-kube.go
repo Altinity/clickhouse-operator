@@ -18,6 +18,7 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
@@ -32,7 +33,7 @@ type ClickHouse struct {
 	service    *ServiceClickHouse
 	sts        *STSClickHouse
 	crStatus   *CRStatusClickHouse
-	storage    *StorageClickHouse
+	pvc        *storage.PVC
 }
 
 func NewClickHouse(kubeClient kube.Interface, chopClient chopClientSet.Interface, namer interfaces.INameManager) *ClickHouse {
@@ -40,14 +41,14 @@ func NewClickHouse(kubeClient kube.Interface, chopClient chopClientSet.Interface
 		kubeClient: kubeClient,
 		namer:      namer,
 
-		deployment: NewDeploymentClickHouse(kubeClient, namer),
+		deployment: NewDeploymentClickHouse(kubeClient),
 		event:      NewEventClickHouse(kubeClient),
 		pod:        NewPodClickHouse(kubeClient, namer),
-		replicaSet: NewReplicaSetClickHouse(kubeClient, namer),
+		replicaSet: NewReplicaSetClickHouse(kubeClient),
 		service:    NewServiceClickHouse(kubeClient, namer),
 		sts:        NewSTSClickHouse(kubeClient, namer),
 		crStatus:   NewCRStatusClickHouse(chopClient),
-		storage:    NewStorageClickHouse(kubeClient),
+		pvc:        storage.NewStoragePVC(NewPVCClickHouse(kubeClient)),
 	}
 }
 
@@ -72,6 +73,6 @@ func (k *ClickHouse) STS() interfaces.IKubeSTS {
 func (k *ClickHouse) CRStatus() interfaces.IKubeCRStatus {
 	return k.crStatus
 }
-func (k *ClickHouse) Storage() interfaces.IKubeStorage {
-	return k.storage
+func (k *ClickHouse) Storage() interfaces.IKubeStoragePVC {
+	return k.pvc
 }

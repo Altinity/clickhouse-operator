@@ -40,11 +40,13 @@ require (
 	github.com/sanity-io/litter v1.3.0
 	github.com/securego/gosec/v2 v2.8.1
 	github.com/stretchr/testify v1.8.4
+	github.com/z-division/go-zookeeper v1.0.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/exporters/prometheus v0.46.0
 	go.opentelemetry.io/otel/metric v1.24.0
 	go.opentelemetry.io/otel/sdk v1.24.0
 	go.opentelemetry.io/otel/sdk/metric v1.24.0
+	golang.org/x/sync v0.3.0
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	sigs.k8s.io/controller-runtime v0.15.1

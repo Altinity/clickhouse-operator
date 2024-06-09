@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 )
 
 func getNamespacedName(obj meta.Object) types.NamespacedName {
@@ -42,8 +42,8 @@ func getFunctionName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
 
-func (r *ChkReconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]string, error) {
-	labelSelector := labels.SelectorFromSet(model.GetPodLabels(chk))
+func (r *Reconciler) getReadyPods(chk *api.ClickHouseKeeperInstallation) ([]string, error) {
+	labelSelector := labels.SelectorFromSet(labeler.GetPodLabels(chk))
 	listOps := &client.ListOptions{
 		Namespace:     chk.Namespace,
 		LabelSelector: labelSelector,

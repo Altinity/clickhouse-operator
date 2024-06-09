@@ -51,19 +51,9 @@ func (n *Namer) namePartCRName(name string) string {
 	return sanitize(util.StringHead(name, n.lenCR()))
 }
 
-// namePartCRNameID
-func (n *Namer) namePartCRNameID(name string) string {
-	return util.CreateStringID(name, n.lenCR())
-}
-
 // namePartClusterName
 func (n *Namer) namePartClusterName(name string) string {
 	return sanitize(util.StringHead(name, n.lenCluster()))
-}
-
-// namePartClusterNameID
-func (n *Namer) namePartClusterNameID(name string) string {
-	return util.CreateStringID(name, n.lenCluster())
 }
 
 // namePartShardName
@@ -71,29 +61,14 @@ func (n *Namer) namePartShardName(name string) string {
 	return sanitize(util.StringHead(name, n.lenShard()))
 }
 
-// namePartShardNameID
-func (n *Namer) namePartShardNameID(name string) string {
-	return util.CreateStringID(name, n.lenShard())
-}
-
 // namePartReplicaName
 func (n *Namer) namePartReplicaName(name string) string {
 	return sanitize(util.StringHead(name, n.lenReplica()))
 }
 
-// namePartReplicaNameID
-func (n *Namer) namePartReplicaNameID(name string) string {
-	return util.CreateStringID(name, n.lenReplica())
-}
-
 // namePartHostName
 func (n *Namer) namePartHostName(name string) string {
 	return sanitize(util.StringHead(name, n.lenReplica()))
-}
-
-// namePartHostNameID
-func (n *Namer) namePartHostNameID(name string) string {
-	return util.CreateStringID(name, n.lenReplica())
 }
 
 func (n *Namer) Name(what NameType, params ...any) string {

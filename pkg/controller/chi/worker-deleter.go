@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -334,7 +335,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 }
 
 // canDropReplica
-func (w *worker) canDropReplica(host *api.Host, opts ...*dropReplicaOptions) (can bool) {
+func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dropReplicaOptions) (can bool) {
 	o := NewDropReplicaOptionsArr(opts...).First()
 
 	if o.ForceDrop() {
@@ -342,7 +343,7 @@ func (w *worker) canDropReplica(host *api.Host, opts ...*dropReplicaOptions) (ca
 	}
 
 	can = true
-	kube.NewStorageClickHouse(w.c.kubeClient).WalkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
+	storage.NewStoragePVC(kube.NewPVCClickHouse(w.c.kubeClient)).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
 		if commonLabeler.GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
@@ -392,7 +393,7 @@ func (w *worker) dropReplica(ctx context.Context, hostToDrop *api.Host, opts ...
 		return nil
 	}
 
-	if !w.canDropReplica(hostToDrop, opts...) {
+	if !w.canDropReplica(ctx, hostToDrop, opts...) {
 		w.a.V(1).F().Warning("CAN NOT drop replica. hostToDrop: %s", hostToDrop.GetName())
 		return nil
 	}

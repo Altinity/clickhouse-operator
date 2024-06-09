@@ -16,7 +16,8 @@ package managers
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	chiNamer "github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	chkNamer "github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 )
 
 type NameManagerType string
@@ -29,7 +30,9 @@ const (
 func NewNameManager(what NameManagerType) interfaces.INameManager {
 	switch what {
 	case NameManagerTypeClickHouse:
-		return namer.NewClickHouse()
+		return chiNamer.NewClickHouse()
+	case NameManagerTypeKeeper:
+		return chkNamer.NewKeeper()
 	}
 	panic("unknown name manager type")
 }

@@ -18,6 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -57,7 +60,7 @@ type worker struct {
 	schemer       *schemer.ClusterSchemer
 	start         time.Time
 	task          *common.Task
-	stsReconciler *common.StatefulSetReconciler
+	stsReconciler *statefulset.StatefulSetReconciler
 }
 
 // newWorker
@@ -89,23 +92,23 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	}
 }
 
+func configGeneratorOptions(chi *api.ClickHouseInstallation) *chiConfig.GeneratorOptions {
+	return &chiConfig.GeneratorOptions{
+		Users:          chi.GetSpec().Configuration.Users,
+		Profiles:       chi.GetSpec().Configuration.Profiles,
+		Quotas:         chi.GetSpec().Configuration.Quotas,
+		Settings:       chi.GetSpec().Configuration.Settings,
+		Files:          chi.GetSpec().Configuration.Files,
+		DistributedDDL: chi.GetSpec().Defaults.DistributedDDL,
+	}
+}
+
 // newContext creates new reconcile task
 func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 	w.task = common.NewTask(
 		commonCreator.NewCreator(
 			chi,
-			managers.NewConfigFilesGenerator(
-				managers.FilesGeneratorTypeClickHouse,
-				chi,
-				&chiConfig.GeneratorOptions{
-					Users:          chi.GetSpec().Configuration.Users,
-					Profiles:       chi.GetSpec().Configuration.Profiles,
-					Quotas:         chi.GetSpec().Configuration.Quotas,
-					Settings:       chi.GetSpec().Configuration.Settings,
-					Files:          chi.GetSpec().Configuration.Files,
-					DistributedDDL: chi.GetSpec().Defaults.DistributedDDL,
-				},
-			),
+			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeClickHouse, chi, configGeneratorOptions(chi)),
 			managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
 			managers.NewTagManager(managers.TagManagerTypeClickHouse, chi),
 			managers.NewProbeManager(managers.ProbeManagerTypeClickHouse),
@@ -116,12 +119,12 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 		),
 	)
 
-	w.stsReconciler = common.NewStatefulSetReconciler(
+	w.stsReconciler = statefulset.NewStatefulSetReconciler(
 		w.a,
 		w.task,
-		NewHostPoller(common.NewStatefulSetPoller(w.c.kube), w.c.labeler, w.c.kube),
+		NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.labeler, w.c.kube),
 		w.c.namer,
-		common.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
+		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		w.c,
 	)
@@ -1294,19 +1297,19 @@ func (w *worker) shouldWaitIncludeHost(host *api.Host) bool {
 
 // waitHostInCluster
 func (w *worker) waitHostInCluster(ctx context.Context, host *api.Host) error {
-	return common.PollHost(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
+	return poller.PollHost(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
 }
 
 // waitHostNotInCluster
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *api.Host) error {
-	return common.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
+	return poller.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
 		return !w.ensureClusterSchemer(host).IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) error {
-	return common.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
+	return poller.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
 		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})

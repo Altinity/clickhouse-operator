@@ -19,18 +19,15 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 type ReplicaSetClickHouse struct {
 	kubeClient kube.Interface
-	namer      interfaces.INameManager
 }
 
-func NewReplicaSetClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *ReplicaSetClickHouse {
+func NewReplicaSetClickHouse(kubeClient kube.Interface) *ReplicaSetClickHouse {
 	return &ReplicaSetClickHouse{
 		kubeClient: kubeClient,
-		namer:      namer,
 	}
 }
 

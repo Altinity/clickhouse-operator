@@ -16,7 +16,8 @@ package managers
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
+	chiVolume "github.com/altinity/clickhouse-operator/pkg/model/chi/volume"
+	chkVolume "github.com/altinity/clickhouse-operator/pkg/model/chk/volume"
 )
 
 type VolumeManagerType string
@@ -29,7 +30,9 @@ const (
 func NewVolumeManager(what VolumeManagerType) interfaces.IVolumeManager {
 	switch what {
 	case VolumeManagerTypeClickHouse:
-		return volume.NewVolumeManagerClickHouse()
+		return chiVolume.NewVolumeManagerClickHouse()
+	case VolumeManagerTypeKeeper:
+		return chkVolume.NewVolumeManagerKeeper()
 	}
 	panic("unknown volume manager type")
 }

@@ -45,15 +45,15 @@ const (
 // ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
 // which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
 type GeneratorClickHouse struct {
-	chi   api.ICustomResource
+	cr    api.ICustomResource
 	namer interfaces.INameManager
 	opts  *GeneratorOptions
 }
 
 // newConfigGeneratorClickHouse returns new GeneratorClickHouse struct
-func newConfigGeneratorClickHouse(chi api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *GeneratorClickHouse {
+func newConfigGeneratorClickHouse(cr api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *GeneratorClickHouse {
 	return &GeneratorClickHouse{
-		chi:   chi,
+		cr:    cr,
 		namer: namer,
 		opts:  opts,
 	}
@@ -183,7 +183,7 @@ func (c *GeneratorClickHouse) getHostZookeeper(host *api.Host) string {
 // chiHostsNum count hosts according to the options
 func (c *GeneratorClickHouse) chiHostsNum(options *RemoteServersOptions) int {
 	num := 0
-	c.chi.WalkHosts(func(host *api.Host) error {
+	c.cr.WalkHosts(func(host *api.Host) error {
 		if options.Include(host) {
 			num++
 		}
@@ -250,7 +250,7 @@ func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) st
 	util.Iline(b, 8, "<!-- User-specified clusters -->")
 
 	// Build each cluster XML
-	c.chi.WalkClusters(func(cluster api.ICluster) error {
+	c.cr.WalkClusters(func(cluster api.ICluster) error {
 		if c.clusterHostsNum(cluster, options) < 1 {
 			// Skip empty cluster
 			return nil
@@ -321,7 +321,7 @@ func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) st
 		util.Iline(b, 8, "<%s>", clusterName)
 		util.Iline(b, 8, "    <shard>")
 		util.Iline(b, 8, "        <internal_replication>true</internal_replication>")
-		c.chi.WalkHosts(func(host *api.Host) error {
+		c.cr.WalkHosts(func(host *api.Host) error {
 			if options.Include(host) {
 				c.getRemoteServersReplica(host, b)
 			}
@@ -338,7 +338,7 @@ func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) st
 		// <all-sharded>
 		clusterName = AllShardsOneReplicaClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
-		c.chi.WalkHosts(func(host *api.Host) error {
+		c.cr.WalkHosts(func(host *api.Host) error {
 			if options.Include(host) {
 				// <shard>
 				//     <internal_replication>
@@ -360,7 +360,7 @@ func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) st
 		// <all-clusters>
 		clusterName = AllClustersClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
-		c.chi.WalkClusters(func(cluster api.ICluster) error {
+		c.cr.WalkClusters(func(cluster api.ICluster) error {
 			cluster.WalkShards(func(index int, shard api.IShard) error {
 				if c.shardHostsNum(shard, options) < 1 {
 					// Skip empty shard
@@ -488,7 +488,7 @@ func (c *GeneratorClickHouse) generateXMLConfig(settings *api.Settings, prefix s
 
 // getDistributedDDLPath returns string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
 func (c *GeneratorClickHouse) getDistributedDDLPath() string {
-	return fmt.Sprintf(DistributedDDLPathPattern, c.chi.GetName())
+	return fmt.Sprintf(DistributedDDLPathPattern, c.cr.GetName())
 }
 
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"

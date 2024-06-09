@@ -28,6 +28,17 @@ type ICustomResource interface {
 	IEnsureStatus() IStatus
 }
 
+type ICustomResourceRuntime interface {
+	GetAttributes() *ComparableAttributes
+	LockCommonConfig()
+	UnlockCommonConfig()
+}
+
+type IRoot interface {
+	GetName() string
+	WalkHosts(f func(host *Host) error) []error
+}
+
 type IStatus interface {
 	SetAction(string)
 	PushAction(string)

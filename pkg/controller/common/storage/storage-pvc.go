@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package kube
+package storage
 
 import (
 	"context"
@@ -20,34 +20,29 @@ import (
 
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
-	kube "k8s.io/client-go/kubernetes"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type StorageClickHouse struct {
-	*PVCClickHouse
+type PVC struct {
+	interfaces.IKubePVC
 	pvcDeleter *volume.PVCDeleter
 }
 
-func NewStorageClickHouse(kubeClient kube.Interface) *StorageClickHouse {
-	return &StorageClickHouse{
-		PVCClickHouse: NewPVCClickHouse(kubeClient),
-		pvcDeleter:    volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
+func NewStoragePVC(pvcKube interfaces.IKubePVC) *PVC {
+	return &PVC{
+		IKubePVC:   pvcKube,
+		pvcDeleter: volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 }
 
 // UpdateOrCreate
-func (c *StorageClickHouse) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+func (c *PVC) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	log.V(2).M(pvc).F().P()
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -84,7 +79,7 @@ func (c *StorageClickHouse) UpdateOrCreate(ctx context.Context, pvc *core.Persis
 }
 
 // deletePVC deletes PersistentVolumeClaim
-func (c *StorageClickHouse) DeletePVC(ctx context.Context, host *api.Host) error {
+func (c *PVC) DeletePVC(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -94,7 +89,7 @@ func (c *StorageClickHouse) DeletePVC(ctx context.Context, host *api.Host) error
 	defer log.V(2).M(host).E().P()
 
 	namespace := host.Runtime.Address.Namespace
-	c.WalkDiscoveredPVCs(host, func(pvc *core.PersistentVolumeClaim) {
+	c.WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
 		if util.IsContextDone(ctx) {
 			log.V(2).Info("task is done")
 			return
@@ -122,10 +117,10 @@ func (c *StorageClickHouse) DeletePVC(ctx context.Context, host *api.Host) error
 	return nil
 }
 
-func (c *StorageClickHouse) WalkDiscoveredPVCs(host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
+func (c *PVC) WalkDiscoveredPVCs(ctx context.Context, host *api.Host, f func(pvc *core.PersistentVolumeClaim)) {
 	namespace := host.Runtime.Address.Namespace
 
-	pvcList, err := c.kubePVCListForHost(host)
+	pvcList, err := c.ListForHost(ctx, host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get list of PVCs for the host %s/%s err:%v", namespace, host.GetName(), err)
 		return
@@ -137,22 +132,4 @@ func (c *StorageClickHouse) WalkDiscoveredPVCs(host *api.Host, f func(pvc *core.
 
 		f(pvc)
 	}
-}
-
-func (c *StorageClickHouse) kubePVCListForHost(host *api.Host) (*core.PersistentVolumeClaimList, error) {
-	return c.kubeClient.
-		CoreV1().
-		PersistentVolumeClaims(host.Runtime.Address.Namespace).
-		List(
-			controller.NewContext(),
-			controller.NewListOptions(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
-		)
-}
-
-func labeler(cr api.ICustomResource) interfaces.ILabeler {
-	return chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
-		AppendScope: chop.Config().Label.Runtime.AppendScope,
-		Include:     chop.Config().Label.Include,
-		Exclude:     chop.Config().Label.Exclude,
-	})
 }

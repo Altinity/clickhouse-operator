@@ -16,13 +16,10 @@ package chk
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiMachinery "k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -31,25 +28,28 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
-	//	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	chkNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
+	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // ReconcileTime is the delay between reconciliations
 const ReconcileTime = 30 * time.Second
 
-// ChkReconciler reconciles a ClickHouseKeeper object
-type ChkReconciler struct {
+// Reconciler reconciles a ClickHouseKeeper object
+type Reconciler struct {
 	client.Client
 	Scheme *apiMachinery.Scheme
+	task   *common.Task
 }
 
 type reconcileFunc func(cluster *apiChk.ClickHouseKeeperInstallation) error
 
-func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return ctrl.Result{}, nil
@@ -91,6 +91,7 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 		return ctrl.Result{}, nil
 	}
 
+	r.reconcileInit(new)
 	if old.GetGeneration() != new.GetGeneration() {
 		for _, f := range []reconcileFunc{
 			r.reconcileConfigMap,
@@ -128,106 +129,18 @@ func (r *ChkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	return ctrl.Result{}, nil
 }
 
-func (r *ChkReconciler) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
-		chk,
-		&core.ConfigMap{},
-		model.CreateConfigMap(chk),
-		"ConfigMap",
-		func(curObject, newObject client.Object) error {
-			cur, ok1 := curObject.(*core.ConfigMap)
-			new, ok2 := newObject.(*core.ConfigMap)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("unable to cast")
-			}
-			cur.Data = new.Data
-			cur.BinaryData = new.BinaryData
-			return nil
-		},
-	)
-}
-
-func (r *ChkReconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
-		chk,
-		&apps.StatefulSet{},
-		model.CreateStatefulSet(chk),
-		"StatefulSet",
-		func(curObject, newObject client.Object) error {
-			cur, ok1 := curObject.(*apps.StatefulSet)
-			new, ok2 := newObject.(*apps.StatefulSet)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("unable to cast")
-			}
-			markPodRestartedNow(new)
-			cur.Spec.Replicas = new.Spec.Replicas
-			cur.Spec.Template = new.Spec.Template
-			cur.Spec.UpdateStrategy = new.Spec.UpdateStrategy
-			return nil
-		},
-	)
-}
-
-func (r *ChkReconciler) reconcileClientService(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
-		chk,
-		&core.Service{},
-		model.CreateClientService(chk),
-		"Client Service",
-		func(curObject, newObject client.Object) error {
-			cur, ok1 := curObject.(*core.Service)
-			new, ok2 := newObject.(*core.Service)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("unable to cast")
-			}
-			cur.Spec.Ports = new.Spec.Ports
-			cur.Spec.Type = new.Spec.Type
-			cur.SetAnnotations(new.GetAnnotations())
-			return nil
-		},
-	)
-}
-
-func (r *ChkReconciler) reconcileHeadlessService(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
-		chk,
-		&core.Service{},
-		model.CreateHeadlessService(chk),
-		"Headless Service",
-		func(curObject, newObject client.Object) error {
-			cur, ok1 := curObject.(*core.Service)
-			new, ok2 := newObject.(*core.Service)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("unable to cast")
-			}
-			cur.Spec.Ports = new.Spec.Ports
-			cur.Spec.Type = new.Spec.Type
-			cur.SetAnnotations(new.GetAnnotations())
-			return nil
-		},
-	)
-}
-
-func (r *ChkReconciler) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
-		chk,
-		&policy.PodDisruptionBudget{},
-		model.CreatePodDisruptionBudget(chk),
-		"PodDisruptionBudget",
-		nil,
-	)
-}
-
-func (r *ChkReconciler) reconcile(
-	chk *apiChk.ClickHouseKeeperInstallation,
+func (r *Reconciler) reconcile(
+	owner meta.Object,
 	cur client.Object,
 	new client.Object,
 	name string,
 	updater func(cur, new client.Object) error,
 ) (err error) {
-	if err = ctrlUtil.SetControllerReference(chk, new, r.Scheme); err != nil {
+	// TODO unify approach with CHI - set OWNER REFERENCE
+	if err = ctrlUtil.SetControllerReference(owner, new, r.Scheme); err != nil {
 		return err
 	}
+
 	err = r.Client.Get(context.TODO(), getNamespacedName(new), cur)
 	if err != nil && apiErrors.IsNotFound(err) {
 		log.V(1).Info("Creating new " + name)
@@ -253,63 +166,52 @@ func (r *ChkReconciler) reconcile(
 	return nil
 }
 
-func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstallation) (err error) {
-	readyMembers, err := r.getReadyPods(chk)
-	if err != nil {
-		return err
-	}
-
-	for {
-		// Fetch the latest ClickHouseKeeper instance again
-		cur := &apiChk.ClickHouseKeeperInstallation{}
-		if err := r.Get(context.TODO(), getNamespacedName(chk), cur); err != nil {
-			log.V(1).Error("Error: not found %s err: %s", chk.Name, err)
-			return err
-		}
-
-		if cur.GetStatus() == nil {
-			cur.Status = cur.EnsureStatus()
-		}
-		cur.Status.Replicas = int32(model.GetReplicasCount(chk))
-
-		cur.Status.ReadyReplicas = []apiChi.ChiZookeeperNode{}
-		for _, readyOne := range readyMembers {
-			cur.Status.ReadyReplicas = append(cur.Status.ReadyReplicas,
-				apiChi.ChiZookeeperNode{
-					Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, chk.Namespace),
-					Port:   apiChi.NewInt32(int32(chk.Spec.GetClientPort())),
-					Secure: apiChi.NewStringBool(false),
-				})
-		}
-
-		log.V(2).Info("ReadyReplicas: " + fmt.Sprintf("%v", cur.Status.ReadyReplicas))
-
-		if len(readyMembers) == model.GetReplicasCount(chk) {
-			cur.Status.Status = "Completed"
-		} else {
-			cur.Status.Status = "In progress"
-		}
-
-		cur.Status.NormalizedCHK = nil
-		cur.Status.NormalizedCHKCompleted = chk.DeepCopy()
-		cur.Status.NormalizedCHKCompleted.ObjectMeta.ManagedFields = nil
-		cur.Status.NormalizedCHKCompleted.Status = nil
-
-		if err := r.Status().Update(context.TODO(), cur); err != nil {
-			log.V(1).Error("err: %s", err.Error())
-		} else {
-			return nil
-		}
-	}
-}
-
 // normalize
-func (r *ChkReconciler) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := model.NewNormalizer().CreateTemplatedCHK(c, normalizer.NewOptions())
+func (r *Reconciler) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+	chk, err := chkNormalizer.NewNormalizer().CreateTemplatedCHK(c, chiNormalizer.NewOptions())
 	if err != nil {
 		log.V(1).
 			M(chk).F().
-			Error("FAILED to normalize CHI 1: %v", err)
+			Error("FAILED to normalize CHK: %v", err)
 	}
 	return chk
+}
+
+func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *chkConfig.GeneratorOptions {
+	return &chkConfig.GeneratorOptions{
+		RaftPort:      chk.GetSpec().GetRaftPort(),
+		ReplicasCount: 1,
+	}
+}
+
+func (r *Reconciler) reconcileInit(chk *apiChk.ClickHouseKeeperInstallation) {
+
+	//namer := managers.NewNameManager(managers.NameManagerTypeKeeper)
+	//kube := kube.NewKeeper(r.Client, namer)
+	//pvcDeleter :=              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeKeeper))
+	//announcer := common.NewAnnouncer(nil,	kube.CRStatus())
+
+	r.task = common.NewTask(
+		commonCreator.NewCreator(
+			chk,
+			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeKeeper, chk, configGeneratorOptions(chk)),
+			managers.NewContainerManager(managers.ContainerManagerTypeKeeper),
+			managers.NewTagManager(managers.TagManagerTypeKeeper, chk),
+			managers.NewProbeManager(managers.ProbeManagerTypeKeeper),
+			managers.NewServiceManager(managers.ServiceManagerTypeKeeper),
+			managers.NewVolumeManager(managers.VolumeManagerTypeKeeper),
+			managers.NewConfigMapManager(managers.ConfigMapManagerTypeKeeper),
+			managers.NewNameManager(managers.NameManagerTypeKeeper),
+		),
+	)
+
+	//stsReconciler := common.NewStatefulSetReconciler(
+	//	announcer,
+	//	r.task,
+	//	NewHostStatefulSetPoller(poller.NewStatefulSetPoller(kube), kube),
+	//	namer,
+	//	storage.NewStorageReconciler(r.task, namer, kube.Storage()),
+	//	kube,
+	//	common.NewDefaultFallback(),
+	//)
 }

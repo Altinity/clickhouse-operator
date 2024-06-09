@@ -16,10 +16,38 @@ VERBOSITY="${VERBOSITY:-"2"}"
 # replace | apply
 KUBECTL_MODE="${KUBECTL_MODE:-"replace"}"
 
-EXECUTABLE="${EXECUTABLE:-"run_tests_operator.sh"}"
-# EXECUTABLE="run_tests_metrics.sh" ./run_tests_local.sh
-#EXECUTABLE="${EXECUTABLE:-"run_tests_metrics.sh"}"
+echo "What would you like to start. Possible options:"
+echo "  1     - test operator"
+echo "  2     - test keeper"
+echo "  3     - test metrics"
+echo -n "Enter command choice (1, 2, 3)"
+read COMMAND
+# Trim EOL from the command received
+COMMAND=$(echo "${COMMAND}" | tr -d '\n\t\r ')
+echo "Provided command is: ${COMMAND}"
+echo -n "Which means we are going to "
+case "${COMMAND}" in
+    "1")
+        DEFAULT_EXECUTABLE="run_tests_operator.sh"
+        echo "test OPERATOR"
+        ;;
+    "2")
+        DEFAULT_EXECUTABLE="run_tests_keeper.sh"
+        echo "test KEEPER"
+        ;;
+    "3")
+        DEFAULT_EXECUTABLE="run_tests_metrics.sh"
+        echo "test METRICS"
+        ;;
+    *)
+        echo "test OPERATOR"
+        ;;
+esac
 
+read -p "Press enter to start new release"
+echo "Starting new release: ${NEW_RELEASE}"
+
+EXECUTABLE="${EXECUTABLE:-"${DEFAULT_EXECUTABLE}"}"
 MINIKUBE_PRELOAD_IMAGES="${MINIKUBE_PRELOAD_IMAGES:-""}"
 
 if [[ ! -z ${MINIKUBE_RESET} ]]; then

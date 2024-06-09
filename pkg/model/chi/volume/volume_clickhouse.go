@@ -70,9 +70,9 @@ func (m *VolumeManagerClickHouse) stsSetupVolumesForConfigMaps(statefulSet *apps
 	// So Pod will have ConfigMaps mounted as Volumes in each Container
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
-		k8s.CreateVolumeMount(configMapCommonName, config.DirPathCommonConfig),
-		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathUsersConfig),
-		k8s.CreateVolumeMount(configMapHostName, config.DirPathHostConfig),
+		k8s.CreateVolumeMount(configMapCommonName, config.DirPathConfigCommon),
+		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
+		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
 }
 

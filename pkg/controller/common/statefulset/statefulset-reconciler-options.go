@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package statefulset
 
 type ReconcileStatefulSetOptions struct {
 	forceRecreate bool

@@ -18,8 +18,10 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	chiAnnotator "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	chkAnnotator "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/annotator"
+	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	commonAnnotator "github.com/altinity/clickhouse-operator/pkg/model/common/tags/annotator"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
@@ -35,6 +37,8 @@ func NewTagManager(what TagManagerType, cr api.ICustomResource) interfaces.ITagg
 	switch what {
 	case TagManagerTypeClickHouse:
 		return newTaggerClickHouse(cr)
+	case TagManagerTypeKeeper:
+		return newTaggerKeeper(cr)
 	}
 	panic("unknown volume manager type")
 }
@@ -46,11 +50,25 @@ type tagger struct {
 
 func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: annotator.NewAnnotatorClickHouse(cr, commonAnnotator.Config{
+		annotator: chiAnnotator.NewAnnotatorClickHouse(cr, commonAnnotator.Config{
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
-		labeler: labeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+		labeler: chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+			AppendScope: chop.Config().Label.Runtime.AppendScope,
+			Include:     chop.Config().Label.Include,
+			Exclude:     chop.Config().Label.Exclude,
+		}),
+	}
+}
+
+func newTaggerKeeper(cr api.ICustomResource) *tagger {
+	return &tagger{
+		annotator: chkAnnotator.NewAnnotatorKeeper(cr, commonAnnotator.Config{
+			Include: chop.Config().Annotation.Include,
+			Exclude: chop.Config().Annotation.Exclude,
+		}),
+		labeler: chkLabeler.NewLabelerKeeper(cr, commonLabeler.Config{
 			AppendScope: chop.Config().Label.Runtime.AppendScope,
 			Include:     chop.Config().Label.Include,
 			Exclude:     chop.Config().Label.Exclude,

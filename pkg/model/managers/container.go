@@ -16,7 +16,8 @@ package managers
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	chkCreator "github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
 )
 
 type ContainerManagerType string
@@ -29,7 +30,9 @@ const (
 func NewContainerManager(what ContainerManagerType) interfaces.IContainerManager {
 	switch what {
 	case ContainerManagerTypeClickHouse:
-		return creator.NewContainerManagerClickHouse(creator.NewProbeManagerClickHouse())
+		return chiCreator.NewContainerManagerClickHouse(chiCreator.NewProbeManagerClickHouse())
+	case ContainerManagerTypeKeeper:
+		return chkCreator.NewContainerManagerKeeper(chkCreator.NewProbeManagerKeeper())
 	}
 	panic("unknown container manager type")
 }

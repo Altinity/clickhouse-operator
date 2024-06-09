@@ -19,18 +19,15 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 type DeploymentClickHouse struct {
 	kubeClient kube.Interface
-	namer      interfaces.INameManager
 }
 
-func NewDeploymentClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *DeploymentClickHouse {
+func NewDeploymentClickHouse(kubeClient kube.Interface) *DeploymentClickHouse {
 	return &DeploymentClickHouse{
 		kubeClient: kubeClient,
-		namer:      namer,
 	}
 }
 

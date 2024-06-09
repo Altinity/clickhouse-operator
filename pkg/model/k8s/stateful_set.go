@@ -20,22 +20,29 @@ import (
 )
 
 // StatefulSetContainerGet gets container from the StatefulSet either by name or by index
-func StatefulSetContainerGet(statefulSet *apps.StatefulSet, name string, index int) (*core.Container, bool) {
-	// Find by name
-	if len(name) > 0 {
-		for i := range statefulSet.Spec.Template.Spec.Containers {
-			// Convenience wrapper
-			container := &statefulSet.Spec.Template.Spec.Containers[i]
-			if container.Name == name {
-				return container, true
+func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...any) (*core.Container, bool) {
+	for _, nameOrIndex := range namesOrIndexes {
+		switch typed := nameOrIndex.(type) {
+		// Find by name
+		case string:
+			name := typed
+			if len(name) > 0 {
+				for i := range statefulSet.Spec.Template.Spec.Containers {
+					// Convenience wrapper
+					container := &statefulSet.Spec.Template.Spec.Containers[i]
+					if container.Name == name {
+						return container, true
+					}
+				}
 			}
-		}
-	}
-
-	// Find by index
-	if index >= 0 {
-		if len(statefulSet.Spec.Template.Spec.Containers) > index {
-			return &statefulSet.Spec.Template.Spec.Containers[index], true
+		// Find by index
+		case int:
+			index := typed
+			if index >= 0 {
+				if len(statefulSet.Spec.Template.Spec.Containers) > index {
+					return &statefulSet.Spec.Template.Spec.Containers[index], true
+				}
+			}
 		}
 	}
 

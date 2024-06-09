@@ -18,6 +18,9 @@ import (
 	"context"
 	"errors"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"math"
 	"sync"
 	"time"
@@ -353,7 +356,7 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host, o
 }
 
 func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version string, err error) {
-	err = common.PollHost(
+	err = poller.PollHost(
 		ctx,
 		host,
 		nil,
@@ -371,7 +374,7 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*common.ReconcileStatefulSetOptions) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*statefulset.ReconcileStatefulSetOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -629,7 +632,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	var (
-		reconcileStatefulSetOpts *common.ReconcileStatefulSetOptions
+		reconcileStatefulSetOpts *statefulset.ReconcileStatefulSetOptions
 		migrateTableOpts         *migrateTableOptions
 	)
 
@@ -687,11 +690,15 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(1).
 		M(host).F().
 		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
-	if common.ErrIsDataLoss(common.NewStorageReconciler(w.task, w.c.namer, kube.NewStorageClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)) {
+	if storage.ErrIsDataLoss(
+		storage.NewStorageReconciler(
+			w.task, w.c.namer, storage.NewStoragePVC(kube.NewPVCClickHouse(w.c.kubeClient)),
+		).ReconcilePVCs(ctx, host, api.DesiredStatefulSet),
+	) {
 		// In case of data loss detection on existing volumes, we need to:
 		// 1. recreate StatefulSet
 		// 2. run tables migration again
-		reconcileStatefulSetOpts = common.NewReconcileStatefulSetOptions(true)
+		reconcileStatefulSetOpts = statefulset.NewReconcileStatefulSetOptions(true)
 		migrateTableOpts = &migrateTableOptions{
 			forceMigrate: true,
 			dropReplica:  true,
@@ -709,7 +716,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		return err
 	}
 	// Polish all new volumes that operator has to create
-	_ = common.NewStorageReconciler(w.task, w.c.namer, kube.NewStorageClickHouse(w.c.kubeClient)).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
+	_ = storage.NewStorageReconciler(w.task, w.c.namer, storage.NewStoragePVC(kube.NewPVCClickHouse(w.c.kubeClient))).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 
 	_ = w.reconcileHostService(ctx, host)
 

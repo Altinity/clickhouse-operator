@@ -59,7 +59,7 @@ func initKeeper(ctx context.Context) error {
 		For(&api.ClickHouseKeeperInstallation{}).
 		Owns(&apps.StatefulSet{}).
 		Complete(
-			&controller.ChkReconciler{
+			&controller.Reconciler{
 				Client: manager.GetClient(),
 				Scheme: manager.GetScheme(),
 			},

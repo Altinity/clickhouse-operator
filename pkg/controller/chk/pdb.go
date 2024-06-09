@@ -15,20 +15,17 @@
 package chk
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
+	policy "k8s.io/api/policy/v1"
 )
 
-func GetPodLabels(chk *api.ClickHouseKeeperInstallation) map[string]string {
-	// In case Pod template has labels explicitly specified - use them
-	labels := getPodTemplateLabels(chk)
-	if labels != nil {
-		return labels
-	}
-
-	// Either no pod template or labels specified.
-	// Construct default labels
-	return map[string]string{
-		"app": chk.GetName(),
-		"uid": string(chk.UID),
-	}
+func (r *Reconciler) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeeperInstallation) error {
+	return r.reconcile(
+		chk,
+		&policy.PodDisruptionBudget{},
+		creator.CreatePodDisruptionBudget(chk),
+		"PodDisruptionBudget",
+		nil,
+	)
 }

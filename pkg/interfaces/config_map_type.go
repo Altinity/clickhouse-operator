@@ -20,4 +20,5 @@ const (
 	ConfigMapCHICommon      ConfigMapType = "chi common"
 	ConfigMapCHICommonUsers ConfigMapType = "chi common users"
 	ConfigMapCHIHost        ConfigMapType = "chi host"
+	ConfigMapConfig         ConfigMapType = "config"
 )

@@ -18,8 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	kube2 "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -49,6 +47,8 @@ import (
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
@@ -85,7 +85,7 @@ func NewController(
 	)
 
 	namer := managers.NewNameManager(managers.NameManagerTypeClickHouse)
-	kube := kube2.NewClickHouse(kubeClient, chopClient, namer)
+	kube := chiKube.NewClickHouse(kubeClient, chopClient, namer)
 
 	// Create Controller instance
 	controller := &Controller{

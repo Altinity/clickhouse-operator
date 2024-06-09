@@ -34,28 +34,28 @@ const (
 )
 
 const (
-	// DirPathCommonConfig specifies full path to folder, where generated common XML files for ClickHouse would be placed
+	// DirPathConfigCommon specifies full path to folder, where generated common XML files for ClickHouse would be placed
 	// for the following sections:
 	// 1. remote servers
 	// 2. operator-provided additional config files
-	DirPathCommonConfig = "/etc/clickhouse-server/" + api.CommonConfigDir + "/"
+	DirPathConfigCommon = "/etc/clickhouse-server/" + api.CommonConfigDir + "/"
 
-	// DirPathUsersConfig specifies full path to folder, where generated users XML files for ClickHouse would be placed
+	// DirPathConfigUsers specifies full path to folder, where generated users XML files for ClickHouse would be placed
 	// for the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
 	// 4. operator-provided additional config files
-	DirPathUsersConfig = "/etc/clickhouse-server/" + api.UsersConfigDir + "/"
+	DirPathConfigUsers = "/etc/clickhouse-server/" + api.UsersConfigDir + "/"
 
-	// DirPathHostConfig specifies full path to folder, where generated host XML files for ClickHouse would be placed
+	// DirPathConfigHost specifies full path to folder, where generated host XML files for ClickHouse would be placed
 	// for the following sections:
 	// 1. macros
 	// 2. zookeeper
 	// 3. settings
 	// 4. files
 	// 5. operator-provided additional config files
-	DirPathHostConfig = "/etc/clickhouse-server/" + api.HostConfigDir + "/"
+	DirPathConfigHost = "/etc/clickhouse-server/" + api.HostConfigDir + "/"
 
 	// DirPathSecretFilesConfig specifies full path to folder, where secrets are mounted
 	DirPathSecretFilesConfig = "/etc/clickhouse-server/secrets.d/"
@@ -82,6 +82,7 @@ const (
 
 	// ClickHouseContainerName specifies name of the clickhouse container in the pod
 	ClickHouseContainerName = "clickhouse"
+
 	// ClickHouseLogContainerName specifies name of the logger container in the pod
 	ClickHouseLogContainerName = "clickhouse-log"
 )

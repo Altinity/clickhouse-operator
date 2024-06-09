@@ -16,6 +16,11 @@ package kube
 
 import (
 	"context"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	core "k8s.io/api/core/v1"
 	kube "k8s.io/client-go/kubernetes"
 
@@ -46,4 +51,22 @@ func (c *PVCClickHouse) Update(ctx context.Context, pvc *core.PersistentVolumeCl
 
 func (c *PVCClickHouse) Delete(ctx context.Context, namespace, name string) error {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
+func (c *PVCClickHouse) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
+	return c.kubeClient.
+		CoreV1().
+		PersistentVolumeClaims(host.Runtime.Address.Namespace).
+		List(
+			ctx,
+			controller.NewListOptions(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
+		)
+}
+
+func labeler(cr api.ICustomResource) interfaces.ILabeler {
+	return chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+		AppendScope: chop.Config().Label.Runtime.AppendScope,
+		Include:     chop.Config().Label.Include,
+		Exclude:     chop.Config().Label.Exclude,
+	})
 }

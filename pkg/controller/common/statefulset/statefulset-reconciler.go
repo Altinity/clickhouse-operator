@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package common
+package statefulset
 
 import (
 	"context"
@@ -25,28 +25,43 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type poller interface {
-	WaitHostReady(ctx context.Context, host *api.Host) error
-	WaitHostDeleted(host *api.Host)
+type IHostStatefulSetPoller interface {
+	WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error
+	WaitHostStatefulSetDeleted(host *api.Host)
 }
 
 type fallback interface {
-	OnStatefulSetCreateFailed(ctx context.Context, host *api.Host) ErrorCRUD
-	OnStatefulSetUpdateFailed(ctx context.Context, oldStatefulSet *apps.StatefulSet, host *api.Host, sts interfaces.IKubeSTS) ErrorCRUD
+	OnStatefulSetCreateFailed(ctx context.Context, host *api.Host) common.ErrorCRUD
+	OnStatefulSetUpdateFailed(ctx context.Context, oldStatefulSet *apps.StatefulSet, host *api.Host, sts interfaces.IKubeSTS) common.ErrorCRUD
+}
+
+type DefaultFallback struct{}
+
+func NewDefaultFallback() *DefaultFallback {
+	return &DefaultFallback{}
+}
+
+func (f *DefaultFallback) OnStatefulSetCreateFailed(ctx context.Context, host *api.Host) common.ErrorCRUD {
+	return common.ErrCRUDIgnore
+}
+func (f *DefaultFallback) OnStatefulSetUpdateFailed(ctx context.Context, oldStatefulSet *apps.StatefulSet, host *api.Host, sts interfaces.IKubeSTS) common.ErrorCRUD {
+	return common.ErrCRUDIgnore
 }
 
 type StatefulSetReconciler struct {
-	a    Announcer
-	task *Task
+	a    common.Announcer
+	task *common.Task
 
-	poller  poller
-	namer   interfaces.INameManager
-	storage *StorageReconciler
+	hostSTSPoller IHostStatefulSetPoller
+	namer         interfaces.INameManager
+	storage       *storage.Reconciler
 
 	kubeStatus interfaces.IKubeCRStatus
 	kubeSTS    interfaces.IKubeSTS
@@ -55,11 +70,11 @@ type StatefulSetReconciler struct {
 }
 
 func NewStatefulSetReconciler(
-	a Announcer,
-	task *Task,
-	poller poller,
+	a common.Announcer,
+	task *common.Task,
+	hostSTSPoller IHostStatefulSetPoller,
 	namer interfaces.INameManager,
-	storage *StorageReconciler,
+	storage *storage.Reconciler,
 	kube interfaces.IKube,
 	fallback fallback,
 ) *StatefulSetReconciler {
@@ -67,9 +82,9 @@ func NewStatefulSetReconciler(
 		a:    a,
 		task: task,
 
-		poller:  poller,
-		namer:   namer,
-		storage: storage,
+		hostSTSPoller: hostSTSPoller,
+		namer:         namer,
+		storage:       storage,
 
 		kubeStatus: kube.CRStatus(),
 		kubeSTS:    kube.STS(),
@@ -104,7 +119,7 @@ func (r *StatefulSetReconciler) getStatefulSetStatus(host *api.Host) api.ObjectS
 	switch {
 	case curStatefulSet != nil:
 		r.a.V(2).M(new).Info("Have StatefulSet available, try to perform label-based comparison for %s/%s", new.GetNamespace(), new.GetName())
-		return GetObjectStatusFromMetas(curStatefulSet, new)
+		return common.GetObjectStatusFromMetas(curStatefulSet, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
@@ -159,7 +174,7 @@ func (r *StatefulSetReconciler) ReconcileStatefulSet(
 	// Report diff to trace
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
 		r.a.V(1).M(host).F().Info("Need to reconcile MODIFIED StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
-		DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
+		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}
 
 	opt := NewReconcileStatefulSetOptionsArr(opts...).First()
@@ -213,7 +228,7 @@ func (r *StatefulSetReconciler) updateStatefulSet(ctx context.Context, host *api
 	name := newStatefulSet.Name
 
 	r.a.V(1).
-		WithEvent(host.GetCR(), EventActionCreate, EventReasonCreateStarted).
+		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
 		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Update StatefulSet(%s/%s) - started", namespace, name)
@@ -223,7 +238,7 @@ func (r *StatefulSetReconciler) updateStatefulSet(ctx context.Context, host *api
 		return nil
 	}
 
-	action := ErrCRUDRecreate
+	action := common.ErrCRUDRecreate
 	if k8s.IsStatefulSetReady(curStatefulSet) {
 		action = r.doUpdateStatefulSet(ctx, curStatefulSet, newStatefulSet, host)
 	}
@@ -239,25 +254,25 @@ func (r *StatefulSetReconciler) updateStatefulSet(ctx context.Context, host *api
 			})
 		}
 		r.a.V(1).
-			WithEvent(host.GetCR(), EventActionUpdate, EventReasonUpdateCompleted).
+			WithEvent(host.GetCR(), common.EventActionUpdate, common.EventReasonUpdateCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) - completed", namespace, name)
 		return nil
-	case ErrCRUDAbort:
+	case common.ErrCRUDAbort:
 		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got abort. Abort", namespace, name)
-		return ErrCRUDAbort
-	case ErrCRUDIgnore:
+		return common.ErrCRUDAbort
+	case common.ErrCRUDIgnore:
 		r.a.V(1).M(host).Info("Update StatefulSet(%s/%s) - got ignore. Ignore", namespace, name)
 		return nil
-	case ErrCRUDRecreate:
-		r.a.WithEvent(host.GetCR(), EventActionUpdate, EventReasonUpdateInProgress).
+	case common.ErrCRUDRecreate:
+		r.a.WithEvent(host.GetCR(), common.EventActionUpdate, common.EventReasonUpdateInProgress).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Update StatefulSet(%s/%s) switch from Update to Recreate", namespace, name)
-		DumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
+		common.DumpStatefulSetDiff(host, curStatefulSet, newStatefulSet)
 		return r.recreateStatefulSet(ctx, host, register)
-	case ErrCRUDUnexpectedFlow:
+	case common.ErrCRUDUnexpectedFlow:
 		r.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
 		return nil
 	}
@@ -279,7 +294,7 @@ func (r *StatefulSetReconciler) createStatefulSet(ctx context.Context, host *api
 	defer r.a.V(2).M(host).E().Info(util.NamespaceNameString(statefulSet.GetObjectMeta()))
 
 	r.a.V(1).
-		WithEvent(host.GetCR(), EventActionCreate, EventReasonCreateStarted).
+		WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateStarted).
 		WithStatusAction(host.GetCR()).
 		M(host).F().
 		Info("Create StatefulSet %s/%s - started", statefulSet.Namespace, statefulSet.Name)
@@ -298,28 +313,28 @@ func (r *StatefulSetReconciler) createStatefulSet(ctx context.Context, host *api
 	switch action {
 	case nil:
 		r.a.V(1).
-			WithEvent(host.GetCR(), EventActionCreate, EventReasonCreateCompleted).
+			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Info("Create StatefulSet %s/%s - completed", statefulSet.Namespace, statefulSet.Name)
 		return nil
-	case ErrCRUDAbort:
-		r.a.WithEvent(host.GetCR(), EventActionCreate, EventReasonCreateFailed).
+	case common.ErrCRUDAbort:
+		r.a.WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(host.GetCR()).
 			WithStatusError(host.GetCR()).
 			M(host).F().
 			Error("Create StatefulSet %s/%s - failed with error %v", statefulSet.Namespace, statefulSet.Name, action)
 		return action
-	case ErrCRUDIgnore:
-		r.a.WithEvent(host.GetCR(), EventActionCreate, EventReasonCreateFailed).
+	case common.ErrCRUDIgnore:
+		r.a.WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
 			Warning("Create StatefulSet %s/%s - error ignored", statefulSet.Namespace, statefulSet.Name)
 		return nil
-	case ErrCRUDRecreate:
+	case common.ErrCRUDRecreate:
 		r.a.V(1).M(host).Warning("Got recreate action. Ignore and continue for now")
 		return nil
-	case ErrCRUDUnexpectedFlow:
+	case common.ErrCRUDUnexpectedFlow:
 		r.a.V(1).M(host).Warning("Got unexpected flow action. Ignore and continue for now")
 		return nil
 	}
@@ -371,7 +386,7 @@ func (r *StatefulSetReconciler) waitForConfigMapPropagation(ctx context.Context,
 }
 
 // createStatefulSet is an internal function, used in reconcileStatefulSet only
-func (r *StatefulSetReconciler) doCreateStatefulSet(ctx context.Context, host *api.Host) ErrorCRUD {
+func (r *StatefulSetReconciler) doCreateStatefulSet(ctx context.Context, host *api.Host) common.ErrorCRUD {
 	log.V(1).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -384,11 +399,11 @@ func (r *StatefulSetReconciler) doCreateStatefulSet(ctx context.Context, host *a
 	log.V(1).Info("Create StatefulSet %s/%s", statefulSet.Namespace, statefulSet.Name)
 	if _, err := r.kubeSTS.Create(statefulSet); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
-		return ErrCRUDRecreate
+		return common.ErrCRUDRecreate
 	}
 
 	// StatefulSet created, wait until host is ready
-	if err := r.poller.WaitHostReady(ctx, host); err != nil {
+	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create wait failed. err: %v", err)
 		return r.fallback.OnStatefulSetCreateFailed(ctx, host)
 	}
@@ -403,7 +418,7 @@ func (r *StatefulSetReconciler) doUpdateStatefulSet(
 	oldStatefulSet *apps.StatefulSet,
 	newStatefulSet *apps.StatefulSet,
 	host *api.Host,
-) ErrorCRUD {
+) common.ErrorCRUD {
 	log.V(2).M(host).F().P()
 
 	if util.IsContextDone(ctx) {
@@ -416,7 +431,7 @@ func (r *StatefulSetReconciler) doUpdateStatefulSet(
 	if err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update failed. err: %v", err)
 		log.V(1).M(host).F().Error("%s", dumpDiff(oldStatefulSet, newStatefulSet))
-		return ErrCRUDRecreate
+		return common.ErrCRUDRecreate
 	}
 
 	// After calling "Update()"
@@ -431,7 +446,7 @@ func (r *StatefulSetReconciler) doUpdateStatefulSet(
 
 	log.V(1).M(host).F().Info("generation change %d=>%d", oldStatefulSet.Generation, updatedStatefulSet.Generation)
 
-	if err := r.poller.WaitHostReady(ctx, host); err != nil {
+	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update wait failed. err: %v", err)
 		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.kubeSTS)
 	}
@@ -506,12 +521,12 @@ func (r *StatefulSetReconciler) doDeleteStatefulSet(ctx context.Context, host *a
 	}
 
 	// Wait until StatefulSet scales down to 0 pods count.
-	_ = r.poller.WaitHostReady(ctx, host)
+	_ = r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host)
 
 	// And now delete empty StatefulSet
 	if err := r.kubeSTS.Delete(namespace, name); err == nil {
 		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
-		r.poller.WaitHostDeleted(host)
+		r.hostSTSPoller.WaitHostStatefulSetDeleted(host)
 	} else if apiErrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 	} else {

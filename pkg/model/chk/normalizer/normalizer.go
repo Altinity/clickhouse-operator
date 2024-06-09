@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chk
+package normalizer
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"strings"
 
@@ -219,7 +220,7 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *apiChi.Settings {
 	return settings.
 		Ensure().
-		MergeFrom(defaultKeeperSettings(n.ctx.chk.Spec.GetPath())).
+		MergeFrom(config.DefaultSettings(n.ctx.chk.Spec.GetPath())).
 		Normalize()
 }
 

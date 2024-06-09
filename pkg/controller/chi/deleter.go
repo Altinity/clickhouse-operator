@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
@@ -33,7 +34,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *api.Host) error {
 
 	// Each host consists of:
 	_ = c.deleteStatefulSet(ctx, host)
-	_ = kube.NewStorageClickHouse(c.kubeClient).DeletePVC(ctx, host)
+	_ = storage.NewStoragePVC(kube.NewPVCClickHouse(c.kubeClient)).DeletePVC(ctx, host)
 	_ = c.deleteConfigMap(ctx, host)
 	_ = c.deleteServiceHost(ctx, host)
 

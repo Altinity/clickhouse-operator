@@ -16,7 +16,8 @@ package managers
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	chiCreator "github.com/altinity/clickhouse-operator/pkg/model/chi/creator"
+	chkCreator "github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
 )
 
 type ServiceManagerType string
@@ -29,7 +30,9 @@ const (
 func NewServiceManager(what ServiceManagerType) interfaces.IServiceManager {
 	switch what {
 	case ServiceManagerTypeClickHouse:
-		return creator.NewServiceManagerClickHouse()
+		return chiCreator.NewServiceManagerClickHouse()
+	case ServiceManagerTypeKeeper:
+		return chkCreator.NewServiceManagerKeeper()
 	}
 	panic("unknown service manager type")
 }

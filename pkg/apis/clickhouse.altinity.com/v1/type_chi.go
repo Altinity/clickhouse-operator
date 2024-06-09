@@ -27,11 +27,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type IRoot interface {
-	GetName() string
-	WalkHosts(f func(host *Host) error) []error
-}
-
 func (chi *ClickHouseInstallation) GetSpec() *ChiSpec {
 	return &chi.Spec
 }

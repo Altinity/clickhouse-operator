@@ -12,14 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chk
+package kube
 
 import (
-	"fmt"
+	"context"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	core "k8s.io/api/core/v1"
 )
 
-func getHeadlessServiceName(chk *api.ClickHouseKeeperInstallation) string {
-	return fmt.Sprintf("%s-headless", chk.GetName())
+type EventKeeper struct {
+	kubeClient client.Client
+}
+
+func NewEventKeeper(kubeClient client.Client) *EventKeeper {
+	return &EventKeeper{
+		kubeClient: kubeClient,
+	}
+}
+
+func (c *EventKeeper) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
+	err := c.kubeClient.Create(ctx, event)
+	return event, err
 }
