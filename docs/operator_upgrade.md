@@ -165,7 +165,7 @@ kube-system clickhouse-operator   1            1           19h       0.17.0
 If you want to update to the latest version, we can run following command:
   
 ```
-$ kubectl apply -n kube-system -f https://github.com/Altinity/clickhouse-operator/blob/master/deploy/operator/clickhouse-operator-install-bundle.yaml
+$ kubectl apply -n kube-system -f https://github.com/Altinity/clickhouse-operator/raw/master/deploy/operator/clickhouse-operator-install-bundle.yaml
 
 ```
   
