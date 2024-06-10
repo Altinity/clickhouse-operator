@@ -18,6 +18,7 @@ import (
 	"context"
 	"strings"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/z-division/go-zookeeper/zk"
 )
 
@@ -54,12 +55,23 @@ func (p *PathManager) Ensure(path string) {
 	}
 
 	// Create path step-by-step
+	log.Info("zk path to be verified: %s", path)
 	pathParts := strings.Split(strings.Trim(path, "/"), "/")
 	subPath := ""
 	for _, folder := range pathParts {
 		subPath += "/" + folder
-		if !p.Connection.Exists(ctx, subPath) {
-			p.Connection.Create(ctx, subPath, value, flags, acl)
+		if p.Connection.Exists(ctx, subPath) {
+			log.Info("zk path already exists: %s", subPath)
+			continue // for
+		}
+
+		log.Info("zk path does not exist, need to create: %s", subPath)
+
+		created, err := p.Connection.Create(ctx, subPath, value, flags, acl)
+		if err == nil {
+			log.Info("zk path created: %s", created)
+		} else {
+			log.Warning("zk path FAILED to create: %s err: %v", subPath, err)
 		}
 	}
 }

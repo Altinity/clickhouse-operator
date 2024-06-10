@@ -17,11 +17,6 @@ package chi
 import (
 	"context"
 	"errors"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
-	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 	"math"
 	"sync"
 	"time"
@@ -35,10 +30,15 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
