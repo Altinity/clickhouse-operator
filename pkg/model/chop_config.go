@@ -25,7 +25,7 @@ import (
 
 // isZookeeperChangeRequiresReboot checks two ZooKeeper configs and decides,
 // whether config modifications require a reboot to be applied
-func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ChiZookeeperConfig) bool {
+func isZookeeperChangeRequiresReboot(host *api.Host, a, b *api.ZookeeperConfig) bool {
 	return !a.Equals(b)
 }
 
@@ -151,7 +151,7 @@ const (
 func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	// Zookeeper
 	{
-		var old, new *api.ChiZookeeperConfig
+		var old, new *api.ZookeeperConfig
 		if host.HasAncestor() {
 			old = host.GetAncestor().GetZookeeper()
 		}

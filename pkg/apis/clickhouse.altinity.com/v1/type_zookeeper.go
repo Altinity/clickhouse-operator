@@ -16,10 +16,10 @@ package v1
 
 import "gopkg.in/d4l3k/messagediff.v1"
 
-// ChiZookeeperConfig defines zookeeper section of .spec.configuration
+// ZookeeperConfig defines zookeeper section of .spec.configuration
 // Refers to
 // https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
-type ChiZookeeperConfig struct {
+type ZookeeperConfig struct {
 	Nodes              []ChiZookeeperNode `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
 	SessionTimeoutMs   int                `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
 	OperationTimeoutMs int                `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
@@ -27,13 +27,13 @@ type ChiZookeeperConfig struct {
 	Identity           string             `json:"identity,omitempty"             yaml:"identity,omitempty"`
 }
 
-// NewChiZookeeperConfig creates new ChiZookeeperConfig object
-func NewChiZookeeperConfig() *ChiZookeeperConfig {
-	return new(ChiZookeeperConfig)
+// NewZookeeperConfig creates new ZookeeperConfig object
+func NewZookeeperConfig() *ZookeeperConfig {
+	return new(ZookeeperConfig)
 }
 
 // IsEmpty checks whether config is empty
-func (zkc *ChiZookeeperConfig) IsEmpty() bool {
+func (zkc *ZookeeperConfig) IsEmpty() bool {
 	if zkc == nil {
 		return true
 	}
@@ -42,13 +42,13 @@ func (zkc *ChiZookeeperConfig) IsEmpty() bool {
 }
 
 // MergeFrom merges from provided object
-func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeType) *ChiZookeeperConfig {
+func (zkc *ZookeeperConfig) MergeFrom(from *ZookeeperConfig, _type MergeType) *ZookeeperConfig {
 	if from == nil {
 		return zkc
 	}
 
 	if zkc == nil {
-		zkc = NewChiZookeeperConfig()
+		zkc = NewZookeeperConfig()
 	}
 
 	if !from.IsEmpty() {
@@ -94,7 +94,7 @@ func (zkc *ChiZookeeperConfig) MergeFrom(from *ChiZookeeperConfig, _type MergeTy
 }
 
 // Equals checks whether config is equal to another one
-func (zkc *ChiZookeeperConfig) Equals(b *ChiZookeeperConfig) bool {
+func (zkc *ZookeeperConfig) Equals(b *ZookeeperConfig) bool {
 	_, equals := messagediff.DeepDiff(zkc, b)
 	return equals
 }

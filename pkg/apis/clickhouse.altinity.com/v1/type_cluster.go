@@ -16,17 +16,17 @@ package v1
 
 // Cluster defines item of a clusters section of .configuration
 type Cluster struct {
-	Name              string              `json:"name,omitempty"              yaml:"name,omitempty"`
-	Zookeeper         *ChiZookeeperConfig `json:"zookeeper,omitempty"         yaml:"zookeeper,omitempty"`
-	Settings          *Settings           `json:"settings,omitempty"          yaml:"settings,omitempty"`
-	Files             *Settings           `json:"files,omitempty"             yaml:"files,omitempty"`
-	Templates         *TemplatesList      `json:"templates,omitempty"         yaml:"templates,omitempty"`
-	SchemaPolicy      *SchemaPolicy       `json:"schemaPolicy,omitempty"      yaml:"schemaPolicy,omitempty"`
-	Insecure          *StringBool         `json:"insecure,omitempty"          yaml:"insecure,omitempty"`
-	Secure            *StringBool         `json:"secure,omitempty"            yaml:"secure,omitempty"`
-	Secret            *ClusterSecret      `json:"secret,omitempty"            yaml:"secret,omitempty"`
-	PDBMaxUnavailable *Int32              `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
-	Layout            *ChiClusterLayout   `json:"layout,omitempty"            yaml:"layout,omitempty"`
+	Name              string            `json:"name,omitempty"              yaml:"name,omitempty"`
+	Zookeeper         *ZookeeperConfig  `json:"zookeeper,omitempty"         yaml:"zookeeper,omitempty"`
+	Settings          *Settings         `json:"settings,omitempty"          yaml:"settings,omitempty"`
+	Files             *Settings         `json:"files,omitempty"             yaml:"files,omitempty"`
+	Templates         *TemplatesList    `json:"templates,omitempty"         yaml:"templates,omitempty"`
+	SchemaPolicy      *SchemaPolicy     `json:"schemaPolicy,omitempty"      yaml:"schemaPolicy,omitempty"`
+	Insecure          *StringBool       `json:"insecure,omitempty"          yaml:"insecure,omitempty"`
+	Secure            *StringBool       `json:"secure,omitempty"            yaml:"secure,omitempty"`
+	Secret            *ClusterSecret    `json:"secret,omitempty"            yaml:"secret,omitempty"`
+	PDBMaxUnavailable *Int32            `json:"pdbMaxUnavailable,omitempty" yaml:"pdbMaxUnavailable,omitempty"`
+	Layout            *ChiClusterLayout `json:"layout,omitempty"            yaml:"layout,omitempty"`
 
 	Runtime ClusterRuntime `json:"-" yaml:"-"`
 }

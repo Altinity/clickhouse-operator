@@ -627,7 +627,7 @@ func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 }
 
 // normalizeConfigurationZookeeper normalizes .spec.configuration.zookeeper
-func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ChiZookeeperConfig) *api.ChiZookeeperConfig {
+func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ZookeeperConfig) *api.ZookeeperConfig {
 	if zk == nil {
 		return nil
 	}

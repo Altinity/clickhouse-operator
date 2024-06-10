@@ -210,7 +210,7 @@ func (host *Host) GetSettings() *Settings {
 }
 
 // GetZookeeper gets zookeeper
-func (host *Host) GetZookeeper() *ChiZookeeperConfig {
+func (host *Host) GetZookeeper() *ZookeeperConfig {
 	cluster := host.GetCluster()
 	return cluster.Zookeeper
 }

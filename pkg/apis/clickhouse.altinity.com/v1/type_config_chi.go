@@ -30,12 +30,12 @@ const (
 
 // Configuration defines configuration section of .spec
 type Configuration struct {
-	Zookeeper *ChiZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper,omitempty"`
-	Users     *Settings           `json:"users,omitempty"     yaml:"users,omitempty"`
-	Profiles  *Settings           `json:"profiles,omitempty"  yaml:"profiles,omitempty"`
-	Quotas    *Settings           `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
-	Settings  *Settings           `json:"settings,omitempty"  yaml:"settings,omitempty"`
-	Files     *Settings           `json:"files,omitempty"     yaml:"files,omitempty"`
+	Zookeeper *ZookeeperConfig `json:"zookeeper,omitempty" yaml:"zookeeper,omitempty"`
+	Users     *Settings        `json:"users,omitempty"     yaml:"users,omitempty"`
+	Profiles  *Settings        `json:"profiles,omitempty"  yaml:"profiles,omitempty"`
+	Quotas    *Settings        `json:"quotas,omitempty"    yaml:"quotas,omitempty"`
+	Settings  *Settings        `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files     *Settings        `json:"files,omitempty"     yaml:"files,omitempty"`
 	// TODO refactor into map[string]ChiCluster
 	Clusters []*Cluster `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
