@@ -21,6 +21,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
+	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 	"math"
 	"sync"
 	"time"
@@ -481,7 +482,19 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 		w.task.RegistryFailed.RegisterPDB(pdb.GetObjectMeta())
 	}
 
+	reconcileZookeeperRootPath(cluster)
 	return nil
+}
+
+func reconcileZookeeperRootPath(cluster *api.Cluster) {
+	if cluster.Zookeeper.IsEmpty() {
+		// Nothing to reconcile
+		return
+	}
+	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes)
+	path := zookeeper.NewPathManager(conn)
+	path.Ensure(cluster.Zookeeper.Root)
+	path.Close()
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
