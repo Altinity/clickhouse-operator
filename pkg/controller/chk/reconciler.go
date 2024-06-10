@@ -16,6 +16,10 @@ package chk
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"time"
 
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,8 +47,9 @@ const ReconcileTime = 30 * time.Second
 // Reconciler reconciles a ClickHouseKeeper object
 type Reconciler struct {
 	client.Client
-	Scheme *apiMachinery.Scheme
-	task   *common.Task
+	Scheme        *apiMachinery.Scheme
+	task          *common.Task
+	stsReconciler *statefulset.StatefulSetReconciler
 }
 
 type reconcileFunc func(cluster *apiChk.ClickHouseKeeperInstallation) error
@@ -186,10 +191,10 @@ func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *chkConfig
 
 func (r *Reconciler) reconcileInit(chk *apiChk.ClickHouseKeeperInstallation) {
 
-	//namer := managers.NewNameManager(managers.NameManagerTypeKeeper)
-	//kube := kube.NewKeeper(r.Client, namer)
+	namer := managers.NewNameManager(managers.NameManagerTypeKeeper)
+	kube := kube.NewKeeper(r.Client, namer)
 	//pvcDeleter :=              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeKeeper))
-	//announcer := common.NewAnnouncer(nil,	kube.CRStatus())
+	announcer := common.NewAnnouncer(nil, kube.CRStatus())
 
 	r.task = common.NewTask(
 		commonCreator.NewCreator(
@@ -205,13 +210,13 @@ func (r *Reconciler) reconcileInit(chk *apiChk.ClickHouseKeeperInstallation) {
 		),
 	)
 
-	//stsReconciler := common.NewStatefulSetReconciler(
-	//	announcer,
-	//	r.task,
-	//	NewHostStatefulSetPoller(poller.NewStatefulSetPoller(kube), kube),
-	//	namer,
-	//	storage.NewStorageReconciler(r.task, namer, kube.Storage()),
-	//	kube,
-	//	common.NewDefaultFallback(),
-	//)
+	r.stsReconciler = statefulset.NewStatefulSetReconciler(
+		announcer,
+		r.task,
+		NewHostStatefulSetPoller(poller.NewStatefulSetPoller(kube), kube),
+		namer,
+		storage.NewStorageReconciler(r.task, namer, kube.Storage()),
+		kube,
+		statefulset.NewDefaultFallback(),
+	)
 }
