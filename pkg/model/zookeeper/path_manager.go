@@ -32,6 +32,7 @@ func NewPathManager(connection *Connection) *PathManager {
 }
 
 func (p *PathManager) Ensure(path string) {
+	// Sanity check
 	path = strings.TrimSpace(path)
 	if len(path) == 0 {
 		return
@@ -40,8 +41,7 @@ func (p *PathManager) Ensure(path string) {
 		return
 	}
 
-	pathParts := strings.Split(strings.Trim(path, "/"), "/")
-
+	// Params if the zk node to be created on each folder
 	ctx := context.TODO()
 	value := []byte{}
 	flags := int32(0)
@@ -53,12 +53,12 @@ func (p *PathManager) Ensure(path string) {
 		},
 	}
 
+	// Create path step-by-step
+	pathParts := strings.Split(strings.Trim(path, "/"), "/")
 	subPath := ""
 	for _, folder := range pathParts {
 		subPath += "/" + folder
-		if p.Connection.Exists(ctx, subPath) {
-
-		} else {
+		if !p.Connection.Exists(ctx, subPath) {
 			p.Connection.Create(ctx, subPath, value, flags, acl)
 		}
 	}

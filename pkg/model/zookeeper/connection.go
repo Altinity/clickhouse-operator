@@ -19,14 +19,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"math/rand/v2"
+	"math/rand"
 	"net"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	log "github.com/golang/glog"
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/z-division/go-zookeeper/zk"
 	"golang.org/x/sync/semaphore"
 
@@ -98,6 +98,9 @@ func (c *Connection) Delete(ctx context.Context, path string, version int32) err
 }
 
 func (c *Connection) Close() error {
+	if c == nil {
+		return nil
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.connection != nil {
@@ -114,7 +117,7 @@ func (c *Connection) retry(ctx context.Context, fn func(*zk.Conn) error) error {
 
 	for i := 0; i < c.MaxRetriesNum; i++ {
 		if i > 0 {
-			time.Sleep(2*time.Second + time.Duration(rand.Int64N(5e9)))
+			time.Sleep(1*time.Second + time.Duration(rand.Int63n(int64(1*time.Second))))
 		}
 
 		connection, err := c.ensureConnection(ctx)
@@ -161,18 +164,18 @@ func (c *Connection) connectionAddAuth(ctx context.Context) {
 	}
 	authFileContent, err := os.ReadFile(c.AuthFile)
 	if err != nil {
-		log.Errorf("auth file: %v", err)
+		log.Error("auth file: %v", err)
 		return
 	}
 	authInfo := strings.TrimRight(string(authFileContent), "\n")
 	authInfoParts := strings.SplitN(authInfo, ":", 2)
 	if len(authInfoParts) != 2 {
-		log.Errorf("failed to parse auth file content, expected format <scheme>:<auth> but saw: %s", authInfo)
+		log.Error("failed to parse auth file content, expected format <scheme>:<auth> but saw: %s", authInfo)
 		return
 	}
 	err = c.connection.AddAuth(authInfoParts[0], []byte(authInfoParts[1]))
 	if err != nil {
-		log.Errorf("failed to add auth to zk connection: %v", err)
+		log.Error("failed to add auth to zk connection: %v", err)
 		return
 	}
 }
@@ -195,10 +198,10 @@ func (c *Connection) connectionEventsProcessor(connection *zk.Conn, events <-cha
 			if shouldCloseConnection {
 				connection.Close()
 			}
-			log.Infof("zk conn: session for addr %v ended: %v", c.nodes, event)
+			log.Info("zk conn: session for addr %v ended: %v", c.nodes, event)
 			return
 		}
-		log.Infof("zk conn: session for addr %v event: %v", c.nodes, event)
+		log.Info("zk conn: session for addr %v event: %v", c.nodes, event)
 	}
 }
 
@@ -235,19 +238,19 @@ func (c *Connection) connect(servers []string) (*zk.Conn, <-chan zk.Event, error
 
 	if c.CertFile != "" && c.KeyFile != "" {
 		if len(servers) > 1 {
-			log.Fatalf("This TLS zk code requires that the all the zk servers validate to a single server name.")
+			log.Fatal("This TLS zk code requires that the all the zk servers validate to a single server name.")
 		}
 
 		serverName := strings.Split(servers[0], ":")[0]
 
-		log.Infof("Using TLS for %s", serverName)
+		log.Info("Using TLS for %s", serverName)
 		cert, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
 		if err != nil {
-			log.Fatalf("Unable to load cert %v and key %v, err: %v", c.CertFile, c.KeyFile, err)
+			log.Fatal("Unable to load cert %v and key %v, err: %v", c.CertFile, c.KeyFile, err)
 		}
 		clientCACert, err := os.ReadFile(c.CaFile)
 		if err != nil {
-			log.Fatalf("Unable to open ca cert %v, err %v", c.CaFile, err)
+			log.Fatal("Unable to open ca cert %v, err %v", c.CaFile, err)
 		}
 
 		clientCertPool := x509.NewCertPool()
