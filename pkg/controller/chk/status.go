@@ -43,10 +43,10 @@ func (r *Reconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstalla
 		}
 		cur.Status.Replicas = int32(model.GetReplicasCount(chk))
 
-		cur.Status.ReadyReplicas = []apiChi.ChiZookeeperNode{}
+		cur.Status.ReadyReplicas = []apiChi.ZookeeperNode{}
 		for _, readyOne := range readyMembers {
 			cur.Status.ReadyReplicas = append(cur.Status.ReadyReplicas,
-				apiChi.ChiZookeeperNode{
+				apiChi.ZookeeperNode{
 					Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, chk.Namespace),
 					Port:   apiChi.NewInt32(int32(chk.Spec.GetClientPort())),
 					Secure: apiChi.NewStringBool(false),

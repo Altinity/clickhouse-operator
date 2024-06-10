@@ -31,7 +31,7 @@ type ChkStatus struct {
 	Replicas int32 `json:"replicas,omitempty"`
 
 	// ReadyReplicas is the number of number of ready replicas in the cluster
-	ReadyReplicas []apiChi.ChiZookeeperNode `json:"readyReplicas,omitempty"`
+	ReadyReplicas []apiChi.ZookeeperNode `json:"readyReplicas,omitempty"`
 
 	Pods                   []string                      `json:"pods,omitempty"                   yaml:"pods,omitempty"`
 	PodIPs                 []string                      `json:"pod-ips,omitempty"                yaml:"pod-ips,omitempty"`

@@ -110,7 +110,7 @@ func (in *ChkStatus) DeepCopyInto(out *ChkStatus) {
 	*out = *in
 	if in.ReadyReplicas != nil {
 		in, out := &in.ReadyReplicas, &out.ReadyReplicas
-		*out = make([]clickhousealtinitycomv1.ChiZookeeperNode, len(*in))
+		*out = make([]clickhousealtinitycomv1.ZookeeperNode, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

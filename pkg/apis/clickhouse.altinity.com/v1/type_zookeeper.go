@@ -30,13 +30,13 @@ type ZookeeperConfig struct {
 	Identity           string         `json:"identity,omitempty"             yaml:"identity,omitempty"`
 }
 
-type ZookeeperNodes []ChiZookeeperNode
+type ZookeeperNodes []ZookeeperNode
 
 func (n ZookeeperNodes) Len() int {
 	return len(n)
 }
 
-func (n ZookeeperNodes) First() ChiZookeeperNode {
+func (n ZookeeperNodes) First() ZookeeperNode {
 	return n[0]
 }
 
@@ -79,7 +79,7 @@ func (zkc *ZookeeperConfig) MergeFrom(from *ZookeeperConfig, _type MergeType) *Z
 	if !from.IsEmpty() {
 		// Append Nodes from `from`
 		if zkc.Nodes == nil {
-			zkc.Nodes = make([]ChiZookeeperNode, 0)
+			zkc.Nodes = make([]ZookeeperNode, 0)
 		}
 		for fromIndex := range from.Nodes {
 			fromNode := &from.Nodes[fromIndex]
