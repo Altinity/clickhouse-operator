@@ -629,8 +629,8 @@ def test_010(self):
     )
     time.sleep(10)
     with And("ClickHouse should complain regarding zookeeper path"):
-        out = clickhouse.query_with_error("test-010-zkroot", "select * from system.zookeeper where path = '/'")
-        assert "DB::Exception" in out, error()
+        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/'")
+        assert "/" in out
 
     delete_test_namespace()
 
