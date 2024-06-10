@@ -18,6 +18,7 @@ spec:
           port: 2181
       session_timeout_ms: 5000
       operation_timeout_ms: 5000
+      root: /test/root/path
     clusters:
       - name: default
         layout:
