@@ -21,6 +21,17 @@ type ChiZookeeperNode struct {
 	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
 }
 
+func (zkNode *ChiZookeeperNode) String() string {
+	if zkNode == nil {
+		return ""
+	}
+	str := zkNode.Host
+	if zkNode.Port.HasValue() {
+		str += ":" + zkNode.Port.String()
+	}
+	return str
+}
+
 // Equal checks whether zookeeper node is equal to another
 func (zkNode *ChiZookeeperNode) Equal(to *ChiZookeeperNode) bool {
 	if to == nil {

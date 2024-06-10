@@ -29,33 +29,28 @@ import (
 	log "github.com/golang/glog"
 	"github.com/z-division/go-zookeeper/zk"
 	"golang.org/x/sync/semaphore"
-)
 
-const maxRetriesNum = 3
-
-var (
-	maxConcurrentRequests int64 = 32
-
-	timeoutConnect   = 30 * time.Second
-	timeoutKeepAlive = 30 * time.Second
-
-	certFile string
-	keyFile  string
-	caFile   string
-	authFile string
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 type Connection struct {
-	address    string
+	nodes api.ZookeeperNodes
+	ConnectionParams
 	sema       *semaphore.Weighted
 	mu         sync.Mutex
 	connection *zk.Conn
 }
 
-func NewConnection(address string) *Connection {
+func NewConnection(nodes api.ZookeeperNodes, _params ...*ConnectionParams) *Connection {
+	var params *ConnectionParams
+	if len(_params) > 0 {
+		params = _params[0]
+	}
+	params = params.Normalize()
 	return &Connection{
-		address: address,
-		sema:    semaphore.NewWeighted(maxConcurrentRequests),
+		nodes:            nodes,
+		sema:             semaphore.NewWeighted(params.MaxConcurrentRequests),
+		ConnectionParams: *params,
 	}
 }
 
@@ -112,7 +107,7 @@ func (c *Connection) retry(ctx context.Context, fn func(*zk.Conn) error) error {
 	}
 	defer c.sema.Release(1)
 
-	for i := 0; i < maxRetriesNum; i++ {
+	for i := 0; i < c.MaxRetriesNum; i++ {
 		if i > 0 {
 			time.Sleep(2*time.Second + time.Duration(rand.Int64N(5e9)))
 		}
@@ -144,7 +139,7 @@ func (c *Connection) ensureConnection(ctx context.Context) (*zk.Conn, error) {
 	defer c.mu.Unlock()
 
 	if c.connection == nil {
-		connection, events, err := c.dial(ctx, c.address)
+		connection, events, err := c.dial(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -156,10 +151,10 @@ func (c *Connection) ensureConnection(ctx context.Context) (*zk.Conn, error) {
 }
 
 func (c *Connection) connectionAddAuth(ctx context.Context) {
-	if authFile == "" {
+	if c.AuthFile == "" {
 		return
 	}
-	authFileContent, err := os.ReadFile(authFile)
+	authFileContent, err := os.ReadFile(c.AuthFile)
 	if err != nil {
 		log.Errorf("auth file: %v", err)
 		return
@@ -195,18 +190,18 @@ func (c *Connection) connectionEventsProcessor(connection *zk.Conn, events <-cha
 			if shouldCloseConnection {
 				connection.Close()
 			}
-			log.Infof("zk conn: session for addr %v ended: %v", c.address, event)
+			log.Infof("zk conn: session for addr %v ended: %v", c.nodes, event)
 			return
 		}
-		log.Infof("zk conn: session for addr %v event: %v", c.address, event)
+		log.Infof("zk conn: session for addr %v event: %v", c.nodes, event)
 	}
 }
 
-func (c *Connection) dial(ctx context.Context, address string) (*zk.Conn, <-chan zk.Event, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeoutConnect)
+func (c *Connection) dial(ctx context.Context) (*zk.Conn, <-chan zk.Event, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.TimeoutConnect)
 	defer cancel()
 
-	connection, events, err := c.connect(address)
+	connection, events, err := c.connect(c.nodes.Servers())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -228,28 +223,26 @@ func (c *Connection) dial(ctx context.Context, address string) (*zk.Conn, <-chan
 	}
 }
 
-func (c *Connection) connect(address string) (*zk.Conn, <-chan zk.Event, error) {
-	servers := strings.Split(address, ",")
-
+func (c *Connection) connect(servers []string) (*zk.Conn, <-chan zk.Event, error) {
 	optionsDNSHostProvider := zk.WithHostProvider(&zk.SimpleDNSHostProvider{})
 
 	optionsDialer := zk.WithDialer(net.DialTimeout)
 
-	if certFile != "" && keyFile != "" {
-		if strings.Contains(address, ",") {
+	if c.CertFile != "" && c.KeyFile != "" {
+		if len(servers) > 1 {
 			log.Fatalf("This TLS zk code requires that the all the zk servers validate to a single server name.")
 		}
 
-		serverName := strings.Split(address, ":")[0]
+		serverName := strings.Split(servers[0], ":")[0]
 
-		log.Infof("Using TLS for %s/%s", address, serverName)
-		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		log.Infof("Using TLS for %s", serverName)
+		cert, err := tls.LoadX509KeyPair(c.CertFile, c.KeyFile)
 		if err != nil {
-			log.Fatalf("Unable to load cert %v and key %v, err: %v", certFile, keyFile, err)
+			log.Fatalf("Unable to load cert %v and key %v, err: %v", c.CertFile, c.KeyFile, err)
 		}
-		clientCACert, err := os.ReadFile(caFile)
+		clientCACert, err := os.ReadFile(c.CaFile)
 		if err != nil {
-			log.Fatalf("Unable to open ca cert %v, err %v", caFile, err)
+			log.Fatalf("Unable to open ca cert %v, err %v", c.CaFile, err)
 		}
 
 		clientCertPool := x509.NewCertPool()
@@ -270,5 +263,5 @@ func (c *Connection) connect(address string) (*zk.Conn, <-chan zk.Event, error) 
 		})
 	}
 
-	return zk.Connect(servers, timeoutKeepAlive, optionsDialer, optionsDNSHostProvider)
+	return zk.Connect(servers, c.TimeoutKeepAlive, optionsDialer, optionsDNSHostProvider)
 }

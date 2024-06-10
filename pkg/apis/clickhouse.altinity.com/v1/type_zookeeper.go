@@ -14,17 +14,42 @@
 
 package v1
 
-import "gopkg.in/d4l3k/messagediff.v1"
+import (
+	"gopkg.in/d4l3k/messagediff.v1"
+	"strings"
+)
 
 // ZookeeperConfig defines zookeeper section of .spec.configuration
 // Refers to
 // https://clickhouse.yandex/docs/en/single/index.html?#server-settings_zookeeper
 type ZookeeperConfig struct {
-	Nodes              []ChiZookeeperNode `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
-	SessionTimeoutMs   int                `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
-	OperationTimeoutMs int                `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
-	Root               string             `json:"root,omitempty"                 yaml:"root,omitempty"`
-	Identity           string             `json:"identity,omitempty"             yaml:"identity,omitempty"`
+	Nodes              ZookeeperNodes `json:"nodes,omitempty"                yaml:"nodes,omitempty"`
+	SessionTimeoutMs   int            `json:"session_timeout_ms,omitempty"   yaml:"session_timeout_ms,omitempty"`
+	OperationTimeoutMs int            `json:"operation_timeout_ms,omitempty" yaml:"operation_timeout_ms,omitempty"`
+	Root               string         `json:"root,omitempty"                 yaml:"root,omitempty"`
+	Identity           string         `json:"identity,omitempty"             yaml:"identity,omitempty"`
+}
+
+type ZookeeperNodes []ChiZookeeperNode
+
+func (n ZookeeperNodes) Len() int {
+	return len(n)
+}
+
+func (n ZookeeperNodes) First() ChiZookeeperNode {
+	return n[0]
+}
+
+func (n ZookeeperNodes) Servers() []string {
+	var servers []string
+	for _, node := range n {
+		servers = append(servers, node.String())
+	}
+	return servers
+}
+
+func (n ZookeeperNodes) String() string {
+	return strings.Join(n.Servers(), ",")
 }
 
 // NewZookeeperConfig creates new ZookeeperConfig object
