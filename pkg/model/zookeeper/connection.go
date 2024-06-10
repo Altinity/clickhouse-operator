@@ -62,7 +62,12 @@ func (c *Connection) Get(ctx context.Context, path string) (data []byte, stat *z
 	return
 }
 
-func (c *Connection) Exists(ctx context.Context, path string) (exists bool, stat *zk.Stat, err error) {
+func (c *Connection) Exists(ctx context.Context, path string) bool {
+	exists, _, _ := c.Details(ctx, path)
+	return exists
+}
+
+func (c *Connection) Details(ctx context.Context, path string) (exists bool, stat *zk.Stat, err error) {
 	err = c.retry(ctx, func(connection *zk.Conn) error {
 		exists, stat, err = connection.Exists(path)
 		return err
