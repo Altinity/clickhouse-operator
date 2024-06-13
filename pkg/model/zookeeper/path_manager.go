@@ -18,8 +18,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/go-zookeeper/zk"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/z-division/go-zookeeper/zk"
 )
 
 type PathManager struct {

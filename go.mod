@@ -30,6 +30,7 @@ require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Masterminds/semver/v3 v3.2.0
 	github.com/go-logr/logr v1.4.1
+	github.com/go-zookeeper/zk v1.0.3
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.4.0
 	github.com/imdario/mergo v0.3.15

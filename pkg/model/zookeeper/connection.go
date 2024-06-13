@@ -26,10 +26,10 @@ import (
 	"sync"
 	"time"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/z-division/go-zookeeper/zk"
+	"github.com/go-zookeeper/zk"
 	"golang.org/x/sync/semaphore"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
@@ -232,10 +232,7 @@ func (c *Connection) dial(ctx context.Context) (*zk.Conn, <-chan zk.Event, error
 }
 
 func (c *Connection) connect(servers []string) (*zk.Conn, <-chan zk.Event, error) {
-	optionsDNSHostProvider := zk.WithHostProvider(&zk.SimpleDNSHostProvider{})
-
 	optionsDialer := zk.WithDialer(net.DialTimeout)
-
 	if c.CertFile != "" && c.KeyFile != "" {
 		if len(servers) > 1 {
 			log.Fatal("This TLS zk code requires that the all the zk servers validate to a single server name.")
@@ -271,5 +268,8 @@ func (c *Connection) connect(servers []string) (*zk.Conn, <-chan zk.Event, error
 		})
 	}
 
+	// May need to implement manually &zk.SimpleDNSHostProvider{} from github.com/z-division/go-zookeeper/zk
+	hostProvider := &zk.DNSHostProvider{}
+	optionsDNSHostProvider := zk.WithHostProvider(hostProvider)
 	return zk.Connect(servers, c.TimeoutKeepAlive, optionsDialer, optionsDNSHostProvider)
 }
