@@ -628,9 +628,9 @@ def test_010(self):
         },
     )
     time.sleep(10)
-    with And("ClickHouse should complain regarding zookeeper path"):
-        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/'")
-        assert "/" in out
+    with And("ClickHouse should not complain regarding zookeeper path"):
+        out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
+        assert "/" == out
 
     delete_test_namespace()
 
@@ -1307,7 +1307,7 @@ def get_shards_from_remote_servers(chi, cluster, shell=None):
 def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wait = False):
     with Given(f"Cluster {cluster} is properly configured"):
         if current().context.operator_version >= "0.24" and force_wait == False:
-            print(f"operator ${current().context.operator_version} does not require extra wait, skipping check")
+            print(f"operator {current().context.operator_version} does not require extra wait, skipping check")
         else:
             with By(f"remote_servers have {num_shards} shards"):
                 assert num_shards == get_shards_from_remote_servers(chi, cluster)
@@ -3697,18 +3697,8 @@ def test_036(self):
             kubectl.launch(
                 f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
             )
-            # Give it some time to be deleted
-            time.sleep(10)
-            kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
-            kubectl.launch(
-                f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
-                ok_to_fail=True
-            )
-            kubectl.launch(f"delete pv {pv_name} --force &", shell=shell_2, ok_to_fail=True)
-            kubectl.launch(
-                f"""patch pv {pv_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
-                ok_to_fail=True
-            )
+            # restart pod to make sure volume is unmounted
+            kubectl.launch("delete pod chi-test-036-volume-re-provisioning-simple-0-0-0")
             # Give it some time to be deleted
             time.sleep(10)
 
@@ -3763,18 +3753,8 @@ def test_036(self):
             kubectl.launch(
                 f"""patch pvc {pvc_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'"""
             )
-            # Give it some time to be deleted
-            time.sleep(10)
-            kubectl.launch(f"delete pvc {pvc_name} --force &", shell=shell_2, ok_to_fail=True)
-            kubectl.launch(
-                f"""patch pvc {pvc_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
-                ok_to_fail=True
-            )
-            kubectl.launch(f"delete pvc {pvc_name} --force &", shell=shell_2, ok_to_fail=True)
-            kubectl.launch(
-                f"""patch pvc {pvc_name} --type='json' --patch='[{{"op":"remove","path":"/metadata/finalizers"}}]'""",
-                ok_to_fail=True
-            )
+            # restart pod to make sure volume is unmounted
+            kubectl.launch("delete pod chi-test-036-volume-re-provisioning-simple-0-0-0")
             # Give it some time to be deleted
             time.sleep(10)
 
@@ -3834,8 +3814,8 @@ def test_036(self):
     check_data_is_recovered("reconcile-after-PV-deleted")
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+       with By("deleting test namespace"):
+           delete_test_namespace()
 
 
 @TestScenario
