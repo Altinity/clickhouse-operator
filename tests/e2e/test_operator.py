@@ -1391,6 +1391,7 @@ def test_014_0(self):
         "test_local_uuid_014",
         "test_uuid_014",
         "test_mv2_014",
+        "test_view2_014",
     ]
     replicated_tables = [
         "default.test_local_014",
@@ -1412,6 +1413,8 @@ def test_014_0(self):
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)",
+        "CREATE DATABASE test_memory_014 ON CLUSTER '{cluster}' Engine = Memory",
+        "CREATE VIEW test_memory_014.test_view2_014 ON CLUSTER '{cluster}' AS SELECT * from system.tables",
     ]
 
     chi_version = clickhouse.query(chi_name, "select value from system.build_options where name='VERSION_INTEGER'")
@@ -3657,6 +3660,9 @@ def test_036(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
+        clickhouse.query(chi, "CREATE DATABASE test_memory_036 ON CLUSTER '{cluster}' Engine = Memory")
+        clickhouse.query(chi, "CREATE VIEW test_memory_036.test_view ON CLUSTER '{cluster}' AS SELECT * from system.tables")
+
     def delete_pv():
         with When("Delete PV", description="delete PV on replica 0"):
             # Prepare counters
@@ -3797,6 +3803,19 @@ def test_036(self):
                     sql="SELECT count(*) FROM test_local_036",
                 )
                 assert r == "10000", error()
+            with And("checking view in Memory engine exists"):
+                r = clickhouse.query(
+                    chi,
+                    pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
+                )
+                assert r == "1", error()
+                r = clickhouse.query(
+                    chi,
+                    pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
+                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
+                )
+                assert r == "1", error()
 
     delete_sts_and_pvc()
     check_data_is_recovered("reconcile-after-STS-and-PVC-deleted")
