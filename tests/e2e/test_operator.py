@@ -151,8 +151,8 @@ def test_005(self):
 def test_006(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:23.3"
-    new_version = "clickhouse/clickhouse-server:23.8"
+    old_version = "clickhouse/clickhouse-server:23.8"
+    new_version = "clickhouse/clickhouse-server:24.3"
     with Then("Create initial position"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
@@ -1805,7 +1805,7 @@ def test_016(self):
     with And("query_log should be disabled"):
         clickhouse.query(chi, sql="system flush logs")
         out = clickhouse.query_with_error(chi, sql="select count() from system.query_log")
-        assert "doesn't exist" in out or "does not exist" in out
+        assert "UNKNOWN_TABLE" in out
 
     with And("max_memory_usage should be 7000000000"):
         out = clickhouse.query(chi, sql="select value from system.settings where name='max_memory_usage'")
@@ -4072,7 +4072,7 @@ def test_040(self):
             "pod_volumes": {
                 "/var/lib/clickhouse",
             },
-            "pod_image": "clickhouse/clickhouse-server:23.8",
+            "pod_image": current().context.clickhouse_version,
             "do_not_delete": 1,
             "chi_status": "InProgress",
         },
