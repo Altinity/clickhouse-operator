@@ -785,17 +785,19 @@ def test_011_1(self):
             )
             assert out == "1000"
 
-        with And("User 'default' with NO access management enabled CAN NOT run SHOW USERS"):
+        with And("User 'user3' with NO access management enabled CAN NOT run SHOW GRANTS"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
-                "SHOW USERS",
+                "SHOW GRANTS FOR default", # Looks like a regression in 24.3, SHOW USERS works here
+                user="user3",
+                pwd="clickhouse_operator_password",
             )
             assert "ACCESS_DENIED" in out
 
-        with And("User 'user4' with access management enabled CAN run SHOW USERS"):
+        with And("User 'user4' with access management enabled CAN run SHOW GRANTS"):
             out = clickhouse.query(
                 "test-011-secured-cluster",
-                "SHOW USERS",
+                "SHOW GRANTS FOR default",
                 user="user4",
                 pwd="secret",
             )
