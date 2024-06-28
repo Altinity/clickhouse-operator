@@ -7,9 +7,10 @@ from requirements.requirements import *
 
 xfails = {
     # test_operator.py
+    # "/regression/e2e.test_operator/test_008_3*": [(Fail, "Test 008_3 sometimes fails due to unknown reasons")],
     #"/regression/e2e.test_operator/test_009_1*": [(Fail, "Test 009_1 sometimes fails due to unknown reasons")],
     # "/regression/e2e.test_operator/test_028*": [(Fail, "In case of: 1) operator restarted on the different IP and 2) long time before operator received event, this test would fail due to RollingUpdate option")],
-    "/regression/e2e.test_operator/test_032*": [(Fail, "Test 32 sometimes fails due to unknown reasons")],
+    # "/regression/e2e.test_operator/test_032*": [(Fail, "Test 32 sometimes fails due to unknown reasons")],
     "/regression/e2e.test_operator/test_041*": [(Fail, "Test 41 sometimes fails due to incorrect certificate")],
     "/regression/e2e.test_operator/test_048*": [(Fail, "Test 48 is not ready")],
     "/regression/e2e.test_operator/test_049*": [(Fail, "Test 49 is not ready")],

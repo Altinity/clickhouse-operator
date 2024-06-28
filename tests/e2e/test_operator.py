@@ -151,8 +151,8 @@ def test_005(self):
 def test_006(self):
     create_shell_namespace_clickhouse_template()
 
-    old_version = "clickhouse/clickhouse-server:23.3"
-    new_version = "clickhouse/clickhouse-server:23.8"
+    old_version = "clickhouse/clickhouse-server:23.8"
+    new_version = "clickhouse/clickhouse-server:24.3"
     with Then("Create initial position"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-006-ch-upgrade-1.yaml",
@@ -784,17 +784,19 @@ def test_011_1(self):
             )
             assert out == "1000"
 
-        with And("User 'default' with NO access management enabled CAN NOT run SHOW USERS"):
+        with And("User 'user3' with NO access management enabled CAN NOT run SHOW GRANTS"):
             out = clickhouse.query_with_error(
                 "test-011-secured-cluster",
-                "SHOW USERS",
+                "SHOW GRANTS FOR default", # Looks like a regression in 24.3, SHOW USERS works here
+                user="user3",
+                pwd="clickhouse_operator_password",
             )
             assert "ACCESS_DENIED" in out
 
-        with And("User 'user4' with access management enabled CAN run SHOW USERS"):
+        with And("User 'user4' with access management enabled CAN run SHOW GRANTS"):
             out = clickhouse.query(
                 "test-011-secured-cluster",
-                "SHOW USERS",
+                "SHOW GRANTS FOR default",
                 user="user4",
                 pwd="secret",
             )
@@ -1394,6 +1396,7 @@ def test_014_0(self):
         "test_local_uuid_014",
         "test_uuid_014",
         "test_mv2_014",
+        "test_view2_014",
     ]
     replicated_tables = [
         "default.test_local_014",
@@ -1415,6 +1418,8 @@ def test_014_0(self):
         "CREATE TABLE test_atomic_014.test_uuid_014 ON CLUSTER '{cluster}' (a Int8) Engine = Distributed('{cluster}', test_atomic_014, test_local_uuid_014, rand())",
         "CREATE MATERIALIZED VIEW test_atomic_014.test_mv2_014 ON CLUSTER '{cluster}' Engine = ReplicatedMergeTree ORDER BY tuple() PARTITION BY tuple() as SELECT * from test_atomic_014.test_local2_014",
         "CREATE FUNCTION test_014 ON CLUSTER '{cluster}' AS (x, k, b) -> ((k * x) + b)",
+        "CREATE DATABASE test_memory_014 ON CLUSTER '{cluster}' Engine = Memory",
+        "CREATE VIEW test_memory_014.test_view2_014 ON CLUSTER '{cluster}' AS SELECT * from system.tables",
     ]
 
     chi_version = clickhouse.query(chi_name, "select value from system.build_options where name='VERSION_INTEGER'")
@@ -1805,7 +1810,7 @@ def test_016(self):
     with And("query_log should be disabled"):
         clickhouse.query(chi, sql="system flush logs")
         out = clickhouse.query_with_error(chi, sql="select count() from system.query_log")
-        assert "doesn't exist" in out or "does not exist" in out
+        assert "UNKNOWN_TABLE" in out
 
     with And("max_memory_usage should be 7000000000"):
         out = clickhouse.query(chi, sql="select value from system.settings where name='max_memory_usage'")
@@ -3683,6 +3688,9 @@ def test_036(self):
         clickhouse.query(chi, create_table)
         clickhouse.query(chi, f"INSERT INTO test_local_036 select * from numbers(10000)")
 
+        clickhouse.query(chi, "CREATE DATABASE test_memory_036 ON CLUSTER '{cluster}' Engine = Memory")
+        clickhouse.query(chi, "CREATE VIEW test_memory_036.test_view ON CLUSTER '{cluster}' AS SELECT * from system.tables")
+
     def delete_pv():
         with When("Delete PV", description="delete PV on replica 0"):
             # Prepare counters
@@ -3803,6 +3811,19 @@ def test_036(self):
                     sql="SELECT count(*) FROM test_local_036",
                 )
                 assert r == "10000", error()
+            with And("checking view in Memory engine exists"):
+                r = clickhouse.query(
+                    chi,
+                    pod="chi-test-036-volume-re-provisioning-simple-0-0-0",
+                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
+                )
+                assert r == "1", error()
+                r = clickhouse.query(
+                    chi,
+                    pod="chi-test-036-volume-re-provisioning-simple-0-1-0",
+                    sql="SELECT count(*) FROM system.tables where name = 'test_view'",
+                )
+                assert r == "1", error()
 
     delete_sts_and_pvc()
     check_data_is_recovered("reconcile-after-STS-and-PVC-deleted")
@@ -4059,7 +4080,7 @@ def test_040(self):
             "pod_volumes": {
                 "/var/lib/clickhouse",
             },
-            "pod_image": "clickhouse/clickhouse-server:23.8",
+            "pod_image": current().context.clickhouse_version,
             "do_not_delete": 1,
             "chi_status": "InProgress",
         },

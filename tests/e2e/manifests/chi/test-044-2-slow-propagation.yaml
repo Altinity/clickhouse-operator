@@ -27,10 +27,22 @@ spec:
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.3
       - name: slow-replica
         spec:
           containers:
             - name: clickhouse-pod
-              image: clickhouse/clickhouse-server:23.8
+              image: clickhouse/clickhouse-server:24.3
+              command:
+                - "/bin/bash"
+                - "-c"
+                - "sleep 600 && /entrypoint.sh"
+              livenessProbe:
+                exec:
+                  command:
+                    - bash
+                    - -xc
+                    - 'echo 1'
+                initialDelaySeconds: 700
+                timeoutSeconds: 15
 
