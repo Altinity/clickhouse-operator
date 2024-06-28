@@ -4,14 +4,14 @@
 # SINGULAR=clickhouseinstallation
 # PLURAL=clickhouseinstallations
 # SHORT=chi
-# OPERATOR_VERSION=0.23.5
+# OPERATOR_VERSION=0.23.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -1230,14 +1230,14 @@ spec:
 # SINGULAR=clickhouseinstallationtemplate
 # PLURAL=clickhouseinstallationtemplates
 # SHORT=chit
-# OPERATOR_VERSION=0.23.5
+# OPERATOR_VERSION=0.23.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhouseinstallationtemplates.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2459,7 +2459,7 @@ kind: CustomResourceDefinition
 metadata:
   name: clickhouseoperatorconfigurations.clickhouse.altinity.com
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
 spec:
   group: clickhouse.altinity.com
   scope: Namespaced
@@ -2874,14 +2874,14 @@ spec:
 ---
 # Template Parameters:
 #
-# OPERATOR_VERSION=0.23.5
+# OPERATOR_VERSION=0.23.6
 #
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: clickhousekeeperinstallations.clickhouse-keeper.altinity.com
   labels:
-    clickhouse-keeper.altinity.com/chop: 0.23.5
+    clickhouse-keeper.altinity.com/chop: 0.23.6
 spec:
   group: clickhouse-keeper.altinity.com
   scope: Namespaced
@@ -3150,7 +3150,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
 ---
 # Template Parameters:
 #
@@ -3176,7 +3176,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
 rules:
 
   #
@@ -3395,7 +3395,7 @@ metadata:
   name: clickhouse-operator-${OPERATOR_NAMESPACE}
   #namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -3417,7 +3417,7 @@ metadata:
   name: etc-clickhouse-operator-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 data:
   config.yaml: |
@@ -3789,7 +3789,7 @@ metadata:
   name: etc-clickhouse-operator-confd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 data:
 ---
@@ -3805,7 +3805,7 @@ metadata:
   name: etc-clickhouse-operator-configd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 data:
   01-clickhouse-01-listen.xml: |
@@ -3904,7 +3904,7 @@ metadata:
   name: etc-clickhouse-operator-templatesd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 data:
   001-templates.json.example: |
@@ -4004,7 +4004,7 @@ metadata:
   name: etc-clickhouse-operator-usersd-files
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 data:
   01-clickhouse-operator-profile.xml: |
@@ -4059,7 +4059,7 @@ data:
 # Template parameters available:
 #   NAMESPACE=${OPERATOR_NAMESPACE}
 #   COMMENT=
-#   OPERATOR_VERSION=0.23.5
+#   OPERATOR_VERSION=0.23.6
 #   CH_USERNAME_SECRET_PLAIN=clickhouse_operator
 #   CH_PASSWORD_SECRET_PLAIN=clickhouse_operator_password
 #
@@ -4069,7 +4069,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 type: Opaque
 stringData:
@@ -4093,7 +4093,7 @@ metadata:
   name: clickhouse-operator
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 spec:
   replicas: 1
@@ -4280,7 +4280,7 @@ metadata:
   name: clickhouse-operator-metrics
   namespace: ${OPERATOR_NAMESPACE}
   labels:
-    clickhouse.altinity.com/chop: 0.23.5
+    clickhouse.altinity.com/chop: 0.23.6
     app: clickhouse-operator
 spec:
   ports:
