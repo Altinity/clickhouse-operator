@@ -74,10 +74,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var (
-	_ clientset.Interface = &Clientset{}
-	_ testing.FakeClient  = &Clientset{}
-)
+var _ clientset.Interface = &Clientset{}
 
 // ClickhouseV1 retrieves the ClickhouseV1Client
 func (c *Clientset) ClickhouseV1() clickhousev1.ClickhouseV1Interface {
