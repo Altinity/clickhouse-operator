@@ -1,9 +1,11 @@
 #!/bin/bash
 
-# The number of nodes to spin up. Defaults to 1.
+# The number of nodes to spin up.
+# Defaults to 1.
 NODES="${NODES:-"1"}"
 # --cpus='2':
-# Number of CPUs allocated to Kubernetes. Use "max" to use the maximum number of CPUs.
+# Number of CPUs allocated to Kubernetes.
+# Use "max" to use the maximum number of CPUs.
 CPUS="${CPUS:-"max"}"
 # The Kubernetes version that the minikube will use
 # Ex: v1.2.3, 'stable' for v1.23.3, 'latest' for v1.23.4-rc.0)
