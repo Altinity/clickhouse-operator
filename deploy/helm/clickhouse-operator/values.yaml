@@ -3,20 +3,29 @@ operator:
     # operator.image.repository -- image repository
     repository: altinity/clickhouse-operator
     # operator.image.tag -- image tag (chart's appVersion value will be used if not set)
+
     tag: ""
     # operator.image.pullPolicy -- image pull policy
+
     pullPolicy: IfNotPresent
   containerSecurityContext: {}
   # operator.resources -- custom resource configuration, look `kubectl explain pod.spec.containers.resources` for details
+
   resources: {}
   #  limits:
+
   #    cpu: 100m
+
   #    memory: 128Mi
+
   #  requests:
+
   #    cpu: 100m
+
   #    memory: 128Mi
 
   # operator.env -- additional environment variables for the clickhouse-operator container in deployment
+
   # possible format value [{"name": "SAMPLE", "value": "text"}]
   env: []
 metrics:
@@ -25,44 +34,61 @@ metrics:
     # metrics.image.repository -- image repository
     repository: altinity/metrics-exporter
     # metrics.image.tag -- image tag (chart's appVersion value will be used if not set)
+
     tag: ""
     # metrics.image.pullPolicy -- image pull policy
+
     pullPolicy: IfNotPresent
   containerSecurityContext: {}
   # metrics.resources -- custom resource configuration
+
   resources: {}
   #  limits:
+
   #    cpu: 100m
+
   #    memory: 128Mi
+
   #  requests:
+
   #    cpu: 100m
+
   #    memory: 128Mi
 
   # metrics.env -- additional environment variables for the deployment of metrics-exporter containers
+
   # possible format value [{"name": "SAMPLE", "value": "text"}]
   env: []
 # imagePullSecrets -- image pull secret for private images in clickhouse-operator pod
+
 #  possible value format [{"name":"your-secret-name"}]
+
 #  look `kubectl explain pod.spec.imagePullSecrets` for details
 imagePullSecrets: []
 # podLabels -- labels to add to the clickhouse-operator pod
+
 podLabels: {}
 # podAnnotations -- annotations to add to the clickhouse-operator pod, look `kubectl explain pod.spec.annotations` for details
+
 podAnnotations:
   prometheus.io/port: '8888'
   prometheus.io/scrape: 'true'
   clickhouse-operator-metrics/port: '9999'
   clickhouse-operator-metrics/scrape: 'true'
 # nameOverride -- override name of the chart
+
 nameOverride: ""
 # fullnameOverride -- full name of the chart.
+
 fullnameOverride: ""
 serviceAccount:
   # serviceAccount.create -- specifies whether a service account should be created
   create: true
   # serviceAccount.annotations -- annotations to add to the service account
+
   annotations: {}
   # serviceAccount.name -- the name of the service account to use; if not set and create is true, a name is generated using the fullname template
+
   name:
 rbac:
   # rbac.create -- specifies whether cluster roles and cluster role bindings should be created
@@ -71,23 +97,31 @@ secret:
   # secret.create -- create a secret with operator credentials
   create: true
   # secret.username -- operator credentials username
+
   username: clickhouse_operator
   # secret.password -- operator credentials password
+
   password: clickhouse_operator_password
 # nodeSelector -- node for scheduler pod assignment, look `kubectl explain pod.spec.nodeSelector` for details
+
 nodeSelector: {}
 # tolerations -- tolerations for scheduler pod assignment, look `kubectl explain pod.spec.tolerations` for details
+
 tolerations: []
 # affinity -- affinity for scheduler pod assignment, look `kubectl explain pod.spec.affinity` for details
+
 affinity: {}
 # podSecurityContext - operator deployment SecurityContext, look `kubectl explain pod.spec.securityContext` for details
+
 podSecurityContext: {}
 serviceMonitor:
   # serviceMonitor.enabled -- ServiceMonitor Custom resource is created for a (prometheus-operator)[https://github.com/prometheus-operator/prometheus-operator]
   enabled: false
   # serviceMonitor.additionalLabels -- additional labels for service monitor
+
   additionalLabels: {}
 # configs -- clickhouse-operator configs
+
 # @default -- check the values.yaml file for the config content, auto-generated from latest operator release
 configs:
   confdFiles: null
@@ -632,39 +666,67 @@ configs:
         </profiles>
       </yandex>
 # additionalResources -- list of additional resources to create (are processed via `tpl` function), useful for create ClickHouse clusters together with clickhouse-operator, look `kubectl explain chi` for details
+
 additionalResources: []
 #  - |
+
 #    apiVersion: v1
+
 #    kind: ConfigMap
+
 #    metadata:
+
 #      name: {{ include "altinity-clickhouse-operator.fullname" . }}-cm
+
 #      namespace: {{ .Release.Namespace }}
+
 #  - |
+
 #     apiVersion: v1
+
 #     kind: Secret
+
 #     metadata:
+
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-s
+
 #       namespace: {{ .Release.Namespace }}
+
 #     stringData:
+
 #       mykey: my-value
+
 #  - |
+
 #     apiVersion: clickhouse.altinity.com/v1
+
 #     kind: ClickHouseInstallation
+
 #     metadata:
+
 #       name: {{ include "altinity-clickhouse-operator.fullname" . }}-chi
+
 #       namespace: {{ .Release.Namespace }}
+
 #     spec:
+
 #       configuration:
+
 #         clusters:
+
 #         - name: default
+
 #           layout:
+
 #             shardsCount: 1
 dashboards:
   # dashboards.enabled -- provision grafana dashboards as secrets (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-6.33.1/charts/grafana/values.yaml#L679 )
   enabled: false
   # dashboards.additionalLabels -- labels to add to a secret with dashboards
+
   additionalLabels:
     grafana_dashboard: ""
   # dashboards.annotations -- annotations to add to a secret with dashboards
+
   annotations: {}
   grafana_folder: clickhouse

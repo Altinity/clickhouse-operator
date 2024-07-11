@@ -531,11 +531,7 @@ spec:
                       description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
                 users:
                   type: object
-                  description: |
-                    allows configure <yandex><users>..</users></yandex> section in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/users.d/`
-                    you can configure password hashed, authorization restrictions, database level security row filters etc.
-                    More details: https://clickhouse.tech/docs/en/operations/settings/settings-users/
-                    Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
+                  description: "allows configure <yandex><users>..</users></yandex> section in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/users.d/`\nyou can configure password hashed, authorization restrictions, database level security row filters etc.\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings-users/\nYour yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers\n\nany key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets\nsecret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml \nit not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle\n\nlook into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples\n\nany key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key \nin this case value from secret will write directly into XML tag during render *-usersd ConfigMap\n\nany key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key  \nin this case value from secret will write into environment variable and write to XML tag via from_env=XXX\n\nlook into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples\n"
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
@@ -558,10 +554,7 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                 settings: &TypeSettings
                   type: object
-                  description: |
-                    allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
-                    More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                    Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
+                  description: "allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings/\nYour yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings\n\nany key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets\nlook into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples\n\nsecret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml \nit not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle\n"
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 files: &TypeFiles
@@ -573,6 +566,12 @@ spec:
                     you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
                     each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                     More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
+
+                    any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
+                    secrets will mounted into pod as separate volume in /etc/clickhouse-server/secrets.d/
+                    and will automatically update when update secret
+                    it useful for pass SSL certificates from cert-manager or similar tool
+                    look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 clusters:
@@ -1750,11 +1749,7 @@ spec:
                       description: "optional access credentials string with `user:password` format used when use digest authorization in Zookeeper"
                 users:
                   type: object
-                  description: |
-                    allows configure <yandex><users>..</users></yandex> section in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/users.d/`
-                    you can configure password hashed, authorization restrictions, database level security row filters etc.
-                    More details: https://clickhouse.tech/docs/en/operations/settings/settings-users/
-                    Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers
+                  description: "allows configure <yandex><users>..</users></yandex> section in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/users.d/`\nyou can configure password hashed, authorization restrictions, database level security row filters etc.\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings-users/\nYour yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationusers\n\nany key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets\nsecret value will pass in `pod.spec.containers.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/users.d/chop-generated-users.xml \nit not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle\n\nlook into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples\n\nany key with prefix `k8s_secret_` shall has value with format namespace/secret/key or secret/key \nin this case value from secret will write directly into XML tag during render *-usersd ConfigMap\n\nany key with prefix `k8s_secret_env` shall has value with format namespace/secret/key or secret/key  \nin this case value from secret will write into environment variable and write to XML tag via from_env=XXX\n\nlook into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples\n"
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 profiles:
@@ -1777,10 +1772,7 @@ spec:
                   x-kubernetes-preserve-unknown-fields: true
                 settings: &TypeSettings
                   type: object
-                  description: |
-                    allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`
-                    More details: https://clickhouse.tech/docs/en/operations/settings/settings/
-                    Your yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings
+                  description: "allows configure `clickhouse-server` settings inside <yandex>...</yandex> tag in each `Pod` during generate `ConfigMap` which will mount in `/etc/clickhouse-server/config.d/`\nMore details: https://clickhouse.tech/docs/en/operations/settings/settings/\nYour yaml code will convert to XML, see examples https://github.com/Altinity/clickhouse-operator/blob/master/docs/custom_resource_explained.md#specconfigurationsettings\n\nany key could contains `valueFrom` with `secretKeyRef` which allow pass password from kubernetes secrets\nlook into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples\n\nsecret value will pass in `pod.spec.evn`, and generate with from_env=XXX in XML in /etc/clickhouse-server/config.d/chop-generated-settings.xml \nit not allow automatically updates when updates `secret`, change spec.taskID for manually trigger reconcile cycle\n"
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 files: &TypeFiles
@@ -1792,6 +1784,12 @@ spec:
                     you can use `!!binary |` and base64 for binary files, see details here https://yaml.org/type/binary.html
                     each key could contains prefix like USERS, COMMON, HOST or config.d, users.d, cond.d, wrong prefixes will ignored, subfolders also will ignored
                     More details: https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-05-files-nested.yaml
+
+                    any key could contains `valueFrom` with `secretKeyRef` which allow pass values from kubernetes secrets
+                    secrets will mounted into pod as separate volume in /etc/clickhouse-server/secrets.d/
+                    and will automatically update when update secret
+                    it useful for pass SSL certificates from cert-manager or similar tool
+                    look into https://github.com/Altinity/clickhouse-operator/blob/master/docs/chi-examples/05-settings-01-overview.yaml for examples
                   # nullable: true
                   x-kubernetes-preserve-unknown-fields: true
                 clusters:
@@ -3128,7 +3126,6 @@ metadata:
   namespace: ${OPERATOR_NAMESPACE}
   labels:
     clickhouse.altinity.com/chop: 0.24.0
-
 # Template Parameters:
 #
 # NAMESPACE=${OPERATOR_NAMESPACE}
