@@ -149,6 +149,10 @@ func (c *Creator) stsSetupHostAliases(statefulSet *apps.StatefulSet, host *api.H
 			},
 		},
 	}
+	// Add hostAliases from PodTemplate if any
+	if podTemplate, ok := host.GetPodTemplate(); ok {
+		statefulSet.Spec.Template.Spec.HostAliases = append(statefulSet.Spec.Template.Spec.HostAliases, podTemplate.Spec.HostAliases...)
+	}
 }
 
 // stsAppContainerSetupTroubleshootingMode
