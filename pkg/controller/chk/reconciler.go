@@ -16,10 +16,6 @@ package chk
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"time"
 
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +28,12 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
+	hostPoller "github.com/altinity/clickhouse-operator/pkg/controller/chk/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	chkNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
@@ -213,7 +214,7 @@ func (r *Reconciler) reconcileInit(chk *apiChk.ClickHouseKeeperInstallation) {
 	r.stsReconciler = statefulset.NewStatefulSetReconciler(
 		announcer,
 		r.task,
-		NewHostStatefulSetPoller(poller.NewStatefulSetPoller(kube), kube),
+		hostPoller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(kube), kube),
 		namer,
 		storage.NewStorageReconciler(r.task, namer, kube.Storage()),
 		kube,

@@ -25,6 +25,8 @@ type Keeper struct {
 	kubeClient client.Client
 	namer      interfaces.INameManager
 
+	// Set of k8s components
+
 	deployment *DeploymentKeeper
 	event      *EventKeeper
 	pod        *PodKeeper
@@ -40,6 +42,8 @@ func NewKeeper(kubeClient client.Client, namer interfaces.INameManager) *Keeper 
 		kubeClient: kubeClient,
 		namer:      namer,
 
+		// Set of k8s components
+
 		deployment: NewDeploymentKeeper(kubeClient),
 		event:      NewEventKeeper(kubeClient),
 		pod:        NewPodKeeper(kubeClient, namer),
@@ -51,27 +55,42 @@ func NewKeeper(kubeClient client.Client, namer interfaces.INameManager) *Keeper 
 	}
 }
 
+// Deployment is a getter
 func (k *Keeper) Deployment() interfaces.IKubeDeployment {
 	return k.deployment
 }
+
+// Event is a getter
 func (k *Keeper) Event() interfaces.IKubeEvent {
 	return k.event
 }
+
+// Pod is a getter
 func (k *Keeper) Pod() interfaces.IKubePod {
 	return k.pod
 }
+
+// ReplicaSet is a getter
 func (k *Keeper) ReplicaSet() interfaces.IKubeReplicaSet {
 	return k.replicaSet
 }
+
+// Service is a getter
 func (k *Keeper) Service() interfaces.IKubeService {
 	return k.service
 }
+
+// STS is a getter
 func (k *Keeper) STS() interfaces.IKubeSTS {
 	return k.sts
 }
+
+// CRStatus is a getter
 func (k *Keeper) CRStatus() interfaces.IKubeCRStatus {
 	return k.crStatus
 }
+
+// Storage is a getter
 func (k *Keeper) Storage() interfaces.IKubeStoragePVC {
 	return k.pvc
 }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chk
+package poller
 
 import (
 	"context"
@@ -27,11 +27,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
+// HostStatefulSetPoller enriches StatefulSet poller with host capabilities
 type HostStatefulSetPoller struct {
 	*poller.StatefulSetPoller
 	interfaces.IKubeSTS
 }
 
+// NewHostStatefulSetPoller creates new HostStatefulSetPoller from StatefulSet poller
 func NewHostStatefulSetPoller(poller *poller.StatefulSetPoller, kube interfaces.IKube) *HostStatefulSetPoller {
 	return &HostStatefulSetPoller{
 		StatefulSetPoller: poller,
