@@ -12,40 +12,107 @@ OPERATOR_INSTALL="${OPERATOR_INSTALL:-"yes"}"
 ONLY="${ONLY:-"*"}"
 MINIKUBE_RESET="${MINIKUBE_RESET:-""}"
 VERBOSITY="${VERBOSITY:-"2"}"
+# Possible options are:
+#  1. operator
+#  2. keeper
+#  3. metrics
+WHAT="${WHAT}"
 
-# replace | apply
+# Possible options are:
+#   1. replace
+#   2. apply
 KUBECTL_MODE="${KUBECTL_MODE:-"replace"}"
 
-echo "What would you like to start. Possible options:"
-echo "  1     - test operator"
-echo "  2     - test keeper"
-echo "  3     - test metrics"
-echo -n "Enter command choice (1, 2, 3)"
-read COMMAND
-# Trim EOL from the command received
-COMMAND=$(echo "${COMMAND}" | tr -d '\n\t\r ')
-echo "Provided command is: ${COMMAND}"
+#
+#
+#
+function select_test_goal() {
+    local specified_goal="${1}"
+    if [[ ! -z "${specified_goal}" ]]; then
+        echo "Having specified explicitly: ${specified_goal}"
+        return 0
+    else
+        echo "What would you like to start. Possible options:"
+        echo "  1     - test operator"
+        echo "  2     - test keeper"
+        echo "  3     - test metrics"
+        echo -n "Enter your choice (1, 2, 3): "
+        read COMMAND
+        # Trim EOL from the command received
+        COMMAND=$(echo "${COMMAND}" | tr -d '\n\t\r ')
+        case "${COMMAND}" in
+        "1")
+            echo "picking operator"
+            return 1
+            ;;
+        "2")
+            echo "piking keeper"
+            return 2
+            ;;
+        "3")
+            echo "picking metrics"
+            return 3
+            ;;
+        *)
+            echo "don't know what '${COMMAND}' is, so picking operator"
+            return 1
+            ;;
+        esac
+    fi
+}
+
+#
+#
+#
+function goal_name() {
+    local goal_code=${1}
+    case "${goal_code}" in
+        "0")
+            echo "${WHAT}"
+            ;;
+        "1")
+            echo "operator"
+            ;;
+        "2")
+            echo "keeper"
+            ;;
+        "3")
+            echo "metrics"
+            ;;
+        *)
+            echo "operator"
+            ;;
+    esac
+}
+
+select_test_goal "${WHAT}"
+WHAT=$(goal_name $?)
+
+echo "Provided command is: ${WHAT}"
 echo -n "Which means we are going to "
-case "${COMMAND}" in
-    "1")
+case "${WHAT}" in
+    "operator")
         DEFAULT_EXECUTABLE="run_tests_operator.sh"
         echo "test OPERATOR"
         ;;
-    "2")
+    "keeper")
         DEFAULT_EXECUTABLE="run_tests_keeper.sh"
         echo "test KEEPER"
         ;;
-    "3")
+    "metrics")
         DEFAULT_EXECUTABLE="run_tests_metrics.sh"
         echo "test METRICS"
         ;;
     *)
-        echo "test OPERATOR"
+        echo "exit because I do not know what '${WHAT}' is"
+        exit 1
         ;;
 esac
 
-read -p "Press enter to start new release"
-echo "Starting new release: ${NEW_RELEASE}"
+TIMEOUT=30
+echo "Press <ENTER> to start test immediately (if you agree with specified options)"
+echo "In case no input provided tests would start in ${TIMEOUT} seconds automatically"
+read -t ${TIMEOUT}
 
 EXECUTABLE="${EXECUTABLE:-"${DEFAULT_EXECUTABLE}"}"
 MINIKUBE_PRELOAD_IMAGES="${MINIKUBE_PRELOAD_IMAGES:-""}"
@@ -75,6 +142,9 @@ if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
     echo "images pre-loaded"
 fi
 
+#
+# Build images and run tests
+#
 echo "Build" && \
 VERBOSITY="${VERBOSITY}" ${CUR_DIR}/../../dev/image_build_all_dev.sh && \
 echo "Load images" && \
