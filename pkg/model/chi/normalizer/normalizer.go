@@ -18,7 +18,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -37,6 +36,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -98,7 +98,7 @@ func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSub
 }
 
 func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
-	return managers.CreateCustomResource(managers.CustomResourceCHI)
+	return managers.CreateCustomResource(managers.CustomResourceCHI).(*api.ClickHouseInstallation)
 }
 
 func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {

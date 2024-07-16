@@ -15,9 +15,8 @@
 package normalizer
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"strings"
-
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -26,24 +25,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 )
 
-// NormalizerContext specifies CHI-related normalization context
-type NormalizerContext struct {
-	// chk specifies current CHK being normalized
-	chk *apiChk.ClickHouseKeeperInstallation
-	// options specifies normalization options
-	options *normalizer.Options
-}
-
-// NewNormalizerContext creates new NormalizerContext
-func NewNormalizerContext(options *normalizer.Options) *NormalizerContext {
-	return &NormalizerContext{
-		options: options,
-	}
-}
-
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	ctx *NormalizerContext
+	ctx *Context
 }
 
 // NewNormalizer creates new normalizer
@@ -51,50 +35,93 @@ func NewNormalizer() *Normalizer {
 	return &Normalizer{}
 }
 
-func newCHK() *apiChk.ClickHouseKeeperInstallation {
-	return &apiChk.ClickHouseKeeperInstallation{
-		TypeMeta: meta.TypeMeta{
-			Kind:       apiChk.ClickHouseKeeperInstallationCRDResourceKind,
-			APIVersion: apiChk.SchemeGroupVersion.String(),
-		},
+// CreateTemplatedCHK produces ready-to-use CHK object
+func (n *Normalizer) CreateTemplatedCHK(subj *apiChk.ClickHouseKeeperInstallation, options *normalizer.Options) (
+	*apiChk.ClickHouseKeeperInstallation,
+	error,
+) {
+	// Normalization starts with a new context
+	n.buildContext(options)
+	// Ensure normalization subject presence
+	subj = n.ensureSubject(subj)
+	// Build target from all templates and subject
+	n.buildTargetFromTemplates(subj)
+	// And launch normalization of the whole stack
+	return n.normalizeTarget()
+}
+
+func (n *Normalizer) buildContext(options *normalizer.Options) {
+	n.ctx = NewContext(options)
+}
+
+func (n *Normalizer) buildTargetFromTemplates(subj *apiChk.ClickHouseKeeperInstallation) {
+	// Create new target that will be populated with data during normalization process
+	n.ctx.SetTarget(n.createTarget())
+
+	// At this moment we have target available - is either newly created or a system-wide template
+
+	// Apply templates - both auto and explicitly requested - on top of target
+	//n.applyTemplatesOnTarget(subj)
+
+	// After all templates applied, place provided 'subject' on top of the whole stack (target)
+	n.ctx.GetTarget().MergeFrom(subj, apiChi.MergeTypeOverrideByNonEmptyValues)
+}
+
+func (n *Normalizer) createTarget() *apiChk.ClickHouseKeeperInstallation {
+	//if n.HasTargetTemplate() {
+	//	// Template specified - start with template
+	//	return n.GetTargetTemplate().DeepCopy()
+	//} else {
+	//	// No template specified - start with clear page
+	return n.newSubject()
+	//}
+}
+
+func (n *Normalizer) newSubject() *apiChk.ClickHouseKeeperInstallation {
+	return managers.CreateCustomResource(managers.CustomResourceCHK).(*apiChk.ClickHouseKeeperInstallation)
+}
+
+func (n *Normalizer) ensureSubject(subj *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+	switch {
+	case subj == nil:
+		// No subject specified - meaning we are normalizing non-existing subject and it should have no clusters inside
+		// Need to create subject
+		n.ctx.Options().WithDefaultCluster = false
+		return n.newSubject()
+	default:
+		// Subject specified - meaning we are normalizing existing subject and we need to ensure default cluster presence
+		n.ctx.Options().WithDefaultCluster = true
+		return subj
 	}
 }
 
-// CreateTemplatedCHK produces ready-to-use CHK object
-func (n *Normalizer) CreateTemplatedCHK(
-	chk *apiChk.ClickHouseKeeperInstallation,
-	options *normalizer.Options,
-) (*apiChk.ClickHouseKeeperInstallation, error) {
-	// New CHI starts with new context
-	n.ctx = NewNormalizerContext(options)
+// normalizeTarget normalizes target
+func (n *Normalizer) normalizeTarget() (*apiChk.ClickHouseKeeperInstallation, error) {
+	n.normalizeSpec()
+	n.finalize()
+	n.fillStatus()
 
-	if chk == nil {
-		// No CHK specified - meaning we are building over provided 'empty' CHK with no clusters inside
-		chk = newCHK()
-		n.ctx.options.WithDefaultCluster = false
-	} else {
-		// Even in case having CHI provided, we need to insert default cluster in case no clusters specified
-		n.ctx.options.WithDefaultCluster = true
-	}
-
-	n.ctx.chk = newCHK()
-
-	n.ctx.chk.MergeFrom(chk, apiChi.MergeTypeOverrideByNonEmptyValues)
-
-	return n.normalize()
+	return n.ctx.GetTarget(), nil
 }
 
 // normalize normalizes whole CHI.
 // Returns normalized CHI
-func (n *Normalizer) normalize() (*apiChk.ClickHouseKeeperInstallation, error) {
+func (n *Normalizer) normalizeSpec() {
 	// Walk over ChiSpec datatype fields
-	n.ctx.chk.Spec.Configuration = n.normalizeConfiguration(n.ctx.chk.Spec.Configuration)
-	n.ctx.chk.Spec.Templates = n.normalizeTemplates(n.ctx.chk.Spec.Templates)
+	n.ctx.GetTarget().GetSpec().Configuration = n.normalizeConfiguration(n.ctx.chk.Spec.Configuration)
+	n.ctx.GetTarget().GetSpec().Templates = n.normalizeTemplates(n.ctx.chk.Spec.Templates)
 	// UseTemplates already done
+}
 
-	n.fillStatus()
-
-	return n.ctx.chk, nil
+// finalize performs some finalization tasks, which should be done after CHI is normalized
+func (n *Normalizer) finalize() {
+	//n.ctx.GetTarget().Fill()
+	//n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
+	//	hostTemplate := n.hostGetHostTemplate(host)
+	//	hostApplyHostTemplate(host, hostTemplate)
+	//	return nil
+	//})
+	//n.fillCHIAddressInfo()
 }
 
 // fillStatus fills .status section of a CHI with values based on current CHI

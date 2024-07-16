@@ -15,6 +15,7 @@
 package managers
 
 import (
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -24,12 +25,15 @@ type CustomResourceType string
 
 const (
 	CustomResourceCHI CustomResourceType = "chi"
+	CustomResourceCHK CustomResourceType = "chk"
 )
 
-func CreateCustomResource(what CustomResourceType) *api.ClickHouseInstallation {
+func CreateCustomResource(what CustomResourceType) any {
 	switch what {
 	case CustomResourceCHI:
 		return createCHI()
+	case CustomResourceCHK:
+		return createCHK()
 	default:
 		return nil
 	}
@@ -40,6 +44,15 @@ func createCHI() *api.ClickHouseInstallation {
 		TypeMeta: meta.TypeMeta{
 			Kind:       api.ClickHouseInstallationCRDResourceKind,
 			APIVersion: api.SchemeGroupVersion.String(),
+		},
+	}
+}
+
+func createCHK() *apiChk.ClickHouseKeeperInstallation {
+	return &apiChk.ClickHouseKeeperInstallation{
+		TypeMeta: meta.TypeMeta{
+			Kind:       apiChk.ClickHouseKeeperInstallationCRDResourceKind,
+			APIVersion: apiChk.SchemeGroupVersion.String(),
 		},
 	}
 }
