@@ -1,6 +1,6 @@
 {{- if .Values.dashboards.enabled }}
 apiVersion: v1
-kind: Secret
+kind: ConfigMap
 metadata:
   name: {{ include "altinity-clickhouse-operator.fullname" . }}-dashboards
   namespace: {{ .Release.Namespace }}
@@ -13,7 +13,6 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
 {{- end }}
-type: Opaque
 data:
 {{- range $path, $_ := .Files.Glob "files/*.json" }}
   {{ $path | trimPrefix "files/" }}: {{ $.Files.Get $path | b64enc -}}

@@ -720,7 +720,7 @@ additionalResources: []
 
 #             shardsCount: 1
 dashboards:
-  # dashboards.enabled -- provision grafana dashboards as secrets (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-6.33.1/charts/grafana/values.yaml#L679 )
+  # dashboards.enabled -- provision grafana dashboards as configMaps (can be synced by grafana dashboards sidecar https://github.com/grafana/helm-charts/blob/grafana-8.3.4/charts/grafana/values.yaml#L778 )
   enabled: false
   # dashboards.additionalLabels -- labels to add to a secret with dashboards
 
