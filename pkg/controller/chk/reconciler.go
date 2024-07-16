@@ -16,7 +16,6 @@ package chk
 
 import (
 	"context"
-	"time"
 
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,16 +33,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
-	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	chkNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
-
-// ReconcileTime is the delay between reconciliations
-const ReconcileTime = 30 * time.Second
 
 // Reconciler reconciles a ClickHouseKeeper object
 type Reconciler struct {
@@ -174,7 +170,7 @@ func (r *Reconciler) reconcile(
 
 // normalize
 func (r *Reconciler) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := chkNormalizer.NewNormalizer().CreateTemplatedCHK(c, chiNormalizer.NewOptions())
+	chk, err := chkNormalizer.NewNormalizer().CreateTemplatedCHK(c, normalizer.NewOptions())
 	if err != nil {
 		log.V(1).
 			M(chk).F().

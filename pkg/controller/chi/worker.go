@@ -18,9 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -35,6 +32,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
@@ -43,6 +43,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	normalizerCommon "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -312,7 +313,7 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *ReconcilePod) err
 }
 
 func (w *worker) processDropDns(ctx context.Context, cmd *DropDns) error {
-	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, normalizer.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(cmd.initiator, false, normalizerCommon.NewOptions()); err == nil {
 		w.a.V(2).M(cmd.initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
@@ -355,7 +356,7 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 // normalize
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 
-	chi, err := w.normalizer.CreateTemplatedCHI(c, normalizer.NewOptions())
+	chi, err := w.normalizer.CreateTemplatedCHI(c, normalizerCommon.NewOptions())
 	if err != nil {
 		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -365,7 +366,7 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-	opts := normalizer.NewOptions()
+	opts := normalizerCommon.NewOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
 	chi, err = w.normalizer.CreateTemplatedCHI(c, opts)
@@ -411,11 +412,11 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 
-	if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, normalizer.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, normalizerCommon.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := normalizer.NewOptions()
+		opts := normalizerCommon.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
@@ -709,11 +710,11 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	w.a.V(1).M(_chi).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(_chi, true, normalizer.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(_chi, true, normalizerCommon.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := normalizer.NewOptions()
+		opts := normalizerCommon.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(_chi, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
@@ -1316,7 +1317,7 @@ func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) er
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(meta meta.Object, isCHI bool, options *normalizer.Options) (*api.ClickHouseInstallation, error) {
+func (w *worker) createCHIFromObjectMeta(meta meta.Object, isCHI bool, options *normalizerCommon.Options) (*api.ClickHouseInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()
 

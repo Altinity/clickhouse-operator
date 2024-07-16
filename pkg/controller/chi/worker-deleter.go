@@ -16,8 +16,6 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -26,11 +24,13 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )

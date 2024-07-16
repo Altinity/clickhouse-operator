@@ -18,6 +18,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -41,17 +42,17 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type secretGet func(namespace, name string) (*core.Secret, error)
+type secretGetter func(namespace, name string) (*core.Secret, error)
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	secretGet secretGet
+	secretGet secretGetter
 	ctx       *Context
 	namer     interfaces.INameManager
 }
 
 // NewNormalizer creates new normalizer
-func NewNormalizer(secretGet secretGet) *Normalizer {
+func NewNormalizer(secretGet secretGetter) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
 		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),
@@ -59,7 +60,7 @@ func NewNormalizer(secretGet secretGet) *Normalizer {
 }
 
 // CreateTemplatedCHI produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedCHI(subj *api.ClickHouseInstallation, options *Options) (
+func (n *Normalizer) CreateTemplatedCHI(subj *api.ClickHouseInstallation, options *normalizer.Options) (
 	*api.ClickHouseInstallation,
 	error,
 ) {
@@ -73,7 +74,7 @@ func (n *Normalizer) CreateTemplatedCHI(subj *api.ClickHouseInstallation, option
 	return n.normalizeTarget()
 }
 
-func (n *Normalizer) buildContext(options *Options) {
+func (n *Normalizer) buildContext(options *normalizer.Options) {
 	n.ctx = NewContext(options)
 }
 

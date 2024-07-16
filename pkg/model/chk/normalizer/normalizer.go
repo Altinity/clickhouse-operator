@@ -15,15 +15,15 @@
 package normalizer
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"strings"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 )
 
 // NormalizerContext specifies CHI-related normalization context

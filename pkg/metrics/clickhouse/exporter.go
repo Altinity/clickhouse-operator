@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"net/http"
 	"sync"
 	"time"
@@ -30,11 +29,13 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopAPI "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	normalizerCommon "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
 
 // Exporter implements prometheus.Collector interface
@@ -401,7 +402,7 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		normalizer := chiNormalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
 			return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 		})
-		normalized, _ := normalizer.CreateTemplatedCHI(chi, chiNormalizer.NewOptions())
+		normalized, _ := normalizer.CreateTemplatedCHI(chi, normalizerCommon.NewOptions())
 
 		watchedCHI := metrics.NewWatchedCHI(normalized)
 		e.updateWatched(watchedCHI)
