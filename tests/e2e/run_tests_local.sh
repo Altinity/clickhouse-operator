@@ -19,8 +19,8 @@ VERBOSITY="${VERBOSITY:-"2"}"
 WHAT="${WHAT}"
 
 # Possible options are:
-#   1. replace
-#   2. apply
+#  1. replace
+#  2. apply
 KUBECTL_MODE="${KUBECTL_MODE:-"replace"}"
 
 #
@@ -117,8 +117,8 @@ read -t ${TIMEOUT}
 EXECUTABLE="${EXECUTABLE:-"${DEFAULT_EXECUTABLE}"}"
 MINIKUBE_PRELOAD_IMAGES="${MINIKUBE_PRELOAD_IMAGES:-""}"
 
-if [[ ! -z ${MINIKUBE_RESET} ]]; then
-    SKIP_K9S=yes ./run_minikube_reset.sh
+if [[ ! -z "${MINIKUBE_RESET}" ]]; then
+    SKIP_K9S="yes" ./run_minikube_reset.sh
 fi
 
 if [[ ! -z "${MINIKUBE_PRELOAD_IMAGES}" ]]; then
