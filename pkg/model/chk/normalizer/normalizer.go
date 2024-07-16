@@ -15,14 +15,12 @@
 package normalizer
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
-	"strings"
-
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 )
 
 // Normalizer specifies structures normalizer
@@ -139,12 +137,12 @@ func (n *Normalizer) fillStatus() {
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
-func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern string) string {
-	if strings.Count(namespaceDomainPattern, "%s") > 1 {
-		return ""
-	}
-	return namespaceDomainPattern
-}
+//func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern string) string {
+//	if strings.Count(namespaceDomainPattern, "%s") > 1 {
+//		return ""
+//	}
+//	return namespaceDomainPattern
+//}
 
 // normalizeConfiguration normalizes .spec.configuration
 func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiChk.ChkConfiguration {
