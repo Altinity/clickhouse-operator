@@ -17,7 +17,10 @@ package normalizer
 import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -30,7 +33,8 @@ type Normalizer struct {
 
 // NewNormalizer creates new normalizer
 func NewNormalizer() *Normalizer {
-	return &Normalizer{}
+	return &Normalizer{
+	}
 }
 
 // CreateTemplatedCHK produces ready-to-use CHK object
@@ -65,13 +69,9 @@ func (n *Normalizer) buildTargetFromTemplates(subj *apiChk.ClickHouseKeeperInsta
 	n.ctx.GetTarget().MergeFrom(subj, apiChi.MergeTypeOverrideByNonEmptyValues)
 }
 
-func (n *Normalizer) createTarget() *apiChk.ClickHouseKeeperInstallation {
-	//if n.HasTargetTemplate() {
-	//	// Template specified - start with template
-	//	return n.GetTargetTemplate().DeepCopy()
-	//} else {
-	//	// No template specified - start with clear page
-	return n.newSubject()
+func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSubject) {
+	//for _, template := range templatesNormalizer.ApplyTemplates(n.ctx.GetTarget(), subj) {
+	//	n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	//}
 }
 
@@ -93,6 +93,25 @@ func (n *Normalizer) ensureSubject(subj *apiChk.ClickHouseKeeperInstallation) *a
 	}
 }
 
+func (n *Normalizer) GetTargetTemplate() *apiChk.ClickHouseKeeperInstallation {
+	//return chop.Config().Template.CHI.Runtime.Template
+	return nil
+}
+
+func (n *Normalizer) HasTargetTemplate() bool {
+	return n.GetTargetTemplate() != nil
+}
+
+func (n *Normalizer) createTarget() *apiChk.ClickHouseKeeperInstallation {
+	//if n.HasTargetTemplate() {
+	//	// Template specified - start with template
+	//	return n.GetTargetTemplate().DeepCopy()
+	//} else {
+	//	// No template specified - start with clear page
+	return n.newSubject()
+	//}
+}
+
 // normalizeTarget normalizes target
 func (n *Normalizer) normalizeTarget() (*apiChk.ClickHouseKeeperInstallation, error) {
 	n.normalizeSpec()
@@ -102,8 +121,6 @@ func (n *Normalizer) normalizeTarget() (*apiChk.ClickHouseKeeperInstallation, er
 	return n.ctx.GetTarget(), nil
 }
 
-// normalize normalizes whole CHI.
-// Returns normalized CHI
 func (n *Normalizer) normalizeSpec() {
 	// Walk over ChiSpec datatype fields
 	n.ctx.GetTarget().GetSpec().Configuration = n.normalizeConfiguration(n.ctx.chk.Spec.Configuration)
@@ -146,7 +163,6 @@ func (n *Normalizer) fillStatus() {
 
 // normalizeConfiguration normalizes .spec.configuration
 func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiChk.ChkConfiguration {
-	// Ensure configuration
 	if conf == nil {
 		conf = apiChk.NewConfiguration()
 	}
@@ -158,26 +174,45 @@ func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiC
 // normalizeTemplates normalizes .spec.templates
 func (n *Normalizer) normalizeTemplates(templates *apiChi.Templates) *apiChi.Templates {
 	if templates == nil {
-		//templates = apiChi.NewChiTemplates()
 		return nil
 	}
 
-	for i := range templates.PodTemplates {
-		podTemplate := &templates.PodTemplates[i]
-		n.normalizePodTemplate(podTemplate)
-	}
-
-	for i := range templates.VolumeClaimTemplates {
-		vcTemplate := &templates.VolumeClaimTemplates[i]
-		n.normalizeVolumeClaimTemplate(vcTemplate)
-	}
-
-	for i := range templates.ServiceTemplates {
-		serviceTemplate := &templates.ServiceTemplates[i]
-		n.normalizeServiceTemplate(serviceTemplate)
-	}
-
+	n.normalizeHostTemplates(templates)
+	n.normalizePodTemplates(templates)
+	n.normalizeVolumeClaimTemplates(templates)
+	n.normalizeServiceTemplates(templates)
 	return templates
+}
+
+func (n *Normalizer) normalizeHostTemplates(templates *apiChi.Templates) {
+	for i := range templates.HostTemplates {
+		n.normalizeHostTemplate(&templates.HostTemplates[i])
+	}
+}
+
+func (n *Normalizer) normalizePodTemplates(templates *apiChi.Templates) {
+	for i := range templates.PodTemplates {
+		n.normalizePodTemplate(&templates.PodTemplates[i])
+	}
+}
+
+func (n *Normalizer) normalizeVolumeClaimTemplates(templates *apiChi.Templates) {
+	for i := range templates.VolumeClaimTemplates {
+		n.normalizeVolumeClaimTemplate(&templates.VolumeClaimTemplates[i])
+	}
+}
+
+func (n *Normalizer) normalizeServiceTemplates(templates *apiChi.Templates) {
+	for i := range templates.ServiceTemplates {
+		n.normalizeServiceTemplate(&templates.ServiceTemplates[i])
+	}
+}
+
+// normalizeHostTemplate normalizes .spec.templates.hostTemplates
+func (n *Normalizer) normalizeHostTemplate(template *apiChi.HostTemplate) {
+	templates.NormalizeHostTemplate(template)
+	// Introduce HostTemplate into Index
+	n.ctx.GetTarget().GetSpec().Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
@@ -210,35 +245,29 @@ func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ServiceTemplate) 
 func (n *Normalizer) normalizeClusters(clusters []*apiChk.ChkCluster) []*apiChk.ChkCluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
-
 	// Normalize all clusters
 	for i := range clusters {
 		clusters[i] = n.normalizeCluster(clusters[i])
 	}
-
 	return clusters
-}
-
-// newDefaultCluster
-func (n *Normalizer) newDefaultCluster() *apiChk.ChkCluster {
-	return &apiChk.ChkCluster{
-		Name: "cluster",
-	}
 }
 
 // ensureClusters
 func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.ChkCluster {
+	// May be we have cluster(s) available
 	if len(clusters) > 0 {
 		return clusters
 	}
 
+	// In case no clusters available, we may want to create a default one
 	if n.ctx.options.WithDefaultCluster {
 		return []*apiChk.ChkCluster{
-			n.newDefaultCluster(),
+			commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*apiChk.ChkCluster),
 		}
 	}
 
-	return []*apiChk.ChkCluster{}
+	// Nope, no clusters expected
+	return nil
 }
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
@@ -253,7 +282,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *
 func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkCluster {
 	// Ensure cluster
 	if cluster == nil {
-		cluster = n.newDefaultCluster()
+		cluster = commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*apiChk.ChkCluster)
 	}
 
 	// Ensure layout
