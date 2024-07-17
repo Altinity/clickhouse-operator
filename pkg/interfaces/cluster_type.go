@@ -18,4 +18,5 @@ type ClusterType string
 
 const (
 	ClusterCHIDefault ClusterType = "chi cluster default"
+	ClusterCHKDefault ClusterType = "chk cluster default"
 )
