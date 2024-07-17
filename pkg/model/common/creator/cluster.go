@@ -15,22 +15,32 @@
 package creator
 
 import (
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-func CreateCluster(what interfaces.ClusterType) *api.Cluster {
+func CreateCluster(what interfaces.ClusterType) any {
 	switch what {
 	case interfaces.ClusterCHIDefault:
-		return createDefaultCluster()
+		return createDefaultClusterCHI()
+	case interfaces.ClusterCHKDefault:
+		return createDefaultClusterCHK()
 	default:
 		return nil
 	}
 }
 
-// createDefaultCluster
-func createDefaultCluster() *api.Cluster {
+// createDefaultClusterCHI
+func createDefaultClusterCHI() *api.Cluster {
 	return &api.Cluster{
+		Name: "cluster",
+	}
+}
+
+// createDefaultClusterCHK
+func createDefaultClusterCHK() *apiChk.ChkCluster {
+	return &apiChk.ChkCluster{
 		Name: "cluster",
 	}
 }
