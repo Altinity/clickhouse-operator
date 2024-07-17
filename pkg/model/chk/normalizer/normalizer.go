@@ -33,8 +33,7 @@ type Normalizer struct {
 
 // NewNormalizer creates new normalizer
 func NewNormalizer() *Normalizer {
-	return &Normalizer{
-	}
+	return &Normalizer{}
 }
 
 // CreateTemplatedCHK produces ready-to-use CHK object
