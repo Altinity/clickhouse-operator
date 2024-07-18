@@ -855,11 +855,11 @@ def test_011_2(self):
             )
 
             with Then("Wait until configuration is reloaded by ClickHouse"):
-                time.sleep(60)
+                time.sleep(90)
 
             with Then("Connection to localhost should succeed with default user and no password"):
                 out = clickhouse.query_with_error("test-011-secured-default", "select 'OK'")
-                assert out == "OK"
+                assert out == "OK", error()
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
