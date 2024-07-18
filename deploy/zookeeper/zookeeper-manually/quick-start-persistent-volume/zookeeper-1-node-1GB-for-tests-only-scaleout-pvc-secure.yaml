@@ -385,26 +385,26 @@ data:
     sed -i 's/# keyUsage = cRLSign, keyCertSign/keyUsage = cRLSign, keyCertSign/' /usr/lib/ssl/openssl.cnf 
     cat << EOF > /usr/local/share/ca-certificates/my_own_ca.crt 
     -----BEGIN CERTIFICATE-----
-    MIIDljCCAn6gAwIBAgIUWCSwiZeH4eBrc+WT3cYqX6pUrjYwDQYJKoZIhvcNAQEL
+    MIIDljCCAn6gAwIBAgIUNguwa/wXOis1xKoKbTMsmlYg9B4wDQYJKoZIhvcNAQEL
     BQAwVDELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
-    GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDENMAsGA1UEAwwEcm9vdDAeFw0yMzA2
-    MDcxMTE5MTRaFw0zMzA2MDQxMTE5MTRaMFQxCzAJBgNVBAYTAkFVMRMwEQYDVQQI
+    GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDENMAsGA1UEAwwEcm9vdDAeFw0yNDA3
+    MTYxMzI2NDVaFw0zNDA3MTQxMzI2NDVaMFQxCzAJBgNVBAYTAkFVMRMwEQYDVQQI
     DApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQx
-    DTALBgNVBAMMBHJvb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCI
-    fMKmdtx5BGna7LqGdu0C+xacNb6TjZ10SeEbeznRJ+axHG5UgyVWspN2w6PX4CUH
-    gHNDBfYbeNyfJ2HQSCprxDhxv9p9s0wfta70S1hEzsuNjgKtk8vm7f6B4SkZx56A
-    OumnENzGlx0oiGEW7qalez5QPa5veUbFDnmIBk6VLn6ILPXTKBgk22RT0I4fCq73
-    RKdtJFirPjnnOl16ognN+0I3Okfu05j52wi1HqK8L6bI+Gw02Ke9Zz0UtG0ssdcj
-    OQPzslTie5ZzpGcytv6WxpBPYKFcCNQrzyE8AUlNnOzxwIEZcE8Nx/SiT6W9NAIJ
-    PiPiEZcHfxid/0a1B15NAgMBAAGjYDBeMB0GA1UdDgQWBBTiZPq3TeMW9fr4syd0
-    F34J4x9SBDAfBgNVHSMEGDAWgBTiZPq3TeMW9fr4syd0F34J4x9SBDAPBgNVHRMB
-    Af8EBTADAQH/MAsGA1UdDwQEAwIBBjANBgkqhkiG9w0BAQsFAAOCAQEAKGuPxfzt
-    +268pzmxpYDMoMdKcTZ3JduhBBPsQKHV+ShV4EiEQ/0IduHnnjtzFIBBzVyYe8kt
-    FH/dI3F0umhNIxRtkchr3R26DfNhpBYzlE4Sm6WTeCGsYdYxhWU7deB72KmG2jiU
-    w4/ZfYp/JCM0TQ/uZpetYmoFwpPfNMqAAyiDiWiL8Fheky2VL7l51FMPe5H49BMY
-    JG6QmpCooEQ34Fxbc2FifyjcBagfJAUDdnxs9lgEYquY8uaEb0zBF9rtZH3IpJ1o
-    H+5YdoDBJBlV/EtJsET8wzQr/bJIodUs1qSSreL3QiXgAy9X9HFeEcN0dhReR8M+
-    /Fa9ElbT45l+4g==
+    DTALBgNVBAMMBHJvb3QwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDa
+    WtbAlWpLc0l4JFp5mvD/+xIR7CZiWDJpzulMh2kr/u8Chc5D1lcbr21KNJ39wJ2U
+    u4Ofbnn0ZAvE91LJvXoKrNS2EebeJU0p0Y5TzpXQDaF/enIjUW+NJmlFxfLUHner
+    O/lRoxmi4mKHcohZ05b8cIQ6JJOiZoD3n5lz8BIMSouBwdzaU8N4Utp4CwSD0NyK
+    I4xiWZrykwc/L2Pkrp2BqwxJBI1k/sSnp1j+MYeUADR3VSDRb1ZDPewRHl5PAjiy
+    mQyE521JP8fnQiql5rHMXsZeFm2nQ4Afad/YvF9XAgGcQakCQzu3ENqO5TAOCO2v
+    2vBRajIqO2fVyJ+bp6rzAgMBAAGjYDBeMB0GA1UdDgQWBBTVtBWP7WUOJtGF2L/F
+    xMXrsBLb0jAfBgNVHSMEGDAWgBTVtBWP7WUOJtGF2L/FxMXrsBLb0jAPBgNVHRMB
+    Af8EBTADAQH/MAsGA1UdDwQEAwIBBjANBgkqhkiG9w0BAQsFAAOCAQEAMjOzAZfA
+    tUi1WUKV521lwOAeTASph2Dbj+WMVtVN0ESM8P216Xr6mCEKfaovXb+zUMeeHh+4
+    B48ViAbIhg4/pu2hlV7QIfqD45g7qkwC5s+VFImnIqgvhtRmabXCyNYR1FZQw4GH
+    o/1FxXJJIOnyNOxBxRTWYJtpGjNCtZUR88f0Sa1hTsaafOAJrWAbXm67lDjjZIr9
+    l7Tlnmp5Fa8nGq2p68amL0BW9uQvC5awV9RK4ie6kSV2ZYN24swcQAor3fiWx/KO
+    TnT5D4wa/5I1TEr/NeeSOtc9DoqKxD8TybNp+FjOlWvXN/+sSqHOe3ta/aAei8Wa
+    l3ziYEavXFbo6A==
     -----END CERTIFICATE-----
     EOF
     
@@ -412,32 +412,32 @@ data:
     
     cat << EOF > /my_own_ca.key 
     -----BEGIN PRIVATE KEY-----
-    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCIfMKmdtx5BGna
-    7LqGdu0C+xacNb6TjZ10SeEbeznRJ+axHG5UgyVWspN2w6PX4CUHgHNDBfYbeNyf
-    J2HQSCprxDhxv9p9s0wfta70S1hEzsuNjgKtk8vm7f6B4SkZx56AOumnENzGlx0o
-    iGEW7qalez5QPa5veUbFDnmIBk6VLn6ILPXTKBgk22RT0I4fCq73RKdtJFirPjnn
-    Ol16ognN+0I3Okfu05j52wi1HqK8L6bI+Gw02Ke9Zz0UtG0ssdcjOQPzslTie5Zz
-    pGcytv6WxpBPYKFcCNQrzyE8AUlNnOzxwIEZcE8Nx/SiT6W9NAIJPiPiEZcHfxid
-    /0a1B15NAgMBAAECggEAHpxwoZoV75RkU2P1n5PLq3f6BbXuFLTVxA+Py7SS7ox2
-    6nEYc57oQG4TsbbGJ/QPCgQulbEgFeBBBvbzsp2E2h+rkyN20utkHtaGMyc02FXT
-    BF/9zMVRnWzyQFnp+GyzaUoNPlmDUozwzrbro5OJz6J5AtEarsix7R9GdZIIjN+J
-    S2NjO/mcD6wujaqbjXSHFUqXAcZDcGZuhmwra0Y3izepaHSPGgNM1BzZnqhXaytj
-    UKggu1MAYnPz4YsxFz3JkJqNeTTR85YSE5gx8JzZAs+ikqj8Qc/ndH9o16Lk12Xa
-    qoEOT1kNf6FNsbCsS3CqazPpG3XSeYusHvT6E/lq1wKBgQC7i1dZnwBY3f0izncb
-    AXAg7ncUPMK70dLkdZ3UEXKa3DRbPCEZCPyE1U2346OJBF64ncxGNjLs+bfKquiU
-    Yxi6xotdTVjn/xXE/1624JqXO7YwV7W7B8B4G4Mm0s6rDLcepNWHyUgfteVpeENK
-    8f1IyRGVM9ggoicNJ1u4t/20uwKBgQC6ToQJZoBGng+VvgDWkqbMUd84vMyQsIbq
-    G2C2h6mHJWn9j0Nfz71xqdtNx2fsXVkln24iOY4yJfQUm1QGp9i4WSh49g+F+o2K
-    /eu0XWIe7OjDM/InLxqTNyoj5ZWAi06rw/mQSrU6eCuZ6FrIU2Mjh6n+/GjR2n69
-    6/2/I6sMlwKBgQCWKZmFHrRuc0ANsHbZXqtjEsyxnXzmWbicSDhY5qd2qz4YluqB
-    WxqlWQzjYhc8zAzzkRVQWnEoIUIxueqDdV0Fn5dS222GRE4v77DsiKX+1UapKnFO
-    EYTgJlc6rKvhdUrh9GUsVdOz4DaR3kMzLNL6hlPXvS0d4/eUpqDgJCG1pQKBgFhv
-    jsN7kWZz/wfgkjtIj76rGl+vVxdThCc6abUbPoC1ZNOEnsGrNczviPcpsY4EXZ27
-    SScb1QC+/VaOyNsD757KS6jnfETnwyp4D9uk/D+by31legvZky7QX8N8ZnQHLIfi
-    VeOFYvNnOaMsJXO0CXpDGpG8NPFwWvtCO0fw4W/vAoGAaYpk6VTWTw4cih/1dnRf
-    2LQbEO05lFkRSMtEuqgkWUKvWZjnNRdDU3yXqaz0Pgee7drObUwRnKL3Ywj1QY7H
-    zbaEWIZEZ2PId2Bs/5bSOA9VcExZZDNpGd7I2pBosKpHXT5Y+VszdxLMCnmsRzyq
-    LRSX0TaG3xyggkcVlyyAcPw=
+    MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDaWtbAlWpLc0l4
+    JFp5mvD/+xIR7CZiWDJpzulMh2kr/u8Chc5D1lcbr21KNJ39wJ2Uu4Ofbnn0ZAvE
+    91LJvXoKrNS2EebeJU0p0Y5TzpXQDaF/enIjUW+NJmlFxfLUHnerO/lRoxmi4mKH
+    cohZ05b8cIQ6JJOiZoD3n5lz8BIMSouBwdzaU8N4Utp4CwSD0NyKI4xiWZrykwc/
+    L2Pkrp2BqwxJBI1k/sSnp1j+MYeUADR3VSDRb1ZDPewRHl5PAjiymQyE521JP8fn
+    Qiql5rHMXsZeFm2nQ4Afad/YvF9XAgGcQakCQzu3ENqO5TAOCO2v2vBRajIqO2fV
+    yJ+bp6rzAgMBAAECggEAH7s3XcQ42V8XFvuoHuePzJCmtxkLbkY6iUV1giwOx23O
+    5khzSZ4X3uDsRRjcDs3+IxOUP0fVjC46cZ9Za2d6w/C1dqynprJirMg/DS8by/Yh
+    zn3eTANKboeIS93wzwzgahoXPgWxijSo3zMbMnvnrfwHPdB77eFEg6JbW/hQFHM/
+    Y24VdZeTj1ElT5Xm2T/BAiVa6clc1aSMSc6js6REKnRAfuZhCqZURE7JpvfFaQZc
+    Yv2Qu+mcZe66CEqNSuChHeL6EwJIaPBhn5ye65BwbJBUs+LLF62LVIpWLFa8XW0A
+    2JWyAqu6rsmpFkViXDpFBUX1PGerRC9zyPNI6W9ZoQKBgQDlEIa9RX7/tlqVjGtt
+    EErO1pz7tD2qeVUM+btHfoqlLrVrUJuJxwBqr1fXQmIZ9o46UPc5QI2+9xD5twmy
+    HocDzfzuRBM61oEaynvyps93PEeu//2TZ8vW54292cW9MyJC5DvWNKQwZEKDK+a+
+    +QBN5sJyAN0vXa+5EUbxz3NtkwKBgQD0B+useg2iUUQDcGwndf+SHnZQjLwZpQF7
+    URlXdcfwNHLQgODmc6ATqWzrQeOxx3AVoS/fAVnchEZuB8tmcBcbHDjOjNXzb4nN
+    PRPQ1dMqI55LbsIdtVdZ4mCRp6s2NVhTVxDS4ORoSGPIoRQQJ5PNQZp9L1WSKZ2y
+    kJTkjh4pIQKBgG9JeCy8dtcFYT0G26pBIBcdbWdcShlomUmUishRUkquRrW8k9R8
+    OleamLKcLc0vXCo46+OE2VjN8BFiO/OtoSrYCOo5aJ5NWKwLc+yP3nuvbaQ3+pqC
+    8yWVmeeCxe8FyL924xtOt/ZKv4W67oAZuWwfkJiSkuNQQO9I1Y7lms7BAoGBAN1K
+    iXbAv7hgBVMxEYK/SGES6quk07ZVoYBYTKi5D/RNO4jENi4E0DbEPxcfiwFeH9Ad
+    eTG7IegMs2l3/AUKxIk7EHCN2j6E+Ot65YtNO85MunEhITqbhXjnBjdPWr0vpsb8
+    fy8b7UR70LDREUaM/UT2pse6sth2kKCq57pS/hrBAoGBAMxwQt4J4aQQi9ngmzCT
+    iYbl6YIn1lfUoFq5qPr+5ML0TMw0ORGBqjidGWT+uMiH2KftfAv3y8QmT3rJvuMX
+    ekm321dwWo0MsYNfgD1cqkNaQVS5GNE1adUm/wTlaqCSEBALtz4lQvrCVLdnEpcA
+    kydqCJp60VuvvIxBYqhrF0yP
     -----END PRIVATE KEY-----
     EOF
 
@@ -445,7 +445,7 @@ data:
     
     keytool -certreq -alias server -keystore /keystore.jks -file /server.csr -storepass keystore 
     
-    openssl x509 -sha256 -req -in /server.csr -CA /usr/local/share/ca-certificates/my_own_ca.crt -CAkey /my_own_ca.key -CAcreateserial -out /server.crt -days 365 
+    openssl x509 -sha256 -req -in /server.csr -CA /usr/local/share/ca-certificates/my_own_ca.crt -CAkey /my_own_ca.key -CAcreateserial -out /server.crt -days 3650 
     
     openssl verify -x509_strict -CAfile /usr/local/share/ca-certificates/my_own_ca.crt /server.crt 
     
