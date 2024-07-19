@@ -59,8 +59,8 @@ func NewNormalizer(secretGet secretGetter) *Normalizer {
 	}
 }
 
-// CreateTemplatedCHI produces ready-to-use CHI object
-func (n *Normalizer) CreateTemplatedCHI(subj *api.ClickHouseInstallation, options *normalizer.Options) (
+// CreateTemplated produces ready-to-use object
+func (n *Normalizer) CreateTemplated(subj *api.ClickHouseInstallation, options *normalizer.Options) (
 	*api.ClickHouseInstallation,
 	error,
 ) {
@@ -101,16 +101,24 @@ func (n *Normalizer) newSubject() *api.ClickHouseInstallation {
 	return managers.CreateCustomResource(managers.CustomResourceCHI).(*api.ClickHouseInstallation)
 }
 
-func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	switch {
-	case subj == nil:
+func (n *Normalizer) shouldCreateDefaultCluster(subj *api.ClickHouseInstallation) bool {
+	if subj == nil {
 		// No subject specified - meaning we are normalizing non-existing subject and it should have no clusters inside
-		// Need to create subject
-		n.ctx.Options().WithDefaultCluster = false
-		return n.newSubject()
-	default:
+		return false
+	} else {
 		// Subject specified - meaning we are normalizing existing subject and we need to ensure default cluster presence
-		n.ctx.Options().WithDefaultCluster = true
+		return true
+	}
+}
+
+func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	n.ctx.Options().WithDefaultCluster = n.shouldCreateDefaultCluster(subj)
+
+	if subj == nil {
+		// Need to create subject
+		return n.newSubject()
+	} else {
+		// Subject specified
 		return subj
 	}
 }
@@ -143,7 +151,7 @@ func (n *Normalizer) normalizeTarget() (*api.ClickHouseInstallation, error) {
 }
 
 func (n *Normalizer) normalizeSpec() {
-	// Walk over ChiSpec datatype fields
+	// Walk over Spec datatype fields
 	n.ctx.GetTarget().GetSpec().TaskID = n.normalizeTaskID(n.ctx.GetTarget().GetSpec().TaskID)
 	n.ctx.GetTarget().GetSpec().UseTemplates = n.normalizeUseTemplates(n.ctx.GetTarget().GetSpec().UseTemplates)
 	n.ctx.GetTarget().GetSpec().Stop = n.normalizeStop(n.ctx.GetTarget().GetSpec().Stop)
@@ -799,6 +807,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 	case api.ClusterSecretSourcePlaintext:
 		// Secret has explicit value, it is not passed via ENV vars
 		// Do nothing here
+		return
 	case api.ClusterSecretSourceSecretRef:
 		// Secret has explicit SecretKeyRef
 		// Set the password for internode communication using an ENV VAR
@@ -825,51 +834,15 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 }
 
 func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
-	// Sanity check
-	if envVar.Name == "" {
-		return
-	}
-
-	for _, existingEnvVar := range n.ctx.GetTarget().GetRuntime().GetAttributes().GetAdditionalEnvVars() {
-		if existingEnvVar.Name == envVar.Name {
-			// Such a variable already exists
-			return
-		}
-	}
-
-	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVars(envVar)
+	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(envVar)
 }
 
 func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
-	// Sanity check
-	if volume.Name == "" {
-		return
-	}
-
-	for _, existingVolume := range n.ctx.GetTarget().GetRuntime().GetAttributes().GetAdditionalVolumes() {
-		if existingVolume.Name == volume.Name {
-			// Such a variable already exists
-			return
-		}
-	}
-
-	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumes(volume)
+	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeIfNotExists(volume)
 }
 
 func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
-	// Sanity check
-	if volumeMount.Name == "" {
-		return
-	}
-
-	for _, existingVolumeMount := range n.ctx.GetTarget().GetRuntime().GetAttributes().GetAdditionalVolumeMounts() {
-		if existingVolumeMount.Name == volumeMount.Name {
-			// Such a variable already exists
-			return
-		}
-	}
-
-	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMounts(volumeMount)
+	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMountIfNotExists(volumeMount)
 }
 
 var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
@@ -1116,7 +1089,6 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
 func (n *Normalizer) normalizeConfigurationProfiles(profiles *api.Settings) *api.Settings {
 	if profiles == nil {
-		//profiles = api.NewSettings()
 		return nil
 	}
 	profiles.Normalize()
@@ -1126,7 +1098,6 @@ func (n *Normalizer) normalizeConfigurationProfiles(profiles *api.Settings) *api
 // normalizeConfigurationQuotas normalizes .spec.configuration.quotas
 func (n *Normalizer) normalizeConfigurationQuotas(quotas *api.Settings) *api.Settings {
 	if quotas == nil {
-		//quotas = api.NewSettings()
 		return nil
 	}
 	quotas.Normalize()
@@ -1136,7 +1107,6 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *api.Settings) *api.Set
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
 func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api.Settings {
 	if settings == nil {
-		//settings = api.NewSettings()
 		return nil
 	}
 	settings.Normalize()
@@ -1306,13 +1276,15 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 		replica := &clusterLayout.Replicas[i]
 
 		if replica.ShardsCount > clusterLayout.ShardsCount {
-			// We have Shards number specified explicitly in this replica
+			// We have Shards number specified explicitly in this replica,
+			// and this replica has more shards than specified in cluster.
+			// Well, enlarge cluster shards count
 			clusterLayout.ShardsCount = replica.ShardsCount
 		}
 
 		if len(replica.Hosts) > clusterLayout.ShardsCount {
 			// We have more explicitly specified shards than count specified.
-			// Need to adjust.
+			// Well, enlarge cluster shards count
 			clusterLayout.ShardsCount = len(replica.Hosts)
 		}
 	}
@@ -1327,7 +1299,7 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 	if len(clusterLayout.Replicas) > clusterLayout.ReplicasCount {
 		// We have more explicitly specified replicas than count specified.
-		// Need to adjust.
+		// Well, enlarge cluster replicas count
 		clusterLayout.ReplicasCount = len(clusterLayout.Replicas)
 	}
 
@@ -1337,12 +1309,13 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 		if shard.ReplicasCount > clusterLayout.ReplicasCount {
 			// We have Replicas number specified explicitly in this shard
+			// Well, enlarge cluster replicas count
 			clusterLayout.ReplicasCount = shard.ReplicasCount
 		}
 
 		if len(shard.Hosts) > clusterLayout.ReplicasCount {
-			// We have more explicitly specified replcas than count specified.
-			// Need to adjust.
+			// We have more explicitly specified replicas than count specified.
+			// Well, enlarge cluster replicas count
 			clusterLayout.ReplicasCount = len(shard.Hosts)
 		}
 	}
@@ -1355,7 +1328,7 @@ func (n *Normalizer) ensureClusterLayoutShards(layout *api.ChiClusterLayout) {
 	// Disposition of shards in slice would be
 	// [explicitly specified shards 0..N, N+1..layout.ShardsCount-1 empty slots for to-be-filled shards]
 
-	// Some (may be all) shards specified, need to append space for unspecified shards
+	// Some (may be all) shards specified, need to append assumed (unspecified, but expected to exist) shards
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Shards) < layout.ShardsCount {
 		layout.Shards = append(layout.Shards, api.ChiShard{})
@@ -1367,7 +1340,7 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *api.ChiClusterLayout) {
 	// Disposition of replicas in slice would be
 	// [explicitly specified replicas 0..N, N+1..layout.ReplicasCount-1 empty slots for to-be-filled replicas]
 
-	// Some (may be all) replicas specified, need to append space for unspecified replicas
+	// Some (may be all) replicas specified, need to append assumed (unspecified, but expected to exist) replicas
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Replicas) < layout.ReplicasCount {
 		layout.Replicas = append(layout.Replicas, api.ChiReplica{})

@@ -36,8 +36,8 @@ func NewNormalizer() *Normalizer {
 	return &Normalizer{}
 }
 
-// CreateTemplatedCHK produces ready-to-use CHK object
-func (n *Normalizer) CreateTemplatedCHK(subj *apiChk.ClickHouseKeeperInstallation, options *normalizer.Options) (
+// CreateTemplated produces ready-to-use object
+func (n *Normalizer) CreateTemplated(subj *apiChk.ClickHouseKeeperInstallation, options *normalizer.Options) (
 	*apiChk.ClickHouseKeeperInstallation,
 	error,
 ) {
@@ -78,23 +78,30 @@ func (n *Normalizer) newSubject() *apiChk.ClickHouseKeeperInstallation {
 	return managers.CreateCustomResource(managers.CustomResourceCHK).(*apiChk.ClickHouseKeeperInstallation)
 }
 
-func (n *Normalizer) ensureSubject(subj *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	switch {
-	case subj == nil:
+func (n *Normalizer) shouldCreateDefaultCluster(subj *apiChk.ClickHouseKeeperInstallation) bool {
+	if subj == nil {
 		// No subject specified - meaning we are normalizing non-existing subject and it should have no clusters inside
-		// Need to create subject
-		n.ctx.Options().WithDefaultCluster = false
-		return n.newSubject()
-	default:
+		return false
+	} else {
 		// Subject specified - meaning we are normalizing existing subject and we need to ensure default cluster presence
-		n.ctx.Options().WithDefaultCluster = true
+		return true
+	}
+}
+
+func (n *Normalizer) ensureSubject(subj *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+	n.ctx.Options().WithDefaultCluster = n.shouldCreateDefaultCluster(subj)
+
+	if subj == nil {
+		// Need to create subject
+		return n.newSubject()
+	} else {
+		// Subject specified
 		return subj
 	}
 }
 
 func (n *Normalizer) GetTargetTemplate() *apiChk.ClickHouseKeeperInstallation {
-	//return chop.Config().Template.CHI.Runtime.Template
-	return nil
+	return nil // return chop.Config().Template.CHI.Runtime.Template
 }
 
 func (n *Normalizer) HasTargetTemplate() bool {
@@ -121,9 +128,9 @@ func (n *Normalizer) normalizeTarget() (*apiChk.ClickHouseKeeperInstallation, er
 }
 
 func (n *Normalizer) normalizeSpec() {
-	// Walk over ChiSpec datatype fields
-	n.ctx.GetTarget().GetSpec().Configuration = n.normalizeConfiguration(n.ctx.chk.Spec.Configuration)
-	n.ctx.GetTarget().GetSpec().Templates = n.normalizeTemplates(n.ctx.chk.Spec.Templates)
+	// Walk over Spec datatype fields
+	n.ctx.GetTarget().GetSpec().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpec().Configuration)
+	n.ctx.GetTarget().GetSpec().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpec().Templates)
 	// UseTemplates already done
 }
 
@@ -161,13 +168,19 @@ func (n *Normalizer) fillStatus() {
 //}
 
 // normalizeConfiguration normalizes .spec.configuration
-func (n *Normalizer) normalizeConfiguration(conf *apiChk.ChkConfiguration) *apiChk.ChkConfiguration {
+func (n *Normalizer) normalizeConfiguration(conf *apiChk.Configuration) *apiChk.Configuration {
 	if conf == nil {
 		conf = apiChk.NewConfiguration()
 	}
-	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
+
+	n.normalizeConfigurationAllSettingsBasedSections(conf)
 	conf.Clusters = n.normalizeClusters(conf.Clusters)
 	return conf
+}
+
+// normalizeConfigurationAllSettingsBasedSections normalizes Settings-based configuration
+func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *apiChk.Configuration) {
+	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
 }
 
 // normalizeTemplates normalizes .spec.templates
@@ -237,7 +250,7 @@ func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTe
 func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ServiceTemplate) {
 	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
-	n.ctx.chk.Spec.Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpec().Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeClusters normalizes clusters
@@ -259,7 +272,7 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 	}
 
 	// In case no clusters available, we may want to create a default one
-	if n.ctx.options.WithDefaultCluster {
+	if n.ctx.Options().WithDefaultCluster {
 		return []*apiChk.ChkCluster{
 			commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*apiChk.ChkCluster),
 		}
@@ -273,7 +286,7 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *apiChi.Settings {
 	return settings.
 		Ensure().
-		MergeFrom(config.DefaultSettings(n.ctx.chk.Spec.GetPath())).
+		MergeFrom(config.DefaultSettings(n.ctx.GetTarget().GetSpec().GetPath())).
 		Normalize()
 }
 
