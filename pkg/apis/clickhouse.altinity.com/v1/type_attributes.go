@@ -102,11 +102,31 @@ func (a *ComparableAttributes) GetAdditionalVolumeMounts() []core.VolumeMount {
 	return a.AdditionalVolumeMounts
 }
 
-func (a *ComparableAttributes) AppendAdditionalVolumeMounts(volumeMounts ...core.VolumeMount) {
+func (a *ComparableAttributes) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 	if a == nil {
 		return
 	}
-	a.AdditionalVolumeMounts = append(a.AdditionalVolumeMounts, volumeMounts...)
+	a.AdditionalVolumeMounts = append(a.AdditionalVolumeMounts, volumeMount)
+}
+
+func (a *ComparableAttributes) AppendAdditionalVolumeMountIfNotExists(volumeMount core.VolumeMount) {
+	if a == nil {
+		return
+	}
+
+	// Sanity check
+	if volumeMount.Name == "" {
+		return
+	}
+
+	for _, existingVolumeMount := range a.GetAdditionalVolumeMounts() {
+		if existingVolumeMount.Name == volumeMount.Name {
+			// Such a volume mount already exists
+			return
+		}
+	}
+
+	a.AppendAdditionalVolumeMount(volumeMount)
 }
 
 func (a *ComparableAttributes) GetSkipOwnerRef() bool {
