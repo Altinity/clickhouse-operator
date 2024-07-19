@@ -45,11 +45,33 @@ func (a *ComparableAttributes) GetAdditionalVolumes() []core.Volume {
 	return a.AdditionalVolumes
 }
 
-func (a *ComparableAttributes) AppendAdditionalVolumes(volumes ...core.Volume) {
+func (a *ComparableAttributes) AppendAdditionalVolume(volume core.Volume) {
 	if a == nil {
 		return
 	}
-	a.AdditionalVolumes = append(a.AdditionalVolumes, volumes...)
+	a.AdditionalVolumes = append(a.AdditionalVolumes, volume)
+}
+
+func (a *ComparableAttributes) AppendAdditionalVolumeIfNotExists(volume core.Volume) {
+	if a == nil {
+		return
+	}
+
+	// Sanity check
+	if volume.Name == "" {
+		// This volume is incorrect
+		return
+	}
+
+	for _, existingVolume := range a.GetAdditionalVolumes() {
+		if existingVolume.Name == volume.Name {
+			// Such a volume already exists
+			return
+		}
+	}
+
+	// Volume looks good
+	a.AppendAdditionalVolume(volume)
 }
 
 func (a *ComparableAttributes) GetAdditionalVolumeMounts() []core.VolumeMount {
