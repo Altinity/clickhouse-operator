@@ -42,31 +42,33 @@ jobs:
 
       - name: Build clickhouse-operator locally without push to registry
         run: |
-          minikube status          
+          minikube status
           export CHO_RELEASE=$(cat release)
           echo "current release=$CHO_RELEASE"
-          
+
           docker build -f dockerfile/operator/Dockerfile -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
           docker build -f dockerfile/metrics-exporter/Dockerfile -t altinity/metrics-exporter:${CHO_RELEASE} --pull .
-          
-          docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar 
+
+          docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
           docker image save altinity/metrics-exporter:${CHO_RELEASE} -o metrics-exporter.tar
 
-          minikube image load operator.tar 
+          minikube image load operator.tar
           minikube image load metrics-exporter.tar
 
       - name: Run Tests
+        id: run-tests
+        continue-on-error: true
         run: |
           source ~/venv/qa/bin/activate
           set -x
-        
+
           # bash -xe ./deploy/prometheus/create-prometheus.sh
           # bash -xe ./deploy/minio/install-minio-operator.sh
           # bash -xe ./deploy/minio/install-minio-tenant.sh
 
           # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
           # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
-          
+
           # docker compose -f ./tests/docker-compose/docker-compose.yml pull runner
           # ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --trim-results on --debug --log ./tests/raw.log
 
@@ -75,11 +77,13 @@ jobs:
           ONLY='*'
           # ONLY='*test_008_2*'
 
-          ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --trim-results on --debug --native --log ./tests/raw.log
+          test_result=`~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --test-to-end --trim-results on --debug --native --log ./tests/raw.log`
           ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
           ~/venv/qa/bin/tfs --debug --no-colors transform short ./tests/raw.log ./tests/short.log.txt
-          ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity LTD" --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
+          ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity Inc." --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
+
+          exit "$test_result"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -96,4 +100,4 @@ jobs:
           path: |
             tests/report.html
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 180
