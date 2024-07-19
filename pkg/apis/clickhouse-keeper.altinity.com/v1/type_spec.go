@@ -18,13 +18,13 @@ import (
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func (spec ChkSpec) GetConfiguration() *ChkConfiguration {
+func (spec ChkSpec) GetConfiguration() *Configuration {
 	return spec.Configuration
 }
 
-func (spec ChkSpec) EnsureConfiguration() *ChkConfiguration {
+func (spec ChkSpec) EnsureConfiguration() *Configuration {
 	if spec.GetConfiguration() == nil {
-		spec.Configuration = new(ChkConfiguration)
+		spec.Configuration = new(Configuration)
 	}
 	return spec.Configuration
 }

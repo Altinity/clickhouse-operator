@@ -19,11 +19,11 @@ import (
 )
 
 // NewConfiguration creates new ChkConfiguration objects
-func NewConfiguration() *ChkConfiguration {
-	return new(ChkConfiguration)
+func NewConfiguration() *Configuration {
+	return new(Configuration)
 }
 
-func (c *ChkConfiguration) GetSettings() *apiChi.Settings {
+func (c *Configuration) GetSettings() *apiChi.Settings {
 	if c == nil {
 		return nil
 	}
@@ -31,7 +31,7 @@ func (c *ChkConfiguration) GetSettings() *apiChi.Settings {
 	return c.Settings
 }
 
-func (c *ChkConfiguration) GetClusters() []*ChkCluster {
+func (c *Configuration) GetClusters() []*ChkCluster {
 	if c == nil {
 		return nil
 	}
@@ -39,7 +39,7 @@ func (c *ChkConfiguration) GetClusters() []*ChkCluster {
 	return c.Clusters
 }
 
-func (c *ChkConfiguration) GetCluster(i int) *ChkCluster {
+func (c *Configuration) GetCluster(i int) *ChkCluster {
 	clusters := c.GetClusters()
 	if clusters == nil {
 		return nil
@@ -51,7 +51,7 @@ func (c *ChkConfiguration) GetCluster(i int) *ChkCluster {
 }
 
 // MergeFrom merges from specified source
-func (configuration *ChkConfiguration) MergeFrom(from *ChkConfiguration, _type apiChi.MergeType) *ChkConfiguration {
+func (configuration *Configuration) MergeFrom(from *Configuration, _type apiChi.MergeType) *Configuration {
 	if from == nil {
 		return configuration
 	}

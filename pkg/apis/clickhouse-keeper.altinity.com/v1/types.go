@@ -56,12 +56,12 @@ func (runtime *ClickHouseKeeperInstallationRuntime) UnlockCommonConfig() {
 
 // ChkSpec defines spec section of ClickHouseKeeper resource
 type ChkSpec struct {
-	Configuration *ChkConfiguration `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Configuration *Configuration `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates     *apiChi.Templates `json:"templates,omitempty"              yaml:"templates,omitempty"`
 }
 
-// ChkConfiguration defines configuration section of .spec
-type ChkConfiguration struct {
+// Configuration defines configuration section of .spec
+type Configuration struct {
 	Settings *apiChi.Settings `json:"settings,omitempty"  yaml:"settings,omitempty"`
 	Clusters []*ChkCluster    `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
