@@ -31,11 +31,32 @@ func (a *ComparableAttributes) GetAdditionalEnvVars() []core.EnvVar {
 	return a.AdditionalEnvVars
 }
 
-func (a *ComparableAttributes) AppendAdditionalEnvVars(envVars ...core.EnvVar) {
+func (a *ComparableAttributes) AppendAdditionalEnvVar(envVar core.EnvVar) {
 	if a == nil {
 		return
 	}
-	a.AdditionalEnvVars = append(a.AdditionalEnvVars, envVars...)
+	a.AdditionalEnvVars = append(a.AdditionalEnvVars, envVar)
+}
+
+func (a *ComparableAttributes) AppendAdditionalEnvVarIfNotExists(envVar core.EnvVar) {
+	if a == nil {
+		return
+	}
+
+	// Sanity check
+	if envVar.Name == "" {
+		// This env var is incorrect
+		return
+	}
+
+	for _, existingEnvVar := range a.GetAdditionalEnvVars() {
+		if existingEnvVar.Name == envVar.Name {
+			// Such a variable already exists
+			return
+		}
+	}
+
+	a.AppendAdditionalEnvVar(envVar)
 }
 
 func (a *ComparableAttributes) GetAdditionalVolumes() []core.Volume {
