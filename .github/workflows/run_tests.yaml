@@ -4,6 +4,17 @@ on:
     branches:
       - '*'
   workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode'
+        type: choice
+        options:
+        - Run all
+        - Fail fast
+      test_mask:
+        description: 'Wildcard mask to run only some tests. Empty means all.'
+        type: string
+        required: false
 jobs:
   run_tests:
     name: Run Tests
@@ -74,15 +85,26 @@ jobs:
 
           # bash ./tests/e2e/run_tests_parallel.sh
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
-          ONLY='*'
-          # ONLY='*test_008_2*'
 
-          test_result=`~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --test-to-end --trim-results on --debug --native --log ./tests/raw.log`
+          if [[ "${{ github.event.inputs.test_mask }}" != '' ]]
+          then
+            ONLY="${{ github.event.inputs.test_mask }}"
+          else
+            ONLY="*"
+          end
+
+          if [[ "${{ github.event.inputs.test_mode }}" == 'All tests' ]]
+          then
+            test_mode="--test-to-end"
+          end
+
+          test_result=`~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" "$test_mode" --trim-results on --debug --native --log ./tests/raw.log`
           ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
           ~/venv/qa/bin/tfs --debug --no-colors transform short ./tests/raw.log ./tests/short.log.txt
           ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity Inc." --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
 
+          # echo "test_result=$test_result" >> $GITHUB_ENV
           exit "$test_result"
 
       - uses: actions/upload-artifact@v4
