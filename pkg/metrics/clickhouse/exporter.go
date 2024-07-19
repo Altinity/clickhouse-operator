@@ -402,7 +402,7 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		normalizer := chiNormalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
 			return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 		})
-		normalized, _ := normalizer.CreateTemplatedCHI(chi, normalizerCommon.NewOptions())
+		normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions())
 
 		watchedCHI := metrics.NewWatchedCHI(normalized)
 		e.updateWatched(watchedCHI)

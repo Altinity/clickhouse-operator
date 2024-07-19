@@ -170,7 +170,7 @@ func (r *Reconciler) reconcile(
 
 // normalize
 func (r *Reconciler) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := chkNormalizer.NewNormalizer().CreateTemplatedCHK(c, normalizer.NewOptions())
+	chk, err := chkNormalizer.NewNormalizer().CreateTemplated(c, normalizer.NewOptions())
 	if err != nil {
 		log.V(1).
 			M(chk).F().

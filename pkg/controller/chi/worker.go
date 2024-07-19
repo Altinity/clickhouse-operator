@@ -356,7 +356,7 @@ func (w *worker) processItem(ctx context.Context, item interface{}) error {
 // normalize
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 
-	chi, err := w.normalizer.CreateTemplatedCHI(c, normalizerCommon.NewOptions())
+	chi, err := w.normalizer.CreateTemplated(c, normalizerCommon.NewOptions())
 	if err != nil {
 		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -369,7 +369,7 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 	opts := normalizerCommon.NewOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
-	chi, err = w.normalizer.CreateTemplatedCHI(c, opts)
+	chi, err = w.normalizer.CreateTemplated(c, opts)
 	if err != nil {
 		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -1326,7 +1326,7 @@ func (w *worker) createCHIFromObjectMeta(meta meta.Object, isCHI bool, options *
 		return nil, err
 	}
 
-	chi, err = w.normalizer.CreateTemplatedCHI(chi, options)
+	chi, err = w.normalizer.CreateTemplated(chi, options)
 	if err != nil {
 		return nil, err
 	}
