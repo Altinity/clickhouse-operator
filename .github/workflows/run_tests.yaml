@@ -98,7 +98,8 @@ jobs:
             test_mode="--test-to-end"
           fi
 
-          test_result=`~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e.test_operator/${ONLY} $test_mode --trim-results on --debug --native --log ./tests/raw.log`
+          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e.test_operator/${ONLY} $test_mode --trim-results on --debug --native --log ./tests/raw.log
+          test_result=$?
           ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
           ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
           ~/venv/qa/bin/tfs --debug --no-colors transform short ./tests/raw.log ./tests/short.log.txt
