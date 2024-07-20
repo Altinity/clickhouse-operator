@@ -12,7 +12,7 @@ import e2e.yaml_manifest as yaml_manifest
 import e2e.util as util
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-max_retries = 35
+max_retries = 20
 
 
 def launch(command, ok_to_fail=False, ns=None, timeout=600, shell=None):
