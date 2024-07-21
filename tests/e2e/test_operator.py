@@ -3327,7 +3327,7 @@ def run_select_query(self, host, user, password, query, res1, res2, trigger_even
             f"incomplete results runs: {partial_runs} " +
             f"error runs: {error_runs}"
         ):
-            assert errors == 0
+            assert errors == 0, error()
             if partial > 0:
                 print(
                     f"*** WARNING ***: cluster was partially unavailable, {partial} queries returned incomplete results"
@@ -3359,7 +3359,7 @@ def run_insert_query(self, host, user, password, query, trigger_event, shell=Non
                 note(f"WTF res={res}")
                 errors += 1
         with By(f"{ok} inserts have been executed with no errors, {errors} inserts have failed"):
-            assert errors == 0
+            assert errors == 0, error()
     finally:
         with Finally("I clean up"):
             with By("deleting pod"):
