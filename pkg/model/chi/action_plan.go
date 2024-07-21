@@ -25,8 +25,8 @@ import (
 
 // ActionPlan is an action plan with list of differences between two CHIs
 type ActionPlan struct {
-	old *api.ClickHouseInstallation
-	new *api.ClickHouseInstallation
+	old api.ICustomResource
+	new api.ICustomResource
 
 	specDiff  *messagediff.Diff
 	specEqual bool
@@ -45,32 +45,32 @@ type ActionPlan struct {
 }
 
 // NewActionPlan makes new ActionPlan out of two CHIs
-func NewActionPlan(old, new *api.ClickHouseInstallation) *ActionPlan {
+func NewActionPlan(old, new api.ICustomResource) *ActionPlan {
 	ap := &ActionPlan{
 		old: old,
 		new: new,
 	}
 
 	if (old != nil) && (new != nil) {
-		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.GetSpec(), ap.new.GetSpec())
-		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, ap.new.Labels)
-		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
-		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, ap.new.DeletionTimestamp)
-		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, ap.new.Finalizers)
+		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.GetSpecA(), ap.new.GetSpecA())
+		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.GetLabels(), ap.new.GetLabels())
+		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
+		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.GetDeletionTimestamp(), ap.new.GetDeletionTimestamp())
+		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.GetFinalizers(), ap.new.GetFinalizers())
 		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.GetRuntime().GetAttributes(), ap.new.GetRuntime().GetAttributes())
 	} else if old == nil {
-		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.GetSpec())
-		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.Labels)
-		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.DeletionTimestamp)
-		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(nil, ap.new.DeletionTimestamp)
-		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.Finalizers)
+		ap.specDiff, ap.specEqual = messagediff.DeepDiff(nil, ap.new.GetSpecA())
+		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(nil, ap.new.GetLabels())
+		ap.deletionTimestampEqual = ap.timestampEqual(nil, ap.new.GetDeletionTimestamp())
+		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(nil, ap.new.GetDeletionTimestamp())
+		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(nil, ap.new.GetFinalizers())
 		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(nil, ap.new.GetRuntime().GetAttributes())
 	} else if new == nil {
-		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.GetSpec(), nil)
-		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.Labels, nil)
-		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.DeletionTimestamp, nil)
-		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.DeletionTimestamp, nil)
-		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.Finalizers, nil)
+		ap.specDiff, ap.specEqual = messagediff.DeepDiff(ap.old.GetSpecA(), nil)
+		ap.labelsDiff, ap.labelsEqual = messagediff.DeepDiff(ap.old.GetLabels(), nil)
+		ap.deletionTimestampEqual = ap.timestampEqual(ap.old.GetDeletionTimestamp(), nil)
+		ap.deletionTimestampDiff, _ = messagediff.DeepDiff(ap.old.GetDeletionTimestamp(), nil)
+		ap.finalizersDiff, ap.finalizersEqual = messagediff.DeepDiff(ap.old.GetFinalizers(), nil)
 		ap.attributesDiff, ap.attributesEqual = messagediff.DeepDiff(ap.old.GetRuntime().GetAttributes(), nil)
 	} else {
 		// Both are nil
@@ -232,11 +232,6 @@ func (ap *ActionPlan) String() string {
 	}
 
 	return str
-}
-
-// GetNewHostsNum - total number of hosts to be achieved
-func (ap *ActionPlan) GetNewHostsNum() int {
-	return ap.new.HostsCount()
 }
 
 // GetRemovedHostsNum - how many hosts would be removed

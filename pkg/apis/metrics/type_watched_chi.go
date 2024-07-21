@@ -46,22 +46,22 @@ type WatchedHost struct {
 }
 
 // NewWatchedCHI creates new watched CHI
-func NewWatchedCHI(c *api.ClickHouseInstallation) *WatchedCHI {
+func NewWatchedCHI(cr api.ICustomResource) *WatchedCHI {
 	chi := &WatchedCHI{}
-	chi.readFrom(c)
+	chi.readFrom(cr)
 	return chi
 }
 
-func (chi *WatchedCHI) readFrom(c *api.ClickHouseInstallation) {
+func (chi *WatchedCHI) readFrom(cr api.ICustomResource) {
 	if chi == nil {
 		return
 	}
-	chi.Namespace = c.Namespace
-	chi.Name = c.Name
-	chi.Labels = c.Labels
-	chi.Annotations = c.Annotations
+	chi.Namespace = cr.GetNamespace()
+	chi.Name = cr.GetName()
+	chi.Labels = cr.GetLabels()
+	chi.Annotations = cr.GetAnnotations()
 
-	c.WalkClusters(func(cl api.ICluster) error {
+	cr.WalkClusters(func(cl api.ICluster) error {
 		cluster := &WatchedCluster{}
 		cluster.readFrom(cl)
 		chi.Clusters = append(chi.Clusters, cluster)

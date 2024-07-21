@@ -31,6 +31,10 @@ func (chi *ClickHouseInstallation) GetSpec() *ChiSpec {
 	return &chi.Spec
 }
 
+func (chi *ClickHouseInstallation) GetSpecA() any {
+	return &chi.Spec
+}
+
 func (chi *ClickHouseInstallation) GetUsedTemplates() []*TemplateRef {
 	return chi.GetSpec().UseTemplates
 }

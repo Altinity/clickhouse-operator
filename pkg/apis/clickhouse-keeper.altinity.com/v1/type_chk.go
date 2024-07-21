@@ -191,3 +191,7 @@ func (chk *ClickHouseKeeperInstallation) GetRootServiceTemplate() (*apiChi.Servi
 func (chk *ClickHouseKeeperInstallation) GetSpec() *ChkSpec {
 	return &chk.Spec
 }
+
+func (chk *ClickHouseKeeperInstallation) GetSpecA() any {
+	return &chk.Spec
+}

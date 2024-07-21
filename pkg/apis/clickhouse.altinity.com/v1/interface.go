@@ -21,6 +21,7 @@ import (
 type ICustomResource interface {
 	meta.Object
 
+	GetSpecA() any
 	GetRuntime() ICustomResourceRuntime
 	GetRootServiceTemplate() (*ServiceTemplate, bool)
 	WalkClusters(f func(cluster ICluster) error) []error
