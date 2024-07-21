@@ -95,7 +95,7 @@ jobs:
           ~/venv/qa/bin/tfs --no-colors transform short ./tests/raw.log ./tests/short.log.txt
           ~/venv/qa/bin/tfs --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity Inc." --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
 
-          # echo "test_result=$test_result" >> $GITHUB_ENV
+          echo "test_result=$test_result" >> $GITHUB_ENV
           exit "$test_result"
 
       - uses: actions/upload-artifact@v4
@@ -114,3 +114,7 @@ jobs:
             tests/report.html
           if-no-files-found: error
           retention-days: 90
+
+      - name: Test Result
+        if: job.steps.run-tests.status == failure()
+        run: exit 1
