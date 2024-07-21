@@ -116,7 +116,7 @@ jobs:
           retention-days: 90
 
       - name: Test Result
-        if: ${{ steps.vars.outputs.test_result == '1' }}
+        if: ${{ steps.vars.outputs.test_result 1= '0' }}
         uses: actions/github-script@v3
         with:
           script: |
