@@ -24,26 +24,15 @@ metadata:
 spec:
   templates:
     podTemplates:
-      - name: pod1
-        metadata:
-          labels:
-            app: clickhouse-keeper
-            what: node
+      - name: default
         spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:24.3.2.23"
-              resources:
-                requests:
-                  memory: "256M"
-                  cpu: "1"
-                limits:
-                  memory: "4Gi"
-                  cpu: "2"
+              image: "clickhouse/clickhouse-keeper:24.3.5.46"
   configuration:
     clusters:
-      - name: "simple-3"
+      - name: "test-only"
         layout:
           replicasCount: 3
     settings:
