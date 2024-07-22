@@ -4662,12 +4662,12 @@ def test_048(self):
     """Check clickhouse-operator support ClickHouseKeeperInstallation with PVC in keeper manifest."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
-                        keeper_manifest="clickhouse-keeper-3-node-with-volume-for-test-only.yaml")
+    util.require_keeper(keeper_type="CHK",
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
-    with Given("CHI with 2 shards"):
+    with Given("CHI with 2 replicas"):
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -4675,8 +4675,7 @@ def test_048(self):
                 "do_not_delete": 1,
                 },
             )
-    numbers = 100
-    with When("I create distributed table"):
+    with When("I create replicated table"):
         create_table = """
             CREATE TABLE test_local_048 ON CLUSTER 'default' (a UInt32)
             Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
@@ -4688,30 +4687,16 @@ def test_048(self):
             "\n", ""
         )
         clickhouse.query(chi, create_table)
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_distr_048 ON CLUSTER 'default' AS test_local_048 "
-            "Engine = Distributed('default', default, test_local_048, a%2)",
-        )
 
-    with And("Give CH some time to propagate new table"):
-        time.sleep(30)
-    with And("I insert data in the distributed table"):
-        clickhouse.query(chi, f"INSERT INTO test_distr_048 select * from numbers({numbers})")
-    with And("Give data some time to propagate among CH instances"):
-        time.sleep(30)
+    numbers = 100
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_local_048 select * from numbers({numbers})")
 
-    with Then("Check local table on host 0 has 1/2 of all rows"):
+    with Then("Check reploicated table on host 0 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
-        assert out == f"{numbers // 2}", error()
-    with Then("Check local table on host 1 has 1/2 of all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
-        assert out == f"{numbers // 2}", error()
-    with Then("Check dist table on host 0 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-0-0-0")
         assert out == f"{numbers}", error()
-    with Then("Check dist table on host 1 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_distr_048", host=f"chi-{chi}-{cluster}-1-0-0")
+    with Then("Check reploicated table on host 1 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
         assert out == f"{numbers}", error()
 
     with Finally("I clean up"):
@@ -4728,7 +4713,7 @@ def test_049(self):
      when clickhouse-keeper defined with ClickHouseKeeperInstallation."""
 
     create_shell_namespace_clickhouse_template()
-    util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
+    util.require_keeper(keeper_type="CHK",
                         keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-23.yaml")
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
