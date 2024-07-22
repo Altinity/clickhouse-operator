@@ -115,9 +115,9 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Test Result
+      - name: Test Failed
         if: ${{ steps.vars.outputs.test_result != '0' }}
         uses: actions/github-script@v3
         with:
           script: |
-            core.setFailed('Test suite has failures!')
+            core.setFailed('Test suite has failures! Check test run status and logs.')
