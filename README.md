@@ -1,4 +1,4 @@
-# Altinity Kubernetes Operator for ClickHouse
+# Altinity Kubernetes Operator for ClickHouse®
 
 Altinity Kubernetes Operator for ClickHouse creates, configures and manages ClickHouse clusters running on Kubernetes.
 
