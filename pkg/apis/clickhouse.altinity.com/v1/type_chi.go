@@ -509,29 +509,29 @@ func (chi *ClickHouseInstallation) HostsCountAttributes(a *HostReconcileAttribut
 
 // GetHostTemplate gets HostTemplate by name
 func (chi *ClickHouseInstallation) GetHostTemplate(name string) (*HostTemplate, bool) {
-	if !chi.GetSpec().Templates.GetHostTemplatesIndex().Has(name) {
+	if !chi.GetSpec().GetTemplates().GetHostTemplatesIndex().Has(name) {
 		return nil, false
 	}
-	return chi.GetSpec().Templates.GetHostTemplatesIndex().Get(name), true
+	return chi.GetSpec().GetTemplates().GetHostTemplatesIndex().Get(name), true
 }
 
 // GetPodTemplate gets PodTemplate by name
 func (chi *ClickHouseInstallation) GetPodTemplate(name string) (*PodTemplate, bool) {
-	if !chi.GetSpec().Templates.GetPodTemplatesIndex().Has(name) {
+	if !chi.GetSpec().GetTemplates().GetPodTemplatesIndex().Has(name) {
 		return nil, false
 	}
-	return chi.GetSpec().Templates.GetPodTemplatesIndex().Get(name), true
+	return chi.GetSpec().GetTemplates().GetPodTemplatesIndex().Get(name), true
 }
 
 // WalkPodTemplates walks over all PodTemplates
 func (chi *ClickHouseInstallation) WalkPodTemplates(f func(template *PodTemplate)) {
-	chi.GetSpec().Templates.GetPodTemplatesIndex().Walk(f)
+	chi.GetSpec().GetTemplates().GetPodTemplatesIndex().Walk(f)
 }
 
 // GetVolumeClaimTemplate gets VolumeClaimTemplate by name
 func (chi *ClickHouseInstallation) GetVolumeClaimTemplate(name string) (*VolumeClaimTemplate, bool) {
-	if chi.GetSpec().Templates.GetVolumeClaimTemplatesIndex().Has(name) {
-		return chi.GetSpec().Templates.GetVolumeClaimTemplatesIndex().Get(name), true
+	if chi.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Has(name) {
+		return chi.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Get(name), true
 	}
 	return nil, false
 }
@@ -541,15 +541,15 @@ func (chi *ClickHouseInstallation) WalkVolumeClaimTemplates(f func(template *Vol
 	if chi == nil {
 		return
 	}
-	chi.GetSpec().Templates.GetVolumeClaimTemplatesIndex().Walk(f)
+	chi.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Walk(f)
 }
 
 // GetServiceTemplate gets ServiceTemplate by name
 func (chi *ClickHouseInstallation) GetServiceTemplate(name string) (*ServiceTemplate, bool) {
-	if !chi.GetSpec().Templates.GetServiceTemplatesIndex().Has(name) {
+	if !chi.GetSpec().GetTemplates().GetServiceTemplatesIndex().Has(name) {
 		return nil, false
 	}
-	return chi.GetSpec().Templates.GetServiceTemplatesIndex().Get(name), true
+	return chi.GetSpec().GetTemplates().GetServiceTemplatesIndex().Get(name), true
 }
 
 // GetRootServiceTemplate gets ServiceTemplate of a CHI

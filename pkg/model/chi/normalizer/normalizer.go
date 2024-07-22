@@ -15,10 +15,6 @@
 package normalizer
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -26,13 +22,13 @@ import (
 
 	core "k8s.io/api/core/v1"
 
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
-	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/subst_settings"
+	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
@@ -42,17 +38,15 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type secretGetter func(namespace, name string) (*core.Secret, error)
-
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	secretGet secretGetter
+	secretGet subst_settings.SecretGetter
 	ctx       *Context
 	namer     interfaces.INameManager
 }
 
 // NewNormalizer creates new normalizer
-func NewNormalizer(secretGet secretGetter) *Normalizer {
+func NewNormalizer(secretGet subst_settings.SecretGetter) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
 		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),
@@ -91,8 +85,8 @@ func (n *Normalizer) buildTargetFromTemplates(subj *api.ClickHouseInstallation) 
 	n.ctx.GetTarget().MergeFrom(subj, api.MergeTypeOverrideByNonEmptyValues)
 }
 
-func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSubject) {
-	for _, template := range templatesNormalizer.ApplyTemplates(n.ctx.GetTarget(), subj) {
+func (n *Normalizer) applyTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
+	for _, template := range crTemplatesNormalizer.ApplyTemplates(n.ctx.GetTarget(), subj) {
 		n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	}
 }
@@ -170,8 +164,7 @@ func (n *Normalizer) normalizeSpec() {
 func (n *Normalizer) finalize() {
 	n.ctx.GetTarget().Fill()
 	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
-		hostTemplate := n.hostGetHostTemplate(host)
-		hostApplyHostTemplate(host, hostTemplate)
+		n.hostApplyHostTemplateSpecifiedOrDefault(host)
 		return nil
 	})
 	n.fillCHIAddressInfo()
@@ -184,154 +177,6 @@ func (n *Normalizer) fillCHIAddressInfo() {
 		host.Runtime.Address.FQDN = n.namer.Name(interfaces.NameFQDN, host)
 		return nil
 	})
-}
-
-// hostGetHostTemplate gets Host Template to be used to normalize Host
-func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
-	// Which host template would be used - either explicitly defined in or a default one
-	hostTemplate, ok := host.GetHostTemplate()
-	if ok {
-		// Host explicitly references known HostTemplate
-		log.V(2).M(host).F().Info("host: %s uses custom hostTemplate %s", host.Name, hostTemplate.Name)
-		return hostTemplate
-	}
-
-	// Host references UNKNOWN HostTemplate, will use default one
-	// However, with default template there is a nuance - hostNetwork requires different default host template
-
-	// Check hostNetwork case at first
-	if podTemplate, ok := host.GetPodTemplate(); ok {
-		if podTemplate.Spec.HostNetwork {
-			// HostNetwork
-			hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateHostNetwork, n.namer.Name(interfaces.NameHostTemplate, host))
-		}
-	}
-
-	// In case hostTemplate still is not picked - use default one
-	if hostTemplate == nil {
-		hostTemplate = commonCreator.CreateHostTemplate(interfaces.HostTemplateCommon, n.namer.Name(interfaces.NameHostTemplate, host))
-	}
-
-	log.V(3).M(host).F().Info("host: %s use default hostTemplate", host.Name)
-
-	return hostTemplate
-}
-
-// hostApplyHostTemplate
-func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
-	if host.GetName() == "" {
-		host.Name = template.Spec.Name
-	}
-
-	host.Insecure = host.Insecure.MergeFrom(template.Spec.Insecure)
-	host.Secure = host.Secure.MergeFrom(template.Spec.Secure)
-
-	for _, portDistribution := range template.PortDistribution {
-		switch portDistribution.Type {
-		case deployment.PortDistributionUnspecified:
-			if !host.TCPPort.HasValue() {
-				host.TCPPort = template.Spec.TCPPort
-			}
-			if !host.TLSPort.HasValue() {
-				host.TLSPort = template.Spec.TLSPort
-			}
-			if !host.HTTPPort.HasValue() {
-				host.HTTPPort = template.Spec.HTTPPort
-			}
-			if !host.HTTPSPort.HasValue() {
-				host.HTTPSPort = template.Spec.HTTPSPort
-			}
-			if !host.InterserverHTTPPort.HasValue() {
-				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
-			}
-		case deployment.PortDistributionClusterScopeIndex:
-			if !host.TCPPort.HasValue() {
-				base := api.ChDefaultTCPPortNumber
-				if template.Spec.TCPPort.HasValue() {
-					base = template.Spec.TCPPort.Value()
-				}
-				host.TCPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-			if !host.TLSPort.HasValue() {
-				base := api.ChDefaultTLSPortNumber
-				if template.Spec.TLSPort.HasValue() {
-					base = template.Spec.TLSPort.Value()
-				}
-				host.TLSPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-			if !host.HTTPPort.HasValue() {
-				base := api.ChDefaultHTTPPortNumber
-				if template.Spec.HTTPPort.HasValue() {
-					base = template.Spec.HTTPPort.Value()
-				}
-				host.HTTPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-			if !host.HTTPSPort.HasValue() {
-				base := api.ChDefaultHTTPSPortNumber
-				if template.Spec.HTTPSPort.HasValue() {
-					base = template.Spec.HTTPSPort.Value()
-				}
-				host.HTTPSPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-			if !host.InterserverHTTPPort.HasValue() {
-				base := api.ChDefaultInterserverHTTPPortNumber
-				if template.Spec.InterserverHTTPPort.HasValue() {
-					base = template.Spec.InterserverHTTPPort.Value()
-				}
-				host.InterserverHTTPPort = api.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-		}
-	}
-
-	hostApplyPortsFromSettings(host)
-
-	host.InheritTemplatesFrom(nil, nil, template)
-}
-
-// hostApplyPortsFromSettings
-func hostApplyPortsFromSettings(host *api.Host) {
-	// Use host personal settings at first
-	hostEnsurePortValuesFromSettings(host, host.GetSettings(), false)
-	// Fallback to common settings
-	hostEnsurePortValuesFromSettings(host, host.GetCR().GetSpec().Configuration.Settings, true)
-}
-
-// hostEnsurePortValuesFromSettings fetches port spec from settings, if any provided
-func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, final bool) {
-	//
-	// 1. Setup fallback/default ports
-	//
-	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
-	// because this is not final setup (just intermittent) and all these ports may be overwritten later
-	var (
-		fallbackTCPPort             *api.Int32
-		fallbackTLSPort             *api.Int32
-		fallbackHTTPPort            *api.Int32
-		fallbackHTTPSPort           *api.Int32
-		fallbackInterserverHTTPPort *api.Int32
-	)
-
-	// On the other hand, for final setup we need to assign real numbers to ports
-	if final {
-		if host.IsInsecure() {
-			fallbackTCPPort = api.NewInt32(api.ChDefaultTCPPortNumber)
-			fallbackHTTPPort = api.NewInt32(api.ChDefaultHTTPPortNumber)
-		}
-		if host.IsSecure() {
-			fallbackTLSPort = api.NewInt32(api.ChDefaultTLSPortNumber)
-			fallbackHTTPSPort = api.NewInt32(api.ChDefaultHTTPSPortNumber)
-		}
-		fallbackInterserverHTTPPort = api.NewInt32(api.ChDefaultInterserverHTTPPortNumber)
-	}
-
-	//
-	// 2. Setup ports
-	//
-	host.TCPPort = api.EnsurePortValue(host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
-	host.TLSPort = api.EnsurePortValue(host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
-	host.HTTPPort = api.EnsurePortValue(host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
-	host.HTTPSPort = api.EnsurePortValue(host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
-	host.InterserverHTTPPort = api.EnsurePortValue(host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
 
 // fillStatus fills .status section of a CHI with values based on current CHI
@@ -571,7 +416,7 @@ func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
 func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
 	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
-	n.ctx.GetTarget().GetSpec().Templates.EnsureHostTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
@@ -583,26 +428,26 @@ func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	}
 	templates.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
-	n.ctx.GetTarget().GetSpec().Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpec().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
 	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
-	n.ctx.GetTarget().GetSpec().Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *api.ServiceTemplate) {
 	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
-	n.ctx.GetTarget().GetSpec().Templates.EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
 func (n *Normalizer) normalizeUseTemplates(templates []*api.TemplateRef) []*api.TemplateRef {
-	return templatesNormalizer.NormalizeTemplatesList(templates)
+	return crTemplatesNormalizer.NormalizeTemplatesList(templates)
 }
 
 // normalizeClusters normalizes clusters
@@ -649,157 +494,12 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ZookeeperConfig) *a
 		}
 	}
 
-	// In case no ZK root specified - assign '/clickhouse/{namespace}/{chi name}'
+	// In case no ZK root specified - assign '/clickhouse/{namespace}/{target name}'
 	//if zk.Root == "" {
-	//	zk.Root = fmt.Sprintf(zkDefaultRootTemplate, n.chi.Namespace, n.chi.Name)
+	//	zk.Root = fmt.Sprintf(zkDefaultRootTemplate, n.target.Namespace, n.target.Name)
 	//}
 
 	return zk
-}
-
-type SettingsSubstitution interface {
-	Has(string) bool
-	Get(string) *api.Setting
-	Set(string, *api.Setting) *api.Settings
-	Delete(string)
-	Name2Key(string) string
-}
-
-// substSettingsFieldWithDataFromDataSource substitute settings field with new setting built from the data source
-func (n *Normalizer) substSettingsFieldWithDataFromDataSource(
-	settings SettingsSubstitution,
-	dstField,
-	srcSecretRefField string,
-	parseScalarString bool,
-	newSettingCreator func(api.ObjectAddress) (*api.Setting, error),
-) bool {
-	// Has to have source field specified
-	if !settings.Has(srcSecretRefField) {
-		// No substitution done
-		return false
-	}
-
-	// Fetch data source address from the source setting field
-	setting := settings.Get(srcSecretRefField)
-	secretAddress, err := setting.FetchDataSourceAddress(n.ctx.GetTarget().Namespace, parseScalarString)
-	if err != nil {
-		// This is not necessarily an error, just no address specified, most likely setting is not data source ref
-		// No substitution done
-		return false
-	}
-
-	// Create setting from the secret with a provided function
-	if newSetting, err := newSettingCreator(secretAddress); err == nil {
-		// Set the new setting as dst.
-		// Replacing src in case src name is the same as dst name.
-		settings.Set(dstField, newSetting)
-	}
-
-	// In case we are NOT replacing the same field with its new value, then remove the source field.
-	// Typically non-replaced source field is not expected to be included into the final config,
-	// mainly because very often these source fields are synthetic ones (do not exist in config fields list).
-	if dstField != srcSecretRefField {
-		settings.Delete(srcSecretRefField)
-	}
-
-	// Substitution done
-	return true
-}
-
-// substSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
-func (n *Normalizer) substSettingsFieldWithSecretFieldValue(
-	settings SettingsSubstitution,
-	dstField,
-	srcSecretRefField string,
-) bool {
-	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, true,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
-			secretFieldValue, err := n.fetchSecretFieldValue(secretAddress)
-			if err != nil {
-				return nil, err
-			}
-			// Create new setting with the value
-			return api.NewSettingScalar(secretFieldValue), nil
-		})
-}
-
-// substSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
-func (n *Normalizer) substSettingsFieldWithEnvRefToSecretField(
-	settings SettingsSubstitution,
-	dstField,
-	srcSecretRefField,
-	envVarNamePrefix string,
-	parseScalarString bool,
-) bool {
-	return n.substSettingsFieldWithDataFromDataSource(settings, dstField, srcSecretRefField, parseScalarString,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
-			// ENV VAR name and value
-			// In case not OK env var name will be empty and config will be incorrect. CH may not start
-			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + settings.Name2Key(dstField))
-			n.appendAdditionalEnvVar(
-				core.EnvVar{
-					Name: envVarName,
-					ValueFrom: &core.EnvVarSource{
-						SecretKeyRef: &core.SecretKeySelector{
-							LocalObjectReference: core.LocalObjectReference{
-								Name: secretAddress.Name,
-							},
-							Key: secretAddress.Key,
-						},
-					},
-				},
-			)
-			// Create new setting w/o value but with attribute to read from ENV var
-			return api.NewSettingScalar("").SetAttribute("from_env", envVarName), nil
-		})
-}
-
-func (n *Normalizer) substSettingsFieldWithMountedFile(settings *api.Settings, srcSecretRefField string) bool {
-	var defaultMode int32 = 0644
-	return n.substSettingsFieldWithDataFromDataSource(settings, "", srcSecretRefField, false,
-		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
-			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
-			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
-			filenameInSettingsOrFiles := srcSecretRefField
-			filenameInMountedFS := secretAddress.Key
-
-			if !ok1 || !ok2 {
-				return nil, fmt.Errorf("unable to build k8s object name")
-			}
-
-			n.appendAdditionalVolume(core.Volume{
-				Name: volumeName,
-				VolumeSource: core.VolumeSource{
-					Secret: &core.SecretVolumeSource{
-						SecretName: secretAddress.Name,
-						Items: []core.KeyToPath{
-							{
-								Key:  secretAddress.Key,
-								Path: filenameInMountedFS,
-							},
-						},
-						DefaultMode: &defaultMode,
-					},
-				},
-			})
-
-			// TODO setting may have specified mountPath explicitly
-			mountPath := filepath.Join(config.DirPathSecretFilesConfig, filenameInSettingsOrFiles, secretAddress.Name)
-			// TODO setting may have specified subPath explicitly
-			// Mount as file
-			//subPath := filename
-			// Mount as folder
-			subPath := ""
-			n.appendAdditionalVolumeMount(core.VolumeMount{
-				Name:      volumeMountName,
-				ReadOnly:  true,
-				MountPath: mountPath,
-				SubPath:   subPath,
-			})
-
-			// Do not create new setting, but old setting would be deleted
-			return nil, fmt.Errorf("no need to create a new setting")
-		})
 }
 
 func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
@@ -811,7 +511,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 	case api.ClusterSecretSourceSecretRef:
 		// Secret has explicit SecretKeyRef
 		// Set the password for internode communication using an ENV VAR
-		n.appendAdditionalEnvVar(
+		n.ctx.AppendAdditionalEnvVar(
 			core.EnvVar{
 				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -822,7 +522,7 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 	case api.ClusterSecretSourceAuto:
 		// Secret is auto-generated
 		// Set the password for internode communication using an ENV VAR
-		n.appendAdditionalEnvVar(
+		n.ctx.AppendAdditionalEnvVar(
 			core.EnvVar{
 				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -831,45 +531,6 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 			},
 		)
 	}
-}
-
-func (n *Normalizer) appendAdditionalEnvVar(envVar core.EnvVar) {
-	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(envVar)
-}
-
-func (n *Normalizer) appendAdditionalVolume(volume core.Volume) {
-	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeIfNotExists(volume)
-}
-
-func (n *Normalizer) appendAdditionalVolumeMount(volumeMount core.VolumeMount) {
-	n.ctx.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMountIfNotExists(volumeMount)
-}
-
-var ErrSecretValueNotFound = fmt.Errorf("secret value not found")
-
-// fetchSecretFieldValue fetches the value of the specified field in the specified secret
-// TODO this is the only usage of k8s API in the normalizer. How to remove it?
-func (n *Normalizer) fetchSecretFieldValue(secretAddress api.ObjectAddress) (string, error) {
-
-	// Fetch the secret
-	secret, err := n.secretGet(secretAddress.Namespace, secretAddress.Name)
-	if err != nil {
-		log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().Info("unable to read secret %s %v", secretAddress, err)
-		return "", ErrSecretValueNotFound
-	}
-
-	// Find the field within the secret
-	for key, value := range secret.Data {
-		if secretAddress.Key == key {
-			// The field found!
-			return string(value), nil
-		}
-	}
-
-	log.V(1).M(secretAddress.Namespace, secretAddress.Name).F().
-		Warning("unable to locate secret data by namespace/name/key: %s", secretAddress)
-
-	return "", ErrSecretValueNotFound
 }
 
 // normalizeUsersList extracts usernames from provided 'users' settings and adds some extra usernames
@@ -896,7 +557,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 	// Add special "chop" user to the list of users, which is used/required for:
 	// 1. Operator to communicate with hosts
 	usernames := n.normalizeUsersList(
-		// user-based settings contains non-explicit users list in it
+		// User-based settings section contains non-explicit users list in it - as part of paths
 		users,
 		// Add default user which always exists
 		defaultUsername,
@@ -909,7 +570,7 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 		n.normalizeConfigurationUser(api.NewSettingsUser(users, username))
 	}
 
-	// Remove plain password for the default user
+	// Remove plain password for the "default" user
 	n.removePlainPassword(api.NewSettingsUser(users, defaultUsername))
 
 	return users
@@ -917,173 +578,11 @@ func (n *Normalizer) normalizeConfigurationUsers(users *api.Settings) *api.Setti
 
 func (n *Normalizer) removePlainPassword(user *api.SettingsUser) {
 	// If user has any of encrypted password(s) specified, we need to delete existing plaintext password.
-	// Set `remove` flag for user's plaintext `password`, which is specified as empty in stock ClickHouse users.xml,
+	// Set 'remove' flag for user's plaintext 'password' setting, which is specified as empty in stock ClickHouse users.xml,
 	// thus we need to overwrite it.
 	if user.Has("password_double_sha1_hex") || user.Has("password_sha256_hex") {
 		user.Set("password", api.NewSettingScalar("").SetAttribute("remove", "1"))
 	}
-}
-
-const (
-	envVarNamePrefixConfigurationUsers    = "CONFIGURATION_USERS"
-	envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
-)
-
-func (n *Normalizer) normalizeConfigurationUser(user *api.SettingsUser) {
-	n.normalizeConfigurationUserSecretRef(user)
-	n.normalizeConfigurationUserPassword(user)
-	n.normalizeConfigurationUserEnsureMandatoryFields(user)
-}
-
-func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser) {
-	user.WalkSafe(func(name string, _ *api.Setting) {
-		if strings.HasPrefix(name, "k8s_secret_") {
-			// TODO remove as obsoleted
-			// Skip this user field, it will be processed later
-		} else {
-			n.substSettingsFieldWithEnvRefToSecretField(user, name, name, envVarNamePrefixConfigurationUsers, false)
-		}
-	})
-}
-
-func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.SettingsUser) {
-	//
-	// Ensure each user has mandatory fields:
-	//
-	// 1. user/profile
-	// 2. user/quota
-	// 3. user/networks/ip
-	// 4. user/networks/host_regexp
-	profile := chop.Config().ClickHouse.Config.User.Default.Profile
-	quota := chop.Config().ClickHouse.Config.User.Default.Quota
-	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	hostRegexp := n.namer.Name(interfaces.NamePodHostnameRegexp, n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
-
-	// Some users may have special options for mandatory fields
-	switch user.Username() {
-	case defaultUsername:
-		// "default" user
-		ips = append(ips, n.ctx.Options().DefaultUserAdditionalIPs...)
-		if !n.ctx.Options().DefaultUserInsertHostRegex {
-			hostRegexp = ""
-		}
-	case chop.Config().ClickHouse.Access.Username:
-		// User used by CHOp to access ClickHouse instances.
-		ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-
-		profile = chopProfile
-		quota = ""
-		ips = []string{ip}
-		hostRegexp = ""
-	}
-
-	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	n.setMandatoryUserFields(user, &userFields{
-		profile:    profile,
-		quota:      quota,
-		ips:        ips,
-		hostRegexp: hostRegexp,
-	})
-}
-
-type userFields struct {
-	profile    string
-	quota      string
-	ips        []string
-	hostRegexp string
-}
-
-// setMandatoryUserFields sets user fields
-func (n *Normalizer) setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
-	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	if fields.profile != "" {
-		user.SetIfNotExists("profile", api.NewSettingScalar(fields.profile))
-	}
-	if fields.quota != "" {
-		user.SetIfNotExists("quota", api.NewSettingScalar(fields.quota))
-	}
-	if len(fields.ips) > 0 {
-		user.Set("networks/ip", api.NewSettingVector(fields.ips).MergeFrom(user.Get("networks/ip")))
-	}
-	if fields.hostRegexp != "" {
-		user.SetIfNotExists("networks/host_regexp", api.NewSettingScalar(fields.hostRegexp))
-	}
-}
-
-// normalizeConfigurationUserPassword deals with user passwords
-func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
-	// Values from the secret have higher priority
-	n.substSettingsFieldWithSecretFieldValue(user, "password", "k8s_secret_password")
-	n.substSettingsFieldWithSecretFieldValue(user, "password_sha256_hex", "k8s_secret_password_sha256_hex")
-	n.substSettingsFieldWithSecretFieldValue(user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex")
-
-	// Values from the secret passed via ENV have even higher priority
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password", "k8s_secret_env_password", envVarNamePrefixConfigurationUsers, true)
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", envVarNamePrefixConfigurationUsers, true)
-	n.substSettingsFieldWithEnvRefToSecretField(user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", envVarNamePrefixConfigurationUsers, true)
-
-	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
-	if user.Has("password_double_sha1_hex") {
-		user.Delete("password_sha256_hex")
-		user.Delete("password")
-		// This is all for this user
-		return
-	}
-
-	// Than goes password_sha256_hex, thus keep it only
-	if user.Has("password_sha256_hex") {
-		user.Delete("password_double_sha1_hex")
-		user.Delete("password")
-		// This is all for this user
-		return
-	}
-
-	// From now on we either have a plaintext password specified (explicitly or via ENV), or no password at all
-
-	if user.Get("password").HasAttributes() {
-		// Have plaintext password with attributes - means we have plaintext password explicitly specified via ENV var
-		// This is fine
-		// This is all for this user
-		return
-	}
-
-	// From now on we either have plaintext password specified as an explicit string, or no password at all
-
-	passwordPlaintext := user.Get("password").String()
-
-	// Apply default password for password-less non-default users
-	// 1. NB "default" user keeps empty password in here.
-	// 2. ClickHouse user gets password from his section of CHOp configuration
-	// 3. All the rest users get default password
-	if passwordPlaintext == "" {
-		switch user.Username() {
-		case defaultUsername:
-			// NB "default" user keeps empty password in here.
-		case chop.Config().ClickHouse.Access.Username:
-			// User used by CHOp to access ClickHouse instances.
-			// Gets ClickHouse access password from "ClickHouse.Access.Password"
-			passwordPlaintext = chop.Config().ClickHouse.Access.Password
-		default:
-			// All the rest users get default password from "ClickHouse.Config.User.Default.Password"
-			passwordPlaintext = chop.Config().ClickHouse.Config.User.Default.Password
-		}
-	}
-
-	// It may come that plaintext password is still empty.
-	// For example, user `default` quite often has empty password.
-	if passwordPlaintext == "" {
-		// This is fine
-		// This is all for this user
-		return
-	}
-
-	// Have plaintext password specified.
-	// Replace plaintext password with encrypted one
-	passwordSHA256 := sha256.Sum256([]byte(passwordPlaintext))
-	user.Set("password_sha256_hex", api.NewSettingScalar(hex.EncodeToString(passwordSHA256[:])))
-	// And keep only one password specification - delete all the rest (if any exists)
-	user.Delete("password_double_sha1_hex")
-	user.Delete("password")
 }
 
 // normalizeConfigurationProfiles normalizes .spec.configuration.profiles
@@ -1104,6 +603,8 @@ func (n *Normalizer) normalizeConfigurationQuotas(quotas *api.Settings) *api.Set
 	return quotas
 }
 
+const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
+
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
 func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api.Settings {
 	if settings == nil {
@@ -1112,7 +613,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api
 	settings.Normalize()
 
 	settings.WalkSafe(func(name string, setting *api.Setting) {
-		n.substSettingsFieldWithEnvRefToSecretField(settings, name, name, envVarNamePrefixConfigurationSettings, false)
+		subst_settings.SubstSettingsFieldWithEnvRefToSecretField(n.ctx, settings, name, name, envVarNamePrefixConfigurationSettings, false)
 	})
 	return settings
 }
@@ -1126,7 +627,7 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 	files.Normalize()
 
 	files.WalkSafe(func(key string, setting *api.Setting) {
-		n.substSettingsFieldWithMountedFile(files, key)
+		subst_settings.SubstSettingsFieldWithMountedFile(n.ctx, files, key)
 	})
 
 	return files
@@ -1165,7 +666,7 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	n.ensureClusterLayoutShards(cluster.Layout)
 	n.ensureClusterLayoutReplicas(cluster.Layout)
 
-	n.createHostsField(cluster)
+	createHostsField(cluster)
 	n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
@@ -1185,24 +686,6 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	})
 
 	return cluster
-}
-
-// createHostsField
-func (n *Normalizer) createHostsField(cluster *api.Cluster) {
-	cluster.Layout.HostsField = api.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
-
-	// Need to migrate hosts from Shards and Replicas into HostsField
-	hostMergeFunc := func(shard, replica int, host *api.Host) error {
-		if curHost := cluster.Layout.HostsField.Get(shard, replica); curHost == nil {
-			cluster.Layout.HostsField.Set(shard, replica, host)
-		} else {
-			curHost.MergeFrom(host)
-		}
-		return nil
-	}
-
-	cluster.WalkHostsByShards(hostMergeFunc)
-	cluster.WalkHostsByReplicas(hostMergeFunc)
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
@@ -1248,6 +731,7 @@ func (n *Normalizer) normalizePDBMaxUnavailable(value *api.Int32) *api.Int32 {
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
 func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *api.ChiClusterLayout) *api.ChiClusterLayout {
+	// Ensure layout
 	if clusterLayout == nil {
 		clusterLayout = api.NewChiClusterLayout()
 	}
@@ -1473,48 +957,6 @@ func (n *Normalizer) normalizeReplicaHosts(replica *api.ChiReplica, cluster *api
 		host := cluster.GetOrCreateHost(shardIndex, replicaIndex)
 		replica.Hosts = append(replica.Hosts, host)
 	}
-}
-
-// normalizeHost normalizes a host/replica
-func (n *Normalizer) normalizeHost(
-	host *api.Host,
-	shard *api.ChiShard,
-	replica *api.ChiReplica,
-	cluster *api.Cluster,
-	shardIndex int,
-	replicaIndex int,
-) {
-
-	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
-	// Inherit from either Shard or Replica
-	var s *api.ChiShard
-	var r *api.ChiReplica
-	if cluster.IsShardSpecified() {
-		s = shard
-	} else {
-		r = replica
-	}
-	host.InheritSettingsFrom(s, r)
-	host.Settings = n.normalizeConfigurationSettings(host.Settings)
-	host.InheritFilesFrom(s, r)
-	host.Files = n.normalizeConfigurationFiles(host.Files)
-	host.InheritTemplatesFrom(s, r, nil)
-}
-
-// normalizeHostName normalizes host's name
-func (n *Normalizer) normalizeHostName(
-	host *api.Host,
-	shard *api.ChiShard,
-	shardIndex int,
-	replica *api.ChiReplica,
-	replicaIndex int,
-) {
-	if (len(host.GetName()) > 0) && !commonNamer.IsAutoGeneratedHostName(host.GetName(), host, shard, shardIndex, replica, replicaIndex) {
-		// Has explicitly specified name already
-		return
-	}
-
-	host.Name = n.namer.Name(interfaces.NameHost, host, shard, shardIndex, replica, replicaIndex)
 }
 
 // normalizeShardInternalReplication ensures reasonable values in

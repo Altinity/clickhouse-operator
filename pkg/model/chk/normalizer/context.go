@@ -21,8 +21,8 @@ import (
 
 // Context specifies normalization context
 type Context struct {
-	// chk specifies current CHK being normalized
-	chk *apiChk.ClickHouseKeeperInstallation
+	// target specifies current target being normalized
+	target *apiChk.ClickHouseKeeperInstallation
 	// options specifies normalization options
 	options *normalizer.Options
 }
@@ -38,15 +38,15 @@ func (c *Context) GetTarget() *apiChk.ClickHouseKeeperInstallation {
 	if c == nil {
 		return nil
 	}
-	return c.chk
+	return c.target
 }
 
 func (c *Context) SetTarget(target *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
 	if c == nil {
 		return nil
 	}
-	c.chk = target
-	return c.chk
+	c.target = target
+	return c.target
 }
 
 func (c *Context) Options() *normalizer.Options {

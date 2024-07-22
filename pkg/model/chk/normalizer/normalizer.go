@@ -18,12 +18,13 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	templatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates"
+	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
+	"strings"
 )
 
 // Normalizer specifies structures normalizer
@@ -68,7 +69,7 @@ func (n *Normalizer) buildTargetFromTemplates(subj *apiChk.ClickHouseKeeperInsta
 	n.ctx.GetTarget().MergeFrom(subj, apiChi.MergeTypeOverrideByNonEmptyValues)
 }
 
-func (n *Normalizer) applyTemplatesOnTarget(subj templatesNormalizer.TemplateSubject) {
+func (n *Normalizer) applyTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
 	//for _, template := range templatesNormalizer.ApplyTemplates(n.ctx.GetTarget(), subj) {
 	//	n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	//}
@@ -109,13 +110,13 @@ func (n *Normalizer) HasTargetTemplate() bool {
 }
 
 func (n *Normalizer) createTarget() *apiChk.ClickHouseKeeperInstallation {
-	//if n.HasTargetTemplate() {
-	//	// Template specified - start with template
-	//	return n.GetTargetTemplate().DeepCopy()
-	//} else {
-	//	// No template specified - start with clear page
-	return n.newSubject()
-	//}
+	if n.HasTargetTemplate() {
+		// Template specified - start with template
+		return n.GetTargetTemplate().DeepCopy()
+	} else {
+		// No template specified - start with clear page
+		return n.newSubject()
+	}
 }
 
 // normalizeTarget normalizes target
@@ -159,13 +160,22 @@ func (n *Normalizer) fillStatus() {
 	//n.ctx.chi.FillStatus(endpoint, pods, fqdns, ip)
 }
 
+func isNamespaceDomainPatternValid(namespaceDomainPattern *apiChi.String) bool {
+	if strings.Count(namespaceDomainPattern.Value(), "%s") > 1 {
+		return false
+	} else {
+		return true
+	}
+}
+
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
-//func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern string) string {
-//	if strings.Count(namespaceDomainPattern, "%s") > 1 {
-//		return ""
-//	}
-//	return namespaceDomainPattern
-//}
+func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *apiChi.String) *apiChi.String {
+	if isNamespaceDomainPatternValid(namespaceDomainPattern) {
+		return namespaceDomainPattern
+	}
+	// In case namespaceDomainPattern is not valid - do not use it
+	return nil
+}
 
 // normalizeConfiguration normalizes .spec.configuration
 func (n *Normalizer) normalizeConfiguration(conf *apiChk.Configuration) *apiChk.Configuration {
@@ -231,19 +241,19 @@ func (n *Normalizer) normalizeHostTemplate(template *apiChi.HostTemplate) {
 func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
-	if len(n.ctx.chk.Spec.Configuration.Clusters) > 0 {
-		replicasCount = n.ctx.chk.Spec.Configuration.Clusters[0].Layout.ReplicasCount
+	if len(n.ctx.GetTarget().GetSpec().Configuration.Clusters) > 0 {
+		replicasCount = n.ctx.GetTarget().GetSpec().Configuration.Clusters[0].Layout.ReplicasCount
 	}
 	templates.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
-	n.ctx.chk.Spec.Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpec().Templates.EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTemplate) {
 	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
-	n.ctx.chk.Spec.Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpec().Templates.EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
@@ -313,8 +323,10 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(layout *a
 		layout = apiChi.NewClusterLayout()
 	}
 
-	// Layout.ShardsCount and
-	// Layout.ReplicasCount must represent max number of shards and replicas requested respectively
+	// Layout.ShardsCount
+	// and
+	// Layout.ReplicasCount
+	// must represent max number of shards and replicas requested respectively
 
 	// Deal with ReplicasCount
 	if layout.ReplicasCount == 0 {

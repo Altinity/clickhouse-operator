@@ -109,6 +109,10 @@ func (s *ChiSpec) GetNamespaceDomainPattern() *String {
 	return s.NamespaceDomainPattern
 }
 
+func (s *ChiSpec) GetTemplates() *Templates {
+	return s.Templates
+}
+
 type ICHISpec interface {
 	GetNamespaceDomainPattern() *String
 }
