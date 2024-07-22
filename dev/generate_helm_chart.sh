@@ -190,6 +190,7 @@ function update_deployment_resource() {
   yq e -i '.spec.template.spec.affinity |= "{{ toYaml .Values.affinity | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.tolerations |= "{{ toYaml .Values.tolerations | nindent 8 }}"' "${file}"
   yq e -i '.spec.template.spec.securityContext |= "{{ toYaml .Values.podSecurityContext | nindent 8 }}"' "${file}"
+  yq e -i '.spec.template.spec.topologySpreadConstraints |= "{{ toYaml .Values.topologySpreadConstraints | nindent 8 }}"' "${file}"
 
   for cm in $(yq e '.spec.template.spec.volumes[].configMap.name' "${file}"); do
     local prefix='{{ include \"altinity-clickhouse-operator.fullname\" . }}'
