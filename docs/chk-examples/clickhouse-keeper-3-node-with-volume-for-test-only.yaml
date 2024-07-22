@@ -4,9 +4,9 @@ apiVersion: v1
 kind: Service
 metadata:
   # DNS would be like zookeeper.namespace.svc
-  name: zookeeper
+  name: clickhouse-keeper
   labels:
-    app: zookeeper
+    app: clickhouse-keeper
 spec:
   ports:
     - port: 2181
