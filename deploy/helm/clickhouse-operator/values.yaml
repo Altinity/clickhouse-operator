@@ -114,6 +114,9 @@ affinity: {}
 # podSecurityContext - operator deployment SecurityContext, look `kubectl explain pod.spec.securityContext` for details
 
 podSecurityContext: {}
+# topologySpreadConstraints - topologySpreadConstraints affinity for scheduler pod assignment, look `kubectl explain pod.spec.topologySpreadConstraints` for details
+
+topologySpreadConstraints: []
 serviceMonitor:
   # serviceMonitor.enabled -- ServiceMonitor Custom resource is created for a (prometheus-operator)[https://github.com/prometheus-operator/prometheus-operator]
   enabled: false
