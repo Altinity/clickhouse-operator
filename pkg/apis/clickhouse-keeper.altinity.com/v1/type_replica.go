@@ -14,37 +14,39 @@
 
 package v1
 
-func (replica *ChiReplica) GetName() string {
+import apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
+func (replica *ChkReplica) GetName() string {
 	return replica.Name
 }
 
 // InheritSettingsFrom inherits settings from specified cluster
-func (replica *ChiReplica) InheritSettingsFrom(cluster *ChiCluster) {
-	replica.Settings = replica.Settings.MergeFrom(cluster.Settings)
+func (replica *ChkReplica) InheritSettingsFrom(cluster *ChkCluster) {
+	// replica.Settings = replica.Settings.MergeFrom(cluster.Settings)
 }
 
 // InheritFilesFrom inherits files from specified cluster
-func (replica *ChiReplica) InheritFilesFrom(cluster *ChiCluster) {
-	replica.Files = replica.Files.MergeFrom(cluster.Files)
+func (replica *ChkReplica) InheritFilesFrom(cluster *ChkCluster) {
+	// replica.Files = replica.Files.MergeFrom(cluster.Files)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
-func (replica *ChiReplica) InheritTemplatesFrom(cluster *ChiCluster) {
-	replica.Templates = replica.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
-	replica.Templates.HandleDeprecatedFields()
+func (replica *ChkReplica) InheritTemplatesFrom(cluster *ChkCluster) {
+	// replica.Templates = replica.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
+	// replica.Templates.HandleDeprecatedFields()
 }
 
 // GetServiceTemplate gets service template
-func (replica *ChiReplica) GetServiceTemplate() (*ServiceTemplate, bool) {
+func (replica *ChkReplica) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	if !replica.Templates.HasReplicaServiceTemplate() {
 		return nil, false
 	}
 	name := replica.Templates.GetReplicaServiceTemplate()
-	return replica.Runtime.CHI.GetServiceTemplate(name)
+	return replica.Runtime.CHK.GetServiceTemplate(name)
 }
 
 // HasShardsCount checks whether replica has shards count specified
-func (replica *ChiReplica) HasShardsCount() bool {
+func (replica *ChkReplica) HasShardsCount() bool {
 	if replica == nil {
 		return false
 	}
@@ -53,7 +55,7 @@ func (replica *ChiReplica) HasShardsCount() bool {
 }
 
 // WalkHosts walks over hosts
-func (replica *ChiReplica) WalkHosts(f func(host *Host) error) []error {
+func (replica *ChkReplica) WalkHosts(f func(host *apiChi.Host) error) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range replica.Hosts {
@@ -65,49 +67,49 @@ func (replica *ChiReplica) WalkHosts(f func(host *Host) error) []error {
 }
 
 // HostsCount returns number of hosts
-func (replica *ChiReplica) HostsCount() int {
+func (replica *ChkReplica) HostsCount() int {
 	count := 0
-	replica.WalkHosts(func(host *Host) error {
+	replica.WalkHosts(func(host *apiChi.Host) error {
 		count++
 		return nil
 	})
 	return count
 }
 
-func (replica *ChiReplica) HasSettings() bool {
+func (replica *ChkReplica) HasSettings() bool {
 	return replica.GetSettings() != nil
 }
 
-func (replica *ChiReplica) GetSettings() *Settings {
+func (replica *ChkReplica) GetSettings() *apiChi.Settings {
 	if replica == nil {
 		return nil
 	}
 	return replica.Settings
 }
 
-func (replica *ChiReplica) HasFiles() bool {
+func (replica *ChkReplica) HasFiles() bool {
 	return replica.GetFiles() != nil
 }
 
-func (replica *ChiReplica) GetFiles() *Settings {
+func (replica *ChkReplica) GetFiles() *apiChi.Settings {
 	if replica == nil {
 		return nil
 	}
 	return replica.Files
 }
 
-func (replica *ChiReplica) HasTemplates() bool {
+func (replica *ChkReplica) HasTemplates() bool {
 	return replica.GetTemplates() != nil
 }
 
-func (replica *ChiReplica) GetTemplates() *TemplatesList {
+func (replica *ChkReplica) GetTemplates() *apiChi.TemplatesList {
 	if replica == nil {
 		return nil
 	}
 	return replica.Templates
 }
 
-func (replica *ChiReplica) GetRuntime() IReplicaRuntime {
+func (replica *ChkReplica) GetRuntime() apiChi.IReplicaRuntime {
 	if replica == nil {
 		return nil
 	}

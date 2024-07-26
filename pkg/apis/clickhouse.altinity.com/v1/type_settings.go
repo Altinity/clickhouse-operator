@@ -17,6 +17,7 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"regexp"
 	"sort"
 	"strings"
@@ -351,32 +352,32 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 }
 
 // fetchPort is the base function to fetch *Int32 port value
-func (s *Settings) fetchPort(name string) *Int32 {
+func (s *Settings) fetchPort(name string) *types.Int32 {
 	return s.Get(name).ScalarInt32Ptr()
 }
 
 // GetTCPPort gets TCP port from settings
-func (s *Settings) GetTCPPort() *Int32 {
+func (s *Settings) GetTCPPort() *types.Int32 {
 	return s.fetchPort("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
-func (s *Settings) GetTCPPortSecure() *Int32 {
+func (s *Settings) GetTCPPortSecure() *types.Int32 {
 	return s.fetchPort("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
-func (s *Settings) GetHTTPPort() *Int32 {
+func (s *Settings) GetHTTPPort() *types.Int32 {
 	return s.fetchPort("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
-func (s *Settings) GetHTTPSPort() *Int32 {
+func (s *Settings) GetHTTPSPort() *types.Int32 {
 	return s.fetchPort("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
-func (s *Settings) GetInterserverHTTPPort() *Int32 {
+func (s *Settings) GetInterserverHTTPPort() *types.Int32 {
 	return s.fetchPort("interserver_http_port")
 }
 
@@ -416,7 +417,7 @@ func (s *Settings) GetSection(section SettingsSection, includeSettingWithNoSecti
 	}
 
 	s.WalkKeys(func(key string, setting *Setting) {
-		_section, err := getSectionFromPath(key)
+		_section, err := GetSectionFromPath(key)
 		switch {
 		case (err == nil) && !_section.Equal(section):
 			// Section is specified in this key.
@@ -467,7 +468,7 @@ func (s *Settings) Filter(
 	}
 
 	s.WalkKeys(func(key string, _ *Setting) {
-		section, err := getSectionFromPath(key)
+		section, err := GetSectionFromPath(key)
 
 		if (err != nil) && (err != errorNoSectionSpecified) {
 			// We have a complex error, skip to the next
@@ -602,8 +603,8 @@ func getSuffixFromPath(path string) (string, error) {
 	return suffix, nil
 }
 
-// getSectionFromPath
-func getSectionFromPath(path string) (SettingsSection, error) {
+// GetSectionFromPath
+func GetSectionFromPath(path string) (SettingsSection, error) {
 	// String representation of the section
 	section, err := getPrefixFromPath(path)
 	if err != nil {

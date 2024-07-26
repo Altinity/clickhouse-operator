@@ -16,6 +16,7 @@ package namer
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
@@ -47,7 +48,7 @@ func createCRServiceName(cr api.ICustomResource) string {
 }
 
 // createCRServiceFQDN creates a FQD name of a root ClickHouseInstallation Service resource
-func createCRServiceFQDN(cr api.ICustomResource, namespaceDomainPattern *api.String) string {
+func createCRServiceFQDN(cr api.ICustomResource, namespaceDomainPattern *types.String) string {
 	// FQDN can be generated either from default pattern,
 	// or from personal pattern provided
 
@@ -275,7 +276,7 @@ func createFQDNs(obj interface{}, scope interface{}, excludeSelf bool) []string 
 			return util.RemoveFromArray(self, []string{createPodFQDN(typed)})
 		case api.ChiShard:
 			return util.RemoveFromArray(self, createPodFQDNsOfShard(any(typed.GetShard()).(api.IShard)))
-		case api.Cluster:
+		case api.ChiCluster:
 			return util.RemoveFromArray(self, createPodFQDNsOfCluster(any(typed.GetCluster()).(api.ICluster)))
 		case api.ClickHouseInstallation:
 			return util.RemoveFromArray(self, createPodFQDNsOfCHI(any(typed.GetCR()).(api.ICustomResource)))

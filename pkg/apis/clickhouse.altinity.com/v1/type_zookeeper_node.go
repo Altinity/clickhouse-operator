@@ -14,11 +14,15 @@
 
 package v1
 
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+)
+
 // ZookeeperNode defines item of nodes section of .spec.configuration.zookeeper
 type ZookeeperNode struct {
-	Host   string      `json:"host,omitempty"   yaml:"host,omitempty"`
-	Port   *Int32      `json:"port,omitempty"   yaml:"port,omitempty"`
-	Secure *StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
+	Host   string            `json:"host,omitempty"   yaml:"host,omitempty"`
+	Port   *types.Int32      `json:"port,omitempty"   yaml:"port,omitempty"`
+	Secure *types.StringBool `json:"secure,omitempty" yaml:"secure,omitempty"`
 }
 
 func (zkNode *ZookeeperNode) String() string {

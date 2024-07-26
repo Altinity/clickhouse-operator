@@ -16,6 +16,7 @@ package v1
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"math"
 	"reflect"
 	"strconv"
@@ -128,12 +129,12 @@ func (s *Setting) ScalarInt() int {
 }
 
 // ScalarInt gets int scalar value of a setting
-func (s *Setting) ScalarInt32Ptr() *Int32 {
+func (s *Setting) ScalarInt32Ptr() *types.Int32 {
 	if s == nil {
 		return nil
 	}
 	if value, err := strconv.Atoi(s.scalar); err == nil {
-		return NewInt32(int32(value))
+		return types.NewInt32(int32(value))
 	}
 
 	return nil

@@ -16,30 +16,6 @@ package v1
 
 import "fmt"
 
-type IHostAddress interface {
-	GetNamespace() string
-	GetStatefulSet() string
-	GetFQDN() string
-	GetCRName() string
-	GetClusterName() string
-	GetClusterIndex() int
-	GetShardName() string
-	GetShardIndex() int
-	GetShardScopeIndex() int
-	GetReplicaName() string
-	GetReplicaIndex() int
-	GetReplicaScopeIndex() int
-	GetHostName() string
-	GetCRScopeIndex() int
-	GetCRScopeCycleSize() int
-	GetCRScopeCycleIndex() int
-	GetCRScopeCycleOffset() int
-	GetClusterScopeIndex() int
-	GetClusterScopeCycleSize() int
-	GetClusterScopeCycleIndex() int
-	GetClusterScopeCycleOffset() int
-}
-
 // HostAddress defines address of a host within ClickHouseInstallation
 type HostAddress struct {
 	Namespace               string `json:"namespace,omitempty"               yaml:"namespace,omitempty"`
@@ -65,82 +41,183 @@ type HostAddress struct {
 	ClusterScopeCycleOffset int    `json:"clusterScopeCycleOffset,omitempty" yaml:"clusterScopeCycleOffset,omitempty"`
 }
 
-func (a HostAddress) GetNamespace() string {
+func (a *HostAddress) GetNamespace() string {
 	return a.Namespace
 }
-func (a HostAddress) GetStatefulSet() string {
+
+func (a *HostAddress) SetNamespace(namespace string) {
+	a.Namespace = namespace
+}
+
+func (a *HostAddress) GetStatefulSet() string {
 	return a.StatefulSet
 }
-func (a HostAddress) GetFQDN() string {
+
+func (a *HostAddress) GetFQDN() string {
 	return a.FQDN
 }
-func (a HostAddress) GetCRName() string {
+
+func (a *HostAddress) GetCRName() string {
 	return a.CHIName
 }
-func (a HostAddress) GetClusterName() string {
+
+func (a *HostAddress) SetCRName(name string) {
+	a.CHIName = name
+}
+
+func (a *HostAddress) GetClusterName() string {
 	return a.ClusterName
 }
-func (a HostAddress) GetClusterIndex() int {
+
+func (a *HostAddress) SetClusterName(name string) {
+	a.ClusterName = name
+}
+
+func (a *HostAddress) GetClusterIndex() int {
 	return a.ClusterIndex
 }
-func (a HostAddress) GetShardName() string {
+
+func (a *HostAddress) SetClusterIndex(index int) {
+	a.ClusterIndex = index
+}
+
+func (a *HostAddress) GetShardName() string {
 	return a.ShardName
 }
-func (a HostAddress) GetShardIndex() int {
+
+func (a *HostAddress) SetShardName(name string) {
+	a.ShardName = name
+}
+
+func (a *HostAddress) GetShardIndex() int {
 	return a.ShardIndex
 }
-func (a HostAddress) GetShardScopeIndex() int {
+
+func (a *HostAddress) SetShardIndex(index int) {
+	a.ShardIndex = index
+}
+
+func (a *HostAddress) GetShardScopeIndex() int {
 	return a.ShardScopeIndex
 }
-func (a HostAddress) GetReplicaName() string {
+
+func (a *HostAddress) SetShardScopeIndex(index int) {
+	a.ShardScopeIndex = index
+}
+
+func (a *HostAddress) GetReplicaName() string {
 	return a.ReplicaName
 }
-func (a HostAddress) GetReplicaIndex() int {
+
+func (a *HostAddress) SetReplicaName(name string) {
+	a.ReplicaName = name
+}
+
+func (a *HostAddress) GetReplicaIndex() int {
 	return a.ReplicaIndex
 }
-func (a HostAddress) GetReplicaScopeIndex() int {
+
+func (a *HostAddress) SetReplicaIndex(index int) {
+	a.ReplicaIndex = index
+}
+
+func (a *HostAddress) GetReplicaScopeIndex() int {
 	return a.ReplicaScopeIndex
 }
-func (a HostAddress) GetHostName() string {
+
+func (a *HostAddress) SetReplicaScopeIndex(index int) {
+	a.ReplicaScopeIndex = index
+}
+
+func (a *HostAddress) GetHostName() string {
 	return a.HostName
 }
-func (a HostAddress) GetCRScopeIndex() int {
+
+func (a *HostAddress) SetHostName(name string) {
+	a.HostName = name
+}
+
+func (a *HostAddress) GetCRScopeIndex() int {
 	return a.CHIScopeIndex
 }
-func (a HostAddress) GetCRScopeCycleSize() int {
+
+func (a *HostAddress) SetCRScopeIndex(index int) {
+	a.CHIScopeIndex = index
+}
+
+func (a *HostAddress) GetCRScopeCycleSize() int {
 	return a.CHIScopeCycleSize
 }
-func (a HostAddress) GetCRScopeCycleIndex() int {
+
+func (a *HostAddress) SetCRScopeCycleSize(size int) {
+	a.CHIScopeCycleSize = size
+}
+
+func (a *HostAddress) GetCRScopeCycleIndex() int {
 	return a.CHIScopeCycleIndex
 }
-func (a HostAddress) GetCRScopeCycleOffset() int {
+
+func (a *HostAddress) SetCRScopeCycleIndex(index int) {
+	a.CHIScopeCycleIndex = index
+}
+
+func (a *HostAddress) GetCRScopeCycleOffset() int {
 	return a.CHIScopeCycleOffset
 }
-func (a HostAddress) GetClusterScopeIndex() int {
+
+func (a *HostAddress) SetCRScopeCycleOffset(offset int) {
+	a.CHIScopeCycleOffset = offset
+}
+
+func (a *HostAddress) GetClusterScopeIndex() int {
 	return a.ClusterScopeIndex
 }
-func (a HostAddress) GetClusterScopeCycleSize() int {
+
+func (a *HostAddress) SetClusterScopeIndex(index int) {
+	a.ClusterScopeIndex = index
+}
+
+func (a *HostAddress) GetClusterScopeCycleSize() int {
 	return a.ClusterScopeCycleSize
 }
-func (a HostAddress) GetClusterScopeCycleIndex() int {
+
+func (a *HostAddress) SetClusterScopeCycleSize(size int) {
+	a.ClusterScopeCycleSize = size
+}
+
+func (a *HostAddress) GetClusterScopeCycleIndex() int {
 	return a.ClusterScopeCycleIndex
 }
-func (a HostAddress) GetClusterScopeCycleOffset() int {
+
+func (a *HostAddress) SetClusterScopeCycleIndex(index int) {
+	a.ClusterScopeCycleIndex = index
+}
+
+func (a *HostAddress) GetClusterScopeCycleOffset() int {
 	return a.ClusterScopeCycleOffset
+}
+
+func (a *HostAddress) SetClusterScopeCycleOffset(offset int) {
+	a.ClusterScopeCycleOffset = offset
 }
 
 // CompactString creates compact string representation
 func (a HostAddress) CompactString() string {
 	return fmt.Sprintf("ns:%s|chi:%s|clu:%s|sha:%s|rep:%s|host:%s",
-		a.Namespace, a.CHIName, a.ClusterName, a.ShardName, a.ReplicaName, a.HostName)
+		a.GetNamespace(),
+		a.GetCRName(),
+		a.GetClusterName(),
+		a.GetShardName(),
+		a.GetReplicaName(),
+		a.GetHostName())
 }
 
 // ClusterNameString creates cluster+host pair
 func (a HostAddress) ClusterNameString() string {
-	return fmt.Sprintf("%s/%s", a.ClusterName, a.HostName)
+	return fmt.Sprintf("%s/%s", a.GetClusterName(), a.GetHostName())
 }
 
 // NamespaceNameString creates namespace+name pair
 func (a HostAddress) NamespaceNameString() string {
-	return fmt.Sprintf("%s/%s", a.Namespace, a.HostName)
+	return fmt.Sprintf("%s/%s", a.GetNamespace(), a.GetHostName())
 }

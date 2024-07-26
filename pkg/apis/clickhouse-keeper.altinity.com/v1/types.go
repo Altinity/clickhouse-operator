@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,20 +57,17 @@ func (runtime *ClickHouseKeeperInstallationRuntime) UnlockCommonConfig() {
 
 // ChkSpec defines spec section of ClickHouseKeeper resource
 type ChkSpec struct {
-	Configuration *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates     *apiChi.Templates `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Defaults               *apiChi.ChiDefaults `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Configuration          *Configuration      `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates              *apiChi.Templates   `json:"templates,omitempty"              yaml:"templates,omitempty"`
 }
 
 // Configuration defines configuration section of .spec
 type Configuration struct {
 	Settings *apiChi.Settings `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files    *apiChi.Settings `json:"files,omitempty"     yaml:"files,omitempty"`
 	Clusters []*ChkCluster    `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
-}
-
-// ChkCluster defines item of a clusters section of .configuration
-type ChkCluster struct {
-	Name   string                `json:"name,omitempty"         yaml:"name,omitempty"`
-	Layout *apiChi.ClusterLayout `json:"layout,omitempty"       yaml:"layout,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

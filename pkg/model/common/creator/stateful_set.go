@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	labeler2 "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -349,7 +350,7 @@ func (c *Creator) stsEnsureAppContainerNamedPortsSpecified(statefulSet *apps.Sta
 	}
 	// Walk over all assigned ports of the host and ensure each port in container
 	host.WalkSpecifiedPorts(
-		func(name string, port *api.Int32, protocol core.Protocol) bool {
+		func(name string, port *types.Int32, protocol core.Protocol) bool {
 			k8s.ContainerEnsurePortByName(container, name, port.Value())
 			// Do not abort, continue iterating
 			return false

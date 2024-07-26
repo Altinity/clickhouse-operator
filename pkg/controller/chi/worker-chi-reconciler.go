@@ -446,7 +446,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 }
 
 // reconcileCluster reconciles ChkCluster, excluding nested shards
-func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) error {
+func (w *worker) reconcileCluster(ctx context.Context, cluster *api.ChiCluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -486,7 +486,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 	return nil
 }
 
-func reconcileZookeeperRootPath(cluster *api.Cluster) {
+func reconcileZookeeperRootPath(cluster *api.ChiCluster) {
 	if cluster.Zookeeper.IsEmpty() {
 		// Nothing to reconcile
 		return
@@ -800,7 +800,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 }
 
 // reconcilePDB reconciles PodDisruptionBudget
-func (w *worker) reconcilePDB(ctx context.Context, cluster *api.Cluster, pdb *policy.PodDisruptionBudget) error {
+func (w *worker) reconcilePDB(ctx context.Context, cluster *api.ChiCluster, pdb *policy.PodDisruptionBudget) error {
 	cur, err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Get(ctx, pdb.Name, controller.NewGetOptions())
 	switch {
 	case err == nil:

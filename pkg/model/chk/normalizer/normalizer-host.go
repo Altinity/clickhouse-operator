@@ -16,6 +16,7 @@ package normalizer
 
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
@@ -173,7 +174,7 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 }
 
 // createHostsField
-func createHostsField(cluster *api.ChiCluster) {
+func createHostsField(cluster *apiChk.ChkCluster) {
 	// Create HostsField of required size
 	cluster.Layout.HostsField = api.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
@@ -198,17 +199,17 @@ func createHostsField(cluster *api.ChiCluster) {
 // normalizeHost normalizes a host
 func (n *Normalizer) normalizeHost(
 	host *api.Host,
-	shard *api.ChiShard,
-	replica *api.ChiReplica,
-	cluster *api.ChiCluster,
+	shard *apiChk.ChkShard,
+	replica *apiChk.ChkReplica,
+	cluster *apiChk.ChkCluster,
 	shardIndex int,
 	replicaIndex int,
 ) {
 
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	// Inherit from either Shard or Replica
-	var s *api.ChiShard
-	var r *api.ChiReplica
+	var s *apiChk.ChkShard
+	var r *apiChk.ChkReplica
 	if cluster.IsShardSpecified() {
 		s = shard
 	} else {
@@ -217,16 +218,16 @@ func (n *Normalizer) normalizeHost(
 	host.InheritSettingsFrom(s, r)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
 	host.InheritFilesFrom(s, r)
-	host.Files = n.normalizeConfigurationFiles(host.Files)
+	//host.Files = n.normalizeConfigurationFiles(host.Files)
 	host.InheritTemplatesFrom(s, r, nil)
 }
 
 // normalizeHostName normalizes host's name
 func (n *Normalizer) normalizeHostName(
 	host *api.Host,
-	shard *api.ChiShard,
+	shard *apiChk.ChkShard,
 	shardIndex int,
-	replica *api.ChiReplica,
+	replica *apiChk.ChkReplica,
 	replicaIndex int,
 ) {
 	hasHostName := len(host.GetName()) > 0

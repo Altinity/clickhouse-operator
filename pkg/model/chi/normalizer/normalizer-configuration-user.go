@@ -54,7 +54,7 @@ func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser)
 
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
-	// Values from the secret have higher priority
+	// Values from the secret have higher priority than explicitly specified settings
 	subst_settings.SubstSettingsFieldWithSecretFieldValue(n.ctx, user, "password", "k8s_secret_password", n.secretGet)
 	subst_settings.SubstSettingsFieldWithSecretFieldValue(n.ctx, user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex", n.secretGet)
 	subst_settings.SubstSettingsFieldWithSecretFieldValue(n.ctx, user, "password_sha256_hex", "k8s_secret_password_sha256_hex", n.secretGet)
@@ -72,7 +72,7 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 		return
 	}
 
-	// Than goes password_sha256_hex, thus keep it only
+	// Than by priority goes password_sha256_hex, thus keep it only
 	if user.Has("password_sha256_hex") {
 		user.Delete("password_double_sha1_hex")
 		user.Delete("password")
@@ -95,7 +95,7 @@ func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) 
 
 	// Apply default password for password-less non-default users
 	// 1. NB "default" user keeps empty password in here.
-	// 2. ClickHouse user gets password from his section of CHOp configuration
+	// 2. CHOp ClickHouse user gets password from the section of CHOp configuration "ClickHouse.Access.Password"
 	// 3. All the rest users get default password
 	if passwordPlaintext == "" {
 		switch user.Username() {
@@ -160,7 +160,7 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 	}
 
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
-	n.setMandatoryUserFields(user, &userFields{
+	setMandatoryUserFields(user, &userFields{
 		profile:    profile,
 		quota:      quota,
 		ips:        ips,
@@ -176,7 +176,7 @@ type userFields struct {
 }
 
 // setMandatoryUserFields sets user fields
-func (n *Normalizer) setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
+func setMandatoryUserFields(user *api.SettingsUser, fields *userFields) {
 	// Ensure required values are in place and apply non-empty values in case no own value(s) provided
 	if fields.profile != "" {
 		user.SetIfNotExists("profile", api.NewSettingScalar(fields.profile))

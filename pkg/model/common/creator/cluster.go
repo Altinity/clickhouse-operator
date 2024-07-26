@@ -32,8 +32,8 @@ func CreateCluster(what interfaces.ClusterType) any {
 }
 
 // createDefaultClusterCHI
-func createDefaultClusterCHI() *api.Cluster {
-	return &api.Cluster{
+func createDefaultClusterCHI() *api.ChiCluster {
+	return &api.ChiCluster{
 		Name: "cluster",
 	}
 }

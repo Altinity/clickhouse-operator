@@ -779,7 +779,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 	existingObjects := w.c.discovery(ctx, chi)
 	ap.WalkAdded(
 		// Walk over added clusters
-		func(cluster *api.Cluster) {
+		func(cluster *api.ChiCluster) {
 			cluster.WalkHosts(func(host *api.Host) error {
 
 				// Name of the StatefulSet for this host
@@ -825,7 +825,7 @@ func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation,
 	)
 
 	ap.WalkModified(
-		func(cluster *api.Cluster) {
+		func(cluster *api.ChiCluster) {
 		},
 		func(shard *api.ChiShard) {
 		},

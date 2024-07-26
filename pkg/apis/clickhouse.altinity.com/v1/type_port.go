@@ -14,6 +14,10 @@
 
 package v1
 
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+)
+
 const (
 	// PortMayBeAssignedLaterOrLeftUnused value means that port
 	// is not assigned yet and is expected to be assigned later.
@@ -44,7 +48,7 @@ func IsPortInvalid(port int32) bool {
 // - already has own value assigned
 // - or has provided value
 // - or value is fell back to default
-func EnsurePortValue(port, value, _default *Int32) *Int32 {
+func EnsurePortValue(port, value, _default *types.Int32) *types.Int32 {
 	// Port may already be explicitly specified in podTemplate or by portDistribution
 	if port.HasValue() {
 		// Port has a value already

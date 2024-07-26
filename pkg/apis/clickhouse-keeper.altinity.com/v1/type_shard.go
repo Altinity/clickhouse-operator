@@ -14,43 +14,46 @@
 
 package v1
 
-import "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+import (
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+)
 
-func (shard *ChiShard) GetName() string {
+func (shard *ChkShard) GetName() string {
 	return shard.Name
 }
 
-func (shard *ChiShard) GetInternalReplication() *types.StringBool {
+func (shard *ChkShard) GetInternalReplication() *types.StringBool {
 	return shard.InternalReplication
 }
 
 // InheritSettingsFrom inherits settings from specified cluster
-func (shard *ChiShard) InheritSettingsFrom(cluster *ChiCluster) {
-	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
+func (shard *ChkShard) InheritSettingsFrom(cluster *ChkCluster) {
+	//shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
 }
 
 // InheritFilesFrom inherits files from specified cluster
-func (shard *ChiShard) InheritFilesFrom(cluster *ChiCluster) {
-	shard.Files = shard.Files.MergeFrom(cluster.Files)
+func (shard *ChkShard) InheritFilesFrom(cluster *ChkCluster) {
+	//shard.Files = shard.Files.MergeFrom(cluster.Files)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
-func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
-	shard.Templates = shard.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
-	shard.Templates.HandleDeprecatedFields()
+func (shard *ChkShard) InheritTemplatesFrom(cluster *ChkCluster) {
+	//shard.Templates = shard.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
+	//shard.Templates.HandleDeprecatedFields()
 }
 
 // GetServiceTemplate gets service template
-func (shard *ChiShard) GetServiceTemplate() (*ServiceTemplate, bool) {
+func (shard *ChkShard) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	if !shard.Templates.HasShardServiceTemplate() {
 		return nil, false
 	}
 	name := shard.Templates.GetShardServiceTemplate()
-	return shard.Runtime.CHI.GetServiceTemplate(name)
+	return shard.Runtime.CHK.GetServiceTemplate(name)
 }
 
 // HasReplicasCount checks whether shard has replicas count specified
-func (shard *ChiShard) HasReplicasCount() bool {
+func (shard *ChkShard) HasReplicasCount() bool {
 	if shard == nil {
 		return false
 	}
@@ -59,7 +62,7 @@ func (shard *ChiShard) HasReplicasCount() bool {
 }
 
 // WalkHosts runs specified function on each host
-func (shard *ChiShard) WalkHosts(f func(host *Host) error) []error {
+func (shard *ChkShard) WalkHosts(f func(host *apiChi.Host) error) []error {
 	if shard == nil {
 		return nil
 	}
@@ -76,8 +79,8 @@ func (shard *ChiShard) WalkHosts(f func(host *Host) error) []error {
 
 // FindHost finds host by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (shard *ChiShard) FindHost(needle interface{}) (res *Host) {
-	shard.WalkHosts(func(host *Host) error {
+func (shard *ChkShard) FindHost(needle interface{}) (res *apiChi.Host) {
+	shard.WalkHosts(func(host *apiChi.Host) error {
 		switch v := needle.(type) {
 		case string:
 			if host.Runtime.Address.HostName == v {
@@ -94,9 +97,9 @@ func (shard *ChiShard) FindHost(needle interface{}) (res *Host) {
 }
 
 // FirstHost finds first host in the shard
-func (shard *ChiShard) FirstHost() *Host {
-	var result *Host
-	shard.WalkHosts(func(host *Host) error {
+func (shard *ChkShard) FirstHost() *apiChi.Host {
+	var result *apiChi.Host
+	shard.WalkHosts(func(host *apiChi.Host) error {
 		if result == nil {
 			result = host
 		}
@@ -106,9 +109,9 @@ func (shard *ChiShard) FirstHost() *Host {
 }
 
 // HostsCount returns count of hosts in the shard
-func (shard *ChiShard) HostsCount() int {
+func (shard *ChkShard) HostsCount() int {
 	count := 0
-	shard.WalkHosts(func(host *Host) error {
+	shard.WalkHosts(func(host *apiChi.Host) error {
 		count++
 		return nil
 	})
@@ -116,17 +119,17 @@ func (shard *ChiShard) HostsCount() int {
 }
 
 // GetCHI gets CHI of the shard
-func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
-	return shard.Runtime.CHI
+func (shard *ChkShard) GetCHK() *ClickHouseKeeperInstallation {
+	return shard.Runtime.CHK
 }
 
 // GetCluster gets cluster of the shard
-func (shard *ChiShard) GetCluster() *ChiCluster {
-	return shard.Runtime.CHI.GetSpec().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
+func (shard *ChkShard) GetCluster() *ChkCluster {
+	return shard.Runtime.CHK.GetSpec().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 
 // HasWeight checks whether shard has applicable weight value specified
-func (shard *ChiShard) HasWeight() bool {
+func (shard *ChkShard) HasWeight() bool {
 	if shard == nil {
 		return false
 	}
@@ -137,47 +140,47 @@ func (shard *ChiShard) HasWeight() bool {
 }
 
 // GetWeight gets weight
-func (shard *ChiShard) GetWeight() int {
+func (shard *ChkShard) GetWeight() int {
 	if shard.HasWeight() {
 		return *shard.Weight
 	}
 	return 0
 }
 
-func (shard *ChiShard) GetRuntime() IShardRuntime {
+func (shard *ChkShard) GetRuntime() apiChi.IShardRuntime {
 	if shard == nil {
 		return nil
 	}
 	return &shard.Runtime
 }
 
-func (shard *ChiShard) HasSettings() bool {
+func (shard *ChkShard) HasSettings() bool {
 	return shard.GetSettings() != nil
 }
 
-func (shard *ChiShard) GetSettings() *Settings {
+func (shard *ChkShard) GetSettings() *apiChi.Settings {
 	if shard == nil {
 		return nil
 	}
 	return shard.Settings
 }
 
-func (shard *ChiShard) HasFiles() bool {
+func (shard *ChkShard) HasFiles() bool {
 	return shard.GetFiles() != nil
 }
 
-func (shard *ChiShard) GetFiles() *Settings {
+func (shard *ChkShard) GetFiles() *apiChi.Settings {
 	if shard == nil {
 		return nil
 	}
 	return shard.Files
 }
 
-func (shard *ChiShard) HasTemplates() bool {
+func (shard *ChkShard) HasTemplates() bool {
 	return shard.GetTemplates() != nil
 }
 
-func (shard *ChiShard) GetTemplates() *TemplatesList {
+func (shard *ChkShard) GetTemplates() *apiChi.TemplatesList {
 	if shard == nil {
 		return nil
 	}

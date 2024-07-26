@@ -23,6 +23,7 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -194,31 +195,31 @@ func (n *Normalizer) fillStatus() {
 }
 
 // normalizeTaskID normalizes .spec.taskID
-func (n *Normalizer) normalizeTaskID(taskID *api.String) *api.String {
+func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
 	if len(taskID.Value()) > 0 {
 		return taskID
 	}
 
-	return api.NewString(uuid.New().String())
+	return types.NewString(uuid.New().String())
 }
 
 // normalizeStop normalizes .spec.stop
-func (n *Normalizer) normalizeStop(stop *api.StringBool) *api.StringBool {
+func (n *Normalizer) normalizeStop(stop *types.StringBool) *types.StringBool {
 	if stop.IsValid() {
 		// It is bool, use as it is
 		return stop
 	}
 
 	// In case it is unknown value - just use set it to false
-	return api.NewStringBool(false)
+	return types.NewStringBool(false)
 }
 
 // normalizeRestart normalizes .spec.restart
-func (n *Normalizer) normalizeRestart(restart *api.String) *api.String {
+func (n *Normalizer) normalizeRestart(restart *types.String) *types.String {
 	switch strings.ToLower(restart.Value()) {
 	case strings.ToLower(api.RestartRollingUpdate):
 		// Known value, overwrite it to ensure case-ness
-		return api.NewString(api.RestartRollingUpdate)
+		return types.NewString(api.RestartRollingUpdate)
 	}
 
 	// In case it is unknown value - just use empty
@@ -226,17 +227,17 @@ func (n *Normalizer) normalizeRestart(restart *api.String) *api.String {
 }
 
 // normalizeTroubleshoot normalizes .spec.stop
-func (n *Normalizer) normalizeTroubleshoot(troubleshoot *api.StringBool) *api.StringBool {
+func (n *Normalizer) normalizeTroubleshoot(troubleshoot *types.StringBool) *types.StringBool {
 	if troubleshoot.IsValid() {
 		// It is bool, use as it is
 		return troubleshoot
 	}
 
 	// In case it is unknown value - just use set it to false
-	return api.NewStringBool(false)
+	return types.NewStringBool(false)
 }
 
-func isNamespaceDomainPatternValid(namespaceDomainPattern *api.String) bool {
+func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {
 	if strings.Count(namespaceDomainPattern.Value(), "%s") > 1 {
 		return false
 	} else {
@@ -245,7 +246,7 @@ func isNamespaceDomainPatternValid(namespaceDomainPattern *api.String) bool {
 }
 
 // normalizeNamespaceDomainPattern normalizes .spec.namespaceDomainPattern
-func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *api.String) *api.String {
+func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *types.String) *types.String {
 	if isNamespaceDomainPatternValid(namespaceDomainPattern) {
 		return namespaceDomainPattern
 	}
@@ -451,7 +452,7 @@ func (n *Normalizer) normalizeUseTemplates(templates []*api.TemplateRef) []*api.
 }
 
 // normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters(clusters []*api.Cluster) []*api.Cluster {
+func (n *Normalizer) normalizeClusters(clusters []*api.ChiCluster) []*api.ChiCluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
 	// Normalize all clusters
@@ -462,7 +463,7 @@ func (n *Normalizer) normalizeClusters(clusters []*api.Cluster) []*api.Cluster {
 }
 
 // ensureClusters
-func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
+func (n *Normalizer) ensureClusters(clusters []*api.ChiCluster) []*api.ChiCluster {
 	// May be we have cluster(s) available
 	if len(clusters) > 0 {
 		return clusters
@@ -470,8 +471,8 @@ func (n *Normalizer) ensureClusters(clusters []*api.Cluster) []*api.Cluster {
 
 	// In case no clusters available, we may want to create a default one
 	if n.ctx.Options().WithDefaultCluster {
-		return []*api.Cluster{
-			commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*api.Cluster),
+		return []*api.ChiCluster{
+			commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*api.ChiCluster),
 		}
 	}
 
@@ -490,7 +491,7 @@ func (n *Normalizer) normalizeConfigurationZookeeper(zk *api.ZookeeperConfig) *a
 		// Convenience wrapper
 		node := &zk.Nodes[i]
 		if !node.Port.IsValid() {
-			node.Port = api.NewInt32(config.ZkDefaultPort)
+			node.Port = types.NewInt32(config.ZkDefaultPort)
 		}
 	}
 
@@ -621,7 +622,6 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api
 // normalizeConfigurationFiles normalizes .spec.configuration.files
 func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Settings {
 	if files == nil {
-		//files = api.NewSettings()
 		return nil
 	}
 	files.Normalize()
@@ -634,14 +634,14 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
+func (n *Normalizer) normalizeCluster(cluster *api.ChiCluster) *api.ChiCluster {
 	// Ensure cluster
 	if cluster == nil {
-		cluster = commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*api.Cluster)
+		cluster = commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*api.ChiCluster)
 	}
 
 	// Runtime has to be prepared first
-	cluster.Runtime.CHI = n.ctx.GetTarget()
+	cluster.GetRuntime().SetCR(n.ctx.GetTarget())
 
 	// Then we need to inherit values from the parent
 	// Inherit from .spec.configuration.zookeeper
@@ -658,6 +658,7 @@ func (n *Normalizer) normalizeCluster(cluster *api.Cluster) *api.Cluster {
 	cluster.SchemaPolicy = n.normalizeClusterSchemaPolicy(cluster.SchemaPolicy)
 	cluster.PDBMaxUnavailable = n.normalizePDBMaxUnavailable(cluster.PDBMaxUnavailable)
 
+	// Ensure layout
 	if cluster.Layout == nil {
 		cluster.Layout = api.NewChiClusterLayout()
 	}
@@ -725,7 +726,7 @@ func (n *Normalizer) normalizeClusterSchemaPolicy(policy *api.SchemaPolicy) *api
 }
 
 // normalizePDBMaxUnavailable normalizes PDBMaxUnavailable
-func (n *Normalizer) normalizePDBMaxUnavailable(value *api.Int32) *api.Int32 {
+func (n *Normalizer) normalizePDBMaxUnavailable(value *types.Int32) *types.Int32 {
 	return value.Normalize(1)
 }
 
@@ -736,9 +737,9 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 		clusterLayout = api.NewChiClusterLayout()
 	}
 
-	// ChiClusterLayout.ShardsCount
+	// clusterLayout.ShardsCount
 	// and
-	// ChiClusterLayout.ReplicasCount
+	// clusterLayout.ReplicasCount
 	// must represent max number of shards and replicas requested respectively
 
 	// Deal with unspecified ShardsCount
@@ -832,7 +833,7 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *api.ChiClusterLayout) {
 }
 
 // normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *api.ChiShard, cluster *api.Cluster, shardIndex int) {
+func (n *Normalizer) normalizeShard(shard *api.ChiShard, cluster *api.ChiCluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
@@ -849,7 +850,7 @@ func (n *Normalizer) normalizeShard(shard *api.ChiShard, cluster *api.Cluster, s
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *api.ChiReplica, cluster *api.Cluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplica(replica *api.ChiReplica, cluster *api.ChiCluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
@@ -934,7 +935,7 @@ func (n *Normalizer) normalizeShardWeight(shard *api.ChiShard) {
 }
 
 // normalizeShardHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardHosts(shard *api.ChiShard, cluster *api.Cluster, shardIndex int) {
+func (n *Normalizer) normalizeShardHosts(shard *api.ChiShard, cluster *api.ChiCluster, shardIndex int) {
 	// Use hosts from HostsField
 	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
@@ -947,7 +948,7 @@ func (n *Normalizer) normalizeShardHosts(shard *api.ChiShard, cluster *api.Clust
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaHosts(replica *api.ChiReplica, cluster *api.Cluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplicaHosts(replica *api.ChiReplica, cluster *api.ChiCluster, replicaIndex int) {
 	// Use hosts from HostsField
 	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {

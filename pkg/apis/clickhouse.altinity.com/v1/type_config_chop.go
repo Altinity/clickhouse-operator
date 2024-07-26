@@ -16,6 +16,7 @@ package v1
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"os"
 	"regexp"
 	"sort"
@@ -177,7 +178,7 @@ type OperatorConfigConfig struct {
 }
 
 // OperatorConfigRestartPolicyRuleSet specifies set of rules
-type OperatorConfigRestartPolicyRuleSet map[Matchable]StringBool
+type OperatorConfigRestartPolicyRuleSet map[Matchable]types.StringBool
 
 // OperatorConfigRestartPolicyRule specifies ClickHouse version and rules for this version
 type OperatorConfigRestartPolicyRule struct {
@@ -365,9 +366,9 @@ type OperatorConfigReconcileHost struct {
 
 // OperatorConfigReconcileHostWait defines reconcile host wait config
 type OperatorConfigReconcileHostWait struct {
-	Exclude *StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
-	Queries *StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
-	Include *StringBool `json:"include,omitempty" yaml:"include,omitempty"`
+	Exclude *types.StringBool `json:"exclude,omitempty" yaml:"exclude,omitempty"`
+	Queries *types.StringBool `json:"queries,omitempty" yaml:"queries,omitempty"`
+	Include *types.StringBool `json:"include,omitempty" yaml:"include,omitempty"`
 }
 
 // OperatorConfigAnnotation specifies annotation section
@@ -384,7 +385,7 @@ type OperatorConfigLabel struct {
 	Exclude []string `json:"exclude" yaml:"exclude"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	AppendScopeString StringBool `json:"appendScope" yaml:"appendScope"`
+	AppendScopeString types.StringBool `json:"appendScope" yaml:"appendScope"`
 
 	Runtime struct {
 		AppendScope bool `json:"appendScope" yaml:"appendScope"`
@@ -508,7 +509,7 @@ type OperatorConfig struct {
 	ExcludeFromPropagationLabels []string `json:"excludeFromPropagationLabels" yaml:"excludeFromPropagationLabels"`
 
 	// Whether to append *Scope* labels to StatefulSet and Pod.
-	AppendScopeLabelsString StringBool `json:"appendScopeLabels" yaml:"appendScopeLabels"`
+	AppendScopeLabelsString types.StringBool `json:"appendScopeLabels" yaml:"appendScopeLabels"`
 
 	// Grace period for Pod termination.
 	TerminationGracePeriod int `json:"terminationGracePeriod" yaml:"terminationGracePeriod"`

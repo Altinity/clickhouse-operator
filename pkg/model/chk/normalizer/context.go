@@ -15,6 +15,8 @@
 package normalizer
 
 import (
+	core "k8s.io/api/core/v1"
+
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
@@ -54,4 +56,29 @@ func (c *Context) Options() *normalizer.Options {
 		return nil
 	}
 	return c.options
+}
+
+func (c *Context) GetTargetNamespace() string {
+	return c.GetTarget().GetNamespace()
+}
+
+func (c *Context) AppendAdditionalEnvVar(envVar core.EnvVar) {
+	if c == nil {
+		return
+	}
+	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(envVar)
+}
+
+func (c *Context) AppendAdditionalVolume(volume core.Volume) {
+	if c == nil {
+		return
+	}
+	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeIfNotExists(volume)
+}
+
+func (c *Context) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
+	if c == nil {
+		return
+	}
+	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMountIfNotExists(volumeMount)
 }

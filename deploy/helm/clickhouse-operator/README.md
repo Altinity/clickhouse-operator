@@ -52,7 +52,6 @@ For upgrade please install CRDs separately:
 | podAnnotations | object | `{"clickhouse-operator-metrics/port":"9999","clickhouse-operator-metrics/scrape":"true","prometheus.io/port":"8888","prometheus.io/scrape":"true"}` | annotations to add to the clickhouse-operator pod, look `kubectl explain pod.spec.annotations` for details |
 | podLabels | object | `{}` | labels to add to the clickhouse-operator pod |
 | podSecurityContext | object | `{}` |  |
-| topologySpreadConstraints | list | `[]` | Topology spread constraints rely on node labels to identify the topology domain(s) that each Node is in. # Ref: https://kubernetes.io/docs/concepts/workloads/pods/pod-topology-spread-constraints/ # |
 | rbac.create | bool | `true` | specifies whether cluster roles and cluster role bindings should be created |
 | secret.create | bool | `true` | create a secret with operator credentials |
 | secret.password | string | `"clickhouse_operator_password"` | operator credentials password |
@@ -63,4 +62,5 @@ For upgrade please install CRDs separately:
 | serviceMonitor.additionalLabels | object | `{}` | additional labels for service monitor |
 | serviceMonitor.enabled | bool | `false` | ServiceMonitor Custom resource is created for a (prometheus-operator)[https://github.com/prometheus-operator/prometheus-operator] |
 | tolerations | list | `[]` | tolerations for scheduler pod assignment, look `kubectl explain pod.spec.tolerations` for details |
+| topologySpreadConstraints | list | `[]` |  |
 

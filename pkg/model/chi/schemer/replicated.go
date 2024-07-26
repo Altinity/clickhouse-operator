@@ -26,7 +26,7 @@ import (
 // shouldCreateReplicatedObjects determines whether replicated objects should be created
 func (s *ClusterSchemer) shouldCreateReplicatedObjects(host *api.Host) bool {
 	shard := s.Names(interfaces.NameFQDNs, host, api.ChiShard{}, false)
-	cluster := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false)
+	cluster := s.Names(interfaces.NameFQDNs, host, api.ChiCluster{}, false)
 
 	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard

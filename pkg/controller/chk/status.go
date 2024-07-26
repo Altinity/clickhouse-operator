@@ -17,6 +17,7 @@ package chk
 import (
 	"context"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
@@ -48,8 +49,8 @@ func (r *Reconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstalla
 			cur.Status.ReadyReplicas = append(cur.Status.ReadyReplicas,
 				apiChi.ZookeeperNode{
 					Host:   fmt.Sprintf("%s.%s.svc.cluster.local", readyOne, chk.Namespace),
-					Port:   apiChi.NewInt32(int32(chk.Spec.GetClientPort())),
-					Secure: apiChi.NewStringBool(false),
+					Port:   types.NewInt32(int32(chk.Spec.GetClientPort())),
+					Secure: types.NewStringBool(false),
 				})
 		}
 

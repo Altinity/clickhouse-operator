@@ -14,9 +14,11 @@
 
 package v1
 
+import "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+
 // ChiDefaults defines defaults section of .spec
 type ChiDefaults struct {
-	ReplicasUseFQDN   *StringBool        `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
+	ReplicasUseFQDN   *types.StringBool  `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
 	DistributedDDL    *DistributedDDL    `json:"distributedDDL,omitempty"     yaml:"distributedDDL,omitempty"`
 	StorageManagement *StorageManagement `json:"storageManagement,omitempty"  yaml:"storageManagement,omitempty"`
 	Templates         *TemplatesList     `json:"templates,omitempty"          yaml:"templates,omitempty"`

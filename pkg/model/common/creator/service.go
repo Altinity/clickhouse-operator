@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	labeler2 "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	core "k8s.io/api/core/v1"
@@ -36,7 +37,7 @@ func (c *Creator) CreateService(what interfaces.ServiceType, params ...any) *cor
 func SvcAppendSpecifiedPorts(service *core.Service, host *api.Host) {
 	// Walk over all assigned ports of the host and append each port to the list of service's ports
 	host.WalkSpecifiedPorts(
-		func(name string, port *api.Int32, protocol core.Protocol) bool {
+		func(name string, port *types.Int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of service's ports
 			service.Spec.Ports = append(service.Spec.Ports,
 				core.ServicePort{

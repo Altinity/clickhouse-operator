@@ -16,6 +16,7 @@ package namer
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
@@ -45,7 +46,7 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 		return createCRServiceName(cr)
 	case interfaces.NameCRServiceFQDN:
 		cr := params[0].(api.ICustomResource)
-		namespaceDomainPattern := params[1].(*api.String)
+		namespaceDomainPattern := params[1].(*types.String)
 		return createCRServiceFQDN(cr, namespaceDomainPattern)
 	case interfaces.NameClusterService:
 		cluster := params[0].(api.ICluster)

@@ -15,6 +15,7 @@
 package v1
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
@@ -34,19 +35,19 @@ type Host struct {
 }
 
 type HostSecure struct {
-	Insecure *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
-	Secure   *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	Insecure *types.StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
+	Secure   *types.StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
 }
 
 type HostPorts struct {
 	// DEPRECATED - to be removed soon
-	Port *Int32 `json:"port,omitempty"  yaml:"port,omitempty"`
+	Port *types.Int32 `json:"port,omitempty"  yaml:"port,omitempty"`
 
-	TCPPort             *Int32 `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
-	TLSPort             *Int32 `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
-	HTTPPort            *Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
-	HTTPSPort           *Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
-	InterserverHTTPPort *Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	TCPPort             *types.Int32 `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	TLSPort             *types.Int32 `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
+	HTTPPort            *types.Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	HTTPSPort           *types.Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
+	InterserverHTTPPort *types.Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
 }
 
 type HostSettings struct {
@@ -59,7 +60,7 @@ type HostRuntime struct {
 	Address             HostAddress                `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
 	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
-	replicas            *Int32                     `json:"-" yaml:"-"`
+	replicas            *types.Int32               `json:"-" yaml:"-"`
 	hasData             bool                       `json:"-" yaml:"-"`
 
 	// CurStatefulSet is a current stateful set, fetched from k8s
@@ -70,16 +71,16 @@ type HostRuntime struct {
 	CHI *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
-func (r HostRuntime) GetAddress() IHostAddress {
-	return r.Address
+func (r *HostRuntime) GetAddress() IHostAddress {
+	return &r.Address
 }
 
-type IHostRuntime interface {
-	GetAddress() IHostAddress
+func (r *HostRuntime) SetCR(cr ICustomResource) {
+	r.CHI = cr.(*ClickHouseInstallation)
 }
 
 func (host *Host) GetRuntime() IHostRuntime {
-	return host.Runtime
+	return &host.Runtime
 }
 
 // GetReconcileAttributes is an ensurer getter
@@ -94,35 +95,35 @@ func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
-func (host *Host) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
-	if shard != nil {
-		host.Settings = host.Settings.MergeFrom(shard.Settings)
+func (host *Host) InheritSettingsFrom(shard IShard, replica IReplica) {
+	if (shard != nil) && shard.HasSettings() {
+		host.Settings = host.Settings.MergeFrom(shard.GetSettings())
 	}
 
-	if replica != nil {
-		host.Settings = host.Settings.MergeFrom(replica.Settings)
+	if (replica != nil) && replica.HasSettings() {
+		host.Settings = host.Settings.MergeFrom(replica.GetSettings())
 	}
 }
 
 // InheritFilesFrom inherits files from specified shard and replica
-func (host *Host) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
-	if shard != nil {
-		host.Files = host.Files.MergeFrom(shard.Files)
+func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
+	if (shard != nil) && shard.HasFiles() {
+		host.Files = host.Files.MergeFrom(shard.GetFiles())
 	}
 
-	if replica != nil {
-		host.Files = host.Files.MergeFrom(replica.Files)
+	if (replica != nil) && replica.HasFiles() {
+		host.Files = host.Files.MergeFrom(replica.GetFiles())
 	}
 }
 
 // InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *Host) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
-	if shard != nil {
-		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
+func (host *Host) InheritTemplatesFrom(shard IShard, replica IReplica, template *HostTemplate) {
+	if (shard != nil) && shard.HasTemplates() {
+		host.Templates = host.Templates.MergeFrom(shard.GetTemplates(), MergeTypeFillEmptyValues)
 	}
 
-	if replica != nil {
-		host.Templates = host.Templates.MergeFrom(replica.Templates, MergeTypeFillEmptyValues)
+	if (replica != nil) && replica.HasTemplates() {
+		host.Templates = host.Templates.MergeFrom(replica.GetTemplates(), MergeTypeFillEmptyValues)
 	}
 
 	if template != nil {
@@ -236,12 +237,12 @@ func (host *Host) HasCR() bool {
 	return host.GetCR() != nil
 }
 
-func (host *Host) SetCR(chi *ClickHouseInstallation) {
-	host.Runtime.CHI = chi
+func (host *Host) SetCR(chi ICustomResource) {
+	host.Runtime.CHI = chi.(*ClickHouseInstallation)
 }
 
 // GetCluster gets cluster
-func (host *Host) GetCluster() *Cluster {
+func (host *Host) GetCluster() *ChiCluster {
 	// Host has to have filled Address
 	return host.GetCR().FindCluster(host.Runtime.Address.ClusterName)
 }
@@ -440,7 +441,7 @@ const (
 	ChDefaultInterserverHTTPPortNumber = int32(9009)
 )
 
-func (host *Host) WalkPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+func (host *Host) WalkPorts(f func(name string, port *types.Int32, protocol core.Protocol) bool) {
 	if host == nil {
 		return
 	}
@@ -464,9 +465,9 @@ func (host *Host) WalkPorts(f func(name string, port *Int32, protocol core.Proto
 	}
 }
 
-func (host *Host) WalkSpecifiedPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+func (host *Host) WalkSpecifiedPorts(f func(name string, port *types.Int32, protocol core.Protocol) bool) {
 	host.WalkPorts(
-		func(_name string, _port *Int32, _protocol core.Protocol) bool {
+		func(_name string, _port *types.Int32, _protocol core.Protocol) bool {
 			if _port.HasValue() {
 				// Port is explicitly specified - call provided function on it
 				return f(_name, _port, _protocol)
@@ -480,7 +481,7 @@ func (host *Host) WalkSpecifiedPorts(f func(name string, port *Int32, protocol c
 func (host *Host) AppendSpecifiedPortsToContainer(container *core.Container) {
 	// Walk over all assigned ports of the host and append each port to the list of container's ports
 	host.WalkSpecifiedPorts(
-		func(name string, port *Int32, protocol core.Protocol) bool {
+		func(name string, port *types.Int32, protocol core.Protocol) bool {
 			// Append assigned port to the list of container's ports
 			container.Ports = append(container.Ports,
 				core.ContainerPort{
