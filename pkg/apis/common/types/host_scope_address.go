@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package types
 
 // CycleSpec defines spec of a cycle, such as size
 type CycleSpec struct {
@@ -110,8 +110,8 @@ func (s *ScopeAddress) Inc() {
 
 // HostScopeAddress specifies address of a host
 type HostScopeAddress struct {
-	// CHIScopeAddress specifies address of a host within CHI scope
-	CHIScopeAddress *ScopeAddress
+	// CRScopeAddress specifies address of a host within CHI scope
+	CRScopeAddress *ScopeAddress
 	// ClusterScopeAddress specifies address of a host within cluster scope
 	ClusterScopeAddress *ScopeAddress
 	// ClusterIndex specifies index of a cluster within CHI
@@ -123,20 +123,10 @@ type HostScopeAddress struct {
 }
 
 // NewHostScopeAddress creates new HostScopeAddress
-func NewHostScopeAddress(chiScopeCycleSize, clusterScopeCycleSize int) (a *HostScopeAddress) {
+func NewHostScopeAddress(crScopeCycleSize, clusterScopeCycleSize int) (a *HostScopeAddress) {
 	a = &HostScopeAddress{
-		CHIScopeAddress:     NewScopeAddress(chiScopeCycleSize),
+		CRScopeAddress:      NewScopeAddress(crScopeCycleSize),
 		ClusterScopeAddress: NewScopeAddress(clusterScopeCycleSize),
 	}
 	return a
 }
-
-// WalkHostsAddressFn specifies function to walk over hosts
-type WalkHostsAddressFn func(
-	chi *ClickHouseInstallation,
-	cluster *Cluster,
-	shard *ChiShard,
-	replica *ChiReplica,
-	host *Host,
-	address *HostScopeAddress,
-) error

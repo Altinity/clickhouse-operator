@@ -4714,7 +4714,7 @@ def test_049(self):
 
     create_shell_namespace_clickhouse_template()
     util.require_keeper(keeper_type="CHK",
-                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-23.yaml")
+                        keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"

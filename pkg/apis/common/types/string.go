@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package types
 
-// Int32 defines int32 representation with possibility to be optional
+// String defines string representation with possibility to be optional
 type String string
 
 // NewString creates new variable
