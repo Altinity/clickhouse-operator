@@ -23,7 +23,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/subst_settings"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst_settings"
 )
 
 const envVarNamePrefixConfigurationUsers = "CONFIGURATION_USERS"
