@@ -46,8 +46,8 @@ type Normalizer struct {
 	namer     interfaces.INameManager
 }
 
-// NewNormalizer creates new normalizer
-func NewNormalizer(secretGet subst_settings.SecretGetter) *Normalizer {
+// New creates new normalizer
+func New(secretGet subst_settings.SecretGetter) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
 		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),

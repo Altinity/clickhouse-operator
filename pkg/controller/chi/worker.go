@@ -84,7 +84,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		c:     c,
 		a:     announcer,
 		queue: q,
-		normalizer: normalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
+		normalizer: normalizer.New(func(namespace, name string) (*core.Secret, error) {
 			return c.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 		}),
 		schemer: nil,
@@ -123,7 +123,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 	w.stsReconciler = statefulset.NewStatefulSetReconciler(
 		w.a,
 		w.task,
-		NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.labeler, w.c.kube),
+		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
 		w.c.namer,
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
@@ -1103,8 +1103,7 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *api.Host) err
 		return nil
 	}
 
-	_ = w.c.labeler.deleteLabelReadyOnPod(ctx, host)
-	_ = w.c.labeler.deleteAnnotationReadyOnService(ctx, host)
+	_ = w.c.labeler.DeleteReadyMarkOnPodAndService(ctx, host)
 	return nil
 }
 

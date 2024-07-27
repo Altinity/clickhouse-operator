@@ -399,7 +399,7 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 		}
 
 		log.V(1).Infof("CHI %s/%s is completed, add it", chi.Namespace, chi.Name)
-		normalizer := chiNormalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
+		normalizer := chiNormalizer.New(func(namespace, name string) (*core.Secret, error) {
 			return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 		})
 		normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions())

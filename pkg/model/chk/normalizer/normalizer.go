@@ -36,8 +36,8 @@ type Normalizer struct {
 	namer interfaces.INameManager
 }
 
-// NewNormalizer creates new normalizer
-func NewNormalizer() *Normalizer {
+// New creates new normalizer
+func New() *Normalizer {
 	return &Normalizer{
 		namer: managers.NewNameManager(managers.NameManagerTypeKeeper),
 	}

@@ -28,7 +28,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
-	hostPoller "github.com/altinity/clickhouse-operator/pkg/controller/chk/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
@@ -170,7 +169,7 @@ func (r *Reconciler) reconcile(
 
 // normalize
 func (r *Reconciler) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := chkNormalizer.NewNormalizer().CreateTemplated(c, normalizer.NewOptions())
+	chk, err := chkNormalizer.New().CreateTemplated(c, normalizer.NewOptions())
 	if err != nil {
 		log.V(1).
 			M(chk).F().
@@ -210,7 +209,7 @@ func (r *Reconciler) reconcileInit(chk *apiChk.ClickHouseKeeperInstallation) {
 	r.stsReconciler = statefulset.NewStatefulSetReconciler(
 		announcer,
 		r.task,
-		hostPoller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(kube), kube),
+		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(kube), kube, nil),
 		namer,
 		storage.NewStorageReconciler(r.task, namer, kube.Storage()),
 		kube,

@@ -54,7 +54,7 @@ func NewLabeler(kube interfaces.IKube) *Labeler {
 	}
 }
 
-func (c *Labeler) labelMyObjectsTree(ctx context.Context) error {
+func (l *Labeler) labelMyObjectsTree(ctx context.Context) error {
 
 	// Operator is running in the Pod. We need to label this Pod
 	// Pod is owned by ReplicaSet. We need to label this ReplicaSet also.
@@ -102,7 +102,7 @@ func (c *Labeler) labelMyObjectsTree(ctx context.Context) error {
 	}
 
 	// Put labels on the pod
-	pod, err := c.labelPod(ctx, namespace, name)
+	pod, err := l.labelPod(ctx, namespace, name)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (c *Labeler) labelMyObjectsTree(ctx context.Context) error {
 	}
 
 	// Put labels on the ReplicaSet
-	replicaSet, err := c.labelReplicaSet(ctx, pod)
+	replicaSet, err := l.labelReplicaSet(ctx, pod)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (c *Labeler) labelMyObjectsTree(ctx context.Context) error {
 	}
 
 	// Put labels on the Deployment
-	err = c.labelDeployment(ctx, replicaSet)
+	err = l.labelDeployment(ctx, replicaSet)
 	if err != nil {
 		return err
 	}
@@ -128,8 +128,8 @@ func (c *Labeler) labelMyObjectsTree(ctx context.Context) error {
 	return nil
 }
 
-func (c *Labeler) labelPod(ctx context.Context, namespace, name string) (*core.Pod, error) {
-	pod, err := c.pod.Get(namespace, name)
+func (l *Labeler) labelPod(ctx context.Context, namespace, name string) (*core.Pod, error) {
+	pod, err := l.pod.Get(namespace, name)
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR get Pod %s/%s %v", namespace, name, err)
 		return nil, err
@@ -141,8 +141,8 @@ func (c *Labeler) labelPod(ctx context.Context, namespace, name string) (*core.P
 	}
 
 	// Put label on the Pod
-	pod.Labels = c.addLabels(pod.Labels)
-	pod, err = c.pod.Update(ctx, pod)
+	pod.Labels = l.addLabels(pod.Labels)
+	pod, err = l.pod.Update(ctx, pod)
 	if err != nil {
 		log.V(1).M(namespace, name).F().Error("ERROR put label on Pod %s/%s %v", namespace, name, err)
 		return nil, err
@@ -156,7 +156,7 @@ func (c *Labeler) labelPod(ctx context.Context, namespace, name string) (*core.P
 	return pod, nil
 }
 
-func (c *Labeler) labelReplicaSet(ctx context.Context, pod *core.Pod) (*apps.ReplicaSet, error) {
+func (l *Labeler) labelReplicaSet(ctx context.Context, pod *core.Pod) (*apps.ReplicaSet, error) {
 	// Find parent ReplicaSet
 	replicaSetName := ""
 	for i := range pod.OwnerReferences {
@@ -176,7 +176,7 @@ func (c *Labeler) labelReplicaSet(ctx context.Context, pod *core.Pod) (*apps.Rep
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
-	replicaSet, err := c.replicaSet.Get(pod.Namespace, replicaSetName)
+	replicaSet, err := l.replicaSet.Get(pod.Namespace, replicaSetName)
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
@@ -188,8 +188,8 @@ func (c *Labeler) labelReplicaSet(ctx context.Context, pod *core.Pod) (*apps.Rep
 	}
 
 	// Put label on the ReplicaSet
-	replicaSet.Labels = c.addLabels(replicaSet.Labels)
-	replicaSet, err = c.replicaSet.Update(replicaSet)
+	replicaSet.Labels = l.addLabels(replicaSet.Labels)
+	replicaSet, err = l.replicaSet.Update(replicaSet)
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
@@ -203,7 +203,7 @@ func (c *Labeler) labelReplicaSet(ctx context.Context, pod *core.Pod) (*apps.Rep
 	return replicaSet, nil
 }
 
-func (c *Labeler) labelDeployment(ctx context.Context, rs *apps.ReplicaSet) error {
+func (l *Labeler) labelDeployment(ctx context.Context, rs *apps.ReplicaSet) error {
 	// Find parent Deployment
 	deploymentName := ""
 	for i := range rs.OwnerReferences {
@@ -223,7 +223,7 @@ func (c *Labeler) labelDeployment(ctx context.Context, rs *apps.ReplicaSet) erro
 	}
 
 	// Deployment namespaced name found, fetch the Deployment
-	deployment, err := c.deployment.Get(rs.Namespace, deploymentName)
+	deployment, err := l.deployment.Get(rs.Namespace, deploymentName)
 	if err != nil {
 		log.V(1).M(rs.Namespace, deploymentName).F().Error("ERROR get Deployment %s/%s", rs.Namespace, deploymentName)
 		return err
@@ -235,8 +235,8 @@ func (c *Labeler) labelDeployment(ctx context.Context, rs *apps.ReplicaSet) erro
 	}
 
 	// Put label on the Deployment
-	deployment.Labels = c.addLabels(deployment.Labels)
-	deployment, err = c.deployment.Update(deployment)
+	deployment.Labels = l.addLabels(deployment.Labels)
+	deployment, err = l.deployment.Update(deployment)
 	if err != nil {
 		log.V(1).M(rs.Namespace, deploymentName).F().Error("ERROR put label on Deployment %s/%s %v", rs.Namespace, deploymentName, err)
 		return err
@@ -251,7 +251,7 @@ func (c *Labeler) labelDeployment(ctx context.Context, rs *apps.ReplicaSet) erro
 }
 
 // addLabels adds app and version labels
-func (c *Labeler) addLabels(labels map[string]string) map[string]string {
+func (l *Labeler) addLabels(labels map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		labels,
 		// Add the following labels
@@ -265,13 +265,13 @@ func (c *Labeler) addLabels(labels map[string]string) map[string]string {
 }
 
 // appendLabelReadyOnPod appends Label "Ready" to the pod of the specified host
-func (c *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) error {
+func (l *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	pod, err := c.pod.Get(host)
+	pod, err := l.pod.Get(host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get pod for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
@@ -279,7 +279,7 @@ func (c *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) err
 
 	if commonLabeler.AppendLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.pod.Update(ctx, pod)
+		_, err = l.pod.Update(ctx, pod)
 		if err != nil {
 			log.M(host).F().Error("FAIL setting 'ready' label for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 			return err
@@ -290,7 +290,7 @@ func (c *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) err
 }
 
 // deleteLabelReadyOnPod deletes Label "Ready" from the pod of the specified host
-func (c *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) error {
+func (l *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -299,7 +299,7 @@ func (c *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) err
 	if host == nil {
 		return nil
 	}
-	pod, err := c.pod.Get(host)
+	pod, err := l.pod.Get(host)
 	if apiErrors.IsNotFound(err) {
 		// Pod may be missing in case, say, StatefulSet has 0 pods because CHI is stopped
 		// This is not an error, after all
@@ -313,7 +313,7 @@ func (c *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) err
 
 	if commonLabeler.DeleteLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.pod.Update(ctx, pod)
+		_, err = l.pod.Update(ctx, pod)
 		return err
 	}
 
@@ -321,13 +321,13 @@ func (c *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) err
 }
 
 // appendAnnotationReadyOnService appends Annotation "Ready" to the service of the specified host
-func (c *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
+func (l *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	svc, err := c.service.Get(host)
+	svc, err := l.service.Get(host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get service for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
@@ -335,7 +335,7 @@ func (c *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.
 
 	if commonLabeler.AppendAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.service.Update(svc)
+		_, err = l.service.Update(svc)
 		if err != nil {
 			log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 			return err
@@ -346,7 +346,7 @@ func (c *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.
 }
 
 // deleteAnnotationReadyOnService deletes Annotation "Ready" from the service of the specified host
-func (c *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
+func (l *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -356,7 +356,7 @@ func (c *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.
 		return nil
 	}
 
-	svc, err := c.service.Get(host)
+	svc, err := l.service.Get(host)
 	if apiErrors.IsNotFound(err) {
 		// Service may be missing in case, say, StatefulSet has 0 pods because CHI is stopped
 		// This is not an error, after all
@@ -369,9 +369,18 @@ func (c *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.
 
 	if commonLabeler.DeleteAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
-		_, err = c.service.Update(svc)
+		_, err = l.service.Update(svc)
 		return err
 	}
 
+	return nil
+}
+
+func (l *Labeler) DeleteReadyMarkOnPodAndService(ctx context.Context, host *api.Host) error {
+	if l == nil {
+		return nil
+	}
+	_ = l.deleteLabelReadyOnPod(ctx, host)
+	_ = l.deleteAnnotationReadyOnService(ctx, host)
 	return nil
 }

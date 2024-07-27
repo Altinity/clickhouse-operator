@@ -12,31 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package poller
 
 import (
 	"context"
 	"time"
 
+	apps "k8s.io/api/apps/v1"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
-	apps "k8s.io/api/apps/v1"
 )
 
-type HostStatefulSetPoller struct {
-	*poller.StatefulSetPoller
-	*Labeler
-	interfaces.IKubeSTS
+type readyMarkDeleter interface {
+	DeleteReadyMarkOnPodAndService(ctx context.Context, host *api.Host) error
 }
 
-func NewHostStatefulSetPoller(poller *poller.StatefulSetPoller, labeler *Labeler, kube interfaces.IKube) *HostStatefulSetPoller {
+// HostStatefulSetPoller enriches StatefulSet poller with host capabilities
+type HostStatefulSetPoller struct {
+	*StatefulSetPoller
+	interfaces.IKubeSTS
+	readyMarkDeleter
+}
+
+// NewHostStatefulSetPoller creates new HostStatefulSetPoller from StatefulSet poller
+func NewHostStatefulSetPoller(poller *StatefulSetPoller, kube interfaces.IKube, labeler readyMarkDeleter) *HostStatefulSetPoller {
 	return &HostStatefulSetPoller{
 		StatefulSetPoller: poller,
-		Labeler:           labeler,
 		IKubeSTS:          kube.STS(),
+		readyMarkDeleter:  labeler,
 	}
 }
 
@@ -51,13 +57,11 @@ func (c *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 			if sts == nil {
 				return false
 			}
-			_ = c.deleteLabelReadyOnPod(_ctx, host)
-			_ = c.deleteAnnotationReadyOnService(_ctx, host)
+			c.deleteReadyMark(_ctx, host)
 			return k8s.IsStatefulSetGeneration(sts, sts.Generation)
 		},
 		func(_ctx context.Context) {
-			_ = c.deleteLabelReadyOnPod(_ctx, host)
-			_ = c.deleteAnnotationReadyOnService(_ctx, host)
+			c.deleteReadyMark(_ctx, host)
 		},
 	)
 	if err != nil {
@@ -70,13 +74,11 @@ func (c *HostStatefulSetPoller) WaitHostStatefulSetReady(ctx context.Context, ho
 		host,
 		nil, // rely on default options
 		func(_ctx context.Context, sts *apps.StatefulSet) bool {
-			_ = c.deleteLabelReadyOnPod(_ctx, host)
-			_ = c.deleteAnnotationReadyOnService(_ctx, host)
+			c.deleteReadyMark(_ctx, host)
 			return k8s.IsStatefulSetReady(sts)
 		},
 		func(_ctx context.Context) {
-			_ = c.deleteLabelReadyOnPod(_ctx, host)
-			_ = c.deleteAnnotationReadyOnService(_ctx, host)
+			c.deleteReadyMark(_ctx, host)
 		},
 	)
 
@@ -119,4 +121,14 @@ func (c *HostStatefulSetPoller) WaitHostStatefulSetDeleted(host *api.Host) {
 			return
 		}
 	}
+}
+
+func (c *HostStatefulSetPoller) deleteReadyMark(ctx context.Context, host *api.Host) {
+	if c == nil {
+		return
+	}
+	if c.readyMarkDeleter == nil {
+		return
+	}
+	_ = c.DeleteReadyMarkOnPodAndService(ctx, host)
 }
