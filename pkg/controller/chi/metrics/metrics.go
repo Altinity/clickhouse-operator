@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package metrics
 
 import (
 	"context"
@@ -161,7 +161,7 @@ func prepareLabels(chi *api.ClickHouseInstallation) (attributes []attribute.KeyV
 //
 // This is due to `rate` prometheus function limitation where it expects the metric to be 0-initialized with all possible labels
 // and doesn't default to 0 if the metric is not present.
-func metricsCHIInitZeroValues(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIInitZeroValues(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
@@ -172,41 +172,41 @@ func metricsCHIInitZeroValues(ctx context.Context, chi *api.ClickHouseInstallati
 	ensureMetrics().HostReconcilesErrors.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
 }
 
-func metricsCHIReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsCHIReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsCHIReconcilesAborted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIReconcilesAborted(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsCHIReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
+func CHIReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
 	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds, metric.WithAttributes(prepareLabels(chi)...))
 }
 
-func metricsHostReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().HostReconcilesStarted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().HostReconcilesCompleted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesRestart(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesRestart(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().HostReconcilesRestarts.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesErrors(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesErrors(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().HostReconcilesErrors.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func metricsHostReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
+func HostReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
 	ensureMetrics().HostReconcilesTimings.Record(ctx, seconds, metric.WithAttributes(prepareLabels(chi)...))
 }
 
-func metricsPodAdd(ctx context.Context) {
+func PodAdd(ctx context.Context) {
 	ensureMetrics().PodAddEvents.Add(ctx, 1)
 }
 func metricsPodUpdate(ctx context.Context) {
 	ensureMetrics().PodUpdateEvents.Add(ctx, 1)
 }
-func metricsPodDelete(ctx context.Context) {
+func PodDelete(ctx context.Context) {
 	ensureMetrics().PodDeleteEvents.Add(ctx, 1)
 }
