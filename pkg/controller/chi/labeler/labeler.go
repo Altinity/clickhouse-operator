@@ -18,8 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
@@ -27,6 +25,8 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
@@ -382,5 +382,16 @@ func (l *Labeler) DeleteReadyMarkOnPodAndService(ctx context.Context, host *api.
 	}
 	_ = l.deleteLabelReadyOnPod(ctx, host)
 	_ = l.deleteAnnotationReadyOnService(ctx, host)
+
+	return nil
+}
+
+func (l *Labeler) SetReadyMarkOnPodAndService(ctx context.Context, host *api.Host) error {
+	if l == nil {
+		return nil
+	}
+	_ = l.appendLabelReadyOnPod(ctx, host)
+	_ = l.appendAnnotationReadyOnService(ctx, host)
+
 	return nil
 }
