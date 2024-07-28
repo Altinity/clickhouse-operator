@@ -35,6 +35,7 @@ func (r *Reconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeperInstallati
 				return fmt.Errorf("unable to cast")
 			}
 			markPodRestartedNow(new)
+			cur.Spec.Selector = new.Spec.Selector
 			cur.Spec.Replicas = new.Spec.Replicas
 			cur.Spec.Template = new.Spec.Template
 			cur.Spec.UpdateStrategy = new.Spec.UpdateStrategy
