@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package labeler
 
 import (
 	"context"
@@ -25,10 +25,10 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -45,7 +45,7 @@ type Labeler struct {
 	deployment interfaces.IKubeDeployment
 }
 
-func NewLabeler(kube interfaces.IKube) *Labeler {
+func New(kube interfaces.IKube) *Labeler {
 	return &Labeler{
 		pod:        kube.Pod(),
 		service:    kube.Service(),
@@ -54,7 +54,7 @@ func NewLabeler(kube interfaces.IKube) *Labeler {
 	}
 }
 
-func (l *Labeler) labelMyObjectsTree(ctx context.Context) error {
+func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 
 	// Operator is running in the Pod. We need to label this Pod
 	// Pod is owned by ReplicaSet. We need to label this ReplicaSet also.
