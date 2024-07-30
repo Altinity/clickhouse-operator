@@ -17,16 +17,16 @@ package chk
 import (
 	"context"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 
-func (r *Reconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstallation) (err error) {
-	readyMembers, err := r.getReadyPods(chk)
+func (c *Controller) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstallation) (err error) {
+	readyMembers, err := c.getReadyPods(chk)
 	if err != nil {
 		return err
 	}
@@ -34,7 +34,7 @@ func (r *Reconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstalla
 	for {
 		// Fetch the latest ClickHouseKeeper instance again
 		cur := &apiChk.ClickHouseKeeperInstallation{}
-		if err := r.Get(context.TODO(), getNamespacedName(chk), cur); err != nil {
+		if err := c.Client.Get(context.TODO(), getNamespacedName(chk), cur); err != nil {
 			log.V(1).Error("Error: not found %s err: %s", chk.Name, err)
 			return err
 		}
@@ -68,7 +68,7 @@ func (r *Reconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstalla
 		cur.Status.NormalizedCHKCompleted.ObjectMeta.ManagedFields = nil
 		cur.Status.NormalizedCHKCompleted.Status = nil
 
-		if err := r.Status().Update(context.TODO(), cur); err != nil {
+		if err := c.Status().Update(context.TODO(), cur); err != nil {
 			log.V(1).Error("err: %s", err.Error())
 		} else {
 			return nil

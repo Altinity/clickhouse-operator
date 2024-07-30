@@ -15,17 +15,20 @@
 package chk
 
 import (
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
-	policy "k8s.io/api/policy/v1"
+	"reflect"
+	"runtime"
+
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *Reconciler) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
-		chk,
-		&policy.PodDisruptionBudget{},
-		creator.CreatePodDisruptionBudget(chk),
-		"PodDisruptionBudget",
-		nil,
-	)
+func getNamespacedName(obj meta.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+}
+
+func getFunctionName(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }

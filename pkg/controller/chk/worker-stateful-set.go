@@ -16,14 +16,16 @@ package chk
 
 import (
 	"fmt"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
+
 	apps "k8s.io/api/apps/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
 )
 
-func (r *Reconciler) reconcileStatefulSet(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
+func (w *worker) reconcileStatefulSet(chk *apiChk.ClickHouseKeeperInstallation) error {
+	return w.c.reconcile(
 		chk,
 		&apps.StatefulSet{},
 		creator.CreateStatefulSet(chk),

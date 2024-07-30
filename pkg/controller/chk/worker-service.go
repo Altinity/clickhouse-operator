@@ -16,7 +16,6 @@ package chk
 
 import (
 	"fmt"
-	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 
 	core "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -25,21 +24,38 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-func (r *Reconciler) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return r.reconcile(
+func (w *worker) reconcileClientService(chk *apiChk.ClickHouseKeeperInstallation) error {
+	return w.c.reconcile(
 		chk,
-		&core.ConfigMap{},
-		r.task.Creator.CreateConfigMap(interfaces.ConfigMapConfig, chkConfig.NewConfigFilesGeneratorOptionsKeeper().SetSettings(chk.GetSpec().GetConfiguration().GetSettings())),
-		"ConfigMap",
-		func(_cur, _new client.Object) error {
-			cur, ok1 := _cur.(*core.ConfigMap)
-			new, ok2 := _new.(*core.ConfigMap)
-			if !ok1 || !ok2 {
-				return fmt.Errorf("unable to cast")
-			}
-			cur.Data = new.Data
-			cur.BinaryData = new.BinaryData
-			return nil
-		},
+		&core.Service{},
+		w.task.Creator.CreateService(interfaces.ServiceCR, chk),
+		"Client Service",
+		reconcileUpdaterService,
 	)
+}
+
+func (w *worker) reconcileHeadlessService(chk *apiChk.ClickHouseKeeperInstallation) error {
+	return w.c.reconcile(
+		chk,
+		&core.Service{},
+		w.task.Creator.CreateService(interfaces.ServiceCHIHost, chk),
+		"Headless Service",
+		reconcileUpdaterService,
+	)
+}
+
+func reconcileUpdaterService(_cur, _new client.Object) error {
+	cur, ok1 := _cur.(*core.Service)
+	new, ok2 := _new.(*core.Service)
+	if !ok1 || !ok2 {
+		return fmt.Errorf("unable to cast")
+	}
+	return updateService(cur, new)
+}
+
+func updateService(cur, new *core.Service) error {
+	cur.Spec.Ports = new.Spec.Ports
+	cur.Spec.Type = new.Spec.Type
+	cur.SetAnnotations(new.GetAnnotations())
+	return nil
 }
