@@ -238,10 +238,10 @@ func (ap *ActionPlan) String() string {
 func (ap *ActionPlan) GetRemovedHostsNum() int {
 	var count int
 	ap.WalkRemoved(
-		func(cluster *api.ChiCluster) {
+		func(cluster api.ICluster) {
 			count += cluster.HostsCount()
 		},
-		func(shard *api.ChiShard) {
+		func(shard api.IShard) {
 			count += shard.HostsCount()
 		},
 		func(host *api.Host) {
@@ -253,8 +253,8 @@ func (ap *ActionPlan) GetRemovedHostsNum() int {
 
 // WalkRemoved walk removed cluster items
 func (ap *ActionPlan) WalkRemoved(
-	clusterFunc func(cluster *api.ChiCluster),
-	shardFunc func(shard *api.ChiShard),
+	clusterFunc func(cluster api.ICluster),
+	shardFunc func(shard api.IShard),
 	hostFunc func(host *api.Host),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
@@ -284,8 +284,8 @@ func (ap *ActionPlan) WalkRemoved(
 
 // WalkAdded walk added cluster items
 func (ap *ActionPlan) WalkAdded(
-	clusterFunc func(cluster *api.ChiCluster),
-	shardFunc func(shard *api.ChiShard),
+	clusterFunc func(cluster api.ICluster),
+	shardFunc func(shard api.IShard),
 	hostFunc func(host *api.Host),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
@@ -315,8 +315,8 @@ func (ap *ActionPlan) WalkAdded(
 
 // WalkModified walk modified cluster items
 func (ap *ActionPlan) WalkModified(
-	clusterFunc func(cluster *api.ChiCluster),
-	shardFunc func(shard *api.ChiShard),
+	clusterFunc func(cluster api.ICluster),
+	shardFunc func(shard api.IShard),
 	hostFunc func(host *api.Host),
 ) {
 	// TODO refactor to map[string]object handling, instead of slice
