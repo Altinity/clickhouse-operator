@@ -85,16 +85,24 @@ func (in *ChkClusterLayout) DeepCopyInto(out *ChkClusterLayout) {
 	*out = *in
 	if in.Shards != nil {
 		in, out := &in.Shards, &out.Shards
-		*out = make([]ChkShard, len(*in))
+		*out = make([]*ChkShard, len(*in))
 		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ChkShard)
+				(*in).DeepCopyInto(*out)
+			}
 		}
 	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		*out = make([]ChkReplica, len(*in))
+		*out = make([]*ChkReplica, len(*in))
 		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ChkReplica)
+				(*in).DeepCopyInto(*out)
+			}
 		}
 	}
 	if in.HostsField != nil {
@@ -486,6 +494,11 @@ func (in *Configuration) DeepCopyInto(out *Configuration) {
 	*out = *in
 	if in.Settings != nil {
 		in, out := &in.Settings, &out.Settings
+		*out = new(clickhousealtinitycomv1.Settings)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Files != nil {
+		in, out := &in.Files, &out.Files
 		*out = new(clickhousealtinitycomv1.Settings)
 		(*in).DeepCopyInto(*out)
 	}

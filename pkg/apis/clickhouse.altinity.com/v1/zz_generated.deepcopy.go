@@ -143,16 +143,24 @@ func (in *ChiClusterLayout) DeepCopyInto(out *ChiClusterLayout) {
 	*out = *in
 	if in.Shards != nil {
 		in, out := &in.Shards, &out.Shards
-		*out = make([]ChiShard, len(*in))
+		*out = make([]*ChiShard, len(*in))
 		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ChiShard)
+				(*in).DeepCopyInto(*out)
+			}
 		}
 	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
-		*out = make([]ChiReplica, len(*in))
+		*out = make([]*ChiReplica, len(*in))
 		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(ChiReplica)
+				(*in).DeepCopyInto(*out)
+			}
 		}
 	}
 	if in.HostsField != nil {
