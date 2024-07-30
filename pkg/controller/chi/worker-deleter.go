@@ -25,6 +25,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -56,7 +57,7 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 	objs.Subtract(need)
 	w.a.V(1).M(chi).F().Info("Non-reconciled objects:\n%s", objs)
 	if w.purge(ctx, chi, objs, w.task.RegistryFailed) > 0 {
-		w.c.enqueueObject(NewDropDns(chi))
+		w.c.enqueueObject(cmd_queue.NewDropDns(chi))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 
@@ -73,9 +74,9 @@ func (w *worker) dropReplicas(ctx context.Context, chi *api.ClickHouseInstallati
 	w.a.V(1).M(chi).F().S().Info("drop replicas based on AP")
 	cnt := 0
 	ap.WalkRemoved(
-		func(cluster *api.ChiCluster) {
+		func(cluster api.ICluster) {
 		},
-		func(shard *api.ChiShard) {
+		func(shard api.IShard) {
 		},
 		func(host *api.Host) {
 			_ = w.dropReplica(ctx, host)

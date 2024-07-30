@@ -30,7 +30,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func labeler(cr api.ICustomResource) interfaces.ILabeler {
+func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
 	return chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
 		AppendScope: chop.Config().Label.Runtime.AppendScope,
 		Include:     chop.Config().Label.Include,
@@ -44,7 +44,7 @@ func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *mod
 		return nil
 	}
 
-	opts := controller.NewListOptions(labeler(cr).Selector(interfaces.SelectorCRScope))
+	opts := controller.NewListOptions(getLabeler(cr).Selector(interfaces.SelectorCRScope))
 	r := model.NewRegistry()
 	c.discoveryStatefulSets(ctx, r, cr, opts)
 	c.discoveryConfigMaps(ctx, r, cr, opts)

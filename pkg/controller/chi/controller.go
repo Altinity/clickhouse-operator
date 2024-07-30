@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeInformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
+	appsListers "k8s.io/client-go/listers/apps/v1"
+	coreListers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedCore "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -46,8 +48,11 @@ import (
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
+	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
@@ -56,6 +61,54 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// Controller defines CRO controller
+type Controller struct {
+	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
+	kubeClient kube.Interface
+	extClient  apiExtensions.Interface
+	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
+	chopClient chopClientSet.Interface
+
+	// chiLister used as chiLister.ClickHouseInstallations(namespace).Get(name)
+	chiLister chopListers.ClickHouseInstallationLister
+	// chiListerSynced used in waitForCacheSync()
+	chiListerSynced cache.InformerSynced
+
+	chitLister       chopListers.ClickHouseInstallationTemplateLister
+	chitListerSynced cache.InformerSynced
+
+	// serviceLister used as serviceLister.Services(namespace).Get(name)
+	serviceLister coreListers.ServiceLister
+	// serviceListerSynced used in waitForCacheSync()
+	serviceListerSynced cache.InformerSynced
+	// endpointsLister used as endpointsLister.Endpoints(namespace).Get(name)
+	endpointsLister coreListers.EndpointsLister
+	// endpointsListerSynced used in waitForCacheSync()
+	endpointsListerSynced cache.InformerSynced
+	// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
+	configMapLister coreListers.ConfigMapLister
+	// configMapListerSynced used in waitForCacheSync()
+	configMapListerSynced cache.InformerSynced
+	// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+	statefulSetLister appsListers.StatefulSetLister
+	// statefulSetListerSynced used in waitForCacheSync()
+	statefulSetListerSynced cache.InformerSynced
+	// podLister used as statefulSetLister.StatefulSets(namespace).Get(name)
+	podLister coreListers.PodLister
+	// podListerSynced used in waitForCacheSync()
+	podListerSynced cache.InformerSynced
+
+	// queues used to organize events queue processed by operator
+	queues []queue.PriorityQueue
+	// not used explicitly
+	recorder record.EventRecorder
+
+	namer      interfaces.INameManager
+	kube       interfaces.IKube
+	labeler    *labeler.Labeler
+	pvcDeleter *volume.PVCDeleter
+}
 
 // NewController creates instance of Controller
 func NewController(
@@ -109,7 +162,7 @@ func NewController(
 		recorder:                recorder,
 		namer:                   namer,
 		kube:                    kube,
-		labeler:                 NewLabeler(kube),
+		labeler:                 labeler.New(kube),
 		pvcDeleter:              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
@@ -143,7 +196,7 @@ func (c *Controller) addEventHandlersCHI(
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.AddFunc")
-			c.enqueueObject(NewReconcileCHI(reconcileAdd, nil, chi))
+			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileAdd, nil, chi))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldChi := old.(*api.ClickHouseInstallation)
@@ -152,7 +205,7 @@ func (c *Controller) addEventHandlersCHI(
 				return
 			}
 			log.V(3).M(newChi).Info("chiInformer.UpdateFunc")
-			c.enqueueObject(NewReconcileCHI(reconcileUpdate, oldChi, newChi))
+			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileUpdate, oldChi, newChi))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chi := obj.(*api.ClickHouseInstallation)
@@ -160,7 +213,7 @@ func (c *Controller) addEventHandlersCHI(
 				return
 			}
 			log.V(3).M(chi).Info("chiInformer.DeleteFunc")
-			c.enqueueObject(NewReconcileCHI(reconcileDelete, chi, nil))
+			c.enqueueObject(cmd_queue.NewReconcileCHI(cmd_queue.ReconcileDelete, chi, nil))
 		},
 	})
 }
@@ -175,7 +228,7 @@ func (c *Controller) addEventHandlersCHIT(
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.AddFunc")
-			c.enqueueObject(NewReconcileCHIT(reconcileAdd, nil, chit))
+			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileAdd, nil, chit))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldChit := old.(*api.ClickHouseInstallationTemplate)
@@ -184,7 +237,7 @@ func (c *Controller) addEventHandlersCHIT(
 				return
 			}
 			log.V(3).M(newChit).Info("chitInformer.UpdateFunc")
-			c.enqueueObject(NewReconcileCHIT(reconcileUpdate, oldChit, newChit))
+			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileUpdate, oldChit, newChit))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chit := obj.(*api.ClickHouseInstallationTemplate)
@@ -192,7 +245,7 @@ func (c *Controller) addEventHandlersCHIT(
 				return
 			}
 			log.V(3).M(chit).Info("chitInformer.DeleteFunc")
-			c.enqueueObject(NewReconcileCHIT(reconcileDelete, chit, nil))
+			c.enqueueObject(cmd_queue.NewReconcileCHIT(cmd_queue.ReconcileDelete, chit, nil))
 		},
 	})
 }
@@ -207,7 +260,7 @@ func (c *Controller) addEventHandlersChopConfig(
 				return
 			}
 			log.V(3).M(chopConfig).Info("chopInformer.AddFunc")
-			c.enqueueObject(NewReconcileChopConfig(reconcileAdd, nil, chopConfig))
+			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileAdd, nil, chopConfig))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			newChopConfig := new.(*api.ClickHouseOperatorConfiguration)
@@ -216,7 +269,7 @@ func (c *Controller) addEventHandlersChopConfig(
 				return
 			}
 			log.V(3).M(newChopConfig).Info("chopInformer.UpdateFunc")
-			c.enqueueObject(NewReconcileChopConfig(reconcileUpdate, oldChopConfig, newChopConfig))
+			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileUpdate, oldChopConfig, newChopConfig))
 		},
 		DeleteFunc: func(obj interface{}) {
 			chopConfig := obj.(*api.ClickHouseOperatorConfiguration)
@@ -224,7 +277,7 @@ func (c *Controller) addEventHandlersChopConfig(
 				return
 			}
 			log.V(3).M(chopConfig).Info("chopInformer.DeleteFunc")
-			c.enqueueObject(NewReconcileChopConfig(reconcileDelete, chopConfig, nil))
+			c.enqueueObject(cmd_queue.NewReconcileChopConfig(cmd_queue.ReconcileDelete, chopConfig, nil))
 		},
 	})
 }
@@ -347,8 +400,8 @@ func (c *Controller) addEventHandlersEndpoint(
 			}
 			log.V(3).M(newEndpoints).Info("endpointsInformer.UpdateFunc")
 			if updated(oldEndpoints, newEndpoints) {
-				c.enqueueObject(NewReconcileEndpoints(reconcileUpdate, oldEndpoints, newEndpoints))
-				c.enqueueObject(NewDropDns(&newEndpoints.ObjectMeta))
+				c.enqueueObject(cmd_queue.NewReconcileEndpoints(cmd_queue.ReconcileUpdate, oldEndpoints, newEndpoints))
+				c.enqueueObject(cmd_queue.NewDropDns(&newEndpoints.ObjectMeta))
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -429,7 +482,7 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.AddFunc")
-			c.enqueueObject(NewReconcilePod(reconcileAdd, nil, pod))
+			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileAdd, nil, pod))
 		},
 		UpdateFunc: func(old, new interface{}) {
 			oldPod := old.(*core.Pod)
@@ -438,7 +491,7 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(newPod).Info("podInformer.UpdateFunc")
-			c.enqueueObject(NewReconcilePod(reconcileUpdate, oldPod, newPod))
+			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileUpdate, oldPod, newPod))
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*core.Pod)
@@ -446,7 +499,7 @@ func (c *Controller) addEventHandlersPod(
 				return
 			}
 			log.V(3).M(pod).Info("podInformer.DeleteFunc")
-			c.enqueueObject(NewReconcilePod(reconcileDelete, pod, nil))
+			c.enqueueObject(cmd_queue.NewReconcilePod(cmd_queue.ReconcileDelete, pod, nil))
 		},
 	})
 }
@@ -497,10 +550,10 @@ func (c *Controller) Run(ctx context.Context) {
 	// Label controller runtime objects with proper labels
 	max := 10
 	for cnt := 0; cnt < max; cnt++ {
-		switch err := c.labeler.labelMyObjectsTree(ctx); err {
+		switch err := c.labeler.LabelMyObjectsTree(ctx); err {
 		case nil:
 			cnt = max
-		case ErrOperatorPodNotSpecified:
+		case labeler.ErrOperatorPodNotSpecified:
 			log.V(1).F().Error("Since operator pod is not specified, will not perform labeling")
 			cnt = max
 		default:
@@ -529,8 +582,8 @@ func (c *Controller) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func prepareCHIAdd(command *ReconcileCHI) bool {
-	newjs, _ := json.Marshal(command.new)
+func prepareCHIAdd(command *cmd_queue.ReconcileCHI) bool {
+	newjs, _ := json.Marshal(command.New)
 	newchi := api.ClickHouseInstallation{
 		TypeMeta: meta.TypeMeta{
 			APIVersion: api.SchemeGroupVersion.String(),
@@ -538,24 +591,24 @@ func prepareCHIAdd(command *ReconcileCHI) bool {
 		},
 	}
 	_ = json.Unmarshal(newjs, &newchi)
-	command.new = &newchi
+	command.New = &newchi
 	logCommand(command)
 	return true
 }
 
-func prepareCHIUpdate(command *ReconcileCHI) bool {
-	actionPlan := model.NewActionPlan(command.old, command.new)
+func prepareCHIUpdate(command *cmd_queue.ReconcileCHI) bool {
+	actionPlan := model.NewActionPlan(command.Old, command.New)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}
-	oldjson, _ := json.MarshalIndent(command.old, "", "  ")
-	newjson, _ := json.MarshalIndent(command.new, "", "  ")
+	oldjson, _ := json.MarshalIndent(command.Old, "", "  ")
+	newjson, _ := json.MarshalIndent(command.New, "", "  ")
 	log.V(2).Info("AP enqueue---------------------------------------------:\n%s\n", actionPlan)
 	log.V(3).Info("old enqueue--------------------------------------------:\n%s\n", string(oldjson))
 	log.V(3).Info("new enqueue--------------------------------------------:\n%s\n", string(newjson))
 
-	oldjs, _ := json.Marshal(command.old)
-	newjs, _ := json.Marshal(command.new)
+	oldjs, _ := json.Marshal(command.Old)
+	newjs, _ := json.Marshal(command.New)
 	oldchi := api.ClickHouseInstallation{}
 	newchi := api.ClickHouseInstallation{
 		TypeMeta: meta.TypeMeta{
@@ -565,24 +618,24 @@ func prepareCHIUpdate(command *ReconcileCHI) bool {
 	}
 	_ = json.Unmarshal(oldjs, &oldchi)
 	_ = json.Unmarshal(newjs, &newchi)
-	command.old = &oldchi
-	command.new = &newchi
+	command.Old = &oldchi
+	command.New = &newchi
 	logCommand(command)
 	return true
 }
 
-func logCommand(command *ReconcileCHI) {
+func logCommand(command *cmd_queue.ReconcileCHI) {
 	namespace := "uns"
 	name := "un"
 	switch {
-	case command.new != nil:
-		namespace = command.new.Namespace
-		name = command.new.Name
-	case command.old != nil:
-		namespace = command.old.Namespace
-		name = command.old.Name
+	case command.New != nil:
+		namespace = command.New.Namespace
+		name = command.New.Name
+	case command.Old != nil:
+		namespace = command.Old.Namespace
+		name = command.Old.Name
 	}
-	log.V(1).Info("ENQUEUE new ReconcileCHI cmd=%s for %s/%s", command.cmd, namespace, name)
+	log.V(1).Info("ENQUEUE new ReconcileCHI cmd=%s for %s/%s", command.Cmd, namespace, name)
 }
 
 // enqueueObject adds ClickHouseInstallation object to the work queue
@@ -591,21 +644,21 @@ func (c *Controller) enqueueObject(obj queue.PriorityQueueItem) {
 	index := 0
 	enqueue := false
 	switch command := obj.(type) {
-	case *ReconcileCHI:
+	case *cmd_queue.ReconcileCHI:
 		variants := len(c.queues) - api.DefaultReconcileSystemThreadsNumber
 		index = api.DefaultReconcileSystemThreadsNumber + util.HashIntoIntTopped(handle, variants)
-		switch command.cmd {
-		case reconcileAdd:
+		switch command.Cmd {
+		case cmd_queue.ReconcileAdd:
 			enqueue = prepareCHIAdd(command)
-		case reconcileUpdate:
+		case cmd_queue.ReconcileUpdate:
 			enqueue = prepareCHIUpdate(command)
 		}
 	case
-		*ReconcileCHIT,
-		*ReconcileChopConfig,
-		*ReconcileEndpoints,
-		*ReconcilePod,
-		*DropDns:
+		*cmd_queue.ReconcileCHIT,
+		*cmd_queue.ReconcileChopConfig,
+		*cmd_queue.ReconcileEndpoints,
+		*cmd_queue.ReconcilePod,
+		*cmd_queue.DropDns:
 		variants := api.DefaultReconcileSystemThreadsNumber
 		index = util.HashIntoIntTopped(handle, variants)
 		enqueue = true

@@ -577,7 +577,7 @@ func (chi *ClickHouseInstallation) WalkShards(
 	for clusterIndex := range chi.GetSpec().Configuration.Clusters {
 		cluster := chi.GetSpec().Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
+			shard := cluster.Layout.Shards[shardIndex]
 			res = append(res, f(shard))
 		}
 	}
@@ -629,7 +629,7 @@ func (chi *ClickHouseInstallation) WalkHosts(f func(host *Host) error) []error {
 	for clusterIndex := range chi.GetSpec().Configuration.Clusters {
 		cluster := chi.GetSpec().Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
+			shard := cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Hosts {
 				host := shard.Hosts[replicaIndex]
 				res = append(res, f(host))
@@ -660,7 +660,7 @@ func (chi *ClickHouseInstallation) WalkTillError(
 
 		shards := make([]*ChiShard, 0, len(cluster.Layout.Shards))
 		for shardIndex := range cluster.Layout.Shards {
-			shards = append(shards, &cluster.Layout.Shards[shardIndex])
+			shards = append(shards, cluster.Layout.Shards[shardIndex])
 		}
 		if err := fShards(ctx, shards); err != nil {
 			return err

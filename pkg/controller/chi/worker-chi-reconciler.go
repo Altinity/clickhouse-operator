@@ -33,6 +33,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -62,8 +63,8 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
 
-	metricsCHIInitZeroValues(ctx, new)
-	metricsCHIReconcilesStarted(ctx, new)
+	metrics.CHIInitZeroValues(ctx, new)
+	metrics.CHIReconcilesStarted(ctx, new)
 	startTime := time.Now()
 
 	w.a.M(new).F().Info("Changing OLD to Normalized COMPLETED: %s/%s", new.Namespace, new.Name)
@@ -116,7 +117,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 			Error("FAILED to reconcile CHI err: %v", err)
 		w.markReconcileCompletedUnsuccessfully(ctx, new, err)
 		if errors.Is(err, common.ErrCRUDAbort) {
-			metricsCHIReconcilesAborted(ctx, new)
+			metrics.CHIReconcilesAborted(ctx, new)
 		}
 	} else {
 		// Reconcile successful
@@ -131,8 +132,8 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 		w.waitForIPAddresses(ctx, new)
 		w.finalizeReconcileAndMarkCompleted(ctx, new)
 
-		metricsCHIReconcilesCompleted(ctx, new)
-		metricsCHIReconcilesTimings(ctx, new, time.Now().Sub(startTime).Seconds())
+		metrics.CHIReconcilesCompleted(ctx, new)
+		metrics.CHIReconcilesTimings(ctx, new, time.Now().Sub(startTime).Seconds())
 	}
 
 	return nil
@@ -394,7 +395,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 		w.a.V(1).M(host).F().Info("Reconcile host: %s. Shutting host down due to force restart", host.GetName())
 		w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, true)
 		_ = w.stsReconciler.ReconcileStatefulSet(ctx, host, false)
-		metricsHostReconcilesRestart(ctx, host.GetCR())
+		metrics.HostReconcilesRestart(ctx, host.GetCR())
 		// At this moment StatefulSet has 0 replicas.
 		// First stage of RollingUpdate completed.
 	}
@@ -464,7 +465,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.ChiCluster) 
 		}
 	}
 
-	// Add ChkCluster's Auto Secret
+	// Add cluster's Auto Secret
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
 		if secret := w.task.Creator.CreateClusterSecret(w.c.namer.Name(interfaces.NameClusterAutoSecret, cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
@@ -657,7 +658,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 
-	metricsHostReconcilesStarted(ctx, host.GetCR())
+	metrics.HostReconcilesStarted(ctx, host.GetCR())
 	startTime := time.Now()
 
 	if host.IsFirst() {
@@ -691,7 +692,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 
 	if err := w.reconcileHostConfigMap(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx, host.GetCR())
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
@@ -722,7 +723,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	}
 
 	if err := w.reconcileHostStatefulSet(ctx, host, reconcileStatefulSetOpts); err != nil {
-		metricsHostReconcilesErrors(ctx, host.GetCR())
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 3. Host: %s Err: %v", host.GetName(), err)
@@ -750,7 +751,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	_ = w.migrateTables(ctx, host, migrateTableOpts)
 
 	if err := w.includeHost(ctx, host); err != nil {
-		metricsHostReconcilesErrors(ctx, host.GetCR())
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
@@ -793,8 +794,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		},
 	})
 
-	metricsHostReconcilesCompleted(ctx, host.GetCR())
-	metricsHostReconcilesTimings(ctx, host.GetCR(), time.Now().Sub(startTime).Seconds())
+	metrics.HostReconcilesCompleted(ctx, host.GetCR())
+	metrics.HostReconcilesTimings(ctx, host.GetCR(), time.Now().Sub(startTime).Seconds())
 
 	return nil
 }

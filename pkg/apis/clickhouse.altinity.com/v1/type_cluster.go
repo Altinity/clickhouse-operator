@@ -104,8 +104,8 @@ type ChiClusterLayout struct {
 	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
 
 	// TODO refactor into map[string]ChiShard
-	Shards   []ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
-	Replicas []ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	Shards   []*ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
+	Replicas []*ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
 	// Internal data
 	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
@@ -234,7 +234,7 @@ func (cluster *ChiCluster) GetCHI() *ClickHouseInstallation {
 
 // GetShard gets shard with specified index
 func (cluster *ChiCluster) GetShard(shard int) *ChiShard {
-	return &cluster.Layout.Shards[shard]
+	return cluster.Layout.Shards[shard]
 }
 
 // GetOrCreateHost gets or creates host on specified coordinates
@@ -244,7 +244,7 @@ func (cluster *ChiCluster) GetOrCreateHost(shard, replica int) *Host {
 
 // GetReplica gets replica with specified index
 func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {
-	return &cluster.Layout.Replicas[replica]
+	return cluster.Layout.Replicas[replica]
 }
 
 // FindShard finds shard by name or index.
@@ -293,7 +293,7 @@ func (cluster *ChiCluster) WalkShards(f func(index int, shard IShard) error) []e
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
-		shard := &cluster.Layout.Shards[shardIndex]
+		shard := cluster.Layout.Shards[shardIndex]
 		res = append(res, f(shardIndex, shard))
 	}
 
@@ -305,7 +305,7 @@ func (cluster *ChiCluster) WalkReplicas(f func(index int, replica *ChiReplica) e
 	res := make([]error, 0)
 
 	for replicaIndex := range cluster.Layout.Replicas {
-		replica := &cluster.Layout.Replicas[replicaIndex]
+		replica := cluster.Layout.Replicas[replicaIndex]
 		res = append(res, f(replicaIndex, replica))
 	}
 
@@ -318,7 +318,7 @@ func (cluster *ChiCluster) WalkHosts(f func(host *Host) error) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
-		shard := &cluster.Layout.Shards[shardIndex]
+		shard := cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Hosts {
 			host := shard.Hosts[replicaIndex]
 			res = append(res, f(host))
@@ -334,7 +334,7 @@ func (cluster *ChiCluster) WalkHostsByShards(f func(shard, replica int, host *Ho
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
-		shard := &cluster.Layout.Shards[shardIndex]
+		shard := cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Hosts {
 			host := shard.Hosts[replicaIndex]
 			res = append(res, f(shardIndex, replicaIndex, host))
@@ -350,7 +350,7 @@ func (cluster *ChiCluster) WalkHostsByReplicas(f func(shard, replica int, host *
 	res := make([]error, 0)
 
 	for replicaIndex := range cluster.Layout.Replicas {
-		replica := &cluster.Layout.Replicas[replicaIndex]
+		replica := cluster.Layout.Replicas[replicaIndex]
 		for shardIndex := range replica.Hosts {
 			host := replica.Hosts[shardIndex]
 			res = append(res, f(shardIndex, replicaIndex, host))

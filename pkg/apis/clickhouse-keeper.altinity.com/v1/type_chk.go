@@ -332,7 +332,7 @@ func (chk *ClickHouseKeeperInstallation) WalkHosts(f func(host *apiChi.Host) err
 	for clusterIndex := range chk.GetSpec().Configuration.Clusters {
 		cluster := chk.GetSpec().Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
-			shard := &cluster.Layout.Shards[shardIndex]
+			shard := cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Hosts {
 				host := shard.Hosts[replicaIndex]
 				res = append(res, f(host))

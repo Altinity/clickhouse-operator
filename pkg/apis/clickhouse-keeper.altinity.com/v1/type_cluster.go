@@ -149,30 +149,30 @@ func (cluster *ChkCluster) InheritTemplatesFrom(chk *ClickHouseKeeperInstallatio
 	cluster.Templates.HandleDeprecatedFields()
 }
 
-func (c *ChkCluster) GetName() string {
-	return c.Name
+func (cluster *ChkCluster) GetName() string {
+	return cluster.Name
 }
-func (c *ChkCluster) GetRuntime() apiChi.IClusterRuntime {
+func (cluster *ChkCluster) GetRuntime() apiChi.IClusterRuntime {
 	return nil
 }
-func (c *ChkCluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
+func (cluster *ChkCluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	return nil, false
 }
 func (c *ChkCluster) GetSecret() *apiChi.ClusterSecret {
 	return nil
 }
-func (c *ChkCluster) GetPDBMaxUnavailable() *types.Int32 {
+func (cluster *ChkCluster) GetPDBMaxUnavailable() *types.Int32 {
 	return types.NewInt32(1)
 }
 
-func (c *ChkCluster) WalkShards(f func(index int, shard apiChi.IShard) error) []error {
-	if c == nil {
+func (cluster *ChkCluster) WalkShards(f func(index int, shard apiChi.IShard) error) []error {
+	if cluster == nil {
 		return nil
 	}
 	res := make([]error, 0)
 
-	for shardIndex := range c.Layout.Shards {
-		shard := &c.Layout.Shards[shardIndex]
+	for shardIndex := range cluster.Layout.Shards {
+		shard := cluster.Layout.Shards[shardIndex]
 		res = append(res, f(shardIndex, shard))
 	}
 
@@ -184,20 +184,20 @@ func (cluster *ChkCluster) WalkReplicas(f func(index int, replica *ChkReplica) e
 	res := make([]error, 0)
 
 	for replicaIndex := range cluster.Layout.Replicas {
-		replica := &cluster.Layout.Replicas[replicaIndex]
+		replica := cluster.Layout.Replicas[replicaIndex]
 		res = append(res, f(replicaIndex, replica))
 	}
 
 	return res
 }
 
-func (c *ChkCluster) WalkHosts(func(host *apiChi.Host) error) []error {
+func (cluster *ChkCluster) WalkHosts(func(host *apiChi.Host) error) []error {
 	return nil
 }
 
 // GetShard gets shard with specified index
 func (cluster *ChkCluster) GetShard(shard int) *ChkShard {
-	return &cluster.Layout.Shards[shard]
+	return cluster.Layout.Shards[shard]
 }
 
 // GetOrCreateHost gets or creates host on specified coordinates
@@ -207,7 +207,7 @@ func (cluster *ChkCluster) GetOrCreateHost(shard, replica int) *apiChi.Host {
 
 // GetReplica gets replica with specified index
 func (cluster *ChkCluster) GetReplica(replica int) *ChkReplica {
-	return &cluster.Layout.Replicas[replica]
+	return cluster.Layout.Replicas[replica]
 }
 
 // WalkHostsByShards walks hosts by shards
@@ -216,7 +216,7 @@ func (cluster *ChkCluster) WalkHostsByShards(f func(shard, replica int, host *ap
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
-		shard := &cluster.Layout.Shards[shardIndex]
+		shard := cluster.Layout.Shards[shardIndex]
 		for replicaIndex := range shard.Hosts {
 			host := shard.Hosts[replicaIndex]
 			res = append(res, f(shardIndex, replicaIndex, host))
@@ -236,7 +236,7 @@ func (cluster *ChkCluster) WalkHostsByReplicas(f func(shard, replica int, host *
 	res := make([]error, 0)
 
 	for replicaIndex := range cluster.Layout.Replicas {
-		replica := &cluster.Layout.Replicas[replicaIndex]
+		replica := cluster.Layout.Replicas[replicaIndex]
 		for shardIndex := range replica.Hosts {
 			host := replica.Hosts[shardIndex]
 			res = append(res, f(shardIndex, replicaIndex, host))
@@ -246,13 +246,23 @@ func (cluster *ChkCluster) WalkHostsByReplicas(f func(shard, replica int, host *
 	return res
 }
 
+// HostsCount counts hosts
+func (cluster *ChkCluster) HostsCount() int {
+	count := 0
+	cluster.WalkHosts(func(host *apiChi.Host) error {
+		count++
+		return nil
+	})
+	return count
+}
+
 type ChkClusterLayout struct {
 	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
 	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
 
 	// TODO refactor into map[string]ChiShard
-	Shards   []ChkShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
-	Replicas []ChkReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	Shards   []*ChkShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
+	Replicas []*ChkReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
 
 	// Internal data
 	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica

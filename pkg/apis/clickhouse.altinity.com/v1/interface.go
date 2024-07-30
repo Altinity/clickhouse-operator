@@ -62,6 +62,8 @@ type ICluster interface {
 
 	WalkShards(f func(index int, shard IShard) error) []error
 	WalkHosts(func(host *Host) error) []error
+
+	HostsCount() int
 }
 
 type IClusterRuntime interface {
@@ -99,6 +101,8 @@ type IShard interface {
 	GetTemplates() *TemplatesList
 
 	WalkHosts(func(host *Host) error) []error
+
+	HostsCount() int
 }
 
 type IShardRuntime interface {

@@ -15,20 +15,12 @@
 package chk
 
 import (
-	"reflect"
-	"runtime"
+	"time"
 
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	apps "k8s.io/api/apps/v1"
 )
 
-func getNamespacedName(obj meta.Object) types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
-}
-
-func getFunctionName(fn interface{}) string {
-	return runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name()
+func markPodRestartedNow(sts *apps.StatefulSet) {
+	v, _ := time.Now().UTC().MarshalText()
+	sts.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": string(v)}
 }

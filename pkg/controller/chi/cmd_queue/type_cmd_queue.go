@@ -24,9 +24,9 @@ import (
 )
 
 const (
-	reconcileAdd    = "add"
-	reconcileUpdate = "update"
-	reconcileDelete = "delete"
+	ReconcileAdd    = "add"
+	ReconcileUpdate = "update"
+	ReconcileDelete = "delete"
 )
 
 // PriorityQueueItem specifies item of the priority queue
@@ -50,20 +50,20 @@ const (
 // ReconcileCHI specifies reconcile request queue item
 type ReconcileCHI struct {
 	PriorityQueueItem
-	cmd string
-	old *api.ClickHouseInstallation
-	new *api.ClickHouseInstallation
+	Cmd string
+	Old *api.ClickHouseInstallation
+	New *api.ClickHouseInstallation
 }
 
 var _ queue.PriorityQueueItem = &ReconcileCHI{}
 
 // Handle returns handle of the queue item
 func (r ReconcileCHI) Handle() queue.T {
-	if r.new != nil {
-		return "ReconcileCHI" + ":" + r.new.Namespace + "/" + r.new.Name
+	if r.New != nil {
+		return "ReconcileCHI" + ":" + r.New.Namespace + "/" + r.New.Name
 	}
-	if r.old != nil {
-		return "ReconcileCHI" + ":" + r.old.Namespace + "/" + r.old.Name
+	if r.Old != nil {
+		return "ReconcileCHI" + ":" + r.Old.Namespace + "/" + r.Old.Name
 	}
 	return ""
 }
@@ -74,9 +74,9 @@ func NewReconcileCHI(cmd string, old, new *api.ClickHouseInstallation) *Reconcil
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileCHI,
 		},
-		cmd: cmd,
-		old: old,
-		new: new,
+		Cmd: cmd,
+		Old: old,
+		New: new,
 	}
 
 	/*
@@ -101,20 +101,20 @@ func NewReconcileCHI(cmd string, old, new *api.ClickHouseInstallation) *Reconcil
 // ReconcileCHIT specifies reconcile CHI template queue item
 type ReconcileCHIT struct {
 	PriorityQueueItem
-	cmd string
-	old *api.ClickHouseInstallationTemplate
-	new *api.ClickHouseInstallationTemplate
+	Cmd string
+	Old *api.ClickHouseInstallationTemplate
+	New *api.ClickHouseInstallationTemplate
 }
 
 var _ queue.PriorityQueueItem = &ReconcileCHIT{}
 
 // Handle returns handle of the queue item
 func (r ReconcileCHIT) Handle() queue.T {
-	if r.new != nil {
-		return "ReconcileCHIT" + ":" + r.new.Namespace + "/" + r.new.Name
+	if r.New != nil {
+		return "ReconcileCHIT" + ":" + r.New.Namespace + "/" + r.New.Name
 	}
-	if r.old != nil {
-		return "ReconcileCHIT" + ":" + r.old.Namespace + "/" + r.old.Name
+	if r.Old != nil {
+		return "ReconcileCHIT" + ":" + r.Old.Namespace + "/" + r.Old.Name
 	}
 	return ""
 }
@@ -125,29 +125,29 @@ func NewReconcileCHIT(cmd string, old, new *api.ClickHouseInstallationTemplate) 
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileCHIT,
 		},
-		cmd: cmd,
-		old: old,
-		new: new,
+		Cmd: cmd,
+		Old: old,
+		New: new,
 	}
 }
 
 // ReconcileChopConfig specifies CHOp config queue item
 type ReconcileChopConfig struct {
 	PriorityQueueItem
-	cmd string
-	old *api.ClickHouseOperatorConfiguration
-	new *api.ClickHouseOperatorConfiguration
+	Cmd string
+	Old *api.ClickHouseOperatorConfiguration
+	New *api.ClickHouseOperatorConfiguration
 }
 
 var _ queue.PriorityQueueItem = &ReconcileChopConfig{}
 
 // Handle returns handle of the queue item
 func (r ReconcileChopConfig) Handle() queue.T {
-	if r.new != nil {
-		return "ReconcileChopConfig" + ":" + r.new.Namespace + "/" + r.new.Name
+	if r.New != nil {
+		return "ReconcileChopConfig" + ":" + r.New.Namespace + "/" + r.New.Name
 	}
-	if r.old != nil {
-		return "ReconcileChopConfig" + ":" + r.old.Namespace + "/" + r.old.Name
+	if r.Old != nil {
+		return "ReconcileChopConfig" + ":" + r.Old.Namespace + "/" + r.Old.Name
 	}
 	return ""
 }
@@ -158,29 +158,29 @@ func NewReconcileChopConfig(cmd string, old, new *api.ClickHouseOperatorConfigur
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileChopConfig,
 		},
-		cmd: cmd,
-		old: old,
-		new: new,
+		Cmd: cmd,
+		Old: old,
+		New: new,
 	}
 }
 
 // ReconcileEndpoints specifies endpoint
 type ReconcileEndpoints struct {
 	PriorityQueueItem
-	cmd string
-	old *core.Endpoints
-	new *core.Endpoints
+	Cmd string
+	Old *core.Endpoints
+	New *core.Endpoints
 }
 
 var _ queue.PriorityQueueItem = &ReconcileEndpoints{}
 
 // Handle returns handle of the queue item
 func (r ReconcileEndpoints) Handle() queue.T {
-	if r.new != nil {
-		return "ReconcileEndpoints" + ":" + r.new.Namespace + "/" + r.new.Name
+	if r.New != nil {
+		return "ReconcileEndpoints" + ":" + r.New.Namespace + "/" + r.New.Name
 	}
-	if r.old != nil {
-		return "ReconcileEndpoints" + ":" + r.old.Namespace + "/" + r.old.Name
+	if r.Old != nil {
+		return "ReconcileEndpoints" + ":" + r.Old.Namespace + "/" + r.Old.Name
 	}
 	return ""
 }
@@ -191,24 +191,24 @@ func NewReconcileEndpoints(cmd string, old, new *core.Endpoints) *ReconcileEndpo
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityReconcileEndpoints,
 		},
-		cmd: cmd,
-		old: old,
-		new: new,
+		Cmd: cmd,
+		Old: old,
+		New: new,
 	}
 }
 
 // DropDns specifies drop dns queue item
 type DropDns struct {
 	PriorityQueueItem
-	initiator meta.Object
+	Initiator meta.Object
 }
 
 var _ queue.PriorityQueueItem = &DropDns{}
 
 // Handle returns handle of the queue item
 func (r DropDns) Handle() queue.T {
-	if r.initiator != nil {
-		return "DropDNS" + ":" + r.initiator.GetNamespace() + "/" + r.initiator.GetName()
+	if r.Initiator != nil {
+		return "DropDNS" + ":" +r.Initiator.GetNamespace() + "/" + r.Initiator.GetName()
 	}
 	return ""
 }
@@ -219,27 +219,27 @@ func NewDropDns(initiator meta.Object) *DropDns {
 		PriorityQueueItem: PriorityQueueItem{
 			priority: priorityDropDNS,
 		},
-		initiator: initiator,
+		Initiator: initiator,
 	}
 }
 
 // ReconcilePod specifies pod reconcile
 type ReconcilePod struct {
 	PriorityQueueItem
-	cmd string
-	old *core.Pod
-	new *core.Pod
+	Cmd string
+	Old *core.Pod
+	New *core.Pod
 }
 
 var _ queue.PriorityQueueItem = &ReconcileEndpoints{}
 
 // Handle returns handle of the queue item
 func (r ReconcilePod) Handle() queue.T {
-	if r.new != nil {
-		return "ReconcilePod" + ":" + r.new.Namespace + "/" + r.new.Name
+	if r.New != nil {
+		return "ReconcilePod" + ":" + r.New.Namespace + "/" + r.New.Name
 	}
-	if r.old != nil {
-		return "ReconcilePod" + ":" + r.old.Namespace + "/" + r.old.Name
+	if r.Old != nil {
+		return "ReconcilePod" + ":" + r.Old.Namespace + "/" + r.Old.Name
 	}
 	return ""
 }
@@ -247,8 +247,8 @@ func (r ReconcilePod) Handle() queue.T {
 // NewReconcilePod creates new reconcile endpoints queue item
 func NewReconcilePod(cmd string, old, new *core.Pod) *ReconcilePod {
 	return &ReconcilePod{
-		cmd: cmd,
-		old: old,
-		new: new,
+		Cmd: cmd,
+		Old: old,
+		New: new,
 	}
 }

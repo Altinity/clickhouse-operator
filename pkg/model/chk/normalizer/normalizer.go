@@ -433,7 +433,7 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 	// Let's look for explicitly specified Shards in Layout.Replicas
 	for i := range clusterLayout.Replicas {
-		replica := &clusterLayout.Replicas[i]
+		replica :=clusterLayout.Replicas[i]
 
 		if replica.ShardsCount > clusterLayout.ShardsCount {
 			// We have Shards number specified explicitly in this replica,
@@ -465,7 +465,7 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 	// Let's look for explicitly specified Replicas in Layout.Shards
 	for i := range clusterLayout.Shards {
-		shard := &clusterLayout.Shards[i]
+		shard := clusterLayout.Shards[i]
 
 		if shard.ReplicasCount > clusterLayout.ReplicasCount {
 			// We have Replicas number specified explicitly in this shard
@@ -491,7 +491,7 @@ func (n *Normalizer) ensureClusterLayoutShards(layout *apiChk.ChkClusterLayout) 
 	// Some (may be all) shards specified, need to append assumed (unspecified, but expected to exist) shards
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Shards) < layout.ShardsCount {
-		layout.Shards = append(layout.Shards, apiChk.ChkShard{})
+		layout.Shards = append(layout.Shards, &apiChk.ChkShard{})
 	}
 }
 
@@ -503,7 +503,7 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *apiChk.ChkClusterLayout
 	// Some (may be all) replicas specified, need to append assumed (unspecified, but expected to exist) replicas
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Replicas) < layout.ReplicasCount {
-		layout.Replicas = append(layout.Replicas, apiChk.ChkReplica{})
+		layout.Replicas = append(layout.Replicas, &apiChk.ChkReplica{})
 	}
 }
 
