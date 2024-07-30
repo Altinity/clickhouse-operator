@@ -26,21 +26,21 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Controller reconciles a ClickHouseKeeper object
 type Controller struct {
 	client.Client
-	Scheme        *apiMachinery.Scheme
+	Scheme *apiMachinery.Scheme
 
-	namer      interfaces.INameManager
-	kube       interfaces.IKube
+	namer interfaces.INameManager
+	kube  interfaces.IKube
 	//labeler    *Labeler
 	pvcDeleter *volume.PVCDeleter
 }

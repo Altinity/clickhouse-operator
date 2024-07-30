@@ -32,10 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeInformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
-	appsListers "k8s.io/client-go/listers/apps/v1"
-	coreListers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedCore "k8s.io/client-go/kubernetes/typed/core/v1"
+	appsListers "k8s.io/client-go/listers/apps/v1"
+	coreListers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
@@ -50,12 +50,12 @@ import (
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
 	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/labeler"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -597,7 +597,7 @@ func prepareCHIAdd(command *cmd_queue.ReconcileCHI) bool {
 }
 
 func prepareCHIUpdate(command *cmd_queue.ReconcileCHI) bool {
-	actionPlan := model.NewActionPlan(command.Old, command.New)
+	actionPlan := action_plan.NewActionPlan(command.Old, command.New)
 	if !actionPlan.HasActionsToDo() {
 		return false
 	}

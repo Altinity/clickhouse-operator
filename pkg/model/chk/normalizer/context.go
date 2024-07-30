@@ -15,70 +15,26 @@
 package normalizer
 
 import (
-	core "k8s.io/api/core/v1"
-
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
 
 // Context specifies normalization context
 type Context struct {
-	// target specifies current target being normalized
-	target *apiChk.ClickHouseKeeperInstallation
-	// options specifies normalization options
-	options *normalizer.Options
+	*normalizer.Context
 }
 
 // NewContext creates new Context
 func NewContext(options *normalizer.Options) *Context {
 	return &Context{
-		options: options,
+		normalizer.NewContext(options),
 	}
 }
 
-func (c *Context) GetTarget() *apiChk.ClickHouseKeeperInstallation {
-	if c == nil {
-		return nil
-	}
-	return c.target
+func (c *Context) GetTarget() *api.ClickHouseKeeperInstallation {
+	return c.Context.GetTarget().(*api.ClickHouseKeeperInstallation)
 }
 
-func (c *Context) SetTarget(target *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	if c == nil {
-		return nil
-	}
-	c.target = target
-	return c.target
-}
-
-func (c *Context) Options() *normalizer.Options {
-	if c == nil {
-		return nil
-	}
-	return c.options
-}
-
-func (c *Context) GetTargetNamespace() string {
-	return c.GetTarget().GetNamespace()
-}
-
-func (c *Context) AppendAdditionalEnvVar(envVar core.EnvVar) {
-	if c == nil {
-		return
-	}
-	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(envVar)
-}
-
-func (c *Context) AppendAdditionalVolume(volume core.Volume) {
-	if c == nil {
-		return
-	}
-	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeIfNotExists(volume)
-}
-
-func (c *Context) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
-	if c == nil {
-		return
-	}
-	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMountIfNotExists(volumeMount)
+func (c *Context) SetTarget(target *api.ClickHouseKeeperInstallation) *api.ClickHouseKeeperInstallation {
+	return c.Context.SetTarget(target).(*api.ClickHouseKeeperInstallation)
 }

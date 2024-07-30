@@ -21,8 +21,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 )
 
 func (w *worker) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) error {

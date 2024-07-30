@@ -16,7 +16,7 @@ package chi
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 )
 
 // logCHI writes a CHI into the log
@@ -30,7 +30,7 @@ func (w *worker) logCHI(name string, chi *api.ClickHouseInstallation) {
 }
 
 // logActionPlan logs action plan
-func (w *worker) logActionPlan(ap *chiModel.ActionPlan) {
+func (w *worker) logActionPlan(ap *action_plan.ActionPlan) {
 	w.a.Info(
 		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
 		ap,

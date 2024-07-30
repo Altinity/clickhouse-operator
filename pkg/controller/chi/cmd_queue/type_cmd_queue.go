@@ -208,7 +208,7 @@ var _ queue.PriorityQueueItem = &DropDns{}
 // Handle returns handle of the queue item
 func (r DropDns) Handle() queue.T {
 	if r.Initiator != nil {
-		return "DropDNS" + ":" +r.Initiator.GetNamespace() + "/" + r.Initiator.GetName()
+		return "DropDNS" + ":" + r.Initiator.GetNamespace() + "/" + r.Initiator.GetName()
 	}
 	return ""
 }

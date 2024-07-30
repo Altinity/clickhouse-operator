@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package action_plan
 
 import (
 	"gopkg.in/d4l3k/messagediff.v1"
@@ -260,20 +260,26 @@ func (ap *ActionPlan) WalkRemoved(
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Removed {
 		switch ap.specDiff.Removed[path].(type) {
-		case api.ChiCluster:
-			cluster := ap.specDiff.Removed[path].(api.ChiCluster)
-			clusterFunc(&cluster)
-		case api.ChiShard:
-			shard := ap.specDiff.Removed[path].(api.ChiShard)
-			shardFunc(&shard)
-		case api.Host:
-			host := ap.specDiff.Removed[path].(api.Host)
-			hostFunc(&host)
-		case *api.ChiCluster:
-			cluster := ap.specDiff.Removed[path].(*api.ChiCluster)
+		//case api.ChiCluster:
+		//	cluster := ap.specDiff.Removed[path].(api.ChiCluster)
+		//	clusterFunc(&cluster)
+		//case api.ChiShard:
+		//	shard := ap.specDiff.Removed[path].(api.ChiShard)
+		//	shardFunc(&shard)
+		//case api.Host:
+		//	host := ap.specDiff.Removed[path].(api.Host)
+		//	hostFunc(&host)
+		//case *api.ChiCluster:
+		//	cluster := ap.specDiff.Removed[path].(*api.ChiCluster)
+		//	clusterFunc(cluster)
+		case api.ICluster:
+			cluster := ap.specDiff.Removed[path].(api.ICluster)
 			clusterFunc(cluster)
-		case *api.ChiShard:
-			shard := ap.specDiff.Removed[path].(*api.ChiShard)
+		//case *api.ChiShard:
+		//	shard := ap.specDiff.Removed[path].(*api.ChiShard)
+		//	shardFunc(shard)
+		case api.IShard:
+			shard := ap.specDiff.Removed[path].(api.IShard)
 			shardFunc(shard)
 		case *api.Host:
 			host := ap.specDiff.Removed[path].(*api.Host)
@@ -291,20 +297,26 @@ func (ap *ActionPlan) WalkAdded(
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Added {
 		switch ap.specDiff.Added[path].(type) {
-		case api.ChiCluster:
-			cluster := ap.specDiff.Added[path].(api.ChiCluster)
-			clusterFunc(&cluster)
-		case api.ChiShard:
-			shard := ap.specDiff.Added[path].(api.ChiShard)
-			shardFunc(&shard)
-		case api.Host:
-			host := ap.specDiff.Added[path].(api.Host)
-			hostFunc(&host)
-		case *api.ChiCluster:
-			cluster := ap.specDiff.Added[path].(*api.ChiCluster)
+		//case api.ChiCluster:
+		//	cluster := ap.specDiff.Added[path].(api.ChiCluster)
+		//	clusterFunc(&cluster)
+		//case api.ChiShard:
+		//	shard := ap.specDiff.Added[path].(api.ChiShard)
+		//	shardFunc(&shard)
+		//case api.Host:
+		//	host := ap.specDiff.Added[path].(api.Host)
+		//	hostFunc(&host)
+		//case *api.ChiCluster:
+		//	cluster := ap.specDiff.Added[path].(*api.ChiCluster)
+		//	clusterFunc(cluster)
+		case api.ICluster:
+			cluster := ap.specDiff.Added[path].(api.ICluster)
 			clusterFunc(cluster)
-		case *api.ChiShard:
-			shard := ap.specDiff.Added[path].(*api.ChiShard)
+		//case *api.ChiShard:
+		//	shard := ap.specDiff.Added[path].(*api.ChiShard)
+		//	shardFunc(shard)
+		case api.IShard:
+			shard := ap.specDiff.Added[path].(api.IShard)
 			shardFunc(shard)
 		case *api.Host:
 			host := ap.specDiff.Added[path].(*api.Host)
@@ -322,20 +334,26 @@ func (ap *ActionPlan) WalkModified(
 	// TODO refactor to map[string]object handling, instead of slice
 	for path := range ap.specDiff.Modified {
 		switch ap.specDiff.Modified[path].(type) {
-		case api.ChiCluster:
-			cluster := ap.specDiff.Modified[path].(api.ChiCluster)
-			clusterFunc(&cluster)
-		case api.ChiShard:
-			shard := ap.specDiff.Modified[path].(api.ChiShard)
-			shardFunc(&shard)
-		case api.Host:
-			host := ap.specDiff.Modified[path].(api.Host)
-			hostFunc(&host)
-		case *api.ChiCluster:
-			cluster := ap.specDiff.Modified[path].(*api.ChiCluster)
+		//case api.ChiCluster:
+		//	cluster := ap.specDiff.Modified[path].(api.ChiCluster)
+		//	clusterFunc(&cluster)
+		//case api.ChiShard:
+		//	shard := ap.specDiff.Modified[path].(api.ChiShard)
+		//	shardFunc(&shard)
+		//case api.Host:
+		//	host := ap.specDiff.Modified[path].(api.Host)
+		//	hostFunc(&host)
+		//case *api.ChiCluster:
+		//	cluster := ap.specDiff.Modified[path].(*api.ChiCluster)
+		//	clusterFunc(cluster)
+		case api.ICluster:
+			cluster := ap.specDiff.Modified[path].(api.ICluster)
 			clusterFunc(cluster)
-		case *api.ChiShard:
-			shard := ap.specDiff.Modified[path].(*api.ChiShard)
+		//case *api.ChiShard:
+		//	shard := ap.specDiff.Modified[path].(*api.ChiShard)
+		//	shardFunc(shard)
+		case api.IShard:
+			shard := ap.specDiff.Modified[path].(api.IShard)
 			shardFunc(shard)
 		case *api.Host:
 			host := ap.specDiff.Modified[path].(*api.Host)

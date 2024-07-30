@@ -433,7 +433,7 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 
 	// Let's look for explicitly specified Shards in Layout.Replicas
 	for i := range clusterLayout.Replicas {
-		replica :=clusterLayout.Replicas[i]
+		replica := clusterLayout.Replicas[i]
 
 		if replica.ShardsCount > clusterLayout.ShardsCount {
 			// We have Shards number specified explicitly in this replica,

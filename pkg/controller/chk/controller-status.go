@@ -18,10 +18,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 )
 

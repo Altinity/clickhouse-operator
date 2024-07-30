@@ -15,70 +15,26 @@
 package normalizer
 
 import (
-	core "k8s.io/api/core/v1"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
 
 // Context specifies normalization context
 type Context struct {
-	// target specifies current target being normalized
-	target *api.ClickHouseInstallation
-	// options specifies normalization options
-	options *normalizer.Options
+	*normalizer.Context
 }
 
 // NewContext creates new Context
 func NewContext(options *normalizer.Options) *Context {
 	return &Context{
-		options: options,
+		normalizer.NewContext(options),
 	}
 }
 
 func (c *Context) GetTarget() *api.ClickHouseInstallation {
-	if c == nil {
-		return nil
-	}
-	return c.target
+	return c.Context.GetTarget().(*api.ClickHouseInstallation)
 }
 
 func (c *Context) SetTarget(target *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	if c == nil {
-		return nil
-	}
-	c.target = target
-	return c.target
-}
-
-func (c *Context) Options() *normalizer.Options {
-	if c == nil {
-		return nil
-	}
-	return c.options
-}
-
-func (c *Context) GetTargetNamespace() string {
-	return c.GetTarget().GetNamespace()
-}
-
-func (c *Context) AppendAdditionalEnvVar(envVar core.EnvVar) {
-	if c == nil {
-		return
-	}
-	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(envVar)
-}
-
-func (c *Context) AppendAdditionalVolume(volume core.Volume) {
-	if c == nil {
-		return
-	}
-	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeIfNotExists(volume)
-}
-
-func (c *Context) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
-	if c == nil {
-		return
-	}
-	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeMountIfNotExists(volumeMount)
+	return c.Context.SetTarget(target).(*api.ClickHouseInstallation)
 }

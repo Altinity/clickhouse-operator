@@ -32,16 +32,16 @@ import (
 
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
-	c *Controller
-	a common.Announcer
+	c             *Controller
+	a             common.Announcer
 	normalizer    *chkNormalizer.Normalizer
 	task          *common.Task
 	stsReconciler *statefulset.StatefulSetReconciler
 
-	start         time.Time
+	start time.Time
 }
 
-const componentName   = "clickhouse-operator"
+const componentName = "clickhouse-operator"
 
 // newWorker
 func (c *Controller) newWorker() *worker {
@@ -57,11 +57,11 @@ func (c *Controller) newWorker() *worker {
 	)
 
 	return &worker{
-		c:     c,
-		a:     announcer,
+		c:          c,
+		a:          announcer,
 		normalizer: chkNormalizer.New(),
-		start:   start,
-		task:    nil,
+		start:      start,
+		task:       nil,
 	}
 }
 
@@ -109,4 +109,3 @@ func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *chkConfig
 		ReplicasCount: 1,
 	}
 }
-

@@ -39,10 +39,10 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
-	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	chiConfig "github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	normalizerCommon "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
@@ -619,7 +619,7 @@ func (w *worker) addCHIToMonitoring(chi *api.ClickHouseInstallation) {
 	w.c.updateWatch(chi)
 }
 
-func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInstallation, ap *chiModel.ActionPlan) {
+func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
@@ -711,7 +711,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpec().GetTaskID())
 }
 
-func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation, ap *chiModel.ActionPlan) {
+func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return

@@ -31,14 +31,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -86,7 +86,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	new.SetAncestor(old)
 	w.logOldAndNew("normalized", old, new)
 
-	actionPlan := chiModel.NewActionPlan(old, new)
+	actionPlan := action_plan.NewActionPlan(old, new)
 	w.logActionPlan(actionPlan)
 
 	switch {

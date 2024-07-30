@@ -24,13 +24,13 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
-	chiModel "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -65,7 +65,7 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 }
 
 // dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
-func (w *worker) dropReplicas(ctx context.Context, chi *api.ClickHouseInstallation, ap *chiModel.ActionPlan) {
+func (w *worker) dropReplicas(ctx context.Context, chi *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
