@@ -20,6 +20,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 )
 
@@ -57,7 +58,7 @@ func (m *ConfigMapManagerKeeper) SetConfigFilesGenerator(configFilesGenerator in
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
 func (m *ConfigMapManagerKeeper) common(options *config.FilesGeneratorOptionsKeeper) *core.ConfigMap {
-	return &core.ConfigMap{
+	cm := &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
@@ -68,4 +69,7 @@ func (m *ConfigMapManagerKeeper) common(options *config.FilesGeneratorOptionsKee
 		},
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupCommon, options),
 	}
+	// And after the object is ready we can put version label
+	commonLabeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	return cm
 }
