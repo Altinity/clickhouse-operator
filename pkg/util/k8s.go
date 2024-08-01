@@ -16,6 +16,7 @@ package util
 
 import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // NamespaceName returns namespace and anme from the meta
@@ -26,6 +27,14 @@ func NamespaceName(meta meta.Object) (string, string) {
 // NamespaceNameString returns namespace and name as one string
 func NamespaceNameString(meta meta.Object) string {
 	return meta.GetNamespace() + "/" + meta.GetName()
+}
+
+// NamespacedName returns NamespacedName from obj
+func NamespacedName(obj meta.Object) types.NamespacedName {
+	return types.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
 }
 
 // AnnotationsToBeSkipped kubectl service annotation that we'd like to skip

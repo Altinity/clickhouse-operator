@@ -23,6 +23,7 @@ import (
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	model "github.com/altinity/clickhouse-operator/pkg/model/chk"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (c *Controller) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstallation) (err error) {
@@ -34,7 +35,7 @@ func (c *Controller) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstalla
 	for {
 		// Fetch the latest ClickHouseKeeper instance again
 		cur := &apiChk.ClickHouseKeeperInstallation{}
-		if err := c.Client.Get(context.TODO(), getNamespacedName(chk), cur); err != nil {
+		if err := c.Client.Get(context.TODO(), util.NamespacedName(chk), cur); err != nil {
 			log.V(1).Error("Error: not found %s err: %s", chk.Name, err)
 			return err
 		}

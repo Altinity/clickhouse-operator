@@ -32,6 +32,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
 // Controller reconciles a ClickHouseKeeper object
@@ -96,7 +97,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 
 	// Move to worker?!
 	if err := c.reconcileClusterStatus(new); err != nil {
-		log.V(1).Error("Error during reconcile status. f: %s err: %s", getFunctionName(c.reconcileClusterStatus), err)
+		log.V(1).Error("Error during reconcile status. f: %s err: %s", runtime.FunctionName(c.reconcileClusterStatus), err)
 		return reconcile.Result{}, err
 	}
 
@@ -115,7 +116,7 @@ func (c *Controller) reconcile(
 		return err
 	}
 
-	err = c.Client.Get(context.TODO(), getNamespacedName(new), cur)
+	err = c.Client.Get(context.TODO(), util.NamespacedName(new), cur)
 	if err != nil && apiErrors.IsNotFound(err) {
 		log.V(1).Info("Creating new " + name)
 

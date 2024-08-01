@@ -20,6 +20,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
 func (w *worker) reconcileCHK(ctx context.Context, old, new *apiChk.ClickHouseKeeperInstallation) error {
@@ -70,7 +71,7 @@ func (w *worker) reconcile(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 		w.reconcilePodDisruptionBudget,
 	} {
 		if err := f(chk); err != nil {
-			log.V(1).Error("Error during reconcile. f: %s err: %s", getFunctionName(f), err)
+			log.V(1).Error("Error during reconcile. f: %s err: %s", runtime.FunctionName(f), err)
 			return err
 		}
 	}
