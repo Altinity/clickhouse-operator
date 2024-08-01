@@ -28,7 +28,7 @@ func (w *worker) reconcileClientService(chk *apiChk.ClickHouseKeeperInstallation
 	return w.c.reconcile(
 		chk,
 		&core.Service{},
-		w.task.Creator.CreateService(interfaces.ServiceCR, chk),
+		w.task.GetCreator().CreateService(interfaces.ServiceCR, chk),
 		"Client Service",
 		reconcileUpdaterService,
 	)
@@ -38,7 +38,7 @@ func (w *worker) reconcileHeadlessService(chk *apiChk.ClickHouseKeeperInstallati
 	return w.c.reconcile(
 		chk,
 		&core.Service{},
-		w.task.Creator.CreateService(interfaces.ServiceCHIHost, chk),
+		w.task.GetCreator().CreateService(interfaces.ServiceCHIHost, chk),
 		"Headless Service",
 		reconcileUpdaterService,
 	)

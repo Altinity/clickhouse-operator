@@ -223,7 +223,7 @@ func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *api.ClickHou
 	}
 
 	// Create entry point for the whole CHI
-	if service := w.task.Creator.CreateService(interfaces.ServiceCR); service != nil {
+	if service := w.task.GetCreator().CreateService(interfaces.ServiceCR); service != nil {
 		if err := w.reconcileService(ctx, chi, service); err != nil {
 			// Service not reconciled
 			w.task.RegistryFailed.RegisterService(service.GetObjectMeta())
@@ -266,7 +266,7 @@ func (w *worker) reconcileCHIConfigMapCommon(
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.task.Creator.CreateConfigMap(interfaces.ConfigMapCHICommon, options)
+	configMapCommon := w.task.GetCreator().CreateConfigMap(interfaces.ConfigMapCHICommon, options)
 	err := w.reconcileConfigMap(ctx, chi, configMapCommon)
 	if err == nil {
 		w.task.RegistryReconciled.RegisterConfigMap(configMapCommon.GetObjectMeta())
@@ -285,7 +285,7 @@ func (w *worker) reconcileCHIConfigMapUsers(ctx context.Context, chi *api.ClickH
 	}
 
 	// ConfigMap common for all users resources in CHI
-	configMapUsers := w.task.Creator.CreateConfigMap(interfaces.ConfigMapCHICommonUsers)
+	configMapUsers := w.task.GetCreator().CreateConfigMap(interfaces.ConfigMapCHICommonUsers)
 	err := w.reconcileConfigMap(ctx, chi, configMapUsers)
 	if err == nil {
 		w.task.RegistryReconciled.RegisterConfigMap(configMapUsers.GetObjectMeta())
@@ -303,7 +303,7 @@ func (w *worker) reconcileHostConfigMap(ctx context.Context, host *api.Host) err
 	}
 
 	// ConfigMap for a host
-	configMap := w.task.Creator.CreateConfigMap(interfaces.ConfigMapCHIHost, host)
+	configMap := w.task.GetCreator().CreateConfigMap(interfaces.ConfigMapCHIHost, host)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.RegistryReconciled.RegisterConfigMap(configMap.GetObjectMeta())
@@ -430,7 +430,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 		log.V(2).Info("task is done")
 		return nil
 	}
-	service := w.task.Creator.CreateService(interfaces.ServiceCHIHost, host)
+	service := w.task.GetCreator().CreateService(interfaces.ServiceCHIHost, host)
 	if service == nil {
 		// This is not a problem, service may be omitted
 		return nil
@@ -457,7 +457,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.ChiCluster) 
 	defer w.a.V(2).M(cluster).E().P()
 
 	// Add ChkCluster's Service
-	if service := w.task.Creator.CreateService(interfaces.ServiceCHICluster, cluster); service != nil {
+	if service := w.task.GetCreator().CreateService(interfaces.ServiceCHICluster, cluster); service != nil {
 		if err := w.reconcileService(ctx, cluster.Runtime.CHI, service); err == nil {
 			w.task.RegistryReconciled.RegisterService(service.GetObjectMeta())
 		} else {
@@ -467,7 +467,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.ChiCluster) 
 
 	// Add cluster's Auto Secret
 	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
-		if secret := w.task.Creator.CreateClusterSecret(w.c.namer.Name(interfaces.NameClusterAutoSecret, cluster)); secret != nil {
+		if secret := w.task.GetCreator().CreateClusterSecret(w.c.namer.Name(interfaces.NameClusterAutoSecret, cluster)); secret != nil {
 			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
 				w.task.RegistryReconciled.RegisterSecret(secret.GetObjectMeta())
 			} else {
@@ -476,7 +476,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.ChiCluster) 
 		}
 	}
 
-	pdb := w.task.Creator.CreatePodDisruptionBudget(cluster)
+	pdb := w.task.GetCreator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
 		w.task.RegistryReconciled.RegisterPDB(pdb.GetObjectMeta())
 	} else {
@@ -629,7 +629,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 	defer w.a.V(2).M(shard).E().P()
 
 	// Add Shard's Service
-	service := w.task.Creator.CreateService(interfaces.ServiceCHIShard, shard)
+	service := w.task.GetCreator().CreateService(interfaces.ServiceCHIShard, shard)
 	if service == nil {
 		// This is not a problem, ServiceShard may be omitted
 		return nil

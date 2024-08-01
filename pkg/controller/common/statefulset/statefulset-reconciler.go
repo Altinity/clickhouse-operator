@@ -106,7 +106,7 @@ func (r *StatefulSetReconciler) PrepareHostStatefulSetWithStatus(ctx context.Con
 
 // prepareDesiredStatefulSet prepares desired StatefulSet
 func (r *StatefulSetReconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
-	host.Runtime.DesiredStatefulSet = r.task.Creator.CreateStatefulSet(host, shutdown)
+	host.Runtime.DesiredStatefulSet = r.task.GetCreator().CreateStatefulSet(host, shutdown)
 }
 
 // getStatefulSetStatus gets StatefulSet status

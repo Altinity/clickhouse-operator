@@ -29,7 +29,6 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
@@ -43,10 +42,8 @@ type Controller struct {
 	namer interfaces.INameManager
 	kube  interfaces.IKube
 	//labeler    *Labeler
-	pvcDeleter *volume.PVCDeleter
+	//pvcDeleter *volume.PVCDeleter
 }
-
-type reconcileFunc func(cluster *apiChk.ClickHouseKeeperInstallation) error
 
 func (c *Controller) new() {
 	c.namer = managers.NewNameManager(managers.NameManagerTypeKeeper)

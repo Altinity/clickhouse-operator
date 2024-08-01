@@ -228,7 +228,7 @@ func (w *Reconciler) fetchPVC(
 	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		// Operator is in charge of PVCs
 		// Create PVC model.
-		pvc = w.task.Creator.CreatePVC(pvcName, namespace, host, &volumeClaimTemplate.Spec)
+		pvc = w.task.GetCreator().CreatePVC(pvcName, namespace, host, &volumeClaimTemplate.Spec)
 		log.V(1).M(host).Info("PVC (%s/%s/%s/%s) model provided by the operator", namespace, host.GetName(), volumeMount.Name, pvcName)
 		return pvc, volumeClaimTemplate, true, nil
 	}
@@ -261,7 +261,7 @@ func (w *Reconciler) reconcilePVC(
 	}
 
 	model.VolumeClaimTemplateApplyResourcesRequestsOnPVC(template, pvc)
-	pvc = w.task.Creator.AdjustPVC(pvc, host, template)
+	pvc = w.task.GetCreator().AdjustPVC(pvc, host, template)
 	return w.pvc.UpdateOrCreate(ctx, pvc)
 }
 

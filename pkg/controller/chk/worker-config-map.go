@@ -29,7 +29,10 @@ func (w *worker) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) er
 	return w.c.reconcile(
 		chk,
 		&core.ConfigMap{},
-		w.task.Creator.CreateConfigMap(interfaces.ConfigMapConfig, chkConfig.NewConfigFilesGeneratorOptionsKeeper().SetSettings(chk.GetSpec().GetConfiguration().GetSettings())),
+		w.task.GetCreator().CreateConfigMap(
+			interfaces.ConfigMapConfig,
+			chkConfig.NewConfigFilesGeneratorOptionsKeeper().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
+		),
 		"ConfigMap",
 		func(_cur, _new client.Object) error {
 			cur, ok1 := _cur.(*core.ConfigMap)

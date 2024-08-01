@@ -40,3 +40,7 @@ func NewTask(creator interfaces.ICreator) *Task {
 		Start:              time.Now(),
 	}
 }
+
+func (t *Task) GetCreator() interfaces.ICreator {
+	return t.Creator
+}

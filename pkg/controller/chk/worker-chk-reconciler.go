@@ -30,17 +30,17 @@ func (w *worker) reconcileCHK(ctx context.Context, old, new *apiChk.ClickHouseKe
 	}
 
 	if new.HasAncestor() {
-		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CHK: %s/%s", new.Namespace, new.Name)
+		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CHK: %s", util.NamespaceNameString(new))
 		old = new.GetAncestor()
 	} else {
-		log.V(2).M(new).F().Info("has NO ancestor, use empty CHK as a base for reconcile. CHK: %s/%s", new.Namespace, new.Name)
+		log.V(2).M(new).F().Info("has NO ancestor, use empty CHK as a base for reconcile. CHK: %s", util.NamespaceNameString(new))
 		old = nil
 	}
 
-	log.V(2).M(new).F().Info("Normalized OLD CHK: %s/%s", new.Namespace, new.Name)
+	log.V(2).M(new).F().Info("Normalized OLD CHK: %s", util.NamespaceNameString(new))
 	old = w.normalize(old)
 
-	log.V(2).M(new).F().Info("Normalized NEW CHK %s/%s", new.Namespace, new.Name)
+	log.V(2).M(new).F().Info("Normalized NEW CHK %s", util.NamespaceNameString(new))
 	new = w.normalize(new)
 	new.SetAncestor(old)
 
@@ -61,6 +61,8 @@ func (w *worker) reconcileCHK(ctx context.Context, old, new *apiChk.ClickHouseKe
 
 	return nil
 }
+
+type reconcileFunc func(cluster *apiChk.ClickHouseKeeperInstallation) error
 
 func (w *worker) reconcile(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) error {
 	for _, f := range []reconcileFunc{
