@@ -23,24 +23,40 @@ import (
 
 // task represents context of a worker. This also can be called "a reconcile task"
 type Task struct {
-	Creator            interfaces.ICreator
-	RegistryReconciled *model.Registry
-	RegistryFailed     *model.Registry
-	CmUpdate           time.Time
-	Start              time.Time
+	creator            interfaces.ICreator
+	registryReconciled *model.Registry
+	registryFailed     *model.Registry
+	cmUpdate           time.Time
+	start              time.Time
 }
 
 // NewTask creates new context
 func NewTask(creator interfaces.ICreator) *Task {
 	return &Task{
-		Creator:            creator,
-		RegistryReconciled: model.NewRegistry(),
-		RegistryFailed:     model.NewRegistry(),
-		CmUpdate:           time.Time{},
-		Start:              time.Now(),
+		creator:            creator,
+		registryReconciled: model.NewRegistry(),
+		registryFailed:     model.NewRegistry(),
+		cmUpdate:           time.Time{},
+		start:              time.Now(),
 	}
 }
 
-func (t *Task) GetCreator() interfaces.ICreator {
-	return t.Creator
+func (t *Task) Creator() interfaces.ICreator {
+	return t.creator
+}
+
+func (t *Task) RegistryReconciled() *model.Registry {
+	return t.registryReconciled
+}
+
+func (t *Task) RegistryFailed() *model.Registry {
+	return t.registryFailed
+}
+
+func (t *Task) CmUpdate() time.Time {
+	return t.cmUpdate
+}
+
+func (t *Task) SetCmUpdate(update time.Time) {
+	t.cmUpdate = update
 }

@@ -42,7 +42,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 			M(chi).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		if updatedConfigMap.ResourceVersion != configMap.ResourceVersion {
-			w.task.CmUpdate = time.Now()
+			w.task.SetCmUpdate(time.Now())
 		}
 	} else {
 		w.a.WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateFailed).

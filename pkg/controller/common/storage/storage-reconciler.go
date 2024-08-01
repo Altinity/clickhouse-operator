@@ -143,9 +143,9 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 	case errNilPVC:
 		log.M(host).F().Error("Unable to reconcile nil PVC: %s/%s", namespace, pvcName)
 	case nil:
-		w.task.RegistryReconciled.RegisterPVC(pvcReconciled.GetObjectMeta())
+		w.task.RegistryReconciled().RegisterPVC(pvcReconciled.GetObjectMeta())
 	default:
-		w.task.RegistryFailed.RegisterPVC(pvc.GetObjectMeta())
+		w.task.RegistryFailed().RegisterPVC(pvc.GetObjectMeta())
 		log.M(host).F().Error("Unable to reconcile PVC: %s/%s err: %v", pvc.Namespace, pvc.Name, err)
 	}
 
@@ -228,7 +228,7 @@ func (w *Reconciler) fetchPVC(
 	if volume.OperatorShouldCreatePVC(host, volumeClaimTemplate) {
 		// Operator is in charge of PVCs
 		// Create PVC model.
-		pvc = w.task.GetCreator().CreatePVC(pvcName, namespace, host, &volumeClaimTemplate.Spec)
+		pvc = w.task.Creator().CreatePVC(pvcName, namespace, host, &volumeClaimTemplate.Spec)
 		log.V(1).M(host).Info("PVC (%s/%s/%s/%s) model provided by the operator", namespace, host.GetName(), volumeMount.Name, pvcName)
 		return pvc, volumeClaimTemplate, true, nil
 	}
@@ -261,7 +261,7 @@ func (w *Reconciler) reconcilePVC(
 	}
 
 	model.VolumeClaimTemplateApplyResourcesRequestsOnPVC(template, pvc)
-	pvc = w.task.GetCreator().AdjustPVC(pvc, host, template)
+	pvc = w.task.Creator().AdjustPVC(pvc, host, template)
 	return w.pvc.UpdateOrCreate(ctx, pvc)
 }
 

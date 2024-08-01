@@ -52,11 +52,11 @@ func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
 	w.a.V(1).M(chi).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed)
 	w.a.V(1).M(chi).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled)
 	objs := w.c.discovery(ctx, chi)
-	need := w.task.RegistryReconciled
+	need := w.task.RegistryReconciled()
 	w.a.V(1).M(chi).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
 	w.a.V(1).M(chi).F().Info("Non-reconciled objects:\n%s", objs)
-	if w.purge(ctx, chi, objs, w.task.RegistryFailed) > 0 {
+	if w.purge(ctx, chi, objs, w.task.RegistryFailed()) > 0 {
 		w.c.enqueueObject(cmd_queue.NewDropDns(chi))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}

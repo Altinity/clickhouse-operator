@@ -81,7 +81,7 @@ func (r *StatefulSetReconciler) PrepareHostStatefulSetWithStatus(ctx context.Con
 
 // prepareDesiredStatefulSet prepares desired StatefulSet
 func (r *StatefulSetReconciler) prepareDesiredStatefulSet(host *api.Host, shutdown bool) {
-	host.Runtime.DesiredStatefulSet = r.task.GetCreator().CreateStatefulSet(host, shutdown)
+	host.Runtime.DesiredStatefulSet = r.task.Creator().CreateStatefulSet(host, shutdown)
 }
 
 // getStatefulSetStatus gets StatefulSet status
@@ -327,7 +327,7 @@ func (r *StatefulSetReconciler) waitForConfigMapPropagation(ctx context.Context,
 	}
 
 	// No need to wait on unchanged ConfigMap
-	if r.task.CmUpdate.IsZero() {
+	if r.task.CmUpdate().IsZero() {
 		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - no changes in ConfigMap")
 		return false
 	}
@@ -343,7 +343,7 @@ func (r *StatefulSetReconciler) waitForConfigMapPropagation(ctx context.Context,
 
 	// How much time has elapsed since last ConfigMap update?
 	// May be there is no need to wait already
-	elapsed := time.Now().Sub(r.task.CmUpdate)
+	elapsed := time.Now().Sub(r.task.CmUpdate())
 	if elapsed >= timeout {
 		r.a.V(1).M(host).F().Info("No need to wait for ConfigMap propagation - already elapsed. %s/%s", elapsed, timeout)
 		return false

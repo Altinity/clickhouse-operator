@@ -29,7 +29,7 @@ func (w *worker) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) er
 	return w.c.reconcile(
 		chk,
 		&core.ConfigMap{},
-		w.task.GetCreator().CreateConfigMap(
+		w.task.Creator().CreateConfigMap(
 			interfaces.ConfigMapConfig,
 			chkConfig.NewConfigFilesGeneratorOptionsKeeper().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
 		),
