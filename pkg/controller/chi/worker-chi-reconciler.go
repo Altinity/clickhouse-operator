@@ -163,10 +163,8 @@ func (w *worker) reconcile(ctx context.Context, chi *api.ClickHouseInstallation)
 		return nil
 	})
 
-	if counters.GetAdd() > 0 && counters.GetFound() == 0 && counters.GetModify() == 0 && counters.GetRemove() == 0 {
-		w.a.V(1).M(chi).Info(
-			"Looks like we are just adding hosts to a new CHI. Enabling full fan-out mode. CHI: %s/%s",
-			chi.Namespace, chi.Name)
+	if counters.AddOnly() {
+		w.a.V(1).M(chi).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(chi))
 		ctx = context.WithValue(ctx, ReconcileShardsAndHostsOptionsCtxKey, &ReconcileShardsAndHostsOptions{
 			fullFanOut: true,
 		})

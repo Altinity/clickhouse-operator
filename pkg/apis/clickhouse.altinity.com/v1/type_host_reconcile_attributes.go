@@ -305,3 +305,8 @@ func (s *HostReconcileAttributesCounters) GetExclude() int {
 	}
 	return s.exclude
 }
+
+// AddOnly checks whether counters have Add() only items
+func (s *HostReconcileAttributesCounters) AddOnly() bool {
+	return s.GetAdd() > 0 && s.GetFound() == 0 && s.GetModify() == 0 && s.GetRemove() == 0
+}
