@@ -40,6 +40,7 @@ func StatefulSetContainerGet(statefulSet *apps.StatefulSet, namesOrIndexes ...an
 			index := typed
 			if index >= 0 {
 				if len(statefulSet.Spec.Template.Spec.Containers) > index {
+					// Existing index, get container
 					return &statefulSet.Spec.Template.Spec.Containers[index], true
 				}
 			}
