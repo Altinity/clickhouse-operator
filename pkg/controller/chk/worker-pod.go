@@ -22,5 +22,9 @@ import (
 
 func markPodRestartedNow(sts *apps.StatefulSet) {
 	v, _ := time.Now().UTC().MarshalText()
-	sts.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": string(v)}
+	// Instantiate new annotations if they don't exist yet, otherwise append the new annotation
+	if sts.Spec.Template.Annotations == nil {
+		sts.Spec.Template.Annotations = make(map[string]string)
+	}
+	sts.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = string(v)
 }
