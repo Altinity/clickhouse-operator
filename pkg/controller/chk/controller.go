@@ -47,7 +47,7 @@ type Controller struct {
 
 func (c *Controller) new() {
 	c.namer = managers.NewNameManager(managers.NameManagerTypeKeeper)
-	c.kube = kube.NewKeeper(c.Client, c.namer)
+	c.kube = kube.NewAdapter(c.Client, c.namer)
 	//labeler:                 NewLabeler(kube),
 	//pvcDeleter :=              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeKeeper))
 
