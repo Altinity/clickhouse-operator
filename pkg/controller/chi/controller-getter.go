@@ -17,72 +17,13 @@ package chi
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
-	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sLabels "k8s.io/apimachinery/pkg/labels"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
-
-// getConfigMap gets ConfigMap either by namespaced name or by labels
-// TODO review byNameOnly params
-func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.ConfigMap, error) {
-	get := c.configMapLister.ConfigMaps(meta.GetNamespace()).Get
-	list := c.configMapLister.ConfigMaps(meta.GetNamespace()).List
-	var objects []*core.ConfigMap
-
-	// Check whether object with such name already exists
-	obj, err := get(meta.GetName())
-
-	if (obj != nil) && (err == nil) {
-		// Object found by name
-		return obj, nil
-	}
-
-	if !apiErrors.IsNotFound(err) {
-		// Error, which is not related to "Object not found"
-		return nil, err
-	}
-
-	// Object not found by name
-
-	if byNameOnly {
-		return nil, err
-	}
-
-	// Try to find by labels
-
-	var selector k8sLabels.Selector
-	if selector, err = commonLabeler.MakeSelectorFromObjectMeta(meta); err != nil {
-		return nil, err
-	}
-
-	if objects, err = list(selector); err != nil {
-		return nil, err
-	}
-
-	if len(objects) == 0 {
-		return nil, apiErrors.NewNotFound(apps.Resource("ConfigMap"), meta.GetName())
-	}
-
-	if len(objects) == 1 {
-		// Exactly one object found by labels
-		return objects[0], nil
-	}
-
-	// Too much objects found by labels
-	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
-}
-
-// getSecret gets secret
-func (c *Controller) getSecret(secret *core.Secret) (*core.Secret, error) {
-	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(controller.NewContext(), secret.Name, controller.NewGetOptions())
-}
 
 // getPodsIPs gets all pod IPs
 func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {

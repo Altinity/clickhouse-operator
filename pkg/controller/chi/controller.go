@@ -138,7 +138,7 @@ func NewController(
 	)
 
 	namer := managers.NewNameManager(managers.NameManagerTypeClickHouse)
-	kube := chiKube.NewClickHouse(kubeClient, chopClient, namer)
+	kube := chiKube.NewAdapter(kubeClient, chopClient, namer)
 
 	// Create Controller instance
 	controller := &Controller{

@@ -17,32 +17,34 @@ package chi
 import (
 	"context"
 
-	core "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// getSecret gets secret
-func (c *Controller) getSecret(ctx context.Context, secret *core.Secret) (*core.Secret, error) {
-	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(ctx, secret.Name, controller.NewGetOptions())
+func (c *Controller) getPDB(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
+	return c.kube.PDB().Get(ctx, pdb.GetNamespace(), pdb.GetName())
 }
 
-func (c *Controller) createSecret(ctx context.Context, secret *core.Secret) error {
-	log.V(1).M(secret).F().P()
-
+func (c *Controller) createPDB(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	log.V(1).Info("Create Secret %s/%s", secret.Namespace, secret.Name)
-	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, controller.NewCreateOptions()); err != nil {
-		// Unable to create StatefulSet at all
-		log.V(1).Error("Create Secret %s/%s failed err:%v", secret.Namespace, secret.Name, err)
-		return err
+	_, err := c.kube.PDB().Create(ctx, pdb)
+
+	return err
+}
+
+func (c *Controller) updatePDB(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
 	}
 
-	return nil
+	_, err := c.kube.PDB().Update(ctx, pdb)
+
+	return err
 }

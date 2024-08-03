@@ -16,14 +16,15 @@ package chi
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
+
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -34,7 +35,7 @@ func (c *Controller) deleteHost(ctx context.Context, host *api.Host) error {
 
 	// Each host consists of:
 	_ = c.deleteStatefulSet(ctx, host)
-	_ = storage.NewStoragePVC(kube.NewPVCClickHouse(c.kubeClient)).DeletePVC(ctx, host)
+	_ = storage.NewStoragePVC(kube.NewPVC(c.kubeClient)).DeletePVC(ctx, host)
 	_ = c.deleteConfigMap(ctx, host)
 	_ = c.deleteServiceHost(ctx, host)
 
@@ -191,33 +192,6 @@ func (c *Controller) deleteServiceCHI(ctx context.Context, chi *api.ClickHouseIn
 	namespace := chi.Namespace
 	log.V(1).M(chi).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
-}
-
-// deleteServiceIfExists deletes Service in case it does not exist
-func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name string) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	// Check specified service exists
-	_, err := c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, controller.NewGetOptions())
-
-	if err != nil {
-		// No such a service, nothing to delete
-		log.V(1).M(namespace, name).F().Info("Not Found Service: %s/%s err: %v", namespace, name, err)
-		return nil
-	}
-
-	// Delete service
-	err = c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
-	if err == nil {
-		log.V(1).M(namespace, name).F().Info("OK delete Service: %s/%s", namespace, name)
-	} else {
-		log.V(1).M(namespace, name).F().Error("FAIL delete Service: %s/%s err:%v", namespace, name, err)
-	}
-
-	return err
 }
 
 // deleteSecretCluster
