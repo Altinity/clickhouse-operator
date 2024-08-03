@@ -19,19 +19,36 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	policy "k8s.io/api/policy/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 type IKube interface {
+	ConfigMap() IKubeConfigMap
+	CRStatus() IKubeCRStatus
 	Deployment() IKubeDeployment
+	PDB() IKubePDB
 	Event() IKubeEvent
 	Pod() IKubePod
+	Storage() IKubeStoragePVC
 	ReplicaSet() IKubeReplicaSet
 	Service() IKubeService
 	STS() IKubeSTS
-	CRStatus() IKubeCRStatus
-	Storage() IKubeStoragePVC
+}
+
+type IKubeConfigMap interface {
+	Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error)
+	Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error)
+	Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error)
+	Delete(ctx context.Context, namespace, name string) error
+}
+
+type IKubePDB interface {
+	Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
+	Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error)
+	Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
+	Delete(ctx context.Context, namespace, name string) error
 }
 
 type IKubePVC interface {
@@ -63,7 +80,9 @@ type IKubeSTS interface {
 
 type IKubeService interface {
 	Get(obj any) (*core.Service, error)
+	Create(svc *core.Service) (*core.Service, error)
 	Update(svc *core.Service) (*core.Service, error)
+	Delete(namespace, name string) error
 }
 
 type IKubePod interface {
