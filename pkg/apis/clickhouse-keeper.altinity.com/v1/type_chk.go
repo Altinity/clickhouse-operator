@@ -15,6 +15,8 @@
 package v1
 
 import (
+	"context"
+
 	"github.com/imdario/mergo"
 
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
@@ -341,4 +343,38 @@ func (chk *ClickHouseKeeperInstallation) WalkHosts(f func(host *apiChi.Host) err
 	}
 
 	return res
+}
+
+// WalkTillError walks hosts with a function until an error met
+func (chk *ClickHouseKeeperInstallation) WalkTillError(
+	ctx context.Context,
+	fCRPreliminary func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
+	fCluster func(ctx context.Context, cluster *ChkCluster) error,
+	fShards func(ctx context.Context, shards []*ChkShard) error,
+	fCRFinal func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
+) error {
+	if err := fCRPreliminary(ctx, chk); err != nil {
+		return err
+	}
+
+	for clusterIndex := range chk.GetSpec().Configuration.Clusters {
+		cluster := chk.GetSpec().Configuration.Clusters[clusterIndex]
+		if err := fCluster(ctx, cluster); err != nil {
+			return err
+		}
+
+		shards := make([]*ChkShard, 0, len(cluster.Layout.Shards))
+		for shardIndex := range cluster.Layout.Shards {
+			shards = append(shards, cluster.Layout.Shards[shardIndex])
+		}
+		if err := fShards(ctx, shards); err != nil {
+			return err
+		}
+	}
+
+	if err := fCRFinal(ctx, chk); err != nil {
+		return err
+	}
+
+	return nil
 }
