@@ -29,6 +29,10 @@ import (
 // CreatePodDisruptionBudget creates new PodDisruptionBudget
 func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDisruptionBudget {
 	return &policy.PodDisruptionBudget{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "PodDisruptionBudget",
+			APIVersion: "policy/v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetCRName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.cr.GetNamespace(),
