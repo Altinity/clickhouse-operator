@@ -39,7 +39,7 @@ func (r *ChkClusterRuntime) GetAddress() apiChi.IClusterAddress {
 	return &r.Address
 }
 
-func (r ChkClusterRuntime) GetRoot() apiChi.IRoot {
+func (r *	ChkClusterRuntime) GetRoot() apiChi.IRoot {
 	return r.CHK
 }
 
@@ -153,7 +153,7 @@ func (cluster *ChkCluster) GetName() string {
 	return cluster.Name
 }
 func (cluster *ChkCluster) GetRuntime() apiChi.IClusterRuntime {
-	return nil
+	return &cluster.Runtime
 }
 func (cluster *ChkCluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	return nil, false
