@@ -174,7 +174,7 @@ func (w *worker) excludeHostFromClickHouseCluster(ctx context.Context, host *api
 	// Specify in options to exclude this host from ClickHouse config file
 	host.GetCR().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().SetExclude()
-	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCR(), w.options())
+	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
 	host.GetCR().GetRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitExcludeHost(host) {
@@ -199,7 +199,7 @@ func (w *worker) includeHostIntoClickHouseCluster(ctx context.Context, host *api
 	// Specify in options to add this host into ClickHouse config file
 	host.GetCR().GetRuntime().LockCommonConfig()
 	host.GetReconcileAttributes().UnsetExclude()
-	_ = w.reconcileCHIConfigMapCommon(ctx, host.GetCR(), w.options())
+	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
 	host.GetCR().GetRuntime().UnlockCommonConfig()
 
 	if !w.shouldWaitIncludeHost(host) {

@@ -21,10 +21,39 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// reconcileSecret reconciles core.Secret
+func (w *worker) reconcileSecret(ctx context.Context, chi *api.ClickHouseInstallation, secret *core.Secret) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	w.a.V(2).M(chi).S().Info(secret.Name)
+	defer w.a.V(2).M(chi).E().Info(secret.Name)
+
+	// Check whether this object already exists
+	if _, err := w.c.getSecret(ctx, secret); err == nil {
+		// We have Secret - try to update it
+		return nil
+	}
+
+	// Secret not found or broken. Try to recreate
+	_ = w.c.deleteSecretIfExists(ctx, secret.Namespace, secret.Name)
+	err := w.createSecret(ctx, chi, secret)
+	if err != nil {
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			M(chi).F().
+			Error("FAILED to reconcile Secret: %s CHI: %s ", secret.Name, chi.Name)
+	}
+
+	return err
+}
 
 // createSecret
 func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallation, secret *core.Secret) error {
@@ -33,7 +62,7 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, controller.NewCreateOptions())
+	err := w.c.createSecret(ctx, secret)
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).

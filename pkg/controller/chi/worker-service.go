@@ -19,13 +19,62 @@ import (
 	"fmt"
 
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// reconcileService reconciles core.Service
+func (w *worker) reconcileService(ctx context.Context, chi *api.ClickHouseInstallation, service *core.Service) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	w.a.V(2).M(chi).S().Info(service.Name)
+	defer w.a.V(2).M(chi).E().Info(service.Name)
+
+	// Check whether this object already exists
+	curService, err := w.c.getService(ctx, service)
+
+	if curService != nil {
+		// We have the Service - try to update it
+		w.a.V(1).M(chi).F().Info("Service found: %s/%s. Will try to update", service.Namespace, service.Name)
+		err = w.updateService(ctx, chi, curService, service)
+	}
+
+	if err != nil {
+		if apiErrors.IsNotFound(err) {
+			// The Service is either not found or not updated. Try to recreate it
+			w.a.V(1).M(chi).F().Info("Service: %s/%s not found. err: %v", service.Namespace, service.Name, err)
+		} else {
+			// The Service is either not found or not updated. Try to recreate it
+			w.a.WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateFailed).
+				WithStatusAction(chi).
+				WithStatusError(chi).
+				M(chi).F().
+				Error("Update Service: %s/%s failed with error: %v", service.Namespace, service.Name, err)
+		}
+
+		_ = w.c.deleteServiceIfExists(ctx, service.Namespace, service.Name)
+		err = w.createService(ctx, chi, service)
+	}
+
+	if err == nil {
+		w.a.V(1).M(chi).F().Info("Service reconcile successful: %s/%s", service.Namespace, service.Name)
+	} else {
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			M(chi).F().
+			Error("FAILED to reconcile Service: %s/%s CHI: %s ", service.Namespace, service.Name, chi.Name)
+	}
+
+	return err
+}
 
 // updateService
 func (w *worker) updateService(
@@ -125,7 +174,7 @@ func (w *worker) updateService(
 	// And only now we are ready to actually update the service with new version of the service
 	//
 
-	_, err := w.c.kubeClient.CoreV1().Services(newService.GetNamespace()).Update(ctx, newService, controller.NewUpdateOptions())
+	err := w.c.updateService(ctx, newService)
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateCompleted).
@@ -146,7 +195,7 @@ func (w *worker) createService(ctx context.Context, chi *api.ClickHouseInstallat
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().Services(service.Namespace).Create(ctx, service, controller.NewCreateOptions())
+	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).

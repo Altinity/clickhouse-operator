@@ -424,7 +424,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 
 			// TODO unify with finalize reconcile
 			w.newTask(chi)
-			w.reconcileCHIConfigMapUsers(ctx, chi)
+			w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 				TolerateAbsence: true,
 				CopyStatusOptions: api.CopyStatusOptions{
@@ -664,7 +664,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			chi.EnsureStatus().ReconcileComplete()
 			// TODO unify with update endpoints
 			w.newTask(chi)
-			w.reconcileCHIConfigMapUsers(ctx, chi)
+			w.reconcileConfigMapCommonUsers(ctx, chi)
 			w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
 				CopyStatusOptions: api.CopyStatusOptions{
 					WholeStatus: true,

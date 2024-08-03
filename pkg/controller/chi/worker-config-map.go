@@ -19,13 +19,51 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
+func (w *worker) reconcileConfigMap(
+	ctx context.Context,
+	chi *api.ClickHouseInstallation,
+	configMap *core.ConfigMap,
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	w.a.V(2).M(chi).S().P()
+	defer w.a.V(2).M(chi).E().P()
+
+	// Check whether this object already exists in k8s
+	curConfigMap, err := w.c.getConfigMap(configMap.GetObjectMeta(), true)
+
+	if curConfigMap != nil {
+		// We have ConfigMap - try to update it
+		err = w.updateConfigMap(ctx, chi, configMap)
+	}
+
+	if apiErrors.IsNotFound(err) {
+		// ConfigMap not found - even during Update process - try to create it
+		err = w.createConfigMap(ctx, chi, configMap)
+	}
+
+	if err != nil {
+		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusAction(chi).
+			WithStatusError(chi).
+			M(chi).F().
+			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.Name, chi.Name)
+	}
+
+	return err
+}
 
 // updateConfigMap
 func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstallation, configMap *core.ConfigMap) error {
@@ -34,7 +72,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 		return nil
 	}
 
-	updatedConfigMap, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Update(ctx, configMap, controller.NewUpdateOptions())
+	updatedConfigMap, err := w.c.updateConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateCompleted).
@@ -62,19 +100,19 @@ func (w *worker) createConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 		return nil
 	}
 
-	_, err := w.c.kubeClient.CoreV1().ConfigMaps(configMap.Namespace).Create(ctx, configMap, controller.NewCreateOptions())
+	err := w.c.createConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
 			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(chi).
 			M(chi).F().
-			Info("Create ConfigMap %s/%s", configMap.Namespace, configMap.Name)
+			Info("Create ConfigMap %s", util.NamespaceNameString(configMap))
 	} else {
 		w.a.WithEvent(chi, common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(chi).
 			WithStatusError(chi).
 			M(chi).F().
-			Error("Create ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
+			Error("Create ConfigMap %s failed with error %v", util.NamespaceNameString(configMap), err)
 	}
 
 	return err
