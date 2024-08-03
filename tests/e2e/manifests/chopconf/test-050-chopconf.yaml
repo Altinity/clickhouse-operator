@@ -1,0 +1,8 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseOperatorConfiguration"
+metadata:
+  name: "test-050-chopconf"
+spec:
+  label:
+    exclude:
+      - exclude_this_label

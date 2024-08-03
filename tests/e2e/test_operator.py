@@ -4803,6 +4803,53 @@ def test_049(self):
         with And("deleting test namespace"):
             delete_test_namespace()
 
+
+@TestScenario
+@Name("test_050. Test metrics exclusion in operator config")
+def test_050(self):
+    create_shell_namespace_clickhouse_template()
+    with Given("Operator configuration is installed"):
+        util.apply_operator_config("manifests/chopconf/test-050-chopconf.yaml")
+
+    manifest = f"manifests/chi/test-050-labels.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+
+    with Given("CHI is installed"):
+        kubectl.create_and_check(
+            manifest=manifest,
+            check={
+                "pod_count": 1,
+                "apply_templates": {
+                    current().context.clickhouse_template,
+                },
+                "pod_image": current().context.clickhouse_version,
+                "do_not_delete": 1,
+            },
+        )
+
+    def test_labels(chi, label, value):
+
+        with Then(f"Pod label {label}={value} should populated from CHI"):
+            assert kubectl.get_field("pod", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.labels.{label}") == value
+
+        with And(f"Service label {label}={value} should populated from CHI"):
+            assert kubectl.get_field("service", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.labels.{label}") == value
+
+        with And(f"PVC label {label}={value} should populated from CHI"):
+            assert kubectl.get_field("pvc", f"-l clickhouse.altinity.com/chi={chi}", f".metadata.labels.{label}") == value
+
+    test_labels(chi, "include_this_label", "test-050")
+
+    test_labels(chi, "exclude_this_label", "<none>")
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
+
+
+
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
