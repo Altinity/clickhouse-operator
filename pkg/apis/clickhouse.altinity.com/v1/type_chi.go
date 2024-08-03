@@ -643,12 +643,12 @@ func (chi *ClickHouseInstallation) WalkHosts(f func(host *Host) error) []error {
 // WalkTillError walks hosts with a function until an error met
 func (chi *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
-	fCHIPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
+	fCRPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
 	fCluster func(ctx context.Context, cluster *ChiCluster) error,
 	fShards func(ctx context.Context, shards []*ChiShard) error,
-	fCHIFinal func(ctx context.Context, chi *ClickHouseInstallation) error,
+	fCRFinal func(ctx context.Context, chi *ClickHouseInstallation) error,
 ) error {
-	if err := fCHIPreliminary(ctx, chi); err != nil {
+	if err := fCRPreliminary(ctx, chi); err != nil {
 		return err
 	}
 
@@ -667,7 +667,7 @@ func (chi *ClickHouseInstallation) WalkTillError(
 		}
 	}
 
-	if err := fCHIFinal(ctx, chi); err != nil {
+	if err := fCRFinal(ctx, chi); err != nil {
 		return err
 	}
 
