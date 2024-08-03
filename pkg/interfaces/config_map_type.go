@@ -17,8 +17,8 @@ package interfaces
 type ConfigMapType string
 
 const (
-	ConfigMapCHICommon      ConfigMapType = "chi common"
-	ConfigMapCHICommonUsers ConfigMapType = "chi common users"
-	ConfigMapCHIHost        ConfigMapType = "chi host"
-	ConfigMapConfig         ConfigMapType = "config"
+	ConfigMapCommon      ConfigMapType = "common"
+	ConfigMapCommonUsers ConfigMapType = "common users"
+	ConfigMapHost        ConfigMapType = "host"
+	ConfigMapConfig      ConfigMapType = "config"
 )
