@@ -39,7 +39,7 @@ func (r *ChkClusterRuntime) GetAddress() apiChi.IClusterAddress {
 	return &r.Address
 }
 
-func (r *	ChkClusterRuntime) GetRoot() apiChi.IRoot {
+func (r *ChkClusterRuntime) GetRoot() apiChi.IRoot {
 	return r.CHK
 }
 
