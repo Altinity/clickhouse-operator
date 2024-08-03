@@ -27,11 +27,11 @@ type Adapter struct {
 
 	// Set of k8s components
 
-	configMap *ConfigMap
+	configMap  *ConfigMap
 	crStatus   *CRStatus
 	deployment *Deployment
 	event      *Event
-	pdb *PDB
+	pdb        *PDB
 	pod        *Pod
 	pvc        *storage.PVC
 	replicaSet *ReplicaSet
@@ -46,13 +46,13 @@ func NewAdapter(kubeClient client.Client, namer interfaces.INameManager) *Adapte
 
 		// Set of k8s components
 
-		configMap: NewConfigMap(kubeClient),
+		configMap:  NewConfigMap(kubeClient),
 		crStatus:   NewCRStatus(kubeClient),
 		deployment: NewDeployment(kubeClient),
 		event:      NewEvent(kubeClient),
-		pdb: NewPDB(kubeClient),
+		pdb:        NewPDB(kubeClient),
 		pod:        NewPod(kubeClient, namer),
-		pvc:        storage.NewStoragePVC(NewPVCKeeper(kubeClient)),
+		pvc:        storage.NewStoragePVC(NewPVC(kubeClient)),
 		replicaSet: NewReplicaSetKeeper(kubeClient),
 		service:    NewService(kubeClient, namer),
 		sts:        NewSTS(kubeClient, namer),

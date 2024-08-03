@@ -15,33 +15,51 @@
 package kube
 
 import (
-	apps "k8s.io/api/apps/v1"
+	"context"
+
+	policy "k8s.io/api/policy/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
-type Deployment struct {
+type PDB struct {
 	kubeClient client.Client
 }
 
-func NewDeployment(kubeClient client.Client) *Deployment {
-	return &Deployment{
+func NewPDB(kubeClient client.Client) *PDB {
+	return &PDB{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *Deployment) Get(namespace, name string) (*apps.Deployment, error) {
-	deployment := &apps.Deployment{}
+func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
+	err := c.kubeClient.Create(ctx, pdb)
+	return pdb, err
+}
+
+func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
+	pdb := &policy.PodDisruptionBudget{}
 	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
-	}, deployment)
-	return deployment, err
+	}, pdb)
+	return pdb, err
 }
 
-func (c *Deployment) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
-	err := c.kubeClient.Update(controller.NewContext(), deployment)
-	return deployment, err
+func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
+	err := c.kubeClient.Update(controller.NewContext(), pdb)
+	return pdb, err
+}
+
+func (c *PDB) Delete(ctx context.Context, namespace, name string) error {
+	pvc := &policy.PodDisruptionBudget{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+	}
+	return c.kubeClient.Delete(ctx, pvc)
 }

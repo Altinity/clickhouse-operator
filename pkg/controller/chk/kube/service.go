@@ -16,6 +16,7 @@ package kube
 
 import (
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -24,13 +25,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type ServiceKeeper struct {
+type Service struct {
 	kubeClient client.Client
 	namer      interfaces.INameManager
 }
 
-func NewServiceKeeper(kubeClient client.Client, namer interfaces.INameManager) *ServiceKeeper {
-	return &ServiceKeeper{
+func NewService(kubeClient client.Client, namer interfaces.INameManager) *Service {
+	return &Service{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -39,7 +40,7 @@ func NewServiceKeeper(kubeClient client.Client, namer interfaces.INameManager) *
 // getService gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
-func (c *ServiceKeeper) Get(obj any) (*core.Service, error) {
+func (c *Service) Get(obj any) (*core.Service, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *core.Service:
@@ -57,7 +58,21 @@ func (c *ServiceKeeper) Get(obj any) (*core.Service, error) {
 	return service, err
 }
 
-func (c *ServiceKeeper) Update(svc *core.Service) (*core.Service, error) {
+func (c *Service) Create(svc *core.Service) (*core.Service, error) {
+	err := c.kubeClient.Create(controller.NewContext(), svc)
+	return svc, err
+}
+
+func (c *Service) Update(svc *core.Service) (*core.Service, error) {
 	err := c.kubeClient.Update(controller.NewContext(), svc)
 	return svc, err
+}
+
+func (c *Service) Delete(namespace, name string) error {
+	return c.kubeClient.Delete(controller.NewContext(), &core.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+	})
 }

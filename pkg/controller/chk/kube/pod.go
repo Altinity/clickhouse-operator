@@ -26,13 +26,13 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-type PodKeeper struct {
+type Pod struct {
 	kubeClient client.Client
 	namer      interfaces.INameManager
 }
 
-func NewPodKeeper(kubeClient client.Client, namer interfaces.INameManager) *PodKeeper {
-	return &PodKeeper{
+func NewPod(kubeClient client.Client, namer interfaces.INameManager) *Pod {
+	return &Pod{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -41,7 +41,7 @@ func NewPodKeeper(kubeClient client.Client, namer interfaces.INameManager) *PodK
 // getPod gets pod. Accepted types:
 //  1. *apps.StatefulSet
 //  2. *chop.Host
-func (c *PodKeeper) Get(params ...any) (*core.Pod, error) {
+func (c *Pod) Get(params ...any) (*core.Pod, error) {
 	var name, namespace string
 	switch len(params) {
 	case 2:
@@ -73,7 +73,7 @@ func (c *PodKeeper) Get(params ...any) (*core.Pod, error) {
 }
 
 // GetAll gets all pods for provided entity
-func (c *PodKeeper) GetAll(obj any) []*core.Pod {
+func (c *Pod) GetAll(obj any) []*core.Pod {
 	switch typed := obj.(type) {
 	case api.ICustomResource:
 		return c.getPodsOfCR(typed)
@@ -93,13 +93,13 @@ func (c *PodKeeper) GetAll(obj any) []*core.Pod {
 	return nil
 }
 
-func (c *PodKeeper) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
+func (c *Pod) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
 	err := c.kubeClient.Update(controller.NewContext(), pod)
 	return pod, err
 }
 
 // getPodsOfCluster gets all pods in a cluster
-func (c *PodKeeper) getPodsOfCluster(cluster api.ICluster) (pods []*core.Pod) {
+func (c *Pod) getPodsOfCluster(cluster api.ICluster) (pods []*core.Pod) {
 	cluster.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.Get(host); err == nil {
 			pods = append(pods, pod)
@@ -110,7 +110,7 @@ func (c *PodKeeper) getPodsOfCluster(cluster api.ICluster) (pods []*core.Pod) {
 }
 
 // getPodsOfShard gets all pods in a shard
-func (c *PodKeeper) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
+func (c *Pod) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
 	shard.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.Get(host); err == nil {
 			pods = append(pods, pod)
@@ -121,7 +121,7 @@ func (c *PodKeeper) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
 }
 
 // getPodsOfCHI gets all pods in a CHI
-func (c *PodKeeper) getPodsOfCR(cr api.ICustomResource) (pods []*core.Pod) {
+func (c *Pod) getPodsOfCR(cr api.ICustomResource) (pods []*core.Pod) {
 	cr.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.Get(host); err == nil {
 			pods = append(pods, pod)

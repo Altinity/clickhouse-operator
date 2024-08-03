@@ -31,22 +31,22 @@ import (
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
-type PVCKeeper struct {
+type PVC struct {
 	kubeClient client.Client
 }
 
-func NewPVCKeeper(kubeClient client.Client) *PVCKeeper {
-	return &PVCKeeper{
+func NewPVC(kubeClient client.Client) *PVC {
+	return &PVC{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *PVCKeeper) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	err := c.kubeClient.Create(ctx, pvc)
 	return pvc, err
 }
 
-func (c *PVCKeeper) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
+func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
 	pvc := &core.PersistentVolumeClaim{}
 	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
@@ -55,12 +55,12 @@ func (c *PVCKeeper) Get(ctx context.Context, namespace, name string) (*core.Pers
 	return pvc, err
 }
 
-func (c *PVCKeeper) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	err := c.kubeClient.Update(controller.NewContext(), pvc)
 	return pvc, err
 }
 
-func (c *PVCKeeper) Delete(ctx context.Context, namespace, name string) error {
+func (c *PVC) Delete(ctx context.Context, namespace, name string) error {
 	pvc := &core.PersistentVolumeClaim{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,
@@ -70,7 +70,7 @@ func (c *PVCKeeper) Delete(ctx context.Context, namespace, name string) error {
 	return c.kubeClient.Delete(ctx, pvc)
 }
 
-func (c *PVCKeeper) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
+func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
 	list := &core.PersistentVolumeClaimList{}
 	opts := &client.ListOptions{
 		LabelSelector: labels.SelectorFromSet(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),

@@ -22,17 +22,17 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
-type ReplicaSetKeeper struct {
+type ReplicaSet struct {
 	kubeClient client.Client
 }
 
-func NewReplicaSetKeeper(kubeClient client.Client) *ReplicaSetKeeper {
-	return &ReplicaSetKeeper{
+func NewReplicaSetKeeper(kubeClient client.Client) *ReplicaSet {
+	return &ReplicaSet{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *ReplicaSetKeeper) Get(namespace, name string) (*apps.ReplicaSet, error) {
+func (c *ReplicaSet) Get(namespace, name string) (*apps.ReplicaSet, error) {
 	rs := &apps.ReplicaSet{}
 	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
@@ -41,7 +41,7 @@ func (c *ReplicaSetKeeper) Get(namespace, name string) (*apps.ReplicaSet, error)
 	return rs, err
 }
 
-func (c *ReplicaSetKeeper) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+func (c *ReplicaSet) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
 	err := c.kubeClient.Update(controller.NewContext(), replicaSet)
 	return replicaSet, err
 }

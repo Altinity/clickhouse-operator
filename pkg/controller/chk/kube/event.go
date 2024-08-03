@@ -21,17 +21,17 @@ import (
 	core "k8s.io/api/core/v1"
 )
 
-type EventKeeper struct {
+type Event struct {
 	kubeClient client.Client
 }
 
-func NewEventKeeper(kubeClient client.Client) *EventKeeper {
-	return &EventKeeper{
+func NewEvent(kubeClient client.Client) *Event {
+	return &Event{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *EventKeeper) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
+func (c *Event) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
 	err := c.kubeClient.Create(ctx, event)
 	return event, err
 }

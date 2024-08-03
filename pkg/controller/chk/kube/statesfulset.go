@@ -26,13 +26,13 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type STSKeeper struct {
+type STS struct {
 	kubeClient client.Client
 	namer      interfaces.INameManager
 }
 
-func NewSTSKeeper(kubeClient client.Client, namer interfaces.INameManager) *STSKeeper {
-	return &STSKeeper{
+func NewSTS(kubeClient client.Client, namer interfaces.INameManager) *STS {
+	return &STS{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -41,7 +41,7 @@ func NewSTSKeeper(kubeClient client.Client, namer interfaces.INameManager) *STSK
 // getStatefulSet gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.Host
-func (c *STSKeeper) Get(obj any) (*apps.StatefulSet, error) {
+func (c *STS) Get(obj any) (*apps.StatefulSet, error) {
 	switch obj := obj.(type) {
 	case meta.Object:
 		return c.get(obj.GetNamespace(), obj.GetName())
@@ -55,7 +55,7 @@ func (c *STSKeeper) Get(obj any) (*apps.StatefulSet, error) {
 	return nil, fmt.Errorf("unknown type")
 }
 
-func (c *STSKeeper) get(namespace, name string) (*apps.StatefulSet, error) {
+func (c *STS) get(namespace, name string) (*apps.StatefulSet, error) {
 	sts := &apps.StatefulSet{}
 	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
@@ -64,20 +64,20 @@ func (c *STSKeeper) get(namespace, name string) (*apps.StatefulSet, error) {
 	return sts, err
 }
 
-func (c *STSKeeper) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STS) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
 	err := c.kubeClient.Create(controller.NewContext(), statefulSet)
 	return statefulSet, err
 
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *STSKeeper) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STS) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	err := c.kubeClient.Update(controller.NewContext(), sts)
 	return sts, err
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
-func (c *STSKeeper) Delete(namespace, name string) error {
+func (c *STS) Delete(namespace, name string) error {
 	sts := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,

@@ -15,33 +15,51 @@
 package kube
 
 import (
-	apps "k8s.io/api/apps/v1"
+	"context"
+
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
-type Deployment struct {
+type ConfigMap struct {
 	kubeClient client.Client
 }
 
-func NewDeployment(kubeClient client.Client) *Deployment {
-	return &Deployment{
+func NewConfigMap(kubeClient client.Client) *ConfigMap {
+	return &ConfigMap{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *Deployment) Get(namespace, name string) (*apps.Deployment, error) {
-	deployment := &apps.Deployment{}
+func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
+	err := c.kubeClient.Create(ctx, cm)
+	return cm, err
+}
+
+func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
+	cm := &core.ConfigMap{}
 	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
-	}, deployment)
-	return deployment, err
+	}, cm)
+	return cm, err
 }
 
-func (c *Deployment) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
-	err := c.kubeClient.Update(controller.NewContext(), deployment)
-	return deployment, err
+func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
+	err := c.kubeClient.Update(controller.NewContext(), cm)
+	return cm, err
+}
+
+func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
+	pvc := &core.ConfigMap{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+	}
+	return c.kubeClient.Delete(ctx, pvc)
 }
