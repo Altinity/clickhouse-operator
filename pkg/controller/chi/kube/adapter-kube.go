@@ -22,57 +22,88 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type ClickHouse struct {
+type Adapter struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 
-	deployment *DeploymentClickHouse
-	event      *EventClickHouse
-	pod        *PodClickHouse
-	replicaSet *ReplicaSetClickHouse
-	service    *ServiceClickHouse
-	sts        *STSClickHouse
-	crStatus   *CRStatusClickHouse
+	// Set of k8s components
+
+	configMap  *ConfigMap
+	crStatus   *CRStatus
+	deployment *Deployment
+	event      *Event
+	pdb        *PDB
+	pod        *Pod
 	pvc        *storage.PVC
+	replicaSet *ReplicaSet
+	service    *Service
+	sts        *STS
 }
 
-func NewClickHouse(kubeClient kube.Interface, chopClient chopClientSet.Interface, namer interfaces.INameManager) *ClickHouse {
-	return &ClickHouse{
+func NewAdapter(kubeClient kube.Interface, chopClient chopClientSet.Interface, namer interfaces.INameManager) *Adapter {
+	return &Adapter{
 		kubeClient: kubeClient,
 		namer:      namer,
 
-		deployment: NewDeploymentClickHouse(kubeClient),
-		event:      NewEventClickHouse(kubeClient),
-		pod:        NewPodClickHouse(kubeClient, namer),
-		replicaSet: NewReplicaSetClickHouse(kubeClient),
-		service:    NewServiceClickHouse(kubeClient, namer),
-		sts:        NewSTSClickHouse(kubeClient, namer),
-		crStatus:   NewCRStatusClickHouse(chopClient),
-		pvc:        storage.NewStoragePVC(NewPVCClickHouse(kubeClient)),
+		configMap:  NewConfigMap(kubeClient),
+		crStatus:   NewCRStatus(chopClient),
+		deployment: NewDeployment(kubeClient),
+		event:      NewEvent(kubeClient),
+		pdb:        NewPDB(kubeClient),
+		pod:        NewPod(kubeClient, namer),
+		pvc:        storage.NewStoragePVC(NewPVC(kubeClient)),
+		replicaSet: NewReplicaSet(kubeClient),
+		service:    NewService(kubeClient, namer),
+		sts:        NewSTS(kubeClient, namer),
 	}
 }
 
-func (k *ClickHouse) Deployment() interfaces.IKubeDeployment {
-	return k.deployment
+// ConfigMap is a getter
+func (k *Adapter) ConfigMap() interfaces.IKubeConfigMap {
+	return k.configMap
 }
-func (k *ClickHouse) Event() interfaces.IKubeEvent {
-	return k.event
-}
-func (k *ClickHouse) Pod() interfaces.IKubePod {
-	return k.pod
-}
-func (k *ClickHouse) ReplicaSet() interfaces.IKubeReplicaSet {
-	return k.replicaSet
-}
-func (k *ClickHouse) Service() interfaces.IKubeService {
-	return k.service
-}
-func (k *ClickHouse) STS() interfaces.IKubeSTS {
-	return k.sts
-}
-func (k *ClickHouse) CRStatus() interfaces.IKubeCRStatus {
+
+// CRStatus is a getter
+func (k *Adapter) CRStatus() interfaces.IKubeCRStatus {
 	return k.crStatus
 }
-func (k *ClickHouse) Storage() interfaces.IKubeStoragePVC {
+
+// Deployment is a getter
+func (k *Adapter) Deployment() interfaces.IKubeDeployment {
+	return k.deployment
+}
+
+// Event is a getter
+func (k *Adapter) Event() interfaces.IKubeEvent {
+	return k.event
+}
+
+// PDB is a getter
+func (k *Adapter) PDB() interfaces.IKubePDB {
+	return k.pdb
+}
+
+// Pod is a getter
+func (k *Adapter) Pod() interfaces.IKubePod {
+	return k.pod
+}
+
+// Storage is a getter
+func (k *Adapter) Storage() interfaces.IKubeStoragePVC {
 	return k.pvc
+}
+
+// ReplicaSet is a getter
+func (k *Adapter) ReplicaSet() interfaces.IKubeReplicaSet {
+	return k.replicaSet
+}
+
+// Service is a getter
+func (k *Adapter) Service() interfaces.IKubeService {
+	return k.service
+}
+
+// STS is a getter
+func (k *Adapter) STS() interfaces.IKubeSTS {
+	return k.sts
 }

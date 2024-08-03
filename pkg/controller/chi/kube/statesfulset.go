@@ -26,13 +26,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type STSClickHouse struct {
+type STS struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 }
 
-func NewSTSClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *STSClickHouse {
-	return &STSClickHouse{
+func NewSTS(kubeClient kube.Interface, namer interfaces.INameManager) *STS {
+	return &STS{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -41,7 +41,7 @@ func NewSTSClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) 
 // getStatefulSet gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.Host
-func (c *STSClickHouse) Get(obj any) (*apps.StatefulSet, error) {
+func (c *STS) Get(obj any) (*apps.StatefulSet, error) {
 	switch obj := obj.(type) {
 	case meta.Object:
 		return c.kubeClient.AppsV1().StatefulSets(obj.GetNamespace()).Get(controller.NewContext(), obj.GetName(), controller.NewGetOptions())
@@ -55,16 +55,16 @@ func (c *STSClickHouse) Get(obj any) (*apps.StatefulSet, error) {
 	return nil, fmt.Errorf("unknown type")
 }
 
-func (c *STSClickHouse) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STS) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
 	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(controller.NewContext(), statefulSet, controller.NewCreateOptions())
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *STSClickHouse) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STS) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	return c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Update(controller.NewContext(), sts, controller.NewUpdateOptions())
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
-func (c *STSClickHouse) Delete(namespace, name string) error {
+func (c *STS) Delete(namespace, name string) error {
 	return c.kubeClient.AppsV1().StatefulSets(namespace).Delete(controller.NewContext(), name, controller.NewDeleteOptions())
 }

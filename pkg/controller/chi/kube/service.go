@@ -23,13 +23,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type ServiceClickHouse struct {
+type Service struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 }
 
-func NewServiceClickHouse(kubeClient kube.Interface, namer interfaces.INameManager) *ServiceClickHouse {
-	return &ServiceClickHouse{
+func NewService(kubeClient kube.Interface, namer interfaces.INameManager) *Service {
+	return &Service{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -38,7 +38,7 @@ func NewServiceClickHouse(kubeClient kube.Interface, namer interfaces.INameManag
 // getService gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
-func (c *ServiceClickHouse) Get(obj any) (*core.Service, error) {
+func (c *Service) Get(obj any) (*core.Service, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
 	case *core.Service:
@@ -51,6 +51,14 @@ func (c *ServiceClickHouse) Get(obj any) (*core.Service, error) {
 	return c.kubeClient.CoreV1().Services(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
-func (c *ServiceClickHouse) Update(svc *core.Service) (*core.Service, error) {
+func (c *Service) Create(svc *core.Service) (*core.Service, error) {
+	return c.kubeClient.CoreV1().Services(svc.Namespace).Create(controller.NewContext(), svc, controller.NewCreateOptions())
+}
+
+func (c *Service) Update(svc *core.Service) (*core.Service, error) {
 	return c.kubeClient.CoreV1().Services(svc.Namespace).Update(controller.NewContext(), svc, controller.NewUpdateOptions())
+}
+
+func (c *Service) Delete(namespace, name string) error {
+	return c.kubeClient.CoreV1().Services(namespace).Delete(controller.NewContext(), name, controller.NewDeleteOptions())
 }

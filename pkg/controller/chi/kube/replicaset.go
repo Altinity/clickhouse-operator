@@ -21,20 +21,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
-type ReplicaSetClickHouse struct {
+type ReplicaSet struct {
 	kubeClient kube.Interface
 }
 
-func NewReplicaSetClickHouse(kubeClient kube.Interface) *ReplicaSetClickHouse {
-	return &ReplicaSetClickHouse{
+func NewReplicaSet(kubeClient kube.Interface) *ReplicaSet {
+	return &ReplicaSet{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *ReplicaSetClickHouse) Get(namespace, name string) (*apps.ReplicaSet, error) {
+func (c *ReplicaSet) Get(namespace, name string) (*apps.ReplicaSet, error) {
 	return c.kubeClient.AppsV1().ReplicaSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
-func (c *ReplicaSetClickHouse) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+func (c *ReplicaSet) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
 	return c.kubeClient.AppsV1().ReplicaSets(replicaSet.Namespace).Update(controller.NewContext(), replicaSet, controller.NewUpdateOptions())
 }

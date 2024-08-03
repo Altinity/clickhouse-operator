@@ -23,16 +23,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
-type EventClickHouse struct {
+type Event struct {
 	kubeClient kube.Interface
 }
 
-func NewEventClickHouse(kubeClient kube.Interface) *EventClickHouse {
-	return &EventClickHouse{
+func NewEvent(kubeClient kube.Interface) *Event {
+	return &Event{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *EventClickHouse) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
+func (c *Event) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
 	return c.kubeClient.CoreV1().Events(event.Namespace).Create(ctx, event, controller.NewCreateOptions())
 }

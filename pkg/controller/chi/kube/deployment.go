@@ -21,20 +21,20 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
-type DeploymentClickHouse struct {
+type Deployment struct {
 	kubeClient kube.Interface
 }
 
-func NewDeploymentClickHouse(kubeClient kube.Interface) *DeploymentClickHouse {
-	return &DeploymentClickHouse{
+func NewDeployment(kubeClient kube.Interface) *Deployment {
+	return &Deployment{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *DeploymentClickHouse) Get(namespace, name string) (*apps.Deployment, error) {
+func (c *Deployment) Get(namespace, name string) (*apps.Deployment, error) {
 	return c.kubeClient.AppsV1().Deployments(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
 }
 
-func (c *DeploymentClickHouse) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
+func (c *Deployment) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
 	return c.kubeClient.AppsV1().Deployments(deployment.Namespace).Update(controller.NewContext(), deployment, controller.NewUpdateOptions())
 }

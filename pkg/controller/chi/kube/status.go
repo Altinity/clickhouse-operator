@@ -27,18 +27,18 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type CRStatusClickHouse struct {
+type CRStatus struct {
 	chopClient chopClientSet.Interface
 }
 
-func NewCRStatusClickHouse(chopClient chopClientSet.Interface) *CRStatusClickHouse {
-	return &CRStatusClickHouse{
+func NewCRStatus(chopClient chopClientSet.Interface) *CRStatus {
+	return &CRStatus{
 		chopClient: chopClient,
 	}
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *CRStatusClickHouse) Update(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) (err error) {
+func (c *CRStatus) Update(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -65,7 +65,7 @@ func (c *CRStatusClickHouse) Update(ctx context.Context, cr api.ICustomResource,
 }
 
 // doUpdateCRStatus updates ClickHouseInstallation object's Status
-func (c *CRStatusClickHouse) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) error {
+func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

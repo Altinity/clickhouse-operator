@@ -27,33 +27,33 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
-type PVCClickHouse struct {
+type PVC struct {
 	kubeClient kube.Interface
 }
 
-func NewPVCClickHouse(kubeClient kube.Interface) *PVCClickHouse {
-	return &PVCClickHouse{
+func NewPVC(kubeClient kube.Interface) *PVC {
+	return &PVC{
 		kubeClient: kubeClient,
 	}
 }
 
-func (c *PVCClickHouse) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, pvc, controller.NewCreateOptions())
 }
 
-func (c *PVCClickHouse) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
+func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
-func (c *PVCClickHouse) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
+func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Update(ctx, pvc, controller.NewUpdateOptions())
 }
 
-func (c *PVCClickHouse) Delete(ctx context.Context, namespace, name string) error {
+func (c *PVC) Delete(ctx context.Context, namespace, name string) error {
 	return c.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 }
 
-func (c *PVCClickHouse) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
+func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
 	return c.kubeClient.
 		CoreV1().
 		PersistentVolumeClaims(host.Runtime.Address.Namespace).
