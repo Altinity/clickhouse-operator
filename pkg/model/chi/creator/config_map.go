@@ -39,15 +39,15 @@ func NewConfigMapManagerClickHouse() *ConfigMapManagerClickHouse {
 
 func (m *ConfigMapManagerClickHouse) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
-	case interfaces.ConfigMapCHICommon:
+	case interfaces.ConfigMapCommon:
 		var options *config.FilesGeneratorOptionsClickHouse
 		if len(params) > 0 {
 			options = params[0].(*config.FilesGeneratorOptionsClickHouse)
 			return m.createConfigMapCHICommon(options)
 		}
-	case interfaces.ConfigMapCHICommonUsers:
+	case interfaces.ConfigMapCommonUsers:
 		return m.createConfigMapCHICommonUsers()
-	case interfaces.ConfigMapCHIHost:
+	case interfaces.ConfigMapHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)

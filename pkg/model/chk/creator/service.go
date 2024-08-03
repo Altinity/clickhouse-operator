@@ -41,7 +41,7 @@ func (m *ServiceManagerKeeper) CreateService(what interfaces.ServiceType, params
 			chk := params[0].(*apiChk.ClickHouseKeeperInstallation)
 			return m.CreateClientService(chk)
 		}
-	case interfaces.ServiceCHIHost:
+	case interfaces.ServiceHost:
 		if len(params) > 0 {
 			chk := params[0].(*apiChk.ClickHouseKeeperInstallation)
 			return m.CreateHeadlessService(chk)

@@ -45,19 +45,19 @@ func (m *ServiceManagerClickHouse) CreateService(what interfaces.ServiceType, pa
 	switch what {
 	case interfaces.ServiceCR:
 		return m.createServiceCHI()
-	case interfaces.ServiceCHICluster:
+	case interfaces.ServiceCluster:
 		var cluster api.ICluster
 		if len(params) > 0 {
 			cluster = params[0].(api.ICluster)
 			return m.createServiceCluster(cluster)
 		}
-	case interfaces.ServiceCHIShard:
+	case interfaces.ServiceShard:
 		var shard api.IShard
 		if len(params) > 0 {
 			shard = params[0].(api.IShard)
 			return m.createServiceShard(shard)
 		}
-	case interfaces.ServiceCHIHost:
+	case interfaces.ServiceHost:
 		var host *api.Host
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
