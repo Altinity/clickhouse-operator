@@ -17,8 +17,8 @@ package interfaces
 type ServiceType string
 
 const (
-	ServiceCR         ServiceType = "svc chi"
-	ServiceCHICluster ServiceType = "svc chi cluster"
-	ServiceCHIShard   ServiceType = "svc chi shard"
-	ServiceCHIHost    ServiceType = "svc chi host"
+	ServiceCR      ServiceType = "svc chi"
+	ServiceCluster ServiceType = "svc cluster"
+	ServiceShard   ServiceType = "svc shard"
+	ServiceHost    ServiceType = "svc host"
 )
