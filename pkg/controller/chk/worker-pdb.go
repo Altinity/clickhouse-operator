@@ -15,18 +15,51 @@
 package chk
 
 import (
-	policy "k8s.io/api/policy/v1"
+	"context"
 
+	policy "k8s.io/api/policy/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
+
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/chk/creator"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) reconcilePodDisruptionBudget(chk *apiChk.ClickHouseKeeperInstallation) error {
-	return w.c.reconcile(
-		chk,
-		&policy.PodDisruptionBudget{},
-		creator.CreatePodDisruptionBudget(chk),
-		"PodDisruptionBudget",
-		nil,
-	)
+//func (w *worker) reconcilePDB	(chk *apiChk.ClickHouseKeeperInstallation) error {
+//	return w.c.reconcile(
+//		chk,
+//		&policy.PodDisruptionBudget{},
+//		creator.CreatePodDisruptionBudget(chk),
+//		"PodDisruptionBudget",
+//		nil,
+//	)
+//}
+
+// reconcilePDB reconciles PodDisruptionBudget
+func (w *worker) reconcilePDB(ctx context.Context, cluster *apiChk.ChkCluster, pdb *policy.PodDisruptionBudget) error {
+	cur, err := w.c.getPDB(ctx, pdb)
+	switch {
+	case err == nil:
+		pdb.ResourceVersion = cur.ResourceVersion
+		err := w.c.updatePDB(ctx, pdb)
+		if err == nil {
+			log.V(1).Info("PDB updated: %s", util.NamespaceNameString(pdb))
+		} else {
+			log.Error("FAILED to update PDB: %s err: %v", util.NamespaceNameString(pdb), err)
+			return nil
+		}
+	case apiErrors.IsNotFound(err):
+		err := w.c.createPDB(ctx, pdb)
+		if err == nil {
+			log.V(1).Info("PDB created: %s", util.NamespaceNameString(pdb))
+		} else {
+			log.Error("FAILED create PDB: %s err: %v", util.NamespaceNameString(pdb), err)
+			return err
+		}
+	default:
+		log.Error("FAILED get PDB: %s err: %v", util.NamespaceNameString(pdb), err)
+		return err
+	}
+
+	return nil
 }
