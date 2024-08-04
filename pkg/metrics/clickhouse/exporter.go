@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"net/http"
 	"sync"
 	"time"
@@ -153,10 +154,10 @@ func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *ClickHouseMetricsF
 	switch clusterConnectionParams.Scheme {
 	case api.ChSchemeAuto:
 		switch {
-		case api.IsPortAssigned(host.HTTPPort):
+		case types.IsPortAssigned(host.HTTPPort):
 			clusterConnectionParams.Scheme = "http"
 			clusterConnectionParams.Port = int(host.HTTPPort)
-		case api.IsPortAssigned(host.HTTPSPort):
+		case types.IsPortAssigned(host.HTTPSPort):
 			clusterConnectionParams.Scheme = "https"
 			clusterConnectionParams.Port = int(host.HTTPSPort)
 		}

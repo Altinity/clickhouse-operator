@@ -178,7 +178,7 @@ type OperatorConfigConfig struct {
 }
 
 // OperatorConfigRestartPolicyRuleSet specifies set of rules
-type OperatorConfigRestartPolicyRuleSet map[Matchable]types.StringBool
+type OperatorConfigRestartPolicyRuleSet map[types.Matchable]types.StringBool
 
 // OperatorConfigRestartPolicyRule specifies ClickHouse version and rules for this version
 type OperatorConfigRestartPolicyRule struct {

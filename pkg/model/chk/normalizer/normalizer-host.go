@@ -166,11 +166,11 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 	//
 	// 2. Setup ports
 	//
-	host.TCPPort = api.EnsurePortValue(host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
-	host.TLSPort = api.EnsurePortValue(host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
-	host.HTTPPort = api.EnsurePortValue(host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
-	host.HTTPSPort = api.EnsurePortValue(host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
-	host.InterserverHTTPPort = api.EnsurePortValue(host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
+	host.TCPPort = types.EnsurePortValue(host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
+	host.TLSPort = types.EnsurePortValue(host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
+	host.HTTPPort = types.EnsurePortValue(host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
+	host.HTTPSPort = types.EnsurePortValue(host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
+	host.InterserverHTTPPort = types.EnsurePortValue(host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
 }
 
 // createHostsField
