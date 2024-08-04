@@ -71,7 +71,7 @@ func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerato
 func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.FilesGeneratorOptionsClickHouse) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.NewClickHouse().Name(interfaces.NameConfigMapCommon, m.cr),
+			Name:            namer.New().Name(interfaces.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommon)),
@@ -89,7 +89,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.NewClickHouse().Name(interfaces.NameConfigMapCommonUsers, m.cr),
+			Name:            namer.New().Name(interfaces.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommonUsers)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommonUsers)),
@@ -107,7 +107,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.NewClickHouse().Name(interfaces.NameConfigMapHost, host),
+			Name:            namer.New().Name(interfaces.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelConfigMapHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),

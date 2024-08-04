@@ -90,7 +90,7 @@ func (m *ServiceManagerKeeper) CreateHeadlessService(chk *apiChk.ClickHouseKeepe
 		},
 	}
 
-	return createService(namer.NewKeeper().Name(interfaces.NameStatefulSetService, m.cr), chk, svcPorts, false)
+	return createService(namer.New().Name(interfaces.NameStatefulSetService, m.cr), chk, svcPorts, false)
 }
 
 func createService(name string, chk *apiChk.ClickHouseKeeperInstallation, ports []core.ServicePort, clusterIP bool) *core.Service {

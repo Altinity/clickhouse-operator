@@ -50,7 +50,7 @@ func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
 // newAppPodTemplateDefault is a unification wrapper
 func (c *Creator) newAppPodTemplateDefault(host *api.Host) *api.PodTemplate {
 	podTemplate := &api.PodTemplate{
-		Name: namer.NewClickHouse().Name(interfaces.NameStatefulSet, host),
+		Name: namer.New().Name(interfaces.NameStatefulSet, host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
 			Volumes:    []core.Volume{},

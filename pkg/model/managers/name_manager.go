@@ -30,9 +30,9 @@ const (
 func NewNameManager(what NameManagerType) interfaces.INameManager {
 	switch what {
 	case NameManagerTypeClickHouse:
-		return chiNamer.NewClickHouse()
+		return chiNamer.New()
 	case NameManagerTypeKeeper:
-		return chkNamer.NewKeeper()
+		return chkNamer.New()
 	}
 	panic("unknown name manager type")
 }

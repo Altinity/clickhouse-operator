@@ -19,27 +19,33 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
-type Keeper struct {
+type Namer struct {
+	*commonNamer.Namer
 }
 
-// NewKeeper creates new namer with specified context
-func NewKeeper() *Keeper {
-	return &Keeper{}
+// New creates new namer with specified context
+func New() *Namer {
+	return &Namer{
+		Namer: commonNamer.New(),
+	}
 }
 
-func (n *Keeper) Name(what interfaces.NameType, params ...any) string {
+func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	switch what {
 	case interfaces.NameStatefulSetService:
 		cr := params[0].(api.ICustomResource)
 		return getHeadlessServiceName(cr)
+	default:
+		return n.Namer.Name(what, params...)
 	}
 
 	panic("unknown name type")
 }
 
-func (n *Keeper) Names(what interfaces.NameType, params ...any) []string {
+func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
 	return nil
 }
 
