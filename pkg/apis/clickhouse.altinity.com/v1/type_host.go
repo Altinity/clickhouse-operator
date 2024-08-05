@@ -238,7 +238,7 @@ func (host *Host) HasCR() bool {
 }
 
 func (host *Host) SetCR(chi ICustomResource) {
-	host.Runtime.CHI = chi.(*ClickHouseInstallation)
+	host.GetRuntime().SetCR(chi)
 }
 
 // GetCluster gets cluster
@@ -267,14 +267,14 @@ func (host *Host) HasAncestor() bool {
 	return host.GetAncestor() != nil
 }
 
-// GetAncestorCHI gets ancestor of a host
-func (host *Host) GetAncestorCHI() *ClickHouseInstallation {
+// GetAncestorCR gets ancestor of a host
+func (host *Host) GetAncestorCR() *ClickHouseInstallation {
 	return host.GetCR().GetAncestor()
 }
 
-// HasAncestorCHI checks whether host has an ancestor
-func (host *Host) HasAncestorCHI() bool {
-	return host.GetAncestorCHI() != nil
+// HasAncestorCR checks whether host has an ancestor
+func (host *Host) HasAncestorCR() bool {
+	return host.GetAncestorCR() != nil
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
