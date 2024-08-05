@@ -330,6 +330,11 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 		*out = new(clickhousealtinitycomv1.ChiDefaults)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.Reconciling != nil {
+		in, out := &in.Reconciling, &out.Reconciling
+		*out = new(clickhousealtinitycomv1.Reconciling)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Configuration != nil {
 		in, out := &in.Configuration, &out.Configuration
 		*out = new(Configuration)
