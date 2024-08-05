@@ -59,6 +59,7 @@ func (runtime *ClickHouseKeeperInstallationRuntime) UnlockCommonConfig() {
 type ChkSpec struct {
 	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Defaults               *apiChi.ChiDefaults `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Reconciling            *apiChi.Reconciling   `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
 	Configuration          *Configuration      `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *apiChi.Templates   `json:"templates,omitempty"              yaml:"templates,omitempty"`
 }

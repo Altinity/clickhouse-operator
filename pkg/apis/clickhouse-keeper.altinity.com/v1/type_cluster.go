@@ -155,12 +155,41 @@ func (cluster *ChkCluster) GetName() string {
 func (cluster *ChkCluster) GetRuntime() apiChi.IClusterRuntime {
 	return &cluster.Runtime
 }
+
+// FindShard finds shard by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (cluster *ChkCluster) FindShard(needle interface{}) *ChkShard {
+	var resultShard *ChkShard
+	cluster.WalkShards(func(index int, shard apiChi.IShard) error {
+		switch v := needle.(type) {
+		case string:
+			if shard.GetName() == v {
+				resultShard = shard.(*ChkShard)
+			}
+		case int:
+			if index == v {
+				resultShard = shard.(*ChkShard)
+			}
+		}
+		return nil
+	})
+	return resultShard
+}
+
+// FindHost finds host by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (cluster *ChkCluster) FindHost(needleShard interface{}, needleHost interface{}) *apiChi.Host {
+	return cluster.FindShard(needleShard).FindHost(needleHost)
+}
+
 func (cluster *ChkCluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	return nil, false
 }
+
 func (c *ChkCluster) GetSecret() *apiChi.ClusterSecret {
 	return nil
 }
+
 func (cluster *ChkCluster) GetPDBMaxUnavailable() *types.Int32 {
 	return types.NewInt32(1)
 }

@@ -16,141 +16,149 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/imdario/mergo"
+	"gopkg.in/yaml.v3"
 
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (chk *ClickHouseKeeperInstallation) GetSpec() *ChkSpec {
-	return &chk.Spec
+func (cr *ClickHouseKeeperInstallation) GetSpec() *ChkSpec {
+	return &cr.Spec
 }
 
-func (chk *ClickHouseKeeperInstallation) GetSpecA() any {
-	return &chk.Spec
+func (cr *ClickHouseKeeperInstallation) GetSpecA() any {
+	return &cr.Spec
 }
 
-func (chk *ClickHouseKeeperInstallation) GetRuntime() apiChi.ICustomResourceRuntime {
-	return chk.ensureRuntime()
+func (cr *ClickHouseKeeperInstallation) GetRuntime() apiChi.ICustomResourceRuntime {
+	return cr.ensureRuntime()
 }
 
-func (chk *ClickHouseKeeperInstallation) ensureRuntime() *ClickHouseKeeperInstallationRuntime {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) ensureRuntime() *ClickHouseKeeperInstallationRuntime {
+	if cr == nil {
 		return nil
 	}
 
 	// Assume that most of the time, we'll see a non-nil value.
-	if chk.runtime != nil {
-		return chk.runtime
+	if cr.runtime != nil {
+		return cr.runtime
 	}
 
 	// Otherwise, we need to acquire a lock to initialize the field.
-	chk.runtimeCreatorMutex.Lock()
-	defer chk.runtimeCreatorMutex.Unlock()
+	cr.runtimeCreatorMutex.Lock()
+	defer cr.runtimeCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
-	if chk.runtime == nil {
-		chk.runtime = newClickHouseKeeperInstallationRuntime()
+	if cr.runtime == nil {
+		cr.runtime = newClickHouseKeeperInstallationRuntime()
 	}
-	return chk.runtime
+	return cr.runtime
 }
 
-func (chk *ClickHouseKeeperInstallation) IEnsureStatus() apiChi.IStatus {
-	return any(chk.EnsureStatus()).(apiChi.IStatus)
+func (cr *ClickHouseKeeperInstallation) IEnsureStatus() apiChi.IStatus {
+	return any(cr.EnsureStatus()).(apiChi.IStatus)
 }
 
 // EnsureStatus ensures status
-func (chk *ClickHouseKeeperInstallation) EnsureStatus() *ChkStatus {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) EnsureStatus() *ChkStatus {
+	if cr == nil {
 		return nil
 	}
 
 	// Assume that most of the time, we'll see a non-nil value.
-	if chk.Status != nil {
-		return chk.Status
+	if cr.Status != nil {
+		return cr.Status
 	}
 
 	// Otherwise, we need to acquire a lock to initialize the field.
-	chk.statusCreatorMutex.Lock()
-	defer chk.statusCreatorMutex.Unlock()
+	cr.statusCreatorMutex.Lock()
+	defer cr.statusCreatorMutex.Unlock()
 	// Note that we have to check this property again to avoid a TOCTOU bug.
-	if chk.Status == nil {
-		chk.Status = &ChkStatus{}
+	if cr.Status == nil {
+		cr.Status = &ChkStatus{}
 	}
-	return chk.Status
+	return cr.Status
 }
 
 // GetStatus gets Status
-func (chk *ClickHouseKeeperInstallation) GetStatus() *ChkStatus {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) GetStatus() *ChkStatus {
+	if cr == nil {
 		return nil
 	}
-	return chk.Status
+	return cr.Status
 }
 
 // HasStatus checks whether CHI has Status
-func (chk *ClickHouseKeeperInstallation) HasStatus() bool {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) HasStatus() bool {
+	if cr == nil {
 		return false
 	}
-	return chk.Status != nil
+	return cr.Status != nil
 }
 
 // HasAncestor checks whether CHI has an ancestor
-func (chk *ClickHouseKeeperInstallation) HasAncestor() bool {
-	if !chk.HasStatus() {
+func (cr *ClickHouseKeeperInstallation) HasAncestor() bool {
+	if !cr.HasStatus() {
 		return false
 	}
-	return chk.Status.HasNormalizedCHKCompleted()
+	return cr.Status.HasNormalizedCHKCompleted()
 }
 
 // GetAncestor gets ancestor of a CHI
-func (chk *ClickHouseKeeperInstallation) GetAncestor() *ClickHouseKeeperInstallation {
-	if !chk.HasAncestor() {
+func (cr *ClickHouseKeeperInstallation) GetAncestor() *ClickHouseKeeperInstallation {
+	if !cr.HasAncestor() {
 		return nil
 	}
-	return chk.Status.GetNormalizedCHKCompleted()
+	return cr.Status.GetNormalizedCHKCompleted()
 }
 
 // SetAncestor sets ancestor of a CHI
-func (chk *ClickHouseKeeperInstallation) SetAncestor(a *ClickHouseKeeperInstallation) {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) SetAncestor(a *ClickHouseKeeperInstallation) {
+	if cr == nil {
 		return
 	}
-	chk.EnsureStatus().NormalizedCHKCompleted = a
+	cr.EnsureStatus().NormalizedCHKCompleted = a
 }
 
 // HasTarget checks whether CHI has a target
-func (chk *ClickHouseKeeperInstallation) HasTarget() bool {
-	if !chk.HasStatus() {
+func (cr *ClickHouseKeeperInstallation) HasTarget() bool {
+	if !cr.HasStatus() {
 		return false
 	}
-	return chk.Status.HasNormalizedCHK()
+	return cr.Status.HasNormalizedCHK()
 }
 
 // GetTarget gets target of a CHI
-func (chk *ClickHouseKeeperInstallation) GetTarget() *ClickHouseKeeperInstallation {
-	if !chk.HasTarget() {
+func (cr *ClickHouseKeeperInstallation) GetTarget() *ClickHouseKeeperInstallation {
+	if !cr.HasTarget() {
 		return nil
 	}
-	return chk.Status.GetNormalizedCHK()
+	return cr.Status.GetNormalizedCHK()
 }
 
 // SetTarget sets target of a CHI
-func (chk *ClickHouseKeeperInstallation) SetTarget(a *ClickHouseKeeperInstallation) {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) SetTarget(a *ClickHouseKeeperInstallation) {
+	if cr == nil {
 		return
 	}
-	chk.EnsureStatus().NormalizedCHK = a
+	cr.EnsureStatus().NormalizedCHK = a
 }
 
-func (chk *ClickHouseKeeperInstallation) Fill() {
-	apiChi.FillCR(chk)
+func (cr *ClickHouseKeeperInstallation) GetUsedTemplates() []*apiChi.TemplateRef {
+	return nil
+}
+
+
+func (cr *ClickHouseKeeperInstallation) Fill() {
+	apiChi.FillCR(cr)
 }
 
 // MergeFrom merges from CHI
-func (chk *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstallation, _type apiChi.MergeType) {
+func (cr *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstallation, _type apiChi.MergeType) {
 	if from == nil {
 		return
 	}
@@ -158,141 +166,378 @@ func (chk *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstall
 	// Merge Meta
 	switch _type {
 	case apiChi.MergeTypeFillEmptyValues:
-		_ = mergo.Merge(&chk.TypeMeta, from.TypeMeta)
-		_ = mergo.Merge(&chk.ObjectMeta, from.ObjectMeta)
+		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta)
+		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta)
 	case apiChi.MergeTypeOverrideByNonEmptyValues:
-		_ = mergo.Merge(&chk.TypeMeta, from.TypeMeta, mergo.WithOverride)
-		_ = mergo.Merge(&chk.ObjectMeta, from.ObjectMeta, mergo.WithOverride)
+		_ = mergo.Merge(&cr.TypeMeta, from.TypeMeta, mergo.WithOverride)
+		_ = mergo.Merge(&cr.ObjectMeta, from.ObjectMeta, mergo.WithOverride)
 	}
 	// Exclude skipped annotations
-	chk.SetAnnotations(
+	cr.SetAnnotations(
 		util.CopyMapFilter(
-			chk.GetAnnotations(),
+			cr.GetAnnotations(),
 			nil,
 			util.ListSkippedAnnotations(),
 		),
 	)
 
 	// Do actual merge for Spec
-	chk.GetSpec().MergeFrom(from.GetSpec(), _type)
+	cr.GetSpec().MergeFrom(from.GetSpec(), _type)
 
 	// Copy service attributes
-	//chk.ensureRuntime().attributes = from.ensureRuntime().attributes
+	//cr.ensureRuntime().attributes = from.ensureRuntime().attributes
 
-	chk.EnsureStatus().CopyFrom(from.Status, apiChi.CopyStatusOptions{
+	cr.EnsureStatus().CopyFrom(from.Status, apiChi.CopyStatusOptions{
 		InheritableFields: true,
 	})
 }
 
-// HostsCount counts hosts
-func (chk *ClickHouseKeeperInstallation) HostsCount() int {
+// FindCluster finds cluster by name or index.
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (cr *ClickHouseKeeperInstallation) FindCluster(needle interface{}) *ChkCluster {
+	var resultCluster *ChkCluster
+	cr.WalkClustersFullPath(func(chk *ClickHouseKeeperInstallation, clusterIndex int, cluster *ChkCluster) error {
+		switch v := needle.(type) {
+		case string:
+			if cluster.Name == v {
+				resultCluster = cluster
+			}
+		case int:
+			if clusterIndex == v {
+				resultCluster = cluster
+			}
+		}
+		return nil
+	})
+	return resultCluster
+}
+
+// FindShard finds shard by name or index
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (cr *ClickHouseKeeperInstallation) FindShard(needleCluster interface{}, needleShard interface{}) *ChkShard {
+	return cr.FindCluster(needleCluster).FindShard(needleShard)
+}
+
+// FindHost finds shard by name or index
+// Expectations: name is expected to be a string, index is expected to be an int.
+func (cr *ClickHouseKeeperInstallation) FindHost(needleCluster interface{}, needleShard interface{}, needleHost interface{}) *apiChi.Host {
+	return cr.FindCluster(needleCluster).FindHost(needleShard, needleHost)
+}
+
+// ClustersCount counts clusters
+func (cr *ClickHouseKeeperInstallation) ClustersCount() int {
 	count := 0
-	chk.WalkHosts(func(host *apiChi.Host) error {
+	cr.WalkClusters(func(cluster apiChi.ICluster) error {
 		count++
 		return nil
 	})
 	return count
 }
 
+// ShardsCount counts shards
+func (cr *ClickHouseKeeperInstallation) ShardsCount() int {
+	count := 0
+	cr.WalkShards(func(shard *ChkShard) error {
+		count++
+		return nil
+	})
+	return count
+}
+
+// HostsCount counts hosts
+func (cr *ClickHouseKeeperInstallation) HostsCount() int {
+	count := 0
+	cr.WalkHosts(func(host *apiChi.Host) error {
+		count++
+		return nil
+	})
+	return count
+}
+
+// HostsCountAttributes counts hosts by attributes
+func (cr *ClickHouseKeeperInstallation) HostsCountAttributes(a *apiChi.HostReconcileAttributes) int {
+	count := 0
+	cr.WalkHosts(func(host *apiChi.Host) error {
+		if host.GetReconcileAttributes().Any(a) {
+			count++
+		}
+		return nil
+	})
+	return count
+}
+
 // GetHostTemplate gets HostTemplate by name
-func (chk *ClickHouseKeeperInstallation) GetHostTemplate(name string) (*apiChi.HostTemplate, bool) {
-	if !chk.GetSpec().GetTemplates().GetHostTemplatesIndex().Has(name) {
+func (cr *ClickHouseKeeperInstallation) GetHostTemplate(name string) (*apiChi.HostTemplate, bool) {
+	if !cr.GetSpec().GetTemplates().GetHostTemplatesIndex().Has(name) {
 		return nil, false
 	}
-	return chk.GetSpec().GetTemplates().GetHostTemplatesIndex().Get(name), true
+	return cr.GetSpec().GetTemplates().GetHostTemplatesIndex().Get(name), true
 }
 
 // GetPodTemplate gets PodTemplate by name
-func (chk *ClickHouseKeeperInstallation) GetPodTemplate(name string) (*apiChi.PodTemplate, bool) {
-	if !chk.GetSpec().GetTemplates().GetPodTemplatesIndex().Has(name) {
+func (cr *ClickHouseKeeperInstallation) GetPodTemplate(name string) (*apiChi.PodTemplate, bool) {
+	if !cr.GetSpec().GetTemplates().GetPodTemplatesIndex().Has(name) {
 		return nil, false
 	}
-	return chk.GetSpec().GetTemplates().GetPodTemplatesIndex().Get(name), true
+	return cr.GetSpec().GetTemplates().GetPodTemplatesIndex().Get(name), true
 }
 
 // WalkPodTemplates walks over all PodTemplates
-func (chk *ClickHouseKeeperInstallation) WalkPodTemplates(f func(template *apiChi.PodTemplate)) {
-	chk.GetSpec().GetTemplates().GetPodTemplatesIndex().Walk(f)
+func (cr *ClickHouseKeeperInstallation) WalkPodTemplates(f func(template *apiChi.PodTemplate)) {
+	cr.GetSpec().GetTemplates().GetPodTemplatesIndex().Walk(f)
 }
 
 // GetVolumeClaimTemplate gets VolumeClaimTemplate by name
-func (chk *ClickHouseKeeperInstallation) GetVolumeClaimTemplate(name string) (*apiChi.VolumeClaimTemplate, bool) {
-	if chk.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Has(name) {
-		return chk.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Get(name), true
+func (cr *ClickHouseKeeperInstallation) GetVolumeClaimTemplate(name string) (*apiChi.VolumeClaimTemplate, bool) {
+	if cr.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Has(name) {
+		return cr.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Get(name), true
 	}
 	return nil, false
 }
 
 // WalkVolumeClaimTemplates walks over all VolumeClaimTemplates
-func (chk *ClickHouseKeeperInstallation) WalkVolumeClaimTemplates(f func(template *apiChi.VolumeClaimTemplate)) {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) WalkVolumeClaimTemplates(f func(template *apiChi.VolumeClaimTemplate)) {
+	if cr == nil {
 		return
 	}
-	chk.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Walk(f)
+	cr.GetSpec().GetTemplates().GetVolumeClaimTemplatesIndex().Walk(f)
 }
 
 // GetServiceTemplate gets ServiceTemplate by name
-func (chk *ClickHouseKeeperInstallation) GetServiceTemplate(name string) (*apiChi.ServiceTemplate, bool) {
-	if !chk.GetSpec().GetTemplates().GetServiceTemplatesIndex().Has(name) {
+func (cr *ClickHouseKeeperInstallation) GetServiceTemplate(name string) (*apiChi.ServiceTemplate, bool) {
+	if !cr.GetSpec().GetTemplates().GetServiceTemplatesIndex().Has(name) {
 		return nil, false
 	}
-	return chk.GetSpec().GetTemplates().GetServiceTemplatesIndex().Get(name), true
+	return cr.GetSpec().GetTemplates().GetServiceTemplatesIndex().Get(name), true
 }
 
 // GetRootServiceTemplate gets ServiceTemplate of a CHI
-func (chk *ClickHouseKeeperInstallation) GetRootServiceTemplate() (*apiChi.ServiceTemplate, bool) {
-	if !chk.GetSpec().Defaults.Templates.HasServiceTemplate() {
+func (cr *ClickHouseKeeperInstallation) GetRootServiceTemplate() (*apiChi.ServiceTemplate, bool) {
+	if !cr.GetSpec().Defaults.Templates.HasServiceTemplate() {
 		return nil, false
 	}
-	name := chk.GetSpec().Defaults.Templates.GetServiceTemplate()
-	return chk.GetServiceTemplate(name)
+	name := cr.GetSpec().Defaults.Templates.GetServiceTemplate()
+	return cr.GetServiceTemplate(name)
 }
 
-func (chk *ClickHouseKeeperInstallation) GetName() string {
-	if chk == nil {
-		return ""
+// MatchNamespace matches namespace
+func (cr *ClickHouseKeeperInstallation) MatchNamespace(namespace string) bool {
+	if cr == nil {
+		return false
 	}
-	return chk.Name
+	return cr.Namespace == namespace
 }
 
-func (chk *ClickHouseKeeperInstallation) GetNamespace() string {
-	if chk == nil {
-		return ""
+// MatchFullName matches full name
+func (cr *ClickHouseKeeperInstallation) MatchFullName(namespace, name string) bool {
+	if cr == nil {
+		return false
 	}
-	return chk.Namespace
+	return (cr.Namespace == namespace) && (cr.Name == name)
 }
 
-func (chk *ClickHouseKeeperInstallation) GetLabels() map[string]string {
-	if chk == nil {
+// FoundIn checks whether CHI can be found in haystack
+func (cr *ClickHouseKeeperInstallation) FoundIn(haystack []*ClickHouseKeeperInstallation) bool {
+	if cr == nil {
+		return false
+	}
+
+	for _, candidate := range haystack {
+		if candidate.MatchFullName(cr.Namespace, cr.Name) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// IsAuto checks whether templating policy is auto
+func (cr *ClickHouseKeeperInstallation) IsAuto() bool {
+	return false
+}
+
+// IsStopped checks whether CHI is stopped
+func (cr *ClickHouseKeeperInstallation) IsStopped() bool {
+	return false
+}
+
+// IsRollingUpdate checks whether CHI should perform rolling update
+func (cr *ClickHouseKeeperInstallation) IsRollingUpdate() bool {
+	return false
+}
+
+// IsTroubleshoot checks whether CHI is in troubleshoot mode
+func (cr *ClickHouseKeeperInstallation) IsTroubleshoot() bool {
+	return false
+}
+
+// GetReconciling gets reconciling spec
+func (cr *ClickHouseKeeperInstallation) GetReconciling() *apiChi.Reconciling {
+	if cr == nil {
 		return nil
 	}
-	return chk.Labels
+	return cr.GetSpec().Reconciling
 }
 
-func (chk *ClickHouseKeeperInstallation) GetAnnotations() map[string]string {
-	if chk == nil {
+// Copy makes copy of a CHI, filtering fields according to specified CopyOptions
+func (cr *ClickHouseKeeperInstallation) Copy(opts apiChi.CopyCROptions) *ClickHouseKeeperInstallation {
+	if cr == nil {
 		return nil
 	}
-	return chk.Annotations
+	jsonBytes, err := json.Marshal(cr)
+	if err != nil {
+		return nil
+	}
+
+	var chi2 *ClickHouseKeeperInstallation
+	if err := json.Unmarshal(jsonBytes, &chi2); err != nil {
+		return nil
+	}
+
+	if opts.SkipStatus {
+		chi2.Status = nil
+	}
+
+	if opts.SkipManagedFields {
+		chi2.SetManagedFields(nil)
+	}
+
+	return chi2
 }
 
-// WalkHostsFullPath walks hosts with a function
-func (chk *ClickHouseKeeperInstallation) WalkHostsFullPath(f apiChi.WalkHostsAddressFn) []error {
-	return chk.WalkHostsFullPathAndScope(0, 0, f)
+// JSON returns JSON string
+func (cr *ClickHouseKeeperInstallation) JSON(opts apiChi.CopyCROptions) string {
+	if cr == nil {
+		return ""
+	}
+
+	filtered := cr.Copy(opts)
+	jsonBytes, err := json.MarshalIndent(filtered, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("unable to parse. err: %v", err)
+	}
+	return string(jsonBytes)
+
+}
+
+// YAML return YAML string
+func (cr *ClickHouseKeeperInstallation) YAML(opts apiChi.CopyCROptions) string {
+	if cr == nil {
+		return ""
+	}
+
+	filtered := cr.Copy(opts)
+	yamlBytes, err := yaml.Marshal(filtered)
+	if err != nil {
+		return fmt.Sprintf("unable to parse. err: %v", err)
+	}
+	return string(yamlBytes)
+}
+
+// FirstHost returns first host of the CHI
+func (cr *ClickHouseKeeperInstallation) FirstHost() *apiChi.Host {
+	var result *apiChi.Host
+	cr.WalkHosts(func(host *apiChi.Host) error {
+		if result == nil {
+			result = host
+		}
+		return nil
+	})
+	return result
+}
+
+func (cr *ClickHouseKeeperInstallation) GetName() string {
+	if cr == nil {
+		return ""
+	}
+	return cr.Name
+}
+
+func (cr *ClickHouseKeeperInstallation) GetNamespace() string {
+	if cr == nil {
+		return ""
+	}
+	return cr.Namespace
+}
+
+func (cr *ClickHouseKeeperInstallation) GetLabels() map[string]string {
+	if cr == nil {
+		return nil
+	}
+	return cr.Labels
+}
+
+func (cr *ClickHouseKeeperInstallation) GetAnnotations() map[string]string {
+	if cr == nil {
+		return nil
+	}
+	return cr.Annotations
+}
+
+// WalkClustersFullPath walks clusters with full path
+func (cr *ClickHouseKeeperInstallation) WalkClustersFullPath(
+	f func(chi *ClickHouseKeeperInstallation, clusterIndex int, cluster *ChkCluster) error,
+) []error {
+	if cr == nil {
+		return nil
+	}
+	res := make([]error, 0)
+
+	for clusterIndex := range cr.GetSpec().Configuration.Clusters {
+		res = append(res, f(cr, clusterIndex, cr.GetSpec().Configuration.Clusters[clusterIndex]))
+	}
+
+	return res
+}
+
+// WalkClusters walks clusters
+func (cr *ClickHouseKeeperInstallation) WalkClusters(f func(i apiChi.ICluster) error) []error {
+	if cr == nil {
+		return nil
+	}
+	res := make([]error, 0)
+
+	for clusterIndex := range cr.GetSpec().Configuration.Clusters {
+		res = append(res, f(cr.GetSpec().Configuration.Clusters[clusterIndex]))
+	}
+
+	return res
+}
+
+// WalkShards walks shards
+func (cr *ClickHouseKeeperInstallation) WalkShards(
+	f func(
+	shard *ChkShard,
+) error,
+) []error {
+	if cr == nil {
+		return nil
+	}
+	res := make([]error, 0)
+
+	for clusterIndex := range cr.GetSpec().Configuration.Clusters {
+		cluster := cr.GetSpec().Configuration.Clusters[clusterIndex]
+		for shardIndex := range cluster.Layout.Shards {
+			shard := cluster.Layout.Shards[shardIndex]
+			res = append(res, f(shard))
+		}
+	}
+
+	return res
 }
 
 // WalkHostsFullPathAndScope walks hosts with full path
-func (chk *ClickHouseKeeperInstallation) WalkHostsFullPathAndScope(
+func (cr *ClickHouseKeeperInstallation) WalkHostsFullPathAndScope(
 	crScopeCycleSize int,
 	clusterScopeCycleSize int,
 	f apiChi.WalkHostsAddressFn,
 ) (res []error) {
-	if chk == nil {
+	if cr == nil {
 		return nil
 	}
 	address := types.NewHostScopeAddress(crScopeCycleSize, clusterScopeCycleSize)
-	for clusterIndex := range chk.GetSpec().Configuration.Clusters {
-		cluster := chk.GetSpec().Configuration.Clusters[clusterIndex]
+	for clusterIndex := range cr.GetSpec().Configuration.Clusters {
+		cluster := cr.GetSpec().Configuration.Clusters[clusterIndex]
 		address.ClusterScopeAddress.Init()
 		for shardIndex := range cluster.Layout.Shards {
 			shard := cluster.GetShard(shardIndex)
@@ -301,7 +546,7 @@ func (chk *ClickHouseKeeperInstallation) WalkHostsFullPathAndScope(
 				address.ClusterIndex = clusterIndex
 				address.ShardIndex = shardIndex
 				address.ReplicaIndex = replicaIndex
-				res = append(res, f(chk, cluster, shard, replica, host, address))
+				res = append(res, f(cr, cluster, shard, replica, host, address))
 				address.CRScopeAddress.Inc()
 				address.ClusterScopeAddress.Inc()
 			}
@@ -310,29 +555,20 @@ func (chk *ClickHouseKeeperInstallation) WalkHostsFullPathAndScope(
 	return res
 }
 
-// WalkClusters walks clusters
-func (chk *ClickHouseKeeperInstallation) WalkClusters(f func(i apiChi.ICluster) error) []error {
-	if chk == nil {
-		return nil
-	}
-	res := make([]error, 0)
-
-	for clusterIndex := range chk.GetSpec().Configuration.Clusters {
-		res = append(res, f(chk.GetSpec().Configuration.Clusters[clusterIndex]))
-	}
-
-	return res
+// WalkHostsFullPath walks hosts with a function
+func (cr *ClickHouseKeeperInstallation) WalkHostsFullPath(f apiChi.WalkHostsAddressFn) []error {
+	return cr.WalkHostsFullPathAndScope(0, 0, f)
 }
 
 // WalkHosts walks hosts with a function
-func (chk *ClickHouseKeeperInstallation) WalkHosts(f func(host *apiChi.Host) error) []error {
-	if chk == nil {
+func (cr *ClickHouseKeeperInstallation) WalkHosts(f func(host *apiChi.Host) error) []error {
+	if cr == nil {
 		return nil
 	}
 	res := make([]error, 0)
 
-	for clusterIndex := range chk.GetSpec().Configuration.Clusters {
-		cluster := chk.GetSpec().Configuration.Clusters[clusterIndex]
+	for clusterIndex := range cr.GetSpec().Configuration.Clusters {
+		cluster := cr.GetSpec().Configuration.Clusters[clusterIndex]
 		for shardIndex := range cluster.Layout.Shards {
 			shard := cluster.Layout.Shards[shardIndex]
 			for replicaIndex := range shard.Hosts {
@@ -346,19 +582,19 @@ func (chk *ClickHouseKeeperInstallation) WalkHosts(f func(host *apiChi.Host) err
 }
 
 // WalkTillError walks hosts with a function until an error met
-func (chk *ClickHouseKeeperInstallation) WalkTillError(
+func (cr *ClickHouseKeeperInstallation) WalkTillError(
 	ctx context.Context,
 	fCRPreliminary func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
 	fCluster func(ctx context.Context, cluster *ChkCluster) error,
 	fShards func(ctx context.Context, shards []*ChkShard) error,
 	fCRFinal func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
 ) error {
-	if err := fCRPreliminary(ctx, chk); err != nil {
+	if err := fCRPreliminary(ctx, cr); err != nil {
 		return err
 	}
 
-	for clusterIndex := range chk.GetSpec().Configuration.Clusters {
-		cluster := chk.GetSpec().Configuration.Clusters[clusterIndex]
+	for clusterIndex := range cr.GetSpec().Configuration.Clusters {
+		cluster := cr.GetSpec().Configuration.Clusters[clusterIndex]
 		if err := fCluster(ctx, cluster); err != nil {
 			return err
 		}
@@ -372,7 +608,7 @@ func (chk *ClickHouseKeeperInstallation) WalkTillError(
 		}
 	}
 
-	if err := fCRFinal(ctx, chk); err != nil {
+	if err := fCRFinal(ctx, cr); err != nil {
 		return err
 	}
 
