@@ -25,6 +25,8 @@ type ICustomResource interface {
 	GetSpecA() any
 	GetRuntime() ICustomResourceRuntime
 	GetRootServiceTemplate() (*ServiceTemplate, bool)
+	GetReconciling() *Reconciling
+
 	WalkClusters(f func(cluster ICluster) error) []error
 	WalkHosts(func(host *Host) error) []error
 	WalkPodTemplates(f func(template *PodTemplate))
