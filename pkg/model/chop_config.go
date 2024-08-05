@@ -163,8 +163,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	// Profiles Global
 	{
 		var old, new *api.Settings
-		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().GetSpec().Configuration.Profiles
+		if host.HasAncestorCR() {
+			old = host.GetAncestorCR().GetSpec().Configuration.Profiles
 		}
 		if host.HasCR() {
 			new = host.GetCR().GetSpec().Configuration.Profiles
@@ -176,8 +176,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	// Quotas Global
 	{
 		var old, new *api.Settings
-		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().GetSpec().Configuration.Quotas
+		if host.HasAncestorCR() {
+			old = host.GetAncestorCR().GetSpec().Configuration.Quotas
 		}
 		if host.HasCR() {
 			new = host.GetCR().GetSpec().Configuration.Quotas
@@ -189,8 +189,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	// Settings Global
 	{
 		var old, new *api.Settings
-		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().GetSpec().Configuration.Settings
+		if host.HasAncestorCR() {
+			old = host.GetAncestorCR().GetSpec().Configuration.Settings
 		}
 		if host.HasCR() {
 			new = host.GetCR().GetSpec().Configuration.Settings
@@ -213,8 +213,8 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	// Files Global
 	{
 		var old, new *api.Settings
-		if host.HasAncestorCHI() {
-			old = host.GetAncestorCHI().GetSpec().Configuration.Files.Filter(
+		if host.HasAncestorCR() {
+			old = host.GetAncestorCR().GetSpec().Configuration.Files.Filter(
 				nil,
 				[]api.SettingsSection{api.SectionUsers},
 				true,

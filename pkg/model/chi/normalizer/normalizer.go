@@ -330,9 +330,9 @@ func (n *Normalizer) normalizeTemplating(templating *api.ChiTemplating) *api.Chi
 }
 
 // normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *api.ChiReconciling) *api.ChiReconciling {
+func (n *Normalizer) normalizeReconciling(reconciling *api.Reconciling) *api.Reconciling {
 	if reconciling == nil {
-		reconciling = api.NewChiReconciling().SetDefaults()
+		reconciling = api.NewReconciling().SetDefaults()
 	}
 	switch strings.ToLower(reconciling.GetPolicy()) {
 	case strings.ToLower(api.ReconcilingPolicyWait):
@@ -345,13 +345,13 @@ func (n *Normalizer) normalizeReconciling(reconciling *api.ChiReconciling) *api.
 		// Unknown value, fallback to default
 		reconciling.SetPolicy(api.ReconcilingPolicyUnspecified)
 	}
-	reconciling.Cleanup = n.normalizeReconcilingCleanup(reconciling.Cleanup)
+	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
 	return reconciling
 }
 
-func (n *Normalizer) normalizeReconcilingCleanup(cleanup *api.ChiCleanup) *api.ChiCleanup {
+func (n *Normalizer) normalizeReconcilingCleanup(cleanup *api.Cleanup) *api.Cleanup {
 	if cleanup == nil {
-		cleanup = api.NewChiCleanup()
+		cleanup = api.NewCleanup()
 	}
 
 	if cleanup.UnknownObjects == nil {

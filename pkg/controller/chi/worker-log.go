@@ -25,7 +25,7 @@ func (w *worker) logCHI(name string, chi *api.ClickHouseInstallation) {
 		"logCHI %s start--------------------------------------------:\n%s\nlogCHI %s end--------------------------------------------",
 		name,
 		name,
-		chi.YAML(api.CopyCHIOptions{SkipStatus: true, SkipManagedFields: true}),
+		chi.YAML(api.CopyCROptions{SkipStatus: true, SkipManagedFields: true}),
 	)
 }
 

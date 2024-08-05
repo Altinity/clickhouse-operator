@@ -24,18 +24,18 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
-type VolumeManagerKeeper struct {
+type Manager struct {
 	cr    api.ICustomResource
 	namer *namer.Namer
 }
 
-func NewVolumeManagerKeeper() *VolumeManagerKeeper {
-	return &VolumeManagerKeeper{
+func NewManager() *Manager {
+	return &Manager{
 		namer: namer.New(),
 	}
 }
 
-func (m *VolumeManagerKeeper) SetupVolumes(what interfaces.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
+func (m *Manager) SetupVolumes(what interfaces.VolumeType, statefulSet *apps.StatefulSet, host *api.Host) {
 	switch what {
 	case interfaces.VolumesForConfigMaps:
 		m.stsSetupVolumesForConfigMaps(statefulSet, host)
@@ -47,12 +47,12 @@ func (m *VolumeManagerKeeper) SetupVolumes(what interfaces.VolumeType, statefulS
 	panic("unknown volume type")
 }
 
-func (m *VolumeManagerKeeper) SetCR(cr api.ICustomResource) {
+func (m *Manager) SetCR(cr api.ICustomResource) {
 	m.cr = cr
 }
 
 // stsSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
-func (m *VolumeManagerKeeper) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
+func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
 	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
 	configMapCommonName := m.namer.Name(interfaces.NameConfigMapCommon, m.cr)
 	configMapCommonUsersName := m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr)
@@ -79,7 +79,7 @@ func (m *VolumeManagerKeeper) stsSetupVolumesForConfigMaps(statefulSet *apps.Sta
 // stsSetupVolumesUserDataWithFixedPaths
 // appends VolumeMounts for Data and Log VolumeClaimTemplates on all containers.
 // Creates VolumeMounts for Data and Log volumes in case these volume templates are specified in `templates`.
-func (m *VolumeManagerKeeper) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.StatefulSet, host *api.Host) {
+func (m *Manager) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.StatefulSet, host *api.Host) {
 	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,

@@ -26,14 +26,14 @@ import (
 )
 
 // reconcileSecret reconciles core.Secret
-func (w *worker) reconcileSecret(ctx context.Context, chi *api.ClickHouseInstallation, secret *core.Secret) error {
+func (w *worker) reconcileSecret(ctx context.Context, cr api.ICustomResource, secret *core.Secret) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().Info(secret.Name)
-	defer w.a.V(2).M(chi).E().Info(secret.Name)
+	w.a.V(2).M(cr).S().Info(secret.Name)
+	defer w.a.V(2).M(cr).E().Info(secret.Name)
 
 	// Check whether this object already exists
 	if _, err := w.c.getSecret(ctx, secret); err == nil {
@@ -43,20 +43,20 @@ func (w *worker) reconcileSecret(ctx context.Context, chi *api.ClickHouseInstall
 
 	// Secret not found or broken. Try to recreate
 	_ = w.c.deleteSecretIfExists(ctx, secret.Namespace, secret.Name)
-	err := w.createSecret(ctx, chi, secret)
+	err := w.createSecret(ctx, cr, secret)
 	if err != nil {
-		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			M(chi).F().
-			Error("FAILED to reconcile Secret: %s CHI: %s ", secret.Name, chi.Name)
+		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
+			Error("FAILED to reconcile Secret: %s CHI: %s ", secret.Name, cr.GetName())
 	}
 
 	return err
 }
 
 // createSecret
-func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallation, secret *core.Secret) error {
+func (w *worker) createSecret(ctx context.Context, cr api.ICustomResource, secret *core.Secret) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -65,15 +65,15 @@ func (w *worker) createSecret(ctx context.Context, chi *api.ClickHouseInstallati
 	err := w.c.createSecret(ctx, secret)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(chi).
-			M(chi).F().
+			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
+			WithStatusAction(cr).
+			M(cr).F().
 			Info("Create Secret %s/%s", secret.Namespace, secret.Name)
 	} else {
-		w.a.WithEvent(chi, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			M(chi).F().
+		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
 			Error("Create Secret %s/%s failed with error %v", secret.Namespace, secret.Name, err)
 	}
 

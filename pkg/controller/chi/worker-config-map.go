@@ -30,7 +30,7 @@ import (
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
 func (w *worker) reconcileConfigMap(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	configMap *core.ConfigMap,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -38,35 +38,35 @@ func (w *worker) reconcileConfigMap(
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
 
 	// Check whether this object already exists in k8s
 	curConfigMap, err := w.c.getConfigMap(configMap.GetObjectMeta(), true)
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it
-		err = w.updateConfigMap(ctx, chi, configMap)
+		err = w.updateConfigMap(ctx, cr, configMap)
 	}
 
 	if apiErrors.IsNotFound(err) {
 		// ConfigMap not found - even during Update process - try to create it
-		err = w.createConfigMap(ctx, chi, configMap)
+		err = w.createConfigMap(ctx, cr, configMap)
 	}
 
 	if err != nil {
-		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			M(chi).F().
-			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.Name, chi.Name)
+		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
+			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.GetName(), cr.GetName())
 	}
 
 	return err
 }
 
 // updateConfigMap
-func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstallation, configMap *core.ConfigMap) error {
+func (w *worker) updateConfigMap(ctx context.Context, cr api.ICustomResource, configMap *core.ConfigMap) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -75,18 +75,18 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 	updatedConfigMap, err := w.c.updateConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(chi).
-			M(chi).F().
+			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
+			WithStatusAction(cr).
+			M(cr).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		if updatedConfigMap.ResourceVersion != configMap.ResourceVersion {
 			w.task.SetCmUpdate(time.Now())
 		}
 	} else {
-		w.a.WithEvent(chi, common.EventActionUpdate, common.EventReasonUpdateFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			M(chi).F().
+		w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
 			Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
 	}
 
@@ -94,7 +94,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 }
 
 // createConfigMap
-func (w *worker) createConfigMap(ctx context.Context, chi *api.ClickHouseInstallation, configMap *core.ConfigMap) error {
+func (w *worker) createConfigMap(ctx context.Context, cr api.ICustomResource, configMap *core.ConfigMap) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -103,15 +103,15 @@ func (w *worker) createConfigMap(ctx context.Context, chi *api.ClickHouseInstall
 	err := w.c.createConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chi, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(chi).
-			M(chi).F().
+			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
+			WithStatusAction(cr).
+			M(cr).F().
 			Info("Create ConfigMap %s", util.NamespaceNameString(configMap))
 	} else {
-		w.a.WithEvent(chi, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(chi).
-			WithStatusError(chi).
-			M(chi).F().
+		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
 			Error("Create ConfigMap %s failed with error %v", util.NamespaceNameString(configMap), err)
 	}
 

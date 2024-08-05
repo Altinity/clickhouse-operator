@@ -86,52 +86,52 @@ func (w *worker) dropReplicas(ctx context.Context, chi *api.ClickHouseInstallati
 	w.a.V(1).M(chi).F().E().Info("processed replicas: %d", cnt)
 }
 
-func shouldPurgeStatefulSet(chi *api.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m meta.Object) bool {
+func shouldPurgeStatefulSet(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasStatefulSet(m) {
-		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == api.ObjectsCleanupDelete
+		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetStatefulSet() == api.ObjectsCleanupDelete
 	}
-	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == api.ObjectsCleanupDelete
+	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetStatefulSet() == api.ObjectsCleanupDelete
 }
 
-func shouldPurgePVC(chi *api.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m meta.Object) bool {
+func shouldPurgePVC(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasPVC(m) {
-		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == api.ObjectsCleanupDelete
+		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetPVC() == api.ObjectsCleanupDelete
 	}
-	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == api.ObjectsCleanupDelete
+	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetPVC() == api.ObjectsCleanupDelete
 }
 
-func shouldPurgeConfigMap(chi *api.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m meta.Object) bool {
+func shouldPurgeConfigMap(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasConfigMap(m) {
-		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == api.ObjectsCleanupDelete
+		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetConfigMap() == api.ObjectsCleanupDelete
 	}
-	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == api.ObjectsCleanupDelete
+	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetConfigMap() == api.ObjectsCleanupDelete
 }
 
-func shouldPurgeService(chi *api.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m meta.Object) bool {
+func shouldPurgeService(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasService(m) {
-		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == api.ObjectsCleanupDelete
+		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetService() == api.ObjectsCleanupDelete
 	}
-	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == api.ObjectsCleanupDelete
+	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetService() == api.ObjectsCleanupDelete
 }
 
-func shouldPurgeSecret(chi *api.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m meta.Object) bool {
+func shouldPurgeSecret(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	if reconcileFailedObjs.HasSecret(m) {
-		return chi.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetSecret() == api.ObjectsCleanupDelete
+		return cr.GetReconciling().GetCleanup().GetReconcileFailedObjects().GetSecret() == api.ObjectsCleanupDelete
 	}
-	return chi.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == api.ObjectsCleanupDelete
+	return cr.GetReconciling().GetCleanup().GetUnknownObjects().GetSecret() == api.ObjectsCleanupDelete
 }
 
-func shouldPurgePDB(chi *api.ClickHouseInstallation, reconcileFailedObjs *model.Registry, m meta.Object) bool {
+func shouldPurgePDB(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
 	return true
 }
 
 func (w *worker) purgeStatefulSet(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	reconcileFailedObjs *model.Registry,
 	m meta.Object,
 ) int {
-	if shouldPurgeStatefulSet(chi, reconcileFailedObjs, m) {
+	if shouldPurgeStatefulSet(cr, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete StatefulSet: %s/%s", m.GetNamespace(), m.GetName())
 		if err := w.c.kubeClient.AppsV1().StatefulSets(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
@@ -143,11 +143,11 @@ func (w *worker) purgeStatefulSet(
 
 func (w *worker) purgePVC(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	reconcileFailedObjs *model.Registry,
 	m meta.Object,
 ) {
-	if shouldPurgePVC(chi, reconcileFailedObjs, m) {
+	if shouldPurgePVC(cr, reconcileFailedObjs, m) {
 		if commonLabeler.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
 			w.a.V(1).M(m).F().Info("Delete PVC: %s/%s", m.GetNamespace(), m.GetName())
 			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
@@ -159,11 +159,11 @@ func (w *worker) purgePVC(
 
 func (w *worker) purgeConfigMap(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	reconcileFailedObjs *model.Registry,
 	m meta.Object,
 ) {
-	if shouldPurgeConfigMap(chi, reconcileFailedObjs, m) {
+	if shouldPurgeConfigMap(cr, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete ConfigMap: %s/%s", m.GetNamespace(), m.GetName())
 		if err := w.c.kubeClient.CoreV1().ConfigMaps(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
@@ -173,11 +173,11 @@ func (w *worker) purgeConfigMap(
 
 func (w *worker) purgeService(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	reconcileFailedObjs *model.Registry,
 	m meta.Object,
 ) {
-	if shouldPurgeService(chi, reconcileFailedObjs, m) {
+	if shouldPurgeService(cr, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete Service: %s/%s", m.GetNamespace(), m.GetName())
 		if err := w.c.kubeClient.CoreV1().Services(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete Service: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
@@ -187,11 +187,11 @@ func (w *worker) purgeService(
 
 func (w *worker) purgeSecret(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	reconcileFailedObjs *model.Registry,
 	m meta.Object,
 ) {
-	if shouldPurgeSecret(chi, reconcileFailedObjs, m) {
+	if shouldPurgeSecret(cr, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete Secret: %s/%s", m.GetNamespace(), m.GetName())
 		if err := w.c.kubeClient.CoreV1().Secrets(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete Secret: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
@@ -201,11 +201,11 @@ func (w *worker) purgeSecret(
 
 func (w *worker) purgePDB(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	reconcileFailedObjs *model.Registry,
 	m meta.Object,
 ) {
-	if shouldPurgePDB(chi, reconcileFailedObjs, m) {
+	if shouldPurgePDB(cr, reconcileFailedObjs, m) {
 		w.a.V(1).M(m).F().Info("Delete PDB: %s/%s", m.GetNamespace(), m.GetName())
 		if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
 			w.a.V(1).M(m).F().Error("FAILED to delete PDB: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
@@ -216,7 +216,7 @@ func (w *worker) purgePDB(
 // purge
 func (w *worker) purge(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	cr api.ICustomResource,
 	reg *model.Registry,
 	reconcileFailedObjs *model.Registry,
 ) (cnt int) {
@@ -228,37 +228,37 @@ func (w *worker) purge(
 	reg.Walk(func(entityType model.EntityType, m meta.Object) {
 		switch entityType {
 		case model.StatefulSet:
-			cnt += w.purgeStatefulSet(ctx, chi, reconcileFailedObjs, m)
+			cnt += w.purgeStatefulSet(ctx, cr, reconcileFailedObjs, m)
 		case model.PVC:
-			w.purgePVC(ctx, chi, reconcileFailedObjs, m)
+			w.purgePVC(ctx, cr, reconcileFailedObjs, m)
 		case model.ConfigMap:
-			w.purgeConfigMap(ctx, chi, reconcileFailedObjs, m)
+			w.purgeConfigMap(ctx, cr, reconcileFailedObjs, m)
 		case model.Service:
-			w.purgeService(ctx, chi, reconcileFailedObjs, m)
+			w.purgeService(ctx, cr, reconcileFailedObjs, m)
 		case model.Secret:
-			w.purgeSecret(ctx, chi, reconcileFailedObjs, m)
+			w.purgeSecret(ctx, cr, reconcileFailedObjs, m)
 		case model.PDB:
-			w.purgePDB(ctx, chi, reconcileFailedObjs, m)
+			w.purgePDB(ctx, cr, reconcileFailedObjs, m)
 		}
 	})
 	return cnt
 }
 
 // discoveryAndDeleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
-func (w *worker) discoveryAndDeleteCHI(ctx context.Context, chi *api.ClickHouseInstallation) error {
+func (w *worker) discoveryAndDeleteCHI(ctx context.Context, cr api.ICustomResource) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	objs := w.c.discovery(ctx, chi)
+	objs := w.c.discovery(ctx, cr)
 	if objs.NumStatefulSet() > 0 {
-		chi.WalkHosts(func(host *api.Host) error {
+		cr.WalkHosts(func(host *api.Host) error {
 			_ = w.ensureClusterSchemer(host).HostSyncTables(ctx, host)
 			return nil
 		})
 	}
-	w.purge(ctx, chi, objs, nil)
+	w.purge(ctx, cr, objs, nil)
 	return nil
 }
 

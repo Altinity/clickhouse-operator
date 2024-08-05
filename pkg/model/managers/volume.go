@@ -30,9 +30,9 @@ const (
 func NewVolumeManager(what VolumeManagerType) interfaces.IVolumeManager {
 	switch what {
 	case VolumeManagerTypeClickHouse:
-		return chiVolume.NewVolumeManagerClickHouse()
+		return chiVolume.NewManager()
 	case VolumeManagerTypeKeeper:
-		return chkVolume.NewVolumeManagerKeeper()
+		return chkVolume.NewManager()
 	}
 	panic("unknown volume manager type")
 }

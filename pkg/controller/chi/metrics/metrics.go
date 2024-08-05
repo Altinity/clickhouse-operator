@@ -20,7 +20,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/operator"
 )
 
@@ -146,8 +145,15 @@ func ensureMetrics() *Metrics {
 	return m
 }
 
-func prepareLabels(chi *api.ClickHouseInstallation) (attributes []attribute.KeyValue) {
-	labels, values := operator.GetMandatoryLabelsAndValues(chi)
+type BaseInfoGetter interface {
+	GetName() string
+	GetNamespace() string
+	GetLabels() map[string]string
+	GetAnnotations() map[string]string
+}
+
+func prepareLabels(cr BaseInfoGetter) (attributes []attribute.KeyValue) {
+	labels, values := operator.GetMandatoryLabelsAndValues(cr)
 	for i := range labels {
 		label := labels[i]
 		value := values[i]
@@ -161,7 +167,7 @@ func prepareLabels(chi *api.ClickHouseInstallation) (attributes []attribute.KeyV
 //
 // This is due to `rate` prometheus function limitation where it expects the metric to be 0-initialized with all possible labels
 // and doesn't default to 0 if the metric is not present.
-func CHIInitZeroValues(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIInitZeroValues(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
@@ -172,32 +178,32 @@ func CHIInitZeroValues(ctx context.Context, chi *api.ClickHouseInstallation) {
 	ensureMetrics().HostReconcilesErrors.Add(ctx, 0, metric.WithAttributes(prepareLabels(chi)...))
 }
 
-func CHIReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIReconcilesStarted(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().CHIReconcilesStarted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func CHIReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIReconcilesCompleted(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().CHIReconcilesCompleted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func CHIReconcilesAborted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func CHIReconcilesAborted(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().CHIReconcilesAborted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func CHIReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
+func CHIReconcilesTimings(ctx context.Context, chi BaseInfoGetter, seconds float64) {
 	ensureMetrics().CHIReconcilesTimings.Record(ctx, seconds, metric.WithAttributes(prepareLabels(chi)...))
 }
 
-func HostReconcilesStarted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesStarted(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().HostReconcilesStarted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func HostReconcilesCompleted(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesCompleted(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().HostReconcilesCompleted.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func HostReconcilesRestart(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesRestart(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().HostReconcilesRestarts.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func HostReconcilesErrors(ctx context.Context, chi *api.ClickHouseInstallation) {
+func HostReconcilesErrors(ctx context.Context, chi BaseInfoGetter) {
 	ensureMetrics().HostReconcilesErrors.Add(ctx, 1, metric.WithAttributes(prepareLabels(chi)...))
 }
-func HostReconcilesTimings(ctx context.Context, chi *api.ClickHouseInstallation, seconds float64) {
+func HostReconcilesTimings(ctx context.Context, chi BaseInfoGetter, seconds float64) {
 	ensureMetrics().HostReconcilesTimings.Record(ctx, seconds, metric.WithAttributes(prepareLabels(chi)...))
 }
 
