@@ -23,6 +23,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -133,9 +134,9 @@ func (r *StatefulSetReconciler) ReconcileStatefulSet(
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusSame {
 		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		if register {
-			host.GetCR().EnsureStatus().HostUnchanged()
-			_ = r.kubeStatus.Update(ctx, host.GetCR(), interfaces.UpdateStatusOptions{
-				CopyStatusOptions: api.CopyStatusOptions{
+			host.GetCR().IEnsureStatus().HostUnchanged()
+			_ = r.kubeStatus.Update(ctx, host.GetCR(), types.UpdateStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
 					MainFields: true,
 				},
 			})
@@ -221,9 +222,9 @@ func (r *StatefulSetReconciler) updateStatefulSet(ctx context.Context, host *api
 	switch action {
 	case nil:
 		if register {
-			host.GetCR().EnsureStatus().HostUpdated()
-			_ = r.kubeStatus.Update(ctx, host.GetCR(), interfaces.UpdateStatusOptions{
-				CopyStatusOptions: api.CopyStatusOptions{
+			host.GetCR().IEnsureStatus().HostUpdated()
+			_ = r.kubeStatus.Update(ctx, host.GetCR(), types.UpdateStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
 					MainFields: true,
 				},
 			})
@@ -277,9 +278,9 @@ func (r *StatefulSetReconciler) createStatefulSet(ctx context.Context, host *api
 	action := r.doCreateStatefulSet(ctx, host)
 
 	if register {
-		host.GetCR().EnsureStatus().HostAdded()
-		_ = r.kubeStatus.Update(ctx, host.GetCR(), interfaces.UpdateStatusOptions{
-			CopyStatusOptions: api.CopyStatusOptions{
+		host.GetCR().IEnsureStatus().HostAdded()
+		_ = r.kubeStatus.Update(ctx, host.GetCR(), types.UpdateStatusOptions{
+			CopyStatusOptions: types.CopyStatusOptions{
 				MainFields: true,
 			},
 		})
