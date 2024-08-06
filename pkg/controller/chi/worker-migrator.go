@@ -104,7 +104,7 @@ func (w *worker) migrateTables(ctx context.Context, host *api.Host, opts ...*mig
 			M(host).F().
 			Info("Tables added successfully on shard/host:%d/%d cluster:%s",
 				host.Runtime.Address.ShardIndex, host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ClusterName)
-		host.GetCR().EnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
+		host.GetCR().IEnsureStatus().PushHostTablesCreated(w.c.namer.Name(interfaces.NameFQDN, host))
 	} else {
 		w.a.V(1).
 			WithEvent(host.GetCR(), common.EventActionCreate, common.EventReasonCreateFailed).

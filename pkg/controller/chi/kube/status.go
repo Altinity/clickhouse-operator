@@ -21,9 +21,9 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -38,7 +38,7 @@ func NewCRStatus(chopClient chopClientSet.Interface) *CRStatus {
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *CRStatus) Update(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) (err error) {
+func (c *CRStatus) Update(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -65,7 +65,7 @@ func (c *CRStatus) Update(ctx context.Context, cr api.ICustomResource, opts inte
 }
 
 // doUpdateCRStatus updates ClickHouseInstallation object's Status
-func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) error {
+func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

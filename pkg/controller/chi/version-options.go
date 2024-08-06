@@ -27,17 +27,21 @@ type versionOptions struct {
 }
 
 func (opts versionOptions) shouldSkip(host *api.Host) (bool, string) {
-	if opts.skipNew && (host.IsNewOne()) {
-		return true, "host is a new one, version is not not applicable"
-	}
+	switch {
+	case opts.skipNew:
+		if host.IsNewOne() {
+			return true, "host is a new one, version is not not applicable"
+		}
 
-	if opts.skipStopped && host.IsStopped() {
-		return true, "host is stopped, version is not applicable"
-	}
+	case opts.skipStopped:
+		if host.IsStopped() {
+			return true, "host is stopped, version is not applicable"
+		}
 
-	if opts.skipStoppedAncestor && host.GetAncestor().IsStopped() {
-		return true, "host ancestor is stopped, version is not applicable"
+	case opts.skipStoppedAncestor:
+		if host.HasAncestor() && host.GetAncestor().IsStopped() {
+			return true, "host ancestor is stopped, version is not applicable"
+		}
 	}
-
 	return false, ""
 }

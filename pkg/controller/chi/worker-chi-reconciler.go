@@ -17,6 +17,7 @@ package chi
 import (
 	"context"
 	"errors"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"math"
 	"sync"
 	"time"
@@ -66,7 +67,7 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 
 	if new.HasAncestor() {
 		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile. CHI: %s", util.NamespaceNameString(new))
-		old = new.GetAncestor()
+		old = new.GetAncestorT()
 	} else {
 		w.a.M(new).F().Info("has NO ancestor, use empty CHI as a base for reconcile. CHI: %s", util.NamespaceNameString(new))
 		old = nil
@@ -192,7 +193,7 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, chi *api.
 }
 
 // reconcileCHIServicePreliminary runs first stage of CHI reconcile process
-func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi *api.ClickHouseInstallation) error {
+func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi api.ICustomResource) error {
 	if chi.IsStopped() {
 		// Stopped CHI must have no entry point
 		_ = w.c.deleteServiceCHI(ctx, chi)
@@ -201,7 +202,7 @@ func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi *api.Cl
 }
 
 // reconcileCHIServiceFinal runs second stage of CHI reconcile process
-func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi *api.ClickHouseInstallation) error {
+func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi api.ICustomResource) error {
 	if chi.IsStopped() {
 		// Stopped CHI must have no entry point
 		return nil
@@ -240,7 +241,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, chi *api.ClickH
 // reconcileConfigMapCommon reconciles common ConfigMap
 func (w *worker) reconcileConfigMapCommon(
 	ctx context.Context,
-	chi *api.ClickHouseInstallation,
+	chi api.ICustomResource,
 	options *config.FilesGeneratorOptionsClickHouse,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -374,7 +375,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 			err = nil
 		}
 
-		host.GetCR().EnsureStatus().HostFailed()
+		host.GetCR().IEnsureStatus().HostFailed()
 		w.a.WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusAction(host.GetCR()).
 			WithStatusError(host.GetCR()).
@@ -731,10 +732,10 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	now := time.Now()
 	hostsCompleted := 0
 	hostsCount := 0
-	host.GetCR().EnsureStatus().HostCompleted()
-	if host.GetCR() != nil && host.GetCR().Status != nil {
-		hostsCompleted = host.GetCR().Status.GetHostsCompletedCount()
-		hostsCount = host.GetCR().Status.GetHostsCount()
+	host.GetCR().IEnsureStatus().HostCompleted()
+	if host.GetCR() != nil && host.GetCR().GetStatus() != nil {
+		hostsCompleted = host.GetCR().GetStatus().GetHostsCompletedCount()
+		hostsCount = host.GetCR().GetStatus().GetHostsCount()
 	}
 	w.a.V(1).
 		WithEvent(host.GetCR(), common.EventActionProgress, common.EventReasonProgressHostsCompleted).
@@ -742,8 +743,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		M(host).F().
 		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
-	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), interfaces.UpdateStatusOptions{
-		CopyStatusOptions: api.CopyStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
 	})

@@ -23,12 +23,12 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
@@ -290,9 +290,9 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 		Info("Delete CHI started")
 
 	chi.EnsureStatus().DeleteStart()
-	if err := w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
+	if err := w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		TolerateAbsence: true,
-		CopyStatusOptions: api.CopyStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
 	}); err != nil {
@@ -496,9 +496,9 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	chi.EnsureStatus().HostDeleted()
-	_ = w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		TolerateAbsence: true,
-		CopyStatusOptions: api.CopyStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
 	})

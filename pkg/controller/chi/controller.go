@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	types2 "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -787,7 +788,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, cr api.ICustomResource, opts interfaces.UpdateStatusOptions) (err error) {
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, cr api.ICustomResource, opts types2.UpdateStatusOptions) (err error) {
 	return c.kube.CRStatus().Update(ctx, cr, opts)
 }
 

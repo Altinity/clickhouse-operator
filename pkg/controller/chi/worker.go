@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"time"
 
 	core "k8s.io/api/core/v1"
@@ -96,12 +97,12 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 func configGeneratorOptions(chi *api.ClickHouseInstallation) *chiConfig.GeneratorOptions {
 	return &chiConfig.GeneratorOptions{
-		Users:          chi.GetSpec().Configuration.Users,
-		Profiles:       chi.GetSpec().Configuration.Profiles,
-		Quotas:         chi.GetSpec().Configuration.Quotas,
-		Settings:       chi.GetSpec().Configuration.Settings,
-		Files:          chi.GetSpec().Configuration.Files,
-		DistributedDDL: chi.GetSpec().Defaults.DistributedDDL,
+		Users:          chi.GetSpecT().Configuration.Users,
+		Profiles:       chi.GetSpecT().Configuration.Profiles,
+		Quotas:         chi.GetSpecT().Configuration.Quotas,
+		Settings:       chi.GetSpecT().Configuration.Settings,
+		Files:          chi.GetSpecT().Configuration.Files,
+		DistributedDDL: chi.GetSpecT().Defaults.DistributedDDL,
 	}
 }
 
@@ -425,9 +426,9 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			// TODO unify with finalize reconcile
 			w.newTask(chi)
 			w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
+			w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				TolerateAbsence: true,
-				CopyStatusOptions: api.CopyStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
 					Normalized: true,
 				},
 			})
@@ -543,11 +544,11 @@ func (w *worker) isCleanRestart(chi *api.ClickHouseInstallation) bool {
 	generationIsOk := false
 	// However, completed CHI still can be missing, for example, in newly requested CHI
 	if chi.HasAncestor() {
-		generationIsOk = chi.Generation == chi.GetAncestor().Generation
+		generationIsOk = chi.Generation == chi.GetAncestor().GetGeneration()
 		log.V(1).Info(
 			"CHI %s has ancestor. Generations. Prev: %d Cur: %d Generation is the same: %t",
 			chi.Name,
-			chi.GetAncestor().Generation,
+			chi.GetAncestor().GetGeneration(),
 			chi.Generation,
 			generationIsOk,
 		)
@@ -627,8 +628,8 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInst
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	chi.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
-		CopyStatusOptions: api.CopyStatusOptions{
+	_ = w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
 	})
@@ -638,7 +639,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInst
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
-		Info("reconcile started, task id: %s", chi.GetSpec().GetTaskID())
+		Info("reconcile started, task id: %s", chi.GetSpecT().GetTaskID())
 	w.a.V(2).M(chi).F().Info("action plan\n%s\n", ap.String())
 }
 
@@ -665,8 +666,8 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			// TODO unify with update endpoints
 			w.newTask(chi)
 			w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
-				CopyStatusOptions: api.CopyStatusOptions{
+			w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+				CopyStatusOptions: types.CopyStatusOptions{
 					WholeStatus: true,
 				},
 			})
@@ -682,7 +683,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 		WithStatusAction(_chi).
 		WithStatusActions(_chi).
 		M(_chi).F().
-		Info("reconcile completed successfully, task id: %s", _chi.GetSpec().GetTaskID())
+		Info("reconcile completed successfully, task id: %s", _chi.GetSpecT().GetTaskID())
 }
 
 func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *api.ClickHouseInstallation, err error) {
@@ -697,8 +698,8 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	case errors.Is(err, common.ErrCRUDAbort):
 		chi.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCHIObjectStatus(ctx, chi, interfaces.UpdateStatusOptions{
-		CopyStatusOptions: api.CopyStatusOptions{
+	w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
 	})
@@ -708,7 +709,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 		WithStatusAction(chi).
 		WithStatusActions(chi).
 		M(chi).F().
-		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpec().GetTaskID())
+		Warning("reconcile completed UNSUCCESSFULLY, task id: %s", chi.GetSpecT().GetTaskID())
 }
 
 func (w *worker) walkHosts(ctx context.Context, chi *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
