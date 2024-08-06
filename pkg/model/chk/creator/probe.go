@@ -34,6 +34,8 @@ func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *c
 	switch what {
 	case interfaces.ProbeDefaultLiveness:
 		return m.createDefaultKeeperLivenessProbe(host)
+	case interfaces.ProbeDefaultReadiness:
+		return nil
 	}
 	panic("unknown probe type")
 }
