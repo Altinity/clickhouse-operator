@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package interfaces
+package types
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+// CopyStatusOptions specifies what parts to copy in status
+type CopyStatusOptions struct {
+	Actions           bool
+	Errors            bool
+	Normalized        bool
+	MainFields        bool
+	WholeStatus       bool
+	InheritableFields bool
+}
 
 // UpdateStatusOptions defines how to update CHI status
 type UpdateStatusOptions struct {
-	api.CopyStatusOptions
+	CopyStatusOptions
 	TolerateAbsence bool
 }
