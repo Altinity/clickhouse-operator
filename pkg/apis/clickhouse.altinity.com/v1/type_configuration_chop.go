@@ -24,11 +24,10 @@ import (
 	"sync"
 	"time"
 
-	// log "k8s.io/klog"
 	log "github.com/golang/glog"
 	"github.com/imdario/mergo"
 	"gopkg.in/yaml.v3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
@@ -1027,7 +1026,7 @@ func (c *OperatorConfig) IsWatchedNamespace(namespace string) bool {
 // TODO unify approaches to multiple namespaces support
 func (c *OperatorConfig) GetInformerNamespace() string {
 	// Namespace where informers would watch notifications from
-	namespace := metav1.NamespaceAll
+	namespace := meta.NamespaceAll
 	if len(c.Watch.Namespaces) == 1 {
 		// We have exactly one watch namespace specified
 		// This scenario is implemented in go-client
