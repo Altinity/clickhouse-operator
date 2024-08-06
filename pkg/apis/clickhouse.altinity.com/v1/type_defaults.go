@@ -24,6 +24,11 @@ type ChiDefaults struct {
 	Templates         *TemplatesList     `json:"templates,omitempty"          yaml:"templates,omitempty"`
 }
 
+// DistributedDDL defines distributedDDL section of .spec.defaults
+type DistributedDDL struct {
+	Profile string `json:"profile,omitempty" yaml:"profile"`
+}
+
 // NewChiDefaults creates new ChiDefaults object
 func NewChiDefaults() *ChiDefaults {
 	return new(ChiDefaults)

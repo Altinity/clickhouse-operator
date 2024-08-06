@@ -17,7 +17,6 @@ package v1
 import (
 	"sync"
 
-	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
@@ -105,160 +104,6 @@ type ChiSpec struct {
 	UseTemplates           []*TemplateRef    `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
-// ChiTemplating defines templating policy struct
-type ChiTemplating struct {
-	Policy      string         `json:"policy,omitempty"      yaml:"policy,omitempty"`
-	CHISelector TargetSelector `json:"chiSelector,omitempty" yaml:"chiSelector,omitempty"`
-}
-
-// NewChiTemplating creates new templating
-func NewChiTemplating() *ChiTemplating {
-	return new(ChiTemplating)
-}
-
-// GetPolicy gets policy
-func (t *ChiTemplating) GetPolicy() string {
-	if t == nil {
-		return ""
-	}
-	return t.Policy
-}
-
-// SetPolicy sets policy
-func (t *ChiTemplating) SetPolicy(p string) {
-	if t == nil {
-		return
-	}
-	t.Policy = p
-}
-
-// GetSelector gets CHI selector
-func (t *ChiTemplating) GetSelector() TargetSelector {
-	if t == nil {
-		return nil
-	}
-	return t.CHISelector
-}
-
-// MergeFrom merges from specified templating
-func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemplating {
-	if from == nil {
-		return t
-	}
-
-	if t == nil {
-		t = NewChiTemplating()
-	}
-
-	switch _type {
-	case MergeTypeFillEmptyValues:
-		if t.Policy == "" {
-			t.Policy = from.Policy
-		}
-		if t.CHISelector == nil {
-			t.CHISelector = from.CHISelector
-		}
-	case MergeTypeOverrideByNonEmptyValues:
-		if from.Policy != "" {
-			// Override by non-empty values only
-			t.Policy = from.Policy
-		}
-		if from.CHISelector != nil {
-			// Override by non-empty values only
-			t.CHISelector = from.CHISelector
-		}
-	}
-
-	return t
-}
-
-// TemplatesList defines references to .spec.templates to be used
-type TemplatesList struct {
-	HostTemplate            string `json:"hostTemplate,omitempty"            yaml:"hostTemplate,omitempty"`
-	PodTemplate             string `json:"podTemplate,omitempty"             yaml:"podTemplate,omitempty"`
-	DataVolumeClaimTemplate string `json:"dataVolumeClaimTemplate,omitempty" yaml:"dataVolumeClaimTemplate,omitempty"`
-	LogVolumeClaimTemplate  string `json:"logVolumeClaimTemplate,omitempty"  yaml:"logVolumeClaimTemplate,omitempty"`
-	ServiceTemplate         string `json:"serviceTemplate,omitempty"         yaml:"serviceTemplate,omitempty"`
-	ClusterServiceTemplate  string `json:"clusterServiceTemplate,omitempty"  yaml:"clusterServiceTemplate,omitempty"`
-	ShardServiceTemplate    string `json:"shardServiceTemplate,omitempty"    yaml:"shardServiceTemplate,omitempty"`
-	ReplicaServiceTemplate  string `json:"replicaServiceTemplate,omitempty"  yaml:"replicaServiceTemplate,omitempty"`
-
-	// VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate
-	// !!! DEPRECATED !!!
-	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty"     yaml:"volumeClaimTemplate,omitempty"`
-}
-
-// HostTemplate defines full Host Template
-type HostTemplate struct {
-	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
-	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
-	Spec             Host               `json:"spec,omitempty"             yaml:"spec,omitempty"`
-}
-
-// PortDistribution defines port distribution
-type PortDistribution struct {
-	Type string `json:"type,omitempty"   yaml:"type,omitempty"`
-}
-
-// ChiHostConfig defines additional data related to a host
-type ChiHostConfig struct {
-	ZookeeperFingerprint string `json:"zookeeperfingerprint" yaml:"zookeeperfingerprint"`
-	SettingsFingerprint  string `json:"settingsfingerprint"  yaml:"settingsfingerprint"`
-	FilesFingerprint     string `json:"filesfingerprint"     yaml:"filesfingerprint"`
-}
-
-// Templates defines templates section of .spec
-type Templates struct {
-	// Templates
-	HostTemplates        []HostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
-	PodTemplates         []PodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
-	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
-	ServiceTemplates     []ServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
-
-	// Index maps template name to template itself
-	HostTemplatesIndex        *HostTemplatesIndex        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
-	PodTemplatesIndex         *PodTemplatesIndex         `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
-	VolumeClaimTemplatesIndex *VolumeClaimTemplatesIndex `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
-	ServiceTemplatesIndex     *ServiceTemplatesIndex     `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
-}
-
-// PodTemplate defines full Pod Template, directly used by StatefulSet
-type PodTemplate struct {
-	Name            string            `json:"name"                      yaml:"name"`
-	GenerateName    string            `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
-	Zone            PodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
-	PodDistribution []PodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
-	ObjectMeta      meta.ObjectMeta   `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
-	Spec            core.PodSpec      `json:"spec,omitempty"            yaml:"spec,omitempty"`
-}
-
-// PodTemplateZone defines pod template zone
-type PodTemplateZone struct {
-	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
-	Values []string `json:"values,omitempty" yaml:"values,omitempty"`
-}
-
-// PodDistribution defines pod distribution
-type PodDistribution struct {
-	Type        string `json:"type,omitempty"        yaml:"type,omitempty"`
-	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
-	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`
-	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
-}
-
-// ServiceTemplate defines CHI service template
-type ServiceTemplate struct {
-	Name         string           `json:"name"                   yaml:"name"`
-	GenerateName string           `json:"generateName,omitempty" yaml:"generateName,omitempty"`
-	ObjectMeta   meta.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`
-	Spec         core.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
-}
-
-// DistributedDDL defines distributedDDL section of .spec.defaults
-type DistributedDDL struct {
-	Profile string `json:"profile,omitempty" yaml:"profile"`
-}
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClickHouseInstallationList defines a list of ClickHouseInstallation resources
@@ -284,9 +129,4 @@ type ClickHouseOperatorConfigurationList struct {
 	meta.TypeMeta `json:",inline"  yaml:",inline"`
 	meta.ListMeta `json:"metadata" yaml:"metadata"`
 	Items         []ClickHouseOperatorConfiguration `json:"items" yaml:"items"`
-}
-
-// Secured interface for nodes and hosts
-type Secured interface {
-	IsSecure() bool
 }
