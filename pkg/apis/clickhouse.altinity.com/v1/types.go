@@ -105,13 +105,6 @@ type ChiSpec struct {
 	UseTemplates           []*TemplateRef    `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
-// TemplateRef defines UseTemplate section of ClickHouseInstallation resource
-type TemplateRef struct {
-	Name      string `json:"name,omitempty"      yaml:"name,omitempty"`
-	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	UseType   string `json:"useType,omitempty"   yaml:"useType,omitempty"`
-}
-
 // ChiTemplating defines templating policy struct
 type ChiTemplating struct {
 	Policy      string         `json:"policy,omitempty"      yaml:"policy,omitempty"`
@@ -177,39 +170,6 @@ func (t *ChiTemplating) MergeFrom(from *ChiTemplating, _type MergeType) *ChiTemp
 	}
 
 	return t
-}
-
-// TargetSelector specifies target selector based on labels
-type TargetSelector map[string]string
-
-// Matches checks whether TargetSelector matches provided set of labels
-func (s TargetSelector) Matches(labels map[string]string) bool {
-	if s == nil {
-		// Empty selector matches all labels
-		return true
-	}
-
-	// Walk over selector keys
-	for key, selectorValue := range s {
-		if labelValue, ok := labels[key]; !ok {
-			// Labels have no key specified in selector.
-			// Selector does not match the labels
-			return false
-		} else if selectorValue != labelValue {
-			// Labels have the key specified in selector, but selector value is not the same as labels value
-			// Selector does not match the labels
-			return false
-		} else {
-			// Selector value and label value are equal
-			// So far label matches selector
-			// Continue iteration to next value
-		}
-	}
-
-	// All keys are in place with the same values
-	// Selector matches the labels
-
-	return true
 }
 
 // TemplatesList defines references to .spec.templates to be used

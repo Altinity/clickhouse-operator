@@ -44,7 +44,7 @@ func (r *ChiClusterRuntime) GetAddress() IClusterAddress {
 	return &r.Address
 }
 
-func (r ChiClusterRuntime) GetRoot() IRoot {
+func (r ChiClusterRuntime) GetCR() ICustomResource {
 	return r.CHI
 }
 
