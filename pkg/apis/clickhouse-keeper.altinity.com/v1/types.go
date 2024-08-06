@@ -30,8 +30,8 @@ type ClickHouseKeeperInstallation struct {
 	meta.TypeMeta   `json:",inline"                     yaml:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty"          yaml:"metadata,omitempty"`
 
-	Spec   ChkSpec    `json:"spec"             yaml:"spec"`
-	Status *ChkStatus `json:"status,omitempty" yaml:"status,omitempty"`
+	Spec   ChkSpec `json:"spec"             yaml:"spec"`
+	Status *Status `json:"status,omitempty" yaml:"status,omitempty"`
 
 	runtime             *ClickHouseKeeperInstallationRuntime `json:"-" yaml:"-"`
 	statusCreatorMutex  sync.Mutex                           `json:"-" yaml:"-"`
@@ -59,16 +59,9 @@ func (runtime *ClickHouseKeeperInstallationRuntime) UnlockCommonConfig() {
 type ChkSpec struct {
 	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Defaults               *apiChi.ChiDefaults `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
-	Reconciling            *apiChi.Reconciling   `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconciling            *apiChi.Reconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
 	Configuration          *Configuration      `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *apiChi.Templates   `json:"templates,omitempty"              yaml:"templates,omitempty"`
-}
-
-// Configuration defines configuration section of .spec
-type Configuration struct {
-	Settings *apiChi.Settings `json:"settings,omitempty"  yaml:"settings,omitempty"`
-	Files    *apiChi.Settings `json:"files,omitempty"     yaml:"files,omitempty"`
-	Clusters []*ChkCluster    `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

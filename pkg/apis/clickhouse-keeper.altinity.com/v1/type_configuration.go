@@ -18,9 +18,24 @@ import (
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
+// Configuration defines configuration section of .spec
+type Configuration struct {
+	Settings *apiChi.Settings `json:"settings,omitempty"  yaml:"settings,omitempty"`
+	Files    *apiChi.Settings `json:"files,omitempty"     yaml:"files,omitempty"`
+	Clusters []*ChkCluster    `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
+}
+
 // NewConfiguration creates new ChkConfiguration objects
 func NewConfiguration() *Configuration {
 	return new(Configuration)
+}
+
+func (c *Configuration) GetProfiles() *apiChi.Settings {
+	return nil
+}
+
+func (c *Configuration) GetQuotas() *apiChi.Settings {
+	return nil
 }
 
 func (c *Configuration) GetSettings() *apiChi.Settings {
@@ -29,6 +44,10 @@ func (c *Configuration) GetSettings() *apiChi.Settings {
 	}
 
 	return c.Settings
+}
+
+func (c *Configuration) GetFiles() *apiChi.Settings {
+	return c.Files
 }
 
 func (c *Configuration) GetClusters() []*ChkCluster {
@@ -51,20 +70,21 @@ func (c *Configuration) GetCluster(i int) *ChkCluster {
 }
 
 // MergeFrom merges from specified source
-func (configuration *Configuration) MergeFrom(from *Configuration, _type apiChi.MergeType) *Configuration {
+func (c *Configuration) MergeFrom(from *Configuration, _type apiChi.MergeType) *Configuration {
 	if from == nil {
-		return configuration
+		return c
 	}
 
-	if configuration == nil {
-		configuration = NewConfiguration()
+	if c == nil {
+		c = NewConfiguration()
 	}
 
-	configuration.Settings = configuration.Settings.MergeFrom(from.Settings)
+	c.Settings = c.Settings.MergeFrom(from.Settings)
+	c.Files = c.Files.MergeFrom(from.Files)
 
 	// TODO merge clusters
 	// Copy Clusters for now
-	configuration.Clusters = from.Clusters
+	c.Clusters = from.Clusters
 
-	return configuration
+	return c
 }

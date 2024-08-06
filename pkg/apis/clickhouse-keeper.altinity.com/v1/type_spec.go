@@ -16,10 +16,23 @@ package v1
 
 import (
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
-func (spec ChkSpec) GetConfiguration() *Configuration {
+func (spec *ChkSpec) GetNamespaceDomainPattern() *types.String {
+	return spec.NamespaceDomainPattern
+}
+
+func (spec *ChkSpec) GetDefaults() *apiChi.ChiDefaults {
+	return spec.Defaults
+}
+
+func (spec ChkSpec) GetConfiguration() apiChi.IConfiguration {
 	return spec.Configuration
+}
+
+func (spec ChkSpec) GetTemplates() *apiChi.Templates {
+	return spec.Templates
 }
 
 func (spec ChkSpec) EnsureConfiguration() *Configuration {
@@ -27,10 +40,6 @@ func (spec ChkSpec) EnsureConfiguration() *Configuration {
 		spec.Configuration = new(Configuration)
 	}
 	return spec.Configuration
-}
-
-func (spec ChkSpec) GetTemplates() *apiChi.Templates {
-	return spec.Templates
 }
 
 // MergeFrom merges from spec

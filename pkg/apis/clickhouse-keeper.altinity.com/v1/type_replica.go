@@ -16,6 +16,33 @@ package v1
 
 import apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
+// ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
+// TODO unify with ChiShard based on HostsSet
+type ChkReplica struct {
+	Name        string                `json:"name,omitempty"        yaml:"name,omitempty"`
+	Settings    *apiChi.Settings      `json:"settings,omitempty"    yaml:"settings,omitempty"`
+	Files       *apiChi.Settings      `json:"files,omitempty"       yaml:"files,omitempty"`
+	Templates   *apiChi.TemplatesList `json:"templates,omitempty"   yaml:"templates,omitempty"`
+	ShardsCount int                   `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*apiChi.Host `json:"shards,omitempty" yaml:"shards,omitempty"`
+
+	Runtime ChkReplicaRuntime `json:"-" yaml:"-"`
+}
+
+type ChkReplicaRuntime struct {
+	Address ChkReplicaAddress             `json:"-" yaml:"-"`
+	CHK     *ClickHouseKeeperInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+func (r ChkReplicaRuntime) GetAddress() apiChi.IReplicaAddress {
+	return &r.Address
+}
+
+func (r *ChkReplicaRuntime) SetCR(cr apiChi.ICustomResource) {
+	r.CHK = cr.(*ClickHouseKeeperInstallation)
+}
+
 func (replica *ChkReplica) GetName() string {
 	return replica.Name
 }
@@ -111,7 +138,65 @@ func (replica *ChkReplica) GetTemplates() *apiChi.TemplatesList {
 
 func (replica *ChkReplica) GetRuntime() apiChi.IReplicaRuntime {
 	if replica == nil {
-		return nil
+		return (*ChkReplicaRuntime)(nil)
 	}
 	return &replica.Runtime
+}
+
+// ChiReplicaAddress defines address of a replica within ClickHouseInstallation
+type ChkReplicaAddress struct {
+	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
+	ReplicaName  string `json:"replicaName,omitempty"  yaml:"replicaName,omitempty"`
+	ReplicaIndex int    `json:"replicaIndex,omitempty" yaml:"replicaIndex,omitempty"`
+}
+
+func (a *ChkReplicaAddress) GetNamespace() string {
+	return a.Namespace
+}
+
+func (a *ChkReplicaAddress) SetNamespace(namespace string) {
+	a.Namespace = namespace
+}
+
+func (a *ChkReplicaAddress) GetCRName() string {
+	return a.CHIName
+}
+
+func (a *ChkReplicaAddress) SetCRName(name string) {
+	a.CHIName = name
+}
+
+func (a *ChkReplicaAddress) GetClusterName() string {
+	return a.ClusterName
+}
+
+func (a *ChkReplicaAddress) SetClusterName(name string) {
+	a.ClusterName = name
+}
+
+func (a *ChkReplicaAddress) GetClusterIndex() int {
+	return a.ClusterIndex
+}
+
+func (a *ChkReplicaAddress) SetClusterIndex(index int) {
+	a.ClusterIndex = index
+}
+
+func (a *ChkReplicaAddress) GetReplicaName() string {
+	return a.ReplicaName
+}
+
+func (a *ChkReplicaAddress) SetReplicaName(name string) {
+	a.ReplicaName = name
+}
+
+func (a *ChkReplicaAddress) GetReplicaIndex() int {
+	return a.ReplicaIndex
+}
+
+func (a *ChkReplicaAddress) SetReplicaIndex(index int) {
+	a.ReplicaIndex = index
 }

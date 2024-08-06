@@ -21,7 +21,8 @@ import (
 
 // ChkCluster defines item of a clusters section of .configuration
 type ChkCluster struct {
-	Name      string                `json:"name,omitempty"         yaml:"name,omitempty"`
+	Name string `json:"name,omitempty"         yaml:"name,omitempty"`
+
 	Settings  *apiChi.Settings      `json:"settings,omitempty"          yaml:"settings,omitempty"`
 	Files     *apiChi.Settings      `json:"files,omitempty"             yaml:"files,omitempty"`
 	Templates *apiChi.TemplatesList `json:"templates,omitempty"         yaml:"templates,omitempty"`
@@ -87,6 +88,40 @@ func (a *ChkClusterAddress) SetClusterIndex(index int) {
 	a.ClusterIndex = index
 }
 
+func (cluster *ChkCluster) GetName() string {
+	return cluster.Name
+}
+
+func (c *ChkCluster) GetZookeeper() *apiChi.ZookeeperConfig {
+	return nil
+}
+
+func (c *ChkCluster) GetSchemaPolicy() *apiChi.SchemaPolicy {
+	return nil
+}
+
+// GetInsecure is a getter
+func (cluster *ChkCluster) GetInsecure() *types.StringBool {
+	return nil
+}
+
+// GetSecure is a getter
+func (cluster *ChkCluster) GetSecure() *types.StringBool {
+	return nil
+}
+
+func (c *ChkCluster) GetSecret() *apiChi.ClusterSecret {
+	return nil
+}
+
+func (cluster *ChkCluster) GetRuntime() apiChi.IClusterRuntime {
+	return &cluster.Runtime
+}
+
+func (cluster *ChkCluster) GetPDBMaxUnavailable() *types.Int32 {
+	return types.NewInt32(1)
+}
+
 // FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
 func (cluster *ChkCluster) FillShardReplicaSpecified() {
 	if len(cluster.Layout.Shards) > 0 {
@@ -118,15 +153,15 @@ func (cluster *ChkCluster) IsShardSpecified() bool {
 
 // InheritFilesFrom inherits files from CHI
 func (cluster *ChkCluster) InheritFilesFrom(chk *ClickHouseKeeperInstallation) {
-	if chk.GetSpec().Configuration == nil {
+	if chk.GetSpecT().Configuration == nil {
 		return
 	}
-	if chk.GetSpec().Configuration.Files == nil {
+	if chk.GetSpecT().Configuration.Files == nil {
 		return
 	}
 
 	// Propagate host section only
-	cluster.Files = cluster.Files.MergeFromCB(chk.GetSpec().Configuration.Files, func(path string, _ *apiChi.Setting) bool {
+	cluster.Files = cluster.Files.MergeFromCB(chk.GetSpecT().Configuration.Files, func(path string, _ *apiChi.Setting) bool {
 		if section, err := apiChi.GetSectionFromPath(path); err == nil {
 			if section.Equal(apiChi.SectionHost) {
 				return true
@@ -139,26 +174,39 @@ func (cluster *ChkCluster) InheritFilesFrom(chk *ClickHouseKeeperInstallation) {
 
 // InheritTemplatesFrom inherits templates from CHI
 func (cluster *ChkCluster) InheritTemplatesFrom(chk *ClickHouseKeeperInstallation) {
-	if chk.GetSpec().Defaults == nil {
+	if chk.GetSpec().GetDefaults() == nil {
 		return
 	}
-	if chk.GetSpec().Defaults.Templates == nil {
+	if chk.GetSpec().GetDefaults().Templates == nil {
 		return
 	}
-	cluster.Templates = cluster.Templates.MergeFrom(chk.GetSpec().Defaults.Templates, apiChi.MergeTypeFillEmptyValues)
+	cluster.Templates = cluster.Templates.MergeFrom(chk.GetSpec().GetDefaults().Templates, apiChi.MergeTypeFillEmptyValues)
 	cluster.Templates.HandleDeprecatedFields()
 }
 
-func (cluster *ChkCluster) GetName() string {
-	return cluster.Name
+// GetServiceTemplate returns service template, if exists
+func (cluster *ChkCluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
+	return nil, false
 }
-func (cluster *ChkCluster) GetRuntime() apiChi.IClusterRuntime {
-	return &cluster.Runtime
+
+// GetShard gets shard with specified index
+func (cluster *ChkCluster) GetShard(shard int) *ChkShard {
+	return cluster.Layout.Shards[shard]
+}
+
+// GetOrCreateHost gets or creates host on specified coordinates
+func (cluster *ChkCluster) GetOrCreateHost(shard, replica int) *apiChi.Host {
+	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
+}
+
+// GetReplica gets replica with specified index
+func (cluster *ChkCluster) GetReplica(replica int) *ChkReplica {
+	return cluster.Layout.Replicas[replica]
 }
 
 // FindShard finds shard by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (cluster *ChkCluster) FindShard(needle interface{}) *ChkShard {
+func (cluster *ChkCluster) FindShard(needle interface{}) apiChi.IShard {
 	var resultShard *ChkShard
 	cluster.WalkShards(func(index int, shard apiChi.IShard) error {
 		switch v := needle.(type) {
@@ -182,18 +230,19 @@ func (cluster *ChkCluster) FindHost(needleShard interface{}, needleHost interfac
 	return cluster.FindShard(needleShard).FindHost(needleHost)
 }
 
-func (cluster *ChkCluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
-	return nil, false
+// FirstHost finds first host in the cluster
+func (cluster *ChkCluster) FirstHost() *apiChi.Host {
+	var result *apiChi.Host
+	cluster.WalkHosts(func(host *apiChi.Host) error {
+		if result == nil {
+			result = host
+		}
+		return nil
+	})
+	return result
 }
 
-func (c *ChkCluster) GetSecret() *apiChi.ClusterSecret {
-	return nil
-}
-
-func (cluster *ChkCluster) GetPDBMaxUnavailable() *types.Int32 {
-	return types.NewInt32(1)
-}
-
+// WalkShards walks shards
 func (cluster *ChkCluster) WalkShards(f func(index int, shard apiChi.IShard) error) []error {
 	if cluster == nil {
 		return nil
@@ -220,23 +269,19 @@ func (cluster *ChkCluster) WalkReplicas(f func(index int, replica *ChkReplica) e
 	return res
 }
 
-func (cluster *ChkCluster) WalkHosts(func(host *apiChi.Host) error) []error {
-	return nil
-}
+// WalkHosts walks hosts
+func (cluster *ChkCluster) WalkHosts(f func(host *apiChi.Host) error) []error {
+	res := make([]error, 0)
 
-// GetShard gets shard with specified index
-func (cluster *ChkCluster) GetShard(shard int) *ChkShard {
-	return cluster.Layout.Shards[shard]
-}
+	for shardIndex := range cluster.Layout.Shards {
+		shard := cluster.Layout.Shards[shardIndex]
+		for replicaIndex := range shard.Hosts {
+			host := shard.Hosts[replicaIndex]
+			res = append(res, f(host))
+		}
+	}
 
-// GetOrCreateHost gets or creates host on specified coordinates
-func (cluster *ChkCluster) GetOrCreateHost(shard, replica int) *apiChi.Host {
-	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
-}
-
-// GetReplica gets replica with specified index
-func (cluster *ChkCluster) GetReplica(replica int) *ChkReplica {
-	return cluster.Layout.Replicas[replica]
+	return res
 }
 
 // WalkHostsByShards walks hosts by shards
@@ -285,6 +330,7 @@ func (cluster *ChkCluster) HostsCount() int {
 	return count
 }
 
+// ChkClusterLayout defines layout section of .spec.configuration.clusters
 type ChkClusterLayout struct {
 	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
 	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
@@ -307,179 +353,4 @@ func NewChkClusterLayout() *ChkClusterLayout {
 
 func (l *ChkClusterLayout) GetReplicasCount() int {
 	return l.ReplicasCount
-}
-
-// ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
-// TODO unify with ChiReplica based on HostsSet
-type ChkShard struct {
-	Name                string                `json:"name,omitempty"                yaml:"name,omitempty"`
-	Weight              *int                  `json:"weight,omitempty"              yaml:"weight,omitempty"`
-	InternalReplication *types.StringBool     `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
-	Settings            *apiChi.Settings      `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files               *apiChi.Settings      `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates           *apiChi.TemplatesList `json:"templates,omitempty"           yaml:"templates,omitempty"`
-	ReplicasCount       int                   `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
-	// TODO refactor into map[string]Host
-	Hosts []*apiChi.Host `json:"replicas,omitempty" yaml:"replicas,omitempty"`
-
-	Runtime ChkShardRuntime `json:"-" yaml:"-"`
-
-	// DefinitionType is DEPRECATED - to be removed soon
-	DefinitionType string `json:"definitionType,omitempty" yaml:"definitionType,omitempty"`
-}
-
-type ChkShardRuntime struct {
-	Address ChkShardAddress               `json:"-" yaml:"-"`
-	CHK     *ClickHouseKeeperInstallation `json:"-" yaml:"-" testdiff:"ignore"`
-}
-
-func (r ChkShardRuntime) GetAddress() apiChi.IShardAddress {
-	return &r.Address
-}
-
-func (r *ChkShardRuntime) SetCR(cr apiChi.ICustomResource) {
-	r.CHK = cr.(*ClickHouseKeeperInstallation)
-}
-
-// ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
-// TODO unify with ChiShard based on HostsSet
-type ChkReplica struct {
-	Name        string                `json:"name,omitempty"        yaml:"name,omitempty"`
-	Settings    *apiChi.Settings      `json:"settings,omitempty"    yaml:"settings,omitempty"`
-	Files       *apiChi.Settings      `json:"files,omitempty"       yaml:"files,omitempty"`
-	Templates   *apiChi.TemplatesList `json:"templates,omitempty"   yaml:"templates,omitempty"`
-	ShardsCount int                   `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
-	// TODO refactor into map[string]Host
-	Hosts []*apiChi.Host `json:"shards,omitempty" yaml:"shards,omitempty"`
-
-	Runtime ChkReplicaRuntime `json:"-" yaml:"-"`
-}
-
-type ChkReplicaRuntime struct {
-	Address ChkReplicaAddress             `json:"-" yaml:"-"`
-	CHK     *ClickHouseKeeperInstallation `json:"-" yaml:"-" testdiff:"ignore"`
-}
-
-func (r ChkReplicaRuntime) GetAddress() apiChi.IReplicaAddress {
-	return &r.Address
-}
-
-func (r *ChkReplicaRuntime) SetCR(cr apiChi.ICustomResource) {
-	r.CHK = cr.(*ClickHouseKeeperInstallation)
-}
-
-// ChiShardAddress defines address of a shard within ClickHouseInstallation
-type ChkShardAddress struct {
-	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
-	ShardName    string `json:"shardName,omitempty"    yaml:"shardName,omitempty"`
-	ShardIndex   int    `json:"shardIndex,omitempty"   yaml:"shardIndex,omitempty"`
-}
-
-func (a *ChkShardAddress) GetNamespace() string {
-	return a.Namespace
-}
-
-func (a *ChkShardAddress) SetNamespace(namespace string) {
-	a.Namespace = namespace
-}
-
-func (a *ChkShardAddress) GetCRName() string {
-	return a.CHIName
-}
-
-func (a *ChkShardAddress) SetCRName(name string) {
-	a.CHIName = name
-}
-
-func (a *ChkShardAddress) GetClusterName() string {
-	return a.ClusterName
-}
-
-func (a *ChkShardAddress) SetClusterName(name string) {
-	a.ClusterName = name
-}
-
-func (a *ChkShardAddress) GetClusterIndex() int {
-	return a.ClusterIndex
-}
-
-func (a *ChkShardAddress) SetClusterIndex(index int) {
-	a.ClusterIndex = index
-}
-
-func (a *ChkShardAddress) GetShardName() string {
-	return a.ShardName
-}
-
-func (a *ChkShardAddress) SetShardName(name string) {
-	a.ShardName = name
-}
-
-func (a *ChkShardAddress) GetShardIndex() int {
-	return a.ShardIndex
-}
-
-func (a *ChkShardAddress) SetShardIndex(index int) {
-	a.ShardIndex = index
-}
-
-// ChiReplicaAddress defines address of a replica within ClickHouseInstallation
-type ChkReplicaAddress struct {
-	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
-	ReplicaName  string `json:"replicaName,omitempty"  yaml:"replicaName,omitempty"`
-	ReplicaIndex int    `json:"replicaIndex,omitempty" yaml:"replicaIndex,omitempty"`
-}
-
-func (a *ChkReplicaAddress) GetNamespace() string {
-	return a.Namespace
-}
-
-func (a *ChkReplicaAddress) SetNamespace(namespace string) {
-	a.Namespace = namespace
-}
-
-func (a *ChkReplicaAddress) GetCRName() string {
-	return a.CHIName
-}
-
-func (a *ChkReplicaAddress) SetCRName(name string) {
-	a.CHIName = name
-}
-
-func (a *ChkReplicaAddress) GetClusterName() string {
-	return a.ClusterName
-}
-
-func (a *ChkReplicaAddress) SetClusterName(name string) {
-	a.ClusterName = name
-}
-
-func (a *ChkReplicaAddress) GetClusterIndex() int {
-	return a.ClusterIndex
-}
-
-func (a *ChkReplicaAddress) SetClusterIndex(index int) {
-	a.ClusterIndex = index
-}
-
-func (a *ChkReplicaAddress) GetReplicaName() string {
-	return a.ReplicaName
-}
-
-func (a *ChkReplicaAddress) SetReplicaName(name string) {
-	a.ReplicaName = name
-}
-
-func (a *ChkReplicaAddress) GetReplicaIndex() int {
-	return a.ReplicaIndex
-}
-
-func (a *ChkReplicaAddress) SetReplicaIndex(index int) {
-	a.ReplicaIndex = index
 }
