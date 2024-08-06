@@ -105,7 +105,7 @@ func (w *worker) normalize(_chk *apiChk.ClickHouseKeeperInstallation) *apiChk.Cl
 
 func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *chkConfig.GeneratorOptions {
 	return &chkConfig.GeneratorOptions{
-		RaftPort:      chk.GetSpec().GetRaftPort(),
+		RaftPort:      chk.GetSpecT().GetRaftPort(),
 		ReplicasCount: 1,
 	}
 }

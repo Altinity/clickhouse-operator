@@ -38,7 +38,7 @@ func (w *worker) reconcileCHK(ctx context.Context, old, new *apiChk.ClickHouseKe
 
 	if new.HasAncestor() {
 		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CHK: %s", util.NamespaceNameString(new))
-		old = new.GetAncestor()
+		old = new.GetAncestorT()
 	} else {
 		log.V(2).M(new).F().Info("has NO ancestor, use empty CHK as a base for reconcile. CHK: %s", util.NamespaceNameString(new))
 		old = nil
@@ -169,7 +169,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 			err = nil
 		}
 
-		host.GetCR().EnsureStatus().HostFailed()
+		host.GetCR().IEnsureStatus().HostFailed()
 		w.a.WithEvent(host.GetCR(), common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusAction(host.GetCR()).
 			WithStatusError(host.GetCR()).

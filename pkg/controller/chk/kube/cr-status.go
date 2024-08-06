@@ -25,8 +25,8 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	common "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -41,7 +41,7 @@ func NewCRStatus(kubeClient client.Client) *CRStatus {
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *CRStatus) Update(ctx context.Context, cr apiChi.ICustomResource, opts interfaces.UpdateStatusOptions) (err error) {
+func (c *CRStatus) Update(ctx context.Context, cr apiChi.ICustomResource, opts common.UpdateStatusOptions) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -68,7 +68,7 @@ func (c *CRStatus) Update(ctx context.Context, cr apiChi.ICustomResource, opts i
 }
 
 // doUpdateCRStatus updates ClickHouseInstallation object's Status
-func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr apiChi.ICustomResource, opts interfaces.UpdateStatusOptions) error {
+func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr apiChi.ICustomResource, opts common.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
