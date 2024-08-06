@@ -147,17 +147,17 @@ func (n *Normalizer) normalizeTarget() (*api.ClickHouseInstallation, error) {
 
 func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
-	n.ctx.GetTarget().GetSpec().TaskID = n.normalizeTaskID(n.ctx.GetTarget().GetSpec().TaskID)
-	n.ctx.GetTarget().GetSpec().UseTemplates = n.normalizeUseTemplates(n.ctx.GetTarget().GetSpec().UseTemplates)
-	n.ctx.GetTarget().GetSpec().Stop = n.normalizeStop(n.ctx.GetTarget().GetSpec().Stop)
-	n.ctx.GetTarget().GetSpec().Restart = n.normalizeRestart(n.ctx.GetTarget().GetSpec().Restart)
-	n.ctx.GetTarget().GetSpec().Troubleshoot = n.normalizeTroubleshoot(n.ctx.GetTarget().GetSpec().Troubleshoot)
-	n.ctx.GetTarget().GetSpec().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().GetSpec().NamespaceDomainPattern)
-	n.ctx.GetTarget().GetSpec().Templating = n.normalizeTemplating(n.ctx.GetTarget().GetSpec().Templating)
-	n.ctx.GetTarget().GetSpec().Reconciling = n.normalizeReconciling(n.ctx.GetTarget().GetSpec().Reconciling)
-	n.ctx.GetTarget().GetSpec().Defaults = n.normalizeDefaults(n.ctx.GetTarget().GetSpec().Defaults)
-	n.ctx.GetTarget().GetSpec().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpec().Configuration)
-	n.ctx.GetTarget().GetSpec().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpec().Templates)
+	n.ctx.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.ctx.GetTarget().GetSpecT().TaskID)
+	n.ctx.GetTarget().GetSpecT().UseTemplates = n.normalizeUseTemplates(n.ctx.GetTarget().GetSpecT().UseTemplates)
+	n.ctx.GetTarget().GetSpecT().Stop = n.normalizeStop(n.ctx.GetTarget().GetSpecT().Stop)
+	n.ctx.GetTarget().GetSpecT().Restart = n.normalizeRestart(n.ctx.GetTarget().GetSpecT().Restart)
+	n.ctx.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.ctx.GetTarget().GetSpecT().Troubleshoot)
+	n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern)
+	n.ctx.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.ctx.GetTarget().GetSpecT().Templating)
+	n.ctx.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.ctx.GetTarget().GetSpecT().Reconciling)
+	n.ctx.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.ctx.GetTarget().GetSpecT().Defaults)
+	n.ctx.GetTarget().GetSpecT().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpecT().Configuration)
+	n.ctx.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpecT().Templates)
 	// UseTemplates already done
 }
 
@@ -417,33 +417,33 @@ func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
 func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
 	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
 func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
-	if len(n.ctx.GetTarget().GetSpec().Configuration.Clusters) > 0 {
-		replicasCount = n.ctx.GetTarget().GetSpec().Configuration.Clusters[0].Layout.ReplicasCount
+	if len(n.ctx.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
+		replicasCount = n.ctx.GetTarget().GetSpecT().Configuration.Clusters[0].Layout.ReplicasCount
 	}
 	templates.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
 	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *api.ServiceTemplate) {
 	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section

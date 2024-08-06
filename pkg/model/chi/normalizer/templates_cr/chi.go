@@ -130,7 +130,7 @@ func findApplicableTemplate(templateRef *api.TemplateRef, subj TemplateSubject) 
 	// What target(s) this template wants to be applied to?
 	// This is determined by matching selector of the template and target's labels
 	// Convenience wrapper
-	selector := template.GetSpec().Templating.GetSelector()
+	selector := template.GetSpecT().Templating.GetSelector()
 	if !selector.Matches(subj.GetLabels()) {
 		// This template does not want to be applied to this CHI
 		log.V(1).M(templateRef).F().Info(
@@ -173,7 +173,7 @@ func mergeFromTemplate(target, template *api.ClickHouseInstallation) *api.ClickH
 	)
 
 	// Merge template's Spec over target's Spec
-	target.GetSpec().MergeFrom(template.GetSpec(), api.MergeTypeOverrideByNonEmptyValues)
+	target.GetSpecT().MergeFrom(template.GetSpecT(), api.MergeTypeOverrideByNonEmptyValues)
 
 	return target
 }

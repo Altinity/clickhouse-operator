@@ -131,7 +131,7 @@ func hostApplyPortsFromSettings(host *api.Host) {
 	// Use host personal settings at first
 	hostEnsurePortValuesFromSettings(host, host.GetSettings(), false)
 	// Fallback to common settings
-	hostEnsurePortValuesFromSettings(host, host.GetCR().GetSpec().Configuration.Settings, true)
+	hostEnsurePortValuesFromSettings(host, host.GetCR().GetSpec().GetConfiguration().GetSettings(), true)
 }
 
 // hostEnsurePortValuesFromSettings fetches port spec from settings, if any provided
