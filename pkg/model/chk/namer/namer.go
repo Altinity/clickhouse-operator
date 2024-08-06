@@ -36,7 +36,7 @@ func New() *Namer {
 func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	switch what {
 	case interfaces.NameStatefulSetService:
-		cr := params[0].(api.ICustomResource)
+		cr := params[0].(*api.Host).GetCR()
 		return getHeadlessServiceName(cr)
 	default:
 		return n.Namer.Name(what, params...)
