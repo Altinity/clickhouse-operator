@@ -136,10 +136,10 @@ func (n *Normalizer) normalizeTarget() (*apiChk.ClickHouseKeeperInstallation, er
 
 func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
-	n.ctx.GetTarget().GetSpec().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().GetSpec().NamespaceDomainPattern)
-	n.ctx.GetTarget().GetSpec().Defaults = n.normalizeDefaults(n.ctx.GetTarget().GetSpec().Defaults)
-	n.ctx.GetTarget().GetSpec().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpec().Configuration)
-	n.ctx.GetTarget().GetSpec().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpec().Templates)
+	n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern)
+	n.ctx.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.ctx.GetTarget().GetSpecT().Defaults)
+	n.ctx.GetTarget().GetSpecT().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpecT().Configuration)
+	n.ctx.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpecT().Templates)
 	// UseTemplates already done
 }
 
@@ -274,33 +274,33 @@ func (n *Normalizer) normalizeServiceTemplates(templates *apiChi.Templates) {
 func (n *Normalizer) normalizeHostTemplate(template *apiChi.HostTemplate) {
 	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
 func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
-	if len(n.ctx.GetTarget().GetSpec().Configuration.Clusters) > 0 {
-		replicasCount = n.ctx.GetTarget().GetSpec().Configuration.Clusters[0].Layout.ReplicasCount
+	if len(n.ctx.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
+		replicasCount = n.ctx.GetTarget().GetSpecT().Configuration.Clusters[0].Layout.ReplicasCount
 	}
 	templates.NormalizePodTemplate(replicasCount, template)
 	// Introduce PodTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTemplate) {
 	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ServiceTemplate) {
 	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
-	n.ctx.GetTarget().GetSpec().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeClusters normalizes clusters
@@ -336,7 +336,7 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *apiChi.Settings {
 	return settings.
 		Ensure().
-		MergeFrom(config.DefaultSettings(n.ctx.GetTarget().GetSpec().GetPath())).
+		MergeFrom(config.DefaultSettings(n.ctx.GetTarget().GetSpecT().GetPath())).
 		Normalize()
 }
 
