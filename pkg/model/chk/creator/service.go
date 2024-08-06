@@ -25,18 +25,18 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 )
 
-type ServiceManagerKeeper struct {
+type ServiceManager struct {
 	cr     apiChi.ICustomResource
 	tagger interfaces.ITagger
 }
 
-func NewServiceManagerKeeper() *ServiceManagerKeeper {
-	return &ServiceManagerKeeper{}
+func NewServiceManager() *ServiceManager {
+	return &ServiceManager{}
 }
 
-func (m *ServiceManagerKeeper) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
+func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
 	switch what {
-	case interfaces.ServiceCR:
+	case interfaces.ServiceCluster:
 		if len(params) > 0 {
 			chk := params[0].(*apiChk.ClickHouseKeeperInstallation)
 			return m.CreateClientService(chk)
@@ -50,15 +50,15 @@ func (m *ServiceManagerKeeper) CreateService(what interfaces.ServiceType, params
 	panic("unknown service type")
 }
 
-func (m *ServiceManagerKeeper) SetCR(cr apiChi.ICustomResource) {
+func (m *ServiceManager) SetCR(cr apiChi.ICustomResource) {
 	m.cr = cr
 }
-func (m *ServiceManagerKeeper) SetTagger(tagger interfaces.ITagger) {
+func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
 
 // CreateClientService returns a client service resource for the clickhouse keeper cluster
-func (m *ServiceManagerKeeper) CreateClientService(chk *apiChk.ClickHouseKeeperInstallation) *core.Service {
+func (m *ServiceManager) CreateClientService(chk *apiChk.ClickHouseKeeperInstallation) *core.Service {
 	// Client port is mandatory
 	svcPorts := []core.ServicePort{
 		core.ServicePort{
@@ -82,7 +82,7 @@ func (m *ServiceManagerKeeper) CreateClientService(chk *apiChk.ClickHouseKeeperI
 }
 
 // CreateHeadlessService returns an internal headless-service for the chk stateful-set
-func (m *ServiceManagerKeeper) CreateHeadlessService(chk *apiChk.ClickHouseKeeperInstallation) *core.Service {
+func (m *ServiceManager) CreateHeadlessService(chk *apiChk.ClickHouseKeeperInstallation) *core.Service {
 	svcPorts := []core.ServicePort{
 		{
 			Name: "raft",
