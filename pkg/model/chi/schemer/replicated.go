@@ -28,7 +28,7 @@ func (s *ClusterSchemer) shouldCreateReplicatedObjects(host *api.Host) bool {
 	shard := s.Names(interfaces.NameFQDNs, host, api.ChiShard{}, false)
 	cluster := s.Names(interfaces.NameFQDNs, host, api.ChiCluster{}, false)
 
-	if host.GetCluster().SchemaPolicy.Shard == SchemaPolicyShardAll {
+	if host.GetCluster().GetSchemaPolicy().Shard == SchemaPolicyShardAll {
 		// We have explicit request to create replicated objects on each shard
 		// However, it is reasonable to have at least two instances in a cluster
 		if len(cluster) >= 2 {
@@ -37,7 +37,7 @@ func (s *ClusterSchemer) shouldCreateReplicatedObjects(host *api.Host) bool {
 		}
 	}
 
-	if host.GetCluster().SchemaPolicy.Replica == SchemaPolicyReplicaNone {
+	if host.GetCluster().GetSchemaPolicy().Replica == SchemaPolicyReplicaNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Replica says there is no need to replicate objects")
 		return false
 	}
