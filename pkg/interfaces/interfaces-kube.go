@@ -16,6 +16,7 @@ package interfaces
 
 import (
 	"context"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -68,7 +69,7 @@ type IKubeEvent interface {
 }
 
 type IKubeCRStatus interface {
-	Update(ctx context.Context, cr api.ICustomResource, opts UpdateStatusOptions) (err error)
+	Update(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error)
 }
 
 type IKubeSTS interface {

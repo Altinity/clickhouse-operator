@@ -22,7 +22,10 @@ import (
 type ICustomResource interface {
 	meta.Object
 
+	IsNonZero() bool
+
 	GetSpecA() any
+	GetSpec() ICRSpec
 	GetRuntime() ICustomResourceRuntime
 	GetRootServiceTemplate() (*ServiceTemplate, bool)
 	GetReconciling() *Reconciling
@@ -30,11 +33,42 @@ type ICustomResource interface {
 	WalkClusters(f func(cluster ICluster) error) []error
 	WalkHosts(func(host *Host) error) []error
 	WalkPodTemplates(f func(template *PodTemplate))
+	WalkVolumeClaimTemplates(f func(template *VolumeClaimTemplate))
 	WalkHostsFullPath(f WalkHostsAddressFn) []error
 	WalkHostsFullPathAndScope(crScopeCycleSize int, clusterScopeCycleSize int, f WalkHostsAddressFn) (res []error)
 
+	FindCluster(needle interface{}) ICluster
+	FindShard(needleCluster interface{}, needleShard interface{}) IShard
+	FindHost(needleCluster interface{}, needleShard interface{}, needleHost interface{}) *Host
+
+	GetHostTemplate(name string) (*HostTemplate, bool)
+	GetPodTemplate(name string) (*PodTemplate, bool)
+	GetVolumeClaimTemplate(name string) (*VolumeClaimTemplate, bool)
+	GetServiceTemplate(name string) (*ServiceTemplate, bool)
+
+	HasAncestor() bool
+	GetAncestor() ICustomResource
+
+	IsStopped() bool
+	IsTroubleshoot() bool
+	IsRollingUpdate() bool
+
 	HostsCount() int
 	IEnsureStatus() IStatus
+	GetStatus() IStatus
+}
+
+type ICRSpec interface {
+	GetNamespaceDomainPattern() *types.String
+	GetDefaults() *ChiDefaults
+	GetConfiguration() IConfiguration
+}
+
+type IConfiguration interface {
+	GetProfiles() *Settings
+	GetQuotas() *Settings
+	GetSettings() *Settings
+	GetFiles() *Settings
 }
 
 type IRoot interface {
@@ -53,12 +87,27 @@ type IStatus interface {
 	PushAction(string)
 	SetError(string)
 	PushError(string)
+	GetHostsCount() int
+	GetHostsCompletedCount() int
+	GetHostsAddedCount() int
+	GetHostsWithTablesCreated() []string
+	PushHostTablesCreated(host string)
+
+	HasNormalizedCRCompleted() bool
+
+	HostUnchanged()
+	HostUpdated()
+	HostAdded()
+	HostFailed()
+	HostCompleted()
 }
 
 type ICluster interface {
 	GetName() string
-	GetRuntime() IClusterRuntime
-	GetServiceTemplate() (*ServiceTemplate, bool)
+	GetZookeeper() *ZookeeperConfig
+	GetSchemaPolicy() *SchemaPolicy
+	GetInsecure() *types.StringBool
+	GetSecure() *types.StringBool
 	GetSecret() *ClusterSecret
 	GetPDBMaxUnavailable() *types.Int32
 
@@ -66,6 +115,12 @@ type ICluster interface {
 	WalkHosts(func(host *Host) error) []error
 
 	HostsCount() int
+
+	FindShard(needle interface{}) IShard
+	FindHost(needleShard interface{}, needleHost interface{}) *Host
+
+	GetRuntime() IClusterRuntime
+	GetServiceTemplate() (*ServiceTemplate, bool)
 }
 
 type IClusterRuntime interface {
@@ -103,6 +158,9 @@ type IShard interface {
 	GetTemplates() *TemplatesList
 
 	WalkHosts(func(host *Host) error) []error
+
+	FindHost(needleHost interface{}) *Host
+	FirstHost() *Host
 
 	HostsCount() int
 }
@@ -155,6 +213,7 @@ type IHost interface {
 
 type IHostRuntime interface {
 	GetAddress() IHostAddress
+	GetCR() ICustomResource
 	SetCR(cr ICustomResource)
 }
 
