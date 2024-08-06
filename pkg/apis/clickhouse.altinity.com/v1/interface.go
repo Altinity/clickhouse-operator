@@ -71,11 +71,6 @@ type IConfiguration interface {
 	GetFiles() *Settings
 }
 
-type IRoot interface {
-	GetName() string
-	WalkHosts(f func(host *Host) error) []error
-}
-
 type ICustomResourceRuntime interface {
 	GetAttributes() *ComparableAttributes
 	LockCommonConfig()
@@ -125,7 +120,7 @@ type ICluster interface {
 
 type IClusterRuntime interface {
 	GetAddress() IClusterAddress
-	GetRoot() IRoot
+	GetCR() ICustomResource
 	SetCR(cr ICustomResource)
 }
 
