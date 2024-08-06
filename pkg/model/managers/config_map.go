@@ -30,9 +30,9 @@ const (
 func NewConfigMapManager(what ConfigMapManagerType) interfaces.IConfigMapManager {
 	switch what {
 	case ConfigMapManagerTypeClickHouse:
-		return chiCreator.NewConfigMapManagerClickHouse()
+		return chiCreator.NewConfigMapManager()
 	case ConfigMapManagerTypeKeeper:
-		return chkCreator.NewConfigMapManagerKeeper()
+		return chkCreator.NewConfigMapManager()
 	}
 	panic("unknown config map manager type")
 }

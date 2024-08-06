@@ -30,9 +30,9 @@ const (
 func NewProbeManager(what ProbeManagerType) interfaces.IProbeManager {
 	switch what {
 	case ProbeManagerTypeClickHouse:
-		return chiCreator.NewProbeManagerClickHouse()
+		return chiCreator.NewProbeManager()
 	case ProbeManagerTypeKeeper:
-		return chkCreator.NewProbeManagerKeeper()
+		return chkCreator.NewProbeManager()
 	}
 	panic("unknown probe manager type")
 }

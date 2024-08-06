@@ -30,9 +30,9 @@ const (
 func NewServiceManager(what ServiceManagerType) interfaces.IServiceManager {
 	switch what {
 	case ServiceManagerTypeClickHouse:
-		return chiCreator.NewServiceManagerClickHouse()
+		return chiCreator.NewServiceManager()
 	case ServiceManagerTypeKeeper:
-		return chkCreator.NewServiceManagerKeeper()
+		return chkCreator.NewServiceManager()
 	}
 	panic("unknown service manager type")
 }

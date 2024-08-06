@@ -30,9 +30,9 @@ const (
 func NewContainerManager(what ContainerManagerType) interfaces.IContainerManager {
 	switch what {
 	case ContainerManagerTypeClickHouse:
-		return chiCreator.NewContainerManagerClickHouse(chiCreator.NewProbeManagerClickHouse())
+		return chiCreator.NewContainerManager(chiCreator.NewProbeManager())
 	case ContainerManagerTypeKeeper:
-		return chkCreator.NewContainerManagerKeeper(chkCreator.NewProbeManagerKeeper())
+		return chkCreator.NewContainerManager(chkCreator.NewProbeManager())
 	}
 	panic("unknown container manager type")
 }
