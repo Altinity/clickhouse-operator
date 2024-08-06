@@ -14,6 +14,33 @@
 
 package v1
 
+// ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
+// TODO unify with ChiShard based on HostsSet
+type ChiReplica struct {
+	Name        string         `json:"name,omitempty"        yaml:"name,omitempty"`
+	Settings    *Settings      `json:"settings,omitempty"    yaml:"settings,omitempty"`
+	Files       *Settings      `json:"files,omitempty"       yaml:"files,omitempty"`
+	Templates   *TemplatesList `json:"templates,omitempty"   yaml:"templates,omitempty"`
+	ShardsCount int            `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*Host `json:"shards,omitempty" yaml:"shards,omitempty"`
+
+	Runtime ChiReplicaRuntime `json:"-" yaml:"-"`
+}
+
+type ChiReplicaRuntime struct {
+	Address ChiReplicaAddress       `json:"-" yaml:"-"`
+	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+func (r *ChiReplicaRuntime) GetAddress() IReplicaAddress {
+	return &r.Address
+}
+
+func (r *ChiReplicaRuntime) SetCR(cr ICustomResource) {
+	r.CHI = cr.(*ClickHouseInstallation)
+}
+
 func (replica *ChiReplica) GetName() string {
 	return replica.Name
 }
@@ -109,7 +136,65 @@ func (replica *ChiReplica) GetTemplates() *TemplatesList {
 
 func (replica *ChiReplica) GetRuntime() IReplicaRuntime {
 	if replica == nil {
-		return nil
+		return (*ChiReplicaRuntime)(nil)
 	}
 	return &replica.Runtime
+}
+
+// ChiReplicaAddress defines address of a replica within ClickHouseInstallation
+type ChiReplicaAddress struct {
+	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
+	ReplicaName  string `json:"replicaName,omitempty"  yaml:"replicaName,omitempty"`
+	ReplicaIndex int    `json:"replicaIndex,omitempty" yaml:"replicaIndex,omitempty"`
+}
+
+func (a *ChiReplicaAddress) GetNamespace() string {
+	return a.Namespace
+}
+
+func (a *ChiReplicaAddress) SetNamespace(namespace string) {
+	a.Namespace = namespace
+}
+
+func (a *ChiReplicaAddress) GetCRName() string {
+	return a.CHIName
+}
+
+func (a *ChiReplicaAddress) SetCRName(name string) {
+	a.CHIName = name
+}
+
+func (a *ChiReplicaAddress) GetClusterName() string {
+	return a.ClusterName
+}
+
+func (a *ChiReplicaAddress) SetClusterName(name string) {
+	a.ClusterName = name
+}
+
+func (a *ChiReplicaAddress) GetClusterIndex() int {
+	return a.ClusterIndex
+}
+
+func (a *ChiReplicaAddress) SetClusterIndex(index int) {
+	a.ClusterIndex = index
+}
+
+func (a *ChiReplicaAddress) GetReplicaName() string {
+	return a.ReplicaName
+}
+
+func (a *ChiReplicaAddress) SetReplicaName(name string) {
+	a.ReplicaName = name
+}
+
+func (a *ChiReplicaAddress) GetReplicaIndex() int {
+	return a.ReplicaIndex
+}
+
+func (a *ChiReplicaAddress) SetReplicaIndex(index int) {
+	a.ReplicaIndex = index
 }

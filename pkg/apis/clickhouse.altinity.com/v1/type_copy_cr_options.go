@@ -14,7 +14,6 @@
 
 package v1
 
-
 // CopyCROptions specifies options for copier
 type CopyCROptions struct {
 	// SkipStatus specifies whether to copy status

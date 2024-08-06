@@ -40,8 +40,8 @@ type ClickHouseInstallation struct {
 	meta.TypeMeta   `json:",inline"            yaml:",inline"`
 	meta.ObjectMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
-	Spec   ChiSpec    `json:"spec"               yaml:"spec"`
-	Status *ChiStatus `json:"status,omitempty"   yaml:"status,omitempty"`
+	Spec   ChiSpec `json:"spec"               yaml:"spec"`
+	Status *Status `json:"status,omitempty"   yaml:"status,omitempty"`
 
 	runtime             *ClickHouseInstallationRuntime `json:"-" yaml:"-"`
 	statusCreatorMutex  sync.Mutex                     `json:"-" yaml:"-"`
@@ -98,23 +98,11 @@ type ChiSpec struct {
 	Troubleshoot           *types.StringBool `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
 	NamespaceDomainPattern *types.String     `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
 	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconciling            *Reconciling   `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Reconciling            *Reconciling      `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
 	Defaults               *ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
 	UseTemplates           []*TemplateRef    `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
-}
-
-func (s *ChiSpec) GetNamespaceDomainPattern() *types.String {
-	return s.NamespaceDomainPattern
-}
-
-func (s *ChiSpec) GetTemplates() *Templates {
-	return s.Templates
-}
-
-type ICHISpec interface {
-	GetNamespaceDomainPattern() *types.String
 }
 
 // TemplateRef defines UseTemplate section of ClickHouseInstallation resource
@@ -238,181 +226,6 @@ type TemplatesList struct {
 	// VolumeClaimTemplate is deprecated in favor of DataVolumeClaimTemplate and LogVolumeClaimTemplate
 	// !!! DEPRECATED !!!
 	VolumeClaimTemplate string `json:"volumeClaimTemplate,omitempty"     yaml:"volumeClaimTemplate,omitempty"`
-}
-
-// ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
-// TODO unify with ChiReplica based on HostsSet
-type ChiShard struct {
-	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
-	Weight              *int              `json:"weight,omitempty"              yaml:"weight,omitempty"`
-	InternalReplication *types.StringBool `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
-	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
-	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
-	Templates           *TemplatesList    `json:"templates,omitempty"           yaml:"templates,omitempty"`
-	ReplicasCount       int               `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
-	// TODO refactor into map[string]Host
-	Hosts []*Host `json:"replicas,omitempty" yaml:"replicas,omitempty"`
-
-	Runtime ChiShardRuntime `json:"-" yaml:"-"`
-
-	// DefinitionType is DEPRECATED - to be removed soon
-	DefinitionType string `json:"definitionType,omitempty" yaml:"definitionType,omitempty"`
-}
-
-type ChiShardRuntime struct {
-	Address ChiShardAddress         `json:"-" yaml:"-"`
-	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
-}
-
-func (r *ChiShardRuntime) GetAddress() IShardAddress {
-	return &r.Address
-}
-
-func (r *ChiShardRuntime) SetCR(cr ICustomResource) {
-	r.CHI = cr.(*ClickHouseInstallation)
-}
-
-// ChiReplica defines item of a replica section of .spec.configuration.clusters[n].replicas
-// TODO unify with ChiShard based on HostsSet
-type ChiReplica struct {
-	Name        string         `json:"name,omitempty"        yaml:"name,omitempty"`
-	Settings    *Settings      `json:"settings,omitempty"    yaml:"settings,omitempty"`
-	Files       *Settings      `json:"files,omitempty"       yaml:"files,omitempty"`
-	Templates   *TemplatesList `json:"templates,omitempty"   yaml:"templates,omitempty"`
-	ShardsCount int            `json:"shardsCount,omitempty" yaml:"shardsCount,omitempty"`
-	// TODO refactor into map[string]Host
-	Hosts []*Host `json:"shards,omitempty" yaml:"shards,omitempty"`
-
-	Runtime ChiReplicaRuntime `json:"-" yaml:"-"`
-}
-
-type ChiReplicaRuntime struct {
-	Address ChiReplicaAddress       `json:"-" yaml:"-"`
-	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
-}
-
-func (r *ChiReplicaRuntime) GetAddress() IReplicaAddress {
-	return &r.Address
-}
-
-func (r *ChiReplicaRuntime) SetCR(cr ICustomResource) {
-	r.CHI = cr.(*ClickHouseInstallation)
-}
-
-// ChiShardAddress defines address of a shard within ClickHouseInstallation
-type ChiShardAddress struct {
-	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
-	ShardName    string `json:"shardName,omitempty"    yaml:"shardName,omitempty"`
-	ShardIndex   int    `json:"shardIndex,omitempty"   yaml:"shardIndex,omitempty"`
-}
-
-func (a *ChiShardAddress) GetNamespace() string {
-	return a.Namespace
-}
-
-func (a *ChiShardAddress) SetNamespace(namespace string) {
-	a.Namespace = namespace
-}
-
-func (a *ChiShardAddress) GetCRName() string {
-	return a.CHIName
-}
-
-func (a *ChiShardAddress) SetCRName(name string) {
-	a.CHIName = name
-}
-
-func (a *ChiShardAddress) GetClusterName() string {
-	return a.ClusterName
-}
-
-func (a *ChiShardAddress) SetClusterName(name string) {
-	a.ClusterName = name
-}
-
-func (a *ChiShardAddress) GetClusterIndex() int {
-	return a.ClusterIndex
-}
-
-func (a *ChiShardAddress) SetClusterIndex(index int) {
-	a.ClusterIndex = index
-}
-
-func (a *ChiShardAddress) GetShardName() string {
-	return a.ShardName
-}
-
-func (a *ChiShardAddress) SetShardName(name string) {
-	a.ShardName = name
-}
-
-func (a *ChiShardAddress) GetShardIndex() int {
-	return a.ShardIndex
-}
-
-func (a *ChiShardAddress) SetShardIndex(index int) {
-	a.ShardIndex = index
-}
-
-// ChiReplicaAddress defines address of a replica within ClickHouseInstallation
-type ChiReplicaAddress struct {
-	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
-	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
-	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
-	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
-	ReplicaName  string `json:"replicaName,omitempty"  yaml:"replicaName,omitempty"`
-	ReplicaIndex int    `json:"replicaIndex,omitempty" yaml:"replicaIndex,omitempty"`
-}
-
-func (a *ChiReplicaAddress) GetNamespace() string {
-	return a.Namespace
-}
-
-func (a *ChiReplicaAddress) SetNamespace(namespace string) {
-	a.Namespace = namespace
-}
-
-func (a *ChiReplicaAddress) GetCRName() string {
-	return a.CHIName
-}
-
-func (a *ChiReplicaAddress) SetCRName(name string) {
-	a.CHIName = name
-}
-
-func (a *ChiReplicaAddress) GetClusterName() string {
-	return a.ClusterName
-}
-
-func (a *ChiReplicaAddress) SetClusterName(name string) {
-	a.ClusterName = name
-}
-
-func (a *ChiReplicaAddress) GetClusterIndex() int {
-	return a.ClusterIndex
-}
-
-func (a *ChiReplicaAddress) SetClusterIndex(index int) {
-	a.ClusterIndex = index
-}
-
-func (a *ChiReplicaAddress) GetReplicaName() string {
-	return a.ReplicaName
-}
-
-func (a *ChiReplicaAddress) SetReplicaName(name string) {
-	a.ReplicaName = name
-}
-
-func (a *ChiReplicaAddress) GetReplicaIndex() int {
-	return a.ReplicaIndex
-}
-
-func (a *ChiReplicaAddress) SetReplicaIndex(index int) {
-	a.ReplicaIndex = index
 }
 
 // HostTemplate defines full Host Template

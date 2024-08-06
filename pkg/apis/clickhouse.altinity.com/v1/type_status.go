@@ -18,6 +18,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )
@@ -28,7 +29,7 @@ const (
 	maxTaskIDs = 10
 )
 
-// Possible CHI statuses
+// Possible CR statuses
 const (
 	StatusInProgress  = "InProgress"
 	StatusCompleted   = "Completed"
@@ -36,13 +37,13 @@ const (
 	StatusTerminating = "Terminating"
 )
 
-// ChiStatus defines status section of ClickHouseInstallation resource.
+// Status defines status section of the custom resource.
 //
-// Note: application level reads and writes to ChiStatus fields should be done through synchronized getter/setter functions.
+// Note: application level reads and writes to Status fields should be done through synchronized getter/setter functions.
 // While all of these fields need to be exported for JSON and YAML serialization/deserialization, we can at least audit
 // that application logic sticks to the synchronized getter/setters by auditing whether all explicit Go field-level
 // accesses are strictly within _this_ source file OR the generated deep copy source file.
-type ChiStatus struct {
+type Status struct {
 	CHOpVersion            string                  `json:"chop-version,omitempty"           yaml:"chop-version,omitempty"`
 	CHOpCommit             string                  `json:"chop-commit,omitempty"            yaml:"chop-commit,omitempty"`
 	CHOpDate               string                  `json:"chop-date,omitempty"              yaml:"chop-date,omitempty"`
@@ -70,22 +71,12 @@ type ChiStatus struct {
 	PodIPs                 []string                `json:"pod-ips,omitempty"                yaml:"pod-ips,omitempty"`
 	FQDNs                  []string                `json:"fqdns,omitempty"                  yaml:"fqdns,omitempty"`
 	Endpoint               string                  `json:"endpoint,omitempty"               yaml:"endpoint,omitempty"`
-	NormalizedCHI          *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
-	NormalizedCHICompleted *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
+	NormalizedCR           *ClickHouseInstallation `json:"normalized,omitempty"             yaml:"normalized,omitempty"`
+	NormalizedCRCompleted  *ClickHouseInstallation `json:"normalizedCompleted,omitempty"    yaml:"normalizedCompleted,omitempty"`
 	HostsWithTablesCreated []string                `json:"hostsWithTablesCreated,omitempty" yaml:"hostsWithTablesCreated,omitempty"`
 	UsedTemplates          []*TemplateRef          `json:"usedTemplates,omitempty"          yaml:"usedTemplates,omitempty"`
 
 	mu sync.RWMutex `json:"-" yaml:"-"`
-}
-
-// CopyStatusOptions specifies what parts to copy in status
-type CopyStatusOptions struct {
-	Actions           bool
-	Errors            bool
-	Normalized        bool
-	MainFields        bool
-	WholeStatus       bool
-	InheritableFields bool
 }
 
 // FillStatusParams is a struct used to fill status params
@@ -104,14 +95,14 @@ type FillStatusParams struct {
 	Pods                []string
 	FQDNs               []string
 	Endpoint            string
-	NormalizedCHI       *ClickHouseInstallation
+	NormalizedCR        *ClickHouseInstallation
 }
 
 // Fill is a synchronized setter for a fairly large number of fields. We take a struct type "params" argument to avoid
 // confusion of similarly typed positional arguments, and to avoid defining a lot of separate synchronized setters
 // for these fields that are typically all set together at once (during "fills").
-func (s *ChiStatus) Fill(params *FillStatusParams) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) Fill(params *FillStatusParams) {
+	doWithWriteLock(s, func(s *Status) {
 		// We always set these (build-hardcoded) version fields.
 		s.CHOpVersion = version.Version
 		s.CHOpCommit = version.GitSHA
@@ -132,20 +123,20 @@ func (s *ChiStatus) Fill(params *FillStatusParams) {
 		s.Pods = params.Pods
 		s.FQDNs = params.FQDNs
 		s.Endpoint = params.Endpoint
-		s.NormalizedCHI = params.NormalizedCHI
+		s.NormalizedCR = params.NormalizedCR
 	})
 }
 
 // SetError sets status error
-func (s *ChiStatus) SetError(err string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetError(err string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Error = err
 	})
 }
 
 // SetAndPushError sets and pushes error into status
-func (s *ChiStatus) SetAndPushError(err string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetAndPushError(err string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Error = err
 		s.Errors = append([]string{err}, s.Errors...)
 		if len(s.Errors) > maxErrors {
@@ -155,8 +146,8 @@ func (s *ChiStatus) SetAndPushError(err string) {
 }
 
 // PushHostTablesCreated pushes host to the list of hosts with created tables
-func (s *ChiStatus) PushHostTablesCreated(host string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) PushHostTablesCreated(host string) {
+	doWithWriteLock(s, func(s *Status) {
 		if util.InArray(host, s.HostsWithTablesCreated) {
 			return
 		}
@@ -165,8 +156,8 @@ func (s *ChiStatus) PushHostTablesCreated(host string) {
 }
 
 // SyncHostTablesCreated syncs list of hosts with tables created with actual list of hosts
-func (s *ChiStatus) SyncHostTablesCreated() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SyncHostTablesCreated() {
+	doWithWriteLock(s, func(s *Status) {
 		if s.FQDNs == nil {
 			return
 		}
@@ -175,47 +166,47 @@ func (s *ChiStatus) SyncHostTablesCreated() {
 }
 
 // PushUsedTemplate pushes used template to the list of used templates
-func (s *ChiStatus) PushUsedTemplate(templateRef *TemplateRef) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) PushUsedTemplate(templateRef *TemplateRef) {
+	doWithWriteLock(s, func(s *Status) {
 		s.UsedTemplates = append(s.UsedTemplates, templateRef)
 	})
 }
 
 // GetUsedTemplatesCount gets used templates count
-func (s *ChiStatus) GetUsedTemplatesCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetUsedTemplatesCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return len(s.UsedTemplates)
 	})
 }
 
 // SetAction action setter
-func (s *ChiStatus) SetAction(action string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetAction(action string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Action = action
 	})
 }
 
-// HasNormalizedCHICompleted is a checker
-func (s *ChiStatus) HasNormalizedCHICompleted() bool {
-	return s.GetNormalizedCHICompleted() != nil
+// HasNormalizedCRCompleted is a checker
+func (s *Status) HasNormalizedCRCompleted() bool {
+	return s.GetNormalizedCRCompleted() != nil
 }
 
-// HasNormalizedCHI is a checker
-func (s *ChiStatus) HasNormalizedCHI() bool {
-	return s.GetNormalizedCHI() != nil
+// HasNormalizedCR is a checker
+func (s *Status) HasNormalizedCR() bool {
+	return s.GetNormalizedCR() != nil
 }
 
 // PushAction pushes action into status
-func (s *ChiStatus) PushAction(action string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) PushAction(action string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Actions = append([]string{action}, s.Actions...)
 		trimActionsNoSync(s)
 	})
 }
 
 // PushError sets and pushes error into status
-func (s *ChiStatus) PushError(error string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) PushError(error string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.Errors = append([]string{error}, s.Errors...)
 		if len(s.Errors) > maxErrors {
 			s.Errors = s.Errors[:maxErrors]
@@ -224,57 +215,57 @@ func (s *ChiStatus) PushError(error string) {
 }
 
 // SetPodIPs sets pod IPs
-func (s *ChiStatus) SetPodIPs(podIPs []string) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) SetPodIPs(podIPs []string) {
+	doWithWriteLock(s, func(s *Status) {
 		s.PodIPs = podIPs
 	})
 }
 
 // HostDeleted increments deleted hosts counter
-func (s *ChiStatus) HostDeleted() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostDeleted() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsDeletedCount++
 	})
 }
 
 // HostUpdated increments updated hosts counter
-func (s *ChiStatus) HostUpdated() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostUpdated() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsUpdatedCount++
 	})
 }
 
 // HostAdded increments added hosts counter
-func (s *ChiStatus) HostAdded() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostAdded() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsAddedCount++
 	})
 }
 
 // HostUnchanged increments unchanged hosts counter
-func (s *ChiStatus) HostUnchanged() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostUnchanged() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsUnchangedCount++
 	})
 }
 
 // HostFailed increments failed hosts counter
-func (s *ChiStatus) HostFailed() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostFailed() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsFailedCount++
 	})
 }
 
 // HostCompleted increments completed hosts counter
-func (s *ChiStatus) HostCompleted() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) HostCompleted() {
+	doWithWriteLock(s, func(s *Status) {
 		s.HostsCompletedCount++
 	})
 }
 
 // ReconcileStart marks reconcile start
-func (s *ChiStatus) ReconcileStart(deleteHostsCount int) {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) ReconcileStart(deleteHostsCount int) {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -290,8 +281,8 @@ func (s *ChiStatus) ReconcileStart(deleteHostsCount int) {
 }
 
 // ReconcileComplete marks reconcile completion
-func (s *ChiStatus) ReconcileComplete() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) ReconcileComplete() {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -302,8 +293,8 @@ func (s *ChiStatus) ReconcileComplete() {
 }
 
 // ReconcileAbort marks reconcile abortion
-func (s *ChiStatus) ReconcileAbort() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) ReconcileAbort() {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -314,8 +305,8 @@ func (s *ChiStatus) ReconcileAbort() {
 }
 
 // DeleteStart marks deletion start
-func (s *ChiStatus) DeleteStart() {
-	doWithWriteLock(s, func(s *ChiStatus) {
+func (s *Status) DeleteStart() {
+	doWithWriteLock(s, func(s *Status) {
 		if s == nil {
 			return
 		}
@@ -330,10 +321,10 @@ func (s *ChiStatus) DeleteStart() {
 	})
 }
 
-// CopyFrom copies the state of a given ChiStatus f into the receiver ChiStatus of the call.
-func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyStatusOptions) {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		doWithReadLock(f, func(from *ChiStatus) {
+// CopyFrom copies the state of a given Status f into the receiver Status of the call.
+func (s *Status) CopyFrom(f *Status, opts types.CopyStatusOptions) {
+	doWithWriteLock(s, func(s *Status) {
+		doWithReadLock(f, func(from *Status) {
 			if s == nil || from == nil {
 				return
 			}
@@ -392,11 +383,11 @@ func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyStatusOptions) {
 				s.PodIPs = from.PodIPs
 				s.FQDNs = from.FQDNs
 				s.Endpoint = from.Endpoint
-				s.NormalizedCHI = from.NormalizedCHI
+				s.NormalizedCR = from.NormalizedCR
 			}
 
 			if opts.Normalized {
-				s.NormalizedCHI = from.NormalizedCHI
+				s.NormalizedCR = from.NormalizedCR
 			}
 
 			if opts.WholeStatus {
@@ -426,240 +417,240 @@ func (s *ChiStatus) CopyFrom(f *ChiStatus, opts CopyStatusOptions) {
 				s.PodIPs = from.PodIPs
 				s.FQDNs = from.FQDNs
 				s.Endpoint = from.Endpoint
-				s.NormalizedCHI = from.NormalizedCHI
-				s.NormalizedCHICompleted = from.NormalizedCHICompleted
+				s.NormalizedCR = from.NormalizedCR
+				s.NormalizedCRCompleted = from.NormalizedCRCompleted
 			}
 		})
 	})
 }
 
-// ClearNormalizedCHI clears normalized CHI in status
-func (s *ChiStatus) ClearNormalizedCHI() {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		s.NormalizedCHI = nil
+// ClearNormalizedCR clears normalized CR in status
+func (s *Status) ClearNormalizedCR() {
+	doWithWriteLock(s, func(s *Status) {
+		s.NormalizedCR = nil
 	})
 }
 
-// SetNormalizedCompletedFromCurrentNormalized sets completed CHI from current CHI
-func (s *ChiStatus) SetNormalizedCompletedFromCurrentNormalized() {
-	doWithWriteLock(s, func(s *ChiStatus) {
-		s.NormalizedCHICompleted = s.NormalizedCHI
+// SetNormalizedCompletedFromCurrentNormalized sets completed CR from current CR
+func (s *Status) SetNormalizedCompletedFromCurrentNormalized() {
+	doWithWriteLock(s, func(s *Status) {
+		s.NormalizedCRCompleted = s.NormalizedCR
 	})
 }
 
 // GetCHOpVersion gets operator version
-func (s *ChiStatus) GetCHOpVersion() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpVersion() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpVersion
 	})
 }
 
 // GetCHOpCommit gets operator build commit
-func (s *ChiStatus) GetCHOpCommit() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpCommit() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpCommit
 	})
 }
 
 // GetCHOpDate gets operator build date
-func (s *ChiStatus) GetCHOpDate() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpDate() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpDate
 	})
 }
 
 // GetCHOpIP gets operator pod's IP
-func (s *ChiStatus) GetCHOpIP() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetCHOpIP() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.CHOpIP
 	})
 }
 
 // GetClustersCount gets clusters count
-func (s *ChiStatus) GetClustersCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetClustersCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.ClustersCount
 	})
 }
 
 // GetShardsCount gets shards count
-func (s *ChiStatus) GetShardsCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetShardsCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.ShardsCount
 	})
 }
 
 // GetReplicasCount gets replicas count
-func (s *ChiStatus) GetReplicasCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetReplicasCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.ReplicasCount
 	})
 }
 
 // GetHostsCount gets hosts count
-func (s *ChiStatus) GetHostsCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsCount
 	})
 }
 
 // GetStatus gets status
-func (s *ChiStatus) GetStatus() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetStatus() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Status
 	})
 }
 
 // GetTaskID gets task ipd
-func (s *ChiStatus) GetTaskID() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetTaskID() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.TaskID
 	})
 }
 
 // GetTaskIDsStarted gets started task id
-func (s *ChiStatus) GetTaskIDsStarted() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetTaskIDsStarted() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.TaskIDsStarted
 	})
 }
 
 // GetTaskIDsCompleted gets completed task id
-func (s *ChiStatus) GetTaskIDsCompleted() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetTaskIDsCompleted() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.TaskIDsCompleted
 	})
 }
 
 // GetAction gets last action
-func (s *ChiStatus) GetAction() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetAction() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Action
 	})
 }
 
 // GetActions gets all actions
-func (s *ChiStatus) GetActions() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetActions() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.Actions
 	})
 }
 
 // GetError gets last error
-func (s *ChiStatus) GetError() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetError() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Error
 	})
 }
 
 // GetErrors gets all errors
-func (s *ChiStatus) GetErrors() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetErrors() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.Errors
 	})
 }
 
 // GetHostsUpdatedCount gets updated hosts counter
-func (s *ChiStatus) GetHostsUpdatedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsUpdatedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsUpdatedCount
 	})
 }
 
 // GetHostsAddedCount gets added hosts counter
-func (s *ChiStatus) GetHostsAddedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsAddedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsAddedCount
 	})
 }
 
 // GetHostsUnchangedCount gets unchanged hosts counter
-func (s *ChiStatus) GetHostsUnchangedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsUnchangedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsUnchangedCount
 	})
 }
 
 // GetHostsFailedCount gets failed hosts counter
-func (s *ChiStatus) GetHostsFailedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsFailedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsFailedCount
 	})
 }
 
 // GetHostsCompletedCount gets completed hosts counter
-func (s *ChiStatus) GetHostsCompletedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsCompletedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsCompletedCount
 	})
 }
 
 // GetHostsDeletedCount gets deleted hosts counter
-func (s *ChiStatus) GetHostsDeletedCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsDeletedCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsDeletedCount
 	})
 }
 
 // GetHostsDeleteCount gets hosts to be deleted counter
-func (s *ChiStatus) GetHostsDeleteCount() int {
-	return getIntWithReadLock(s, func(s *ChiStatus) int {
+func (s *Status) GetHostsDeleteCount() int {
+	return getIntWithReadLock(s, func(s *Status) int {
 		return s.HostsDeleteCount
 	})
 }
 
 // GetPods gets list of pods
-func (s *ChiStatus) GetPods() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetPods() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.Pods
 	})
 }
 
 // GetPodIPs gets list of pod ips
-func (s *ChiStatus) GetPodIPs() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetPodIPs() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.PodIPs
 	})
 }
 
 // GetFQDNs gets list of all FQDNs of hosts
-func (s *ChiStatus) GetFQDNs() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetFQDNs() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.FQDNs
 	})
 }
 
 // GetEndpoint gets API endpoint
-func (s *ChiStatus) GetEndpoint() string {
-	return getStringWithReadLock(s, func(s *ChiStatus) string {
+func (s *Status) GetEndpoint() string {
+	return getStringWithReadLock(s, func(s *Status) string {
 		return s.Endpoint
 	})
 }
 
-// GetNormalizedCHI gets target CHI
-func (s *ChiStatus) GetNormalizedCHI() *ClickHouseInstallation {
-	return getInstallationWithReadLock(s, func(s *ChiStatus) *ClickHouseInstallation {
-		return s.NormalizedCHI
+// GetNormalizedCR gets target CR
+func (s *Status) GetNormalizedCR() *ClickHouseInstallation {
+	return getInstallationWithReadLock(s, func(s *Status) *ClickHouseInstallation {
+		return s.NormalizedCR
 	})
 }
 
-// GetNormalizedCHICompleted gets completed CHI
-func (s *ChiStatus) GetNormalizedCHICompleted() *ClickHouseInstallation {
-	return getInstallationWithReadLock(s, func(s *ChiStatus) *ClickHouseInstallation {
-		return s.NormalizedCHICompleted
+// GetNormalizedCRCompleted gets completed CR
+func (s *Status) GetNormalizedCRCompleted() *ClickHouseInstallation {
+	return getInstallationWithReadLock(s, func(s *Status) *ClickHouseInstallation {
+		return s.NormalizedCRCompleted
 	})
 }
 
 // GetHostsWithTablesCreated gets hosts with created tables
-func (s *ChiStatus) GetHostsWithTablesCreated() []string {
-	return getStringArrWithReadLock(s, func(s *ChiStatus) []string {
+func (s *Status) GetHostsWithTablesCreated() []string {
+	return getStringArrWithReadLock(s, func(s *Status) []string {
 		return s.HostsWithTablesCreated
 	})
 }
 
 // Begin helpers
 
-func doWithWriteLock(s *ChiStatus, f func(s *ChiStatus)) {
+func doWithWriteLock(s *Status, f func(s *Status)) {
 	if s == nil {
 		return
 	}
@@ -669,7 +660,7 @@ func doWithWriteLock(s *ChiStatus, f func(s *ChiStatus)) {
 	f(s)
 }
 
-func doWithReadLock(s *ChiStatus, f func(s *ChiStatus)) {
+func doWithReadLock(s *Status, f func(s *Status)) {
 	if s == nil {
 		return
 	}
@@ -679,7 +670,7 @@ func doWithReadLock(s *ChiStatus, f func(s *ChiStatus)) {
 	f(s)
 }
 
-func getIntWithReadLock(s *ChiStatus, f func(s *ChiStatus) int) int {
+func getIntWithReadLock(s *Status, f func(s *Status) int) int {
 	var zeroVal int
 	if s == nil {
 		return zeroVal
@@ -690,7 +681,7 @@ func getIntWithReadLock(s *ChiStatus, f func(s *ChiStatus) int) int {
 	return f(s)
 }
 
-func getStringWithReadLock(s *ChiStatus, f func(s *ChiStatus) string) string {
+func getStringWithReadLock(s *Status, f func(s *Status) string) string {
 	var zeroVal string
 	if s == nil {
 		return zeroVal
@@ -701,7 +692,7 @@ func getStringWithReadLock(s *ChiStatus, f func(s *ChiStatus) string) string {
 	return f(s)
 }
 
-func getInstallationWithReadLock(s *ChiStatus, f func(s *ChiStatus) *ClickHouseInstallation) *ClickHouseInstallation {
+func getInstallationWithReadLock(s *Status, f func(s *Status) *ClickHouseInstallation) *ClickHouseInstallation {
 	var zeroVal *ClickHouseInstallation
 	if s == nil {
 		return zeroVal
@@ -712,7 +703,7 @@ func getInstallationWithReadLock(s *ChiStatus, f func(s *ChiStatus) *ClickHouseI
 	return f(s)
 }
 
-func getStringArrWithReadLock(s *ChiStatus, f func(s *ChiStatus) []string) []string {
+func getStringArrWithReadLock(s *Status, f func(s *Status) []string) []string {
 	emptyArr := make([]string, 0, 0)
 	if s == nil {
 		return emptyArr
@@ -725,21 +716,21 @@ func getStringArrWithReadLock(s *ChiStatus, f func(s *ChiStatus) []string) []str
 
 // mergeActionsNoSync merges the actions of from into those of s (without synchronization, because synchronized
 // functions call into this).
-func mergeActionsNoSync(s *ChiStatus, from *ChiStatus) {
+func mergeActionsNoSync(s *Status, from *Status) {
 	s.Actions = util.MergeStringArrays(s.Actions, from.Actions)
 	sort.Sort(sort.Reverse(sort.StringSlice(s.Actions)))
 	trimActionsNoSync(s)
 }
 
 // trimActionsNoSync trims actions (without synchronization, because synchronized functions call into this).
-func trimActionsNoSync(s *ChiStatus) {
+func trimActionsNoSync(s *Status) {
 	if len(s.Actions) > maxActions {
 		s.Actions = s.Actions[:maxActions]
 	}
 }
 
 // pushTaskIDStartedNoSync pushes task id into status
-func pushTaskIDStartedNoSync(s *ChiStatus) {
+func pushTaskIDStartedNoSync(s *Status) {
 	s.TaskIDsStarted = append([]string{s.TaskID}, s.TaskIDsStarted...)
 	if len(s.TaskIDsStarted) > maxTaskIDs {
 		s.TaskIDsStarted = s.TaskIDsStarted[:maxTaskIDs]
@@ -747,7 +738,7 @@ func pushTaskIDStartedNoSync(s *ChiStatus) {
 }
 
 // pushTaskIDCompletedNoSync pushes task id into status w/o sync
-func pushTaskIDCompletedNoSync(s *ChiStatus) {
+func pushTaskIDCompletedNoSync(s *Status) {
 	s.TaskIDsCompleted = append([]string{s.TaskID}, s.TaskIDsCompleted...)
 	if len(s.TaskIDsCompleted) > maxTaskIDs {
 		s.TaskIDsCompleted = s.TaskIDsCompleted[:maxTaskIDs]

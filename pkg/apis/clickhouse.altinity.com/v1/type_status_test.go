@@ -22,7 +22,7 @@ var fillParamsA = &FillStatusParams{
 	Pods:                []string{"pod-a-1", "pod-a-2"},
 	FQDNs:               []string{"fqdns-a-1", "fqdns-a-2"},
 	Endpoint:            "endpoint-a",
-	NormalizedCHI:       normalizedChiA, // fields not recursively checked, this is only used as a pointer
+	NormalizedCR:        normalizedChiA, // fields not recursively checked, this is only used as a pointer
 }
 
 var normalizedChiB = &ClickHouseInstallation{}
@@ -40,10 +40,10 @@ var fillParamsB = &FillStatusParams{
 	Pods:                []string{"pod-b-1", "pod-b-2"},
 	FQDNs:               []string{"fqdns-b-1", "fqdns-b-2"},
 	Endpoint:            "endpoint-b",
-	NormalizedCHI:       normalizedChiB, // fields not recursively checked, this is only used as a pointer
+	NormalizedCR:        normalizedChiB, // fields not recursively checked, this is only used as a pointer
 }
 
-var copyTestStatusFrom = &ChiStatus{
+var copyTestStatusFrom = &Status{
 	CHOpVersion:            "version-a",
 	CHOpCommit:             "commit-a",
 	CHOpDate:               "date-a",
@@ -71,8 +71,8 @@ var copyTestStatusFrom = &ChiStatus{
 	PodIPs:                 []string{"podIP-a-1", "podIP-a-2"},
 	FQDNs:                  []string{"fqdns-a-1", "fqdns-a-2"},
 	Endpoint:               "endpt-a",
-	NormalizedCHI:          normalizedChiA,
-	NormalizedCHICompleted: normalizedChiA,
+	NormalizedCR:           normalizedChiA,
+	NormalizedCRCompleted:  normalizedChiA,
 	HostsWithTablesCreated: []string{"host-a-1", "host-a-2"},
 }
 
@@ -82,20 +82,20 @@ var copyTestStatusFrom = &ChiStatus{
 func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 	type testCase struct {
 		name                       string
-		goRoutineA                 func(s *ChiStatus)
-		goRoutineB                 func(s *ChiStatus)
-		postConditionsVerification func(tt *testing.T, s *ChiStatus)
+		goRoutineA                 func(s *Status)
+		goRoutineB                 func(s *Status)
+		postConditionsVerification func(tt *testing.T, s *Status)
 	}
 	for _, tc := range []testCase{
 		{
 			name: "PushAction",
-			goRoutineA: func(s *ChiStatus) {
+			goRoutineA: func(s *Status) {
 				s.PushAction("foo")
 			},
-			goRoutineB: func(s *ChiStatus) {
+			goRoutineB: func(s *Status) {
 				s.PushAction("bar")
 			},
-			postConditionsVerification: func(tt *testing.T, s *ChiStatus) {
+			postConditionsVerification: func(tt *testing.T, s *Status) {
 				actual := s.GetActions()
 				require.Len(tt, actual, 2)
 				require.Contains(tt, actual, "foo")
@@ -104,14 +104,14 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 		},
 		{
 			name: "PushError",
-			goRoutineA: func(s *ChiStatus) {
+			goRoutineA: func(s *Status) {
 				s.PushError("errA")
 				s.PushError("errB")
 			},
-			goRoutineB: func(s *ChiStatus) {
+			goRoutineB: func(s *Status) {
 				s.PushError("errC")
 			},
-			postConditionsVerification: func(tt *testing.T, s *ChiStatus) {
+			postConditionsVerification: func(tt *testing.T, s *Status) {
 				actual := s.GetErrors()
 				require.Len(t, actual, 3)
 				require.Contains(tt, actual, "errA")
@@ -121,13 +121,13 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 		},
 		{
 			name: "Fill",
-			goRoutineA: func(s *ChiStatus) {
+			goRoutineA: func(s *Status) {
 				s.Fill(fillParamsA)
 			},
-			goRoutineB: func(s *ChiStatus) {
+			goRoutineB: func(s *Status) {
 				s.Fill(fillParamsB)
 			},
-			postConditionsVerification: func(tt *testing.T, s *ChiStatus) {
+			postConditionsVerification: func(tt *testing.T, s *Status) {
 				// Fill performs hard updates (overwrites), not pushing/adding extra data.
 				// The winning goroutine should basically determine the resultant post-condition for every "filled" field.
 				var expectedParams *FillStatusParams
@@ -151,12 +151,12 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 				require.Equal(tt, expectedParams.Pods, s.Pods)
 				require.Equal(tt, expectedParams.FQDNs, s.FQDNs)
 				require.Equal(tt, expectedParams.Endpoint, s.Endpoint)
-				require.Equal(tt, expectedParams.NormalizedCHI, s.NormalizedCHI)
+				require.Equal(tt, expectedParams.NormalizedCR, s.NormalizedCR)
 			},
 		},
 		{
 			name: "CopyFrom",
-			goRoutineA: func(s *ChiStatus) {
+			goRoutineA: func(s *Status) {
 				s.PushAction("always-present-action") // CopyFrom preserves existing actions (does not clobber)
 				s.CopyFrom(copyTestStatusFrom, CopyStatusOptions{
 					Actions:           true,
@@ -166,10 +166,10 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 					InheritableFields: true,
 				})
 			},
-			goRoutineB: func(s *ChiStatus) {
+			goRoutineB: func(s *Status) {
 				s.PushAction("additional-action") // this may or may not win the race, but the race will be sync
 			},
-			postConditionsVerification: func(tt *testing.T, s *ChiStatus) {
+			postConditionsVerification: func(tt *testing.T, s *Status) {
 				if len(s.GetActions()) == len(copyTestStatusFrom.GetActions())+2 {
 					require.Equal(tt, copyTestStatusFrom.GetActions(), s.GetActions())
 					require.Contains(tt, s.GetActions(), "always-present-action")
@@ -204,8 +204,8 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 				require.Equal(tt, copyTestStatusFrom.GetHostsWithTablesCreated(), s.GetHostsWithTablesCreated())
 				require.Equal(tt, copyTestStatusFrom.GetHostsWithTablesCreated(), s.GetHostsWithTablesCreated())
 				require.Equal(tt, copyTestStatusFrom.GetHostsWithTablesCreated(), s.GetHostsWithTablesCreated())
-				require.Equal(tt, copyTestStatusFrom.GetNormalizedCHI(), s.GetNormalizedCHI())
-				require.Equal(tt, copyTestStatusFrom.GetNormalizedCHICompleted(), s.GetNormalizedCHICompleted())
+				require.Equal(tt, copyTestStatusFrom.GetNormalizedCR(), s.GetNormalizedCR())
+				require.Equal(tt, copyTestStatusFrom.GetNormalizedCRCompleted(), s.GetNormalizedCRCompleted())
 				require.Equal(tt, copyTestStatusFrom.GetPodIPs(), s.GetPodIPs())
 				require.Equal(tt, copyTestStatusFrom.GetPods(), s.GetPods())
 				require.Equal(tt, copyTestStatusFrom.GetReplicasCount(), s.GetReplicasCount())
@@ -218,7 +218,7 @@ func Test_ChiStatus_BasicOperations_SingleStatus_ConcurrencyTest(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(tt *testing.T) {
-			status := &ChiStatus{}
+			status := &Status{}
 			startWg := sync.WaitGroup{}
 			doneWg := sync.WaitGroup{}
 			startWg.Add(2) // We will make sure both goroutines begin execution, i.e., that they don't execute sequentially.

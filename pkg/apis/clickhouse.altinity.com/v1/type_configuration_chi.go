@@ -45,26 +45,42 @@ func NewConfiguration() *Configuration {
 	return new(Configuration)
 }
 
+func (c *Configuration) GetProfiles() *Settings {
+	return c.Profiles
+}
+
+func (c *Configuration) GetQuotas() *Settings {
+	return c.Quotas
+}
+
+func (c *Configuration) GetSettings() *Settings {
+	return c.Settings
+}
+
+func (c *Configuration) GetFiles() *Settings {
+	return c.Files
+}
+
 // MergeFrom merges from specified source
-func (configuration *Configuration) MergeFrom(from *Configuration, _type MergeType) *Configuration {
+func (c *Configuration) MergeFrom(from *Configuration, _type MergeType) *Configuration {
 	if from == nil {
-		return configuration
+		return c
 	}
 
-	if configuration == nil {
-		configuration = NewConfiguration()
+	if c == nil {
+		c = NewConfiguration()
 	}
 
-	configuration.Zookeeper = configuration.Zookeeper.MergeFrom(from.Zookeeper, _type)
-	configuration.Users = configuration.Users.MergeFrom(from.Users)
-	configuration.Profiles = configuration.Profiles.MergeFrom(from.Profiles)
-	configuration.Quotas = configuration.Quotas.MergeFrom(from.Quotas)
-	configuration.Settings = configuration.Settings.MergeFrom(from.Settings)
-	configuration.Files = configuration.Files.MergeFrom(from.Files)
+	c.Zookeeper = c.Zookeeper.MergeFrom(from.Zookeeper, _type)
+	c.Users = c.Users.MergeFrom(from.Users)
+	c.Profiles = c.Profiles.MergeFrom(from.Profiles)
+	c.Quotas = c.Quotas.MergeFrom(from.Quotas)
+	c.Settings = c.Settings.MergeFrom(from.Settings)
+	c.Files = c.Files.MergeFrom(from.Files)
 
 	// TODO merge clusters
 	// Copy Clusters for now
-	configuration.Clusters = from.Clusters
+	c.Clusters = from.Clusters
 
-	return configuration
+	return c
 }

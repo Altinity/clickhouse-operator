@@ -17,13 +17,13 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"regexp"
 	"sort"
 	"strings"
 
 	"gopkg.in/d4l3k/messagediff.v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 

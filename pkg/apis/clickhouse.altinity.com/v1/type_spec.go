@@ -26,6 +26,38 @@ func (spec *ChiSpec) GetTaskID() string {
 	return spec.TaskID.Value()
 }
 
+func (spec *ChiSpec) GetStop() *types.StringBool {
+	return spec.Stop
+}
+
+func (spec *ChiSpec) GetRestart() *types.String {
+	return spec.Restart
+}
+
+func (spec *ChiSpec) GetTroubleshoot() *types.StringBool {
+	return spec.Troubleshoot
+}
+
+func (spec *ChiSpec) GetNamespaceDomainPattern() *types.String {
+	return spec.NamespaceDomainPattern
+}
+
+func (spec *ChiSpec) GetTemplating() *ChiTemplating {
+	return spec.Templating
+}
+
+func (spec *ChiSpec) GetDefaults() *ChiDefaults {
+	return spec.Defaults
+}
+
+func (spec *ChiSpec) GetConfiguration() IConfiguration {
+	return spec.Configuration
+}
+
+func (spec *ChiSpec) GetTemplates() *Templates {
+	return spec.Templates
+}
+
 // MergeFrom merges from spec
 func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	if from == nil {
@@ -77,20 +109,4 @@ func (spec *ChiSpec) MergeFrom(from *ChiSpec, _type MergeType) {
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)
 	// TODO may be it would be wiser to make more intelligent merge
 	spec.UseTemplates = append(spec.UseTemplates, from.UseTemplates...)
-}
-
-func (spec *ChiSpec) GetTemplating() *ChiTemplating {
-	return spec.Templating
-}
-
-func (spec *ChiSpec) GetStop() *types.StringBool {
-	return spec.Stop
-}
-
-func (spec *ChiSpec) GetRestart() *types.String {
-	return spec.Restart
-}
-
-func (spec *ChiSpec) GetTroubleshoot() *types.StringBool {
-	return spec.Troubleshoot
 }

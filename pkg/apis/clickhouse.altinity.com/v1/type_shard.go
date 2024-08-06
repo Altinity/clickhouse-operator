@@ -14,7 +14,41 @@
 
 package v1
 
-import "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+)
+
+// ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
+// TODO unify with ChiReplica based on HostsSet
+type ChiShard struct {
+	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
+	Weight              *int              `json:"weight,omitempty"              yaml:"weight,omitempty"`
+	InternalReplication *types.StringBool `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
+	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates           *TemplatesList    `json:"templates,omitempty"           yaml:"templates,omitempty"`
+	ReplicasCount       int               `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*Host `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+
+	Runtime ChiShardRuntime `json:"-" yaml:"-"`
+
+	// DefinitionType is DEPRECATED - to be removed soon
+	DefinitionType string `json:"definitionType,omitempty" yaml:"definitionType,omitempty"`
+}
+
+type ChiShardRuntime struct {
+	Address ChiShardAddress         `json:"-" yaml:"-"`
+	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+func (r *ChiShardRuntime) GetAddress() IShardAddress {
+	return &r.Address
+}
+
+func (r *ChiShardRuntime) SetCR(cr ICustomResource) {
+	r.CHI = cr.(*ClickHouseInstallation)
+}
 
 func (shard *ChiShard) GetName() string {
 	return shard.Name
@@ -122,7 +156,7 @@ func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 
 // GetCluster gets cluster of the shard
 func (shard *ChiShard) GetCluster() *ChiCluster {
-	return shard.Runtime.CHI.GetSpec().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
+	return shard.Runtime.CHI.GetSpecT().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 
 // HasWeight checks whether shard has applicable weight value specified
@@ -146,7 +180,7 @@ func (shard *ChiShard) GetWeight() int {
 
 func (shard *ChiShard) GetRuntime() IShardRuntime {
 	if shard == nil {
-		return nil
+		return (*ChiShardRuntime)(nil)
 	}
 	return &shard.Runtime
 }
@@ -182,4 +216,62 @@ func (shard *ChiShard) GetTemplates() *TemplatesList {
 		return nil
 	}
 	return shard.Templates
+}
+
+// ChiShardAddress defines address of a shard within ClickHouseInstallation
+type ChiShardAddress struct {
+	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
+	ShardName    string `json:"shardName,omitempty"    yaml:"shardName,omitempty"`
+	ShardIndex   int    `json:"shardIndex,omitempty"   yaml:"shardIndex,omitempty"`
+}
+
+func (a *ChiShardAddress) GetNamespace() string {
+	return a.Namespace
+}
+
+func (a *ChiShardAddress) SetNamespace(namespace string) {
+	a.Namespace = namespace
+}
+
+func (a *ChiShardAddress) GetCRName() string {
+	return a.CHIName
+}
+
+func (a *ChiShardAddress) SetCRName(name string) {
+	a.CHIName = name
+}
+
+func (a *ChiShardAddress) GetClusterName() string {
+	return a.ClusterName
+}
+
+func (a *ChiShardAddress) SetClusterName(name string) {
+	a.ClusterName = name
+}
+
+func (a *ChiShardAddress) GetClusterIndex() int {
+	return a.ClusterIndex
+}
+
+func (a *ChiShardAddress) SetClusterIndex(index int) {
+	a.ClusterIndex = index
+}
+
+func (a *ChiShardAddress) GetShardName() string {
+	return a.ShardName
+}
+
+func (a *ChiShardAddress) SetShardName(name string) {
+	a.ShardName = name
+}
+
+func (a *ChiShardAddress) GetShardIndex() int {
+	return a.ShardIndex
+}
+
+func (a *ChiShardAddress) SetShardIndex(index int) {
+	a.ShardIndex = index
 }

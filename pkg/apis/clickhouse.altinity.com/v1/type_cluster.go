@@ -52,12 +52,6 @@ func (r *ChiClusterRuntime) SetCR(cr ICustomResource) {
 	r.CHI = cr.(*ClickHouseInstallation)
 }
 
-// SchemaPolicy defines schema management policy - replica or shard-based
-type SchemaPolicy struct {
-	Replica string `json:"replica" yaml:"replica"`
-	Shard   string `json:"shard"   yaml:"shard"`
-}
-
 // ChiClusterAddress defines address of a cluster within ClickHouseInstallation
 type ChiClusterAddress struct {
 	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
@@ -98,30 +92,32 @@ func (a *ChiClusterAddress) SetClusterIndex(index int) {
 	a.ClusterIndex = index
 }
 
-// ChiClusterLayout defines layout section of .spec.configuration.clusters
-type ChiClusterLayout struct {
-	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
-	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
-
-	// TODO refactor into map[string]ChiShard
-	Shards   []*ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
-	Replicas []*ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
-
-	// Internal data
-	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
-	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
-	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
-	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
+func (cluster *ChiCluster) GetName() string {
+	return cluster.Name
 }
 
-// NewClusterSchemaPolicy creates new cluster layout
-func NewClusterSchemaPolicy() *SchemaPolicy {
-	return new(SchemaPolicy)
+func (c *ChiCluster) GetZookeeper() *ZookeeperConfig {
+	return c.Zookeeper
 }
 
-// NewChiClusterLayout creates new cluster layout
-func NewChiClusterLayout() *ChiClusterLayout {
-	return new(ChiClusterLayout)
+func (c *ChiCluster) GetSchemaPolicy() *SchemaPolicy {
+	return c.SchemaPolicy
+}
+
+// GetInsecure is a getter
+func (cluster *ChiCluster) GetInsecure() *types.StringBool {
+	if cluster == nil {
+		return nil
+	}
+	return cluster.Insecure
+}
+
+// GetSecure is a getter
+func (cluster *ChiCluster) GetSecure() *types.StringBool {
+	if cluster == nil {
+		return nil
+	}
+	return cluster.Secure
 }
 
 func (c *ChiCluster) GetSecret() *ClusterSecret {
@@ -171,27 +167,27 @@ func (cluster *ChiCluster) InheritZookeeperFrom(chi *ClickHouseInstallation) {
 		// Has zk config explicitly specified alread
 		return
 	}
-	if chi.GetSpec().Configuration == nil {
+	if chi.GetSpecT().Configuration == nil {
 		return
 	}
-	if chi.GetSpec().Configuration.Zookeeper == nil {
+	if chi.GetSpecT().Configuration.Zookeeper == nil {
 		return
 	}
 
-	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.GetSpec().Configuration.Zookeeper, MergeTypeFillEmptyValues)
+	cluster.Zookeeper = cluster.Zookeeper.MergeFrom(chi.GetSpecT().Configuration.Zookeeper, MergeTypeFillEmptyValues)
 }
 
 // InheritFilesFrom inherits files from CHI
 func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
-	if chi.GetSpec().Configuration == nil {
+	if chi.GetSpecT().Configuration == nil {
 		return
 	}
-	if chi.GetSpec().Configuration.Files == nil {
+	if chi.GetSpecT().Configuration.Files == nil {
 		return
 	}
 
 	// Propagate host section only
-	cluster.Files = cluster.Files.MergeFromCB(chi.GetSpec().Configuration.Files, func(path string, _ *Setting) bool {
+	cluster.Files = cluster.Files.MergeFromCB(chi.GetSpecT().Configuration.Files, func(path string, _ *Setting) bool {
 		if section, err := GetSectionFromPath(path); err == nil {
 			if section.Equal(SectionHost) {
 				return true
@@ -204,13 +200,13 @@ func (cluster *ChiCluster) InheritFilesFrom(chi *ClickHouseInstallation) {
 
 // InheritTemplatesFrom inherits templates from CHI
 func (cluster *ChiCluster) InheritTemplatesFrom(chi *ClickHouseInstallation) {
-	if chi.GetSpec().Defaults == nil {
+	if chi.GetSpec().GetDefaults() == nil {
 		return
 	}
-	if chi.GetSpec().Defaults.Templates == nil {
+	if chi.GetSpec().GetDefaults().Templates == nil {
 		return
 	}
-	cluster.Templates = cluster.Templates.MergeFrom(chi.GetSpec().Defaults.Templates, MergeTypeFillEmptyValues)
+	cluster.Templates = cluster.Templates.MergeFrom(chi.GetSpec().GetDefaults().Templates, MergeTypeFillEmptyValues)
 	cluster.Templates.HandleDeprecatedFields()
 }
 
@@ -221,10 +217,6 @@ func (cluster *ChiCluster) GetServiceTemplate() (*ServiceTemplate, bool) {
 	}
 	name := cluster.Templates.GetClusterServiceTemplate()
 	return cluster.Runtime.CHI.GetServiceTemplate(name)
-}
-
-func (cluster *ChiCluster) GetName() string {
-	return cluster.Name
 }
 
 // GetCHI gets parent CHI
@@ -249,7 +241,7 @@ func (cluster *ChiCluster) GetReplica(replica int) *ChiReplica {
 
 // FindShard finds shard by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (cluster *ChiCluster) FindShard(needle interface{}) *ChiShard {
+func (cluster *ChiCluster) FindShard(needle interface{}) IShard {
 	var resultShard *ChiShard
 	cluster.WalkShards(func(index int, shard IShard) error {
 		switch v := needle.(type) {
@@ -314,7 +306,6 @@ func (cluster *ChiCluster) WalkReplicas(f func(index int, replica *ChiReplica) e
 
 // WalkHosts walks hosts
 func (cluster *ChiCluster) WalkHosts(f func(host *Host) error) []error {
-
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
@@ -344,6 +335,10 @@ func (cluster *ChiCluster) WalkHostsByShards(f func(shard, replica int, host *Ho
 	return res
 }
 
+func (cluster *ChiCluster) GetLayout() *ChiClusterLayout {
+	return cluster.Layout
+}
+
 // WalkHostsByReplicas walks hosts by replicas
 func (cluster *ChiCluster) WalkHostsByReplicas(f func(shard, replica int, host *Host) error) []error {
 
@@ -370,18 +365,38 @@ func (cluster *ChiCluster) HostsCount() int {
 	return count
 }
 
-// GetInsecure is a getter
-func (cluster *ChiCluster) GetInsecure() *types.StringBool {
-	if cluster == nil {
-		return nil
-	}
-	return cluster.Insecure
+// ChiClusterLayout defines layout section of .spec.configuration.clusters
+type ChiClusterLayout struct {
+	ShardsCount   int `json:"shardsCount,omitempty"   yaml:"shardsCount,omitempty"`
+	ReplicasCount int `json:"replicasCount,omitempty" yaml:"replicasCount,omitempty"`
+
+	// TODO refactor into map[string]ChiShard
+	Shards   []*ChiShard   `json:"shards,omitempty"   yaml:"shards,omitempty"`
+	Replicas []*ChiReplica `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+
+	// Internal data
+	// Whether shards or replicas are explicitly specified as Shards []ChiShard or Replicas []ChiReplica
+	ShardsSpecified   bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	ReplicasSpecified bool        `json:"-" yaml:"-" testdiff:"ignore"`
+	HostsField        *HostsField `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
-// GetSecure is a getter
-func (cluster *ChiCluster) GetSecure() *types.StringBool {
-	if cluster == nil {
-		return nil
-	}
-	return cluster.Secure
+// NewChiClusterLayout creates new cluster layout
+func NewChiClusterLayout() *ChiClusterLayout {
+	return new(ChiClusterLayout)
+}
+
+func (l *ChiClusterLayout) GetReplicasCount() int {
+	return l.ReplicasCount
+}
+
+// SchemaPolicy defines schema management policy - replica or shard-based
+type SchemaPolicy struct {
+	Replica string `json:"replica" yaml:"replica"`
+	Shard   string `json:"shard"   yaml:"shard"`
+}
+
+// NewClusterSchemaPolicy creates new cluster layout
+func NewClusterSchemaPolicy() *SchemaPolicy {
+	return new(SchemaPolicy)
 }

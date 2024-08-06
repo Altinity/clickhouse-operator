@@ -16,10 +16,11 @@ package v1
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"math"
 	"reflect"
 	"strconv"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // NewSettingScalar makes new scalar Setting

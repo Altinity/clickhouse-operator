@@ -68,7 +68,7 @@ type HostRuntime struct {
 	// DesiredStatefulSet is a desired stateful set - reconcile target
 	DesiredStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 
-	CHI *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+	cr ICustomResource `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
 func (r *HostRuntime) GetAddress() IHostAddress {
@@ -76,7 +76,11 @@ func (r *HostRuntime) GetAddress() IHostAddress {
 }
 
 func (r *HostRuntime) SetCR(cr ICustomResource) {
-	r.CHI = cr.(*ClickHouseInstallation)
+	r.cr = cr
+}
+
+func (r *HostRuntime) GetCR() ICustomResource {
+	return r.cr.(ICustomResource)
 }
 
 func (host *Host) GetRuntime() IHostRuntime {
@@ -213,7 +217,7 @@ func (host *Host) GetSettings() *Settings {
 // GetZookeeper gets zookeeper
 func (host *Host) GetZookeeper() *ZookeeperConfig {
 	cluster := host.GetCluster()
-	return cluster.Zookeeper
+	return cluster.GetZookeeper()
 }
 
 // GetName gets name
@@ -225,11 +229,8 @@ func (host *Host) GetName() string {
 }
 
 // GetCR gets CHI
-func (host *Host) GetCR() *ClickHouseInstallation {
-	if host == nil {
-		return nil
-	}
-	return host.Runtime.CHI
+func (host *Host) GetCR() ICustomResource {
+	return host.GetRuntime().GetCR()
 }
 
 // HasCR checks whether host has CHI
@@ -242,20 +243,23 @@ func (host *Host) SetCR(chi ICustomResource) {
 }
 
 // GetCluster gets cluster
-func (host *Host) GetCluster() *ChiCluster {
+func (host *Host) GetCluster() ICluster {
 	// Host has to have filled Address
 	return host.GetCR().FindCluster(host.Runtime.Address.ClusterName)
 }
 
 // GetShard gets shard
-func (host *Host) GetShard() *ChiShard {
+func (host *Host) GetShard() IShard {
 	// Host has to have filled Address
 	return host.GetCR().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
 }
 
 // GetAncestor gets ancestor of a host
 func (host *Host) GetAncestor() *Host {
-	return host.GetCR().GetAncestor().FindHost(
+	if !host.HasAncestorCR() {
+		return nil
+	}
+	return host.GetAncestorCR().FindHost(
 		host.Runtime.Address.ClusterName,
 		host.Runtime.Address.ShardName,
 		host.Runtime.Address.HostName,
@@ -268,13 +272,13 @@ func (host *Host) HasAncestor() bool {
 }
 
 // GetAncestorCR gets ancestor of a host
-func (host *Host) GetAncestorCR() *ClickHouseInstallation {
+func (host *Host) GetAncestorCR() ICustomResource {
 	return host.GetCR().GetAncestor()
 }
 
 // HasAncestorCR checks whether host has an ancestor
 func (host *Host) HasAncestorCR() bool {
-	return host.GetAncestorCR() != nil
+	return host.GetAncestorCR().IsNonZero()
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
@@ -290,7 +294,7 @@ func (host *Host) IsStopped() bool {
 // IsNewOne checks whether host is a new one
 // TODO unify with model HostIsNewOne
 func (host *Host) IsNewOne() bool {
-	return !host.HasAncestor() && (host.GetCR().EnsureStatus().GetHostsCount() == host.GetCR().EnsureStatus().GetHostsAddedCount())
+	return !host.HasAncestor() && (host.GetCR().IEnsureStatus().GetHostsCount() == host.GetCR().IEnsureStatus().GetHostsAddedCount())
 }
 
 // WhichStatefulSet specifies which StatefulSet we are going to process in host functions
@@ -499,7 +503,7 @@ func (host *Host) AppendSpecifiedPortsToContainer(container *core.Container) {
 func (host *Host) HasListedTablesCreated(name string) bool {
 	return util.InArray(
 		name,
-		host.GetCR().EnsureStatus().GetHostsWithTablesCreated(),
+		host.GetCR().IEnsureStatus().GetHostsWithTablesCreated(),
 	)
 }
 
