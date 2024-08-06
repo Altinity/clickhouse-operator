@@ -164,10 +164,10 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCR() {
-			old = host.GetAncestorCR().GetSpec().Configuration.Profiles
+			old = host.GetAncestorCR().GetSpec().GetConfiguration().GetProfiles()
 		}
 		if host.HasCR() {
-			new = host.GetCR().GetSpec().Configuration.Profiles
+			new = host.GetCR().GetSpec().GetConfiguration().GetProfiles()
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionProfiles, old, new) {
 			return true
@@ -177,10 +177,10 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCR() {
-			old = host.GetAncestorCR().GetSpec().Configuration.Quotas
+			old = host.GetAncestorCR().GetSpec().GetConfiguration().GetQuotas()
 		}
 		if host.HasCR() {
-			new = host.GetCR().GetSpec().Configuration.Quotas
+			new = host.GetCR().GetSpec().GetConfiguration().GetQuotas()
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionQuotas, old, new) {
 			return true
@@ -190,10 +190,10 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCR() {
-			old = host.GetAncestorCR().GetSpec().Configuration.Settings
+			old = host.GetAncestorCR().GetSpec().GetConfiguration().GetSettings()
 		}
 		if host.HasCR() {
-			new = host.GetCR().GetSpec().Configuration.Settings
+			new = host.GetCR().GetSpec().GetConfiguration().GetSettings()
 		}
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new) {
 			return true
@@ -203,7 +203,7 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestor() {
-			old = host.GetAncestor().Settings
+			old = host.GetAncestor().GetSettings()
 		}
 		new = host.Settings
 		if isSettingsChangeRequiresReboot(host, configurationRestartPolicyRulesSectionSettings, old, new) {
@@ -214,14 +214,14 @@ func IsConfigurationChangeRequiresReboot(host *api.Host) bool {
 	{
 		var old, new *api.Settings
 		if host.HasAncestorCR() {
-			old = host.GetAncestorCR().GetSpec().Configuration.Files.Filter(
+			old = host.GetAncestorCR().GetSpec().GetConfiguration().GetFiles().Filter(
 				nil,
 				[]api.SettingsSection{api.SectionUsers},
 				true,
 			)
 		}
 		if host.HasCR() {
-			new = host.GetCR().GetSpec().Configuration.Files.Filter(
+			new = host.GetCR().GetSpec().GetConfiguration().GetFiles().Filter(
 				nil,
 				[]api.SettingsSection{api.SectionUsers},
 				true,
