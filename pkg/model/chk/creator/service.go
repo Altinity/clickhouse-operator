@@ -38,7 +38,7 @@ func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...an
 	switch what {
 	case interfaces.ServiceCluster:
 		if len(params) > 0 {
-			chk := params[0].(*apiChk.ClickHouseKeeperInstallation)
+			chk := params[0].(apiChi.ICluster).GetRuntime().GetCR().(*apiChk.ClickHouseKeeperInstallation)
 			return m.CreateClientService(chk)
 		}
 	case interfaces.ServiceHost:
