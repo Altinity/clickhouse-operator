@@ -140,7 +140,7 @@ func createHostTemplateName(host *api.Host) string {
 // any other places
 // Function operations are based on .Spec.Defaults.ReplicasUseFQDN
 func createInstanceHostname(host *api.Host) string {
-	if host.GetCR().GetSpec().Defaults.ReplicasUseFQDN.IsTrue() {
+	if host.GetCR().GetSpec().GetDefaults().ReplicasUseFQDN.IsTrue() {
 		// In case .Spec.Defaults.ReplicasUseFQDN is set replicas would use FQDN pod hostname,
 		// otherwise hostname+service name (unique within namespace) would be used
 		// .my-dev-namespace.svc.cluster.local
@@ -209,9 +209,9 @@ func createPodFQDN(host *api.Host) string {
 	// Start with default pattern
 	pattern := podFQDNPattern
 
-	if host.GetCR().GetSpec().NamespaceDomainPattern.HasValue() {
+	if host.GetCR().GetSpec().GetNamespaceDomainPattern().HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
-		pattern = "%s." + host.GetCR().GetSpec().NamespaceDomainPattern.Value()
+		pattern = "%s." + host.GetCR().GetSpec().GetNamespaceDomainPattern().Value()
 	}
 
 	// Create FQDN based on pattern available
