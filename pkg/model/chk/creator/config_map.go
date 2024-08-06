@@ -24,17 +24,17 @@ import (
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
-type ConfigMapManagerKeeper struct {
+type ConfigMapManager struct {
 	cr                   api.ICustomResource
 	tagger               interfaces.ITagger
 	configFilesGenerator interfaces.IConfigFilesGenerator
 }
 
-func NewConfigMapManagerKeeper() *ConfigMapManagerKeeper {
-	return &ConfigMapManagerKeeper{}
+func NewConfigMapManager() *ConfigMapManager {
+	return &ConfigMapManager{}
 }
 
-func (m *ConfigMapManagerKeeper) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
+func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
 	case interfaces.ConfigMapConfig:
 		var options *config.FilesGeneratorOptionsKeeper
@@ -46,18 +46,18 @@ func (m *ConfigMapManagerKeeper) CreateConfigMap(what interfaces.ConfigMapType, 
 	panic("unknown config map type")
 }
 
-func (m *ConfigMapManagerKeeper) SetCR(cr api.ICustomResource) {
+func (m *ConfigMapManager) SetCR(cr api.ICustomResource) {
 	m.cr = cr
 }
-func (m *ConfigMapManagerKeeper) SetTagger(tagger interfaces.ITagger) {
+func (m *ConfigMapManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
-func (m *ConfigMapManagerKeeper) SetConfigFilesGenerator(configFilesGenerator interfaces.IConfigFilesGenerator) {
+func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfaces.IConfigFilesGenerator) {
 	m.configFilesGenerator = configFilesGenerator
 }
 
 // CreateConfigMap returns a config map containing ClickHouse Keeper config XML
-func (m *ConfigMapManagerKeeper) common(options *config.FilesGeneratorOptionsKeeper) *core.ConfigMap {
+func (m *ConfigMapManager) common(options *config.FilesGeneratorOptionsKeeper) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",

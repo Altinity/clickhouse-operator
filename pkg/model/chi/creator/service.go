@@ -32,16 +32,16 @@ const (
 	TemplateDefaultsServiceClusterIP = "None"
 )
 
-type ServiceManagerClickHouse struct {
+type ServiceManager struct {
 	cr     api.ICustomResource
 	tagger interfaces.ITagger
 }
 
-func NewServiceManagerClickHouse() *ServiceManagerClickHouse {
-	return &ServiceManagerClickHouse{}
+func NewServiceManager() *ServiceManager {
+	return &ServiceManager{}
 }
 
-func (m *ServiceManagerClickHouse) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
+func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
 	switch what {
 	case interfaces.ServiceCR:
 		return m.createServiceCHI()
@@ -67,15 +67,15 @@ func (m *ServiceManagerClickHouse) CreateService(what interfaces.ServiceType, pa
 	panic("unknown service type")
 }
 
-func (m *ServiceManagerClickHouse) SetCR(cr api.ICustomResource) {
+func (m *ServiceManager) SetCR(cr api.ICustomResource) {
 	m.cr = cr
 }
-func (m *ServiceManagerClickHouse) SetTagger(tagger interfaces.ITagger) {
+func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
 
 // createServiceCHI creates new core.Service for specified CHI
-func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
+func (m *ServiceManager) createServiceCHI() *core.Service {
 	if template, ok := m.cr.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(
@@ -126,7 +126,7 @@ func (m *ServiceManagerClickHouse) createServiceCHI() *core.Service {
 }
 
 // createServiceCluster creates new core.Service for specified Cluster
-func (m *ServiceManagerClickHouse) createServiceCluster(cluster api.ICluster) *core.Service {
+func (m *ServiceManager) createServiceCluster(cluster api.ICluster) *core.Service {
 	serviceName := namer.New().Name(interfaces.NameClusterService, cluster)
 	ownerReferences := creator.CreateOwnerReferences(m.cr)
 
@@ -148,7 +148,7 @@ func (m *ServiceManagerClickHouse) createServiceCluster(cluster api.ICluster) *c
 }
 
 // createServiceShard creates new core.Service for specified Shard
-func (m *ServiceManagerClickHouse) createServiceShard(shard api.IShard) *core.Service {
+func (m *ServiceManager) createServiceShard(shard api.IShard) *core.Service {
 	if template, ok := shard.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(
@@ -167,7 +167,7 @@ func (m *ServiceManagerClickHouse) createServiceShard(shard api.IShard) *core.Se
 }
 
 // createServiceHost creates new core.Service for specified host
-func (m *ServiceManagerClickHouse) createServiceHost(host *api.Host) *core.Service {
+func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(

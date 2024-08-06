@@ -23,14 +23,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type ProbeManagerKeeper struct {
+type ProbeManager struct {
 }
 
-func NewProbeManagerKeeper() *ProbeManagerKeeper {
-	return &ProbeManagerKeeper{}
+func NewProbeManager() *ProbeManager {
+	return &ProbeManager{}
 }
 
-func (m *ProbeManagerKeeper) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
+func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
 	switch what {
 	case interfaces.ProbeDefaultLiveness:
 		return m.createDefaultKeeperLivenessProbe(host)
@@ -48,7 +48,7 @@ func probeScript(port int) string {
 }
 
 // createDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
-func (m *ProbeManagerKeeper) createDefaultKeeperLivenessProbe(host *api.Host) *core.Probe {
+func (m *ProbeManager) createDefaultKeeperLivenessProbe(host *api.Host) *core.Probe {
 	return &core.Probe{
 		ProbeHandler: core.ProbeHandler{
 			Exec: &core.ExecAction{

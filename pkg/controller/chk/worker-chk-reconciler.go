@@ -283,19 +283,21 @@ func (w *worker) reconcileShard(ctx context.Context, shard *apiChk.ChkShard) err
 	w.a.V(2).M(shard).S().P()
 	defer w.a.V(2).M(shard).E().P()
 
-	// Add Shard's Service
-	service := w.task.Creator().CreateService(interfaces.ServiceShard, shard)
-	if service == nil {
-		// This is not a problem, ServiceShard may be omitted
-		return nil
-	}
-	err := w.reconcileService(ctx, shard.Runtime.CHK, service)
-	if err == nil {
-		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
-	} else {
-		w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
-	}
-	return err
+	return nil
+
+	//// Add Shard's Service
+	//service := w.task.Creator().CreateService(interfaces.ServiceShard, shard)
+	//if service == nil {
+	//	// This is not a problem, ServiceShard may be omitted
+	//	return nil
+	//}
+	//err := w.reconcileService(ctx, shard.Runtime.CHK, service)
+	//if err == nil {
+	//	w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
+	//} else {
+	//	w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+	//}
+	//return err
 }
 
 // reconcileHost reconciles specified ClickHouse host

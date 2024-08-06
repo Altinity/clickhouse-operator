@@ -24,36 +24,36 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
-type ContainerManagerKeeper struct {
-	probe *ProbeManagerKeeper
+type ContainerManager struct {
+	probe *ProbeManager
 }
 
-func NewContainerManagerKeeper(probe *ProbeManagerKeeper) *ContainerManagerKeeper {
-	return &ContainerManagerKeeper{
+func NewContainerManager(probe *ProbeManager) *ContainerManager {
+	return &ContainerManager{
 		probe: probe,
 	}
 }
 
-func (cm *ContainerManagerKeeper) NewDefaultAppContainer(host *apiChi.Host) core.Container {
+func (cm *ContainerManager) NewDefaultAppContainer(host *apiChi.Host) core.Container {
 	return cm.newDefaultContainerKeeper(host)
 }
 
-func (cm *ContainerManagerKeeper) GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return cm.getContainerKeeper(statefulSet)
 }
 
-func (cm *ContainerManagerKeeper) EnsureAppContainer(statefulSet *apps.StatefulSet, host *apiChi.Host) {
+func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *apiChi.Host) {
 	cm.ensureContainerSpecifiedKeeper(statefulSet, host)
 }
 
-func (cm *ContainerManagerKeeper) EnsureLogContainer(statefulSet *apps.StatefulSet) {
+func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 }
 
-func (cm *ContainerManagerKeeper) getContainerKeeper(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+func (cm *ContainerManager) getContainerKeeper(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.KeeperContainerName)
 }
 
-func (cm *ContainerManagerKeeper) ensureContainerSpecifiedKeeper(statefulSet *apps.StatefulSet, host *apiChi.Host) {
+func (cm *ContainerManager) ensureContainerSpecifiedKeeper(statefulSet *apps.StatefulSet, host *apiChi.Host) {
 	_, ok := cm.getContainerKeeper(statefulSet)
 	if ok {
 		return
@@ -66,14 +66,14 @@ func (cm *ContainerManagerKeeper) ensureContainerSpecifiedKeeper(statefulSet *ap
 	)
 }
 
-func (cm *ContainerManagerKeeper) createInitContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
+func (cm *ContainerManager) createInitContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
 	return []core.Container{
 		cm.newDefaultContainerServerIDInjector(),
 	}
 
 }
 
-func (cm *ContainerManagerKeeper) newDefaultContainerServerIDInjector() core.Container {
+func (cm *ContainerManager) newDefaultContainerServerIDInjector() core.Container {
 	container := core.Container{
 		Name:  config.KeeperServerIDInjectorContainerName,
 		Image: config.DefaultServerIDInjectorDockerImage,
@@ -100,7 +100,7 @@ func (cm *ContainerManagerKeeper) newDefaultContainerServerIDInjector() core.Con
 	return container
 }
 
-func (cm *ContainerManagerKeeper) createContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
+func (cm *ContainerManager) createContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
 	containers := []core.Container{
 		cm.newDefaultContainerKeeper(nil),
 	}
@@ -148,7 +148,7 @@ func (cm *ContainerManagerKeeper) createContainers(chk *apiChk.ClickHouseKeeperI
 	return containers
 }
 
-func (cm *ContainerManagerKeeper) newDefaultContainerKeeper(host *apiChi.Host) core.Container {
+func (cm *ContainerManager) newDefaultContainerKeeper(host *apiChi.Host) core.Container {
 	container := core.Container{
 		Name:          config.KeeperContainerName,
 		Image:         config.DefaultKeeperDockerImage,

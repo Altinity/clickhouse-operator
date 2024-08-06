@@ -23,44 +23,44 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
-type ContainerManagerClickHouse struct {
-	probe *ProbeManagerClickHouse
+type ContainerManager struct {
+	probe *ProbeManager
 }
 
-func NewContainerManagerClickHouse(probe *ProbeManagerClickHouse) *ContainerManagerClickHouse {
-	return &ContainerManagerClickHouse{
+func NewContainerManager(probe *ProbeManager) *ContainerManager {
+	return &ContainerManager{
 		probe: probe,
 	}
 }
 
-func (cm *ContainerManagerClickHouse) NewDefaultAppContainer(host *api.Host) core.Container {
+func (cm *ContainerManager) NewDefaultAppContainer(host *api.Host) core.Container {
 	return cm.newDefaultContainerClickHouse(host)
 }
 
-func (cm *ContainerManagerClickHouse) GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return cm.getClickHouseContainer(statefulSet)
 }
 
-func (cm *ContainerManagerClickHouse) EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host) {
+func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host) {
 	cm.ensureClickHouseContainerSpecified(statefulSet, host)
 }
 
-func (cm *ContainerManagerClickHouse) EnsureLogContainer(statefulSet *apps.StatefulSet) {
+func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
 	cm.ensureClickHouseLogContainerSpecified(statefulSet)
 }
 
 // getClickHouseContainer
-func (cm *ContainerManagerClickHouse) getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+func (cm *ContainerManager) getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
 }
 
 // getClickHouseLogContainer
-func (cm *ContainerManagerClickHouse) getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+func (cm *ContainerManager) getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseLogContainerName)
 }
 
 // ensureClickHouseContainerSpecified
-func (cm *ContainerManagerClickHouse) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
+func (cm *ContainerManager) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
 	_, ok := cm.getClickHouseContainer(statefulSet)
 	if ok {
 		return
@@ -74,7 +74,7 @@ func (cm *ContainerManagerClickHouse) ensureClickHouseContainerSpecified(statefu
 }
 
 // ensureClickHouseLogContainerSpecified
-func (cm *ContainerManagerClickHouse) ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
+func (cm *ContainerManager) ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
 	_, ok := cm.getClickHouseLogContainer(statefulSet)
 	if ok {
 		return
@@ -89,7 +89,7 @@ func (cm *ContainerManagerClickHouse) ensureClickHouseLogContainerSpecified(stat
 }
 
 // newDefaultContainerClickHouse returns default ClickHouse Container
-func (cm *ContainerManagerClickHouse) newDefaultContainerClickHouse(host *api.Host) core.Container {
+func (cm *ContainerManager) newDefaultContainerClickHouse(host *api.Host) core.Container {
 	container := core.Container{
 		Name:           config.ClickHouseContainerName,
 		Image:          config.DefaultClickHouseDockerImage,
@@ -101,7 +101,7 @@ func (cm *ContainerManagerClickHouse) newDefaultContainerClickHouse(host *api.Ho
 }
 
 // newDefaultContainerLog returns default ClickHouse Log Container
-func (cm *ContainerManagerClickHouse) newDefaultContainerLog() core.Container {
+func (cm *ContainerManager) newDefaultContainerLog() core.Container {
 	return core.Container{
 		Name:  config.ClickHouseLogContainerName,
 		Image: config.DefaultUbiDockerImage,

@@ -27,17 +27,17 @@ import (
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
-type ConfigMapManagerClickHouse struct {
+type ConfigMapManager struct {
 	cr                   api.ICustomResource
 	tagger               interfaces.ITagger
 	configFilesGenerator interfaces.IConfigFilesGenerator
 }
 
-func NewConfigMapManagerClickHouse() *ConfigMapManagerClickHouse {
-	return &ConfigMapManagerClickHouse{}
+func NewConfigMapManager() *ConfigMapManager {
+	return &ConfigMapManager{}
 }
 
-func (m *ConfigMapManagerClickHouse) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
+func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
 	case interfaces.ConfigMapCommon:
 		var options *config.FilesGeneratorOptionsClickHouse
@@ -57,18 +57,18 @@ func (m *ConfigMapManagerClickHouse) CreateConfigMap(what interfaces.ConfigMapTy
 	panic("unknown config map type")
 }
 
-func (m *ConfigMapManagerClickHouse) SetCR(cr api.ICustomResource) {
+func (m *ConfigMapManager) SetCR(cr api.ICustomResource) {
 	m.cr = cr
 }
-func (m *ConfigMapManagerClickHouse) SetTagger(tagger interfaces.ITagger) {
+func (m *ConfigMapManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
-func (m *ConfigMapManagerClickHouse) SetConfigFilesGenerator(configFilesGenerator interfaces.IConfigFilesGenerator) {
+func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfaces.IConfigFilesGenerator) {
 	m.configFilesGenerator = configFilesGenerator
 }
 
 // createConfigMapCHICommon creates new core.ConfigMap
-func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.FilesGeneratorOptionsClickHouse) *core.ConfigMap {
+func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGeneratorOptionsClickHouse) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.New().Name(interfaces.NameConfigMapCommon, m.cr),
@@ -86,7 +86,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommon(options *config.Fi
 }
 
 // createConfigMapCHICommonUsers creates new core.ConfigMap
-func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.ConfigMap {
+func (m *ConfigMapManager) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.New().Name(interfaces.NameConfigMapCommonUsers, m.cr),
@@ -104,7 +104,7 @@ func (m *ConfigMapManagerClickHouse) createConfigMapCHICommonUsers() *core.Confi
 }
 
 // createConfigMapCHIHost creates new core.ConfigMap
-func (m *ConfigMapManagerClickHouse) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
+func (m *ConfigMapManager) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.New().Name(interfaces.NameConfigMapHost, host),

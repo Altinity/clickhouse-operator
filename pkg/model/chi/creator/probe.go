@@ -22,14 +22,14 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type ProbeManagerClickHouse struct {
+type ProbeManager struct {
 }
 
-func NewProbeManagerClickHouse() *ProbeManagerClickHouse {
-	return &ProbeManagerClickHouse{}
+func NewProbeManager() *ProbeManager {
+	return &ProbeManager{}
 }
 
-func (m *ProbeManagerClickHouse) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
+func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
 	switch what {
 	case interfaces.ProbeDefaultLiveness:
 		return m.createDefaultClickHouseLivenessProbe(host)
@@ -40,7 +40,7 @@ func (m *ProbeManagerClickHouse) CreateProbe(what interfaces.ProbeType, host *ap
 }
 
 // createDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
-func (m *ProbeManagerClickHouse) createDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
+func (m *ProbeManager) createDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{
@@ -77,7 +77,7 @@ func (m *ProbeManagerClickHouse) createDefaultClickHouseLivenessProbe(host *api.
 }
 
 // createDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
-func (m *ProbeManagerClickHouse) createDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
+func (m *ProbeManager) createDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{
