@@ -181,8 +181,8 @@ func (a Announcer) M(m ...interface{}) Announcer {
 				return a
 			}
 			b.meta = typed.Namespace + "/" + typed.Name
-			if typed.GetSpec().HasTaskID() {
-				b.meta += "/" + typed.GetSpec().GetTaskID()
+			if typed.GetSpecT().HasTaskID() {
+				b.meta += "/" + typed.GetSpecT().GetTaskID()
 			}
 		default:
 			if meta, ok := a.tryToFindNamespaceNameEverywhere(m[0]); ok {
@@ -403,8 +403,8 @@ func (a Announcer) findCHI(m interface{}) (string, bool) {
 		return "", false
 	}
 	res := chi.Namespace + "/" + chi.Name
-	if chi.GetSpec().HasTaskID() {
-		res += "/" + chi.GetSpec().GetTaskID()
+	if chi.GetSpecT().HasTaskID() {
+		res += "/" + chi.GetSpecT().GetTaskID()
 	}
 	return res, true
 }

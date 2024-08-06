@@ -23,6 +23,7 @@ import (
 
 	a "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
@@ -304,9 +305,9 @@ func (a Announcer) writeStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if shouldUpdateStatus {
-		_ = a.statusUpdater.Update(context.Background(), a.cr, interfaces.UpdateStatusOptions{
+		_ = a.statusUpdater.Update(context.Background(), a.cr, types.UpdateStatusOptions{
 			TolerateAbsence: true,
-			CopyStatusOptions: api.CopyStatusOptions{
+			CopyStatusOptions: types.CopyStatusOptions{
 				Actions: true,
 				Errors:  true,
 			},
