@@ -497,8 +497,13 @@ func (c *GeneratorClickHouse) getRemoteServersReplicaHostname(host *api.Host) st
 	return c.namer.Name(interfaces.NameInstanceHostname, host)
 }
 
+// Secured interface for nodes and hosts
+type Secured interface {
+	IsSecure() bool
+}
+
 // getSecure gets config-usable value for host or node secure flag
-func (c *GeneratorClickHouse) getSecure(host api.Secured) int {
+func (c *GeneratorClickHouse) getSecure(host Secured) int {
 	if host.IsSecure() {
 		return 1
 	}
