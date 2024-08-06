@@ -320,13 +320,13 @@ func createClusterAutoSecretName(cluster api.ICluster) string {
 	if cluster.GetName() == "" {
 		return fmt.Sprintf(
 			"%s-auto-secret",
-			cluster.GetRuntime().GetRoot().GetName(),
+			cluster.GetRuntime().GetCR().GetName(),
 		)
 	}
 
 	return fmt.Sprintf(
 		"%s-%s-auto-secret",
-		cluster.GetRuntime().GetRoot().GetName(),
+		cluster.GetRuntime().GetCR().GetName(),
 		cluster.GetName(),
 	)
 }
