@@ -14,7 +14,6 @@
 
 package v1
 
-
 // TargetSelector specifies target selector based on labels
 type TargetSelector map[string]string
 
