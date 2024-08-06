@@ -18,14 +18,15 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 )
 
-func getCluster(chk *api.ClickHouseKeeperInstallation) *api.ChkCluster {
-	return chk.Spec.GetConfiguration().GetCluster(0)
-}
+//func getCluster(chk *api.ClickHouseKeeperInstallation) *api.ChkCluster {
+//	return chk.Spec.GetConfiguration().GetCluster(0)
+//}
 
 func GetReplicasCount(chk *api.ClickHouseKeeperInstallation) int {
-	cluster := getCluster(chk)
-	if cluster == nil {
-		return 0
-	}
-	return cluster.GetLayout().GetReplicasCount()
+	//cluster := getCluster(chk)
+	//if cluster == nil {
+	//	return 0
+	//}
+	//return cluster.GetLayout().GetReplicasCount()
+	return 1
 }
