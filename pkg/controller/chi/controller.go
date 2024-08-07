@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	types2 "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"time"
 
 	"github.com/sanity-io/litter"
@@ -28,14 +27,13 @@ import (
 	core "k8s.io/api/core/v1"
 	apiExtensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	kubeTypes "k8s.io/apimachinery/pkg/types"
 	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	kubeInformers "k8s.io/client-go/informers"
 	kube "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedCore "k8s.io/client-go/kubernetes/typed/core/v1"
-	appsListers "k8s.io/client-go/listers/apps/v1"
 	coreListers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -44,12 +42,12 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	chopClientSetScheme "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned/scheme"
 	chopInformers "github.com/altinity/clickhouse-operator/pkg/client/informers/externalversions"
-	chopListers "github.com/altinity/clickhouse-operator/pkg/client/listers/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
@@ -71,34 +69,8 @@ type Controller struct {
 	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
 	chopClient chopClientSet.Interface
 
-	// chiLister used as chiLister.ClickHouseInstallations(namespace).Get(name)
-	chiLister chopListers.ClickHouseInstallationLister
-	// chiListerSynced used in waitForCacheSync()
-	chiListerSynced cache.InformerSynced
-
-	chitLister       chopListers.ClickHouseInstallationTemplateLister
-	chitListerSynced cache.InformerSynced
-
-	// serviceLister used as serviceLister.Services(namespace).Get(name)
-	serviceLister coreListers.ServiceLister
-	// serviceListerSynced used in waitForCacheSync()
-	serviceListerSynced cache.InformerSynced
-	// endpointsLister used as endpointsLister.Endpoints(namespace).Get(name)
-	endpointsLister coreListers.EndpointsLister
-	// endpointsListerSynced used in waitForCacheSync()
-	endpointsListerSynced cache.InformerSynced
 	// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
 	configMapLister coreListers.ConfigMapLister
-	// configMapListerSynced used in waitForCacheSync()
-	configMapListerSynced cache.InformerSynced
-	// statefulSetLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-	statefulSetLister appsListers.StatefulSetLister
-	// statefulSetListerSynced used in waitForCacheSync()
-	statefulSetListerSynced cache.InformerSynced
-	// podLister used as statefulSetLister.StatefulSets(namespace).Get(name)
-	podLister coreListers.PodLister
-	// podListerSynced used in waitForCacheSync()
-	podListerSynced cache.InformerSynced
 
 	// queues used to organize events queue processed by operator
 	queues []queue.PriorityQueue
@@ -143,28 +115,15 @@ func NewController(
 
 	// Create Controller instance
 	controller := &Controller{
-		kubeClient:              kubeClient,
-		extClient:               extClient,
-		chopClient:              chopClient,
-		chiLister:               chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Lister(),
-		chiListerSynced:         chopInformerFactory.Clickhouse().V1().ClickHouseInstallations().Informer().HasSynced,
-		chitLister:              chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Lister(),
-		chitListerSynced:        chopInformerFactory.Clickhouse().V1().ClickHouseInstallationTemplates().Informer().HasSynced,
-		serviceLister:           kubeInformerFactory.Core().V1().Services().Lister(),
-		serviceListerSynced:     kubeInformerFactory.Core().V1().Services().Informer().HasSynced,
-		endpointsLister:         kubeInformerFactory.Core().V1().Endpoints().Lister(),
-		endpointsListerSynced:   kubeInformerFactory.Core().V1().Endpoints().Informer().HasSynced,
-		configMapLister:         kubeInformerFactory.Core().V1().ConfigMaps().Lister(),
-		configMapListerSynced:   kubeInformerFactory.Core().V1().ConfigMaps().Informer().HasSynced,
-		statefulSetLister:       kubeInformerFactory.Apps().V1().StatefulSets().Lister(),
-		statefulSetListerSynced: kubeInformerFactory.Apps().V1().StatefulSets().Informer().HasSynced,
-		podLister:               kubeInformerFactory.Core().V1().Pods().Lister(),
-		podListerSynced:         kubeInformerFactory.Core().V1().Pods().Informer().HasSynced,
-		recorder:                recorder,
-		namer:                   namer,
-		kube:                    kube,
-		labeler:                 labeler.New(kube),
-		pvcDeleter:              volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
+		kubeClient:      kubeClient,
+		extClient:       extClient,
+		chopClient:      chopClient,
+		configMapLister: kubeInformerFactory.Core().V1().ConfigMaps().Lister(),
+		recorder:        recorder,
+		namer:           namer,
+		kube:            kube,
+		labeler:         labeler.New(kube),
+		pvcDeleter:      volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
 	controller.addEventHandlers(chopInformerFactory, kubeInformerFactory)
@@ -536,17 +495,6 @@ func (c *Controller) Run(ctx context.Context) {
 	}()
 
 	log.V(1).Info("Starting ClickHouseInstallation controller")
-	if !waitForCacheSync(
-		ctx,
-		"ClickHouseInstallation",
-		c.chiListerSynced,
-		c.statefulSetListerSynced,
-		c.configMapListerSynced,
-		c.serviceListerSynced,
-	) {
-		// Unable to sync
-		return
-	}
 
 	// Label controller runtime objects with proper labels
 	max := 10
@@ -768,7 +716,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 		Value: chi.GetFinalizers(),
 	}})
 
-	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, types.JSONPatchType, payload, controller.NewPatchOptions())
+	_new, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Patch(ctx, chi.Name, kubeTypes.JSONPatchType, payload, controller.NewPatchOptions())
 	if err != nil {
 		// Error update
 		log.V(1).M(chi).F().Error("%q", err)
@@ -788,7 +736,7 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 }
 
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, cr api.ICustomResource, opts types2.UpdateStatusOptions) (err error) {
+func (c *Controller) updateCHIObjectStatus(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error) {
 	return c.kube.CRStatus().Update(ctx, cr, opts)
 }
 
@@ -911,15 +859,4 @@ func (c *Controller) handleObject(obj interface{}) {
 
 	// Add CHI object into reconcile loop
 	// TODO c.enqueueObject(chi.Namespace, chi.Name, chi)
-}
-
-// waitForCacheSync is a logger-wrapper over cache.WaitForCacheSync() and it waits for caches to populate
-func waitForCacheSync(ctx context.Context, name string, cacheSyncs ...cache.InformerSynced) bool {
-	log.V(1).F().Info("Syncing caches for %s controller", name)
-	if !cache.WaitForCacheSync(ctx.Done(), cacheSyncs...) {
-		utilRuntime.HandleError(fmt.Errorf(messageUnableToSync, name))
-		return false
-	}
-	log.V(1).F().Info("Caches are synced for %s controller", name)
-	return true
 }
