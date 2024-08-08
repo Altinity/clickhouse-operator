@@ -18,8 +18,6 @@ import (
 	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // MergeType specifies merge types type
@@ -87,21 +85,6 @@ type ClickHouseOperatorConfiguration struct {
 	meta.ObjectMeta `json:"metadata,omitempty"    yaml:"metadata,omitempty"`
 	Spec            OperatorConfig `json:"spec"   yaml:"spec"`
 	Status          string         `json:"status" yaml:"status"`
-}
-
-// ChiSpec defines spec section of ClickHouseInstallation resource
-type ChiSpec struct {
-	TaskID                 *types.String     `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
-	Stop                   *types.StringBool `json:"stop,omitempty"                   yaml:"stop,omitempty"`
-	Restart                *types.String     `json:"restart,omitempty"                yaml:"restart,omitempty"`
-	Troubleshoot           *types.StringBool `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
-	NamespaceDomainPattern *types.String     `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
-	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
-	Reconciling            *Reconciling      `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
-	Defaults               *ChiDefaults      `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
-	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
-	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
-	UseTemplates           []*TemplateRef    `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

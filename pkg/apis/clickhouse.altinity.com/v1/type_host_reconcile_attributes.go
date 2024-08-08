@@ -43,8 +43,8 @@ type HostReconcileAttributes struct {
 	exclude bool
 }
 
-// NewChiHostReconcileAttributes creates new reconcile attributes
-func NewChiHostReconcileAttributes() *HostReconcileAttributes {
+// NewHostReconcileAttributes creates new reconcile attributes
+func NewHostReconcileAttributes() *HostReconcileAttributes {
 	return &HostReconcileAttributes{}
 }
 

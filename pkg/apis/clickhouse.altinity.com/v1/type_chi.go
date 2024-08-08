@@ -184,7 +184,7 @@ func (cr *ClickHouseInstallation) FillStatus(endpoint string, pods, fqdns []stri
 		Pods:                pods,
 		FQDNs:               fqdns,
 		Endpoint:            endpoint,
-		NormalizedCR: cr.Copy(CopyCROptions{
+		NormalizedCR: cr.Copy(types.CopyCROptions{
 			SkipStatus:        true,
 			SkipManagedFields: true,
 		}),
@@ -447,7 +447,7 @@ func (cr *ClickHouseInstallation) GetReconciling() *Reconciling {
 }
 
 // Copy makes copy of a CHI, filtering fields according to specified CopyOptions
-func (cr *ClickHouseInstallation) Copy(opts CopyCROptions) *ClickHouseInstallation {
+func (cr *ClickHouseInstallation) Copy(opts types.CopyCROptions) *ClickHouseInstallation {
 	if cr == nil {
 		return nil
 	}
@@ -473,7 +473,7 @@ func (cr *ClickHouseInstallation) Copy(opts CopyCROptions) *ClickHouseInstallati
 }
 
 // JSON returns JSON string
-func (cr *ClickHouseInstallation) JSON(opts CopyCROptions) string {
+func (cr *ClickHouseInstallation) JSON(opts types.CopyCROptions) string {
 	if cr == nil {
 		return ""
 	}
@@ -488,7 +488,7 @@ func (cr *ClickHouseInstallation) JSON(opts CopyCROptions) string {
 }
 
 // YAML return YAML string
-func (cr *ClickHouseInstallation) YAML(opts CopyCROptions) string {
+func (cr *ClickHouseInstallation) YAML(opts types.CopyCROptions) string {
 	if cr == nil {
 		return ""
 	}

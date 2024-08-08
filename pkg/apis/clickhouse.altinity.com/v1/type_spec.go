@@ -16,6 +16,21 @@ package v1
 
 import "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
+// ChiSpec defines spec section of ClickHouseInstallation resource
+type ChiSpec struct {
+	TaskID                 *types.String     `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	Stop                   *types.StringBool `json:"stop,omitempty"                   yaml:"stop,omitempty"`
+	Restart                *types.String     `json:"restart,omitempty"                yaml:"restart,omitempty"`
+	Troubleshoot           *types.StringBool `json:"troubleshoot,omitempty"           yaml:"troubleshoot,omitempty"`
+	NamespaceDomainPattern *types.String     `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Templating             *ChiTemplating    `json:"templating,omitempty"             yaml:"templating,omitempty"`
+	Reconciling            *Reconciling      `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Defaults               *Defaults         `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Configuration          *Configuration    `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates              *Templates        `json:"templates,omitempty"              yaml:"templates,omitempty"`
+	UseTemplates           []*TemplateRef    `json:"useTemplates,omitempty"           yaml:"useTemplates,omitempty"`
+}
+
 // HasTaskID checks whether task id is specified
 func (spec *ChiSpec) HasTaskID() bool {
 	return len(spec.TaskID.Value()) > 0
@@ -46,7 +61,7 @@ func (spec *ChiSpec) GetTemplating() *ChiTemplating {
 	return spec.Templating
 }
 
-func (spec *ChiSpec) GetDefaults() *ChiDefaults {
+func (spec *ChiSpec) GetDefaults() *Defaults {
 	return spec.Defaults
 }
 

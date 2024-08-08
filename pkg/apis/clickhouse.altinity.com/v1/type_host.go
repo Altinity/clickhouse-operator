@@ -93,7 +93,7 @@ func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
 		return nil
 	}
 	if host.Runtime.reconcileAttributes == nil {
-		host.Runtime.reconcileAttributes = NewChiHostReconcileAttributes()
+		host.Runtime.reconcileAttributes = NewHostReconcileAttributes()
 	}
 	return host.Runtime.reconcileAttributes
 }
@@ -120,18 +120,26 @@ func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
 	}
 }
 
-// InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *Host) InheritTemplatesFrom(shard IShard, replica IReplica, template *HostTemplate) {
-	if (shard != nil) && shard.HasTemplates() {
-		host.Templates = host.Templates.MergeFrom(shard.GetTemplates(), MergeTypeFillEmptyValues)
-	}
-
-	if (replica != nil) && replica.HasTemplates() {
-		host.Templates = host.Templates.MergeFrom(replica.GetTemplates(), MergeTypeFillEmptyValues)
-	}
-
-	if template != nil {
-		host.Templates = host.Templates.MergeFrom(template.Spec.Templates, MergeTypeFillEmptyValues)
+// InheritTemplatesFrom inherits templates from specified shard, replica or template
+func (host *Host) InheritTemplatesFrom(sources ...any) {
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasTemplates() {
+				host.Templates = host.Templates.MergeFrom(shard.GetTemplates(), MergeTypeFillEmptyValues)
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasTemplates() {
+				host.Templates = host.Templates.MergeFrom(replica.GetTemplates(), MergeTypeFillEmptyValues)
+			}
+		case *HostTemplate:
+			template := typed
+			if template != nil {
+				host.Templates = host.Templates.MergeFrom(template.Spec.Templates, MergeTypeFillEmptyValues)
+			}
+		}
 	}
 
 	host.Templates.HandleDeprecatedFields()
