@@ -53,9 +53,9 @@ func (m *Manager) SetCR(cr api.ICustomResource) {
 
 // stsSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
 func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
-	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
 	configMapCommonName := m.namer.Name(interfaces.NameConfigMapCommon, m.cr)
 	configMapCommonUsersName := m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr)
+	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(
@@ -63,7 +63,6 @@ func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, ho
 		k8s.CreateVolumeForConfigMap(configMapCommonName),
 		k8s.CreateVolumeForConfigMap(configMapCommonUsersName),
 		k8s.CreateVolumeForConfigMap(configMapHostName),
-		//createVolumeForConfigMap(configMapHostMigrationName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
