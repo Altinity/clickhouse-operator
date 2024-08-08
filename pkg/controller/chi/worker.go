@@ -823,10 +823,10 @@ func (w *worker) getRemoteServersGeneratorOptions() *chiConfig.RemoteServersOpti
 }
 
 // options build FilesGeneratorOptionsClickHouse
-func (w *worker) options() *chiConfig.FilesGeneratorOptionsClickHouse {
+func (w *worker) options() *chiConfig.FilesGeneratorOptions {
 	opts := w.getRemoteServersGeneratorOptions()
 	w.a.Info("RemoteServersOptions: %s", opts)
-	return chiConfig.NewConfigFilesGeneratorOptionsClickHouse().SetRemoteServersOptions(opts)
+	return chiConfig.NewFilesGeneratorOptions().SetRemoteServersOptions(opts)
 }
 
 // createCHIFromObjectMeta

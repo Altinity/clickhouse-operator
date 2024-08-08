@@ -26,7 +26,7 @@ import (
 )
 
 // reconcilePDB reconciles PodDisruptionBudget
-func (w *worker) reconcilePDB(ctx context.Context, cluster *api.ChiCluster, pdb *policy.PodDisruptionBudget) error {
+func (w *worker) reconcilePDB(ctx context.Context, cluster api.ICluster, pdb *policy.PodDisruptionBudget) error {
 	cur, err := w.c.getPDB(ctx, pdb)
 	switch {
 	case err == nil:

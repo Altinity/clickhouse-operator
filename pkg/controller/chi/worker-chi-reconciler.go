@@ -242,7 +242,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, chi *api.ClickH
 func (w *worker) reconcileConfigMapCommon(
 	ctx context.Context,
 	chi api.ICustomResource,
-	options *config.FilesGeneratorOptionsClickHouse,
+	options *config.FilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -281,7 +281,7 @@ func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, chi *api.Cli
 	return err
 }
 
-// reconcileHostConfigMap reconciles host's personal ConfigMap
+// reconcileConfigMapHost reconciles host's personal ConfigMap
 func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
