@@ -185,7 +185,7 @@ func (cr *ClickHouseKeeperInstallation) FillStatus(endpoint string, pods, fqdns 
 		Pods:                pods,
 		FQDNs:               fqdns,
 		Endpoint:            endpoint,
-		NormalizedCR: cr.Copy(apiChi.CopyCROptions{
+		NormalizedCR: cr.Copy(types.CopyCROptions{
 			SkipStatus:        true,
 			SkipManagedFields: true,
 		}),
@@ -419,7 +419,7 @@ func (cr *ClickHouseKeeperInstallation) GetReconciling() *apiChi.Reconciling {
 }
 
 // Copy makes copy of a CHI, filtering fields according to specified CopyOptions
-func (cr *ClickHouseKeeperInstallation) Copy(opts apiChi.CopyCROptions) *ClickHouseKeeperInstallation {
+func (cr *ClickHouseKeeperInstallation) Copy(opts types.CopyCROptions) *ClickHouseKeeperInstallation {
 	if cr == nil {
 		return nil
 	}
@@ -445,7 +445,7 @@ func (cr *ClickHouseKeeperInstallation) Copy(opts apiChi.CopyCROptions) *ClickHo
 }
 
 // JSON returns JSON string
-func (cr *ClickHouseKeeperInstallation) JSON(opts apiChi.CopyCROptions) string {
+func (cr *ClickHouseKeeperInstallation) JSON(opts types.CopyCROptions) string {
 	if cr == nil {
 		return ""
 	}
@@ -460,7 +460,7 @@ func (cr *ClickHouseKeeperInstallation) JSON(opts apiChi.CopyCROptions) string {
 }
 
 // YAML return YAML string
-func (cr *ClickHouseKeeperInstallation) YAML(opts apiChi.CopyCROptions) string {
+func (cr *ClickHouseKeeperInstallation) YAML(opts types.CopyCROptions) string {
 	if cr == nil {
 		return ""
 	}

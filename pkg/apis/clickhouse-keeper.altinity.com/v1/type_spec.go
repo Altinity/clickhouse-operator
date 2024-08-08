@@ -23,7 +23,7 @@ func (spec *ChkSpec) GetNamespaceDomainPattern() *types.String {
 	return spec.NamespaceDomainPattern
 }
 
-func (spec *ChkSpec) GetDefaults() *apiChi.ChiDefaults {
+func (spec *ChkSpec) GetDefaults() *apiChi.Defaults {
 	return spec.Defaults
 }
 

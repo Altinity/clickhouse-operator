@@ -15,12 +15,12 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"sync"
 
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -58,8 +58,8 @@ func (runtime *ClickHouseKeeperInstallationRuntime) UnlockCommonConfig() {
 // ChkSpec defines spec section of ClickHouseKeeper resource
 type ChkSpec struct {
 	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
-	Defaults               *apiChi.ChiDefaults `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Reconciling            *apiChi.Reconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Defaults               *apiChi.Defaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
 	Configuration          *Configuration      `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
 	Templates              *apiChi.Templates   `json:"templates,omitempty"              yaml:"templates,omitempty"`
 }
