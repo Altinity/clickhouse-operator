@@ -66,49 +66,49 @@ func updateService(cur, new *core.Service) error {
 }
 
 // reconcileService reconciles core.Service
-func (w *worker) reconcileService(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, service *core.Service) error {
+func (w *worker) reconcileService(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, service *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(chk).S().Info(service.Name)
-	defer w.a.V(2).M(chk).E().Info(service.Name)
+	w.a.V(2).M(cr).S().Info(service.GetName())
+	defer w.a.V(2).M(cr).E().Info(service.GetName())
 
 	// Check whether this object already exists
 	curService, err := w.c.getService(ctx, service)
 
 	if curService != nil {
 		// We have the Service - try to update it
-		w.a.V(1).M(chk).F().Info("Service found: %s/%s. Will try to update", service.Namespace, service.Name)
-		err = w.updateService(ctx, chk, curService, service)
+		w.a.V(1).M(cr).F().Info("Service found: %s. Will try to update", util.NamespaceNameString(service))
+		err = w.updateService(ctx, cr, curService, service)
 	}
 
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.V(1).M(chk).F().Info("Service: %s/%s not found. err: %v", service.Namespace, service.Name, err)
+			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.WithEvent(chk, common.EventActionUpdate, common.EventReasonUpdateFailed).
-				WithStatusAction(chk).
-				WithStatusError(chk).
-				M(chk).F().
-				Error("Update Service: %s/%s failed with error: %v", service.Namespace, service.Name, err)
+			w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
+				WithStatusAction(cr).
+				WithStatusError(cr).
+				M(cr).F().
+				Error("Update Service: %s failed with error: %v", util.NamespaceNameString(service), err)
 		}
 
-		_ = w.c.deleteServiceIfExists(ctx, service.Namespace, service.Name)
-		err = w.createService(ctx, chk, service)
+		_ = w.c.deleteServiceIfExists(ctx, service.GetNamespace(), service.GetName())
+		err = w.createService(ctx, cr, service)
 	}
 
 	if err == nil {
-		w.a.V(1).M(chk).F().Info("Service reconcile successful: %s/%s", service.Namespace, service.Name)
+		w.a.V(1).M(cr).F().Info("Service reconcile successful: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(chk, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(chk).
-			WithStatusError(chk).
-			M(chk).F().
-			Error("FAILED to reconcile Service: %s/%s CHI: %s ", service.Namespace, service.Name, chk.Name)
+		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
+			Error("FAILED to reconcile Service: %s CHI: %s ", util.NamespaceNameString(service), cr.GetName())
 	}
 
 	return err
@@ -117,7 +117,7 @@ func (w *worker) reconcileService(ctx context.Context, chk *apiChk.ClickHouseKee
 // updateService
 func (w *worker) updateService(
 	ctx context.Context,
-	chk *apiChk.ClickHouseKeeperInstallation,
+	cr *apiChk.ClickHouseKeeperInstallation,
 	curService *core.Service,
 	targetService *core.Service,
 ) error {
@@ -173,7 +173,7 @@ func (w *worker) updateService(
 					// Already have this port specified - reuse all internals,
 					// due to limitations with auto-assigned values
 					*newPort = *curPort
-					w.a.M(chk).F().Info("reuse Port %d values", newPort.Port)
+					w.a.M(cr).F().Info("reuse Port %d values", newPort.Port)
 					break
 				}
 			}
@@ -215,19 +215,19 @@ func (w *worker) updateService(
 	err := w.c.updateService(ctx, newService)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chk, common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(chk).
-			M(chk).F().
-			Info("Update Service success: %s/%s", newService.GetNamespace(), newService.GetName())
+			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
+			WithStatusAction(cr).
+			M(cr).F().
+			Info("Update Service success: %s", util.NamespaceNameString(newService))
 	} else {
-		w.a.M(chk).F().Error("Update Service fail: %s/%s failed with error %v", newService.GetNamespace(), newService.GetName())
+		w.a.M(cr).F().Error("Update Service fail: %s failed with error: %v", util.NamespaceNameString(newService))
 	}
 
 	return err
 }
 
 // createService
-func (w *worker) createService(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, service *core.Service) error {
+func (w *worker) createService(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, service *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -236,16 +236,16 @@ func (w *worker) createService(ctx context.Context, chk *apiChk.ClickHouseKeeper
 	err := w.c.createService(ctx, service)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chk, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(chk).
-			M(chk).F().
-			Info("OK Create Service: %s/%s", service.Namespace, service.Name)
+			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
+			WithStatusAction(cr).
+			M(cr).F().
+			Info("OK Create Service: %s", util.NamespaceNameString(service))
 	} else {
-		w.a.WithEvent(chk, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(chk).
-			WithStatusError(chk).
-			M(chk).F().
-			Error("FAILED Create Service: %s/%s err: %v", service.Namespace, service.Name, err)
+		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
+			Error("FAILED Create Service: %s err: %v", util.NamespaceNameString(service), err)
 	}
 
 	return err

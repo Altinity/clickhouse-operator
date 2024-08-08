@@ -36,7 +36,7 @@ type worker struct {
 	a             common.Announcer
 	normalizer    *chkNormalizer.Normalizer
 	task          *common.Task
-	stsReconciler *statefulset.StatefulSetReconciler
+	stsReconciler *statefulset.Reconciler
 
 	start time.Time
 }
@@ -77,10 +77,11 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 			managers.NewVolumeManager(managers.VolumeManagerTypeKeeper),
 			managers.NewConfigMapManager(managers.ConfigMapManagerTypeKeeper),
 			managers.NewNameManager(managers.NameManagerTypeKeeper),
+			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
 		),
 	)
 
-	w.stsReconciler = statefulset.NewStatefulSetReconciler(
+	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
 		//poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),

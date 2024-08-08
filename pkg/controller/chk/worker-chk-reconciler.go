@@ -49,6 +49,7 @@ func (w *worker) reconcileCHK(ctx context.Context, old, new *apiChk.ClickHouseKe
 
 	log.V(2).M(new).F().Info("Normalized NEW CHK %s", util.NamespaceNameString(new))
 	new = w.normalize(new)
+
 	new.SetAncestor(old)
 
 	if util.IsContextDone(ctx) {
@@ -187,10 +188,13 @@ func (w *worker) getReconcileShardsWorkersNum(shards []*apiChk.ChkShard, opts *c
 
 // reconcileShardsAndHosts reconciles shards and hosts of each shard
 func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*apiChk.ChkShard) error {
-	// Sanity check - CHI has to have shard(s)
+	// Sanity check - has to have shard(s)
 	if len(shards) == 0 {
 		return nil
 	}
+
+	log.V(1).F().S().Info("reconcileShardsAndHosts start")
+	defer log.V(1).F().E().Info("reconcileShardsAndHosts end")
 
 	// Try to fetch options
 	opts, ok := ctx.Value(common.ReconcileShardsAndHostsOptionsCtxKey).(*common.ReconcileShardsAndHostsOptions)
