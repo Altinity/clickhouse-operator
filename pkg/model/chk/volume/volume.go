@@ -19,8 +19,8 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
@@ -54,24 +54,17 @@ func (m *Manager) SetCR(cr api.ICustomResource) {
 // stsSetupVolumesForConfigMaps adds to each container in the Pod VolumeMount objects
 func (m *Manager) stsSetupVolumesForConfigMaps(statefulSet *apps.StatefulSet, host *api.Host) {
 	configMapHostName := m.namer.Name(interfaces.NameConfigMapHost, host)
-	configMapCommonName := m.namer.Name(interfaces.NameConfigMapCommon, m.cr)
-	configMapCommonUsersName := m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr)
 
 	// Add all ConfigMap objects as Volume objects of type ConfigMap
 	k8s.StatefulSetAppendVolumes(
 		statefulSet,
-		k8s.CreateVolumeForConfigMap(configMapCommonName),
-		k8s.CreateVolumeForConfigMap(configMapCommonUsersName),
 		k8s.CreateVolumeForConfigMap(configMapHostName),
-		//createVolumeForConfigMap(configMapHostMigrationName),
 	)
 
 	// And reference these Volumes in each Container via VolumeMount
 	// So Pod will have ConfigMaps mounted as Volumes in each Container
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
-		k8s.CreateVolumeMount(configMapCommonName, config.DirPathConfigCommon),
-		k8s.CreateVolumeMount(configMapCommonUsersName, config.DirPathConfigUsers),
 		k8s.CreateVolumeMount(configMapHostName, config.DirPathConfigHost),
 	)
 }
@@ -83,7 +76,7 @@ func (m *Manager) stsSetupVolumesUserDataWithFixedPaths(statefulSet *apps.Statef
 	// Mount all named (data and log so far) VolumeClaimTemplates into all containers
 	k8s.StatefulSetAppendVolumeMountsInAllContainers(
 		statefulSet,
-		k8s.CreateVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseData),
-		k8s.CreateVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseLog),
+		k8s.CreateVolumeMount(host.Templates.GetDataVolumeClaimTemplate(), config.DirPathClickHouseKeeperData),
+		k8s.CreateVolumeMount(host.Templates.GetLogVolumeClaimTemplate(), config.DirPathClickHouseKeeperLog),
 	)
 }
