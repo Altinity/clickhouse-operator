@@ -14,32 +14,32 @@
 
 package statefulset
 
-type ReconcileStatefulSetOptions struct {
+type ReconcileOptions struct {
 	forceRecreate bool
 }
 
-func (o *ReconcileStatefulSetOptions) ForceRecreate() bool {
+func (o *ReconcileOptions) ForceRecreate() bool {
 	if o == nil {
 		return false
 	}
 	return o.forceRecreate
 }
 
-func NewReconcileStatefulSetOptions(forceRecreate bool) *ReconcileStatefulSetOptions {
-	return &ReconcileStatefulSetOptions{
+func NewReconcileStatefulSetOptions(forceRecreate bool) *ReconcileOptions {
+	return &ReconcileOptions{
 		forceRecreate: forceRecreate,
 	}
 }
 
-type ReconcileStatefulSetOptionsArr []*ReconcileStatefulSetOptions
+type ReconcileOptionsSet []*ReconcileOptions
 
-// NewReconcileStatefulSetOptionsArr creates new reconcileHostStatefulSetOptions array
-func NewReconcileStatefulSetOptionsArr(opts ...*ReconcileStatefulSetOptions) (res ReconcileStatefulSetOptionsArr) {
+// NewReconcileOptionsSet creates new reconcileHostStatefulSetOptions array
+func NewReconcileOptionsSet(opts ...*ReconcileOptions) (res ReconcileOptionsSet) {
 	return append(res, opts...)
 }
 
 // First gets first option
-func (a ReconcileStatefulSetOptionsArr) First() *ReconcileStatefulSetOptions {
+func (a ReconcileOptionsSet) First() *ReconcileOptions {
 	if len(a) > 0 {
 		return a[0]
 	}

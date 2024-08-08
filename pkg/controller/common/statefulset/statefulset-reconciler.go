@@ -119,7 +119,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	ctx context.Context,
 	host *api.Host,
 	register bool,
-	opts ...*ReconcileStatefulSetOptions,
+	opts ...*ReconcileOptions,
 ) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -153,7 +153,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 		common.DumpStatefulSetDiff(host, host.Runtime.CurStatefulSet, newStatefulSet)
 	}
 
-	opt := NewReconcileStatefulSetOptionsArr(opts...).First()
+	opt := NewReconcileOptionsSet(opts...).First()
 	switch {
 	case opt.ForceRecreate():
 		// Force recreate prevails over all other requests
@@ -445,7 +445,6 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	// To achieve ordered and graceful termination of the pods in the StatefulSet,
 	// it is possible to scale the StatefulSet down to 0 prior to deletion.
 
-	// Namespaced name
 	name := r.namer.Name(interfaces.NameStatefulSet, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)

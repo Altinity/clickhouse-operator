@@ -338,7 +338,7 @@ func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Hos
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*statefulset.ReconcileStatefulSetOptions) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*statefulset.ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -598,7 +598,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	var (
-		reconcileStatefulSetOpts *statefulset.ReconcileStatefulSetOptions
+		reconcileStatefulSetOpts *statefulset.ReconcileOptions
 		migrateTableOpts         *migrateTableOptions
 	)
 

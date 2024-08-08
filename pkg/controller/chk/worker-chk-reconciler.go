@@ -146,7 +146,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.ChkCluste
 }
 
 // reconcileHostStatefulSet reconciles host's StatefulSet
-func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*statefulset.ReconcileStatefulSetOptions) error {
+func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*statefulset.ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -307,7 +307,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *apiChk.ChkShard) err
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	var (
-		reconcileStatefulSetOpts *statefulset.ReconcileStatefulSetOptions
+		reconcileStatefulSetOpts *statefulset.ReconcileOptions
 	)
 
 	if util.IsContextDone(ctx) {
