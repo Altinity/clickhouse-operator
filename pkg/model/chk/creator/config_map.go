@@ -21,6 +21,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
@@ -36,11 +37,13 @@ func NewConfigMapManager() *ConfigMapManager {
 
 func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
-	case interfaces.ConfigMapConfig:
-		var options *config.FilesGeneratorOptionsKeeper
+	case interfaces.ConfigMapHost:
+		var host *api.Host
+		var options *config.FilesGeneratorOptions
 		if len(params) > 0 {
-			options = params[0].(*config.FilesGeneratorOptionsKeeper)
-			return m.common(options)
+			host = params[0].(*api.Host)
+			options = params[1].(*config.FilesGeneratorOptions)
+			return m.host(host, options)
 		}
 	}
 	panic("unknown config map type")
@@ -56,18 +59,18 @@ func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfac
 	m.configFilesGenerator = configFilesGenerator
 }
 
-// CreateConfigMap returns a config map containing ClickHouse Keeper config XML
-func (m *ConfigMapManager) common(options *config.FilesGeneratorOptionsKeeper) *core.ConfigMap {
+// host returns a config map containing ClickHouse Keeper config XML
+func (m *ConfigMapManager) host(host *api.Host, options *config.FilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
 			APIVersion: "v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:      m.cr.GetName(),
-			Namespace: m.cr.GetNamespace(),
+			Name:      namer.New().Name(interfaces.NameConfigMapHost, host),
+			Namespace: host.GetRuntime().GetAddress().GetNamespace(),
 		},
-		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupCommon, options),
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, options),
 	}
 	// And after the object is ready we can put version label
 	commonLabeler.MakeObjectVersion(cm.GetObjectMeta(), cm)

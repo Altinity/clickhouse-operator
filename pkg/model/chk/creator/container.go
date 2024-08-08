@@ -67,37 +67,7 @@ func (cm *ContainerManager) ensureContainerSpecifiedKeeper(statefulSet *apps.Sta
 }
 
 func (cm *ContainerManager) createInitContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
-	return []core.Container{
-		cm.newDefaultContainerServerIDInjector(),
-	}
-
-}
-
-func (cm *ContainerManager) newDefaultContainerServerIDInjector() core.Container {
-	container := core.Container{
-		Name:  config.KeeperServerIDInjectorContainerName,
-		Image: config.DefaultServerIDInjectorDockerImage,
-		Command: []string{
-			`bash`,
-			`-xc`,
-			// Build keeper config
-			`export KEEPER_ID=${HOSTNAME##*-};` +
-				`sed "s/KEEPER_ID/${KEEPER_ID}/g" /tmp/clickhouse-keeper/keeper_config.xml > ` + config.DirPathConfigFilename + `;` +
-				`cat ` + config.DirPathConfigFilename,
-		},
-	}
-	k8s.ContainerAppendVolumeMounts(
-		&container,
-		core.VolumeMount{
-			Name:      "keeper-config",
-			MountPath: "/tmp/clickhouse-keeper",
-		},
-		core.VolumeMount{
-			Name:      "etc-clickhouse-keeper",
-			MountPath: "/etc/clickhouse-keeper",
-		},
-	)
-	return container
+	return []core.Container{}
 }
 
 func (cm *ContainerManager) createContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
@@ -154,19 +124,7 @@ func (cm *ContainerManager) newDefaultContainerKeeper(host *apiChi.Host) core.Co
 		Image:         config.DefaultKeeperDockerImage,
 		LivenessProbe: cm.probe.createDefaultKeeperLivenessProbe(host),
 	}
-	k8s.ContainerAppendVolumeMounts(
-		&container,
-		core.VolumeMount{
-			Name:      "keeper-config",
-			MountPath: "/tmp/clickhouse-keeper",
-		},
-		core.VolumeMount{
-			Name:      "etc-clickhouse-keeper",
-			MountPath: "/etc/clickhouse-keeper",
-		},
-	)
 	return container
-
 }
 
 func setupPort(container *core.Container, port int, containerPort core.ContainerPort) {

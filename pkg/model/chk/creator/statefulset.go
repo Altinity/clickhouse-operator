@@ -39,7 +39,7 @@ func CreateStatefulSet(chk *api.ClickHouseKeeperInstallation) *apps.StatefulSet 
 		},
 		ObjectMeta: meta.ObjectMeta{
 			Name:      chk.GetName(),
-			Namespace: chk.Namespace,
+			Namespace: chk.GetNamespace(),
 			Labels:    labels,
 		},
 		Spec: apps.StatefulSetSpec{
