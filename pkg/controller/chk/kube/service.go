@@ -26,18 +26,18 @@ import (
 )
 
 type Service struct {
-	kubeClient client.Client
-	namer      interfaces.INameManager
+	kube  client.Client
+	namer interfaces.INameManager
 }
 
 func NewService(kubeClient client.Client, namer interfaces.INameManager) *Service {
 	return &Service{
-		kubeClient: kubeClient,
-		namer:      namer,
+		kube:  kubeClient,
+		namer: namer,
 	}
 }
 
-// getService gets Service. Accepted types:
+// Get gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
 func (c *Service) Get(obj any) (*core.Service, error) {
@@ -51,28 +51,33 @@ func (c *Service) Get(obj any) (*core.Service, error) {
 		namespace = typedObj.Runtime.Address.Namespace
 	}
 	service := &core.Service{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kube.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, service)
-	return service, err
+	if err == nil {
+		return service, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (c *Service) Create(svc *core.Service) (*core.Service, error) {
-	err := c.kubeClient.Create(controller.NewContext(), svc)
+	err := c.kube.Create(controller.NewContext(), svc)
 	return svc, err
 }
 
 func (c *Service) Update(svc *core.Service) (*core.Service, error) {
-	err := c.kubeClient.Update(controller.NewContext(), svc)
+	err := c.kube.Update(controller.NewContext(), svc)
 	return svc, err
 }
 
 func (c *Service) Delete(namespace, name string) error {
-	return c.kubeClient.Delete(controller.NewContext(), &core.Service{
+	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
-	})
+	}
+	return c.kube.Delete(controller.NewContext(), svc)
 }

@@ -16,22 +16,22 @@ package kube
 
 import (
 	"context"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	core "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Event struct {
-	kubeClient client.Client
+	kube client.Client
 }
 
 func NewEvent(kubeClient client.Client) *Event {
 	return &Event{
-		kubeClient: kubeClient,
+		kube: kubeClient,
 	}
 }
 
 func (c *Event) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
-	err := c.kubeClient.Create(ctx, event)
+	err := c.kube.Create(ctx, event)
 	return event, err
 }

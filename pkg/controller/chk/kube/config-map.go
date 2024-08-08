@@ -21,45 +21,47 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
 type ConfigMap struct {
-	kubeClient client.Client
+	kube client.Client
 }
 
 func NewConfigMap(kubeClient client.Client) *ConfigMap {
 	return &ConfigMap{
-		kubeClient: kubeClient,
+		kube: kubeClient,
 	}
 }
 
 func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kubeClient.Create(ctx, cm)
+	err := c.kube.Create(ctx, cm)
 	return cm, err
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
 	cm := &core.ConfigMap{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kube.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, cm)
-	return cm, err
+	if err == nil {
+		return cm, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kubeClient.Update(controller.NewContext(), cm)
+	err := c.kube.Update(ctx, cm)
 	return cm, err
 }
 
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
-	pvc := &core.ConfigMap{
+	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
 	}
-	return c.kubeClient.Delete(ctx, pvc)
+	return c.kube.Delete(ctx, cm)
 }

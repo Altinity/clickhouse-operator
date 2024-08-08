@@ -16,29 +16,30 @@ package kube
 
 import (
 	"context"
+
+	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	apps "k8s.io/api/apps/v1"
-	core "k8s.io/api/core/v1"
 )
 
 type Pod struct {
-	kubeClient client.Client
-	namer      interfaces.INameManager
+	kube  client.Client
+	namer interfaces.INameManager
 }
 
 func NewPod(kubeClient client.Client, namer interfaces.INameManager) *Pod {
 	return &Pod{
-		kubeClient: kubeClient,
-		namer:      namer,
+		kube:  kubeClient,
+		namer: namer,
 	}
 }
 
-// getPod gets pod. Accepted types:
+// Get gets pod. Accepted types:
 //  1. *apps.StatefulSet
 //  2. *chop.Host
 func (c *Pod) Get(params ...any) (*core.Pod, error) {
@@ -65,7 +66,7 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 		panic(any("incorrect number or params"))
 	}
 	pod := &core.Pod{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kube.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, pod)
@@ -94,7 +95,7 @@ func (c *Pod) GetAll(obj any) []*core.Pod {
 }
 
 func (c *Pod) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
-	err := c.kubeClient.Update(controller.NewContext(), pod)
+	err := c.kube.Update(ctx, pod)
 	return pod, err
 }
 
@@ -120,7 +121,7 @@ func (c *Pod) getPodsOfShard(shard api.IShard) (pods []*core.Pod) {
 	return pods
 }
 
-// getPodsOfCHI gets all pods in a CHI
+// getPodsOfCR gets all pods in a CHI
 func (c *Pod) getPodsOfCR(cr api.ICustomResource) (pods []*core.Pod) {
 	cr.WalkHosts(func(host *api.Host) error {
 		if pod, err := c.Get(host); err == nil {

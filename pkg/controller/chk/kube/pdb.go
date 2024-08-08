@@ -21,45 +21,47 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
 type PDB struct {
-	kubeClient client.Client
+	kube client.Client
 }
 
 func NewPDB(kubeClient client.Client) *PDB {
 	return &PDB{
-		kubeClient: kubeClient,
+		kube: kubeClient,
 	}
 }
 
 func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kubeClient.Create(ctx, pdb)
+	err := c.kube.Create(ctx, pdb)
 	return pdb, err
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
 	pdb := &policy.PodDisruptionBudget{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kube.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, pdb)
-	return pdb, err
+	if err == nil {
+		return pdb, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kubeClient.Update(controller.NewContext(), pdb)
+	err := c.kube.Update(ctx, pdb)
 	return pdb, err
 }
 
 func (c *PDB) Delete(ctx context.Context, namespace, name string) error {
-	pvc := &policy.PodDisruptionBudget{
+	pdb := &policy.PodDisruptionBudget{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
 	}
-	return c.kubeClient.Delete(ctx, pvc)
+	return c.kube.Delete(ctx, pdb)
 }

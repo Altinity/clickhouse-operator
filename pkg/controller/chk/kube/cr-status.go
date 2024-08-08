@@ -26,17 +26,16 @@ import (
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	common "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type CRStatus struct {
-	kubeClient client.Client
+	kube client.Client
 }
 
 func NewCRStatus(kubeClient client.Client) *CRStatus {
 	return &CRStatus{
-		kubeClient: kubeClient,
+		kube: kubeClient,
 	}
 }
 
@@ -79,7 +78,7 @@ func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr apiChi.ICustomResour
 	log.V(3).M(chk).F().Info("Update CHK status")
 
 	cur := &apiChk.ClickHouseKeeperInstallation{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kube.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, cur)
@@ -101,7 +100,7 @@ func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr apiChi.ICustomResour
 	// Update status of a real object.
 	cur.EnsureStatus().CopyFrom(chk.Status, opts.CopyStatusOptions)
 
-	err = c.kubeClient.Status().Update(context.TODO(), cur)
+	err = c.kube.Status().Update(ctx, cur)
 	if err != nil {
 		// Error update
 		log.V(2).M(chk).F().Info("Got error upon update, may retry. err: %q", err)
@@ -109,7 +108,7 @@ func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr apiChi.ICustomResour
 	}
 
 	new := &apiChk.ClickHouseKeeperInstallation{}
-	err = c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err = c.kube.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, cur)

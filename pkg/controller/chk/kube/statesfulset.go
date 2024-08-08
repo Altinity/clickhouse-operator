@@ -16,29 +16,34 @@ package kube
 
 import (
 	"fmt"
+
+	"gopkg.in/yaml.v3"
+
+	apps "k8s.io/api/apps/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	apps "k8s.io/api/apps/v1"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type STS struct {
-	kubeClient client.Client
-	namer      interfaces.INameManager
+	kube  client.Client
+	namer interfaces.INameManager
 }
 
 func NewSTS(kubeClient client.Client, namer interfaces.INameManager) *STS {
 	return &STS{
-		kubeClient: kubeClient,
-		namer:      namer,
+		kube:  kubeClient,
+		namer: namer,
 	}
 }
 
-// getStatefulSet gets StatefulSet. Accepted types:
+// Get gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.Host
 func (c *STS) Get(obj any) (*apps.StatefulSet, error) {
@@ -57,32 +62,37 @@ func (c *STS) Get(obj any) (*apps.StatefulSet, error) {
 
 func (c *STS) get(namespace, name string) (*apps.StatefulSet, error) {
 	sts := &apps.StatefulSet{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kube.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, sts)
+	if err == nil {
+		return sts, nil
+	} else {
+		return nil, err
+	}
+}
+
+func (c *STS) Create(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+	yamlBytes, _ := yaml.Marshal(sts)
+	log.V(3).M(sts).Info("Going to create STS: %s\n%s", util.NamespaceNameString(sts), string(yamlBytes))
+	err := c.kube.Create(controller.NewContext(), sts)
 	return sts, err
 }
 
-func (c *STS) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
-	err := c.kubeClient.Create(controller.NewContext(), statefulSet)
-	return statefulSet, err
-
-}
-
-// updateStatefulSet is an internal function, used in reconcileStatefulSet only
 func (c *STS) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
-	err := c.kubeClient.Update(controller.NewContext(), sts)
+	log.V(3).M(sts).Info("Going to update STS: %s", util.NamespaceNameString(sts))
+	err := c.kube.Update(controller.NewContext(), sts)
 	return sts, err
 }
 
-// deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
 func (c *STS) Delete(namespace, name string) error {
+	log.V(3).M(namespace, name).Info("Going to delete STS: %s/%s", namespace, name)
 	sts := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},
 	}
-	return c.kubeClient.Delete(controller.NewContext(), sts)
+	return c.kube.Delete(controller.NewContext(), sts)
 }

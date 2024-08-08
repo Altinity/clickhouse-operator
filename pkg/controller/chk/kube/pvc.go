@@ -25,38 +25,41 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type PVC struct {
-	kubeClient client.Client
+	kube client.Client
 }
 
 func NewPVC(kubeClient client.Client) *PVC {
 	return &PVC{
-		kubeClient: kubeClient,
+		kube: kubeClient,
 	}
 }
 
 func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
-	err := c.kubeClient.Create(ctx, pvc)
+	err := c.kube.Create(ctx, pvc)
 	return pvc, err
 }
 
 func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
 	pvc := &core.PersistentVolumeClaim{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kube.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, pvc)
-	return pvc, err
+	if err == nil {
+		return pvc, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
-	err := c.kubeClient.Update(controller.NewContext(), pvc)
+	err := c.kube.Update(ctx, pvc)
 	return pvc, err
 }
 
@@ -67,7 +70,7 @@ func (c *PVC) Delete(ctx context.Context, namespace, name string) error {
 			Name:      name,
 		},
 	}
-	return c.kubeClient.Delete(ctx, pvc)
+	return c.kube.Delete(ctx, pvc)
 }
 
 func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
@@ -76,7 +79,7 @@ func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.Persistent
 		LabelSelector: labels.SelectorFromSet(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
 		Namespace:     host.Runtime.Address.Namespace,
 	}
-	err := c.kubeClient.List(ctx, list, opts)
+	err := c.kube.List(ctx, list, opts)
 	return list, err
 }
 

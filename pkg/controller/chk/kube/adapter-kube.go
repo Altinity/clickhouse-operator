@@ -22,11 +22,7 @@ import (
 )
 
 type Adapter struct {
-	kubeClient client.Client
-	namer      interfaces.INameManager
-
 	// Set of k8s components
-
 	configMap  *ConfigMap
 	crStatus   *CRStatus
 	deployment *Deployment
@@ -41,11 +37,7 @@ type Adapter struct {
 
 func NewAdapter(kubeClient client.Client, namer interfaces.INameManager) *Adapter {
 	return &Adapter{
-		kubeClient: kubeClient,
-		namer:      namer,
-
 		// Set of k8s components
-
 		configMap:  NewConfigMap(kubeClient),
 		crStatus:   NewCRStatus(kubeClient),
 		deployment: NewDeployment(kubeClient),
