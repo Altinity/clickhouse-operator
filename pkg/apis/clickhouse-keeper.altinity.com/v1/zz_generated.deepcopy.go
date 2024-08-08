@@ -325,14 +325,14 @@ func (in *ChkSpec) DeepCopyInto(out *ChkSpec) {
 		*out = new(types.String)
 		**out = **in
 	}
-	if in.Defaults != nil {
-		in, out := &in.Defaults, &out.Defaults
-		*out = new(clickhousealtinitycomv1.ChiDefaults)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Reconciling != nil {
 		in, out := &in.Reconciling, &out.Reconciling
 		*out = new(clickhousealtinitycomv1.Reconciling)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.Defaults != nil {
+		in, out := &in.Defaults, &out.Defaults
+		*out = new(clickhousealtinitycomv1.Defaults)
 		(*in).DeepCopyInto(*out)
 	}
 	if in.Configuration != nil {
