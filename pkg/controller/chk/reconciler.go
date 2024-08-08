@@ -293,6 +293,7 @@ func (r *ChkReconciler) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInsta
 		cur.Status.NormalizedCHK = nil
 		cur.Status.NormalizedCHKCompleted = chk.DeepCopy()
 		cur.Status.NormalizedCHKCompleted.ObjectMeta.ManagedFields = nil
+		cur.Status.NormalizedCHKCompleted.ObjectMeta.ResourceVersion = ""
 		cur.Status.NormalizedCHKCompleted.Status = nil
 
 		if err := r.Status().Update(context.TODO(), cur); err != nil {
