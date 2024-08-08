@@ -24,6 +24,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -66,7 +67,7 @@ func updateService(cur, new *core.Service) error {
 }
 
 // reconcileService reconciles core.Service
-func (w *worker) reconcileService(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, service *core.Service) error {
+func (w *worker) reconcileService(ctx context.Context, cr apiChi.ICustomResource, service *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -117,7 +118,7 @@ func (w *worker) reconcileService(ctx context.Context, cr *apiChk.ClickHouseKeep
 // updateService
 func (w *worker) updateService(
 	ctx context.Context,
-	cr *apiChk.ClickHouseKeeperInstallation,
+	cr apiChi.ICustomResource,
 	curService *core.Service,
 	targetService *core.Service,
 ) error {
@@ -227,7 +228,7 @@ func (w *worker) updateService(
 }
 
 // createService
-func (w *worker) createService(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation, service *core.Service) error {
+func (w *worker) createService(ctx context.Context, cr apiChi.ICustomResource, service *core.Service) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

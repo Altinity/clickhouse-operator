@@ -16,6 +16,7 @@ package chk
 
 import (
 	"context"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"sync"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -26,7 +27,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -110,9 +110,9 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, chk *apiC
 	w.a.V(2).M(chk).S().P()
 	defer w.a.V(2).M(chk).E().P()
 
-	if err := w.reconcileConfigMapCommon(ctx, chk); err != nil {
-		w.a.F().Error("failed to reconcile config map common. err: %v", err)
-	}
+	//if err := w.reconcileConfigMapCommon(ctx, chk); err != nil {
+	//	w.a.F().Error("failed to reconcile config map common. err: %v", err)
+	//}
 	return nil
 }
 
@@ -321,6 +321,14 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	// Create artifacts
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 
+	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
+		//metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
+		return err
+	}
+
 	w.a.V(1).
 		M(host).F().
 		Info("Reconcile PVCs and check possible data loss for host: %s", host.GetName())
@@ -357,35 +365,61 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, chk *apiChk.Cli
 	w.a.V(2).M(chk).S().P()
 	defer w.a.V(2).M(chk).E().P()
 
-	// CHI ConfigMaps with update
-	chk.GetRuntime().LockCommonConfig()
-	err = w.reconcileConfigMapCommon(ctx, chk)
-	chk.GetRuntime().UnlockCommonConfig()
-	return err
+	//// CHI ConfigMaps with update
+	//chk.GetRuntime().LockCommonConfig()
+	//err = w.reconcileConfigMapCommon(ctx, chk)
+	//chk.GetRuntime().UnlockCommonConfig()
+	//return err
+
+	return nil
 }
 
-// reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
-func (w *worker) reconcileConfigMapCommon(
-	ctx context.Context,
-	chk *apiChk.ClickHouseKeeperInstallation,
-) error {
+//// reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
+//func (w *worker) reconcileConfigMapCommon(
+//	ctx context.Context,
+//	chk *apiChk.ClickHouseKeeperInstallation,
+//) error {
+//	if util.IsContextDone(ctx) {
+//		log.V(2).Info("task is done")
+//		return nil
+//	}
+//
+//	// ConfigMap common for all resources in CHI
+//	// contains several sections, mapped as separated chopConfig files,
+//	// such as remote servers, zookeeper setup, etc
+//	configMapCommon := w.task.Creator().CreateConfigMap(
+//		interfaces.ConfigMapConfig,
+//		chkConfig.NewFilesGeneratorOptions().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
+//	)
+//	err := w.reconcileConfigMap(ctx, chk, configMapCommon)
+//	if err == nil {
+//		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
+//	} else {
+//		w.task.RegistryFailed().RegisterConfigMap(configMapCommon.GetObjectMeta())
+//	}
+//	return err
+//}
+
+// reconcileConfigMapHost reconciles host's personal ConfigMap
+func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	// ConfigMap common for all resources in CHI
-	// contains several sections, mapped as separated chopConfig files,
-	// such as remote servers, zookeeper setup, etc
-	configMapCommon := w.task.Creator().CreateConfigMap(
-		interfaces.ConfigMapConfig,
-		chkConfig.NewConfigFilesGeneratorOptionsKeeper().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
+	// ConfigMap for a host
+	configMap := w.task.Creator().CreateConfigMap(
+		interfaces.ConfigMapHost,
+		host,
+		chkConfig.NewFilesGeneratorOptions().SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings()),
 	)
-	err := w.reconcileConfigMap(ctx, chk, configMapCommon)
+	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
-		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
+		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
 	} else {
-		w.task.RegistryFailed().RegisterConfigMap(configMapCommon.GetObjectMeta())
+		w.task.RegistryFailed().RegisterConfigMap(configMap.GetObjectMeta())
+		return err
 	}
-	return err
+
+	return nil
 }

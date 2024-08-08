@@ -22,37 +22,15 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-//func (w *worker) reconcileConfigMap(chk *apiChk.ClickHouseKeeperInstallation) error {
-//	return w.c.reconcile(
-//		chk,
-//		&core.ConfigMap{},
-//		w.task.Creator().CreateConfigMap(
-//			interfaces.ConfigMapConfig,
-//			chkConfig.NewConfigFilesGeneratorOptionsKeeper().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
-//		),
-//		"ConfigMap",
-//		func(_cur, _new client.Object) error {
-//			cur, ok1 := _cur.(*core.ConfigMap)
-//			new, ok2 := _new.(*core.ConfigMap)
-//			if !ok1 || !ok2 {
-//				return fmt.Errorf("unable to cast")
-//			}
-//			cur.Data = new.Data
-//			cur.BinaryData = new.BinaryData
-//			return nil
-//		},
-//	)
-//}
-
 // reconcileConfigMap reconciles core.ConfigMap which belongs to specified CHI
 func (w *worker) reconcileConfigMap(
 	ctx context.Context,
-	chk *apiChk.ClickHouseKeeperInstallation,
+	cr apiChi.ICustomResource,
 	configMap *core.ConfigMap,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -60,35 +38,35 @@ func (w *worker) reconcileConfigMap(
 		return nil
 	}
 
-	w.a.V(2).M(chk).S().P()
-	defer w.a.V(2).M(chk).E().P()
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
 
 	// Check whether this object already exists in k8s
 	curConfigMap, err := w.c.getConfigMap(ctx, configMap.GetObjectMeta())
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it
-		err = w.updateConfigMap(ctx, chk, configMap)
+		err = w.updateConfigMap(ctx, cr, configMap)
 	}
 
 	if apiErrors.IsNotFound(err) {
 		// ConfigMap not found - even during Update process - try to create it
-		err = w.createConfigMap(ctx, chk, configMap)
+		err = w.createConfigMap(ctx, cr, configMap)
 	}
 
 	if err != nil {
-		w.a.WithEvent(chk, common.EventActionReconcile, common.EventReasonReconcileFailed).
-			WithStatusAction(chk).
-			WithStatusError(chk).
-			M(chk).F().
-			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.Name, chk.Name)
+		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
+			Error("FAILED to reconcile ConfigMap: %s CHI: %s ", configMap.GetName(), cr.GetName())
 	}
 
 	return err
 }
 
 // updateConfigMap
-func (w *worker) updateConfigMap(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, configMap *core.ConfigMap) error {
+func (w *worker) updateConfigMap(ctx context.Context, cr apiChi.ICustomResource, configMap *core.ConfigMap) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -97,18 +75,18 @@ func (w *worker) updateConfigMap(ctx context.Context, chk *apiChk.ClickHouseKeep
 	updatedConfigMap, err := w.c.updateConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chk, common.EventActionUpdate, common.EventReasonUpdateCompleted).
-			WithStatusAction(chk).
-			M(chk).F().
+			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
+			WithStatusAction(cr).
+			M(cr).F().
 			Info("Update ConfigMap %s/%s", configMap.Namespace, configMap.Name)
 		if updatedConfigMap.ResourceVersion != configMap.ResourceVersion {
 			w.task.SetCmUpdate(time.Now())
 		}
 	} else {
-		w.a.WithEvent(chk, common.EventActionUpdate, common.EventReasonUpdateFailed).
-			WithStatusAction(chk).
-			WithStatusError(chk).
-			M(chk).F().
+		w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
 			Error("Update ConfigMap %s/%s failed with error %v", configMap.Namespace, configMap.Name, err)
 	}
 
@@ -116,7 +94,7 @@ func (w *worker) updateConfigMap(ctx context.Context, chk *apiChk.ClickHouseKeep
 }
 
 // createConfigMap
-func (w *worker) createConfigMap(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, configMap *core.ConfigMap) error {
+func (w *worker) createConfigMap(ctx context.Context, cr apiChi.ICustomResource, configMap *core.ConfigMap) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -125,15 +103,15 @@ func (w *worker) createConfigMap(ctx context.Context, chk *apiChk.ClickHouseKeep
 	err := w.c.createConfigMap(ctx, configMap)
 	if err == nil {
 		w.a.V(1).
-			WithEvent(chk, common.EventActionCreate, common.EventReasonCreateCompleted).
-			WithStatusAction(chk).
-			M(chk).F().
+			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
+			WithStatusAction(cr).
+			M(cr).F().
 			Info("Create ConfigMap %s", util.NamespaceNameString(configMap))
 	} else {
-		w.a.WithEvent(chk, common.EventActionCreate, common.EventReasonCreateFailed).
-			WithStatusAction(chk).
-			WithStatusError(chk).
-			M(chk).F().
+		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
+			WithStatusAction(cr).
+			WithStatusError(cr).
+			M(cr).F().
 			Error("Create ConfigMap %s failed with error %v", util.NamespaceNameString(configMap), err)
 	}
 

@@ -21,7 +21,7 @@ import (
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -36,7 +36,7 @@ import (
 //}
 
 // reconcilePDB reconciles PodDisruptionBudget
-func (w *worker) reconcilePDB(ctx context.Context, cluster *apiChk.ChkCluster, pdb *policy.PodDisruptionBudget) error {
+func (w *worker) reconcilePDB(ctx context.Context, cluster apiChi.ICluster, pdb *policy.PodDisruptionBudget) error {
 	cur, err := w.c.getPDB(ctx, pdb)
 	switch {
 	case err == nil:
