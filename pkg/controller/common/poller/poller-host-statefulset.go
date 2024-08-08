@@ -128,7 +128,10 @@ func (c *HostStatefulSetPoller) deleteReadyMark(ctx context.Context, host *api.H
 		return
 	}
 	if c.readyMarkDeleter == nil {
+		log.V(3).F().Info("no mark deleter specified")
 		return
 	}
-	_ = c.DeleteReadyMarkOnPodAndService(ctx, host)
+
+	log.V(3).F().Info("Has mark deleter specified")
+	_ = c.readyMarkDeleter.DeleteReadyMarkOnPodAndService(ctx, host)
 }

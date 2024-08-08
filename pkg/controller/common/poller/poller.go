@@ -53,13 +53,13 @@ func Poll(
 			// Object is not found - it either failed to be created or just still not created
 			if (opts.GetErrorTimeout > 0) && (time.Since(start) >= opts.GetErrorTimeout) {
 				// No more wait for the object to be created. Consider create process as failed.
-				log.V(1).M(namespace, name).F().Error("Get() FAILED - item is not available and get timeout reached. Abort")
+				log.V(1).M(namespace, name).F().Error("Poller.Get() FAILED because item is not available and get timeout reached for: %s/%s. Abort", namespace, name)
 				return err
 			}
 			// Object is not found - create timeout is not reached, we need to continue polling
 		default:
 			// Some kind of total error, abort polling
-			log.M(namespace, name).F().Error("%s/%s Get() FAILED", namespace, name)
+			log.M(namespace, name).F().Error("Poller.Get() FAILED for: %s/%s", namespace, name)
 			return err
 		}
 
@@ -80,8 +80,8 @@ func Poll(
 			log.V(1).M(namespace, name).F().Info("WAIT:%s/%s", namespace, name)
 		}
 
-		// Wait some more time and lauch background process(es)
-		log.V(2).M(namespace, name).F().P()
+		// Wait some more time and launch background process(es)
+		log.V(2).M(namespace, name).F().Info("poll iteration")
 		sleepAndRunBackgroundProcess(ctx, opts, background)
 	} // for
 }
