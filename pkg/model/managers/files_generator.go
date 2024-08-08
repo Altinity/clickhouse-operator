@@ -31,9 +31,9 @@ const (
 func NewConfigFilesGenerator(what FilesGeneratorType, cr api.ICustomResource, opts any) interfaces.IConfigFilesGenerator {
 	switch what {
 	case FilesGeneratorTypeClickHouse:
-		return chiConfig.NewConfigFilesGeneratorClickHouse(cr, NewNameManager(NameManagerTypeClickHouse), opts.(*chiConfig.GeneratorOptions))
+		return chiConfig.NewFilesGenerator(cr, NewNameManager(NameManagerTypeClickHouse), opts.(*chiConfig.GeneratorOptions))
 	case FilesGeneratorTypeKeeper:
-		return chkConfig.NewConfigFilesGeneratorKeeper(cr, opts.(*chkConfig.GeneratorOptions))
+		return chkConfig.NewFilesGenerator(cr, opts.(*chkConfig.GeneratorOptions))
 	}
 	panic("unknown config files generator type")
 }
