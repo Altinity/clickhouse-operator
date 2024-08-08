@@ -33,7 +33,7 @@ func (c *Controller) createPDB(ctx context.Context, pdb *policy.PodDisruptionBud
 		return nil
 	}
 
-	_, err := c.kube.PDB().Update(ctx, pdb)
+	_, err := c.kube.PDB().Create(ctx, pdb)
 
 	return err
 }
