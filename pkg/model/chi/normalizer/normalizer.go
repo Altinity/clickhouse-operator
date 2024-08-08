@@ -255,9 +255,9 @@ func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *typ
 }
 
 // normalizeDefaults normalizes .spec.defaults
-func (n *Normalizer) normalizeDefaults(defaults *api.ChiDefaults) *api.ChiDefaults {
+func (n *Normalizer) normalizeDefaults(defaults *api.Defaults) *api.Defaults {
 	if defaults == nil {
-		defaults = api.NewChiDefaults()
+		defaults = api.NewDefaults()
 	}
 	// Set defaults for CHI object properties
 	defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.Normalize(false)
