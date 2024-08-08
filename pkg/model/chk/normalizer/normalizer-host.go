@@ -60,6 +60,7 @@ func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 	if host.GetName() == "" {
 		host.Name = template.Spec.Name
+		log.V(3).M(host).F().Info("host has no name specified thus assigning name from Spec: %s", host.GetName())
 	}
 
 	host.Insecure = host.Insecure.MergeFrom(template.Spec.Insecure)
@@ -124,7 +125,7 @@ func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 
 	hostApplyPortsFromSettings(host)
 
-	host.InheritTemplatesFrom(nil, nil, template)
+	host.InheritTemplatesFrom(template)
 }
 
 // hostApplyPortsFromSettings
@@ -219,7 +220,7 @@ func (n *Normalizer) normalizeHost(
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
 	host.InheritFilesFrom(s, r)
 	//host.Files = n.normalizeConfigurationFiles(host.Files)
-	host.InheritTemplatesFrom(s, r, nil)
+	host.InheritTemplatesFrom(s, r)
 }
 
 // normalizeHostName normalizes host's name
