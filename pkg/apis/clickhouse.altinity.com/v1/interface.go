@@ -60,7 +60,7 @@ type ICustomResource interface {
 
 type ICRSpec interface {
 	GetNamespaceDomainPattern() *types.String
-	GetDefaults() *ChiDefaults
+	GetDefaults() *Defaults
 	GetConfiguration() IConfiguration
 }
 
