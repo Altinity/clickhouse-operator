@@ -38,7 +38,7 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 			Namespace:       c.cr.GetNamespace(),
 			Labels:          macro.Macro(c.cr).Map(c.tagger.Label(interfaces.LabelPDB, cluster)),
 			Annotations:     macro.Macro(c.cr).Map(c.tagger.Annotate(interfaces.AnnotatePDB, cluster)),
-			OwnerReferences: CreateOwnerReferences(c.cr),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
 			Selector: &meta.LabelSelector{

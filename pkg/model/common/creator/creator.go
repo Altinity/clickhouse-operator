@@ -32,6 +32,7 @@ type Creator struct {
 	vm                   interfaces.IVolumeManager
 	cmm                  interfaces.IConfigMapManager
 	nm                   interfaces.INameManager
+	or                   interfaces.IOwnerReferencesManager
 	// container builder
 	// probes builder
 	// default pod template builder
@@ -55,6 +56,7 @@ func NewCreator(
 	volumeManager interfaces.IVolumeManager,
 	configMapManager interfaces.IConfigMapManager,
 	nameManager interfaces.INameManager,
+	ownerReferencer interfaces.IOwnerReferencesManager,
 ) *Creator {
 	return &Creator{
 		cr:                   cr,
@@ -67,5 +69,6 @@ func NewCreator(
 		vm:                   volumeManager,
 		cmm:                  configMapManager,
 		nm:                   nameManager,
+		or:                   ownerReferencer,
 	}
 }

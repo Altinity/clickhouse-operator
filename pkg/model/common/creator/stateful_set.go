@@ -34,12 +34,16 @@ import (
 // CreateStatefulSet creates new apps.StatefulSet
 func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.StatefulSet {
 	statefulSet := &apps.StatefulSet{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "StatefulSet",
+			APIVersion: "apps/v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
 			Name:            c.nm.Name(interfaces.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(c.tagger.Label(interfaces.LabelSTS, host)),
 			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateSTS, host)),
-			OwnerReferences: CreateOwnerReferences(c.cr),
+			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
 		},
 		Spec: apps.StatefulSetSpec{
 			Replicas:    host.GetStatefulSetReplicasNum(shutdown),
