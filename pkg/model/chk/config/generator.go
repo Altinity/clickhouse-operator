@@ -23,19 +23,19 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
 
-type GeneratorKeeper struct {
+type Generator struct {
 	cr   apiChi.ICustomResource
 	opts *GeneratorOptions
 }
 
-func newConfigGeneratorKeeper(cr apiChi.ICustomResource, opts *GeneratorOptions) *GeneratorKeeper {
-	return &GeneratorKeeper{
+func newGenerator(cr apiChi.ICustomResource, opts *GeneratorOptions) *Generator {
+	return &Generator{
 		cr:   cr,
 		opts: opts,
 	}
 }
 
-func (c *GeneratorKeeper) getConfig(settings *apiChi.Settings) string {
+func (c *Generator) getSettings(settings *apiChi.Settings) string {
 	if settings.Len() == 0 {
 		return ""
 	}

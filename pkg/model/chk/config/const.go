@@ -15,29 +15,36 @@
 package config
 
 const (
-	xmlTagYandex = "yandex"
-)
+	DirPathConfigRoot = "/etc/clickhouse-keeper"
 
-const (
-	configMain = "main"
-)
+	// DirPathConfigHost specifies full path to folder, where generated host XML files would be placed
+	// for the following sections:
+	// 1. macros
+	// 2. zookeeper
+	// 3. settings
+	// 4. files
+	// 5. operator-provided additional config files
+	DirPathConfigHost = DirPathConfigRoot + "/"
 
-const (
-	DirPathConfig         = "/etc/clickhouse-keeper/"
-	ConfigFilename        = "keeper_config.xml"
-	DirPathConfigFilename = DirPathConfig + ConfigFilename
+	// DirPathClickHouseKeeperData specifies full path of data folder where ClickHouse would place its data storage
+	DirPathClickHouseKeeperData = "/var/lib/clickhouse-keeper"
+
+	// DirPathClickHouseLog  specifies full path of data folder where ClickHouse would place its log files
+	DirPathClickHouseKeeperLog = "/var/log/clickhouse-keeper-log"
 )
 
 const (
 	// DefaultKeeperDockerImage specifies default ClickHouse docker image to be used
 	DefaultKeeperDockerImage = "clickhouse/clickhouse-keeper:latest"
 
-	// DefaultServerIDInjectorDockerImage
-	DefaultServerIDInjectorDockerImage = "bash"
-
 	// KeeperContainerName specifies name of the clickhouse container in the pod
 	KeeperContainerName = "clickhouse-keeper"
+)
 
-	// KeeperServerIDInjectorContainerName specifies name of the clickhouse container in the pod
-	KeeperServerIDInjectorContainerName = "server-id-injector"
+const (
+	configSettings = "settings"
+)
+
+const (
+	configMain = "main"
 )

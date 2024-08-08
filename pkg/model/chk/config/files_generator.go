@@ -20,34 +20,35 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// FilesGeneratorKeeper specifies keeper configuration generator object
-type FilesGeneratorKeeper struct {
-	configGenerator *GeneratorKeeper
+// FilesGenerator specifies keeper configuration generator object
+type FilesGenerator struct {
+	configGenerator *Generator
 }
 
-// NewConfigFilesGeneratorKeeper creates new keeper configuration generator object
-func NewConfigFilesGeneratorKeeper(cr api.ICustomResource, opts *GeneratorOptions) *FilesGeneratorKeeper {
-	return &FilesGeneratorKeeper{
-		configGenerator: newConfigGeneratorKeeper(cr, opts),
+// NewFilesGenerator creates new configuration files generator object
+func NewFilesGenerator(cr api.ICustomResource, opts *GeneratorOptions) *FilesGenerator {
+	return &FilesGenerator{
+		configGenerator: newGenerator(cr, opts),
 	}
 }
 
-func (c *FilesGeneratorKeeper) CreateConfigFiles(what interfaces.FilesGroupType, params ...any) map[string]string {
+func (c *FilesGenerator) CreateConfigFiles(what interfaces.FilesGroupType, params ...any) map[string]string {
 	switch what {
-	case interfaces.FilesGroupCommon:
-		var options *FilesGeneratorOptionsKeeper
+	case interfaces.FilesGroupHost:
+		var options *FilesGeneratorOptions
 		if len(params) > 0 {
-			options = params[0].(*FilesGeneratorOptionsKeeper)
-			return c.createConfigFilesGroupCommon(options)
+			options = params[0].(*FilesGeneratorOptions)
+			return c.createConfigFilesGroupHost(options)
 		}
 	}
 	return nil
 }
 
-// createConfigFilesGroupCommon creates common config files
-func (c *FilesGeneratorKeeper) createConfigFilesGroupCommon(options *FilesGeneratorOptionsKeeper) map[string]string {
+// createConfigFilesGroupHost creates host config files
+func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptions) map[string]string {
+	// Prepare for this replica deployment chopConfig files map as filename->content
 	configSections := make(map[string]string)
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configMain), c.configGenerator.getConfig(options.GetSettings()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettings(options.GetSettings()))
 
 	return configSections
 }
@@ -55,5 +56,5 @@ func (c *FilesGeneratorKeeper) createConfigFilesGroupCommon(options *FilesGenera
 // createConfigSectionFilename creates filename of a configuration file.
 // filename depends on a section which it will contain
 func createConfigSectionFilename(section string) string {
-	return ConfigFilename
+	return "chop-generated-" + section + ".xml"
 }

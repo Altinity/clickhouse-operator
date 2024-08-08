@@ -16,24 +16,24 @@ package config
 
 import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 
-// FilesGeneratorOptionsClickHouse specifies options for clickhouse configuration generator
-type FilesGeneratorOptionsKeeper struct {
+// FilesGeneratorOptions specifies options for configuration files generator
+type FilesGeneratorOptions struct {
 	settings *api.Settings
 }
 
-// NewConfigFilesGeneratorOptionsKeeper creates new options for keeper configuration generator
-func NewConfigFilesGeneratorOptionsKeeper() *FilesGeneratorOptionsKeeper {
-	return &FilesGeneratorOptionsKeeper{}
+// NewFilesGeneratorOptions creates new options for configuration files generator
+func NewFilesGeneratorOptions() *FilesGeneratorOptions {
+	return &FilesGeneratorOptions{}
 }
 
-func (o *FilesGeneratorOptionsKeeper) GetSettings() *api.Settings {
+func (o *FilesGeneratorOptions) GetSettings() *api.Settings {
 	if o == nil {
 		return nil
 	}
 	return o.settings
 }
 
-func (o *FilesGeneratorOptionsKeeper) SetSettings(settings *api.Settings) *FilesGeneratorOptionsKeeper {
+func (o *FilesGeneratorOptions) SetSettings(settings *api.Settings) *FilesGeneratorOptions {
 	if o == nil {
 		return nil
 	}
