@@ -14,18 +14,18 @@
 
 package config
 
-// FilesGeneratorOptionsClickHouse specifies options for clickhouse configuration generator
-type FilesGeneratorOptionsClickHouse struct {
+// FilesGeneratorOptions specifies options for configuration files generator
+type FilesGeneratorOptions struct {
 	RemoteServersOptions *RemoteServersOptions
 }
 
-// NewConfigFilesGeneratorOptionsClickHouse creates new options for clickhouse configuration generator
-func NewConfigFilesGeneratorOptionsClickHouse() *FilesGeneratorOptionsClickHouse {
-	return &FilesGeneratorOptionsClickHouse{}
+// NewFilesGeneratorOptions creates new options for configuration files generator
+func NewFilesGeneratorOptions() *FilesGeneratorOptions {
+	return &FilesGeneratorOptions{}
 }
 
 // GetRemoteServersOptions gets remote-servers generator options
-func (o *FilesGeneratorOptionsClickHouse) GetRemoteServersOptions() *RemoteServersOptions {
+func (o *FilesGeneratorOptions) GetRemoteServersOptions() *RemoteServersOptions {
 	if o == nil {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (o *FilesGeneratorOptionsClickHouse) GetRemoteServersOptions() *RemoteServe
 }
 
 // SetRemoteServersOptions sets remote-servers generator options
-func (o *FilesGeneratorOptionsClickHouse) SetRemoteServersOptions(opts *RemoteServersOptions) *FilesGeneratorOptionsClickHouse {
+func (o *FilesGeneratorOptions) SetRemoteServersOptions(opts *RemoteServersOptions) *FilesGeneratorOptions {
 	if o == nil {
 		return nil
 	}
@@ -42,7 +42,7 @@ func (o *FilesGeneratorOptionsClickHouse) SetRemoteServersOptions(opts *RemoteSe
 	return o
 }
 
-// defaultConfigFilesGeneratorOptionsClickHouse creates new default options for clickhouse config generator
-func defaultConfigFilesGeneratorOptionsClickHouse() *FilesGeneratorOptionsClickHouse {
-	return NewConfigFilesGeneratorOptionsClickHouse()
+// defaultFilesGeneratorOptions creates new default options for clickhouse config generator
+func defaultFilesGeneratorOptions() *FilesGeneratorOptions {
+	return NewFilesGeneratorOptions()
 }

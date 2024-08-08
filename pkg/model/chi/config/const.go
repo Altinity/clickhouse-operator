@@ -19,46 +19,33 @@ import (
 )
 
 const (
-	xmlTagYandex = "yandex"
-)
+	DirPathConfigRoot = "/etc/clickhouse-server"
 
-const (
-	configMacros        = "macros"
-	configHostnamePorts = "hostname-ports"
-	configProfiles      = "profiles"
-	configQuotas        = "quotas"
-	configRemoteServers = "remote_servers"
-	configSettings      = "settings"
-	configUsers         = "users"
-	configZookeeper     = "zookeeper"
-)
-
-const (
-	// DirPathConfigCommon specifies full path to folder, where generated common XML files for ClickHouse would be placed
-	// for the following sections:
+	// DirPathConfigCommon specifies full path to folder,
+	// where generated common XML files for the following sections would be placed:
 	// 1. remote servers
 	// 2. operator-provided additional config files
-	DirPathConfigCommon = "/etc/clickhouse-server/" + api.CommonConfigDir + "/"
+	DirPathConfigCommon = DirPathConfigRoot + "/" + api.CommonConfigDir + "/"
 
-	// DirPathConfigUsers specifies full path to folder, where generated users XML files for ClickHouse would be placed
+	// DirPathConfigUsers specifies full path to folder, where generated users XML files would be placed
 	// for the following sections:
 	// 1. users
 	// 2. quotas
 	// 3. profiles
 	// 4. operator-provided additional config files
-	DirPathConfigUsers = "/etc/clickhouse-server/" + api.UsersConfigDir + "/"
+	DirPathConfigUsers = DirPathConfigRoot + "/" + api.UsersConfigDir + "/"
 
-	// DirPathConfigHost specifies full path to folder, where generated host XML files for ClickHouse would be placed
+	// DirPathConfigHost specifies full path to folder, where generated host XML files would be placed
 	// for the following sections:
 	// 1. macros
 	// 2. zookeeper
 	// 3. settings
 	// 4. files
 	// 5. operator-provided additional config files
-	DirPathConfigHost = "/etc/clickhouse-server/" + api.HostConfigDir + "/"
+	DirPathConfigHost = DirPathConfigRoot + "/" + api.HostConfigDir + "/"
 
 	// DirPathSecretFilesConfig specifies full path to folder, where secrets are mounted
-	DirPathSecretFilesConfig = "/etc/clickhouse-server/secrets.d/"
+	DirPathSecretFilesConfig = DirPathConfigRoot + "/" + "secrets.d" + "/"
 
 	// DirPathClickHouseData specifies full path of data folder where ClickHouse would place its data storage
 	DirPathClickHouseData = "/var/lib/clickhouse"
@@ -85,6 +72,21 @@ const (
 
 	// ClickHouseLogContainerName specifies name of the logger container in the pod
 	ClickHouseLogContainerName = "clickhouse-log"
+)
+
+const (
+	xmlTagYandex = "yandex"
+)
+
+const (
+	configMacros        = "macros"
+	configHostnamePorts = "hostname-ports"
+	configProfiles      = "profiles"
+	configQuotas        = "quotas"
+	configRemoteServers = "remote_servers"
+	configSettings      = "settings"
+	configUsers         = "users"
+	configZookeeper     = "zookeeper"
 )
 
 const (

@@ -41,18 +41,18 @@ const (
 	AllClustersClusterName         = "all-clusters"
 )
 
-// GeneratorClickHouse generates ClickHouse configuration files content for specified CHI
+// Generator generates ClickHouse configuration files content for specified CHI
 // ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
 // which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
-type GeneratorClickHouse struct {
+type Generator struct {
 	cr    api.ICustomResource
 	namer interfaces.INameManager
 	opts  *GeneratorOptions
 }
 
-// newConfigGeneratorClickHouse returns new GeneratorClickHouse struct
-func newConfigGeneratorClickHouse(cr api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *GeneratorClickHouse {
-	return &GeneratorClickHouse{
+// newGenerator returns new GeneratorClickHouse struct
+func newGenerator(cr api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *Generator {
+	return &Generator{
 		cr:    cr,
 		namer: namer,
 		opts:  opts,
@@ -60,34 +60,34 @@ func newConfigGeneratorClickHouse(cr api.ICustomResource, namer interfaces.IName
 }
 
 // getUsers creates data for users section. Used as "users.xml"
-func (c *GeneratorClickHouse) getUsers() string {
+func (c *Generator) getUsers() string {
 	return c.generateXMLConfig(c.opts.Users, configUsers)
 }
 
 // getProfiles creates data for profiles section. Used as "profiles.xml"
-func (c *GeneratorClickHouse) getProfiles() string {
+func (c *Generator) getProfiles() string {
 	return c.generateXMLConfig(c.opts.Profiles, configProfiles)
 }
 
 // getQuotas creates data for "quotas.xml"
-func (c *GeneratorClickHouse) getQuotas() string {
+func (c *Generator) getQuotas() string {
 	return c.generateXMLConfig(c.opts.Quotas, configQuotas)
 }
 
 // getSettingsGlobal creates data for "settings.xml"
-func (c *GeneratorClickHouse) getSettingsGlobal() string {
+func (c *Generator) getSettingsGlobal() string {
 	// No host specified means request to generate common config
 	return c.generateXMLConfig(c.opts.Settings, "")
 }
 
 // getSettings creates data for "settings.xml"
-func (c *GeneratorClickHouse) getSettings(host *api.Host) string {
+func (c *Generator) getSettings(host *api.Host) string {
 	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }
 
 // getSectionFromFiles creates data for custom common config files
-func (c *GeneratorClickHouse) getSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.Host) map[string]string {
+func (c *Generator) getSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.Host) map[string]string {
 	var files *api.Settings
 	if host == nil {
 		// We are looking into Common files
@@ -103,7 +103,7 @@ func (c *GeneratorClickHouse) getSectionFromFiles(section api.SettingsSection, i
 }
 
 // getHostZookeeper creates data for "zookeeper.xml"
-func (c *GeneratorClickHouse) getHostZookeeper(host *api.Host) string {
+func (c *Generator) getHostZookeeper(host *api.Host) string {
 	zk := host.GetZookeeper()
 
 	if zk.IsEmpty() {
@@ -181,7 +181,7 @@ func (c *GeneratorClickHouse) getHostZookeeper(host *api.Host) string {
 }
 
 // chiHostsNum count hosts according to the options
-func (c *GeneratorClickHouse) chiHostsNum(options *RemoteServersOptions) int {
+func (c *Generator) chiHostsNum(options *RemoteServersOptions) int {
 	num := 0
 	c.cr.WalkHosts(func(host *api.Host) error {
 		if options.Include(host) {
@@ -193,7 +193,7 @@ func (c *GeneratorClickHouse) chiHostsNum(options *RemoteServersOptions) int {
 }
 
 // clusterHostsNum count hosts according to the options
-func (c *GeneratorClickHouse) clusterHostsNum(cluster api.ICluster, options *RemoteServersOptions) int {
+func (c *Generator) clusterHostsNum(cluster api.ICluster, options *RemoteServersOptions) int {
 	num := 0
 	// Build each shard XML
 	cluster.WalkShards(func(index int, shard api.IShard) error {
@@ -204,7 +204,7 @@ func (c *GeneratorClickHouse) clusterHostsNum(cluster api.ICluster, options *Rem
 }
 
 // shardHostsNum count hosts according to the options
-func (c *GeneratorClickHouse) shardHostsNum(shard api.IShard, options *RemoteServersOptions) int {
+func (c *Generator) shardHostsNum(shard api.IShard, options *RemoteServersOptions) int {
 	num := 0
 	shard.WalkHosts(func(host *api.Host) error {
 		if options.Include(host) {
@@ -215,7 +215,7 @@ func (c *GeneratorClickHouse) shardHostsNum(shard api.IShard, options *RemoteSer
 	return num
 }
 
-func (c *GeneratorClickHouse) getRemoteServersReplica(host *api.Host, b *bytes.Buffer) {
+func (c *Generator) getRemoteServersReplica(host *api.Host, b *bytes.Buffer) {
 	// <replica>
 	//		<host>XXX</host>
 	//		<port>XXX</port>
@@ -235,7 +235,7 @@ func (c *GeneratorClickHouse) getRemoteServersReplica(host *api.Host, b *bytes.B
 }
 
 // getRemoteServers creates "remote_servers.xml" content and calculates data generation parameters for other sections
-func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) string {
+func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 	if options == nil {
 		options = defaultRemoteServersOptions()
 	}
@@ -395,7 +395,7 @@ func (c *GeneratorClickHouse) getRemoteServers(options *RemoteServersOptions) st
 }
 
 // getHostMacros creates "macros.xml" content
-func (c *GeneratorClickHouse) getHostMacros(host *api.Host) string {
+func (c *Generator) getHostMacros(host *api.Host) string {
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -433,7 +433,7 @@ func (c *GeneratorClickHouse) getHostMacros(host *api.Host) string {
 }
 
 // getHostHostnameAndPorts creates "ports.xml" content
-func (c *GeneratorClickHouse) getHostHostnameAndPorts(host *api.Host) string {
+func (c *Generator) getHostHostnameAndPorts(host *api.Host) string {
 
 	b := &bytes.Buffer{}
 
@@ -466,7 +466,7 @@ func (c *GeneratorClickHouse) getHostHostnameAndPorts(host *api.Host) string {
 }
 
 // generateXMLConfig creates XML using map[string]string definitions
-func (c *GeneratorClickHouse) generateXMLConfig(settings *api.Settings, prefix string) string {
+func (c *Generator) generateXMLConfig(settings *api.Settings, prefix string) string {
 	if settings.Len() == 0 {
 		return ""
 	}
@@ -487,13 +487,13 @@ func (c *GeneratorClickHouse) generateXMLConfig(settings *api.Settings, prefix s
 //
 
 // getDistributedDDLPath returns string path used in <distributed_ddl><path>XXX</path></distributed_ddl>
-func (c *GeneratorClickHouse) getDistributedDDLPath() string {
+func (c *Generator) getDistributedDDLPath() string {
 	return fmt.Sprintf(DistributedDDLPathPattern, c.cr.GetName())
 }
 
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
-func (c *GeneratorClickHouse) getRemoteServersReplicaHostname(host *api.Host) string {
+func (c *Generator) getRemoteServersReplicaHostname(host *api.Host) string {
 	return c.namer.Name(interfaces.NameInstanceHostname, host)
 }
 
@@ -503,7 +503,7 @@ type Secured interface {
 }
 
 // getSecure gets config-usable value for host or node secure flag
-func (c *GeneratorClickHouse) getSecure(host Secured) int {
+func (c *Generator) getSecure(host Secured) int {
 	if host.IsSecure() {
 		return 1
 	}
