@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package v1
+package types
 
-// CopyCROptions specifies options for copier
+// CopyCROptions specifies options for custom resource copier
 type CopyCROptions struct {
 	// SkipStatus specifies whether to copy status
 	SkipStatus bool
