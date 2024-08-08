@@ -42,9 +42,9 @@ func NewConfigMapManager() *ConfigMapManager {
 func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
 	case interfaces.ConfigMapCommon:
-		var options *config.FilesGeneratorOptionsClickHouse
+		var options *config.FilesGeneratorOptions
 		if len(params) > 0 {
-			options = params[0].(*config.FilesGeneratorOptionsClickHouse)
+			options = params[0].(*config.FilesGeneratorOptions)
 			return m.createConfigMapCHICommon(options)
 		}
 	case interfaces.ConfigMapCommonUsers:
@@ -70,7 +70,7 @@ func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfac
 }
 
 // createConfigMapCHICommon creates new core.ConfigMap
-func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGeneratorOptionsClickHouse) *core.ConfigMap {
+func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.New().Name(interfaces.NameConfigMapCommon, m.cr),
