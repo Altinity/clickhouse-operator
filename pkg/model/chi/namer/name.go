@@ -19,11 +19,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
 
-// createConfigMapNameHost returns a name for a ConfigMap for replica's personal config
-func createConfigMapNameHost(host *api.Host) string {
-	return macro.Macro(host).Line(configMapNamePatternHost)
-}
-
 // createConfigMapNameCommon returns a name for a ConfigMap for replica's common config
 func createConfigMapNameCommon(chi api.ICustomResource) string {
 	return macro.Macro(chi).Line(configMapNamePatternCommon)
@@ -32,4 +27,9 @@ func createConfigMapNameCommon(chi api.ICustomResource) string {
 // createConfigMapNameCommonUsers returns a name for a ConfigMap for replica's common users config
 func createConfigMapNameCommonUsers(chi api.ICustomResource) string {
 	return macro.Macro(chi).Line(configMapNamePatternCommonUsers)
+}
+
+// createConfigMapNameHost returns a name for a ConfigMap for replica's personal config
+func createConfigMapNameHost(host *api.Host) string {
+	return macro.Macro(host).Line(configMapNamePatternHost)
 }
