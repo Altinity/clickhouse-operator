@@ -34,43 +34,43 @@ func (w *worker) reconcileService(ctx context.Context, cr api.ICustomResource, s
 		return nil
 	}
 
-	w.a.V(2).M(cr).S().Info(service.Name)
-	defer w.a.V(2).M(cr).E().Info(service.Name)
+	w.a.V(2).M(cr).S().Info(service.GetName())
+	defer w.a.V(2).M(cr).E().Info(service.GetName())
 
 	// Check whether this object already exists
 	curService, err := w.c.getService(ctx, service)
 
 	if curService != nil {
 		// We have the Service - try to update it
-		w.a.V(1).M(cr).F().Info("Service found: %s/%s. Will try to update", service.Namespace, service.Name)
+		w.a.V(1).M(cr).F().Info("Service found: %s. Will try to update", util.NamespaceNameString(service))
 		err = w.updateService(ctx, cr, curService, service)
 	}
 
 	if err != nil {
 		if apiErrors.IsNotFound(err) {
 			// The Service is either not found or not updated. Try to recreate it
-			w.a.V(1).M(cr).F().Info("Service: %s/%s not found. err: %v", service.Namespace, service.Name, err)
+			w.a.V(1).M(cr).F().Info("Service: %s not found. err: %v", util.NamespaceNameString(service), err)
 		} else {
 			// The Service is either not found or not updated. Try to recreate it
 			w.a.WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateFailed).
 				WithStatusAction(cr).
 				WithStatusError(cr).
 				M(cr).F().
-				Error("Update Service: %s/%s failed with error: %v", service.Namespace, service.Name, err)
+				Error("Update Service: %s failed with error: %v", util.NamespaceNameString(service), err)
 		}
 
-		_ = w.c.deleteServiceIfExists(ctx, service.Namespace, service.Name)
+		_ = w.c.deleteServiceIfExists(ctx, service.GetNamespace(), service.GetName())
 		err = w.createService(ctx, cr, service)
 	}
 
 	if err == nil {
-		w.a.V(1).M(cr).F().Info("Service reconcile successful: %s/%s", service.Namespace, service.Name)
+		w.a.V(1).M(cr).F().Info("Service reconcile successful: %s", util.NamespaceNameString(service))
 	} else {
 		w.a.WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusAction(cr).
 			WithStatusError(cr).
 			M(cr).F().
-			Error("FAILED to reconcile Service: %s/%s CHI: %s ", service.Namespace, service.Name, cr.GetName())
+			Error("FAILED to reconcile Service: %s CHI: %s ", util.NamespaceNameString(service), cr.GetName())
 	}
 
 	return err
@@ -180,9 +180,9 @@ func (w *worker) updateService(
 			WithEvent(cr, common.EventActionUpdate, common.EventReasonUpdateCompleted).
 			WithStatusAction(cr).
 			M(cr).F().
-			Info("Update Service success: %s/%s", newService.GetNamespace(), newService.GetName())
+			Info("Update Service success: %s", util.NamespaceNameString(newService))
 	} else {
-		w.a.M(cr).F().Error("Update Service fail: %s/%s failed with error %v", newService.GetNamespace(), newService.GetName())
+		w.a.M(cr).F().Error("Update Service fail: %s failed with error: %v", util.NamespaceNameString(newService))
 	}
 
 	return err
@@ -201,13 +201,13 @@ func (w *worker) createService(ctx context.Context, cr api.ICustomResource, serv
 			WithEvent(cr, common.EventActionCreate, common.EventReasonCreateCompleted).
 			WithStatusAction(cr).
 			M(cr).F().
-			Info("OK Create Service: %s/%s", service.Namespace, service.Name)
+			Info("OK Create Service: %s", util.NamespaceNameString(service))
 	} else {
 		w.a.WithEvent(cr, common.EventActionCreate, common.EventReasonCreateFailed).
 			WithStatusAction(cr).
 			WithStatusError(cr).
 			M(cr).F().
-			Error("FAILED Create Service: %s/%s err: %v", service.Namespace, service.Name, err)
+			Error("FAILED Create Service: %s err: %v", util.NamespaceNameString(service), err)
 	}
 
 	return err

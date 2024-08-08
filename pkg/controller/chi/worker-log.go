@@ -16,6 +16,7 @@ package chi
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 )
 
@@ -25,7 +26,7 @@ func (w *worker) logCHI(name string, chi *api.ClickHouseInstallation) {
 		"logCHI %s start--------------------------------------------:\n%s\nlogCHI %s end--------------------------------------------",
 		name,
 		name,
-		chi.YAML(api.CopyCROptions{SkipStatus: true, SkipManagedFields: true}),
+		chi.YAML(types.CopyCROptions{SkipStatus: true, SkipManagedFields: true}),
 	)
 }
 

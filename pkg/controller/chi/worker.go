@@ -63,7 +63,7 @@ type worker struct {
 	schemer       *schemer.ClusterSchemer
 	start         time.Time
 	task          *common.Task
-	stsReconciler *statefulset.StatefulSetReconciler
+	stsReconciler *statefulset.Reconciler
 }
 
 // newWorker
@@ -119,10 +119,11 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
 			managers.NewConfigMapManager(managers.ConfigMapManagerTypeClickHouse),
 			managers.NewNameManager(managers.NameManagerTypeClickHouse),
+			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
 		),
 	)
 
-	w.stsReconciler = statefulset.NewStatefulSetReconciler(
+	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
 		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
@@ -815,7 +816,7 @@ func (w *worker) getRemoteServersGeneratorOptions() *chiConfig.RemoteServersOpti
 	// 1. all newly added hosts
 	// 2. all explicitly excluded hosts
 	return chiConfig.NewRemoteServersOptions().ExcludeReconcileAttributes(
-		api.NewChiHostReconcileAttributes().
+		api.NewHostReconcileAttributes().
 			SetAdd().
 			SetExclude(),
 	)

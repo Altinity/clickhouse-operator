@@ -486,6 +486,9 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 		return nil
 	}
 
+	log.V(1).F().S().Info("reconcileShardsAndHosts start")
+	defer log.V(1).F().E().Info("reconcileShardsAndHosts end")
+
 	// Try to fetch options
 	opts, ok := ctx.Value(common.ReconcileShardsAndHostsOptionsCtxKey).(*common.ReconcileShardsAndHostsOptions)
 	if ok {
