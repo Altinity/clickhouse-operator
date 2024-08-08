@@ -34,11 +34,14 @@ const (
 
 type ServiceManager struct {
 	cr     api.ICustomResource
+	or     interfaces.IOwnerReferencesManager
 	tagger interfaces.ITagger
 }
 
 func NewServiceManager() *ServiceManager {
-	return &ServiceManager{}
+	return &ServiceManager{
+		or: NewOwnerReferencer(),
+	}
 }
 
 func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
@@ -85,7 +88,7 @@ func (m *ServiceManager) createServiceCHI() *core.Service {
 			m.tagger.Label(interfaces.LabelServiceCR, m.cr),
 			m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr),
 			m.tagger.Selector(interfaces.SelectorCRScopeReady),
-			creator.CreateOwnerReferences(m.cr),
+			m.or.CreateOwnerReferences(m.cr),
 			macro.Macro(m.cr),
 		)
 	}
@@ -98,7 +101,7 @@ func (m *ServiceManager) createServiceCHI() *core.Service {
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelServiceCR, m.cr)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr)),
-			OwnerReferences: creator.CreateOwnerReferences(m.cr),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
 			ClusterIP: TemplateDefaultsServiceClusterIP,
@@ -128,7 +131,7 @@ func (m *ServiceManager) createServiceCHI() *core.Service {
 // createServiceCluster creates new core.Service for specified Cluster
 func (m *ServiceManager) createServiceCluster(cluster api.ICluster) *core.Service {
 	serviceName := namer.New().Name(interfaces.NameClusterService, cluster)
-	ownerReferences := creator.CreateOwnerReferences(m.cr)
+	ownerReferences := m.or.CreateOwnerReferences(m.cr)
 
 	if template, ok := cluster.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
@@ -158,7 +161,7 @@ func (m *ServiceManager) createServiceShard(shard api.IShard) *core.Service {
 			m.tagger.Label(interfaces.LabelServiceShard, shard),
 			m.tagger.Annotate(interfaces.AnnotateServiceShard, shard),
 			m.tagger.Selector(interfaces.SelectorShardScopeReady, shard),
-			creator.CreateOwnerReferences(m.cr),
+			m.or.CreateOwnerReferences(m.cr),
 			macro.Macro(shard),
 		)
 	}
@@ -177,7 +180,7 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 			m.tagger.Label(interfaces.LabelServiceHost, host),
 			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
 			m.tagger.Selector(interfaces.SelectorHostScope, host),
-			creator.CreateOwnerReferences(m.cr),
+			m.or.CreateOwnerReferences(m.cr),
 			macro.Macro(host),
 		)
 	}
@@ -190,7 +193,7 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 			Namespace:       host.Runtime.Address.Namespace,
 			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
-			OwnerReferences: creator.CreateOwnerReferences(m.cr),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
 			Selector:                 m.tagger.Selector(interfaces.SelectorHostScope, host),

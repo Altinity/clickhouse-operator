@@ -22,19 +22,21 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type ConfigMapManager struct {
 	cr                   api.ICustomResource
+	or                   interfaces.IOwnerReferencesManager
 	tagger               interfaces.ITagger
 	configFilesGenerator interfaces.IConfigFilesGenerator
 }
 
 func NewConfigMapManager() *ConfigMapManager {
-	return &ConfigMapManager{}
+	return &ConfigMapManager{
+		or: NewOwnerReferencer(),
+	}
 }
 
 func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
@@ -75,7 +77,7 @@ func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGenerat
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommon)),
-			OwnerReferences: creator.CreateOwnerReferences(m.cr),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupCommon, options),
@@ -93,7 +95,7 @@ func (m *ConfigMapManager) createConfigMapCHICommonUsers() *core.ConfigMap {
 			Namespace:       m.cr.GetNamespace(),
 			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommonUsers)),
 			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommonUsers)),
-			OwnerReferences: creator.CreateOwnerReferences(m.cr),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupUsers),
@@ -111,7 +113,7 @@ func (m *ConfigMapManager) createConfigMapCHIHost(host *api.Host) *core.ConfigMa
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelConfigMapHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),
-			OwnerReferences: creator.CreateOwnerReferences(m.cr),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, host),
