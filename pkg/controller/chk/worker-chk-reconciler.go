@@ -16,7 +16,6 @@ package chk
 
 import (
 	"context"
-	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"sync"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -27,6 +26,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
