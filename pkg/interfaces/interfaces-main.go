@@ -100,3 +100,7 @@ type IEventEmitter interface {
 	EventWarning(obj meta.Object, action string, reason string, message string)
 	EventError(obj meta.Object, action string, reason string, message string)
 }
+
+type IOwnerReferencesManager interface {
+	CreateOwnerReferences(owner api.ICustomResource) []meta.OwnerReference
+}
