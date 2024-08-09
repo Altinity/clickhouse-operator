@@ -47,6 +47,10 @@ func (r ChkShardRuntime) GetAddress() apiChi.IShardAddress {
 	return &r.Address
 }
 
+func (r *ChkShardRuntime) GetCR() apiChi.ICustomResource {
+	return r.CHK
+}
+
 func (r *ChkShardRuntime) SetCR(cr apiChi.ICustomResource) {
 	r.CHK = cr.(*ClickHouseKeeperInstallation)
 }
