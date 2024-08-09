@@ -181,16 +181,16 @@ func (c *Controller) deleteServiceCluster(ctx context.Context, cluster *api.ChiC
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
 
-// deleteServiceCHI
-func (c *Controller) deleteServiceCHI(ctx context.Context, chi api.ICustomResource) error {
+// deleteServiceCR
+func (c *Controller) deleteServiceCR(ctx context.Context, cr api.ICustomResource) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	serviceName := c.namer.Name(interfaces.NameCRService, chi)
-	namespace := chi.GetNamespace()
-	log.V(1).M(chi).F().Info("%s/%s", namespace, serviceName)
+	serviceName := c.namer.Name(interfaces.NameCRService, cr)
+	namespace := cr.GetNamespace()
+	log.V(1).M(cr).F().Info("%s/%s", namespace, serviceName)
 	return c.deleteServiceIfExists(ctx, namespace, serviceName)
 }
 
