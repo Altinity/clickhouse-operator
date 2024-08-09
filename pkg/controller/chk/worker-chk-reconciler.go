@@ -70,8 +70,6 @@ func (w *worker) reconcileCHK(ctx context.Context, old, new *apiChk.ClickHouseKe
 	return nil
 }
 
-//type reconcileFunc func(cluster *apiChk.ClickHouseKeeperInstallation) error
-
 func (w *worker) reconcile(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -85,61 +83,121 @@ func (w *worker) reconcile(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 		w.reconcileShardsAndHosts,
 		w.reconcileCRAuxObjectsFinal,
 	)
-	//for _, f := range []reconcileFunc{
-	//	w.reconcileConfigMap,
-	//	w.reconcileStatefulSet,
-	//	w.reconcileClientService,
-	//	w.reconcileHeadlessService,
-	//	w.reconcilePodDisruptionBudget,
-	//} {
-	//	if err := f(chk); err != nil {
-	//		log.V(1).Error("Error during reconcile. f: %s err: %s", runtime.FunctionName(f), err)
-	//		return err
-	//	}
-	//}
 	return nil
 }
 
-// reconcileCHIAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
-func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) error {
+// reconcileCRAuxObjectsPreliminary reconciles CR preliminary in order to ensure that ConfigMaps are in place
+func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(chk).S().P()
-	defer w.a.V(2).M(chk).E().P()
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
 
-	//if err := w.reconcileConfigMapCommon(ctx, chk); err != nil {
-	//	w.a.F().Error("failed to reconcile config map common. err: %v", err)
-	//}
+	// CR common ConfigMap without added hosts
+	cr.GetRuntime().LockCommonConfig()
+	if err := w.reconcileConfigMapCommon(ctx, cr); err != nil {
+		w.a.F().Error("failed to reconcile config map common. err: %v", err)
+	}
+	cr.GetRuntime().UnlockCommonConfig()
+
 	return nil
 }
 
-// reconcileCluster reconciles ChkCluster, excluding nested shards
-func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.ChkCluster) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
+// reconcileCRServicePreliminary runs first stage of CR reconcile process
+func (w *worker) reconcileCRServicePreliminary(ctx context.Context, cr api.ICustomResource) error {
+	if cr.IsStopped() {
+		// Stopped CR must have no entry point
+		_ = w.c.deleteServiceCR(ctx, cr)
+	}
+	return nil
+}
+
+// reconcileCRServiceFinal runs second stage of CR reconcile process
+func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomResource) error {
+	if cr.IsStopped() {
+		// Stopped CHI must have no entry point
 		return nil
 	}
 
-	w.a.V(2).M(cluster).S().P()
-	defer w.a.V(2).M(cluster).E().P()
-
-	// Add ChkCluster's Service
-	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
-		if err := w.reconcileService(ctx, cluster.Runtime.CHK, service); err == nil {
-			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
-		} else {
+	// Create entry point for the whole CHI
+	if service := w.task.Creator().CreateService(interfaces.ServiceCR); service != nil {
+		if err := w.reconcileService(ctx, cr, service); err != nil {
+			// Service not reconciled
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+			return err
 		}
+		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 	}
 
-	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
-	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
-		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
+	return nil
+}
+
+// reconcileCRAuxObjectsFinal reconciles CR global objects
+func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) (err error) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
+
+	// CR ConfigMaps with update
+	cr.GetRuntime().LockCommonConfig()
+	err = w.reconcileConfigMapCommon(ctx, cr)
+	cr.GetRuntime().UnlockCommonConfig()
+	return err
+}
+
+// reconcileConfigMapCommon reconciles common ConfigMap
+func (w *worker) reconcileConfigMapCommon(
+	ctx context.Context,
+	cr api.ICustomResource,
+) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	// ConfigMap common for all resources in CHI
+	// contains several sections, mapped as separated chopConfig files,
+	// such as remote servers, zookeeper setup, etc
+	//configMapCommon := w.task.Creator().CreateConfigMap(
+	//	interfaces.ConfigMapConfig,
+	//	chkConfig.NewFilesGeneratorOptions().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
+	//)
+	//err := w.reconcileConfigMap(ctx, chk, configMapCommon)
+	//if err == nil {
+	//	w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
+	//} else {
+	//	w.task.RegistryFailed().RegisterConfigMap(configMapCommon.GetObjectMeta())
+	//}
+	//return err
+	return nil
+}
+
+// reconcileConfigMapHost reconciles host's personal ConfigMap
+func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	// ConfigMap for a host
+	configMap := w.task.Creator().CreateConfigMap(
+		interfaces.ConfigMapHost,
+		host,
+		chkConfig.NewFilesGeneratorOptions().SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings()),
+	)
+	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
+	if err == nil {
+		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
 	} else {
-		w.task.RegistryFailed().RegisterPDB(pdb.GetObjectMeta())
+		w.task.RegistryFailed().RegisterConfigMap(configMap.GetObjectMeta())
+		return err
 	}
 
 	return nil
@@ -179,6 +237,57 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	}
 
 	return err
+}
+
+// reconcileHostService reconciles host's Service
+func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+	service := w.task.Creator().CreateService(interfaces.ServiceHost, host)
+	if service == nil {
+		// This is not a problem, service may be omitted
+		return nil
+	}
+	err := w.reconcileService(ctx, host.GetCR(), service)
+	if err == nil {
+		w.a.V(1).M(host).F().Info("DONE Reconcile service of the host: %s", host.GetName())
+		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
+	} else {
+		w.a.V(1).M(host).F().Warning("FAILED Reconcile service of the host: %s", host.GetName())
+		w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+	}
+	return err
+}
+
+// reconcileCluster reconciles ChkCluster, excluding nested shards
+func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.ChkCluster) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	w.a.V(2).M(cluster).S().P()
+	defer w.a.V(2).M(cluster).E().P()
+
+	// Add ChkCluster's Service
+	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
+		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service); err == nil {
+			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
+		} else {
+			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
+		}
+	}
+
+	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
+	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
+		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterPDB(pdb.GetObjectMeta())
+	}
+
+	return nil
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
@@ -278,7 +387,7 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard *apiChk.ChkS
 }
 
 // reconcileShard reconciles specified shard, excluding nested replicas
-func (w *worker) reconcileShard(ctx context.Context, shard *apiChk.ChkShard) error {
+func (w *worker) reconcileShard(ctx context.Context, shard api.IShard) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -318,6 +427,11 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.a.V(2).M(host).S().P()
 	defer w.a.V(2).M(host).E().P()
 
+	if host.IsFirst() {
+		w.reconcileCRServicePreliminary(ctx, host.GetCR())
+		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
+	}
+
 	// Create artifacts
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 
@@ -348,78 +462,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		storage.NewStoragePVC(kube.NewPVC(w.c.Client)),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 
-	//_ = w.reconcileHostService(ctx, host)
+	_ = w.reconcileHostService(ctx, host)
 
 	host.GetReconcileAttributes().UnsetAdd()
-
-	return nil
-}
-
-// reconcileCHIAuxObjectsFinal reconciles CHI global objects
-func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation) (err error) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	w.a.V(2).M(chk).S().P()
-	defer w.a.V(2).M(chk).E().P()
-
-	//// CHI ConfigMaps with update
-	//chk.GetRuntime().LockCommonConfig()
-	//err = w.reconcileConfigMapCommon(ctx, chk)
-	//chk.GetRuntime().UnlockCommonConfig()
-	//return err
-
-	return nil
-}
-
-//// reconcileCHIConfigMapCommon reconciles all CHI's common ConfigMap
-//func (w *worker) reconcileConfigMapCommon(
-//	ctx context.Context,
-//	chk *apiChk.ClickHouseKeeperInstallation,
-//) error {
-//	if util.IsContextDone(ctx) {
-//		log.V(2).Info("task is done")
-//		return nil
-//	}
-//
-//	// ConfigMap common for all resources in CHI
-//	// contains several sections, mapped as separated chopConfig files,
-//	// such as remote servers, zookeeper setup, etc
-//	configMapCommon := w.task.Creator().CreateConfigMap(
-//		interfaces.ConfigMapConfig,
-//		chkConfig.NewFilesGeneratorOptions().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
-//	)
-//	err := w.reconcileConfigMap(ctx, chk, configMapCommon)
-//	if err == nil {
-//		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
-//	} else {
-//		w.task.RegistryFailed().RegisterConfigMap(configMapCommon.GetObjectMeta())
-//	}
-//	return err
-//}
-
-// reconcileConfigMapHost reconciles host's personal ConfigMap
-func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	// ConfigMap for a host
-	configMap := w.task.Creator().CreateConfigMap(
-		interfaces.ConfigMapHost,
-		host,
-		chkConfig.NewFilesGeneratorOptions().SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings()),
-	)
-	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
-	if err == nil {
-		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
-	} else {
-		w.task.RegistryFailed().RegisterConfigMap(configMap.GetObjectMeta())
-		return err
-	}
 
 	return nil
 }
