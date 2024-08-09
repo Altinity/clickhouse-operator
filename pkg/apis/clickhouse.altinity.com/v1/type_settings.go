@@ -381,6 +381,16 @@ func (s *Settings) GetInterserverHTTPPort() *types.Int32 {
 	return s.fetchPort("interserver_http_port")
 }
 
+// GetZKPort gets Zookeeper port from settings
+func (s *Settings) GetZKPort() *types.Int32 {
+	return s.fetchPort("keeper_server/tcp_port")
+}
+
+// GetRaftPort gets Raft port from settings
+func (s *Settings) GetRaftPort() *types.Int32 {
+	return s.fetchPort("keeper_server/raft_configuration/server/port")
+}
+
 // MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
 func (s *Settings) MergeFrom(src *Settings) *Settings {
 	if src.Len() == 0 {
