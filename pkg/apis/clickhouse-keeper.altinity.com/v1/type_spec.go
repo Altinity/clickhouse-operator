@@ -51,38 +51,3 @@ func (spec *ChkSpec) MergeFrom(from *ChkSpec, _type apiChi.MergeType) {
 	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)
 }
-
-func (spec *ChkSpec) GetPath() string {
-	switch {
-	case spec.GetConfiguration().GetSettings().Has("keeper_server/storage_path"):
-		return spec.GetConfiguration().GetSettings().Get("keeper_server/storage_path").String()
-
-	case spec.GetConfiguration().GetSettings().Has("keeper_server/path"):
-		return spec.GetConfiguration().GetSettings().Get("keeper_server/path").String()
-
-	default:
-		return "/var/lib/clickhouse_keeper"
-	}
-}
-
-func (spec *ChkSpec) GetPort(name string, defaultValue int) int {
-	// Has no setting - use default value
-	if !spec.GetConfiguration().GetSettings().Has(name) {
-		return defaultValue
-	}
-
-	// Port name is specified
-	return spec.GetConfiguration().GetSettings().Get(name).ScalarInt()
-}
-
-func (spec *ChkSpec) GetClientPort() int {
-	return spec.GetPort("keeper_server/tcp_port", 2181)
-}
-
-func (spec *ChkSpec) GetRaftPort() int {
-	return spec.GetPort("keeper_server/raft_configuration/server/port", 9444)
-}
-
-func (spec *ChkSpec) GetPrometheusPort() int {
-	return spec.GetPort("prometheus/port", -1)
-}
