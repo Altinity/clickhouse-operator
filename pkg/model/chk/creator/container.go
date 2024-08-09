@@ -18,7 +18,6 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
@@ -66,58 +65,6 @@ func (cm *ContainerManager) ensureContainerSpecifiedKeeper(statefulSet *apps.Sta
 	)
 }
 
-func (cm *ContainerManager) createInitContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
-	return []core.Container{}
-}
-
-func (cm *ContainerManager) createContainers(chk *apiChk.ClickHouseKeeperInstallation) []core.Container {
-	containers := []core.Container{
-		cm.newDefaultContainerKeeper(nil),
-	}
-	clientPort := chk.Spec.GetClientPort()
-	setupPort(
-		&containers[0],
-		clientPort,
-		core.ContainerPort{
-			Name:          "client",
-			ContainerPort: int32(clientPort),
-		})
-	raftPort := chk.Spec.GetRaftPort()
-	setupPort(
-		&containers[0],
-		raftPort,
-		core.ContainerPort{
-			Name:          "raft",
-			ContainerPort: int32(raftPort),
-		})
-	prometheusPort := chk.Spec.GetPrometheusPort()
-	if prometheusPort != -1 {
-		setupPort(
-			&containers[0],
-			prometheusPort,
-			core.ContainerPort{
-				Name:          "prometheus",
-				ContainerPort: int32(prometheusPort),
-			})
-	}
-
-	//switch length := len(chk2.getVolumeClaimTemplates(chk)); length {
-	//case 0:
-	//	containers[0].VolumeMounts = append(containers[0].VolumeMounts, mountVolumes(chk)...)
-	//case 1:
-	//	containers[0].VolumeMounts = append(containers[0].VolumeMounts, mountSharedVolume(chk)...)
-	//case 2:
-	//	containers[0].VolumeMounts = append(containers[0].VolumeMounts, mountVolumes(chk)...)
-	//}
-	//containers[0].VolumeMounts = append(containers[0].VolumeMounts,
-	//	core.VolumeMount{
-	//		Name:      "etc-clickhouse-keeper",
-	//		MountPath: "/etc/clickhouse-keeper",
-	//	})
-
-	return containers
-}
-
 func (cm *ContainerManager) newDefaultContainerKeeper(host *apiChi.Host) core.Container {
 	container := core.Container{
 		Name:          config.KeeperContainerName,
@@ -125,17 +72,4 @@ func (cm *ContainerManager) newDefaultContainerKeeper(host *apiChi.Host) core.Co
 		LivenessProbe: cm.probe.createDefaultKeeperLivenessProbe(host),
 	}
 	return container
-}
-
-func setupPort(container *core.Container, port int, containerPort core.ContainerPort) {
-	// Check whether such a port already specified in the container
-	for _, p := range container.Ports {
-		if p.ContainerPort == int32(port) {
-			// Yes, such a port already specified in the container, nothing to do here
-			return
-		}
-	}
-
-	// Port is not specified in the container, let's specify it
-	container.Ports = append(container.Ports, containerPort)
 }

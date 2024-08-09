@@ -58,7 +58,7 @@ func (m *ProbeManager) createDefaultKeeperLivenessProbe(host *api.Host) *core.Pr
 					"bash",
 					"-xc",
 					//chk.Spec.GetClientPort(),
-					probeScript(host.Port.IntValue()),
+					probeScript(host.ZKPort.IntValue()),
 				},
 			},
 		},
