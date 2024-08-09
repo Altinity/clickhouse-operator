@@ -336,7 +336,7 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *apiChi.Settings {
 	return settings.
 		Ensure().
-		MergeFrom(config.DefaultSettings(n.ctx.GetTarget().GetSpecT().GetPath())).
+		MergeFrom(config.DefaultSettings()).
 		Normalize()
 }
 
