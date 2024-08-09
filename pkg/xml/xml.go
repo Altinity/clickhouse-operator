@@ -169,7 +169,7 @@ func (n *xmlNode) writeTagNoValue(w io.Writer, attributes string, indent, tabsiz
 func (n *xmlNode) writeTagWithValue(w io.Writer, value string, attributes string, indent, tabsize uint8) {
 	// TODO fix this properly
 	// Used in tests
-	if value == "_removed_" {
+	if value == "_removed_" || value == "_remove_" {
 		attributes = " remove=\"1\""
 		value = ""
 	}
