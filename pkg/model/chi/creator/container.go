@@ -38,30 +38,30 @@ func (cm *ContainerManager) NewDefaultAppContainer(host *api.Host) core.Containe
 }
 
 func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
-	return cm.getClickHouseContainer(statefulSet)
+	return cm.getContainerClickHouse(statefulSet)
 }
 
 func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host) {
-	cm.ensureClickHouseContainerSpecified(statefulSet, host)
+	cm.ensureContainerSpecifiedClickHouse(statefulSet, host)
 }
 
 func (cm *ContainerManager) EnsureLogContainer(statefulSet *apps.StatefulSet) {
-	cm.ensureClickHouseLogContainerSpecified(statefulSet)
+	cm.ensureContainerSpecifiedClickHouseLog(statefulSet)
 }
 
-// getClickHouseContainer
-func (cm *ContainerManager) getClickHouseContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+// getContainerClickHouse(
+func (cm *ContainerManager) getContainerClickHouse(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseContainerName, 0)
 }
 
-// getClickHouseLogContainer
-func (cm *ContainerManager) getClickHouseLogContainer(statefulSet *apps.StatefulSet) (*core.Container, bool) {
+// getContainerClickHouseLog
+func (cm *ContainerManager) getContainerClickHouseLog(statefulSet *apps.StatefulSet) (*core.Container, bool) {
 	return k8s.StatefulSetContainerGet(statefulSet, config.ClickHouseLogContainerName)
 }
 
-// ensureClickHouseContainerSpecified
-func (cm *ContainerManager) ensureClickHouseContainerSpecified(statefulSet *apps.StatefulSet, host *api.Host) {
-	_, ok := cm.getClickHouseContainer(statefulSet)
+// ensureContainerSpecifiedClickHouse
+func (cm *ContainerManager) ensureContainerSpecifiedClickHouse(statefulSet *apps.StatefulSet, host *api.Host) {
+	_, ok := cm.getContainerClickHouse(statefulSet)
 	if ok {
 		return
 	}
@@ -73,9 +73,9 @@ func (cm *ContainerManager) ensureClickHouseContainerSpecified(statefulSet *apps
 	)
 }
 
-// ensureClickHouseLogContainerSpecified
-func (cm *ContainerManager) ensureClickHouseLogContainerSpecified(statefulSet *apps.StatefulSet) {
-	_, ok := cm.getClickHouseLogContainer(statefulSet)
+// ensureContainerSpecifiedClickHouseLog
+func (cm *ContainerManager) ensureContainerSpecifiedClickHouseLog(statefulSet *apps.StatefulSet) {
+	_, ok := cm.getContainerClickHouseLog(statefulSet)
 	if ok {
 		return
 	}

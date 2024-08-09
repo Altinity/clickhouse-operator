@@ -47,7 +47,7 @@ func NewServiceManager() *ServiceManager {
 func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...any) *core.Service {
 	switch what {
 	case interfaces.ServiceCR:
-		return m.createServiceCHI()
+		return m.createServiceCR()
 	case interfaces.ServiceCluster:
 		var cluster api.ICluster
 		if len(params) > 0 {
@@ -77,8 +77,8 @@ func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
 }
 
-// createServiceCHI creates new core.Service for specified CHI
-func (m *ServiceManager) createServiceCHI() *core.Service {
+// createServiceCR creates new core.Service for specified CR
+func (m *ServiceManager) createServiceCR() *core.Service {
 	if template, ok := m.cr.GetRootServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(
@@ -175,7 +175,7 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(
 			template,
-			host.Runtime.Address.Namespace,
+			host.GetRuntime().GetAddress().GetNamespace(),
 			namer.New().Name(interfaces.NameStatefulSetService, host),
 			m.tagger.Label(interfaces.LabelServiceHost, host),
 			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
@@ -190,7 +190,7 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
 			Name:            namer.New().Name(interfaces.NameStatefulSetService, host),
-			Namespace:       host.Runtime.Address.Namespace,
+			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
 			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
 			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
