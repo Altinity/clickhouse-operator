@@ -69,56 +69,26 @@ func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case deployment.PortDistributionUnspecified:
-			if !host.TCPPort.HasValue() {
-				host.TCPPort = template.Spec.TCPPort
+			if !host.ZKPort.HasValue() {
+				host.ZKPort = template.Spec.ZKPort
 			}
-			if !host.TLSPort.HasValue() {
-				host.TLSPort = template.Spec.TLSPort
-			}
-			if !host.HTTPPort.HasValue() {
-				host.HTTPPort = template.Spec.HTTPPort
-			}
-			if !host.HTTPSPort.HasValue() {
-				host.HTTPSPort = template.Spec.HTTPSPort
-			}
-			if !host.InterserverHTTPPort.HasValue() {
-				host.InterserverHTTPPort = template.Spec.InterserverHTTPPort
+			if !host.RaftPort.HasValue() {
+				host.RaftPort = template.Spec.RaftPort
 			}
 		case deployment.PortDistributionClusterScopeIndex:
-			if !host.TCPPort.HasValue() {
-				base := api.ChDefaultTCPPortNumber
-				if template.Spec.TCPPort.HasValue() {
-					base = template.Spec.TCPPort.Value()
+			if !host.ZKPort.HasValue() {
+				base := api.KpDefaultZKPortNumber
+				if template.Spec.ZKPort.HasValue() {
+					base = template.Spec.ZKPort.Value()
 				}
-				host.TCPPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
+				host.ZKPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
-			if !host.TLSPort.HasValue() {
-				base := api.ChDefaultTLSPortNumber
-				if template.Spec.TLSPort.HasValue() {
-					base = template.Spec.TLSPort.Value()
+			if !host.RaftPort.HasValue() {
+				base := api.KpDefaultRaftPortNumber
+				if template.Spec.RaftPort.HasValue() {
+					base = template.Spec.RaftPort.Value()
 				}
-				host.TLSPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-			if !host.HTTPPort.HasValue() {
-				base := api.ChDefaultHTTPPortNumber
-				if template.Spec.HTTPPort.HasValue() {
-					base = template.Spec.HTTPPort.Value()
-				}
-				host.HTTPPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-			if !host.HTTPSPort.HasValue() {
-				base := api.ChDefaultHTTPSPortNumber
-				if template.Spec.HTTPSPort.HasValue() {
-					base = template.Spec.HTTPSPort.Value()
-				}
-				host.HTTPSPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
-			}
-			if !host.InterserverHTTPPort.HasValue() {
-				base := api.ChDefaultInterserverHTTPPortNumber
-				if template.Spec.InterserverHTTPPort.HasValue() {
-					base = template.Spec.InterserverHTTPPort.Value()
-				}
-				host.InterserverHTTPPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
+				host.RaftPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 		}
 	}
@@ -144,34 +114,21 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 	// For intermittent (non-final) setup fallback values should be from "MustBeAssignedLater" family,
 	// because this is not final setup (just intermittent) and all these ports may be overwritten later
 	var (
-		fallbackTCPPort             *types.Int32
-		fallbackTLSPort             *types.Int32
-		fallbackHTTPPort            *types.Int32
-		fallbackHTTPSPort           *types.Int32
-		fallbackInterserverHTTPPort *types.Int32
+		fallbackZKPort   *types.Int32
+		fallbackRaftPort *types.Int32
 	)
 
 	// On the other hand, for final setup we need to assign real numbers to ports
 	if final {
-		if host.IsInsecure() {
-			fallbackTCPPort = types.NewInt32(api.ChDefaultTCPPortNumber)
-			fallbackHTTPPort = types.NewInt32(api.ChDefaultHTTPPortNumber)
-		}
-		if host.IsSecure() {
-			fallbackTLSPort = types.NewInt32(api.ChDefaultTLSPortNumber)
-			fallbackHTTPSPort = types.NewInt32(api.ChDefaultHTTPSPortNumber)
-		}
-		fallbackInterserverHTTPPort = types.NewInt32(api.ChDefaultInterserverHTTPPortNumber)
+		fallbackZKPort = types.NewInt32(api.KpDefaultZKPortNumber)
+		fallbackRaftPort = types.NewInt32(api.KpDefaultRaftPortNumber)
 	}
 
 	//
 	// 2. Setup ports
 	//
-	host.TCPPort = types.EnsurePortValue(host.TCPPort, settings.GetTCPPort(), fallbackTCPPort)
-	host.TLSPort = types.EnsurePortValue(host.TLSPort, settings.GetTCPPortSecure(), fallbackTLSPort)
-	host.HTTPPort = types.EnsurePortValue(host.HTTPPort, settings.GetHTTPPort(), fallbackHTTPPort)
-	host.HTTPSPort = types.EnsurePortValue(host.HTTPSPort, settings.GetHTTPSPort(), fallbackHTTPSPort)
-	host.InterserverHTTPPort = types.EnsurePortValue(host.InterserverHTTPPort, settings.GetInterserverHTTPPort(), fallbackInterserverHTTPPort)
+	host.ZKPort = types.EnsurePortValue(host.ZKPort, settings.GetZKPort(), fallbackZKPort)
+	host.RaftPort = types.EnsurePortValue(host.RaftPort, settings.GetRaftPort(), fallbackRaftPort)
 }
 
 // createHostsField
