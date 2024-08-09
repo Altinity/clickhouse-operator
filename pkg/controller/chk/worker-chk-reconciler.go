@@ -190,7 +190,9 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 	configMap := w.task.Creator().CreateConfigMap(
 		interfaces.ConfigMapHost,
 		host,
-		chkConfig.NewFilesGeneratorOptions().SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings()),
+		chkConfig.NewFilesGeneratorOptions().
+			SetHost(host).
+			SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings()),
 	)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
