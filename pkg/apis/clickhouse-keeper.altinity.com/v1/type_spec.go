@@ -76,11 +76,11 @@ func (spec *ChkSpec) GetPort(name string, defaultValue int) int {
 }
 
 func (spec *ChkSpec) GetClientPort() int {
-	return spec.GetPort("keeper_server/tcp_port", 9181)
+	return spec.GetPort("keeper_server/tcp_port", 2181)
 }
 
 func (spec *ChkSpec) GetRaftPort() int {
-	return spec.GetPort("keeper_server/raft_configuration/server/port", 9234)
+	return spec.GetPort("keeper_server/raft_configuration/server/port", 9444)
 }
 
 func (spec *ChkSpec) GetPrometheusPort() int {
