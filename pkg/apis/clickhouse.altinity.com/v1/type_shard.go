@@ -46,6 +46,10 @@ func (r *ChiShardRuntime) GetAddress() IShardAddress {
 	return &r.Address
 }
 
+func (r *ChiShardRuntime) GetCR() ICustomResource {
+	return r.CHI
+}
+
 func (r *ChiShardRuntime) SetCR(cr ICustomResource) {
 	r.CHI = cr.(*ClickHouseInstallation)
 }
