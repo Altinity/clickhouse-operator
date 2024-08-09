@@ -391,13 +391,13 @@ func (s *Settings) GetRaftPort() *types.Int32 {
 	return s.fetchPort("keeper_server/raft_configuration/server/port")
 }
 
-// MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func (s *Settings) MergeFrom(src *Settings) *Settings {
-	if src.Len() == 0 {
+// MergeFrom merges into `dst` non-empty new-key-values from `from` in case no such `key` already in `src`
+func (s *Settings) MergeFrom(from *Settings) *Settings {
+	if from.Len() == 0 {
 		return s
 	}
 
-	src.Walk(func(name string, value *Setting) {
+	from.Walk(func(name string, value *Setting) {
 		s = s.Ensure().SetIfNotExists(name, value)
 	})
 
