@@ -21,13 +21,13 @@ import (
 )
 
 type Namer struct {
-	*commonNamer.Namer
+	commonNamer *commonNamer.Namer
 }
 
 // New creates new namer with specified context
 func New() *Namer {
 	return &Namer{
-		Namer: commonNamer.New(),
+		commonNamer: commonNamer.New(),
 	}
 }
 
@@ -43,7 +43,7 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 		cr := params[0].(api.ICustomResource)
 		return createConfigMapNameCommonUsers(cr)
 	default:
-		return n.Namer.Name(what, params...)
+		return n.commonNamer.Name(what, params...)
 	}
 
 	panic("unknown name type")
@@ -52,7 +52,7 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
 	switch what {
 	default:
-		return n.Namer.Names(what, params...)
+		return n.commonNamer.Names(what, params...)
 	}
 	panic("unknown names type")
 }
