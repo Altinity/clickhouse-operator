@@ -15,21 +15,19 @@
 package namer
 
 import (
-	"fmt"
-
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
 type Namer struct {
-	*commonNamer.Namer
+	commonNamer *commonNamer.Namer
 }
 
 // New creates new namer with specified context
 func New() *Namer {
 	return &Namer{
-		Namer: commonNamer.New(),
+		commonNamer: commonNamer.New(),
 	}
 }
 
@@ -38,11 +36,8 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameConfigMapHost:
 		host := params[0].(*api.Host)
 		return createConfigMapNameHost(host)
-	case interfaces.NameStatefulSetService:
-		cr := params[0].(*api.Host).GetCR()
-		return getHeadlessServiceName(cr)
 	default:
-		return n.Namer.Name(what, params...)
+		return n.commonNamer.Name(what, params...)
 	}
 
 	panic("unknown name type")
@@ -50,8 +45,4 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 
 func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
 	return nil
-}
-
-func getHeadlessServiceName(cr api.ICustomResource) string {
-	return fmt.Sprintf("%s-headless", cr.GetName())
 }

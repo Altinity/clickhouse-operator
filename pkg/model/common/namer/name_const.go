@@ -29,10 +29,10 @@ const (
 	// replicaServiceNamePattern is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
 	replicaServiceNamePattern = "shard-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosReplicaName
 
-	// statefulSetNamePattern is a template of hosts's StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
+	// statefulSetNamePattern is a template of host StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
 	statefulSetNamePattern = "chi-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 
-	// statefulSetServiceNamePattern is a template of hosts's StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
+	// statefulSetServiceNamePattern is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
 	statefulSetServiceNamePattern = "chi-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 )
 const (
