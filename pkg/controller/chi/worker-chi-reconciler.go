@@ -17,13 +17,13 @@ package chi
 import (
 	"context"
 	"errors"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"math"
 	"sync"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
@@ -167,50 +167,50 @@ func (w *worker) reconcile(ctx context.Context, chi *api.ClickHouseInstallation)
 	)
 }
 
-// reconcileCRAuxObjectsPreliminary reconciles CHI preliminary in order to ensure that ConfigMaps are in place
-func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, chi *api.ClickHouseInstallation) error {
+// reconcileCRAuxObjectsPreliminary reconciles CR preliminary in order to ensure that ConfigMaps are in place
+func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
 
-	// CHI common ConfigMap without added hosts
-	chi.GetRuntime().LockCommonConfig()
-	if err := w.reconcileConfigMapCommon(ctx, chi, w.options()); err != nil {
+	// CR common ConfigMap without added hosts
+	cr.GetRuntime().LockCommonConfig()
+	if err := w.reconcileConfigMapCommon(ctx, cr, w.options()); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
 	}
-	chi.GetRuntime().UnlockCommonConfig()
+	cr.GetRuntime().UnlockCommonConfig()
 
 	// 3. CHI users ConfigMap
-	if err := w.reconcileConfigMapCommonUsers(ctx, chi); err != nil {
+	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
 
 	return nil
 }
 
-// reconcileCHIServicePreliminary runs first stage of CHI reconcile process
-func (w *worker) reconcileCHIServicePreliminary(ctx context.Context, chi api.ICustomResource) error {
-	if chi.IsStopped() {
-		// Stopped CHI must have no entry point
-		_ = w.c.deleteServiceCHI(ctx, chi)
+// reconcileCRServicePreliminary runs first stage of CR reconcile process
+func (w *worker) reconcileCRServicePreliminary(ctx context.Context, cr api.ICustomResource) error {
+	if cr.IsStopped() {
+		// Stopped CR must have no entry point
+		_ = w.c.deleteServiceCR(ctx, cr)
 	}
 	return nil
 }
 
-// reconcileCHIServiceFinal runs second stage of CHI reconcile process
-func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi api.ICustomResource) error {
-	if chi.IsStopped() {
+// reconcileCRServiceFinal runs second stage of CR reconcile process
+func (w *worker) reconcileCRServiceFinal(ctx context.Context, cr api.ICustomResource) error {
+	if cr.IsStopped() {
 		// Stopped CHI must have no entry point
 		return nil
 	}
 
 	// Create entry point for the whole CHI
 	if service := w.task.Creator().CreateService(interfaces.ServiceCR); service != nil {
-		if err := w.reconcileService(ctx, chi, service); err != nil {
+		if err := w.reconcileService(ctx, cr, service); err != nil {
 			// Service not reconciled
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
 			return err
@@ -221,27 +221,27 @@ func (w *worker) reconcileCHIServiceFinal(ctx context.Context, chi api.ICustomRe
 	return nil
 }
 
-// reconcileCHIAuxObjectsFinal reconciles CHI global objects
-func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, chi *api.ClickHouseInstallation) (err error) {
+// reconcileCRAuxObjectsFinal reconciles CR global objects
+func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *api.ClickHouseInstallation) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
 
-	// CHI ConfigMaps with update
-	chi.GetRuntime().LockCommonConfig()
-	err = w.reconcileConfigMapCommon(ctx, chi, nil)
-	chi.GetRuntime().UnlockCommonConfig()
+	// CR ConfigMaps with update
+	cr.GetRuntime().LockCommonConfig()
+	err = w.reconcileConfigMapCommon(ctx, cr, nil)
+	cr.GetRuntime().UnlockCommonConfig()
 	return err
 }
 
 // reconcileConfigMapCommon reconciles common ConfigMap
 func (w *worker) reconcileConfigMapCommon(
 	ctx context.Context,
-	chi api.ICustomResource,
+	cr api.ICustomResource,
 	options *config.FilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -253,7 +253,7 @@ func (w *worker) reconcileConfigMapCommon(
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
 	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, options)
-	err := w.reconcileConfigMap(ctx, chi, configMapCommon)
+	err := w.reconcileConfigMap(ctx, cr, configMapCommon)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
 	} else {
@@ -264,7 +264,7 @@ func (w *worker) reconcileConfigMapCommon(
 
 // reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
 // ConfigMap common for all users resources in CHI
-func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, chi *api.ClickHouseInstallation) error {
+func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -272,7 +272,7 @@ func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, chi *api.Cli
 
 	// ConfigMap common for all users resources in CHI
 	configMapUsers := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommonUsers)
-	err := w.reconcileConfigMap(ctx, chi, configMapUsers)
+	err := w.reconcileConfigMap(ctx, cr, configMapUsers)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMapUsers.GetObjectMeta())
 	} else {
@@ -289,7 +289,10 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 	}
 
 	// ConfigMap for a host
-	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host)
+	configMap := w.task.Creator().CreateConfigMap(
+		interfaces.ConfigMapHost,
+		host,
+	)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
@@ -420,7 +423,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.ChiCluster) 
 
 	// Add ChkCluster's Service
 	if service := w.task.Creator().CreateService(interfaces.ServiceCluster, cluster); service != nil {
-		if err := w.reconcileService(ctx, cluster.Runtime.CHI, service); err == nil {
+		if err := w.reconcileService(ctx, cluster.GetRuntime().GetCR(), service); err == nil {
 			w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 		} else {
 			w.task.RegistryFailed().RegisterService(service.GetObjectMeta())
@@ -481,7 +484,7 @@ func (w *worker) getReconcileShardsWorkersNum(shards []*api.ChiShard, opts *comm
 
 // reconcileShardsAndHosts reconciles shards and hosts of each shard
 func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiShard) error {
-	// Sanity check - CHI has to have shard(s)
+	// Sanity check - has to have shard(s)
 	if len(shards) == 0 {
 		return nil
 	}
@@ -571,7 +574,7 @@ func (w *worker) reconcileShardWithHosts(ctx context.Context, shard *api.ChiShar
 }
 
 // reconcileShard reconciles specified shard, excluding nested replicas
-func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error {
+func (w *worker) reconcileShard(ctx context.Context, shard api.IShard) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -586,7 +589,7 @@ func (w *worker) reconcileShard(ctx context.Context, shard *api.ChiShard) error 
 		// This is not a problem, ServiceShard may be omitted
 		return nil
 	}
-	err := w.reconcileService(ctx, shard.Runtime.CHI, service)
+	err := w.reconcileService(ctx, shard.GetRuntime().GetCR(), service)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterService(service.GetObjectMeta())
 	} else {
@@ -614,8 +617,8 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	startTime := time.Now()
 
 	if host.IsFirst() {
-		w.reconcileCHIServicePreliminary(ctx, host.GetCR())
-		defer w.reconcileCHIServiceFinal(ctx, host.GetCR())
+		w.reconcileCRServicePreliminary(ctx, host.GetCR())
+		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
 	}
 
 	// Check whether ClickHouse is running and accessible and what version is available

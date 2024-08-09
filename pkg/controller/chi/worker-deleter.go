@@ -306,7 +306,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 	w.c.deleteWatch(chi)
 
 	// Delete Service
-	_ = w.c.deleteServiceCHI(ctx, chi)
+	_ = w.c.deleteServiceCR(ctx, chi)
 
 	chi.WalkHosts(func(host *api.Host) error {
 		_ = w.ensureClusterSchemer(host).HostSyncTables(ctx, host)
