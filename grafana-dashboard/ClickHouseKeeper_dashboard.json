@@ -106,15 +106,15 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ClickHouseAsyncMetrics_KeeperAvgLatency{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperAvgLatency{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
-          "legendFormat": "avg {{namespace}}.{{pod}}",
+          "legendFormat": "avg {{namespace}}.{{pod_name}}",
           "refId": "A"
         },
         {
-          "expr": "ClickHouseAsyncMetrics_KeeperMaxLatency{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperMaxLatency{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
-          "legendFormat": "max {{namespace}}.{{pod}}",
+          "legendFormat": "max {{namespace}}.{{pod_name}}",
           "refId": "B"
         }
       ],
@@ -206,10 +206,10 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ClickHouseMetrics_KeeperAliveConnections{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseMetrics_KeeperAliveConnections{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "hide": false,
           "interval": "",
-          "legendFormat": "{{namespace}}.{{pod}}",
+          "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
         }
       ],
@@ -301,16 +301,16 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(ClickHouseAsyncMetrics_KeeperPacketsSent{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}[1m])",
+          "expr": "irate(ClickHouseAsyncMetrics_KeeperPacketsSent{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
           "hide": false,
           "interval": "",
-          "legendFormat": "OUT {{namespace}}.{{pod}}",
+          "legendFormat": "OUT {{namespace}}.{{pod_name}}",
           "refId": "A"
         },
         {
-          "expr": "-irate(ClickHouseAsyncMetrics_KeeperPacketsReceived{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}[1m])",
+          "expr": "-irate(ClickHouseAsyncMetrics_KeeperPacketsReceived{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
           "interval": "",
-          "legendFormat": "IN {{namespace}}.{{pod}}",
+          "legendFormat": "IN {{namespace}}.{{pod_name}}",
           "refId": "B"
         }
       ],
@@ -402,9 +402,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ClickHouseAsyncMetrics_KeeperZnodeCount{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperZnodeCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
-          "legendFormat": "{{namespace}}.{{pod}}",
+          "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
         }
       ],
@@ -496,9 +496,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ClickHouseAsyncMetrics_KeeperWatchCount{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperWatchCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
-          "legendFormat": "{{namespace}}.{{pod}}",
+          "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
         }
       ],
@@ -590,9 +590,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ClickHouseAsyncMetrics_KeeperEphemeralsCount{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperEphemeralsCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
-          "legendFormat": "{{namespace}}.{{pod}}",
+          "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
         }
       ],
@@ -684,9 +684,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ClickHouseAsyncMetrics_KeeperApproximateDataSize{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperApproximateDataSize{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
-          "legendFormat": "{{namespace}}.{{pod}}",
+          "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
         }
       ],
@@ -784,9 +784,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(ClickHouseMetrics_KeeperOutstandingRequests{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}[1m])",
+          "expr": "irate(ClickHouseMetrics_KeeperOutstandingRequests{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
           "interval": "",
-          "legendFormat": "{{namespace}}.{{pod}}",
+          "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
         }
       ],
@@ -878,9 +878,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{namespace=~\"$namespace\", pod=~\"$pod_name\", container=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
-          "legendFormat": "{{namespace}}.{{pod}}",
+          "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
         }
       ],
@@ -941,14 +941,14 @@
         "allValue": ".+",
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(ClickHouseAsyncMetrics_KeeperPacketsSent,namespace)",
+        "definition": "label_values(up{container_name=\"clickhouse-keeper\"},namespace}",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
         "name": "namespace",
         "options": [],
-        "query": "label_values(ClickHouseAsyncMetrics_KeeperPacketsSent,namespace)",
+        "query": "label_values(up{container_name=\"clickhouse-keeper\"},namespace}",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -963,14 +963,14 @@
         "allValue": ".+",
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(ClickHouseAsyncMetrics_KeeperPacketsReceived,pod)",
+        "definition": "label_values(up{container_name=\"clickhouse-keeper\"},pod_name}",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
         "name": "pod_name",
         "options": [],
-        "query": "label_values(ClickHouseAsyncMetrics_KeeperPacketsReceived,pod)",
+        "query": "label_values(up{container_name=\"clickhouse-keeper\"},pod_name}",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
