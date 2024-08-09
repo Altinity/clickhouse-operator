@@ -48,6 +48,8 @@ type HostPorts struct {
 	HTTPPort            *types.Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
 	HTTPSPort           *types.Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
 	InterserverHTTPPort *types.Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	ZKPort              *types.Int32 `json:"zkPort,omitempty"              yaml:"zkPort,omitempty"`
+	RaftPort            *types.Int32 `json:"raftPort,omitempty"            yaml:"raftPort,omitempty"`
 }
 
 type HostSettings struct {
@@ -168,6 +170,12 @@ func (host *Host) MergeFrom(from *Host) {
 	}
 	if !host.InterserverHTTPPort.HasValue() {
 		host.InterserverHTTPPort.MergeFrom(from.InterserverHTTPPort)
+	}
+	if !host.ZKPort.HasValue() {
+		host.ZKPort.MergeFrom(from.ZKPort)
+	}
+	if !host.RaftPort.HasValue() {
+		host.RaftPort.MergeFrom(from.RaftPort)
 	}
 
 	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
@@ -451,6 +459,12 @@ const (
 	ChDefaultHTTPSPortNumber           = int32(8443)
 	ChDefaultInterserverHTTPPortName   = "interserver"
 	ChDefaultInterserverHTTPPortNumber = int32(9009)
+
+	// Keeper open ports names and values
+	KpDefaultZKPortName     = "zk"
+	KpDefaultZKPortNumber   = int32(2181)
+	KpDefaultRaftPortName   = "raft"
+	KpDefaultRaftPortNumber = int32(9444)
 )
 
 func (host *Host) WalkPorts(f func(name string, port *types.Int32, protocol core.Protocol) bool) {
@@ -473,6 +487,12 @@ func (host *Host) WalkPorts(f func(name string, port *types.Int32, protocol core
 		return
 	}
 	if f(ChDefaultInterserverHTTPPortName, host.InterserverHTTPPort, core.ProtocolTCP) {
+		return
+	}
+	if f(KpDefaultZKPortName, host.ZKPort, core.ProtocolTCP) {
+		return
+	}
+	if f(KpDefaultRaftPortName, host.RaftPort, core.ProtocolTCP) {
 		return
 	}
 }
