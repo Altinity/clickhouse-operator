@@ -15,6 +15,4 @@
 package config
 
 type GeneratorOptions struct {
-	RaftPort      int
-	ReplicasCount int
 }

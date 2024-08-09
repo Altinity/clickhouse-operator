@@ -19,29 +19,37 @@ import (
 	"strings"
 
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/xml"
 )
 
 type Generator struct {
-	cr   apiChi.ICustomResource
-	opts *GeneratorOptions
+	cr    apiChi.ICustomResource
+	namer interfaces.INameManager
+	opts  *GeneratorOptions
 }
 
-func newGenerator(cr apiChi.ICustomResource, opts *GeneratorOptions) *Generator {
+func newGenerator(cr apiChi.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *Generator {
 	return &Generator{
-		cr:   cr,
-		opts: opts,
+		cr:    cr,
+		namer: namer,
+		opts:  opts,
 	}
 }
 
-func (c *Generator) getSettings(settings *apiChi.Settings) string {
+func getServerId(host *apiChi.Host) int {
+	return host.GetRuntime().GetAddress().GetReplicaIndex() + 1
+}
+
+func (c *Generator) getHostConfig(host *apiChi.Host, settings *apiChi.Settings) string {
 	if settings.Len() == 0 {
 		return ""
 	}
 
 	// Init container will replace this macro with real value on bootstrap
-	settings.Set("keeper_server/server_id", apiChi.NewSettingScalar("KEEPER_ID"))
+	serverId, _ := apiChi.NewSettingScalarFromAny(getServerId(host))
+	settings.Set("keeper_server/server_id", serverId)
 
 	// Prepare empty placeholder for RAFT config and will be replaced later in this function:
 	// <raft_configuration>
@@ -52,13 +60,14 @@ func (c *Generator) getSettings(settings *apiChi.Settings) string {
 	raftIndent := 12
 	// Prepare RAFT config for injection into main config
 	raft := &bytes.Buffer{}
-	for i := 0; i < c.opts.ReplicasCount; i++ {
+	host.GetShard().WalkHosts(func(_host *apiChi.Host) error {
 		util.Iline(raft, raftIndent, "<server>")
-		util.Iline(raft, raftIndent, "    <id>%d</id>", i)
-		util.Iline(raft, raftIndent, "    <hostname>%s-%d.%s-headless.%s.svc.cluster.local</hostname>", c.cr.GetName(), i, c.cr.GetName(), c.cr.GetNamespace())
-		util.Iline(raft, raftIndent, "    <port>%d</port>", c.opts.RaftPort)
+		util.Iline(raft, raftIndent, "    <id>%d</id>", getServerId(_host))
+		util.Iline(raft, raftIndent, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, _host))
+		util.Iline(raft, raftIndent, "    <port>%d</port>", _host.RaftPort.Value())
 		util.Iline(raft, raftIndent, "</server>")
-	}
+		return nil
+	})
 
 	// <clickhouse>
 	// 		CONFIG

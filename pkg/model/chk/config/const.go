@@ -14,6 +14,10 @@
 
 package config
 
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
 const (
 	DirPathConfigRoot = "/etc/clickhouse-keeper"
 
@@ -24,7 +28,7 @@ const (
 	// 3. settings
 	// 4. files
 	// 5. operator-provided additional config files
-	DirPathConfigHost = DirPathConfigRoot + "/"
+	DirPathConfigHost = DirPathConfigRoot + "/" + api.HostConfigDir + "/"
 
 	// DirPathClickHouseKeeperData specifies full path of data folder where ClickHouse would place its data storage
 	DirPathClickHouseKeeperData = "/var/lib/clickhouse-keeper"

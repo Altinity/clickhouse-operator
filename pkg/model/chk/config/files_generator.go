@@ -26,9 +26,9 @@ type FilesGenerator struct {
 }
 
 // NewFilesGenerator creates new configuration files generator object
-func NewFilesGenerator(cr api.ICustomResource, opts *GeneratorOptions) *FilesGenerator {
+func NewFilesGenerator(cr api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *FilesGenerator {
 	return &FilesGenerator{
-		configGenerator: newGenerator(cr, opts),
+		configGenerator: newGenerator(cr, namer, opts),
 	}
 }
 
@@ -48,7 +48,7 @@ func (c *FilesGenerator) CreateConfigFiles(what interfaces.FilesGroupType, param
 func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptions) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	configSections := make(map[string]string)
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettings(options.GetSettings()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getHostConfig(options.GetHost(), options.GetSettings()))
 
 	return configSections
 }
@@ -57,4 +57,5 @@ func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptio
 // filename depends on a section which it will contain
 func createConfigSectionFilename(section string) string {
 	return "chop-generated-" + section + ".xml"
+	//return "keeper_config.xml"
 }

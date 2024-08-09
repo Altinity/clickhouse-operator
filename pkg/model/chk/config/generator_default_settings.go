@@ -15,11 +15,10 @@
 package config
 
 import (
-	"fmt"
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func DefaultSettings(storagePath string) *apiChi.Settings {
+func DefaultSettings() *apiChi.Settings {
 	settings := apiChi.NewSettings()
 	settings.SetScalarsFromMap(
 		map[string]string{
@@ -29,10 +28,10 @@ func DefaultSettings(storagePath string) *apiChi.Settings {
 			"listen_host":     "0.0.0.0",
 			"max_connections": "4096",
 
-			"keeper_server/tcp_port":                                     "9181",
-			"keeper_server/storage_path":                                 storagePath,
-			"keeper_server/log_storage_path":                             fmt.Sprintf("%s/coordination/logs", storagePath),
-			"keeper_server/snapshot_storage_path":                        fmt.Sprintf("%s/coordination/snapshots", storagePath),
+			"keeper_server/tcp_port":                                     "2181",
+			"keeper_server/storage_path":                                 "/var/lib/clickhouse",
+			"keeper_server/log_storage_path":                             "/var/lib/clickhouse/coordination/logs",
+			"keeper_server/snapshot_storage_path":                        "/var/lib/clickhouse/coordination/snapshots",
 			"keeper_server/coordination_settings/operation_timeout_ms":   "10000",
 			"keeper_server/coordination_settings/min_session_timeout_ms": "10000",
 			"keeper_server/coordination_settings/session_timeout_ms":     "100000",
