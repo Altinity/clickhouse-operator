@@ -162,6 +162,7 @@ type IShard interface {
 
 type IShardRuntime interface {
 	GetAddress() IShardAddress
+	GetCR() ICustomResource
 	SetCR(cr ICustomResource)
 }
 
