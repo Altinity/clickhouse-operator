@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package common
 
 import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
@@ -22,8 +22,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 )
 
-// logCR writes a CR into the log
-func logCR(name string, cr api.ICustomResource) {
+// LogCR writes a CR into the log
+func LogCR(name string, cr api.ICustomResource) {
 	log.V(1).M(cr).Info(
 		"logCHI %s start--------------------------------------------:\n%s\nlogCHI %s end--------------------------------------------",
 		name,
@@ -32,16 +32,16 @@ func logCR(name string, cr api.ICustomResource) {
 	)
 }
 
-// logActionPlan logs action plan
-func logActionPlan(ap *action_plan.ActionPlan) {
+// LogActionPlan logs action plan
+func LogActionPlan(ap *action_plan.ActionPlan) {
 	log.Info(
 		"ActionPlan start---------------------------------------------:\n%s\nActionPlan end---------------------------------------------",
 		ap,
 	)
 }
 
-// logOldAndNew writes old and new CHIs into the log
-func logOldAndNew(name string, old, new api.ICustomResource) {
-	logCR(name+" old", old)
-	logCR(name+" new", new)
+// LogOldAndNew writes old and new CHIs into the log
+func LogOldAndNew(name string, old, new api.ICustomResource) {
+	LogCR(name+" old", old)
+	LogCR(name+" new", new)
 }
