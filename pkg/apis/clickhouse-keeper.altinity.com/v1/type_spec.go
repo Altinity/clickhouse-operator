@@ -19,6 +19,26 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
+// ChkSpec defines spec section of ClickHouseKeeper resource
+type ChkSpec struct {
+	TaskID                 *types.String       `json:"taskID,omitempty"                 yaml:"taskID,omitempty"`
+	NamespaceDomainPattern *types.String       `json:"namespaceDomainPattern,omitempty" yaml:"namespaceDomainPattern,omitempty"`
+	Reconciling            *apiChi.Reconciling `json:"reconciling,omitempty"            yaml:"reconciling,omitempty"`
+	Defaults               *apiChi.Defaults    `json:"defaults,omitempty"               yaml:"defaults,omitempty"`
+	Configuration          *Configuration      `json:"configuration,omitempty"          yaml:"configuration,omitempty"`
+	Templates              *apiChi.Templates   `json:"templates,omitempty"              yaml:"templates,omitempty"`
+}
+
+// HasTaskID checks whether task id is specified
+func (spec *ChkSpec) HasTaskID() bool {
+	return len(spec.TaskID.Value()) > 0
+}
+
+// GetTaskID gets task id as a string
+func (spec *ChkSpec) GetTaskID() string {
+	return spec.TaskID.Value()
+}
+
 func (spec *ChkSpec) GetNamespaceDomainPattern() *types.String {
 	return spec.NamespaceDomainPattern
 }
@@ -27,19 +47,12 @@ func (spec *ChkSpec) GetDefaults() *apiChi.Defaults {
 	return spec.Defaults
 }
 
-func (spec ChkSpec) GetConfiguration() apiChi.IConfiguration {
+func (spec *ChkSpec) GetConfiguration() apiChi.IConfiguration {
 	return spec.Configuration
 }
 
-func (spec ChkSpec) GetTemplates() *apiChi.Templates {
+func (spec *ChkSpec) GetTemplates() *apiChi.Templates {
 	return spec.Templates
-}
-
-func (spec ChkSpec) EnsureConfiguration() *Configuration {
-	if spec.GetConfiguration() == nil {
-		spec.Configuration = new(Configuration)
-	}
-	return spec.Configuration
 }
 
 // MergeFrom merges from spec
@@ -48,6 +61,25 @@ func (spec *ChkSpec) MergeFrom(from *ChkSpec, _type apiChi.MergeType) {
 		return
 	}
 
+	switch _type {
+	case apiChi.MergeTypeFillEmptyValues:
+		if !spec.HasTaskID() {
+			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
+		}
+		if !spec.NamespaceDomainPattern.HasValue() {
+			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
+		}
+	case apiChi.MergeTypeOverrideByNonEmptyValues:
+		if from.HasTaskID() {
+			spec.TaskID = spec.TaskID.MergeFrom(from.TaskID)
+		}
+		if from.NamespaceDomainPattern.HasValue() {
+			spec.NamespaceDomainPattern = spec.NamespaceDomainPattern.MergeFrom(from.NamespaceDomainPattern)
+		}
+	}
+
+	spec.Reconciling = spec.Reconciling.MergeFrom(from.Reconciling, _type)
+	spec.Defaults = spec.Defaults.MergeFrom(from.Defaults, _type)
 	spec.Configuration = spec.Configuration.MergeFrom(from.Configuration, _type)
 	spec.Templates = spec.Templates.MergeFrom(from.Templates, _type)
 }
