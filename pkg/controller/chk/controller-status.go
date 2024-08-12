@@ -16,12 +16,19 @@ package chk
 
 import (
 	"context"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	//model "github.com/altinity/clickhouse-operator/pkg/model/chk"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
+
+// updateCRObjectStatus updates Custom Resource object's Status
+func (c *Controller) updateCRObjectStatus(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error) {
+	return c.kube.CR().StatusUpdate(ctx, cr, opts)
+}
 
 func (c *Controller) reconcileClusterStatus(chk *apiChk.ClickHouseKeeperInstallation) (err error) {
 	return nil
