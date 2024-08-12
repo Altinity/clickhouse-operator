@@ -32,7 +32,7 @@ type Announcer struct {
 	a.Announcer
 
 	eventEmitter  interfaces.IEventEmitter
-	statusUpdater interfaces.IKubeCRStatus
+	statusUpdater interfaces.IKubeCR
 	cr            api.ICustomResource
 
 	// writeEvent specifies whether to produce k8s event into chi, therefore requires chi to be specified
@@ -56,7 +56,7 @@ type Announcer struct {
 }
 
 // NewAnnouncer creates new announcer
-func NewAnnouncer(eventEmitter interfaces.IEventEmitter, statusUpdater interfaces.IKubeCRStatus) Announcer {
+func NewAnnouncer(eventEmitter interfaces.IEventEmitter, statusUpdater interfaces.IKubeCR) Announcer {
 	return Announcer{
 		Announcer:     a.New(),
 		eventEmitter:  eventEmitter,
@@ -305,7 +305,7 @@ func (a Announcer) writeStatus(format string, args ...interface{}) {
 
 	// Propagate status updates into object
 	if shouldUpdateStatus {
-		_ = a.statusUpdater.Update(context.Background(), a.cr, types.UpdateStatusOptions{
+		_ = a.statusUpdater.StatusUpdate(context.Background(), a.cr, types.UpdateStatusOptions{
 			TolerateAbsence: true,
 			CopyStatusOptions: types.CopyStatusOptions{
 				Actions: true,
