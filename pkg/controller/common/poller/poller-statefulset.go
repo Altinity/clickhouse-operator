@@ -63,7 +63,7 @@ func (poller *StatefulSetPoller) PollHostStatefulSet(
 		opts,
 		&Functions{
 			Get: func(_ctx context.Context) (any, error) {
-				return poller.kubeSTS.Get(host)
+				return poller.kubeSTS.Get(ctx, host)
 			},
 			IsDone: func(_ctx context.Context, a any) bool {
 				return isDoneFn(_ctx, a.(*apps.StatefulSet))

@@ -113,7 +113,7 @@ func (c *HostStatefulSetPoller) WaitHostStatefulSetDeleted(host *api.Host) {
 	for {
 		// TODO
 		// Probably there would be better way to wait until k8s reported StatefulSet deleted
-		if _, err := c.IKubeSTS.Get(host); err == nil {
+		if _, err := c.IKubeSTS.Get(context.TODO(), host); err == nil {
 			log.V(2).Info("cache NOT yet synced")
 			time.Sleep(15 * time.Second)
 		} else {
