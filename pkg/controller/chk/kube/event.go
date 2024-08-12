@@ -22,16 +22,16 @@ import (
 )
 
 type Event struct {
-	kube client.Client
+	kubeClient client.Client
 }
 
 func NewEvent(kubeClient client.Client) *Event {
 	return &Event{
-		kube: kubeClient,
+		kubeClient: kubeClient,
 	}
 }
 
 func (c *Event) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
-	err := c.kube.Create(ctx, event)
+	err := c.kubeClient.Create(ctx, event)
 	return event, err
 }

@@ -23,18 +23,18 @@ import (
 )
 
 type Deployment struct {
-	kube client.Client
+	kubeClient client.Client
 }
 
 func NewDeployment(kubeClient client.Client) *Deployment {
 	return &Deployment{
-		kube: kubeClient,
+		kubeClient: kubeClient,
 	}
 }
 
 func (c *Deployment) Get(namespace, name string) (*apps.Deployment, error) {
 	deployment := &apps.Deployment{}
-	err := c.kube.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, deployment)
@@ -46,6 +46,6 @@ func (c *Deployment) Get(namespace, name string) (*apps.Deployment, error) {
 }
 
 func (c *Deployment) Update(deployment *apps.Deployment) (*apps.Deployment, error) {
-	err := c.kube.Update(controller.NewContext(), deployment)
+	err := c.kubeClient.Update(controller.NewContext(), deployment)
 	return deployment, err
 }

@@ -16,6 +16,7 @@ package kube
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/labels"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,23 +25,23 @@ import (
 )
 
 type ConfigMap struct {
-	kube client.Client
+	kubeClient client.Client
 }
 
 func NewConfigMap(kubeClient client.Client) *ConfigMap {
 	return &ConfigMap{
-		kube: kubeClient,
+		kubeClient: kubeClient,
 	}
 }
 
 func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kube.Create(ctx, cm)
+	err := c.kubeClient.Create(ctx, cm)
 	return cm, err
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
 	cm := &core.ConfigMap{}
-	err := c.kube.Get(ctx, types.NamespacedName{
+	err := c.kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, cm)
@@ -52,7 +53,7 @@ func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.Conf
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
-	err := c.kube.Update(ctx, cm)
+	err := c.kubeClient.Update(ctx, cm)
 	return cm, err
 }
 
@@ -63,5 +64,24 @@ func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
 			Name:      name,
 		},
 	}
-	return c.kube.Delete(ctx, cm)
+	return c.kubeClient.Delete(ctx, cm)
+}
+
+func (c *ConfigMap) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.ConfigMap, error) {
+	list := &core.ConfigMapList{}
+	selector, err := labels.Parse(opts.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	err = c.kubeClient.List(ctx, list, &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
