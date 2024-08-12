@@ -327,7 +327,7 @@ func (l *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.
 		return nil
 	}
 
-	svc, err := l.service.Get(host)
+	svc, err := l.service.Get(ctx, host)
 	if err != nil {
 		log.M(host).F().Error("FAIL get service for host %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 		return err
@@ -335,7 +335,7 @@ func (l *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.
 
 	if commonLabeler.AppendAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
-		_, err = l.service.Update(svc)
+		_, err = l.service.Update(ctx, svc)
 		if err != nil {
 			log.M(host).F().Error("FAIL setting 'ready' annotation for host service %s err:%v", host.Runtime.Address.NamespaceNameString(), err)
 			return err
@@ -356,7 +356,7 @@ func (l *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.
 		return nil
 	}
 
-	svc, err := l.service.Get(host)
+	svc, err := l.service.Get(ctx, host)
 	if apiErrors.IsNotFound(err) {
 		// Service may be missing in case, say, StatefulSet has 0 pods because CHI is stopped
 		// This is not an error, after all
@@ -369,7 +369,7 @@ func (l *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.
 
 	if commonLabeler.DeleteAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
-		_, err = l.service.Update(svc)
+		_, err = l.service.Update(ctx, svc)
 		return err
 	}
 

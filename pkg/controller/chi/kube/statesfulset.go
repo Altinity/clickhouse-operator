@@ -15,8 +15,8 @@
 package kube
 
 import (
+	"context"
 	"fmt"
-
 	apps "k8s.io/api/apps/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
@@ -38,10 +38,10 @@ func NewSTS(kubeClient kube.Interface, namer interfaces.INameManager) *STS {
 	}
 }
 
-// getStatefulSet gets StatefulSet. Accepted types:
+// Get gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.Host
-func (c *STS) Get(obj any) (*apps.StatefulSet, error) {
+func (c *STS) Get(ctx context.Context, obj any) (*apps.StatefulSet, error) {
 	switch obj := obj.(type) {
 	case meta.Object:
 		return c.kubeClient.AppsV1().StatefulSets(obj.GetNamespace()).Get(controller.NewContext(), obj.GetName(), controller.NewGetOptions())
@@ -50,21 +50,32 @@ func (c *STS) Get(obj any) (*apps.StatefulSet, error) {
 		name := c.namer.Name(interfaces.NameStatefulSet, obj)
 		namespace := obj.Runtime.Address.Namespace
 
-		return c.kubeClient.AppsV1().StatefulSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
+		return c.kubeClient.AppsV1().StatefulSets(namespace).Get(ctx, name, controller.NewGetOptions())
 	}
 	return nil, fmt.Errorf("unknown type")
 }
 
-func (c *STS) Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
-	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(controller.NewContext(), statefulSet, controller.NewCreateOptions())
+func (c *STS) Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error) {
+	return c.kubeClient.AppsV1().StatefulSets(statefulSet.Namespace).Create(ctx, statefulSet, controller.NewCreateOptions())
 }
 
 // updateStatefulSet is an internal function, used in reconcileStatefulSet only
-func (c *STS) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
-	return c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Update(controller.NewContext(), sts, controller.NewUpdateOptions())
+func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+	return c.kubeClient.AppsV1().StatefulSets(sts.Namespace).Update(ctx, sts, controller.NewUpdateOptions())
 }
 
 // deleteStatefulSet gracefully deletes StatefulSet through zeroing Pod's count
-func (c *STS) Delete(namespace, name string) error {
-	return c.kubeClient.AppsV1().StatefulSets(namespace).Delete(controller.NewContext(), name, controller.NewDeleteOptions())
+func (c *STS) Delete(ctx context.Context, namespace, name string) error {
+	return c.kubeClient.AppsV1().StatefulSets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
+func (c *STS) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]apps.StatefulSet, error) {
+	list, err := c.kubeClient.AppsV1().StatefulSets(namespace).List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, err
+	}
+	return list.Items, nil
 }

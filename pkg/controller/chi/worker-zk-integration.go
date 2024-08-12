@@ -12,26 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package kube
+package chi
 
 import (
-	"context"
-
-	core "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 )
 
-type Event struct {
-	kubeClient client.Client
-}
-
-func NewEvent(kubeClient client.Client) *Event {
-	return &Event{
-		kubeClient: kubeClient,
+func reconcileZookeeperRootPath(cluster *api.ChiCluster) {
+	if cluster.Zookeeper.IsEmpty() {
+		// Nothing to reconcile
+		return
 	}
-}
-
-func (c *Event) Create(ctx context.Context, event *core.Event) (*core.Event, error) {
-	err := c.kubeClient.Create(ctx, event)
-	return event, err
+	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes)
+	path := zookeeper.NewPathManager(conn)
+	path.Ensure(cluster.Zookeeper.Root)
+	path.Close()
 }

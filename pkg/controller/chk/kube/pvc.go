@@ -31,23 +31,23 @@ import (
 )
 
 type PVC struct {
-	kube client.Client
+	kubeClient client.Client
 }
 
 func NewPVC(kubeClient client.Client) *PVC {
 	return &PVC{
-		kube: kubeClient,
+		kubeClient: kubeClient,
 	}
 }
 
 func (c *PVC) Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
-	err := c.kube.Create(ctx, pvc)
+	err := c.kubeClient.Create(ctx, pvc)
 	return pvc, err
 }
 
 func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error) {
 	pvc := &core.PersistentVolumeClaim{}
-	err := c.kube.Get(ctx, types.NamespacedName{
+	err := c.kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, pvc)
@@ -59,7 +59,7 @@ func (c *PVC) Get(ctx context.Context, namespace, name string) (*core.Persistent
 }
 
 func (c *PVC) Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error) {
-	err := c.kube.Update(ctx, pvc)
+	err := c.kubeClient.Update(ctx, pvc)
 	return pvc, err
 }
 
@@ -70,7 +70,26 @@ func (c *PVC) Delete(ctx context.Context, namespace, name string) error {
 			Name:      name,
 		},
 	}
-	return c.kube.Delete(ctx, pvc)
+	return c.kubeClient.Delete(ctx, pvc)
+}
+
+func (c *PVC) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.PersistentVolumeClaim, error) {
+	list := &core.PersistentVolumeClaimList{}
+	selector, err := labels.Parse(opts.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	err = c.kubeClient.List(ctx, list, &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
 
 func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error) {
@@ -79,7 +98,7 @@ func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.Persistent
 		LabelSelector: labels.SelectorFromSet(labeler(host.GetCR()).Selector(interfaces.SelectorHostScope, host)),
 		Namespace:     host.Runtime.Address.Namespace,
 	}
-	err := c.kube.List(ctx, list, opts)
+	err := c.kubeClient.List(ctx, list, opts)
 	return list, err
 }
 

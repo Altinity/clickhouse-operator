@@ -42,7 +42,6 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
@@ -63,10 +62,14 @@ import (
 
 // Controller defines CRO controller
 type Controller struct {
-	// kubeClient used to Create() k8s resources as c.kubeClient.AppsV1().StatefulSets(namespace).Create(name)
+	// kube is a generalized kube client
+	kube interfaces.IKube
+
+	//
+	// Native clients
+	//
 	kubeClient kube.Interface
 	extClient  apiExtensions.Interface
-	// chopClient used to Update() CRD k8s resource as c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.Namespace).Update(chiCopy)
 	chopClient chopClientSet.Interface
 
 	// configMapLister used as configMapLister.ConfigMaps(namespace).Get(name)
@@ -78,7 +81,6 @@ type Controller struct {
 	recorder record.EventRecorder
 
 	namer      interfaces.INameManager
-	kube       interfaces.IKube
 	labeler    *labeler.Labeler
 	pvcDeleter *volume.PVCDeleter
 }
@@ -735,11 +737,6 @@ func (c *Controller) patchCHIFinalizers(ctx context.Context, chi *api.ClickHouse
 	return nil
 }
 
-// updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *Controller) updateCHIObjectStatus(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error) {
-	return c.kube.CRStatus().Update(ctx, cr, opts)
-}
-
 func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, f func(c *api.ClickHouseInstallation, e error) bool) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -749,8 +746,8 @@ func (c *Controller) poll(ctx context.Context, chi *api.ClickHouseInstallation, 
 	namespace, name := util.NamespaceName(chi)
 
 	for {
-		cur, err := c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
-		if f(cur, err) {
+		cur, err := c.kube.CR().Get(ctx, namespace, name)
+		if f(cur.(*api.ClickHouseInstallation), err) {
 			// Continue polling
 			if util.IsContextDone(ctx) {
 				log.V(2).Info("task is done")

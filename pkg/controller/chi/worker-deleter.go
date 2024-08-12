@@ -36,42 +36,42 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-func (w *worker) clean(ctx context.Context, chi *api.ClickHouseInstallation) {
+func (w *worker) clean(ctx context.Context, cr api.ICustomResource) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
 	w.a.V(1).
-		WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileInProgress).
-		WithStatusAction(chi).
-		M(chi).F().
+		WithEvent(cr, common.EventActionReconcile, common.EventReasonReconcileInProgress).
+		WithStatusAction(cr).
+		M(cr).F().
 		Info("remove items scheduled for deletion")
 
 	// Remove deleted items
-	w.a.V(1).M(chi).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed)
-	w.a.V(1).M(chi).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled)
-	objs := w.c.discovery(ctx, chi)
+	w.a.V(1).M(cr).F().Info("List of objects which have failed to reconcile:\n%s", w.task.RegistryFailed)
+	w.a.V(1).M(cr).F().Info("List of successfully reconciled objects:\n%s", w.task.RegistryReconciled)
+	objs := w.c.discovery(ctx, cr)
 	need := w.task.RegistryReconciled()
-	w.a.V(1).M(chi).F().Info("Existing objects:\n%s", objs)
+	w.a.V(1).M(cr).F().Info("Existing objects:\n%s", objs)
 	objs.Subtract(need)
-	w.a.V(1).M(chi).F().Info("Non-reconciled objects:\n%s", objs)
-	if w.purge(ctx, chi, objs, w.task.RegistryFailed()) > 0 {
-		w.c.enqueueObject(cmd_queue.NewDropDns(chi))
+	w.a.V(1).M(cr).F().Info("Non-reconciled objects:\n%s", objs)
+	if w.purge(ctx, cr, objs, w.task.RegistryFailed()) > 0 {
+		w.c.enqueueObject(cmd_queue.NewDropDns(cr))
 		util.WaitContextDoneOrTimeout(ctx, 1*time.Minute)
 	}
 
-	chi.EnsureStatus().SyncHostTablesCreated()
+	cr.(*api.ClickHouseInstallation).EnsureStatus().SyncHostTablesCreated()
 }
 
 // dropReplicas cleans Zookeeper for replicas that are properly deleted - via AP
-func (w *worker) dropReplicas(ctx context.Context, chi *api.ClickHouseInstallation, ap *action_plan.ActionPlan) {
+func (w *worker) dropReplicas(ctx context.Context, cr api.ICustomResource, ap *action_plan.ActionPlan) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return
 	}
 
-	w.a.V(1).M(chi).F().S().Info("drop replicas based on AP")
+	w.a.V(1).M(cr).F().S().Info("drop replicas based on AP")
 	cnt := 0
 	ap.WalkRemoved(
 		func(cluster api.ICluster) {
@@ -83,7 +83,126 @@ func (w *worker) dropReplicas(ctx context.Context, chi *api.ClickHouseInstallati
 			cnt++
 		},
 	)
-	w.a.V(1).M(chi).F().E().Info("processed replicas: %d", cnt)
+	w.a.V(1).M(cr).F().E().Info("processed replicas: %d", cnt)
+}
+
+// purge
+func (w *worker) purge(
+	ctx context.Context,
+	cr api.ICustomResource,
+	reg *model.Registry,
+	reconcileFailedObjs *model.Registry,
+) (cnt int) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return cnt
+	}
+
+	reg.Walk(func(entityType model.EntityType, m meta.Object) {
+		switch entityType {
+		case model.StatefulSet:
+			cnt += w.purgeStatefulSet(ctx, cr, reconcileFailedObjs, m)
+		case model.PVC:
+			w.purgePVC(ctx, cr, reconcileFailedObjs, m)
+		case model.ConfigMap:
+			w.purgeConfigMap(ctx, cr, reconcileFailedObjs, m)
+		case model.Service:
+			w.purgeService(ctx, cr, reconcileFailedObjs, m)
+		case model.Secret:
+			w.purgeSecret(ctx, cr, reconcileFailedObjs, m)
+		case model.PDB:
+			w.purgePDB(ctx, cr, reconcileFailedObjs, m)
+		}
+	})
+	return cnt
+}
+
+func (w *worker) purgeStatefulSet(
+	ctx context.Context,
+	cr api.ICustomResource,
+	reconcileFailedObjs *model.Registry,
+	m meta.Object,
+) int {
+	if shouldPurgeStatefulSet(cr, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete StatefulSet: %s", util.NamespaceNameString(m))
+		if err := w.c.kube.STS().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet: %s, err: %v", util.NamespaceNameString(m), err)
+		}
+		return 1
+	}
+	return 0
+}
+
+func (w *worker) purgePVC(
+	ctx context.Context,
+	cr api.ICustomResource,
+	reconcileFailedObjs *model.Registry,
+	m meta.Object,
+) {
+	if shouldPurgePVC(cr, reconcileFailedObjs, m) {
+		if commonLabeler.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
+			w.a.V(1).M(m).F().Info("Delete PVC: %s", util.NamespaceNameString(m))
+			if err := w.c.kube.Storage().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
+				w.a.V(1).M(m).F().Error("FAILED to delete PVC: %s, err: %v", util.NamespaceNameString(m), err)
+			}
+		}
+	}
+}
+
+func (w *worker) purgeConfigMap(
+	ctx context.Context,
+	cr api.ICustomResource,
+	reconcileFailedObjs *model.Registry,
+	m meta.Object,
+) {
+	if shouldPurgeConfigMap(cr, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete ConfigMap: %s", util.NamespaceNameString(m))
+		if err := w.c.kube.ConfigMap().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap: %s, err: %v", util.NamespaceNameString(m), err)
+		}
+	}
+}
+
+func (w *worker) purgeService(
+	ctx context.Context,
+	cr api.ICustomResource,
+	reconcileFailedObjs *model.Registry,
+	m meta.Object,
+) {
+	if shouldPurgeService(cr, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete Service: %s", util.NamespaceNameString(m))
+		if err := w.c.kube.Service().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete Service: %s, err: %v", util.NamespaceNameString(m), err)
+		}
+	}
+}
+
+func (w *worker) purgeSecret(
+	ctx context.Context,
+	cr api.ICustomResource,
+	reconcileFailedObjs *model.Registry,
+	m meta.Object,
+) {
+	if shouldPurgeSecret(cr, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete Secret: %s", util.NamespaceNameString(m))
+		if err := w.c.kube.Secret().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete Secret: %s, err: %v", util.NamespaceNameString(m), err)
+		}
+	}
+}
+
+func (w *worker) purgePDB(
+	ctx context.Context,
+	cr api.ICustomResource,
+	reconcileFailedObjs *model.Registry,
+	m meta.Object,
+) {
+	if shouldPurgePDB(cr, reconcileFailedObjs, m) {
+		w.a.V(1).M(m).F().Info("Delete PDB: %s", util.NamespaceNameString(m))
+		if err := w.c.kube.PDB().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
+			w.a.V(1).M(m).F().Error("FAILED to delete PDB: %s, err: %v", util.NamespaceNameString(m), err)
+		}
+	}
 }
 
 func shouldPurgeStatefulSet(cr api.ICustomResource, reconcileFailedObjs *model.Registry, m meta.Object) bool {
@@ -125,127 +244,8 @@ func shouldPurgePDB(cr api.ICustomResource, reconcileFailedObjs *model.Registry,
 	return true
 }
 
-func (w *worker) purgeStatefulSet(
-	ctx context.Context,
-	cr api.ICustomResource,
-	reconcileFailedObjs *model.Registry,
-	m meta.Object,
-) int {
-	if shouldPurgeStatefulSet(cr, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete StatefulSet: %s/%s", m.GetNamespace(), m.GetName())
-		if err := w.c.kubeClient.AppsV1().StatefulSets(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete StatefulSet: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
-		}
-		return 1
-	}
-	return 0
-}
-
-func (w *worker) purgePVC(
-	ctx context.Context,
-	cr api.ICustomResource,
-	reconcileFailedObjs *model.Registry,
-	m meta.Object,
-) {
-	if shouldPurgePVC(cr, reconcileFailedObjs, m) {
-		if commonLabeler.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
-			w.a.V(1).M(m).F().Info("Delete PVC: %s/%s", m.GetNamespace(), m.GetName())
-			if err := w.c.kubeClient.CoreV1().PersistentVolumeClaims(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
-				w.a.V(1).M(m).F().Error("FAILED to delete PVC: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
-			}
-		}
-	}
-}
-
-func (w *worker) purgeConfigMap(
-	ctx context.Context,
-	cr api.ICustomResource,
-	reconcileFailedObjs *model.Registry,
-	m meta.Object,
-) {
-	if shouldPurgeConfigMap(cr, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete ConfigMap: %s/%s", m.GetNamespace(), m.GetName())
-		if err := w.c.kubeClient.CoreV1().ConfigMaps(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete ConfigMap: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
-		}
-	}
-}
-
-func (w *worker) purgeService(
-	ctx context.Context,
-	cr api.ICustomResource,
-	reconcileFailedObjs *model.Registry,
-	m meta.Object,
-) {
-	if shouldPurgeService(cr, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete Service: %s/%s", m.GetNamespace(), m.GetName())
-		if err := w.c.kubeClient.CoreV1().Services(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete Service: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
-		}
-	}
-}
-
-func (w *worker) purgeSecret(
-	ctx context.Context,
-	cr api.ICustomResource,
-	reconcileFailedObjs *model.Registry,
-	m meta.Object,
-) {
-	if shouldPurgeSecret(cr, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete Secret: %s/%s", m.GetNamespace(), m.GetName())
-		if err := w.c.kubeClient.CoreV1().Secrets(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete Secret: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
-		}
-	}
-}
-
-func (w *worker) purgePDB(
-	ctx context.Context,
-	cr api.ICustomResource,
-	reconcileFailedObjs *model.Registry,
-	m meta.Object,
-) {
-	if shouldPurgePDB(cr, reconcileFailedObjs, m) {
-		w.a.V(1).M(m).F().Info("Delete PDB: %s/%s", m.GetNamespace(), m.GetName())
-		if err := w.c.kubeClient.PolicyV1().PodDisruptionBudgets(m.GetNamespace()).Delete(ctx, m.GetName(), controller.NewDeleteOptions()); err != nil {
-			w.a.V(1).M(m).F().Error("FAILED to delete PDB: %s/%s, err: %v", m.GetNamespace(), m.GetName(), err)
-		}
-	}
-}
-
-// purge
-func (w *worker) purge(
-	ctx context.Context,
-	cr api.ICustomResource,
-	reg *model.Registry,
-	reconcileFailedObjs *model.Registry,
-) (cnt int) {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return cnt
-	}
-
-	reg.Walk(func(entityType model.EntityType, m meta.Object) {
-		switch entityType {
-		case model.StatefulSet:
-			cnt += w.purgeStatefulSet(ctx, cr, reconcileFailedObjs, m)
-		case model.PVC:
-			w.purgePVC(ctx, cr, reconcileFailedObjs, m)
-		case model.ConfigMap:
-			w.purgeConfigMap(ctx, cr, reconcileFailedObjs, m)
-		case model.Service:
-			w.purgeService(ctx, cr, reconcileFailedObjs, m)
-		case model.Secret:
-			w.purgeSecret(ctx, cr, reconcileFailedObjs, m)
-		case model.PDB:
-			w.purgePDB(ctx, cr, reconcileFailedObjs, m)
-		}
-	})
-	return cnt
-}
-
-// discoveryAndDeleteCHI deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
-func (w *worker) discoveryAndDeleteCHI(ctx context.Context, cr api.ICustomResource) error {
+// discoveryAndDeleteCR deletes all kubernetes resources related to chi *chop.ClickHouseInstallation
+func (w *worker) discoveryAndDeleteCR(ctx context.Context, cr api.ICustomResource) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -290,7 +290,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 		Info("Delete CHI started")
 
 	chi.EnsureStatus().DeleteStart()
-	if err := w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+	if err := w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		TolerateAbsence: true,
 		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
@@ -475,7 +475,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 		Info("Delete host: %s/%s - started", host.Runtime.Address.ClusterName, host.GetName())
 
 	var err error
-	if host.Runtime.CurStatefulSet, err = w.c.kube.STS().Get(host); err != nil {
+	if host.Runtime.CurStatefulSet, err = w.c.kube.STS().Get(ctx, host); err != nil {
 		w.a.WithEvent(host.GetCR(), common.EventActionDelete, common.EventReasonDeleteCompleted).
 			WithStatusAction(host.GetCR()).
 			M(host).F().
@@ -496,7 +496,7 @@ func (w *worker) deleteHost(ctx context.Context, chi *api.ClickHouseInstallation
 
 	// When deleting the whole CHI (not particular host), CHI may already be unavailable, so update CHI tolerantly
 	chi.EnsureStatus().HostDeleted()
-	_ = w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+	_ = w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		TolerateAbsence: true,
 		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
@@ -655,7 +655,7 @@ func (w *worker) deleteCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 		_ = w.deleteCHIProtocol(ctx, new)
 	} else {
 		new.GetRuntime().GetAttributes().SetSkipOwnerRef(true)
-		_ = w.reconcileCHI(ctx, old, new)
+		_ = w.reconcileCR(ctx, old, new)
 	}
 
 	// We need to uninstall finalizer in order to allow k8s to delete CHI resource

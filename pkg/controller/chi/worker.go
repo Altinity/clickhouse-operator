@@ -17,23 +17,18 @@ package chi
 import (
 	"context"
 	"errors"
-	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"time"
 
+	"github.com/altinity/queue"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilRuntime "k8s.io/apimachinery/pkg/util/runtime"
-
-	"github.com/altinity/queue"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
@@ -45,7 +40,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	normalizerCommon "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -79,7 +74,7 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 
 	announcer := common.NewAnnouncer(
 		common.NewEventEmitter(c.kube.Event(), kind, generateName, component),
-		c.kube.CRStatus(),
+		c.kube.CR(),
 	)
 
 	return &worker{
@@ -142,10 +137,6 @@ func (w *worker) isJustStarted() bool {
 	return time.Since(w.start) < timeToStart
 }
 
-func (w *worker) isConfigurationChangeRequiresReboot(host *api.Host) bool {
-	return model.IsConfigurationChangeRequiresReboot(host)
-}
-
 // shouldForceRestartHost checks whether cluster requires hosts restart
 func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	// RollingUpdate purpose is to always shut the host down.
@@ -166,7 +157,7 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	}
 
 	// For some configuration changes we have to force restart host
-	if w.isConfigurationChangeRequiresReboot(host) {
+	if model.IsConfigurationChangeRequiresReboot(host) {
 		w.a.V(1).M(host).F().Info("Config change(s) require host restart. Host: %s", host.GetName())
 		return true
 	}
@@ -192,174 +183,10 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 	return false
 }
 
-// run is an endless work loop, expected to be run in a thread
-func (w *worker) run() {
-	w.a.V(2).S().P()
-	defer w.a.V(2).E().P()
-
-	// For system thread let's wait its 'official start time', thus giving it time to bootstrap
-	util.WaitContextDoneUntil(context.Background(), w.start)
-
-	// Events loop
-	for {
-		// Get() blocks until it can return an item
-		item, ctx, ok := w.queue.Get()
-		if !ok {
-			w.a.Info("shutdown request")
-			return
-		}
-
-		//item, shut := w.queue.Get()
-		//task := context.Background()
-		//if shut {
-		//	w.a.Info("shutdown request")
-		//	return
-		//}
-
-		if err := w.processItem(ctx, item); err != nil {
-			// Item not processed
-			// this code cannot return an error and needs to indicate error has been ignored
-			utilRuntime.HandleError(err)
-		}
-
-		// Forget indicates that an item is finished being retried.  Doesn't matter whether its for perm failing
-		// or for success, we'll stop the rate limiter from tracking it.  This only clears the `rateLimiter`, you
-		// still have to call `Done` on the queue.
-		//w.queue.Forget(item)
-
-		// Remove item from processing set when processing completed
-		w.queue.Done(item)
-	}
-}
-
-func (w *worker) processReconcileCHI(ctx context.Context, cmd *cmd_queue.ReconcileCHI) error {
-	switch cmd.Cmd {
-	case cmd_queue.ReconcileAdd:
-		return w.updateCHI(ctx, nil, cmd.New)
-	case cmd_queue.ReconcileUpdate:
-		return w.updateCHI(ctx, cmd.Old, cmd.New)
-	case cmd_queue.ReconcileDelete:
-		return w.discoveryAndDeleteCHI(ctx, cmd.Old)
-	}
-
-	// Unknown item type, don't know what to do with it
-	// Just skip it and behave like it never existed
-	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
-	return nil
-}
-
-func (w *worker) processReconcileCHIT(cmd *cmd_queue.ReconcileCHIT) error {
-	switch cmd.Cmd {
-	case cmd_queue.ReconcileAdd:
-		return w.addChit(cmd.New)
-	case cmd_queue.ReconcileUpdate:
-		return w.updateChit(cmd.Old, cmd.New)
-	case cmd_queue.ReconcileDelete:
-		return w.deleteChit(cmd.Old)
-	}
-
-	// Unknown item type, don't know what to do with it
-	// Just skip it and behave like it never existed
-	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
-	return nil
-}
-
-func (w *worker) processReconcileChopConfig(cmd *cmd_queue.ReconcileChopConfig) error {
-	switch cmd.Cmd {
-	case cmd_queue.ReconcileAdd:
-		return w.c.addChopConfig(cmd.New)
-	case cmd_queue.ReconcileUpdate:
-		return w.c.updateChopConfig(cmd.Old, cmd.New)
-	case cmd_queue.ReconcileDelete:
-		return w.c.deleteChopConfig(cmd.Old)
-	}
-
-	// Unknown item type, don't know what to do with it
-	// Just skip it and behave like it never existed
-	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
-	return nil
-}
-
-func (w *worker) processReconcileEndpoints(ctx context.Context, cmd *cmd_queue.ReconcileEndpoints) error {
-	switch cmd.Cmd {
-	case cmd_queue.ReconcileUpdate:
-		return w.updateEndpoints(ctx, cmd.Old, cmd.New)
-	}
-
-	// Unknown item type, don't know what to do with it
-	// Just skip it and behave like it never existed
-	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
-	return nil
-}
-
-func (w *worker) processReconcilePod(ctx context.Context, cmd *cmd_queue.ReconcilePod) error {
-	switch cmd.Cmd {
-	case cmd_queue.ReconcileAdd:
-		w.a.V(1).M(cmd.New).F().Info("Add Pod. %s/%s", cmd.New.Namespace, cmd.New.Name)
-		metrics.PodAdd(ctx)
-		return nil
-	case cmd_queue.ReconcileUpdate:
-		//ignore
-		//w.a.V(1).M(cmd.new).F().Info("Update Pod. %s/%s", cmd.new.Namespace, cmd.new.Name)
-		//metricsPodUpdate(ctx)
-		return nil
-	case cmd_queue.ReconcileDelete:
-		w.a.V(1).M(cmd.Old).F().Info("Delete Pod. %s/%s", cmd.Old.Namespace, cmd.Old.Name)
-		metrics.PodDelete(ctx)
-		return nil
-	}
-
-	// Unknown item type, don't know what to do with it
-	// Just skip it and behave like it never existed
-	utilRuntime.HandleError(fmt.Errorf("unexpected reconcile - %#v", cmd))
-	return nil
-}
-
-func (w *worker) processDropDns(ctx context.Context, cmd *cmd_queue.DropDns) error {
-	if chi, err := w.createCHIFromObjectMeta(cmd.Initiator, false, normalizerCommon.NewOptions()); err == nil {
-		w.a.V(2).M(cmd.Initiator).Info("flushing DNS for CHI %s", chi.Name)
-		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
-	} else {
-		w.a.M(cmd.Initiator).F().Error("unable to find CHI by %v err: %v", cmd.Initiator.GetLabels(), err)
-	}
-	return nil
-}
-
-// processItem processes one work item according to its type
-func (w *worker) processItem(ctx context.Context, item interface{}) error {
-	if util.IsContextDone(ctx) {
-		log.V(2).Info("task is done")
-		return nil
-	}
-
-	w.a.V(3).S().P()
-	defer w.a.V(3).E().P()
-
-	switch cmd := item.(type) {
-	case *cmd_queue.ReconcileCHI:
-		return w.processReconcileCHI(ctx, cmd)
-	case *cmd_queue.ReconcileCHIT:
-		return w.processReconcileCHIT(cmd)
-	case *cmd_queue.ReconcileChopConfig:
-		return w.processReconcileChopConfig(cmd)
-	case *cmd_queue.ReconcileEndpoints:
-		return w.processReconcileEndpoints(ctx, cmd)
-	case *cmd_queue.ReconcilePod:
-		return w.processReconcilePod(ctx, cmd)
-	case *cmd_queue.DropDns:
-		return w.processDropDns(ctx, cmd)
-	}
-
-	// Unknown item type, don't know what to do with it
-	// Just skip it and behave like it never existed
-	utilRuntime.HandleError(fmt.Errorf("unexpected item in the queue - %#v", item))
-	return nil
-}
-
 // normalize
 func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstallation {
 
-	chi, err := w.normalizer.CreateTemplated(c, normalizerCommon.NewOptions())
+	chi, err := w.normalizer.CreateTemplated(c, commonNormalizer.NewOptions())
 	if err != nil {
 		w.a.WithEvent(chi, common.EventActionReconcile, common.EventReasonReconcileFailed).
 			WithStatusError(chi).
@@ -369,7 +196,7 @@ func (w *worker) normalize(c *api.ClickHouseInstallation) *api.ClickHouseInstall
 
 	ips := w.c.getPodsIPs(chi)
 	w.a.V(1).M(chi).Info("IPs of the CHI normalizer %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-	opts := normalizerCommon.NewOptions()
+	opts := commonNormalizer.NewOptions()
 	opts.DefaultUserAdditionalIPs = ips
 
 	chi, err = w.normalizer.CreateTemplated(c, opts)
@@ -415,11 +242,11 @@ func (w *worker) ensureFinalizer(ctx context.Context, chi *api.ClickHouseInstall
 // updateEndpoints updates endpoints
 func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) error {
 
-	if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, normalizerCommon.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, commonNormalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-1 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-1 update endpoints %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := normalizerCommon.NewOptions()
+		opts := commonNormalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(new.GetObjectMeta(), false, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-1")
@@ -427,7 +254,7 @@ func (w *worker) updateEndpoints(ctx context.Context, old, new *core.Endpoints) 
 			// TODO unify with finalize reconcile
 			w.newTask(chi)
 			w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				TolerateAbsence: true,
 				CopyStatusOptions: types.CopyStatusOptions{
 					Normalized: true,
@@ -498,7 +325,7 @@ func (w *worker) updateCHI(ctx context.Context, old, new *api.ClickHouseInstalla
 	}
 
 	// CHI is being reconciled
-	return w.reconcileCHI(ctx, old, new)
+	return w.reconcileCR(ctx, old, new)
 }
 
 // isCHIProcessedOnTheSameIP checks whether it is just a restart of the operator on the same IP
@@ -629,7 +456,7 @@ func (w *worker) markReconcileStart(ctx context.Context, chi *api.ClickHouseInst
 
 	// Write desired normalized CHI with initialized .Status, so it would be possible to monitor progress
 	chi.EnsureStatus().ReconcileStart(ap.GetRemovedHostsNum())
-	_ = w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+	_ = w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
@@ -653,11 +480,11 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 	w.a.V(1).M(_chi).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(_chi, true, normalizerCommon.NewOptions()); err == nil {
+	if chi, err := w.createCHIFromObjectMeta(_chi, true, commonNormalizer.NewOptions()); err == nil {
 		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
 		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
-		opts := normalizerCommon.NewOptions()
+		opts := commonNormalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
 		if chi, err := w.createCHIFromObjectMeta(_chi, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
@@ -667,7 +494,7 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chi *ap
 			// TODO unify with update endpoints
 			w.newTask(chi)
 			w.reconcileConfigMapCommonUsers(ctx, chi)
-			w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+			w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
 					WholeStatus: true,
 				},
@@ -699,7 +526,7 @@ func (w *worker) markReconcileCompletedUnsuccessfully(ctx context.Context, chi *
 	case errors.Is(err, common.ErrCRUDAbort):
 		chi.EnsureStatus().ReconcileAbort()
 	}
-	w.c.updateCHIObjectStatus(ctx, chi, types.UpdateStatusOptions{
+	w.c.updateCRObjectStatus(ctx, chi, types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},
@@ -830,7 +657,7 @@ func (w *worker) options() *chiConfig.FilesGeneratorOptions {
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(meta meta.Object, isCHI bool, options *normalizerCommon.Options) (*api.ClickHouseInstallation, error) {
+func (w *worker) createCHIFromObjectMeta(meta meta.Object, isCHI bool, options *commonNormalizer.Options) (*api.ClickHouseInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()
 

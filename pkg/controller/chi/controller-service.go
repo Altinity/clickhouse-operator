@@ -25,7 +25,7 @@ import (
 )
 
 func (c *Controller) getService(ctx context.Context, service *core.Service) (*core.Service, error) {
-	return c.kube.Service().Get(service)
+	return c.kube.Service().Get(ctx, service)
 }
 
 func (c *Controller) createService(ctx context.Context, service *core.Service) error {

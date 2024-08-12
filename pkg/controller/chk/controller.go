@@ -16,22 +16,21 @@ package chk
 
 import (
 	"context"
+	"time"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiMachinery "k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlUtil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chk/kube"
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/managers"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	"github.com/altinity/clickhouse-operator/pkg/util/runtime"
 )
 
 // Controller reconciles a ClickHouseKeeper object
@@ -76,7 +75,7 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	c.new()
 	w := c.newWorker()
 
-	w.reconcileCHK(context.TODO(), nil, new)
+	w.reconcileCR(context.TODO(), nil, new)
 
 	//// Fetch the ClickHouseKeeper instance
 	//dummy := &apiChk.ClickHouseKeeperInstallation{}
@@ -91,12 +90,6 @@ func (c *Controller) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Resu
 	//	// Return and requeue
 	//	return ctrl.Result{}, err
 	//}
-
-	// Move to worker?!
-	if err := c.reconcileClusterStatus(new); err != nil {
-		log.V(1).Error("Error during reconcile status. f: %s err: %s", runtime.FunctionName(c.reconcileClusterStatus), err)
-		return reconcile.Result{}, err
-	}
 
 	return ctrl.Result{}, nil
 }
@@ -136,4 +129,28 @@ func (c *Controller) reconcile(
 		}
 	}
 	return nil
+}
+
+func (c *Controller) poll(ctx context.Context, cr api.ICustomResource, f func(c *apiChk.ClickHouseKeeperInstallation, e error) bool) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return
+	}
+
+	namespace, name := util.NamespaceName(cr)
+
+	for {
+		cur, err := c.kube.CR().Get(ctx, namespace, name)
+		if f(cur.(*apiChk.ClickHouseKeeperInstallation), err) {
+			// Continue polling
+			if util.IsContextDone(ctx) {
+				log.V(2).Info("task is done")
+				return
+			}
+			time.Sleep(15 * time.Second)
+		} else {
+			// Stop polling
+			return
+		}
+	}
 }

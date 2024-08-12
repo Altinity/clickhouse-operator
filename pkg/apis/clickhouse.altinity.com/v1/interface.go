@@ -56,6 +56,8 @@ type ICustomResource interface {
 	HostsCount() int
 	IEnsureStatus() IStatus
 	GetStatus() IStatus
+
+	YAML(opts types.CopyCROptions) string
 }
 
 type ICRSpec interface {
@@ -114,6 +116,8 @@ type ICluster interface {
 	FindShard(needle interface{}) IShard
 	FindHost(needleShard interface{}, needleHost interface{}) *Host
 
+	IsShardSpecified() bool
+
 	GetRuntime() IClusterRuntime
 	GetServiceTemplate() (*ServiceTemplate, bool)
 }
@@ -153,6 +157,7 @@ type IShard interface {
 	GetTemplates() *TemplatesList
 
 	WalkHosts(func(host *Host) error) []error
+	WalkHostsAbortOnError(f func(host *Host) error) error
 
 	FindHost(needleHost interface{}) *Host
 	FirstHost() *Host

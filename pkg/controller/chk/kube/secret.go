@@ -27,13 +27,13 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type Service struct {
+type Secret struct {
 	kubeClient client.Client
 	namer      interfaces.INameManager
 }
 
-func NewService(kubeClient client.Client, namer interfaces.INameManager) *Service {
-	return &Service{
+func NewSecret(kubeClient client.Client, namer interfaces.INameManager) *Secret {
+	return &Secret{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -42,17 +42,17 @@ func NewService(kubeClient client.Client, namer interfaces.INameManager) *Servic
 // Get gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
-func (c *Service) Get(ctx context.Context, obj any) (*core.Service, error) {
+func (c *Secret) Get(ctx context.Context, obj any) (*core.Secret, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *core.Service:
+	case *core.Secret:
 		name = typedObj.Name
 		namespace = typedObj.Namespace
 	case *api.Host:
 		name = c.namer.Name(interfaces.NameStatefulSetService, typedObj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
-	service := &core.Service{}
+	service := &core.Secret{}
 	err := c.kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
@@ -64,18 +64,18 @@ func (c *Service) Get(ctx context.Context, obj any) (*core.Service, error) {
 	}
 }
 
-func (c *Service) Create(ctx context.Context, svc *core.Service) (*core.Service, error) {
+func (c *Secret) Create(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
 	err := c.kubeClient.Create(ctx, svc)
 	return svc, err
 }
 
-func (c *Service) Update(ctx context.Context, svc *core.Service) (*core.Service, error) {
+func (c *Secret) Update(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
 	err := c.kubeClient.Update(ctx, svc)
 	return svc, err
 }
 
-func (c *Service) Delete(ctx context.Context, namespace, name string) error {
-	svc := &core.Service{
+func (c *Secret) Delete(ctx context.Context, namespace, name string) error {
+	svc := &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
@@ -84,8 +84,8 @@ func (c *Service) Delete(ctx context.Context, namespace, name string) error {
 	return c.kubeClient.Delete(ctx, svc)
 }
 
-func (c *Service) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Service, error) {
-	list := &core.ServiceList{}
+func (c *Secret) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Secret, error) {
+	list := &core.SecretList{}
 	selector, err := labels.Parse(opts.LabelSelector)
 	if err != nil {
 		return nil, err

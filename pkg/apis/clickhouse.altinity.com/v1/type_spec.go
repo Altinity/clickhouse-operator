@@ -14,7 +14,9 @@
 
 package v1
 
-import "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+)
 
 // ChiSpec defines spec section of ClickHouseInstallation resource
 type ChiSpec struct {

@@ -23,18 +23,18 @@ import (
 )
 
 type ReplicaSet struct {
-	kube client.Client
+	kubeClient client.Client
 }
 
-func NewReplicaSetKeeper(kubeClient client.Client) *ReplicaSet {
+func NewReplicaSet(kubeClient client.Client) *ReplicaSet {
 	return &ReplicaSet{
-		kube: kubeClient,
+		kubeClient: kubeClient,
 	}
 }
 
 func (c *ReplicaSet) Get(namespace, name string) (*apps.ReplicaSet, error) {
 	rs := &apps.ReplicaSet{}
-	err := c.kube.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, rs)
@@ -46,6 +46,6 @@ func (c *ReplicaSet) Get(namespace, name string) (*apps.ReplicaSet, error) {
 }
 
 func (c *ReplicaSet) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	err := c.kube.Update(controller.NewContext(), replicaSet)
+	err := c.kubeClient.Update(controller.NewContext(), replicaSet)
 	return replicaSet, err
 }

@@ -16,6 +16,7 @@ package kube
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/labels"
 
 	policy "k8s.io/api/policy/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -24,23 +25,23 @@ import (
 )
 
 type PDB struct {
-	kube client.Client
+	kubeClient client.Client
 }
 
 func NewPDB(kubeClient client.Client) *PDB {
 	return &PDB{
-		kube: kubeClient,
+		kubeClient: kubeClient,
 	}
 }
 
 func (c *PDB) Create(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kube.Create(ctx, pdb)
+	err := c.kubeClient.Create(ctx, pdb)
 	return pdb, err
 }
 
 func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error) {
 	pdb := &policy.PodDisruptionBudget{}
-	err := c.kube.Get(ctx, types.NamespacedName{
+	err := c.kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, pdb)
@@ -52,7 +53,7 @@ func (c *PDB) Get(ctx context.Context, namespace, name string) (*policy.PodDisru
 }
 
 func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error) {
-	err := c.kube.Update(ctx, pdb)
+	err := c.kubeClient.Update(ctx, pdb)
 	return pdb, err
 }
 
@@ -63,5 +64,24 @@ func (c *PDB) Delete(ctx context.Context, namespace, name string) error {
 			Name:      name,
 		},
 	}
-	return c.kube.Delete(ctx, pdb)
+	return c.kubeClient.Delete(ctx, pdb)
+}
+
+func (c *PDB) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]policy.PodDisruptionBudget, error) {
+	list := &policy.PodDisruptionBudgetList{}
+	selector, err := labels.Parse(opts.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	err = c.kubeClient.List(ctx, list, &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, err
+	}
+	return list.Items, nil
 }

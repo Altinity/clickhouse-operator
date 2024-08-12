@@ -84,7 +84,7 @@ func (c *Controller) OnStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 	case api.OnStatefulSetUpdateFailureActionRollback:
 		// Need to revert current StatefulSet to oldStatefulSet
 		log.V(1).M(host).F().Info("going to ROLLBACK FAILED StatefulSet %s", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()))
-		curStatefulSet, err := kubeSTS.Get(host)
+		curStatefulSet, err := kubeSTS.Get(ctx, host)
 		if err != nil {
 			log.V(1).M(host).F().Warning("Unable to fetch current StatefulSet %s. err: %q", util.NamespaceNameString(rollbackStatefulSet.GetObjectMeta()), err)
 			return c.shouldContinueOnUpdateFailed()
@@ -97,7 +97,7 @@ func (c *Controller) OnStatefulSetUpdateFailed(ctx context.Context, rollbackStat
 		// Just delete Pod and StatefulSet will recreated Pod with current .spec
 		// This will rollback Pod to "rollback to" .spec
 		curStatefulSet.Spec = *rollbackStatefulSet.Spec.DeepCopy()
-		curStatefulSet, _ = kubeSTS.Update(curStatefulSet)
+		curStatefulSet, _ = kubeSTS.Update(ctx, curStatefulSet)
 		_ = c.statefulSetDeletePod(ctx, curStatefulSet, host)
 
 		return c.shouldContinueOnUpdateFailed()

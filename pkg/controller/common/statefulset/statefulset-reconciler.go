@@ -39,8 +39,8 @@ type Reconciler struct {
 	namer         interfaces.INameManager
 	storage       *storage.Reconciler
 
-	kubeStatus interfaces.IKubeCRStatus
-	kubeSTS    interfaces.IKubeSTS
+	cr  interfaces.IKubeCR
+	sts interfaces.IKubeSTS
 
 	fallback fallback
 }
@@ -62,8 +62,8 @@ func NewReconciler(
 		namer:         namer,
 		storage:       storage,
 
-		kubeStatus: kube.CRStatus(),
-		kubeSTS:    kube.STS(),
+		cr:  kube.CR(),
+		sts: kube.STS(),
 
 		fallback: fallback,
 	}
@@ -91,7 +91,7 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
 	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
 
-	curStatefulSet, err := r.kubeSTS.Get(new)
+	curStatefulSet, err := r.sts.Get(context.TODO(), new)
 	switch {
 	case curStatefulSet != nil:
 		r.a.V(2).M(new).Info("Have StatefulSet available, try to perform label-based comparison for: %s", util.NamespaceNameString(new))
@@ -135,7 +135,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 		r.a.V(2).M(host).F().Info("No need to reconcile THE SAME StatefulSet: %s", util.NamespaceNameString(newStatefulSet))
 		if register {
 			host.GetCR().IEnsureStatus().HostUnchanged()
-			_ = r.kubeStatus.Update(ctx, host.GetCR(), types.UpdateStatusOptions{
+			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
 					MainFields: true,
 				},
@@ -145,7 +145,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	}
 
 	// Check whether this object already exists in k8s
-	host.Runtime.CurStatefulSet, err = r.kubeSTS.Get(newStatefulSet)
+	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, newStatefulSet)
 
 	// Report diff to trace
 	if host.GetReconcileAttributes().GetStatus() == api.ObjectStatusModified {
@@ -169,7 +169,7 @@ func (r *Reconciler) ReconcileStatefulSet(
 	}
 
 	// Host has to know current StatefulSet and Pod
-	host.Runtime.CurStatefulSet, _ = r.kubeSTS.Get(newStatefulSet)
+	host.Runtime.CurStatefulSet, _ = r.sts.Get(ctx, newStatefulSet)
 
 	return err
 }
@@ -226,7 +226,7 @@ func (r *Reconciler) updateStatefulSet(ctx context.Context, host *api.Host, regi
 	case nil:
 		if register {
 			host.GetCR().IEnsureStatus().HostUpdated()
-			_ = r.kubeStatus.Update(ctx, host.GetCR(), types.UpdateStatusOptions{
+			_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 				CopyStatusOptions: types.CopyStatusOptions{
 					MainFields: true,
 				},
@@ -282,7 +282,7 @@ func (r *Reconciler) createStatefulSet(ctx context.Context, host *api.Host, regi
 
 	if register {
 		host.GetCR().IEnsureStatus().HostAdded()
-		_ = r.kubeStatus.Update(ctx, host.GetCR(), types.UpdateStatusOptions{
+		_ = r.cr.StatusUpdate(ctx, host.GetCR(), types.UpdateStatusOptions{
 			CopyStatusOptions: types.CopyStatusOptions{
 				MainFields: true,
 			},
@@ -375,7 +375,7 @@ func (r *Reconciler) doCreateStatefulSet(ctx context.Context, host *api.Host) co
 	statefulSet := host.Runtime.DesiredStatefulSet
 
 	log.V(1).Info("Create StatefulSet %s", util.NamespaceNameString(statefulSet))
-	if _, err := r.kubeSTS.Create(statefulSet); err != nil {
+	if _, err := r.sts.Create(ctx, statefulSet); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet create failed. err: %v", err)
 		return common.ErrCRUDRecreate
 	}
@@ -405,7 +405,7 @@ func (r *Reconciler) doUpdateStatefulSet(
 	}
 
 	// Apply newStatefulSet and wait for Generation to change
-	updatedStatefulSet, err := r.kubeSTS.Update(newStatefulSet)
+	updatedStatefulSet, err := r.sts.Update(ctx, newStatefulSet)
 	if err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update failed. err: %v", err)
 		log.V(1).M(host).F().Error("%s", dumpDiff(oldStatefulSet, newStatefulSet))
@@ -426,7 +426,7 @@ func (r *Reconciler) doUpdateStatefulSet(
 
 	if err := r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host); err != nil {
 		log.V(1).M(host).F().Error("StatefulSet update wait failed. err: %v", err)
-		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.kubeSTS)
+		return r.fallback.OnStatefulSetUpdateFailed(ctx, oldStatefulSet, host, r.sts)
 	}
 
 	log.V(2).M(host).F().Info("Target generation reached, StatefulSet updated successfully")
@@ -450,7 +450,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
 
 	var err error
-	host.Runtime.CurStatefulSet, err = r.kubeSTS.Get(host)
+	host.Runtime.CurStatefulSet, err = r.sts.Get(ctx, host)
 	if err != nil {
 		// Unable to fetch cur StatefulSet, but this is not necessarily an error yet
 		if apiErrors.IsNotFound(err) {
@@ -465,7 +465,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	// This is the proper and graceful way to delete StatefulSet
 	var zero int32 = 0
 	host.Runtime.CurStatefulSet.Spec.Replicas = &zero
-	if _, err := r.kubeSTS.Update(host.Runtime.CurStatefulSet); err != nil {
+	if _, err := r.sts.Update(ctx, host.Runtime.CurStatefulSet); err != nil {
 		log.V(1).M(host).Error("UNABLE to update StatefulSet %s/%s", namespace, name)
 		return err
 	}
@@ -474,7 +474,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	_ = r.hostSTSPoller.WaitHostStatefulSetReady(ctx, host)
 
 	// And now delete empty StatefulSet
-	if err := r.kubeSTS.Delete(namespace, name); err == nil {
+	if err := r.sts.Delete(ctx, namespace, name); err == nil {
 		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
 		r.hostSTSPoller.WaitHostStatefulSetDeleted(host)
 	} else if apiErrors.IsNotFound(err) {

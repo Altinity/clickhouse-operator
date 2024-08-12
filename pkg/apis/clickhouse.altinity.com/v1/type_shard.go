@@ -112,6 +112,22 @@ func (shard *ChiShard) WalkHosts(f func(host *Host) error) []error {
 	return res
 }
 
+// WalkHosts runs specified function on each host
+func (shard *ChiShard) WalkHostsAbortOnError(f func(host *Host) error) error {
+	if shard == nil {
+		return nil
+	}
+
+	for replicaIndex := range shard.Hosts {
+		host := shard.Hosts[replicaIndex]
+		if err := f(host); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // FindHost finds host by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
 func (shard *ChiShard) FindHost(needle interface{}) (res *Host) {

@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chk
+package chi
 
 import (
-	"time"
-
-	apps "k8s.io/api/apps/v1"
+	"context"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
-func markPodRestartedNow(sts *apps.StatefulSet) {
-	v, _ := time.Now().UTC().MarshalText()
-	sts.Spec.Template.Annotations = map[string]string{"kubectl.kubernetes.io/restartedAt": string(v)}
+// updateCRObjectStatus updates Custom Resource object's Status
+func (c *Controller) updateCRObjectStatus(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error) {
+	return c.kube.CR().StatusUpdate(ctx, cr, opts)
 }

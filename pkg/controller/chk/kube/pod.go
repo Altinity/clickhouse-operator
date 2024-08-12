@@ -28,14 +28,14 @@ import (
 )
 
 type Pod struct {
-	kube  client.Client
-	namer interfaces.INameManager
+	kubeClient client.Client
+	namer      interfaces.INameManager
 }
 
 func NewPod(kubeClient client.Client, namer interfaces.INameManager) *Pod {
 	return &Pod{
-		kube:  kubeClient,
-		namer: namer,
+		kubeClient: kubeClient,
+		namer:      namer,
 	}
 }
 
@@ -66,7 +66,7 @@ func (c *Pod) Get(params ...any) (*core.Pod, error) {
 		panic(any("incorrect number or params"))
 	}
 	pod := &core.Pod{}
-	err := c.kube.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, pod)
@@ -95,7 +95,7 @@ func (c *Pod) GetAll(obj any) []*core.Pod {
 }
 
 func (c *Pod) Update(ctx context.Context, pod *core.Pod) (*core.Pod, error) {
-	err := c.kube.Update(ctx, pod)
+	err := c.kubeClient.Update(ctx, pod)
 	return pod, err
 }
 

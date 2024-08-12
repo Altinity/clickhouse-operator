@@ -24,29 +24,26 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
-	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
-	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// reconcileCHI run reconcile cycle for a CHI
-func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInstallation) error {
+// reconcileCR runs reconcile cycle for a Custom Resource
+func (w *worker) reconcileCR(ctx context.Context, old, new *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.logOldAndNew("non-normalized yet (native)", old, new)
+	common.LogOldAndNew("non-normalized yet (native)", old, new)
 
 	switch {
 	case w.isAfterFinalizerInstalled(old, new):
@@ -66,24 +63,24 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	w.a.M(new).F().Info("Changing OLD to Normalized COMPLETED: %s", util.NamespaceNameString(new))
 
 	if new.HasAncestor() {
-		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile. CHI: %s", util.NamespaceNameString(new))
+		w.a.M(new).F().Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
 		old = new.GetAncestorT()
 	} else {
-		w.a.M(new).F().Info("has NO ancestor, use empty CHI as a base for reconcile. CHI: %s", util.NamespaceNameString(new))
+		w.a.M(new).F().Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(new))
 		old = nil
 	}
 
-	w.a.M(new).F().Info("Normalized OLD CHI: %s", util.NamespaceNameString(new))
+	w.a.M(new).F().Info("Normalized OLD: %s", util.NamespaceNameString(new))
 	old = w.normalize(old)
 
-	w.a.M(new).F().Info("Normalized NEW CHI: %s", util.NamespaceNameString(new))
+	w.a.M(new).F().Info("Normalized NEW: %s", util.NamespaceNameString(new))
 	new = w.normalize(new)
 
 	new.SetAncestor(old)
-	w.logOldAndNew("normalized", old, new)
+	common.LogOldAndNew("normalized", old, new)
 
 	actionPlan := action_plan.NewActionPlan(old, new)
-	w.logActionPlan(actionPlan)
+	common.LogActionPlan(actionPlan)
 
 	switch {
 	case actionPlan.HasActionsToDo():
@@ -135,30 +132,30 @@ func (w *worker) reconcileCHI(ctx context.Context, old, new *api.ClickHouseInsta
 	return nil
 }
 
-// reconcile reconciles ClickHouseInstallation
-func (w *worker) reconcile(ctx context.Context, chi *api.ClickHouseInstallation) error {
+// reconcile reconciles Custom Resource
+func (w *worker) reconcile(ctx context.Context, ch *api.ClickHouseInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(chi).S().P()
-	defer w.a.V(2).M(chi).E().P()
+	w.a.V(2).M(ch).S().P()
+	defer w.a.V(2).M(ch).E().P()
 
 	counters := api.NewHostReconcileAttributesCounters()
-	chi.WalkHosts(func(host *api.Host) error {
+	ch.WalkHosts(func(host *api.Host) error {
 		counters.Add(host.GetReconcileAttributes())
 		return nil
 	})
 
 	if counters.AddOnly() {
-		w.a.V(1).M(chi).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(chi))
+		w.a.V(1).M(ch).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(ch))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
 		})
 	}
 
-	return chi.WalkTillError(
+	return ch.WalkTillError(
 		ctx,
 		w.reconcileCRAuxObjectsPreliminary,
 		w.reconcileCluster,
@@ -184,7 +181,7 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	}
 	cr.GetRuntime().UnlockCommonConfig()
 
-	// 3. CHI users ConfigMap
+	// CHI users ConfigMap - common for all hosts
 	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
@@ -304,42 +301,6 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 	return nil
 }
 
-// getHostClickHouseVersion gets host ClickHouse version
-func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host, opts versionOptions) (string, error) {
-	if skip, description := opts.shouldSkip(host); skip {
-		return description, nil
-	}
-
-	version, err := w.ensureClusterSchemer(host).HostClickHouseVersion(ctx, host)
-	if err != nil {
-		w.a.V(1).M(host).F().Warning("Failed to get ClickHouse version on host: %s", host.GetName())
-		return unknownVersion, err
-	}
-
-	w.a.V(1).M(host).F().Info("Get ClickHouse version on host: %s version: %s", host.GetName(), version)
-	host.Runtime.Version = swversion.NewSoftWareVersion(version)
-
-	return version, nil
-}
-
-func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version string, err error) {
-	err = poller.PollHost(
-		ctx,
-		host,
-		nil,
-		func(_ctx context.Context, _host *api.Host) bool {
-			var e error
-			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{skipStopped: true})
-			if e == nil {
-				return true
-			}
-			w.a.V(1).M(host).F().Warning("Host is NOT alive: %s ", host.GetName())
-			return false
-		},
-	)
-	return
-}
-
 // reconcileHostStatefulSet reconciles host's StatefulSet
 func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, opts ...*statefulset.ReconcileOptions) error {
 	if util.IsContextDone(ctx) {
@@ -351,9 +312,9 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
 	version, _ := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true})
-	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(host)
+	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
-	w.a.V(1).M(host).F().Info("Reconcile host: %s. ClickHouse version: %s", host.GetName(), version)
+	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
 	// In case we have to force-restart host
 	// We'll do it via replicas: 0 in StatefulSet.
 	if w.shouldForceRestartHost(host) {
@@ -450,17 +411,6 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.ChiCluster) 
 
 	reconcileZookeeperRootPath(cluster)
 	return nil
-}
-
-func reconcileZookeeperRootPath(cluster *api.ChiCluster) {
-	if cluster.Zookeeper.IsEmpty() {
-		// Nothing to reconcile
-		return
-	}
-	conn := zookeeper.NewConnection(cluster.Zookeeper.Nodes)
-	path := zookeeper.NewPathManager(conn)
-	path.Ensure(cluster.Zookeeper.Root)
-	path.Close()
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
@@ -560,17 +510,13 @@ func (w *worker) reconcileShardsAndHosts(ctx context.Context, shards []*api.ChiS
 	return nil
 }
 
-func (w *worker) reconcileShardWithHosts(ctx context.Context, shard *api.ChiShard) error {
+func (w *worker) reconcileShardWithHosts(ctx context.Context, shard api.IShard) error {
 	if err := w.reconcileShard(ctx, shard); err != nil {
 		return err
 	}
-	for replicaIndex := range shard.Hosts {
-		host := shard.Hosts[replicaIndex]
-		if err := w.reconcileHost(ctx, host); err != nil {
-			return err
-		}
-	}
-	return nil
+	return shard.WalkHostsAbortOnError(func(host *api.Host) error {
+		return w.reconcileHost(ctx, host)
+	})
 }
 
 // reconcileShard reconciles specified shard, excluding nested replicas
@@ -749,7 +695,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		M(host).F().
 		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
-	_ = w.c.updateCHIObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
+	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
 		CopyStatusOptions: types.CopyStatusOptions{
 			MainFields: true,
 		},

@@ -25,16 +25,16 @@ import (
 )
 
 func (c *Controller) getService(ctx context.Context, service *core.Service) (*core.Service, error) {
-	return c.kube.Service().Get(service)
+	return c.kube.Service().Get(ctx, service)
 }
 
 func (c *Controller) createService(ctx context.Context, service *core.Service) error {
-	_, err := c.kube.Service().Create(service)
+	_, err := c.kube.Service().Create(ctx, service)
 	return err
 }
 
 func (c *Controller) updateService(ctx context.Context, service *core.Service) error {
-	_, err := c.kube.Service().Update(service)
+	_, err := c.kube.Service().Update(ctx, service)
 	return err
 }
 
@@ -46,7 +46,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	}
 
 	// Check specified service exists
-	_, err := c.kube.Service().Get(&core.Service{
+	_, err := c.kube.Service().Get(ctx, &core.Service{
 		ObjectMeta: v1.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
@@ -60,7 +60,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	}
 
 	// Delete service
-	err = c.kube.Service().Delete(namespace, name)
+	err = c.kube.Service().Delete(ctx, namespace, name)
 	if err == nil {
 		log.V(1).M(namespace, name).F().Info("OK delete Service: %s/%s", namespace, name)
 	} else {

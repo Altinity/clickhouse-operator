@@ -19,28 +19,30 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	common "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	commonTypes "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	chopClientSet "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-type CRStatus struct {
-	kube client.Client
+type CR struct {
+	chopClient chopClientSet.Interface
 }
 
-func NewCRStatus(kubeClient client.Client) *CRStatus {
-	return &CRStatus{
-		kube: kubeClient,
+func NewCR(chopClient chopClientSet.Interface) *CR {
+	return &CR{
+		chopClient: chopClient,
 	}
 }
 
+func (c *CR) Get(ctx context.Context, namespace, name string) (api.ICustomResource, error) {
+	return c.chopClient.ClickhouseV1().ClickHouseInstallations(namespace).Get(ctx, name, controller.NewGetOptions())
+}
+
 // updateCHIObjectStatus updates ClickHouseInstallation object's Status
-func (c *CRStatus) Update(ctx context.Context, cr apiChi.ICustomResource, opts common.UpdateStatusOptions) (err error) {
+func (c *CR) StatusUpdate(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) (err error) {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -67,63 +69,50 @@ func (c *CRStatus) Update(ctx context.Context, cr apiChi.ICustomResource, opts c
 }
 
 // doUpdateCRStatus updates ClickHouseInstallation object's Status
-func (c *CRStatus) doUpdateCRStatus(ctx context.Context, cr apiChi.ICustomResource, opts common.UpdateStatusOptions) error {
+func (c *CR) doUpdateCRStatus(ctx context.Context, cr api.ICustomResource, opts commonTypes.UpdateStatusOptions) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	chk := cr.(*apiChk.ClickHouseKeeperInstallation)
-	namespace, name := util.NamespaceName(chk)
-	log.V(3).M(chk).F().Info("Update CHK status")
+	chi := cr.(*api.ClickHouseInstallation)
+	namespace, name := util.NamespaceName(chi)
+	log.V(3).M(chi).F().Info("Update CHI status")
 
-	cur := &apiChk.ClickHouseKeeperInstallation{}
-	err := c.kube.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, cur)
+	_cur, err := c.Get(ctx, namespace, name)
+	cur := _cur.(*api.ClickHouseInstallation)
 	if err != nil {
 		if opts.TolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chk).F().Error("%q", err)
+		log.V(1).M(chi).F().Error("%q", err)
 		return err
 	}
 	if cur == nil {
 		if opts.TolerateAbsence {
 			return nil
 		}
-		log.V(1).M(chk).F().Error("NULL returned")
+		log.V(1).M(chi).F().Error("NULL returned")
 		return fmt.Errorf("ERROR GetCR (%s/%s): NULL returned", namespace, name)
 	}
 
 	// Update status of a real object.
-	cur.EnsureStatus().CopyFrom(chk.Status, opts.CopyStatusOptions)
+	cur.EnsureStatus().CopyFrom(chi.Status, opts.CopyStatusOptions)
 
-	err = c.kube.Status().Update(ctx, cur)
+	_, err = c.chopClient.ClickhouseV1().ClickHouseInstallations(chi.GetNamespace()).UpdateStatus(ctx, cur, controller.NewUpdateOptions())
 	if err != nil {
 		// Error update
-		log.V(2).M(chk).F().Info("Got error upon update, may retry. err: %q", err)
+		log.V(2).M(chi).F().Info("Got error upon update, may retry. err: %q", err)
 		return err
 	}
 
-	new := &apiChk.ClickHouseKeeperInstallation{}
-	err = c.kube.Get(ctx, types.NamespacedName{
-		Namespace: namespace,
-		Name:      name,
-	}, cur)
-	if err != nil {
-		if opts.TolerateAbsence {
-			return nil
-		}
-		log.V(1).M(chk).F().Error("%q", err)
-		return err
-	}
+	_cur, err = c.Get(ctx, namespace, name)
+	cur = _cur.(*api.ClickHouseInstallation)
 
 	// Propagate updated ResourceVersion into chi
-	if chk.GetResourceVersion() != new.GetResourceVersion() {
-		log.V(3).M(chk).F().Info("ResourceVersion change: %s to %s", chk.GetResourceVersion(), new.GetResourceVersion())
-		chk.SetResourceVersion(new.GetResourceVersion())
+	if chi.GetResourceVersion() != cur.GetResourceVersion() {
+		log.V(3).M(chi).F().Info("ResourceVersion change: %s to %s", chi.GetResourceVersion(), cur.GetResourceVersion())
+		chi.SetResourceVersion(cur.GetResourceVersion())
 		return nil
 	}
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package chi
+package chk
 
 import (
 	"fmt"
@@ -20,7 +20,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
@@ -42,7 +42,7 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCR bool) (*api.ClickHouseInstallation, error) {
+func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCR bool) (*apiChk.ClickHouseKeeperInstallation, error) {
 	var crName string
 	if isCR {
 		crName = meta.GetName()
@@ -58,5 +58,5 @@ func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCR bool) (*api.Click
 	if cr == nil {
 		return nil, err
 	}
-	return cr.(*api.ClickHouseInstallation), err
+	return cr.(*apiChk.ClickHouseKeeperInstallation), err
 }

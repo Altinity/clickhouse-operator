@@ -15,54 +15,55 @@
 package kube
 
 import (
+	"context"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
 
 	apps "k8s.io/api/apps/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 type STS struct {
-	kube  client.Client
-	namer interfaces.INameManager
+	kubeClient client.Client
+	namer      interfaces.INameManager
 }
 
 func NewSTS(kubeClient client.Client, namer interfaces.INameManager) *STS {
 	return &STS{
-		kube:  kubeClient,
-		namer: namer,
+		kubeClient: kubeClient,
+		namer:      namer,
 	}
 }
 
 // Get gets StatefulSet. Accepted types:
 //  1. *meta.ObjectMeta
 //  2. *chop.Host
-func (c *STS) Get(obj any) (*apps.StatefulSet, error) {
+func (c *STS) Get(ctx context.Context, obj any) (*apps.StatefulSet, error) {
 	switch obj := obj.(type) {
 	case meta.Object:
-		return c.get(obj.GetNamespace(), obj.GetName())
+		return c.get(ctx, obj.GetNamespace(), obj.GetName())
 	case *api.Host:
 		// Namespaced name
 		name := c.namer.Name(interfaces.NameStatefulSet, obj)
 		namespace := obj.Runtime.Address.Namespace
 
-		return c.get(namespace, name)
+		return c.get(ctx, namespace, name)
 	}
 	return nil, fmt.Errorf("unknown type")
 }
 
-func (c *STS) get(namespace, name string) (*apps.StatefulSet, error) {
+func (c *STS) get(ctx context.Context, namespace, name string) (*apps.StatefulSet, error) {
 	sts := &apps.StatefulSet{}
-	err := c.kube.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, sts)
@@ -73,20 +74,20 @@ func (c *STS) get(namespace, name string) (*apps.StatefulSet, error) {
 	}
 }
 
-func (c *STS) Create(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STS) Create(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	yamlBytes, _ := yaml.Marshal(sts)
 	log.V(3).M(sts).Info("Going to create STS: %s\n%s", util.NamespaceNameString(sts), string(yamlBytes))
-	err := c.kube.Create(controller.NewContext(), sts)
+	err := c.kubeClient.Create(ctx, sts)
 	return sts, err
 }
 
-func (c *STS) Update(sts *apps.StatefulSet) (*apps.StatefulSet, error) {
+func (c *STS) Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error) {
 	log.V(3).M(sts).Info("Going to update STS: %s", util.NamespaceNameString(sts))
-	err := c.kube.Update(controller.NewContext(), sts)
+	err := c.kubeClient.Update(ctx, sts)
 	return sts, err
 }
 
-func (c *STS) Delete(namespace, name string) error {
+func (c *STS) Delete(ctx context.Context, namespace, name string) error {
 	log.V(3).M(namespace, name).Info("Going to delete STS: %s/%s", namespace, name)
 	sts := &apps.StatefulSet{
 		ObjectMeta: meta.ObjectMeta{
@@ -94,5 +95,24 @@ func (c *STS) Delete(namespace, name string) error {
 			Name:      name,
 		},
 	}
-	return c.kube.Delete(controller.NewContext(), sts)
+	return c.kubeClient.Delete(ctx, sts)
+}
+
+func (c *STS) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]apps.StatefulSet, error) {
+	list := &apps.StatefulSetList{}
+	selector, err := labels.Parse(opts.LabelSelector)
+	if err != nil {
+		return nil, err
+	}
+	err = c.kubeClient.List(ctx, list, &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: selector,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, err
+	}
+	return list.Items, nil
 }

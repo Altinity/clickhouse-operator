@@ -59,6 +59,7 @@ func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 	if host.GetName() == "" {
 		host.Name = template.Spec.Name
+		log.V(3).M(host).F().Info("host has no name specified thus assigning name from Spec: %s", host.GetName())
 	}
 
 	host.Insecure = host.Insecure.MergeFrom(template.Spec.Insecure)
@@ -198,17 +199,17 @@ func createHostsField(cluster *api.ChiCluster) {
 // normalizeHost normalizes a host
 func (n *Normalizer) normalizeHost(
 	host *api.Host,
-	shard *api.ChiShard,
-	replica *api.ChiReplica,
-	cluster *api.ChiCluster,
+	shard api.IShard,
+	replica api.IReplica,
+	cluster api.ICluster,
 	shardIndex int,
 	replicaIndex int,
 ) {
 
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	// Inherit from either Shard or Replica
-	var s *api.ChiShard
-	var r *api.ChiReplica
+	var s api.IShard
+	var r api.IReplica
 	if cluster.IsShardSpecified() {
 		s = shard
 	} else {
@@ -224,9 +225,9 @@ func (n *Normalizer) normalizeHost(
 // normalizeHostName normalizes host's name
 func (n *Normalizer) normalizeHostName(
 	host *api.Host,
-	shard *api.ChiShard,
+	shard api.IShard,
 	shardIndex int,
-	replica *api.ChiReplica,
+	replica api.IReplica,
 	replicaIndex int,
 ) {
 	hasHostName := len(host.GetName()) > 0
