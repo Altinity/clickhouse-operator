@@ -118,7 +118,7 @@ func (c *Controller) deleteStatefulSet(ctx context.Context, host *api.Host) erro
 	name := c.namer.Name(interfaces.NameStatefulSet, host)
 	namespace := host.Runtime.Address.Namespace
 	log.V(1).M(host).F().Info("%s/%s", namespace, name)
-	return c.kube.STS().Delete(namespace, name)
+	return c.kube.STS().Delete(ctx, namespace, name)
 }
 
 // deleteConfigMap deletes ConfigMap

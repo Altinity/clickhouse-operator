@@ -58,7 +58,7 @@ func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *mod
 }
 
 func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
-	list, err := c.kubeClient.AppsV1().StatefulSets(cr.GetNamespace()).List(ctx, opts)
+	list, err := c.kube.STS().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
 		log.M(cr).F().Error("FAIL to list StatefulSet - err: %v", err)
 		return
@@ -67,13 +67,13 @@ func (c *Controller) discoveryStatefulSets(ctx context.Context, r *model.Registr
 		log.M(cr).F().Error("FAIL to list StatefulSet - list is nil")
 		return
 	}
-	for _, obj := range list.Items {
+	for _, obj := range list {
 		r.RegisterStatefulSet(obj.GetObjectMeta())
 	}
 }
 
 func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().ConfigMaps(cr.GetNamespace()).List(ctx, opts)
+	list, err := c.kube.ConfigMap().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
 		log.M(cr).F().Error("FAIL to list ConfigMap - err: %v", err)
 		return
@@ -82,13 +82,13 @@ func (c *Controller) discoveryConfigMaps(ctx context.Context, r *model.Registry,
 		log.M(cr).F().Error("FAIL to list ConfigMap - list is nil")
 		return
 	}
-	for _, obj := range list.Items {
+	for _, obj := range list {
 		r.RegisterConfigMap(obj.GetObjectMeta())
 	}
 }
 
 func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().Services(cr.GetNamespace()).List(ctx, opts)
+	list, err := c.kube.Service().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
 		log.M(cr).F().Error("FAIL to list Service - err: %v", err)
 		return
@@ -97,13 +97,13 @@ func (c *Controller) discoveryServices(ctx context.Context, r *model.Registry, c
 		log.M(cr).F().Error("FAIL to list Service - list is nil")
 		return
 	}
-	for _, obj := range list.Items {
+	for _, obj := range list {
 		r.RegisterService(obj.GetObjectMeta())
 	}
 }
 
 func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().Secrets(cr.GetNamespace()).List(ctx, opts)
+	list, err := c.kube.Secret().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
 		log.M(cr).F().Error("FAIL to list Secret - err: %v", err)
 		return
@@ -112,13 +112,13 @@ func (c *Controller) discoverySecrets(ctx context.Context, r *model.Registry, cr
 		log.M(cr).F().Error("FAIL to list Secret - list is nil")
 		return
 	}
-	for _, obj := range list.Items {
+	for _, obj := range list {
 		r.RegisterSecret(obj.GetObjectMeta())
 	}
 }
 
 func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
-	list, err := c.kubeClient.CoreV1().PersistentVolumeClaims(cr.GetNamespace()).List(ctx, opts)
+	list, err := c.kube.Storage().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
 		log.M(cr).F().Error("FAIL to list PVC - err: %v", err)
 		return
@@ -127,7 +127,7 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, cr ap
 		log.M(cr).F().Error("FAIL to list PVC - list is nil")
 		return
 	}
-	for _, obj := range list.Items {
+	for _, obj := range list {
 		r.RegisterPVC(obj.GetObjectMeta())
 	}
 }
@@ -149,7 +149,7 @@ func (c *Controller) discoveryPVCs(ctx context.Context, r *model.Registry, cr ap
 //}
 
 func (c *Controller) discoveryPDBs(ctx context.Context, r *model.Registry, cr api.ICustomResource, opts meta.ListOptions) {
-	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(cr.GetNamespace()).List(ctx, opts)
+	list, err := c.kube.PDB().List(ctx, cr.GetNamespace(), opts)
 	if err != nil {
 		log.M(cr).F().Error("FAIL to list PDB - err: %v", err)
 		return
@@ -158,7 +158,7 @@ func (c *Controller) discoveryPDBs(ctx context.Context, r *model.Registry, cr ap
 		log.M(cr).F().Error("FAIL to list PDB - list is nil")
 		return
 	}
-	for _, obj := range list.Items {
+	for _, obj := range list {
 		r.RegisterPDB(obj.GetObjectMeta())
 	}
 }

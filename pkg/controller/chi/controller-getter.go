@@ -42,17 +42,21 @@ func (c *Controller) getPodsIPs(obj interface{}) (ips []string) {
 }
 
 // GetCHIByObjectMeta gets CHI by namespaced name
-func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCHI bool) (*api.ClickHouseInstallation, error) {
-	var chiName string
-	var err error
-	if isCHI {
-		chiName = meta.GetName()
+func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCR bool) (*api.ClickHouseInstallation, error) {
+	var crName string
+	if isCR {
+		crName = meta.GetName()
 	} else {
-		chiName, err = commonLabeler.GetCRNameFromObjectMeta(meta)
+		var err error
+		crName, err = commonLabeler.GetCRNameFromObjectMeta(meta)
 		if err != nil {
-			return nil, fmt.Errorf("unable to find CHI by name: '%s'. More info: %v", meta.GetName(), err)
+			return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", meta.GetName(), err)
 		}
 	}
 
-	return c.chopClient.ClickhouseV1().ClickHouseInstallations(meta.GetNamespace()).Get(controller.NewContext(), chiName, controller.NewGetOptions())
+	cr, err := c.kube.CR().Get(controller.NewContext(), meta.GetNamespace(), crName)
+	if cr == nil {
+		return nil, err
+	}
+	return cr.(*api.ClickHouseInstallation), err
 }
