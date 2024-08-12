@@ -1,7 +1,7 @@
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
-  name: chk-3-nodes
+  name: triple-node
 spec:
   configuration:
     clusters:
