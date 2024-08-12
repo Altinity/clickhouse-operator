@@ -16,24 +16,26 @@ package interfaces
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
 type IKube interface {
+	CR() IKubeCR
 	ConfigMap() IKubeConfigMap
-	CRStatus() IKubeCRStatus
 	Deployment() IKubeDeployment
 	PDB() IKubePDB
 	Event() IKubeEvent
 	Pod() IKubePod
 	Storage() IKubeStoragePVC
 	ReplicaSet() IKubeReplicaSet
+	Secret() IKubeSecret
 	Service() IKubeService
 	STS() IKubeSTS
 }
@@ -43,6 +45,16 @@ type IKubeConfigMap interface {
 	Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error)
 	Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error)
 	Delete(ctx context.Context, namespace, name string) error
+	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.ConfigMap, error)
+}
+
+type IKubeDeployment interface {
+	Get(namespace, name string) (*apps.Deployment, error)
+	Update(deployment *apps.Deployment) (*apps.Deployment, error)
+}
+
+type IKubeEvent interface {
+	Create(ctx context.Context, event *core.Event) (*core.Event, error)
 }
 
 type IKubePDB interface {
@@ -50,40 +62,7 @@ type IKubePDB interface {
 	Get(ctx context.Context, namespace, name string) (*policy.PodDisruptionBudget, error)
 	Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*policy.PodDisruptionBudget, error)
 	Delete(ctx context.Context, namespace, name string) error
-}
-
-type IKubePVC interface {
-	Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
-	Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error)
-	Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
-	Delete(ctx context.Context, namespace, name string) error
-	ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error)
-}
-type IKubeStoragePVC interface {
-	IKubePVC
-	UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
-}
-
-type IKubeEvent interface {
-	Create(ctx context.Context, event *core.Event) (*core.Event, error)
-}
-
-type IKubeCRStatus interface {
-	Update(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error)
-}
-
-type IKubeSTS interface {
-	Get(obj any) (*apps.StatefulSet, error)
-	Create(statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
-	Update(sts *apps.StatefulSet) (*apps.StatefulSet, error)
-	Delete(namespace, name string) error
-}
-
-type IKubeService interface {
-	Get(obj any) (*core.Service, error)
-	Create(svc *core.Service) (*core.Service, error)
-	Update(svc *core.Service) (*core.Service, error)
-	Delete(namespace, name string) error
+	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]policy.PodDisruptionBudget, error)
 }
 
 type IKubePod interface {
@@ -92,12 +71,49 @@ type IKubePod interface {
 	Update(ctx context.Context, pod *core.Pod) (*core.Pod, error)
 }
 
+type IKubePVC interface {
+	Create(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
+	Get(ctx context.Context, namespace, name string) (*core.PersistentVolumeClaim, error)
+	Update(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
+	Delete(ctx context.Context, namespace, name string) error
+	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.PersistentVolumeClaim, error)
+	ListForHost(ctx context.Context, host *api.Host) (*core.PersistentVolumeClaimList, error)
+}
+type IKubeStoragePVC interface {
+	IKubePVC
+	UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClaim) (*core.PersistentVolumeClaim, error)
+}
+
+type IKubeCR interface {
+	Get(ctx context.Context, namespace, name string) (api.ICustomResource, error)
+	StatusUpdate(ctx context.Context, cr api.ICustomResource, opts types.UpdateStatusOptions) (err error)
+}
+
 type IKubeReplicaSet interface {
 	Get(namespace, name string) (*apps.ReplicaSet, error)
 	Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error)
 }
 
-type IKubeDeployment interface {
-	Get(namespace, name string) (*apps.Deployment, error)
-	Update(deployment *apps.Deployment) (*apps.Deployment, error)
+type IKubeSecret interface {
+	Get(ctx context.Context, obj any) (*core.Secret, error)
+	Create(ctx context.Context, svc *core.Secret) (*core.Secret, error)
+	Update(ctx context.Context, svc *core.Secret) (*core.Secret, error)
+	Delete(ctx context.Context, namespace, name string) error
+	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Secret, error)
+}
+
+type IKubeService interface {
+	Get(ctx context.Context, obj any) (*core.Service, error)
+	Create(ctx context.Context, svc *core.Service) (*core.Service, error)
+	Update(ctx context.Context, svc *core.Service) (*core.Service, error)
+	Delete(ctx context.Context, namespace, name string) error
+	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Service, error)
+}
+
+type IKubeSTS interface {
+	Get(ctx context.Context, obj any) (*apps.StatefulSet, error)
+	Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
+	Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error)
+	Delete(ctx context.Context, namespace, name string) error
+	List(ctx context.Context, namespace string, opts meta.ListOptions) ([]apps.StatefulSet, error)
 }
