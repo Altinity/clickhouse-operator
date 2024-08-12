@@ -16,23 +16,23 @@ package kube
 
 import (
 	"context"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/controller"
 
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type Service struct {
+type Secret struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 }
 
-func NewService(kubeClient kube.Interface, namer interfaces.INameManager) *Service {
-	return &Service{
+func NewSecret(kubeClient kube.Interface, namer interfaces.INameManager) *Secret {
+	return &Secret{
 		kubeClient: kubeClient,
 		namer:      namer,
 	}
@@ -41,33 +41,33 @@ func NewService(kubeClient kube.Interface, namer interfaces.INameManager) *Servi
 // Get gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
-func (c *Service) Get(ctx context.Context, obj any) (*core.Service, error) {
+func (c *Secret) Get(ctx context.Context, obj any) (*core.Secret, error) {
 	var name, namespace string
 	switch typedObj := obj.(type) {
-	case *core.Service:
+	case *core.Secret:
 		name = typedObj.Name
 		namespace = typedObj.Namespace
 	case *api.Host:
 		name = c.namer.Name(interfaces.NameStatefulSetService, typedObj)
 		namespace = typedObj.Runtime.Address.Namespace
 	}
-	return c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, controller.NewGetOptions())
+	return c.kubeClient.CoreV1().Secrets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
-func (c *Service) Create(ctx context.Context, svc *core.Service) (*core.Service, error) {
-	return c.kubeClient.CoreV1().Services(svc.Namespace).Create(ctx, svc, controller.NewCreateOptions())
+func (c *Secret) Create(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
+	return c.kubeClient.CoreV1().Secrets(svc.Namespace).Create(ctx, svc, controller.NewCreateOptions())
 }
 
-func (c *Service) Update(ctx context.Context, svc *core.Service) (*core.Service, error) {
-	return c.kubeClient.CoreV1().Services(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
+func (c *Secret) Update(ctx context.Context, svc *core.Secret) (*core.Secret, error) {
+	return c.kubeClient.CoreV1().Secrets(svc.Namespace).Update(ctx, svc, controller.NewUpdateOptions())
 }
 
-func (c *Service) Delete(ctx context.Context, namespace, name string) error {
-	return c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+func (c *Secret) Delete(ctx context.Context, namespace, name string) error {
+	return c.kubeClient.CoreV1().Secrets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 }
 
-func (c *Service) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Service, error) {
-	list, err := c.kubeClient.CoreV1().Services(namespace).List(ctx, opts)
+func (c *Secret) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.Secret, error) {
+	list, err := c.kubeClient.CoreV1().Secrets(namespace).List(ctx, opts)
 	if err != nil {
 		return nil, err
 	}

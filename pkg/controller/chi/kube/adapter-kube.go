@@ -26,16 +26,20 @@ type Adapter struct {
 	kubeClient kube.Interface
 	namer      interfaces.INameManager
 
+	// Set of CR k8s components
+
+	cr *CR
+
 	// Set of k8s components
 
 	configMap  *ConfigMap
-	crStatus   *CRStatus
 	deployment *Deployment
 	event      *Event
 	pdb        *PDB
 	pod        *Pod
 	pvc        *storage.PVC
 	replicaSet *ReplicaSet
+	secret     *Secret
 	service    *Service
 	sts        *STS
 }
@@ -45,27 +49,29 @@ func NewAdapter(kubeClient kube.Interface, chopClient chopClientSet.Interface, n
 		kubeClient: kubeClient,
 		namer:      namer,
 
+		cr: NewCR(chopClient),
+
 		configMap:  NewConfigMap(kubeClient),
-		crStatus:   NewCRStatus(chopClient),
 		deployment: NewDeployment(kubeClient),
 		event:      NewEvent(kubeClient),
 		pdb:        NewPDB(kubeClient),
 		pod:        NewPod(kubeClient, namer),
 		pvc:        storage.NewStoragePVC(NewPVC(kubeClient)),
 		replicaSet: NewReplicaSet(kubeClient),
+		secret:     NewSecret(kubeClient, namer),
 		service:    NewService(kubeClient, namer),
 		sts:        NewSTS(kubeClient, namer),
 	}
 }
 
+// CR is a getter
+func (k *Adapter) CR() interfaces.IKubeCR {
+	return k.cr
+}
+
 // ConfigMap is a getter
 func (k *Adapter) ConfigMap() interfaces.IKubeConfigMap {
 	return k.configMap
-}
-
-// CRStatus is a getter
-func (k *Adapter) CRStatus() interfaces.IKubeCRStatus {
-	return k.crStatus
 }
 
 // Deployment is a getter
@@ -96,6 +102,11 @@ func (k *Adapter) Storage() interfaces.IKubeStoragePVC {
 // ReplicaSet is a getter
 func (k *Adapter) ReplicaSet() interfaces.IKubeReplicaSet {
 	return k.replicaSet
+}
+
+// Secret is a getter
+func (k *Adapter) Secret() interfaces.IKubeSecret {
+	return k.secret
 }
 
 // Service is a getter

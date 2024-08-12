@@ -16,10 +16,12 @@ package kube
 
 import (
 	"context"
+
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	core "k8s.io/api/core/v1"
 )
 
 type ConfigMap struct {
@@ -37,7 +39,7 @@ func (c *ConfigMap) Create(ctx context.Context, cm *core.ConfigMap) (*core.Confi
 }
 
 func (c *ConfigMap) Get(ctx context.Context, namespace, name string) (*core.ConfigMap, error) {
-	return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
+	return c.kubeClient.CoreV1().ConfigMaps(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
 func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.ConfigMap, error) {
@@ -45,5 +47,16 @@ func (c *ConfigMap) Update(ctx context.Context, cm *core.ConfigMap) (*core.Confi
 }
 
 func (c *ConfigMap) Delete(ctx context.Context, namespace, name string) error {
-	return c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(controller.NewContext(), name, controller.NewDeleteOptions())
+	return c.kubeClient.CoreV1().ConfigMaps(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
+func (c *ConfigMap) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]core.ConfigMap, error) {
+	list, err := c.kubeClient.CoreV1().ConfigMaps(namespace).List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, err
+	}
+	return list.Items, nil
 }

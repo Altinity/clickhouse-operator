@@ -16,10 +16,12 @@ package kube
 
 import (
 	"context"
+
+	policy "k8s.io/api/policy/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	policy "k8s.io/api/policy/v1"
 )
 
 type PDB struct {
@@ -46,4 +48,15 @@ func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*pol
 
 func (c *PDB) Delete(ctx context.Context, namespace, name string) error {
 	return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}
+
+func (c *PDB) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]policy.PodDisruptionBudget, error) {
+	list, err := c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	if list == nil {
+		return nil, err
+	}
+	return list.Items, nil
 }
