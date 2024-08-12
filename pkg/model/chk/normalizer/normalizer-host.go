@@ -157,17 +157,17 @@ func createHostsField(cluster *apiChk.ChkCluster) {
 // normalizeHost normalizes a host
 func (n *Normalizer) normalizeHost(
 	host *api.Host,
-	shard *apiChk.ChkShard,
-	replica *apiChk.ChkReplica,
-	cluster *apiChk.ChkCluster,
+	shard api.IShard,
+	replica api.IReplica,
+	cluster api.ICluster,
 	shardIndex int,
 	replicaIndex int,
 ) {
 
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	// Inherit from either Shard or Replica
-	var s *apiChk.ChkShard
-	var r *apiChk.ChkReplica
+	var s api.IShard
+	var r api.IReplica
 	if cluster.IsShardSpecified() {
 		s = shard
 	} else {
@@ -176,16 +176,16 @@ func (n *Normalizer) normalizeHost(
 	host.InheritSettingsFrom(s, r)
 	host.Settings = n.normalizeConfigurationSettings(host.Settings)
 	host.InheritFilesFrom(s, r)
-	//host.Files = n.normalizeConfigurationFiles(host.Files)
+	host.Files = n.normalizeConfigurationFiles(host.Files)
 	host.InheritTemplatesFrom(s, r)
 }
 
 // normalizeHostName normalizes host's name
 func (n *Normalizer) normalizeHostName(
 	host *api.Host,
-	shard *apiChk.ChkShard,
+	shard api.IShard,
 	shardIndex int,
-	replica *apiChk.ChkReplica,
+	replica api.IReplica,
 	replicaIndex int,
 ) {
 	hasHostName := len(host.GetName()) > 0

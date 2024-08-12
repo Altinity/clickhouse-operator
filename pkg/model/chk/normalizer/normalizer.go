@@ -15,10 +15,13 @@
 package normalizer
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/google/uuid"
 	"strings"
 
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
@@ -72,7 +75,7 @@ func (n *Normalizer) buildTargetFromTemplates(subj *apiChk.ClickHouseKeeperInsta
 	//n.applyTemplatesOnTarget(subj)
 
 	// After all templates applied, place provided 'subject' on top of the whole stack (target)
-	n.ctx.GetTarget().MergeFrom(subj, apiChi.MergeTypeOverrideByNonEmptyValues)
+	n.ctx.GetTarget().MergeFrom(subj, api.MergeTypeOverrideByNonEmptyValues)
 }
 
 //func (n *Normalizer) applyTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
@@ -136,7 +139,9 @@ func (n *Normalizer) normalizeTarget() (*apiChk.ClickHouseKeeperInstallation, er
 
 func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
+	n.ctx.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.ctx.GetTarget().GetSpecT().TaskID)
 	n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern)
+	n.ctx.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.ctx.GetTarget().GetSpecT().Reconciling)
 	n.ctx.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.ctx.GetTarget().GetSpecT().Defaults)
 	n.ctx.GetTarget().GetSpecT().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpecT().Configuration)
 	n.ctx.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpecT().Templates)
@@ -146,7 +151,7 @@ func (n *Normalizer) normalizeSpec() {
 // finalize performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalize() {
 	n.ctx.GetTarget().Fill()
-	n.ctx.GetTarget().WalkHosts(func(host *apiChi.Host) error {
+	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
 		n.hostApplyHostTemplateSpecifiedOrDefault(host)
 		return nil
 	})
@@ -155,7 +160,7 @@ func (n *Normalizer) finalize() {
 
 // fillCHIAddressInfo
 func (n *Normalizer) fillCHIAddressInfo() {
-	n.ctx.GetTarget().WalkHosts(func(host *apiChi.Host) error {
+	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
 		host.Runtime.Address.StatefulSet = n.namer.Name(interfaces.NameStatefulSet, host)
 		host.Runtime.Address.FQDN = n.namer.Name(interfaces.NameFQDN, host)
 		return nil
@@ -164,16 +169,25 @@ func (n *Normalizer) fillCHIAddressInfo() {
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	//endpoint := CreateCHIServiceFQDN(n.ctx.chi)
-	//pods := make([]string, 0)
-	//fqdns := make([]string, 0)
-	//n.ctx.chi.WalkHosts(func(host *apiChi.Host) error {
-	//	pods = append(pods, CreatePodName(host))
-	//	fqdns = append(fqdns, CreateFQDN(host))
-	//	return nil
-	//})
-	//ip, _ := chop.Get().ConfigManager.GetRuntimeParam(apiChi.OPERATOR_POD_IP)
-	//n.ctx.chi.FillStatus(endpoint, pods, fqdns, ip)
+	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
+	pods := make([]string, 0)
+	fqdns := make([]string, 0)
+	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
+		pods = append(pods, n.namer.Name(interfaces.NamePod, host))
+		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
+		return nil
+	})
+	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
+	n.ctx.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
+}
+
+// normalizeTaskID normalizes .spec.taskID
+func (n *Normalizer) normalizeTaskID(taskID *types.String) *types.String {
+	if len(taskID.Value()) > 0 {
+		return taskID
+	}
+
+	return types.NewString(uuid.New().String())
 }
 
 func isNamespaceDomainPatternValid(namespaceDomainPattern *types.String) bool {
@@ -194,9 +208,9 @@ func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *typ
 }
 
 // normalizeDefaults normalizes .spec.defaults
-func (n *Normalizer) normalizeDefaults(defaults *apiChi.Defaults) *apiChi.Defaults {
+func (n *Normalizer) normalizeDefaults(defaults *api.Defaults) *api.Defaults {
 	if defaults == nil {
-		defaults = apiChi.NewDefaults()
+		defaults = api.NewDefaults()
 	}
 	// Set defaults for CHI object properties
 	defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.Normalize(false)
@@ -206,7 +220,7 @@ func (n *Normalizer) normalizeDefaults(defaults *apiChi.Defaults) *apiChi.Defaul
 	}
 	// Ensure field
 	if defaults.StorageManagement == nil {
-		defaults.StorageManagement = apiChi.NewStorageManagement()
+		defaults.StorageManagement = api.NewStorageManagement()
 	}
 	// Ensure field
 	if defaults.Templates == nil {
@@ -234,7 +248,7 @@ func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *apiChk
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *apiChi.Templates) *apiChi.Templates {
+func (n *Normalizer) normalizeTemplates(templates *api.Templates) *api.Templates {
 	if templates == nil {
 		return nil
 	}
@@ -246,39 +260,99 @@ func (n *Normalizer) normalizeTemplates(templates *apiChi.Templates) *apiChi.Tem
 	return templates
 }
 
-func (n *Normalizer) normalizeHostTemplates(templates *apiChi.Templates) {
+// normalizeReconciling normalizes .spec.reconciling
+func (n *Normalizer) normalizeReconciling(reconciling *api.Reconciling) *api.Reconciling {
+	if reconciling == nil {
+		reconciling = api.NewReconciling().SetDefaults()
+	}
+	switch strings.ToLower(reconciling.GetPolicy()) {
+	case strings.ToLower(api.ReconcilingPolicyWait):
+		// Known value, overwrite it to ensure case-ness
+		reconciling.SetPolicy(api.ReconcilingPolicyWait)
+	case strings.ToLower(api.ReconcilingPolicyNoWait):
+		// Known value, overwrite it to ensure case-ness
+		reconciling.SetPolicy(api.ReconcilingPolicyNoWait)
+	default:
+		// Unknown value, fallback to default
+		reconciling.SetPolicy(api.ReconcilingPolicyUnspecified)
+	}
+	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
+	return reconciling
+}
+
+func (n *Normalizer) normalizeReconcilingCleanup(cleanup *api.Cleanup) *api.Cleanup {
+	if cleanup == nil {
+		cleanup = api.NewCleanup()
+	}
+
+	if cleanup.UnknownObjects == nil {
+		cleanup.UnknownObjects = cleanup.DefaultUnknownObjects()
+	}
+	n.normalizeCleanup(&cleanup.UnknownObjects.StatefulSet, api.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.PVC, api.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.ConfigMap, api.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.Service, api.ObjectsCleanupDelete)
+
+	if cleanup.ReconcileFailedObjects == nil {
+		cleanup.ReconcileFailedObjects = cleanup.DefaultReconcileFailedObjects()
+	}
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.StatefulSet, api.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.PVC, api.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.ConfigMap, api.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.Service, api.ObjectsCleanupRetain)
+	return cleanup
+}
+
+func (n *Normalizer) normalizeCleanup(str *string, value string) {
+	if str == nil {
+		return
+	}
+	switch strings.ToLower(*str) {
+	case strings.ToLower(api.ObjectsCleanupRetain):
+		// Known value, overwrite it to ensure case-ness
+		*str = api.ObjectsCleanupRetain
+	case strings.ToLower(api.ObjectsCleanupDelete):
+		// Known value, overwrite it to ensure case-ness
+		*str = api.ObjectsCleanupDelete
+	default:
+		// Unknown value, fallback to default
+		*str = value
+	}
+}
+
+func (n *Normalizer) normalizeHostTemplates(templates *api.Templates) {
 	for i := range templates.HostTemplates {
 		n.normalizeHostTemplate(&templates.HostTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizePodTemplates(templates *apiChi.Templates) {
+func (n *Normalizer) normalizePodTemplates(templates *api.Templates) {
 	for i := range templates.PodTemplates {
 		n.normalizePodTemplate(&templates.PodTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeVolumeClaimTemplates(templates *apiChi.Templates) {
+func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.Templates) {
 	for i := range templates.VolumeClaimTemplates {
 		n.normalizeVolumeClaimTemplate(&templates.VolumeClaimTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeServiceTemplates(templates *apiChi.Templates) {
+func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
 	for i := range templates.ServiceTemplates {
 		n.normalizeServiceTemplate(&templates.ServiceTemplates[i])
 	}
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
-func (n *Normalizer) normalizeHostTemplate(template *apiChi.HostTemplate) {
+func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
 	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
 	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
-func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
+func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
 	if len(n.ctx.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
@@ -290,14 +364,14 @@ func (n *Normalizer) normalizePodTemplate(template *apiChi.PodTemplate) {
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func (n *Normalizer) normalizeVolumeClaimTemplate(template *apiChi.VolumeClaimTemplate) {
+func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
 	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
-func (n *Normalizer) normalizeServiceTemplate(template *apiChi.ServiceTemplate) {
+func (n *Normalizer) normalizeServiceTemplate(template *api.ServiceTemplate) {
 	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
 	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
@@ -333,7 +407,7 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 }
 
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
-func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *apiChi.Settings {
+func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api.Settings {
 	return settings.
 		Ensure().
 		MergeFrom(config.DefaultSettings()).
@@ -341,13 +415,13 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *apiChi.Settings) *
 }
 
 // normalizeConfigurationFiles normalizes .spec.configuration.files
-func (n *Normalizer) normalizeConfigurationFiles(files *apiChi.Settings) *apiChi.Settings {
+func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Settings {
 	if files == nil {
 		return nil
 	}
 	files.Normalize()
 
-	files.WalkSafe(func(key string, setting *apiChi.Setting) {
+	files.WalkSafe(func(key string, setting *api.Setting) {
 		subst_settings.SubstSettingsFieldWithMountedFile(n.ctx, files, key)
 	})
 
@@ -387,7 +461,7 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 	//n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
-	cluster.WalkShards(func(index int, shard apiChi.IShard) error {
+	cluster.WalkShards(func(index int, shard api.IShard) error {
 		n.normalizeShard(shard.(*apiChk.ChkShard), cluster, index)
 		return nil
 	})
@@ -397,7 +471,7 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 		return nil
 	})
 
-	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *apiChi.Host) error {
+	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *api.Host) error {
 		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
 		return nil
 	})
@@ -587,7 +661,7 @@ func (n *Normalizer) normalizeReplicaShardsCount(replica *apiChk.ChkReplica, lay
 
 // normalizeShardName normalizes shard name
 func (n *Normalizer) normalizeShardName(shard *apiChk.ChkShard, index int) {
-	if (len(shard.Name) > 0) && !commonNamer.IsAutoGeneratedShardName(shard.Name, shard, index) {
+	if (len(shard.GetName()) > 0) && !commonNamer.IsAutoGeneratedShardName(shard.GetName(), shard, index) {
 		// Has explicitly specified name already
 		return
 	}
