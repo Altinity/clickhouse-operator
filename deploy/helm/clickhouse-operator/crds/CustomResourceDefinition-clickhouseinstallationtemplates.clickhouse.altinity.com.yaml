@@ -51,7 +51,7 @@ spec:
           jsonPath: .status.taskID
         - name: status
           type: string
-          description: CHI status
+          description: Resource status
           jsonPath: .status.status
         - name: hosts-unchanged
           type: integer
@@ -115,16 +115,16 @@ spec:
               properties:
                 chop-version:
                   type: string
-                  description: "ClickHouse operator version"
+                  description: "Operator version"
                 chop-commit:
                   type: string
-                  description: "ClickHouse operator git commit SHA"
+                  description: "Operator git commit SHA"
                 chop-date:
                   type: string
-                  description: "ClickHouse operator build date"
+                  description: "Operator build date"
                 chop-ip:
                   type: string
-                  description: "IP address of the operator's pod which managed this CHI"
+                  description: "IP address of the operator's pod which managed this resource"
                 clusters:
                   type: integer
                   minimum: 0
@@ -228,11 +228,11 @@ spec:
                   description: "Generation"
                 normalized:
                   type: object
-                  description: "Normalized CHI requested"
+                  description: "Normalized resource requested"
                   x-kubernetes-preserve-unknown-fields: true
                 normalizedCompleted:
                   type: object
-                  description: "Normalized CHI completed"
+                  description: "Normalized resource completed"
                   x-kubernetes-preserve-unknown-fields: true
                 hostsWithTablesCreated:
                   type: array
