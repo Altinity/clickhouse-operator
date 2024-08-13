@@ -68,6 +68,10 @@ data:
                 <!-- <raft_logs_level>trace</raft_logs_level> -->
                 <raft_logs_level>information</raft_logs_level>
             </coordination_settings>
+            <http_control>
+                <port>9182</port>
+                <readiness><endpoint>/ready</endpoint></readiness>
+            </http_control>
         </keeper_server>
         <prometheus>
             <endpoint>/metrics</endpoint>
@@ -345,7 +349,7 @@ spec:
             defaultMode: 0755
       containers:
         - name: clickhouse-keeper
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           image: "clickhouse/clickhouse-keeper:latest-alpine"
           resources:
             requests:
@@ -372,7 +376,7 @@ spec:
             exec:
               command:
                 - /conf/keeperLive.sh
-            failureThreshold: 3
+            failureThreshold: 6
             initialDelaySeconds: 60
             periodSeconds: 10
             successThreshold: 1
@@ -385,7 +389,7 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 20
+            timeoutSeconds: 30
           ports:
             - containerPort: 2181
               name: client
