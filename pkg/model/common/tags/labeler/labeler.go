@@ -31,8 +31,8 @@ type Config struct {
 	Exclude     []string
 }
 
-// NewLabeler creates new labeler with context
-func NewLabeler(cr api.ICustomResource, config Config) *Labeler {
+// New creates new labeler with context
+func New(cr api.ICustomResource, config Config) *Labeler {
 	return &Labeler{
 		Config: config,
 		cr:     cr,
