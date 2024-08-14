@@ -15,12 +15,11 @@
 package creator
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/affinity"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
@@ -42,7 +41,7 @@ func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
 	// Now we can customize this Pod Template for particular host
 
-	model.PrepareAffinity(podTemplate, host)
+	affinity.New(c.macro).PreparePodTemplate(podTemplate, host)
 
 	return podTemplate
 }
@@ -50,7 +49,7 @@ func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
 // newAppPodTemplateDefault is a unification wrapper
 func (c *Creator) newAppPodTemplateDefault(host *api.Host) *api.PodTemplate {
 	podTemplate := &api.PodTemplate{
-		Name: namer.New().Name(interfaces.NameStatefulSet, host),
+		Name: c.namer.Name(interfaces.NameStatefulSet, host),
 		Spec: core.PodSpec{
 			Containers: []core.Container{},
 			Volumes:    []core.Volume{},

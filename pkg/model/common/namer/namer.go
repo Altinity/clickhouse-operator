@@ -16,44 +16,27 @@ package namer
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 type Namer struct {
+	macro *macro.Engine
 }
 
 // New creates new Namer with specified context
-func New() *Namer {
-	return &Namer{}
+func New(macro *macro.Engine) *Namer {
+	return &Namer{
+		macro: macro,
+	}
 }
 
 func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
-	switch what {
-	case interfaces.NameFQDNs:
-		obj := params[0]
-		scope := params[1]
-		excludeSelf := params[2].(bool)
-		return createFQDNs(obj, scope, excludeSelf)
-	}
-	panic("unknown names type")
+	return nil
 }
 
 func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	switch what {
-	case interfaces.NameCRService:
-		cr := params[0].(api.ICustomResource)
-		return createCRServiceName(cr)
-	case interfaces.NameCRServiceFQDN:
-		cr := params[0].(api.ICustomResource)
-		namespaceDomainPattern := params[1].(*types.String)
-		return createCRServiceFQDN(cr, namespaceDomainPattern)
-	case interfaces.NameClusterService:
-		cluster := params[0].(api.ICluster)
-		return createClusterServiceName(cluster)
-	case interfaces.NameShardService:
-		shard := params[0].(api.IShard)
-		return createShardServiceName(shard)
 	case interfaces.NameShard:
 		shard := params[0].(api.IShard)
 		index := params[1].(int)
@@ -72,31 +55,10 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameHostTemplate:
 		host := params[0].(*api.Host)
 		return createHostTemplateName(host)
-	case interfaces.NameInstanceHostname:
-		host := params[0].(*api.Host)
-		return createInstanceHostname(host)
-	case interfaces.NameStatefulSet:
-		host := params[0].(*api.Host)
-		return createStatefulSetName(host)
-	case interfaces.NameStatefulSetService:
-		host := params[0].(*api.Host)
-		return createStatefulSetServiceName(host)
-	case interfaces.NamePodHostname:
-		host := params[0].(*api.Host)
-		return createPodHostname(host)
-	case interfaces.NameFQDN:
-		host := params[0].(*api.Host)
-		return createFQDN(host)
 	case interfaces.NamePodHostnameRegexp:
 		cr := params[0].(api.ICustomResource)
 		template := params[1].(string)
-		return createPodHostnameRegexp(cr, template)
-	case interfaces.NamePod:
-		return createPodName(params[0])
-	case interfaces.NamePVCNameByVolumeClaimTemplate:
-		host := params[0].(*api.Host)
-		volumeClaimTemplate := params[1].(*api.VolumeClaimTemplate)
-		return createPVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
+		return n.createPodHostnameRegexp(cr, template)
 	case interfaces.NameClusterAutoSecret:
 		cluster := params[0].(api.ICluster)
 		return createClusterAutoSecretName(cluster)

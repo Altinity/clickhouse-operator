@@ -15,62 +15,39 @@
 package annotator
 
 import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/annotator"
-
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // Annotator is an entity which can annotate CHI artifacts
-type Keeper struct {
+type Annotator struct {
 	*annotator.Annotator
-	cr apiChi.ICustomResource
+	cr api.ICustomResource
 }
 
-// NewAnnotatorKeeper creates new annotator with context
-func NewAnnotatorKeeper(cr apiChi.ICustomResource, config annotator.Config) *Keeper {
-	return &Keeper{
-		Annotator: annotator.NewAnnotator(cr, config),
+// New creates new annotator with context
+func New(cr api.ICustomResource, config annotator.Config) *Annotator {
+	return &Annotator{
+		Annotator: annotator.New(cr, config),
 		cr:        cr,
 	}
 }
 
-func (a *Keeper) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
+func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
 	switch what {
 	case interfaces.AnnotateConfigMapCommon:
 		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapCommonUsers:
 		return a.GetCRScope()
 	case interfaces.AnnotateConfigMapHost:
-		var host *apiChi.Host
+		var host *api.Host
 		if len(params) > 0 {
-			host = params[0].(*apiChi.Host)
+			host = params[0].(*api.Host)
 			return a.GetHostScope(host)
 		}
 	default:
 		return a.Annotator.Annotate(what, params...)
 	}
 	panic("unknown annotate type")
-}
-
-func getPodAnnotations(chk *apiChk.ClickHouseKeeperInstallation) map[string]string {
-	return map[string]string{}
-
-	//// Fetch annotations from Pod template (if any)
-	//annotations := chk2.getPodTemplateAnnotations(chk)
-	//
-	//// In case no Prometheus port specified - nothing to add to annotations
-	//port := chk.Spec.GetPrometheusPort()
-	//if port == -1 {
-	//	return annotations
-	//}
-	//
-	//// Prometheus port specified, append it to annotations
-	//if annotations == nil {
-	//	annotations = map[string]string{}
-	//}
-	//annotations["prometheus.io/port"] = fmt.Sprintf("%d", port)
-	//annotations["prometheus.io/scrape"] = "true"
-	//return annotations
 }

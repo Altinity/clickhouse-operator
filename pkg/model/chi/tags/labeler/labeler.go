@@ -22,23 +22,23 @@ import (
 )
 
 // Labeler is an entity which can label CHI artifacts
-type LabelerClickHouse struct {
+type Labeler struct {
 	*labeler.Labeler
 }
 
-// NewLabelerClickHouse creates new labeler with context
-func NewLabelerClickHouse(cr api.ICustomResource, config labeler.Config) *LabelerClickHouse {
-	return &LabelerClickHouse{
+// New creates new labeler with context
+func New(cr api.ICustomResource, config labeler.Config) *Labeler {
+	return &Labeler{
 		Labeler: labeler.NewLabeler(cr, config),
 	}
 }
 
-func (l *LabelerClickHouse) Label(what interfaces.LabelType, params ...any) map[string]string {
+func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]string {
 	switch what {
 	case interfaces.LabelConfigMapCommon:
-		return l.labelConfigMapCHICommon()
+		return l.labelConfigMapCRCommon()
 	case interfaces.LabelConfigMapCommonUsers:
-		return l.labelConfigMapCHICommonUsers()
+		return l.labelConfigMapCRCommonUsers()
 	case interfaces.LabelConfigMapHost:
 		return l.labelConfigMapHost(params...)
 
@@ -48,12 +48,12 @@ func (l *LabelerClickHouse) Label(what interfaces.LabelType, params ...any) map[
 	panic("unknown label type")
 }
 
-func (l *LabelerClickHouse) Selector(what interfaces.SelectorType, params ...any) map[string]string {
+func (l *Labeler) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	return l.Labeler.Selector(what, params...)
 }
 
-// labelConfigMapCHICommon
-func (l *LabelerClickHouse) labelConfigMapCHICommon() map[string]string {
+// labelConfigMapCRCommon
+func (l *Labeler) labelConfigMapCRCommon() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetCRScope(),
 		map[string]string{
@@ -61,8 +61,8 @@ func (l *LabelerClickHouse) labelConfigMapCHICommon() map[string]string {
 		})
 }
 
-// labelConfigMapCHICommonUsers
-func (l *LabelerClickHouse) labelConfigMapCHICommonUsers() map[string]string {
+// labelConfigMapCRCommonUsers
+func (l *Labeler) labelConfigMapCRCommonUsers() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetCRScope(),
 		map[string]string{
@@ -70,7 +70,7 @@ func (l *LabelerClickHouse) labelConfigMapCHICommonUsers() map[string]string {
 		})
 }
 
-func (l *LabelerClickHouse) labelConfigMapHost(params ...any) map[string]string {
+func (l *Labeler) labelConfigMapHost(params ...any) map[string]string {
 	var host *api.Host
 	if len(params) > 0 {
 		host = params[0].(*api.Host)
@@ -80,7 +80,7 @@ func (l *LabelerClickHouse) labelConfigMapHost(params ...any) map[string]string 
 }
 
 // _labelConfigMapHost
-func (l *LabelerClickHouse) _labelConfigMapHost(host *api.Host) map[string]string {
+func (l *Labeler) _labelConfigMapHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetHostScope(host, false),
 		map[string]string{

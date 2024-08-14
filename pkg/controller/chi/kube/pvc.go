@@ -77,7 +77,7 @@ func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.Persistent
 }
 
 func labeler(cr api.ICustomResource) interfaces.ILabeler {
-	return chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+	return chiLabeler.New(cr, commonLabeler.Config{
 		AppendScope: chop.Config().Label.Runtime.AppendScope,
 		Include:     chop.Config().Label.Include,
 		Exclude:     chop.Config().Label.Exclude,

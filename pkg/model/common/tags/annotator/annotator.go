@@ -33,8 +33,8 @@ type Config struct {
 	Exclude []string
 }
 
-// NewAnnotator creates new annotator with context
-func NewAnnotator(cr api.ICustomResource, config Config) *Annotator {
+// New creates new annotator with context
+func New(cr api.ICustomResource, config Config) *Annotator {
 	return &Annotator{
 		Config: config,
 		cr:     cr,

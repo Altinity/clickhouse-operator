@@ -14,46 +14,51 @@
 
 package macro
 
-const (
-	// MacrosNamespace is a sanitized namespace name where ClickHouseInstallation runs
-	MacrosNamespace = "{namespace}"
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+)
 
-	// MacrosChiName is a sanitized ClickHouseInstallation name
-	MacrosChiName = "{chi}"
+var List = types.List{
+	// MacrosNamespace is a sanitized namespace name where ClickHouseInstallation runs
+	macro.MacrosNamespace: "{namespace}",
+
+	// MacrosCRName is a sanitized Custom Resource name
+	macro.MacrosCRName: "{chi}",
 
 	// MacrosClusterName is a sanitized cluster name
-	MacrosClusterName = "{cluster}"
+	macro.MacrosClusterName: "{cluster}",
 	// MacrosClusterIndex is an index of the cluster in the CHI - integer number, converted into string
-	MacrosClusterIndex = "{clusterIndex}"
+	macro.MacrosClusterIndex: "{clusterIndex}",
 
 	// MacrosShardName is a sanitized shard name
-	MacrosShardName = "{shard}"
+	macro.MacrosShardName: "{shard}",
 	// MacrosShardIndex is an index of the shard in the cluster - integer number, converted into string
-	MacrosShardIndex = "{shardIndex}"
+	macro.MacrosShardIndex: "{shardIndex}",
 
 	// MacrosReplicaName is a sanitized replica name
-	MacrosReplicaName = "{replica}"
+	macro.MacrosReplicaName: "{replica}",
 	// MacrosReplicaIndex is an index of the replica in the cluster - integer number, converted into string
-	MacrosReplicaIndex = "{replicaIndex}"
+	macro.MacrosReplicaIndex: "{replicaIndex}",
 
 	// MacrosHostName is a sanitized host name
-	MacrosHostName = "{host}"
-	// MacrosChiScopeIndex is an index of the host on the CHI-scope
-	MacrosChiScopeIndex = "{chiScopeIndex}"
-	// MacrosChiScopeCycleIndex is an index of the host in the CHI-scope cycle - integer number, converted into string
-	MacrosChiScopeCycleIndex = "{chiScopeCycleIndex}"
-	// MacrosChiScopeCycleOffset is an offset of the host in the CHI-scope cycle - integer number, converted into string
-	MacrosChiScopeCycleOffset = "{chiScopeCycleOffset}"
+	macro.MacrosHostName: "{host}",
+	// MacrosCRScopeIndex is an index of the host on the CHI-scope
+	macro.MacrosCRScopeIndex: "{chiScopeIndex}",
+	// MacrosCRScopeCycleIndex is an index of the host in the CHI-scope cycle - integer number, converted into string
+	macro.MacrosCRScopeCycleIndex: "{chiScopeCycleIndex}",
+	// MacrosCRScopeCycleOffset is an offset of the host in the CHI-scope cycle - integer number, converted into string
+	macro.MacrosCRScopeCycleOffset: "{chiScopeCycleOffset}",
 	// MacrosClusterScopeIndex is an index of the host on the cluster-scope
-	MacrosClusterScopeIndex = "{clusterScopeIndex}"
+	macro.MacrosClusterScopeIndex: "{clusterScopeIndex}",
 	// MacrosClusterScopeCycleIndex is an index of the host in the Cluster-scope cycle - integer number, converted into string
-	MacrosClusterScopeCycleIndex = "{clusterScopeCycleIndex}"
+	macro.MacrosClusterScopeCycleIndex: "{clusterScopeCycleIndex}",
 	// MacrosClusterScopeCycleOffset is an offset of the host in the Cluster-scope cycle - integer number, converted into string
-	MacrosClusterScopeCycleOffset = "{clusterScopeCycleOffset}"
+	macro.MacrosClusterScopeCycleOffset: "{clusterScopeCycleOffset}",
 	// MacrosShardScopeIndex is an index of the host on the shard-scope
-	MacrosShardScopeIndex = "{shardScopeIndex}"
+	macro.MacrosShardScopeIndex: "{shardScopeIndex}",
 	// MacrosReplicaScopeIndex is an index of the host on the replica-scope
-	MacrosReplicaScopeIndex = "{replicaScopeIndex}"
+	macro.MacrosReplicaScopeIndex: "{replicaScopeIndex}",
 	// MacrosClusterScopeCycleHeadPointsToPreviousCycleTail is {clusterScopeIndex} of previous Cycle Tail
-	MacrosClusterScopeCycleHeadPointsToPreviousCycleTail = "{clusterScopeCycleHeadPointsToPreviousCycleTail}"
-)
+	macro.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail: "{clusterScopeCycleHeadPointsToPreviousCycleTail}",
+}

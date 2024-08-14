@@ -16,18 +16,24 @@ package namer
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
 type Namer struct {
 	commonNamer *commonNamer.Namer
+	macro       *commonMacro.Engine
 }
 
 // New creates new namer with specified context
 func New() *Namer {
+	me := commonMacro.New(macro.List)
 	return &Namer{
-		commonNamer: commonNamer.New(),
+		commonNamer: commonNamer.New(me),
+		macro:       me,
 	}
 }
 
@@ -35,13 +41,49 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	switch what {
 	case interfaces.NameConfigMapHost:
 		host := params[0].(*api.Host)
-		return createConfigMapNameHost(host)
+		return n.createConfigMapNameHost(host)
 	case interfaces.NameConfigMapCommon:
 		cr := params[0].(api.ICustomResource)
-		return createConfigMapNameCommon(cr)
+		return n.createConfigMapNameCommon(cr)
 	case interfaces.NameConfigMapCommonUsers:
 		cr := params[0].(api.ICustomResource)
-		return createConfigMapNameCommonUsers(cr)
+		return n.createConfigMapNameCommonUsers(cr)
+
+	case interfaces.NameCRService:
+		cr := params[0].(api.ICustomResource)
+		return n.createCRServiceName(cr)
+	case interfaces.NameCRServiceFQDN:
+		cr := params[0].(api.ICustomResource)
+		namespaceDomainPattern := params[1].(*types.String)
+		return n.createCRServiceFQDN(cr, namespaceDomainPattern)
+	case interfaces.NameClusterService:
+		cluster := params[0].(api.ICluster)
+		return n.createClusterServiceName(cluster)
+	case interfaces.NameShardService:
+		shard := params[0].(api.IShard)
+		return n.createShardServiceName(shard)
+	case interfaces.NameInstanceHostname:
+		host := params[0].(*api.Host)
+		return n.createInstanceHostname(host)
+	case interfaces.NameStatefulSet:
+		host := params[0].(*api.Host)
+		return n.createStatefulSetName(host)
+	case interfaces.NameStatefulSetService:
+		host := params[0].(*api.Host)
+		return n.createStatefulSetServiceName(host)
+	case interfaces.NamePodHostname:
+		host := params[0].(*api.Host)
+		return n.createPodHostname(host)
+	case interfaces.NameFQDN:
+		host := params[0].(*api.Host)
+		return n.createFQDN(host)
+	case interfaces.NamePod:
+		return n.createPodName(params[0])
+	case interfaces.NamePVCNameByVolumeClaimTemplate:
+		host := params[0].(*api.Host)
+		volumeClaimTemplate := params[1].(*api.VolumeClaimTemplate)
+		return n.createPVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
+
 	default:
 		return n.commonNamer.Name(what, params...)
 	}
@@ -51,6 +93,11 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 
 func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
 	switch what {
+	case interfaces.NameFQDNs:
+		obj := params[0]
+		scope := params[1]
+		excludeSelf := params[2].(bool)
+		return n.createFQDNs(obj, scope, excludeSelf)
 	default:
 		return n.commonNamer.Names(what, params...)
 	}

@@ -21,8 +21,9 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
@@ -31,11 +32,16 @@ type ConfigMapManager struct {
 	or                   interfaces.IOwnerReferencesManager
 	tagger               interfaces.ITagger
 	configFilesGenerator interfaces.IConfigFilesGenerator
+	macro                *commonMacro.Engine
+	namer                interfaces.INameManager
 }
 
 func NewConfigMapManager() *ConfigMapManager {
+	me := commonMacro.New(macro.List)
 	return &ConfigMapManager{
-		or: NewOwnerReferencer(),
+		or:    NewOwnerReferencer(),
+		macro: me,
+		namer: namer.New(),
 	}
 }
 
@@ -72,11 +78,15 @@ func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfac
 // createConfigMapCHICommon creates new core.ConfigMap
 func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.New().Name(interfaces.NameConfigMapCommon, m.cr),
+			Name:            m.namer.Name(interfaces.NameConfigMapCommon, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
-			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommon)),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommon)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -90,11 +100,15 @@ func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGenerat
 // createConfigMapCHICommonUsers creates new core.ConfigMap
 func (m *ConfigMapManager) createConfigMapCHICommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.New().Name(interfaces.NameConfigMapCommonUsers, m.cr),
+			Name:            m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommonUsers)),
-			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommonUsers)),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommonUsers)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommonUsers)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files
@@ -108,11 +122,15 @@ func (m *ConfigMapManager) createConfigMapCHICommonUsers() *core.ConfigMap {
 // createConfigMapCHIHost creates new core.ConfigMap
 func (m *ConfigMapManager) createConfigMapCHIHost(host *api.Host) *core.ConfigMap {
 	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.New().Name(interfaces.NameConfigMapHost, host),
+			Name:            m.namer.Name(interfaces.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelConfigMapHost, host)),
-			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),
+			Labels:          m.macro.Scope(host).Map(m.tagger.Label(interfaces.LabelConfigMapHost, host)),
+			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		// Data contains several sections which are to be several xml chopConfig files

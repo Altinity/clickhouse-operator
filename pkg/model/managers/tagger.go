@@ -50,11 +50,11 @@ type tagger struct {
 
 func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: chiAnnotator.NewAnnotatorClickHouse(cr, commonAnnotator.Config{
+		annotator: chiAnnotator.New(cr, commonAnnotator.Config{
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
-		labeler: chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+		labeler: chiLabeler.New(cr, commonLabeler.Config{
 			AppendScope: chop.Config().Label.Runtime.AppendScope,
 			Include:     chop.Config().Label.Include,
 			Exclude:     chop.Config().Label.Exclude,
@@ -64,11 +64,11 @@ func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 
 func newTaggerKeeper(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: chkAnnotator.NewAnnotatorKeeper(cr, commonAnnotator.Config{
+		annotator: chkAnnotator.New(cr, commonAnnotator.Config{
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
-		labeler: chkLabeler.NewLabelerKeeper(cr, commonLabeler.Config{
+		labeler: chkLabeler.New(cr, commonLabeler.Config{
 			AppendScope: chop.Config().Label.Runtime.AppendScope,
 			Include:     chop.Config().Label.Include,
 			Exclude:     chop.Config().Label.Exclude,

@@ -19,11 +19,12 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
-	model "github.com/altinity/clickhouse-operator/pkg/model/chi"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/affinity"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 // NormalizePodTemplate normalizes .spec.templates.podTemplates
-func NormalizePodTemplate(replicasCount int, template *api.PodTemplate) {
+func NormalizePodTemplate(macro *macro.Engine, replicasCount int, template *api.PodTemplate) {
 	// Name
 	// GenerateName
 	// No normalization so far for these
@@ -35,7 +36,10 @@ func NormalizePodTemplate(replicasCount int, template *api.PodTemplate) {
 	normalizePodTemplateDistribution(replicasCount, template)
 
 	// Spec
-	template.Spec.Affinity = model.MergeAffinity(template.Spec.Affinity, model.NewAffinity(template))
+	template.Spec.Affinity = affinity.Merge(
+		template.Spec.Affinity,
+		affinity.New(macro).Make(template),
+	)
 
 	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
 	// https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy

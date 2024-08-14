@@ -23,7 +23,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 )
 
 // CreatePodDisruptionBudget creates new PodDisruptionBudget
@@ -36,8 +35,8 @@ func (c *Creator) CreatePodDisruptionBudget(cluster api.ICluster) *policy.PodDis
 		ObjectMeta: meta.ObjectMeta{
 			Name:            fmt.Sprintf("%s-%s", cluster.GetRuntime().GetAddress().GetCRName(), cluster.GetRuntime().GetAddress().GetClusterName()),
 			Namespace:       c.cr.GetNamespace(),
-			Labels:          macro.Macro(c.cr).Map(c.tagger.Label(interfaces.LabelPDB, cluster)),
-			Annotations:     macro.Macro(c.cr).Map(c.tagger.Annotate(interfaces.AnnotatePDB, cluster)),
+			Labels:          c.macro.Scope(c.cr).Map(c.tagger.Label(interfaces.LabelPDB, cluster)),
+			Annotations:     c.macro.Scope(c.cr).Map(c.tagger.Annotate(interfaces.AnnotatePDB, cluster)),
 			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
 		},
 		Spec: policy.PodDisruptionBudgetSpec{
