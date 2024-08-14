@@ -21,61 +21,61 @@ import (
 )
 
 const (
-	// namePatternConfigMapCommon is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
-	namePatternConfigMapCommon = "chi- + macro.List.Get(macroCommon.MacrosCRName) + -common-configd"
+	// patternConfigMapCommonName is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
+	patternConfigMapCommonName = "chi- + macro.List.Get(macroCommon.MacrosCRName) + -common-configd"
 
-	// namePatternConfigMapCommonUsers is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
-	namePatternConfigMapCommonUsers = "chi- + macro.List.Get(macroCommon.MacrosCRName) + -common-usersd"
+	// patternConfigMapCommonUsersName is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
+	patternConfigMapCommonUsersName = "chi- + macro.List.Get(macroCommon.MacrosCRName) + -common-usersd"
 
-	// namePatternConfigMapHost is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	namePatternConfigMapHost = "chi- + macro.List.Get(macroCommon.MacrosCRName) + -deploy-confd- + macro.List.Get(macroCommon.MacrosClusterName) + - + macro.List.Get(macroCommon.MacrosHostName)"
+	// patternConfigMapHostName is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
+	patternConfigMapHostName = "chi- + macro.List.Get(macroCommon.MacrosCRName) + -deploy-confd- + macro.List.Get(macroCommon.MacrosClusterName) + - + macro.List.Get(macroCommon.MacrosHostName)"
 
-	// namePatternCRService is a template of Custom Resource Service name. "clickhouse-{chi}"
-	namePatternCRService = "clickhouse- + macro.MacrosCRName"
+	// patternCRServiceName is a template of Custom Resource Service name. "clickhouse-{chi}"
+	patternCRServiceName = "clickhouse- + macro.MacrosCRName"
 
-	// namePatternClusterService is a template of cluster Service name. "cluster-{chi}-{cluster}"
-	namePatternClusterService = "cluster- + macro.MacrosCRName + - + macro.MacrosClusterName"
+	// patternClusterServiceName is a template of cluster Service name. "cluster-{chi}-{cluster}"
+	patternClusterServiceName = "cluster- + macro.MacrosCRName + - + macro.MacrosClusterName"
 
-	// namePatternShardService is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
-	namePatternShardService = "shard- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosShardName"
+	// patternShardServiceName is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
+	patternShardServiceName = "shard- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosShardName"
 
-	// namePatternReplicaService is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
-	namePatternReplicaService = "shard- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosReplicaName"
+	// patternReplicaServiceName is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
+	patternReplicaServiceName = "shard- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosReplicaName"
 
-	// namePatternStatefulSet is a template of host StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
-	namePatternStatefulSet = "sts chi- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosHostName"
+	// patternStatefulSetName is a template of host StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
+	patternStatefulSetName = "sts chi- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosHostName"
 
-	// namePatternStatefulSetService is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
-	namePatternStatefulSetService = "service chi- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosHostName"
+	// patternStatefulSetServiceName is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
+	patternStatefulSetServiceName = "service chi- + macro.MacrosCRName + - + macro.MacrosClusterName + - + macro.MacrosHostName"
 )
 
 var patterns = types.List{
-	// namePatternConfigMapCommon is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
-	namePatternConfigMapCommon: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-common-configd",
+	// patternConfigMapCommonName is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
+	patternConfigMapCommonName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-common-configd",
 
-	// namePatternConfigMapCommonUsers is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
-	namePatternConfigMapCommonUsers: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-common-usersd",
+	// patternConfigMapCommonUsersName is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
+	patternConfigMapCommonUsersName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-common-usersd",
 
-	// namePatternConfigMapHost is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
-	namePatternConfigMapHost: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-deploy-confd-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
+	// patternConfigMapHostName is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
+	patternConfigMapHostName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-deploy-confd-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
 
-	// namePatternCRService is a template of Custom Resource Service name. "clickhouse-{chi}"
-	namePatternCRService: "clickhouse-" + macro.List.Get(macroCommon.MacrosCRName),
+	// patternCRServiceName is a template of Custom Resource Service name. "clickhouse-{chi}"
+	patternCRServiceName: "clickhouse-" + macro.List.Get(macroCommon.MacrosCRName),
 
-	// namePatternClusterService is a template of cluster Service name. "cluster-{chi}-{cluster}"
-	namePatternClusterService: "cluster-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName),
+	// patternClusterServiceName is a template of cluster Service name. "cluster-{chi}-{cluster}"
+	patternClusterServiceName: "cluster-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName),
 
-	// namePatternShardService is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
-	namePatternShardService: "shard-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosShardName),
+	// patternShardServiceName is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
+	patternShardServiceName: "shard-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosShardName),
 
-	// namePatternReplicaService is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
-	namePatternReplicaService: "shard-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosReplicaName),
+	// patternReplicaServiceName is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
+	patternReplicaServiceName: "shard-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosReplicaName),
 
-	// namePatternStatefulSet is a template of host StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
-	namePatternStatefulSet: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
+	// patternStatefulSetName is a template of host StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
+	patternStatefulSetName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
 
-	// namePatternStatefulSetService is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
-	namePatternStatefulSetService: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
+	// patternStatefulSetServiceName is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
+	patternStatefulSetServiceName: "chi-" + macro.List.Get(macroCommon.MacrosCRName) + "-" + macro.List.Get(macroCommon.MacrosClusterName) + "-" + macro.List.Get(macroCommon.MacrosHostName),
 }
 
 const (

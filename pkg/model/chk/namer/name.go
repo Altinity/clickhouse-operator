@@ -25,7 +25,7 @@ import (
 
 // createConfigMapNameHost returns a name for a ConfigMap for replica's personal config
 func (n *Namer) createConfigMapNameHost(host *api.Host) string {
-	return n.macro.Scope(host).Line(patterns.Get(namePatternConfigMapHost))
+	return n.macro.Scope(host).Line(patterns.Get(patternConfigMapHostName))
 }
 
 // createCRServiceName creates a name of a root ClickHouseInstallation Service resource
@@ -34,7 +34,7 @@ func (n *Namer) createCRServiceName(cr api.ICustomResource) string {
 	// or from personal name pattern provided in ServiceTemplate
 
 	// Start with default name pattern
-	pattern := patterns.Get(namePatternCRService)
+	pattern := patterns.Get(patternCRServiceName)
 
 	// ServiceTemplate may have personal name pattern specified
 	if template, ok := cr.GetRootServiceTemplate(); ok {
@@ -55,7 +55,7 @@ func (n *Namer) createCRServiceFQDN(cr api.ICustomResource, namespaceDomainPatte
 	// or from personal pattern provided
 
 	// Start with default pattern
-	pattern := patterns.Get(patternServiceFQDN)
+	pattern := patternServiceFQDN
 
 	if namespaceDomainPattern.HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
@@ -76,7 +76,7 @@ func (n *Namer) createClusterServiceName(cluster api.ICluster) string {
 	// or from personal name pattern provided in ServiceTemplate
 
 	// Start with default name pattern
-	pattern := patterns.Get(namePatternClusterService)
+	pattern := patterns.Get(patternClusterServiceName)
 
 	// ServiceTemplate may have personal name pattern specified
 	if template, ok := cluster.GetServiceTemplate(); ok {
@@ -97,7 +97,7 @@ func (n *Namer) createShardServiceName(shard api.IShard) string {
 	// or from personal name pattern provided in ServiceTemplate
 
 	// Start with default name pattern
-	pattern := patterns.Get(namePatternShardService)
+	pattern := patterns.Get(patternShardServiceName)
 
 	// ServiceTemplate may have personal name pattern specified
 	if template, ok := shard.GetServiceTemplate(); ok {
@@ -118,7 +118,7 @@ func (n *Namer) createStatefulSetName(host *api.Host) string {
 	// or from personal name pattern provided in PodTemplate
 
 	// Start with default name pattern
-	pattern := patterns.Get(namePatternStatefulSet)
+	pattern := patterns.Get(patternStatefulSetName)
 
 	// PodTemplate may have personal name pattern specified
 	if template, ok := host.GetPodTemplate(); ok {
@@ -139,7 +139,7 @@ func (n *Namer) createStatefulSetServiceName(host *api.Host) string {
 	// or from personal name pattern provided in ServiceTemplate
 
 	// Start with default name pattern
-	pattern := patterns.Get(namePatternStatefulSetService)
+	pattern := patterns.Get(patternStatefulSetServiceName)
 
 	// ServiceTemplate may have personal name pattern specified
 	if template, ok := host.GetServiceTemplate(); ok {
@@ -186,7 +186,7 @@ func (n *Namer) createPodFQDN(host *api.Host) string {
 	// or from personal pattern provided
 
 	// Start with default pattern
-	pattern := patterns.Get(patternPodFQDN)
+	pattern := patternPodFQDN
 
 	if host.GetCR().GetSpec().GetNamespaceDomainPattern().HasValue() {
 		// NamespaceDomainPattern has been explicitly specified
@@ -211,10 +211,10 @@ func (n *Namer) createPodName(obj interface{}) string {
 	switch obj.(type) {
 	case *apps.StatefulSet:
 		statefulSet := obj.(*apps.StatefulSet)
-		return fmt.Sprintf(patterns.Get(patternPodName), statefulSet.Name)
+		return fmt.Sprintf(patternPodName, statefulSet.Name)
 	case *api.Host:
 		host := obj.(*api.Host)
-		return fmt.Sprintf(patterns.Get(patternPodName), n.createStatefulSetName(host))
+		return fmt.Sprintf(patternPodName, n.createStatefulSetName(host))
 	}
 	return "unknown-type"
 }
