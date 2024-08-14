@@ -21,9 +21,10 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
@@ -36,11 +37,16 @@ type ServiceManager struct {
 	cr     api.ICustomResource
 	or     interfaces.IOwnerReferencesManager
 	tagger interfaces.ITagger
+	macro  *commonMacro.Engine
+	namer  interfaces.INameManager
 }
 
 func NewServiceManager() *ServiceManager {
+	me := commonMacro.New(macro.List)
 	return &ServiceManager{
-		or: NewOwnerReferencer(),
+		or:    NewOwnerReferencer(),
+		macro: me,
+		namer: namer.New(),
 	}
 }
 
@@ -84,12 +90,12 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 		return creator.CreateServiceFromTemplate(
 			template,
 			m.cr.GetNamespace(),
-			namer.New().Name(interfaces.NameCRService, m.cr),
+			m.namer.Name(interfaces.NameCRService, m.cr),
 			m.tagger.Label(interfaces.LabelServiceCR, m.cr),
 			m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr),
 			m.tagger.Selector(interfaces.SelectorCRScopeReady),
 			m.or.CreateOwnerReferences(m.cr),
-			macro.Macro(m.cr),
+			m.macro.Scope(m.cr),
 		)
 	}
 
@@ -97,10 +103,10 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.New().Name(interfaces.NameCRService, m.cr),
+			Name:            m.namer.Name(interfaces.NameCRService, m.cr),
 			Namespace:       m.cr.GetNamespace(),
-			Labels:          macro.Macro(m.cr).Map(m.tagger.Label(interfaces.LabelServiceCR, m.cr)),
-			Annotations:     macro.Macro(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr)),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelServiceCR, m.cr)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateServiceCR, m.cr)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
@@ -130,7 +136,7 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 
 // createServiceCluster creates new core.Service for specified Cluster
 func (m *ServiceManager) createServiceCluster(cluster api.ICluster) *core.Service {
-	serviceName := namer.New().Name(interfaces.NameClusterService, cluster)
+	serviceName := m.namer.Name(interfaces.NameClusterService, cluster)
 	ownerReferences := m.or.CreateOwnerReferences(m.cr)
 
 	if template, ok := cluster.GetServiceTemplate(); ok {
@@ -143,7 +149,7 @@ func (m *ServiceManager) createServiceCluster(cluster api.ICluster) *core.Servic
 			m.tagger.Annotate(interfaces.AnnotateServiceCluster, cluster),
 			m.tagger.Selector(interfaces.SelectorClusterScopeReady, cluster),
 			ownerReferences,
-			macro.Macro(cluster),
+			m.macro.Scope(cluster),
 		)
 	}
 	// No template specified, no need to create service
@@ -157,12 +163,12 @@ func (m *ServiceManager) createServiceShard(shard api.IShard) *core.Service {
 		return creator.CreateServiceFromTemplate(
 			template,
 			shard.GetRuntime().GetAddress().GetNamespace(),
-			namer.New().Name(interfaces.NameShardService, shard),
+			m.namer.Name(interfaces.NameShardService, shard),
 			m.tagger.Label(interfaces.LabelServiceShard, shard),
 			m.tagger.Annotate(interfaces.AnnotateServiceShard, shard),
 			m.tagger.Selector(interfaces.SelectorShardScopeReady, shard),
 			m.or.CreateOwnerReferences(m.cr),
-			macro.Macro(shard),
+			m.macro.Scope(shard),
 		)
 	}
 	// No template specified, no need to create service
@@ -176,12 +182,12 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 		return creator.CreateServiceFromTemplate(
 			template,
 			host.GetRuntime().GetAddress().GetNamespace(),
-			namer.New().Name(interfaces.NameStatefulSetService, host),
+			m.namer.Name(interfaces.NameStatefulSetService, host),
 			m.tagger.Label(interfaces.LabelServiceHost, host),
 			m.tagger.Annotate(interfaces.AnnotateServiceHost, host),
 			m.tagger.Selector(interfaces.SelectorHostScope, host),
 			m.or.CreateOwnerReferences(m.cr),
-			macro.Macro(host),
+			m.macro.Scope(host),
 		)
 	}
 
@@ -189,10 +195,10 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 	// We do not have .templates.ServiceTemplate specified or it is incorrect
 	svc := &core.Service{
 		ObjectMeta: meta.ObjectMeta{
-			Name:            namer.New().Name(interfaces.NameStatefulSetService, host),
+			Name:            m.namer.Name(interfaces.NameStatefulSetService, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          macro.Macro(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
-			Annotations:     macro.Macro(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
+			Labels:          m.macro.Scope(host).Map(m.tagger.Label(interfaces.LabelServiceHost, host)),
+			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateServiceHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Spec: core.ServiceSpec{
