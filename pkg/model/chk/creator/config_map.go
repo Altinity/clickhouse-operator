@@ -21,18 +21,27 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type ConfigMapManager struct {
 	cr                   api.ICustomResource
+	or                   interfaces.IOwnerReferencesManager
 	tagger               interfaces.ITagger
 	configFilesGenerator interfaces.IConfigFilesGenerator
+	macro                *commonMacro.Engine
+	namer                interfaces.INameManager
 }
 
 func NewConfigMapManager() *ConfigMapManager {
-	return &ConfigMapManager{}
+	return &ConfigMapManager{
+		or:    NewOwnerReferencer(),
+		macro: commonMacro.New(macro.List),
+		namer: namer.New(),
+	}
 }
 
 func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
@@ -67,8 +76,9 @@ func (m *ConfigMapManager) host(host *api.Host, options *config.FilesGeneratorOp
 			APIVersion: "v1",
 		},
 		ObjectMeta: meta.ObjectMeta{
-			Name:      namer.New().Name(interfaces.NameConfigMapHost, host),
-			Namespace: host.GetRuntime().GetAddress().GetNamespace(),
+			Name:            m.namer.Name(interfaces.NameConfigMapHost, host),
+			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, options),
 	}
