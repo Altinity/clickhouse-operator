@@ -32,9 +32,12 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 	chkNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -88,6 +91,8 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 			managers.NewConfigMapManager(managers.ConfigMapManagerTypeKeeper),
 			managers.NewNameManager(managers.NameManagerTypeKeeper),
 			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
+			namer.New(),
+			commonMacro.New(macro.List),
 		),
 	)
 
