@@ -15,8 +15,7 @@
 package labeler
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -28,7 +27,7 @@ type Labeler struct {
 }
 
 // New creates new labeler with context
-func New(cr apiChi.ICustomResource, config labeler.Config) *Labeler {
+func New(cr api.ICustomResource, config labeler.Config) *Labeler {
 	return &Labeler{
 		Labeler: labeler.NewLabeler(cr, config),
 	}
@@ -56,19 +55,4 @@ func (l *Labeler) labelConfigMapCRCommon() map[string]string {
 		map[string]string{
 			labeler.LabelConfigMap: labeler.LabelConfigMapValueCHICommon,
 		})
-}
-
-func GetPodLabels(chk *api.ClickHouseKeeperInstallation) map[string]string {
-	// In case Pod template has labels explicitly specified - use them
-	//labels := chk2.getPodTemplateLabels(chk)
-	//if labels != nil {
-	//	return labels
-	//}
-
-	// Either no pod template or labels specified.
-	// Construct default labels
-	return map[string]string{
-		"app": chk.GetName(),
-		"uid": string(chk.UID),
-	}
 }
