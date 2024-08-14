@@ -28,9 +28,11 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst_settings"
@@ -44,6 +46,7 @@ type Normalizer struct {
 	secretGet subst_settings.SecretGetter
 	ctx       *Context
 	namer     interfaces.INameManager
+	macro     *commonMacro.Engine
 }
 
 // New creates new normalizer
@@ -51,6 +54,7 @@ func New(secretGet subst_settings.SecretGetter) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
 		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),
+		macro:     commonMacro.New(macro.List),
 	}
 }
 
@@ -427,7 +431,7 @@ func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	if len(n.ctx.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
 		replicasCount = n.ctx.GetTarget().GetSpecT().Configuration.Clusters[0].Layout.ReplicasCount
 	}
-	templates.NormalizePodTemplate(replicasCount, template)
+	templates.NormalizePodTemplate(n.macro, replicasCount, template)
 	// Introduce PodTemplate into Index
 	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
 }
