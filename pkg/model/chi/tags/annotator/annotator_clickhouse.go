@@ -21,20 +21,20 @@ import (
 )
 
 // Annotator is an entity which can annotate CHI artifacts
-type AnnotatorClickHouse struct {
+type Annotator struct {
 	*annotator.Annotator
 	cr api.ICustomResource
 }
 
-// NewAnnotatorClickHouse creates new annotator with context
-func NewAnnotatorClickHouse(cr api.ICustomResource, config annotator.Config) *AnnotatorClickHouse {
-	return &AnnotatorClickHouse{
-		Annotator: annotator.NewAnnotator(cr, config),
+// New creates new annotator with context
+func New(cr api.ICustomResource, config annotator.Config) *Annotator {
+	return &Annotator{
+		Annotator: annotator.New(cr, config),
 		cr:        cr,
 	}
 }
 
-func (a *AnnotatorClickHouse) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
+func (a *Annotator) Annotate(what interfaces.AnnotateType, params ...any) map[string]string {
 	switch what {
 	case interfaces.AnnotateConfigMapCommon:
 		return a.GetCRScope()

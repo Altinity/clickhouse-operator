@@ -50,7 +50,7 @@ type tagger struct {
 
 func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: chiAnnotator.NewAnnotatorClickHouse(cr, commonAnnotator.Config{
+		annotator: chiAnnotator.New(cr, commonAnnotator.Config{
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
@@ -64,7 +64,7 @@ func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 
 func newTaggerKeeper(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: chkAnnotator.NewAnnotatorKeeper(cr, commonAnnotator.Config{
+		annotator: chkAnnotator.New(cr, commonAnnotator.Config{
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
