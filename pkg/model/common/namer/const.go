@@ -14,26 +14,28 @@
 
 package namer
 
-import "github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
+import (
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+)
 
 const (
 	// crServiceNamePattern is a template of Custom Resource Service name. "clickhouse-{chi}"
-	crServiceNamePattern = "clickhouse-" + macro.MacrosChiName
+	crServiceNamePattern = "clickhouse-" + macro.MacrosCRName
 
 	// clusterServiceNamePattern is a template of cluster Service name. "cluster-{chi}-{cluster}"
-	clusterServiceNamePattern = "cluster-" + macro.MacrosChiName + "-" + macro.MacrosClusterName
+	clusterServiceNamePattern = "cluster-" + macro.MacrosCRName + "-" + macro.MacrosClusterName
 
 	// shardServiceNamePattern is a template of shard Service name. "shard-{chi}-{cluster}-{shard}"
-	shardServiceNamePattern = "shard-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosShardName
+	shardServiceNamePattern = "shard-" + macro.MacrosCRName + "-" + macro.MacrosClusterName + "-" + macro.MacrosShardName
 
 	// replicaServiceNamePattern is a template of replica Service name. "shard-{chi}-{cluster}-{replica}"
-	replicaServiceNamePattern = "shard-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosReplicaName
+	replicaServiceNamePattern = "shard-" + macro.MacrosCRName + "-" + macro.MacrosClusterName + "-" + macro.MacrosReplicaName
 
 	// statefulSetNamePattern is a template of host StatefulSet's name. "chi-{chi}-{cluster}-{shard}-{host}"
-	statefulSetNamePattern = "chi-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
+	statefulSetNamePattern = "chi-" + macro.MacrosCRName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 
 	// statefulSetServiceNamePattern is a template of host StatefulSet's Service name. "chi-{chi}-{cluster}-{shard}-{host}"
-	statefulSetServiceNamePattern = "chi-" + macro.MacrosChiName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
+	statefulSetServiceNamePattern = "chi-" + macro.MacrosCRName + "-" + macro.MacrosClusterName + "-" + macro.MacrosHostName
 )
 const (
 	// podNamePattern is a name of a Pod within StatefulSet. In our setup each StatefulSet has only 1 pod,

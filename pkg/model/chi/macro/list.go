@@ -18,8 +18,8 @@ const (
 	// MacrosNamespace is a sanitized namespace name where ClickHouseInstallation runs
 	MacrosNamespace = "{namespace}"
 
-	// MacrosChiName is a sanitized ClickHouseInstallation name
-	MacrosChiName = "{chi}"
+	// MacrosCRName is a sanitized Custom Resource name
+	MacrosCRName = "{chi}"
 
 	// MacrosClusterName is a sanitized cluster name
 	MacrosClusterName = "{cluster}"
@@ -38,12 +38,12 @@ const (
 
 	// MacrosHostName is a sanitized host name
 	MacrosHostName = "{host}"
-	// MacrosChiScopeIndex is an index of the host on the CHI-scope
-	MacrosChiScopeIndex = "{chiScopeIndex}"
-	// MacrosChiScopeCycleIndex is an index of the host in the CHI-scope cycle - integer number, converted into string
-	MacrosChiScopeCycleIndex = "{chiScopeCycleIndex}"
-	// MacrosChiScopeCycleOffset is an offset of the host in the CHI-scope cycle - integer number, converted into string
-	MacrosChiScopeCycleOffset = "{chiScopeCycleOffset}"
+	// MacrosCRScopeIndex is an index of the host on the CHI-scope
+	MacrosCRScopeIndex = "{chiScopeIndex}"
+	// MacrosCRScopeCycleIndex is an index of the host in the CHI-scope cycle - integer number, converted into string
+	MacrosCRScopeCycleIndex = "{chiScopeCycleIndex}"
+	// MacrosCRScopeCycleOffset is an offset of the host in the CHI-scope cycle - integer number, converted into string
+	MacrosCRScopeCycleOffset = "{chiScopeCycleOffset}"
 	// MacrosClusterScopeIndex is an index of the host on the cluster-scope
 	MacrosClusterScopeIndex = "{clusterScopeIndex}"
 	// MacrosClusterScopeCycleIndex is an index of the host in the Cluster-scope cycle - integer number, converted into string
