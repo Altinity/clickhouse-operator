@@ -22,7 +22,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -37,8 +36,8 @@ func (c *Creator) CreateStatefulSet(host *api.Host, shutdown bool) *apps.Statefu
 		ObjectMeta: meta.ObjectMeta{
 			Name:            c.nm.Name(interfaces.NameStatefulSet, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
-			Labels:          macro.Macro(host).Map(c.tagger.Label(interfaces.LabelSTS, host)),
-			Annotations:     macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateSTS, host)),
+			Labels:          c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelSTS, host)),
+			Annotations:     c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateSTS, host)),
 			OwnerReferences: c.or.CreateOwnerReferences(c.cr),
 		},
 		Spec: apps.StatefulSetSpec{
@@ -94,11 +93,11 @@ func (c *Creator) stsApplyPodTemplate(statefulSet *apps.StatefulSet, template *a
 func (c *Creator) createPodTemplateSpec(template *api.PodTemplate, host *api.Host) core.PodTemplateSpec {
 	// Prepare labels and annotations for the core.PodTemplateSpec
 
-	labels := macro.Macro(host).Map(util.MergeStringMapsOverwrite(
+	labels := c.macro.Scope(host).Map(util.MergeStringMapsOverwrite(
 		c.tagger.Label(interfaces.LabelPodTemplate, host),
 		template.ObjectMeta.GetLabels(),
 	))
-	annotations := macro.Macro(host).Map(util.MergeStringMapsOverwrite(
+	annotations := c.macro.Scope(host).Map(util.MergeStringMapsOverwrite(
 		c.tagger.Annotate(interfaces.AnnotatePodTemplate, host),
 		template.ObjectMeta.GetAnnotations(),
 	))

@@ -20,7 +20,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/namer/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
@@ -45,8 +44,8 @@ func (c *Creator) CreatePVC(
 			//  we are close to proper disk inheritance
 			// Right now we hit the following error:
 			// "Forbidden: updates to statefulset spec for fields other than 'replicas', 'template', and 'updateStrategy' are forbidden"
-			Labels:      macro.Macro(host).Map(c.tagger.Label(interfaces.LabelNewPVC, host, false)),
-			Annotations: macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateNewPVC, host)),
+			Labels:      c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelNewPVC, host, false)),
+			Annotations: c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateNewPVC, host)),
 		},
 		// Append copy of PersistentVolumeClaimSpec
 		Spec: *spec.DeepCopy(),
@@ -65,8 +64,8 @@ func (c *Creator) AdjustPVC(
 	host *api.Host,
 	template *api.VolumeClaimTemplate,
 ) *core.PersistentVolumeClaim {
-	pvc.SetLabels(macro.Macro(host).Map(c.tagger.Label(interfaces.LabelExistingPVC, pvc, host, template)))
-	pvc.SetAnnotations(macro.Macro(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPVC, pvc, host, template)))
+	pvc.SetLabels(c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelExistingPVC, pvc, host, template)))
+	pvc.SetAnnotations(c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPVC, pvc, host, template)))
 	// And after the object is ready we can put version label
 	labeler.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
