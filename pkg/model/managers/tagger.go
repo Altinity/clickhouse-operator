@@ -54,7 +54,7 @@ func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
-		labeler: chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+		labeler: chiLabeler.New(cr, commonLabeler.Config{
 			AppendScope: chop.Config().Label.Runtime.AppendScope,
 			Include:     chop.Config().Label.Include,
 			Exclude:     chop.Config().Label.Exclude,
@@ -68,7 +68,7 @@ func newTaggerKeeper(cr api.ICustomResource) *tagger {
 			Include: chop.Config().Annotation.Include,
 			Exclude: chop.Config().Annotation.Exclude,
 		}),
-		labeler: chkLabeler.NewLabelerKeeper(cr, commonLabeler.Config{
+		labeler: chkLabeler.New(cr, commonLabeler.Config{
 			AppendScope: chop.Config().Label.Runtime.AppendScope,
 			Include:     chop.Config().Label.Include,
 			Exclude:     chop.Config().Label.Exclude,

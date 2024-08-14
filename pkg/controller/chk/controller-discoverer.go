@@ -31,7 +31,7 @@ import (
 )
 
 func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
-	return chiLabeler.NewLabelerClickHouse(cr, commonLabeler.Config{
+	return chiLabeler.New(cr, commonLabeler.Config{
 		AppendScope: chop.Config().Label.Runtime.AppendScope,
 		Include:     chop.Config().Label.Include,
 		Exclude:     chop.Config().Label.Exclude,

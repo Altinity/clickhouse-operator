@@ -23,21 +23,21 @@ import (
 )
 
 // Labeler is an entity which can label CHI artifacts
-type Keeper struct {
+type Labeler struct {
 	*labeler.Labeler
 }
 
-// NewLabelerKeeper creates new labeler with context
-func NewLabelerKeeper(cr apiChi.ICustomResource, config labeler.Config) *Keeper {
-	return &Keeper{
+// New creates new labeler with context
+func New(cr apiChi.ICustomResource, config labeler.Config) *Labeler {
+	return &Labeler{
 		Labeler: labeler.NewLabeler(cr, config),
 	}
 }
 
-func (l *Keeper) Label(what interfaces.LabelType, params ...any) map[string]string {
+func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]string {
 	switch what {
 	case interfaces.LabelConfigMapCommon:
-		return l.labelConfigMapCHICommon()
+		return l.labelConfigMapCRCommon()
 
 	default:
 		return l.Labeler.Label(what, params...)
@@ -45,12 +45,12 @@ func (l *Keeper) Label(what interfaces.LabelType, params ...any) map[string]stri
 	panic("unknown label type")
 }
 
-func (l *Keeper) Selector(what interfaces.SelectorType, params ...any) map[string]string {
+func (l *Labeler) Selector(what interfaces.SelectorType, params ...any) map[string]string {
 	return l.Labeler.Selector(what, params...)
 }
 
-// labelConfigMapCHICommon
-func (l *Keeper) labelConfigMapCHICommon() map[string]string {
+// labelConfigMapCRCommon
+func (l *Labeler) labelConfigMapCRCommon() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetCRScope(),
 		map[string]string{
