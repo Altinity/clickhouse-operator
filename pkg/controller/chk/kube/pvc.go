@@ -24,10 +24,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type PVC struct {
@@ -103,9 +101,5 @@ func (c *PVC) ListForHost(ctx context.Context, host *api.Host) (*core.Persistent
 }
 
 func labeler(cr api.ICustomResource) interfaces.ILabeler {
-	return chiLabeler.New(cr, commonLabeler.Config{
-		AppendScope: chop.Config().Label.Runtime.AppendScope,
-		Include:     chop.Config().Label.Include,
-		Exclude:     chop.Config().Label.Exclude,
-	})
+	return chiLabeler.New(cr)
 }
