@@ -20,7 +20,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 // CreatePVC
@@ -67,6 +66,6 @@ func (c *Creator) AdjustPVC(
 	pvc.SetLabels(c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelExistingPVC, pvc, host, template)))
 	pvc.SetAnnotations(c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPVC, pvc, host, template)))
 	// And after the object is ready we can put version label
-	labeler.MakeObjectVersion(&pvc.ObjectMeta, pvc)
+	c.labeler.MakeObjectVersion(&pvc.ObjectMeta, pvc)
 	return pvc
 }

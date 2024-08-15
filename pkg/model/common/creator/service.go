@@ -23,7 +23,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -63,6 +62,7 @@ func CreateServiceFromTemplate(
 	selector map[string]string,
 	ownerReferences []meta.OwnerReference,
 	macro *macro.Engine,
+	labeler interfaces.ILabeler,
 ) *core.Service {
 
 	// Verify Ports

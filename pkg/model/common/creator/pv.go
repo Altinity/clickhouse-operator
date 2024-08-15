@@ -19,7 +19,6 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 // adjustPersistentVolume prepares PV labels
@@ -27,6 +26,6 @@ func (c *Creator) adjustPersistentVolume(pv *core.PersistentVolume, host *api.Ho
 	pv.SetLabels(c.macro.Scope(host).Map(c.tagger.Label(interfaces.LabelExistingPV, pv, host)))
 	pv.SetAnnotations(c.macro.Scope(host).Map(c.tagger.Annotate(interfaces.AnnotateExistingPV, pv, host)))
 	// And after the object is ready we can put version label
-	labeler.MakeObjectVersion(&pv.ObjectMeta, pv)
+	c.labeler.MakeObjectVersion(&pv.ObjectMeta, pv)
 	return pv
 }

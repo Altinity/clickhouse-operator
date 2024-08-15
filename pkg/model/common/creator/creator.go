@@ -44,8 +44,9 @@ type Creator struct {
 	// namer
 	// port walker
 	// config maps
-	namer interfaces.INameManager
-	macro *macro.Engine
+	namer   interfaces.INameManager
+	macro   *macro.Engine
+	labeler interfaces.ILabeler
 }
 
 // NewCreator creates new Creator object
@@ -62,6 +63,7 @@ func NewCreator(
 	ownerReferencer interfaces.IOwnerReferencesManager,
 	namer interfaces.INameManager,
 	macro *macro.Engine,
+	labeler interfaces.ILabeler,
 ) *Creator {
 	return &Creator{
 		cr:                   cr,
@@ -77,5 +79,6 @@ func NewCreator(
 		or:                   ownerReferencer,
 		namer:                namer,
 		macro:                macro,
+		labeler:              labeler,
 	}
 }
