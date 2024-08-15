@@ -15,6 +15,7 @@
 package normalizer
 
 import (
+	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/google/uuid"
 	"strings"
 
@@ -37,16 +38,18 @@ import (
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	ctx   *Context
-	namer interfaces.INameManager
-	macro *commonMacro.Engine
+	ctx     *Context
+	namer   interfaces.INameManager
+	macro   interfaces.IMacro
+	labeler interfaces.ILabeler
 }
 
 // New creates new normalizer
 func New() *Normalizer {
 	return &Normalizer{
-		namer: managers.NewNameManager(managers.NameManagerTypeKeeper),
-		macro: commonMacro.New(macro.List),
+		namer:   managers.NewNameManager(managers.NameManagerTypeKeeper),
+		macro:   commonMacro.New(macro.List),
+		labeler: chkLabeler.New(nil),
 	}
 }
 
@@ -362,7 +365,7 @@ func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	if len(n.ctx.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
 		replicasCount = n.ctx.GetTarget().GetSpecT().Configuration.Clusters[0].Layout.ReplicasCount
 	}
-	templates.NormalizePodTemplate(n.macro, replicasCount, template)
+	templates.NormalizePodTemplate(n.macro, n.labeler, replicasCount, template)
 	// Introduce PodTemplate into Index
 	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
 }
