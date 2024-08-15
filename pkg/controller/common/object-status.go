@@ -15,19 +15,19 @@
 package common
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // GetObjectStatusFromMetas gets StatefulSet status from cur and new meta infos
-func GetObjectStatusFromMetas(curMeta, newMeta meta.Object) api.ObjectStatus {
+func GetObjectStatusFromMetas(labeler interfaces.ILabeler, curMeta, newMeta meta.Object) api.ObjectStatus {
 	// Try to perform label-based version comparison
-	curVersion, curHasLabel := commonLabeler.GetObjectVersion(curMeta)
-	newVersion, newHasLabel := commonLabeler.GetObjectVersion(newMeta)
+	curVersion, curHasLabel := labeler.GetObjectVersion(curMeta)
+	newVersion, newHasLabel := labeler.GetObjectVersion(newMeta)
 
 	if !curHasLabel || !newHasLabel {
 		log.M(newMeta).F().Warning(
