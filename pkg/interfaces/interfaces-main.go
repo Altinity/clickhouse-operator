@@ -43,11 +43,19 @@ type IAnnotator interface {
 	Annotate(what AnnotateType, params ...any) map[string]string
 }
 
+type IMacro interface {
+	Get(string) string
+	Scope(scope any) IMacro
+	Line(line string) string
+	Map(_map map[string]string) map[string]string
+}
+
 type ILabeler interface {
 	Label(what LabelType, params ...any) map[string]string
 	Selector(what SelectorType, params ...any) map[string]string
 	MakeObjectVersion(meta meta.Object, obj interface{})
 	GetObjectVersion(meta meta.Object) (string, bool)
+	Get(string) string
 }
 
 type ITagger interface {
