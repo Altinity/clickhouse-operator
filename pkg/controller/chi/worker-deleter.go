@@ -30,9 +30,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/model"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -140,7 +140,7 @@ func (w *worker) purgePVC(
 	m meta.Object,
 ) {
 	if shouldPurgePVC(cr, reconcileFailedObjs, m) {
-		if commonLabeler.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
+		if chiLabeler.New(nil).GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
 			w.a.V(1).M(m).F().Info("Delete PVC: %s", util.NamespaceNameString(m))
 			if err := w.c.kube.Storage().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
 				w.a.V(1).M(m).F().Error("FAILED to delete PVC: %s, err: %v", util.NamespaceNameString(m), err)
@@ -347,7 +347,7 @@ func (w *worker) canDropReplica(ctx context.Context, host *api.Host, opts ...*dr
 	storage.NewStoragePVC(kube.NewPVC(w.c.kubeClient)).WalkDiscoveredPVCs(ctx, host, func(pvc *core.PersistentVolumeClaim) {
 		// Replica's state has to be kept in Zookeeper for retained volumes.
 		// ClickHouse expects to have state of the non-empty replica in-place when replica rejoins.
-		if commonLabeler.GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
+		if chiLabeler.New(nil).GetReclaimPolicy(pvc.GetObjectMeta()) == api.PVCReclaimPolicyRetain {
 			w.a.V(1).F().Info("PVC: %s/%s blocks drop replica. Reclaim policy: %s", api.PVCReclaimPolicyRetain.String())
 			can = false
 		}

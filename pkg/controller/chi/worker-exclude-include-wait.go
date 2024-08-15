@@ -144,7 +144,7 @@ func (w *worker) excludeHostFromService(ctx context.Context, host *api.Host) err
 		return nil
 	}
 
-	_ = w.c.labeler.DeleteReadyMarkOnPodAndService(ctx, host)
+	_ = w.c.ctrlLabeler.DeleteReadyMarkOnPodAndService(ctx, host)
 	return nil
 }
 
@@ -155,7 +155,7 @@ func (w *worker) includeHostIntoService(ctx context.Context, host *api.Host) err
 		return nil
 	}
 
-	_ = w.c.labeler.SetReadyMarkOnPodAndService(ctx, host)
+	_ = w.c.ctrlLabeler.SetReadyMarkOnPodAndService(ctx, host)
 	return nil
 }
 

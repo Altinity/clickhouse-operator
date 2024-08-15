@@ -40,6 +40,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/schemer"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
@@ -120,14 +121,16 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
 			namer.New(),
 			commonMacro.New(macro.List),
+			chiLabeler.New(chi),
 		),
 	)
 
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
-		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
+		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.ctrlLabeler),
 		w.c.namer,
+		chiLabeler.New(chi),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		w.c,
