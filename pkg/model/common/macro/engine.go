@@ -16,6 +16,7 @@ package macro
 
 import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"strconv"
 	"strings"
 
@@ -40,7 +41,7 @@ func New(macros types.List) *Engine {
 	}
 }
 
-func (e *Engine) Scope(scope any) *Engine {
+func (e *Engine) Scope(scope any) interfaces.IMacro {
 	return &Engine{
 		namer:  e.namer,
 		macros: e.macros,
