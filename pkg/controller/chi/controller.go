@@ -50,11 +50,11 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/cmd_queue"
 	chiKube "github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/labeler"
+	ctrlLabeler "github.com/altinity/clickhouse-operator/pkg/controller/chi/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/metrics/clickhouse"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/volume"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -80,9 +80,9 @@ type Controller struct {
 	// not used explicitly
 	recorder record.EventRecorder
 
-	namer      interfaces.INameManager
-	labeler    *labeler.Labeler
-	pvcDeleter *volume.PVCDeleter
+	namer       interfaces.INameManager
+	ctrlLabeler *ctrlLabeler.Labeler
+	pvcDeleter  *volume.PVCDeleter
 }
 
 // NewController creates instance of Controller
@@ -124,7 +124,7 @@ func NewController(
 		recorder:        recorder,
 		namer:           namer,
 		kube:            kube,
-		labeler:         labeler.New(kube),
+		ctrlLabeler:     ctrlLabeler.New(kube),
 		pvcDeleter:      volume.NewPVCDeleter(managers.NewNameManager(managers.NameManagerTypeClickHouse)),
 	}
 	controller.initQueues()
@@ -483,7 +483,7 @@ func (c *Controller) addEventHandlers(
 
 // isTrackedObject checks whether operator is interested in changes of this object
 func (c *Controller) isTrackedObject(meta meta.Object) bool {
-	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && commonLabeler.IsCHOPGeneratedObject(meta)
+	return chop.Config().IsWatchedNamespace(meta.GetNamespace()) && chiLabeler.New(nil).IsCHOPGeneratedObject(meta)
 }
 
 // Run syncs caches, starts workers
@@ -501,10 +501,10 @@ func (c *Controller) Run(ctx context.Context) {
 	// Label controller runtime objects with proper labels
 	max := 10
 	for cnt := 0; cnt < max; cnt++ {
-		switch err := c.labeler.LabelMyObjectsTree(ctx); err {
+		switch err := c.ctrlLabeler.LabelMyObjectsTree(ctx); err {
 		case nil:
 			cnt = max
-		case labeler.ErrOperatorPodNotSpecified:
+		case ctrlLabeler.ErrOperatorPodNotSpecified:
 			log.V(1).F().Error("Since operator pod is not specified, will not perform labeling")
 			cnt = max
 		default:

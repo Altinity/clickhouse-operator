@@ -21,21 +21,15 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func getLabeler(cr api.ICustomResource) interfaces.ILabeler {
-	return chiLabeler.New(cr, commonLabeler.Config{
-		AppendScope: chop.Config().Label.Runtime.AppendScope,
-		Include:     chop.Config().Label.Include,
-		Exclude:     chop.Config().Label.Exclude,
-	})
+	return chiLabeler.New(cr)
 }
 
 func (c *Controller) discovery(ctx context.Context, cr api.ICustomResource) *model.Registry {

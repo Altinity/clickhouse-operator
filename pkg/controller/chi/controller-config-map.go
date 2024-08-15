@@ -26,7 +26,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -59,7 +59,7 @@ func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.Conf
 	// Try to find by labels
 
 	var selector k8sLabels.Selector
-	if selector, err = commonLabeler.MakeSelectorFromObjectMeta(meta); err != nil {
+	if selector, err = chiLabeler.New(nil).MakeSelectorFromObjectMeta(meta); err != nil {
 		return nil, err
 	}
 
