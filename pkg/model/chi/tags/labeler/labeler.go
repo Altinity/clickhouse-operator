@@ -29,7 +29,7 @@ type Labeler struct {
 // New creates new labeler with context
 func New(cr api.ICustomResource, config ...*labeler.Config) *Labeler {
 	return &Labeler{
-		Labeler: labeler.New(cr, config...),
+		Labeler: labeler.New(cr, list, config...),
 	}
 }
 
@@ -57,7 +57,7 @@ func (l *Labeler) labelConfigMapCRCommon() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetCRScope(),
 		map[string]string{
-			labeler.LabelConfigMap: labeler.LabelConfigMapValueCHICommon,
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommon),
 		})
 }
 
@@ -66,7 +66,7 @@ func (l *Labeler) labelConfigMapCRCommonUsers() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetCRScope(),
 		map[string]string{
-			labeler.LabelConfigMap: labeler.LabelConfigMapValueCHICommonUsers,
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommonUsers),
 		})
 }
 
@@ -84,6 +84,6 @@ func (l *Labeler) _labelConfigMapHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetHostScope(host, false),
 		map[string]string{
-			labeler.LabelConfigMap: labeler.LabelConfigMapValueHost,
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueHost),
 		})
 }
