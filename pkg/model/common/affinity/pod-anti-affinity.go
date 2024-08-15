@@ -45,7 +45,7 @@ func (a *Affinity) newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAf
 					a.newMatchLabels(
 						podDistribution,
 						map[string]string{
-							commonLabeler.LabelAppName: commonLabeler.LabelAppValue,
+							a.labeler.Get(commonLabeler.LabelAppName): a.labeler.Get(commonLabeler.LabelAppValue),
 						},
 					),
 				),
@@ -59,7 +59,7 @@ func (a *Affinity) newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAf
 					a.newMatchLabels(
 						podDistribution,
 						map[string]string{
-							commonLabeler.LabelClusterScopeCycleIndex: a.macro.Get(macro.MacrosClusterScopeCycleIndex),
+							a.labeler.Get(commonLabeler.LabelClusterScopeCycleIndex): a.macro.Get(macro.MacrosClusterScopeCycleIndex),
 						},
 					),
 				),
@@ -73,7 +73,7 @@ func (a *Affinity) newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAf
 					a.newMatchLabels(
 						podDistribution,
 						map[string]string{
-							commonLabeler.LabelShardName: a.macro.Get(macro.MacrosShardName),
+							a.labeler.Get(commonLabeler.LabelShardName): a.macro.Get(macro.MacrosShardName),
 						},
 					),
 				),
@@ -87,7 +87,7 @@ func (a *Affinity) newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAf
 					a.newMatchLabels(
 						podDistribution,
 						map[string]string{
-							commonLabeler.LabelReplicaName: a.macro.Get(macro.MacrosReplicaName),
+							a.labeler.Get(commonLabeler.LabelReplicaName): a.macro.Get(macro.MacrosReplicaName),
 						},
 					),
 				),
@@ -100,7 +100,7 @@ func (a *Affinity) newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAf
 					podDistribution,
 					[]meta.LabelSelectorRequirement{
 						{
-							Key:      commonLabeler.LabelNamespace,
+							Key:      a.labeler.Get(commonLabeler.LabelNamespace),
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
 								a.macro.Get(macro.MacrosNamespace),
@@ -117,7 +117,7 @@ func (a *Affinity) newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAf
 					podDistribution,
 					[]meta.LabelSelectorRequirement{
 						{
-							Key:      commonLabeler.LabelCRName,
+							Key:      a.labeler.Get(commonLabeler.LabelCRName),
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
 								a.macro.Get(macro.MacrosCRName),
@@ -134,7 +134,7 @@ func (a *Affinity) newPodAntiAffinity(template *api.PodTemplate) *core.PodAntiAf
 					podDistribution,
 					[]meta.LabelSelectorRequirement{
 						{
-							Key:      commonLabeler.LabelClusterName,
+							Key:      a.labeler.Get(commonLabeler.LabelClusterName),
 							Operator: meta.LabelSelectorOpNotIn,
 							Values: []string{
 								a.macro.Get(macro.MacrosClusterName),

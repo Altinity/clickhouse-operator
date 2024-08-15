@@ -43,7 +43,7 @@ func (a *Affinity) newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						commonLabeler.LabelNamespace: a.macro.Get(macro.MacrosNamespace),
+						a.labeler.Get(commonLabeler.LabelNamespace): a.macro.Get(macro.MacrosNamespace),
 					},
 				),
 			)
@@ -55,7 +55,7 @@ func (a *Affinity) newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						commonLabeler.LabelCRName: a.macro.Get(macro.MacrosCRName),
+						a.labeler.Get(commonLabeler.LabelCRName): a.macro.Get(macro.MacrosCRName),
 					},
 				),
 			)
@@ -67,7 +67,7 @@ func (a *Affinity) newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						commonLabeler.LabelClusterName: a.macro.Get(macro.MacrosClusterName),
+						a.labeler.Get(commonLabeler.LabelClusterName): a.macro.Get(macro.MacrosClusterName),
 					},
 				),
 			)
@@ -79,7 +79,7 @@ func (a *Affinity) newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						commonLabeler.LabelShardName: a.macro.Get(macro.MacrosShardName),
+						a.labeler.Get(commonLabeler.LabelShardName): a.macro.Get(macro.MacrosShardName),
 					},
 				),
 			)
@@ -91,7 +91,7 @@ func (a *Affinity) newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						commonLabeler.LabelReplicaName: a.macro.Get(macro.MacrosReplicaName),
+						a.labeler.Get(commonLabeler.LabelReplicaName): a.macro.Get(macro.MacrosReplicaName),
 					},
 				),
 			)
@@ -103,7 +103,7 @@ func (a *Affinity) newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 				newPodAffinityTermWithMatchLabels(
 					podDistribution,
 					map[string]string{
-						commonLabeler.LabelClusterScopeIndex: a.macro.Get(macro.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail),
+						a.labeler.Get(commonLabeler.LabelClusterScopeIndex): a.macro.Get(macro.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail),
 					},
 				),
 			)
@@ -113,7 +113,7 @@ func (a *Affinity) newPodAffinity(template *api.PodTemplate) *core.PodAffinity {
 					1,
 					podDistribution,
 					map[string]string{
-						commonLabeler.LabelClusterScopeIndex: a.macro.Get(macro.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail),
+						a.labeler.Get(commonLabeler.LabelClusterScopeIndex): a.macro.Get(macro.MacrosClusterScopeCycleHeadPointsToPreviousCycleTail),
 					},
 				),
 			)

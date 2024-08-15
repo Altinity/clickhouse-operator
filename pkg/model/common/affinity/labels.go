@@ -20,7 +20,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -31,32 +31,32 @@ func (a *Affinity) newMatchLabels(podDistribution *api.PodDistribution, matchLab
 	switch podDistribution.Scope {
 	case deployment.PodDistributionScopeShard:
 		scopeLabels = map[string]string{
-			commonLabeler.LabelNamespace:   a.macro.Get(macro.MacrosNamespace),
-			commonLabeler.LabelCRName:      a.macro.Get(macro.MacrosCRName),
-			commonLabeler.LabelClusterName: a.macro.Get(macro.MacrosClusterName),
-			commonLabeler.LabelShardName:   a.macro.Get(macro.MacrosShardName),
+			a.labeler.Get(labeler.LabelNamespace):   a.macro.Get(macro.MacrosNamespace),
+			a.labeler.Get(labeler.LabelCRName):      a.macro.Get(macro.MacrosCRName),
+			a.labeler.Get(labeler.LabelClusterName): a.macro.Get(macro.MacrosClusterName),
+			a.labeler.Get(labeler.LabelShardName):   a.macro.Get(macro.MacrosShardName),
 		}
 	case deployment.PodDistributionScopeReplica:
 		scopeLabels = map[string]string{
-			commonLabeler.LabelNamespace:   a.macro.Get(macro.MacrosNamespace),
-			commonLabeler.LabelCRName:      a.macro.Get(macro.MacrosCRName),
-			commonLabeler.LabelClusterName: a.macro.Get(macro.MacrosClusterName),
-			commonLabeler.LabelReplicaName: a.macro.Get(macro.MacrosReplicaName),
+			a.labeler.Get(labeler.LabelNamespace):   a.macro.Get(macro.MacrosNamespace),
+			a.labeler.Get(labeler.LabelCRName):      a.macro.Get(macro.MacrosCRName),
+			a.labeler.Get(labeler.LabelClusterName): a.macro.Get(macro.MacrosClusterName),
+			a.labeler.Get(labeler.LabelReplicaName): a.macro.Get(macro.MacrosReplicaName),
 		}
 	case deployment.PodDistributionScopeCluster:
 		scopeLabels = map[string]string{
-			commonLabeler.LabelNamespace:   a.macro.Get(macro.MacrosNamespace),
-			commonLabeler.LabelCRName:      a.macro.Get(macro.MacrosCRName),
-			commonLabeler.LabelClusterName: a.macro.Get(macro.MacrosClusterName),
+			a.labeler.Get(labeler.LabelNamespace):   a.macro.Get(macro.MacrosNamespace),
+			a.labeler.Get(labeler.LabelCRName):      a.macro.Get(macro.MacrosCRName),
+			a.labeler.Get(labeler.LabelClusterName): a.macro.Get(macro.MacrosClusterName),
 		}
 	case deployment.PodDistributionScopeClickHouseInstallation:
 		scopeLabels = map[string]string{
-			commonLabeler.LabelNamespace: a.macro.Get(macro.MacrosNamespace),
-			commonLabeler.LabelCRName:    a.macro.Get(macro.MacrosCRName),
+			a.labeler.Get(labeler.LabelNamespace): a.macro.Get(macro.MacrosNamespace),
+			a.labeler.Get(labeler.LabelCRName):    a.macro.Get(macro.MacrosCRName),
 		}
 	case deployment.PodDistributionScopeNamespace:
 		scopeLabels = map[string]string{
-			commonLabeler.LabelNamespace: a.macro.Get(macro.MacrosNamespace),
+			a.labeler.Get(labeler.LabelNamespace): a.macro.Get(macro.MacrosNamespace),
 		}
 	case deployment.PodDistributionScopeGlobal:
 		scopeLabels = map[string]string{}

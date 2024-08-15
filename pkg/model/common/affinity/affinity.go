@@ -18,16 +18,18 @@ import (
 	core "k8s.io/api/core/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 type Affinity struct {
-	macro *macro.Engine
+	macro   interfaces.IMacro
+	labeler interfaces.ILabeler
 }
 
-func New(macro *macro.Engine) *Affinity {
+func New(macro interfaces.IMacro, labeler interfaces.ILabeler) *Affinity {
 	return &Affinity{
-		macro: macro,
+		macro:   macro,
+		labeler: labeler,
 	}
 }
 
