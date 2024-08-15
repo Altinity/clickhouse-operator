@@ -17,15 +17,14 @@ package namer
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 type Namer struct {
-	macro *macro.Engine
+	macro interfaces.IMacro
 }
 
 // New creates new Namer with specified context
-func New(macro *macro.Engine) *Namer {
+func New(macro interfaces.IMacro) *Namer {
 	return &Namer{
 		macro: macro,
 	}
