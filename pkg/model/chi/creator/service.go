@@ -23,9 +23,9 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 const (
@@ -34,19 +34,20 @@ const (
 )
 
 type ServiceManager struct {
-	cr     api.ICustomResource
-	or     interfaces.IOwnerReferencesManager
-	tagger interfaces.ITagger
-	macro  *commonMacro.Engine
-	namer  interfaces.INameManager
+	cr      api.ICustomResource
+	or      interfaces.IOwnerReferencesManager
+	tagger  interfaces.ITagger
+	macro   *commonMacro.Engine
+	namer   interfaces.INameManager
+	labeler interfaces.ILabeler
 }
 
 func NewServiceManager() *ServiceManager {
-	me := commonMacro.New(macro.List)
 	return &ServiceManager{
-		or:    NewOwnerReferencer(),
-		macro: me,
-		namer: namer.New(),
+		or:      NewOwnerReferencer(),
+		macro:   commonMacro.New(macro.List),
+		namer:   namer.New(),
+		labeler: nil,
 	}
 }
 
@@ -78,6 +79,7 @@ func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...an
 
 func (m *ServiceManager) SetCR(cr api.ICustomResource) {
 	m.cr = cr
+	m.labeler = labeler.New(cr)
 }
 func (m *ServiceManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
@@ -96,6 +98,7 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 			m.tagger.Selector(interfaces.SelectorCRScopeReady),
 			m.or.CreateOwnerReferences(m.cr),
 			m.macro.Scope(m.cr),
+			m.labeler,
 		)
 	}
 
@@ -130,7 +133,7 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 			// ExternalTrafficPolicy: core.ServiceExternalTrafficPolicyTypeLocal, // For core.ServiceTypeLoadBalancer only
 		},
 	}
-	commonLabeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
 
@@ -150,6 +153,7 @@ func (m *ServiceManager) createServiceCluster(cluster api.ICluster) *core.Servic
 			m.tagger.Selector(interfaces.SelectorClusterScopeReady, cluster),
 			ownerReferences,
 			m.macro.Scope(cluster),
+			m.labeler,
 		)
 	}
 	// No template specified, no need to create service
@@ -169,6 +173,7 @@ func (m *ServiceManager) createServiceShard(shard api.IShard) *core.Service {
 			m.tagger.Selector(interfaces.SelectorShardScopeReady, shard),
 			m.or.CreateOwnerReferences(m.cr),
 			m.macro.Scope(shard),
+			m.labeler,
 		)
 	}
 	// No template specified, no need to create service
@@ -188,6 +193,7 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 			m.tagger.Selector(interfaces.SelectorHostScope, host),
 			m.or.CreateOwnerReferences(m.cr),
 			m.macro.Scope(host),
+			m.labeler,
 		)
 	}
 
@@ -209,6 +215,6 @@ func (m *ServiceManager) createServiceHost(host *api.Host) *core.Service {
 		},
 	}
 	creator.SvcAppendSpecifiedPorts(svc, host)
-	commonLabeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
+	m.labeler.MakeObjectVersion(svc.GetObjectMeta(), svc)
 	return svc
 }
