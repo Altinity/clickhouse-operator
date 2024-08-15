@@ -24,17 +24,18 @@ import (
 
 // Annotator is an entity which can annotate CHI artifacts
 type Annotator struct {
-	Config
+	*Config
 	cr api.ICustomResource
 }
 
-type Config struct {
-	Include []string
-	Exclude []string
-}
-
 // New creates new annotator with context
-func New(cr api.ICustomResource, config Config) *Annotator {
+func New(cr api.ICustomResource, _config ...*Config) *Annotator {
+	var config *Config
+	if len(_config) == 0 {
+		config = NewDefaultConfig()
+	} else {
+		config = _config[0]
+	}
 	return &Annotator{
 		Config: config,
 		cr:     cr,
