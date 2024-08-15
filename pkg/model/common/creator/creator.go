@@ -18,7 +18,6 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 // Creator specifies creator object
@@ -45,7 +44,7 @@ type Creator struct {
 	// port walker
 	// config maps
 	namer   interfaces.INameManager
-	macro   *macro.Engine
+	macro   interfaces.IMacro
 	labeler interfaces.ILabeler
 }
 
@@ -62,7 +61,7 @@ func NewCreator(
 	nameManager interfaces.INameManager,
 	ownerReferencer interfaces.IOwnerReferencesManager,
 	namer interfaces.INameManager,
-	macro *macro.Engine,
+	macro interfaces.IMacro,
 	labeler interfaces.ILabeler,
 ) *Creator {
 	return &Creator{

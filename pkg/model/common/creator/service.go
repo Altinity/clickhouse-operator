@@ -22,7 +22,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -61,7 +60,7 @@ func CreateServiceFromTemplate(
 	annotations map[string]string,
 	selector map[string]string,
 	ownerReferences []meta.OwnerReference,
-	macro *macro.Engine,
+	macro interfaces.IMacro,
 	labeler interfaces.ILabeler,
 ) *core.Service {
 

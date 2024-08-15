@@ -41,7 +41,7 @@ func (c *Creator) getPodTemplate(host *api.Host) *api.PodTemplate {
 	// Here we have local copy of Pod Template, to be used to create StatefulSet
 	// Now we can customize this Pod Template for particular host
 
-	affinity.New(c.macro).PreparePodTemplate(podTemplate, host)
+	affinity.New(c.macro, c.labeler).PreparePodTemplate(podTemplate, host)
 
 	return podTemplate
 }
