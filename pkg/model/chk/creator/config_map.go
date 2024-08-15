@@ -23,8 +23,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type ConfigMapManager struct {
@@ -34,13 +34,15 @@ type ConfigMapManager struct {
 	configFilesGenerator interfaces.IConfigFilesGenerator
 	macro                *commonMacro.Engine
 	namer                interfaces.INameManager
+	labeler              interfaces.ILabeler
 }
 
 func NewConfigMapManager() *ConfigMapManager {
 	return &ConfigMapManager{
-		or:    NewOwnerReferencer(),
-		macro: commonMacro.New(macro.List),
-		namer: namer.New(),
+		or:      NewOwnerReferencer(),
+		macro:   commonMacro.New(macro.List),
+		namer:   namer.New(),
+		labeler: nil,
 	}
 }
 
@@ -52,7 +54,7 @@ func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
 			options = params[1].(*config.FilesGeneratorOptions)
-			return m.host(host, options)
+			return m.createConfigMapHost(host, options)
 		}
 	}
 	panic("unknown config map type")
@@ -60,6 +62,7 @@ func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params
 
 func (m *ConfigMapManager) SetCR(cr api.ICustomResource) {
 	m.cr = cr
+	m.labeler = labeler.New(cr)
 }
 func (m *ConfigMapManager) SetTagger(tagger interfaces.ITagger) {
 	m.tagger = tagger
@@ -68,8 +71,8 @@ func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfac
 	m.configFilesGenerator = configFilesGenerator
 }
 
-// host returns a config map containing ClickHouse Keeper config XML
-func (m *ConfigMapManager) host(host *api.Host, options *config.FilesGeneratorOptions) *core.ConfigMap {
+// createConfigMapHost creates config map for a host
+func (m *ConfigMapManager) createConfigMapHost(host *api.Host, options *config.FilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
@@ -78,11 +81,13 @@ func (m *ConfigMapManager) host(host *api.Host, options *config.FilesGeneratorOp
 		ObjectMeta: meta.ObjectMeta{
 			Name:            m.namer.Name(interfaces.NameConfigMapHost, host),
 			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
+			Labels:          m.macro.Scope(host).Map(m.tagger.Label(interfaces.LabelConfigMapHost, host)),
+			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
 		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, options),
 	}
 	// And after the object is ready we can put version label
-	commonLabeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
 	return cm
 }
