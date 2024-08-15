@@ -16,14 +16,11 @@ package managers
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	chiAnnotator "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/annotator"
 	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	chkAnnotator "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/annotator"
 	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
-	commonAnnotator "github.com/altinity/clickhouse-operator/pkg/model/common/tags/annotator"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )
 
 type TagManagerType string
@@ -50,29 +47,15 @@ type tagger struct {
 
 func newTaggerClickHouse(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: chiAnnotator.New(cr, commonAnnotator.Config{
-			Include: chop.Config().Annotation.Include,
-			Exclude: chop.Config().Annotation.Exclude,
-		}),
-		labeler: chiLabeler.New(cr, commonLabeler.Config{
-			AppendScope: chop.Config().Label.Runtime.AppendScope,
-			Include:     chop.Config().Label.Include,
-			Exclude:     chop.Config().Label.Exclude,
-		}),
+		annotator: chiAnnotator.New(cr),
+		labeler:   chiLabeler.New(cr),
 	}
 }
 
 func newTaggerKeeper(cr api.ICustomResource) *tagger {
 	return &tagger{
-		annotator: chkAnnotator.New(cr, commonAnnotator.Config{
-			Include: chop.Config().Annotation.Include,
-			Exclude: chop.Config().Annotation.Exclude,
-		}),
-		labeler: chkLabeler.New(cr, commonLabeler.Config{
-			AppendScope: chop.Config().Label.Runtime.AppendScope,
-			Include:     chop.Config().Label.Include,
-			Exclude:     chop.Config().Label.Exclude,
-		}),
+		annotator: chkAnnotator.New(cr),
+		labeler:   chkLabeler.New(cr),
 	}
 }
 
