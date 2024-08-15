@@ -16,12 +16,12 @@ package chk
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/util"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 func (c *Controller) getService(ctx context.Context, service *core.Service) (*core.Service, error) {
@@ -47,7 +47,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 
 	// Check specified service exists
 	_, err := c.kube.Service().Get(ctx, &core.Service{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: meta.ObjectMeta{
 			Namespace: namespace,
 			Name:      name,
 		},

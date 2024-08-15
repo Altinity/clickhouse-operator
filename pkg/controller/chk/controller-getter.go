@@ -22,7 +22,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 )
 
 // getPodsIPs gets all pod IPs
@@ -48,7 +48,7 @@ func (c *Controller) GetCHIByObjectMeta(meta meta.Object, isCR bool) (*apiChk.Cl
 		crName = meta.GetName()
 	} else {
 		var err error
-		crName, err = commonLabeler.GetCRNameFromObjectMeta(meta)
+		crName, err = chkLabeler.New(nil).GetCRNameFromObjectMeta(meta)
 		if err != nil {
 			return nil, fmt.Errorf("unable to find CR by name: '%s'. More info: %v", meta.GetName(), err)
 		}
