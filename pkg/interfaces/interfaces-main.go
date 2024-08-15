@@ -46,6 +46,8 @@ type IAnnotator interface {
 type ILabeler interface {
 	Label(what LabelType, params ...any) map[string]string
 	Selector(what SelectorType, params ...any) map[string]string
+	MakeObjectVersion(meta meta.Object, obj interface{})
+	GetObjectVersion(meta meta.Object) (string, bool)
 }
 
 type ITagger interface {
