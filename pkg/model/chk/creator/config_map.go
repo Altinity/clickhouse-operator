@@ -32,7 +32,7 @@ type ConfigMapManager struct {
 	or                   interfaces.IOwnerReferencesManager
 	tagger               interfaces.ITagger
 	configFilesGenerator interfaces.IConfigFilesGenerator
-	macro                *commonMacro.Engine
+	macro                interfaces.IMacro
 	namer                interfaces.INameManager
 	labeler              interfaces.ILabeler
 }

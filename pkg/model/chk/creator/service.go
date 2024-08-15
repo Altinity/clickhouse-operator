@@ -37,7 +37,7 @@ type ServiceManager struct {
 	cr      apiChi.ICustomResource
 	or      interfaces.IOwnerReferencesManager
 	tagger  interfaces.ITagger
-	macro   *commonMacro.Engine
+	macro   interfaces.IMacro
 	namer   interfaces.INameManager
 	labeler interfaces.ILabeler
 }
