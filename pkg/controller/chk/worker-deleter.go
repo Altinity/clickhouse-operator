@@ -24,7 +24,7 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/model"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -110,7 +110,7 @@ func (w *worker) purgePVC(
 	m meta.Object,
 ) {
 	if shouldPurgePVC(cr, reconcileFailedObjs, m) {
-		if commonLabeler.GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
+		if chkLabeler.New(nil).GetReclaimPolicy(m) == api.PVCReclaimPolicyDelete {
 			w.a.V(1).M(m).F().Info("Delete PVC: %s", util.NamespaceNameString(m))
 			if err := w.c.kube.Storage().Delete(ctx, m.GetNamespace(), m.GetName()); err != nil {
 				w.a.V(1).M(m).F().Error("FAILED to delete PVC: %s, err: %v", util.NamespaceNameString(m), err)

@@ -35,6 +35,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
 	chkNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
+	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
@@ -93,6 +94,7 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
 			namer.New(),
 			commonMacro.New(macro.List),
+			chkLabeler.New(chk),
 		),
 	)
 
@@ -102,6 +104,7 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 		//poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
 		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, nil),
 		w.c.namer,
+		chkLabeler.New(chk),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		statefulset.NewDefaultFallback(),
