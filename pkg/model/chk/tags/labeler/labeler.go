@@ -27,9 +27,9 @@ type Labeler struct {
 }
 
 // New creates new labeler with context
-func New(cr api.ICustomResource, config labeler.Config) *Labeler {
+func New(cr api.ICustomResource, config ...*labeler.Config) *Labeler {
 	return &Labeler{
-		Labeler: labeler.New(cr, config),
+		Labeler: labeler.New(cr, config...),
 	}
 }
 
