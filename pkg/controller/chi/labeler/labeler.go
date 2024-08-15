@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"strings"
 
 	apps "k8s.io/api/apps/v1"
@@ -277,7 +278,7 @@ func (l *Labeler) appendLabelReadyOnPod(ctx context.Context, host *api.Host) err
 		return err
 	}
 
-	if commonLabeler.AppendLabelReady(&pod.ObjectMeta) {
+	if chiLabeler.New(host.GetCR()).AppendLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
 		_, err = l.pod.Update(ctx, pod)
 		if err != nil {
@@ -311,7 +312,7 @@ func (l *Labeler) deleteLabelReadyOnPod(ctx context.Context, host *api.Host) err
 		return err
 	}
 
-	if commonLabeler.DeleteLabelReady(&pod.ObjectMeta) {
+	if chiLabeler.New(host.GetCR()).DeleteLabelReady(&pod.ObjectMeta) {
 		// Modified, need to update
 		_, err = l.pod.Update(ctx, pod)
 		return err
@@ -333,7 +334,7 @@ func (l *Labeler) appendAnnotationReadyOnService(ctx context.Context, host *api.
 		return err
 	}
 
-	if commonLabeler.AppendAnnotationReady(&svc.ObjectMeta) {
+	if chiLabeler.New(host.GetCR()).AppendAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
 		_, err = l.service.Update(ctx, svc)
 		if err != nil {
@@ -367,7 +368,7 @@ func (l *Labeler) deleteAnnotationReadyOnService(ctx context.Context, host *api.
 		return err
 	}
 
-	if commonLabeler.DeleteAnnotationReady(&svc.ObjectMeta) {
+	if chiLabeler.New(host.GetCR()).DeleteAnnotationReady(&svc.ObjectMeta) {
 		// Modified, need to update
 		_, err = l.service.Update(ctx, svc)
 		return err
