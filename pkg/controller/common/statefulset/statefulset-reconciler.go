@@ -37,6 +37,7 @@ type Reconciler struct {
 
 	hostSTSPoller IHostStatefulSetPoller
 	namer         interfaces.INameManager
+	labeler       interfaces.ILabeler
 	storage       *storage.Reconciler
 
 	cr  interfaces.IKubeCR
@@ -50,6 +51,7 @@ func NewReconciler(
 	task *common.Task,
 	hostSTSPoller IHostStatefulSetPoller,
 	namer interfaces.INameManager,
+	labeler interfaces.ILabeler,
 	storage *storage.Reconciler,
 	kube interfaces.IKube,
 	fallback fallback,
@@ -60,6 +62,7 @@ func NewReconciler(
 
 		hostSTSPoller: hostSTSPoller,
 		namer:         namer,
+		labeler:       labeler,
 		storage:       storage,
 
 		cr:  kube.CR(),
@@ -95,7 +98,7 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	switch {
 	case curStatefulSet != nil:
 		r.a.V(2).M(new).Info("Have StatefulSet available, try to perform label-based comparison for: %s", util.NamespaceNameString(new))
-		return common.GetObjectStatusFromMetas(curStatefulSet, new)
+		return common.GetObjectStatusFromMetas(r.labeler, curStatefulSet, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
