@@ -27,9 +27,9 @@ type Annotator struct {
 }
 
 // New creates new annotator with context
-func New(cr api.ICustomResource, config annotator.Config) *Annotator {
+func New(cr api.ICustomResource, config ...*annotator.Config) *Annotator {
 	return &Annotator{
-		Annotator: annotator.New(cr, config),
+		Annotator: annotator.New(cr, config...),
 		cr:        cr,
 	}
 }
