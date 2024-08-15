@@ -19,12 +19,12 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/affinity"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
 // NormalizePodTemplate normalizes .spec.templates.podTemplates
-func NormalizePodTemplate(macro *macro.Engine, replicasCount int, template *api.PodTemplate) {
+func NormalizePodTemplate(macro interfaces.IMacro, labeler interfaces.ILabeler, replicasCount int, template *api.PodTemplate) {
 	// Name
 	// GenerateName
 	// No normalization so far for these
@@ -38,7 +38,7 @@ func NormalizePodTemplate(macro *macro.Engine, replicasCount int, template *api.
 	// Spec
 	template.Spec.Affinity = affinity.Merge(
 		template.Spec.Affinity,
-		affinity.New(macro).Make(template),
+		affinity.New(macro, labeler).Make(template),
 	)
 
 	// In case we have hostNetwork specified, we need to have ClusterFirstWithHostNet DNS policy, because of
