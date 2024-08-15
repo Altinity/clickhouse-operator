@@ -45,16 +45,16 @@ func (l *Labeler) GetHostScope(host *api.Host, applySupplementaryServiceLabels b
 	labels := l.getSelectorHostScope(host)
 	if l.AppendScope {
 		// Optional labels
-		labels[LabelShardScopeIndex] = short.NameLabel(short.ShardScopeIndex, host)
-		labels[LabelReplicaScopeIndex] = short.NameLabel(short.ReplicaScopeIndex, host)
-		labels[LabelCRScopeIndex] = short.NameLabel(short.CRScopeIndex, host)
-		labels[LabelCRScopeCycleSize] = short.NameLabel(short.CRScopeCycleSize, host)
-		labels[LabelCRScopeCycleIndex] = short.NameLabel(short.CRScopeCycleIndex, host)
-		labels[LabelCRScopeCycleOffset] = short.NameLabel(short.CRScopeCycleOffset, host)
-		labels[LabelClusterScopeIndex] = short.NameLabel(short.ClusterScopeIndex, host)
-		labels[LabelClusterScopeCycleSize] = short.NameLabel(short.ClusterScopeCycleSize, host)
-		labels[LabelClusterScopeCycleIndex] = short.NameLabel(short.ClusterScopeCycleIndex, host)
-		labels[LabelClusterScopeCycleOffset] = short.NameLabel(short.ClusterScopeCycleOffset, host)
+		labels[l.Get(LabelShardScopeIndex)] = short.NameLabel(short.ShardScopeIndex, host)
+		labels[l.Get(LabelReplicaScopeIndex)] = short.NameLabel(short.ReplicaScopeIndex, host)
+		labels[l.Get(LabelCRScopeIndex)] = short.NameLabel(short.CRScopeIndex, host)
+		labels[l.Get(LabelCRScopeCycleSize)] = short.NameLabel(short.CRScopeCycleSize, host)
+		labels[l.Get(LabelCRScopeCycleIndex)] = short.NameLabel(short.CRScopeCycleIndex, host)
+		labels[l.Get(LabelCRScopeCycleOffset)] = short.NameLabel(short.CRScopeCycleOffset, host)
+		labels[l.Get(LabelClusterScopeIndex)] = short.NameLabel(short.ClusterScopeIndex, host)
+		labels[l.Get(LabelClusterScopeCycleSize)] = short.NameLabel(short.ClusterScopeCycleSize, host)
+		labels[l.Get(LabelClusterScopeCycleIndex)] = short.NameLabel(short.ClusterScopeCycleIndex, host)
+		labels[l.Get(LabelClusterScopeCycleOffset)] = short.NameLabel(short.ClusterScopeCycleOffset, host)
 	}
 	if applySupplementaryServiceLabels {
 		// Optional labels
@@ -73,7 +73,7 @@ func (l *Labeler) getHostScopeReady(host *api.Host, applySupplementaryServiceLab
 // getHostScopeReclaimPolicy gets host scope labels with PVCReclaimPolicy from template
 func (l *Labeler) getHostScopeReclaimPolicy(host *api.Host, template *api.VolumeClaimTemplate, applySupplementaryServiceLabels bool) map[string]string {
 	return util.MergeStringMapsOverwrite(l.GetHostScope(host, applySupplementaryServiceLabels), map[string]string{
-		LabelPVCReclaimPolicyName: volume.GetPVCReclaimPolicy(host, template).String(),
+		l.Get(LabelPVCReclaimPolicyName): volume.GetPVCReclaimPolicy(host, template).String(),
 	})
 }
 

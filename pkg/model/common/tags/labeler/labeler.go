@@ -16,17 +16,19 @@ package labeler
 
 import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
 	*Config
-	cr api.ICustomResource
+	cr     api.ICustomResource
+	labels types.List
 }
 
 // New creates new labeler with context
-func New(cr api.ICustomResource, _config ...*Config) *Labeler {
+func New(cr api.ICustomResource, labels types.List, _config ...*Config) *Labeler {
 	var config *Config
 	if len(_config) == 0 {
 		config = NewDefaultConfig()
@@ -36,7 +38,12 @@ func New(cr api.ICustomResource, _config ...*Config) *Labeler {
 	return &Labeler{
 		Config: config,
 		cr:     cr,
+		labels: labels,
 	}
+}
+
+func (l *Labeler) Get(label string) string {
+	return l.labels.Get(label)
 }
 
 func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]string {

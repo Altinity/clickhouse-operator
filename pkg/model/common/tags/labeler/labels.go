@@ -26,7 +26,7 @@ func (l *Labeler) labelServiceCR() map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetCRScope(),
 		map[string]string{
-			LabelService: labelServiceValueCR,
+			l.Get(LabelService): l.Get(LabelServiceValueCR),
 		})
 }
 
@@ -45,7 +45,7 @@ func (l *Labeler) _labelServiceCluster(cluster api.ICluster) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getClusterScope(cluster),
 		map[string]string{
-			LabelService: labelServiceValueCluster,
+			l.Get(LabelService): l.Get(LabelServiceValueCluster),
 		})
 }
 
@@ -64,7 +64,7 @@ func (l *Labeler) _labelServiceShard(shard api.IShard) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.getShardScope(shard),
 		map[string]string{
-			LabelService: labelServiceValueShard,
+			l.Get(LabelService): l.Get(LabelServiceValueShard),
 		})
 }
 
@@ -83,7 +83,7 @@ func (l *Labeler) _labelServiceHost(host *api.Host) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		l.GetHostScope(host, false),
 		map[string]string{
-			LabelService: labelServiceValueHost,
+			l.Get(LabelService): l.Get(LabelServiceValueHost),
 		})
 }
 
