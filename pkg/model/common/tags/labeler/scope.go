@@ -60,14 +60,14 @@ func (l *Labeler) GetHostScope(host *api.Host, applySupplementaryServiceLabels b
 		// Optional labels
 		// TODO
 		// When we'll have ChkCluster Discovery functionality we can refactor this properly
-		labels = appendConfigLabels(host, labels)
+		labels = l.appendConfigLabels(host, labels)
 	}
 	return l.filterOutLabelsToBeSkipped(l.appendCRProvidedLabels(labels))
 }
 
 // getHostScopeReady gets labels for Host-scoped object including Ready label
 func (l *Labeler) getHostScopeReady(host *api.Host, applySupplementaryServiceLabels bool) map[string]string {
-	return appendKeyReady(l.GetHostScope(host, applySupplementaryServiceLabels))
+	return l.appendKeyReady(l.GetHostScope(host, applySupplementaryServiceLabels))
 }
 
 // getHostScopeReclaimPolicy gets host scope labels with PVCReclaimPolicy from template

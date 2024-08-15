@@ -21,18 +21,18 @@ import (
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	Config
+	*Config
 	cr api.ICustomResource
 }
 
-type Config struct {
-	AppendScope bool
-	Include     []string
-	Exclude     []string
-}
-
 // New creates new labeler with context
-func New(cr api.ICustomResource, config Config) *Labeler {
+func New(cr api.ICustomResource, _config ...*Config) *Labeler {
+	var config *Config
+	if len(_config) == 0 {
+		config = NewDefaultConfig()
+	} else {
+		config = _config[0]
+	}
 	return &Labeler{
 		Config: config,
 		cr:     cr,

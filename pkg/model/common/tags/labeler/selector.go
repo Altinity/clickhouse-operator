@@ -31,7 +31,7 @@ func (l *Labeler) getSelectorCRScope() map[string]string {
 
 // getSelectorCRScopeReady gets labels to select a ready-labelled CR-scoped object
 func (l *Labeler) getSelectorCRScopeReady() map[string]string {
-	return appendKeyReady(l.getSelectorCRScope())
+	return l.appendKeyReady(l.getSelectorCRScope())
 }
 
 // getSelectorClusterScope gets labels to select a Cluster-scoped object
@@ -47,7 +47,7 @@ func (l *Labeler) getSelectorClusterScope(cluster api.ICluster) map[string]strin
 
 // getSelectorClusterScopeReady gets labels to select a ready-labelled Cluster-scoped object
 func (l *Labeler) getSelectorClusterScopeReady(cluster api.ICluster) map[string]string {
-	return appendKeyReady(l.getSelectorClusterScope(cluster))
+	return l.appendKeyReady(l.getSelectorClusterScope(cluster))
 }
 
 // getSelectorShardScope gets labels to select a Shard-scoped object
@@ -64,7 +64,7 @@ func (l *Labeler) getSelectorShardScope(shard api.IShard) map[string]string {
 
 // getSelectorShardScopeReady gets labels to select a ready-labelled Shard-scoped object
 func (l *Labeler) getSelectorShardScopeReady(shard api.IShard) map[string]string {
-	return appendKeyReady(l.getSelectorShardScope(shard))
+	return l.appendKeyReady(l.getSelectorShardScope(shard))
 }
 
 // getSelectorHostScope gets labels to select a Host-scoped object
