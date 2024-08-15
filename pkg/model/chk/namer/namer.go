@@ -25,7 +25,7 @@ import (
 
 type Namer struct {
 	commonNamer *commonNamer.Namer
-	macro       *commonMacro.Engine
+	macro       interfaces.IMacro
 }
 
 // New creates new namer with specified context
