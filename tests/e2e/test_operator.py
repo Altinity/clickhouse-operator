@@ -989,7 +989,6 @@ def test_012(self):
     service_test_012_created = kubectl.get_field("service", "service-test-012", ".metadata.creationTimestamp")
     service_default_created = kubectl.get_field("service", "service-default", ".metadata.creationTimestamp")
 
-
     with Then("Update chi"):
         kubectl.create_and_check(
             manifest="manifests/chi/test-012-service-template-2.yaml",
