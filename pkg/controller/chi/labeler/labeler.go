@@ -18,8 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
-	"strings"
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
@@ -30,13 +28,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	commonLabeler "github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	chiLabeler "github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/util"
-)
-
-var (
-	// ErrOperatorPodNotSpecified specifies error when there is not namespace/name pair provided pointing to operator pod
-	ErrOperatorPodNotSpecified = fmt.Errorf("operator pod not specfied")
 )
 
 type Labeler struct {
@@ -94,7 +87,7 @@ func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 	if !ok1 || !ok2 {
 		str := fmt.Sprintf("ERROR read env vars: %s/%s ", deployment.OPERATOR_POD_NAME, deployment.OPERATOR_POD_NAMESPACE)
 		log.V(1).M(namespace, name).F().Error(str)
-		return errors.New(str)
+		return fmt.Errorf("%w %s", ErrEnvVarNotSpecified, str)
 	}
 
 	log.V(1).Info("OPERATOR_POD_NAMESPACE=%s OPERATOR_POD_NAME=%s", namespace, name)
@@ -105,24 +98,25 @@ func (l *Labeler) LabelMyObjectsTree(ctx context.Context) error {
 	// Put labels on the pod
 	pod, err := l.labelPod(ctx, namespace, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w %s/%s err: %v", ErrUnableToLabelPod, namespace, name, err)
 	}
 	if pod == nil {
-		return fmt.Errorf("ERROR label pod %s/%s", namespace, name)
+		return fmt.Errorf("%w %s/%s", ErrUnableToLabelPod, namespace, name)
 	}
 
 	// Put labels on the ReplicaSet
 	replicaSet, err := l.labelReplicaSet(ctx, pod)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w %s err: %v", ErrUnableToLabelReplicaSet, util.NamespacedName(pod), err)
 	}
 	if replicaSet == nil {
-		return fmt.Errorf("ERROR label ReplicaSet for pod %s/%s", pod.Namespace, pod.Name)
+		return fmt.Errorf("%w %s", ErrUnableToLabelReplicaSet, util.NamespacedName(pod))
 	}
 
 	// Put labels on the Deployment
 	err = l.labelDeployment(ctx, replicaSet)
 	if err != nil {
+		fmt.Errorf("%w %s err: %v", ErrUnableToLabelDeployment, util.NamespacedName(replicaSet), err)
 		return err
 	}
 
@@ -255,13 +249,7 @@ func (l *Labeler) labelDeployment(ctx context.Context, rs *apps.ReplicaSet) erro
 func (l *Labeler) addLabels(labels map[string]string) map[string]string {
 	return util.MergeStringMapsOverwrite(
 		labels,
-		// Add the following labels
-		map[string]string{
-			commonLabeler.LabelAppName:    commonLabeler.LabelAppValue,
-			commonLabeler.LabelCHOP:       chop.Get().Version,
-			commonLabeler.LabelCHOPCommit: chop.Get().Commit,
-			commonLabeler.LabelCHOPDate:   strings.ReplaceAll(chop.Get().Date, ":", "."),
-		},
+		chiLabeler.New(nil).GetCHOpSignature(),
 	)
 }
 

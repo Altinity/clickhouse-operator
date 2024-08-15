@@ -59,7 +59,8 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	err = c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
 	if err == nil {
 		log.V(1).M(namespace, name).F().Info("OK delete Service: %s/%s", namespace, name)
-		time.Sleep(75*time.Second)
+		// TODO fix this properly
+		time.Sleep(75 * time.Second)
 		log.V(1).M(namespace, name).F().Info("OK delete Service -- proceed further: %s/%s", namespace, name)
 	} else {
 		log.V(1).M(namespace, name).F().Error("FAIL delete Service: %s/%s err: %v", namespace, name, err)
