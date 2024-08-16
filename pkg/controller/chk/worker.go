@@ -31,11 +31,11 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model"
-	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
-	chkNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
-	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/normalizer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
@@ -46,16 +46,15 @@ import (
 
 // worker represents worker thread which runs reconcile tasks
 type worker struct {
-	c             *Controller
-	a             common.Announcer
-	normalizer    *chkNormalizer.Normalizer
+	c *Controller
+	a common.Announcer
+
+	normalizer    *normalizer.Normalizer
 	task          *common.Task
 	stsReconciler *statefulset.Reconciler
 
 	start time.Time
 }
-
-const componentName = "clickhouse-operator"
 
 // newWorker
 func (c *Controller) newWorker() *worker {
@@ -71,12 +70,17 @@ func (c *Controller) newWorker() *worker {
 	)
 
 	return &worker{
-		c:          c,
-		a:          announcer,
-		normalizer: chkNormalizer.New(),
+		c: c,
+		a: announcer,
+
+		normalizer: normalizer.New(),
 		start:      start,
 		task:       nil,
 	}
+}
+
+func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *config.GeneratorOptions {
+	return &config.GeneratorOptions{}
 }
 
 func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
@@ -94,7 +98,7 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
 			namer.New(),
 			commonMacro.New(macro.List),
-			chkLabeler.New(chk),
+			labeler.New(chk),
 		),
 	)
 
@@ -104,7 +108,7 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 		//poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
 		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, nil),
 		w.c.namer,
-		chkLabeler.New(chk),
+		labeler.New(chk),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		statefulset.NewDefaultFallback(),
@@ -158,18 +162,15 @@ func (w *worker) shouldForceRestartHost(host *api.Host) bool {
 }
 
 // normalize
-func (w *worker) normalize(_chk *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
-	chk, err := chkNormalizer.New().CreateTemplated(_chk, commonNormalizer.NewOptions())
+func (w *worker) normalize(c *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+	chk, err := normalizer.New().CreateTemplated(c, commonNormalizer.NewOptions())
 	if err != nil {
-		log.V(1).
+		w.a.WithEvent(chk, common.EventActionReconcile, common.EventReasonReconcileFailed).
+			WithStatusError(chk).
 			M(chk).F().
-			Error("FAILED to normalize CHK: %v", err)
+			Error("FAILED to normalize CR 1: %v", err)
 	}
 	return chk
-}
-
-func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *chkConfig.GeneratorOptions {
-	return &chkConfig.GeneratorOptions{}
 }
 
 // areUsableOldAndNew checks whether there are old and new usable
@@ -189,7 +190,7 @@ func (w *worker) isGenerationTheSame(old, new *apiChk.ClickHouseKeeperInstallati
 		return false
 	}
 
-	return old.Generation == new.Generation
+	return old.GetGeneration() == new.GetGeneration()
 }
 
 func (w *worker) markReconcileStart(ctx context.Context, chk *apiChk.ClickHouseKeeperInstallation, ap *action_plan.ActionPlan) {
@@ -224,13 +225,13 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *ap
 	w.a.V(1).M(_chk).F().S().Info("finalize reconcile")
 
 	// Update CHI object
-	if chi, err := w.createCHIFromObjectMeta(_chk, true, commonNormalizer.NewOptions()); err == nil {
-		w.a.V(1).M(chi).Info("updating endpoints for CHI-2 %s", chi.Name)
+	if chi, err := w.createCRFromObjectMeta(_chk, true, commonNormalizer.NewOptions()); err == nil {
+		w.a.V(1).M(chi).Info("updating endpoints for CR-2 %s", chi.Name)
 		ips := w.c.getPodsIPs(chi)
-		w.a.V(1).M(chi).Info("IPs of the CHI-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
+		w.a.V(1).M(chi).Info("IPs of the CR-2 finalize reconcile %s/%s: len: %d %v", chi.Namespace, chi.Name, len(ips), ips)
 		opts := commonNormalizer.NewOptions()
 		opts.DefaultUserAdditionalIPs = ips
-		if chi, err := w.createCHIFromObjectMeta(_chk, true, opts); err == nil {
+		if chi, err := w.createCRFromObjectMeta(_chk, true, opts); err == nil {
 			w.a.V(1).M(chi).Info("Update users IPS-2")
 			chi.SetAncestor(chi.GetTarget())
 			chi.SetTarget(nil)
@@ -244,10 +245,10 @@ func (w *worker) finalizeReconcileAndMarkCompleted(ctx context.Context, _chk *ap
 				},
 			})
 		} else {
-			w.a.M(_chk).F().Error("internal unable to find CHI by %v err: %v", _chk.GetLabels(), err)
+			w.a.M(_chk).F().Error("internal unable to find CR by %v err: %v", _chk.GetLabels(), err)
 		}
 	} else {
-		w.a.M(_chk).F().Error("external unable to find CHI by %v err %v", _chk.GetLabels(), err)
+		w.a.M(_chk).F().Error("external unable to find CR by %v err %v", _chk.GetLabels(), err)
 	}
 
 	w.a.V(1).
@@ -294,7 +295,10 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 	ap.WalkAdded(
 		// Walk over added clusters
 		func(cluster api.ICluster) {
+			w.a.V(1).M(chk).Info("Walking over AP added clusters. Cluster: %s", cluster.GetName())
+
 			cluster.WalkHosts(func(host *api.Host) error {
+				w.a.V(1).M(chk).Info("Walking over hosts in added clusters. Cluster: %s Host: %s", cluster.GetName(), host.GetName())
 
 				// Name of the StatefulSet for this host
 				name := w.c.namer.Name(interfaces.NameStatefulSet, host)
@@ -302,6 +306,7 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 				found := false
 
 				existingObjects.WalkStatefulSet(func(meta meta.Object) {
+					w.a.V(3).M(chk).Info("Walking over existing sts list. sts: %s", util.NamespacedName(meta))
 					if name == meta.GetName() {
 						// StatefulSet of this host already exist
 						found = true
@@ -311,12 +316,12 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 				if found {
 					// StatefulSet of this host already exist, we can't ADD it for sure
 					// It looks like FOUND is the most correct approach
-					host.GetReconcileAttributes().SetFound()
 					w.a.V(1).M(chk).Info("Add host as FOUND via cluster. Host was found as sts. Host: %s", host.GetName())
+					host.GetReconcileAttributes().SetFound()
 				} else {
 					// StatefulSet of this host does not exist, looks like we need to ADD it
-					host.GetReconcileAttributes().SetAdd()
 					w.a.V(1).M(chk).Info("Add host as ADD via cluster. Host was not found as sts. Host: %s", host.GetName())
+					host.GetReconcileAttributes().SetAdd()
 				}
 
 				return nil
@@ -324,47 +329,54 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 		},
 		// Walk over added shards
 		func(shard api.IShard) {
+			w.a.V(1).M(chk).Info("Walking over AP added shards. Shard: %s", shard.GetName())
 			// Mark all hosts of the shard as newly added
 			shard.WalkHosts(func(host *api.Host) error {
+				w.a.V(1).M(chk).Info("Add host as ADD via shard. Shard: %s Host: %s", shard.GetName(), host.GetName())
 				host.GetReconcileAttributes().SetAdd()
-				w.a.V(1).M(chk).Info("Add host as ADD via shard. Host: %s", host.GetName())
 				return nil
 			})
 		},
 		// Walk over added hosts
 		func(host *api.Host) {
-			host.GetReconcileAttributes().SetAdd()
+			w.a.V(1).M(chk).Info("Walking over AP added hosts. Host: %s", host.GetName())
 			w.a.V(1).M(chk).Info("Add host as ADD via host. Host: %s", host.GetName())
+			host.GetReconcileAttributes().SetAdd()
 		},
 	)
 
 	ap.WalkModified(
 		func(cluster api.ICluster) {
+			w.a.V(1).M(chk).Info("Walking over AP modified clusters. Cluster: %s", cluster.GetName())
 		},
 		func(shard api.IShard) {
+			w.a.V(1).M(chk).Info("Walking over AP modified shards. Shard: %s", shard.GetName())
 		},
 		func(host *api.Host) {
+			w.a.V(1).M(chk).Info("Walking over AP modified hosts. Host: %s", host.GetName())
 			w.a.V(1).M(chk).Info("Add host as MODIFIED via host. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetModify()
 		},
 	)
 
 	chk.WalkHosts(func(host *api.Host) error {
+		w.a.V(3).M(chk).Info("Walking over CR hosts. Host: %s", host.GetName())
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
-			// Already added
+			w.a.V(3).M(chk).Info("Walking over CR hosts. Host: is already added Host: %s", host.GetName())
 			return nil
 		case host.GetReconcileAttributes().IsModify():
-			// Already modified
+			w.a.V(3).M(chk).Info("Walking over CR hosts. Host: is already modified Host: %s", host.GetName())
 			return nil
 		default:
-			// Not clear yet
+			w.a.V(3).M(chk).Info("Walking over CR hosts. Host: is not clear yet (not detected as added or modified) Host: %s", host.GetName())
 			w.a.V(1).M(chk).Info("Add host as FOUND via host. Host: %s", host.GetName())
 			host.GetReconcileAttributes().SetFound()
 		}
 		return nil
 	})
 
+	// Log hosts statuses
 	chk.WalkHosts(func(host *api.Host) error {
 		switch {
 		case host.GetReconcileAttributes().IsAdd():
@@ -381,7 +393,7 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 }
 
 // createCHIFromObjectMeta
-func (w *worker) createCHIFromObjectMeta(meta meta.Object, isCHI bool, options *commonNormalizer.Options) (*apiChk.ClickHouseKeeperInstallation, error) {
+func (w *worker) createCRFromObjectMeta(meta meta.Object, isCHI bool, options *commonNormalizer.Options) (*apiChk.ClickHouseKeeperInstallation, error) {
 	w.a.V(3).M(meta).S().P()
 	defer w.a.V(3).M(meta).E().P()
 

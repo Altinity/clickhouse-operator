@@ -30,7 +30,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	chkConfig "github.com/altinity/clickhouse-operator/pkg/model/chk/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/action_plan"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -42,18 +42,8 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 		return nil
 	}
 
-	common.LogOldAndNew("non-normalized yet (native)", old, new)
-
-	switch {
-	case w.isGenerationTheSame(old, new):
-		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
-		return nil
-	}
-
 	w.a.M(new).S().P()
 	defer w.a.M(new).E().P()
-
-	w.a.M(new).F().Info("Changing OLD to Normalized COMPLETED: %s", util.NamespaceNameString(new))
 
 	if new.HasAncestor() {
 		log.V(2).M(new).F().Info("has ancestor, use it as a base for reconcile. CR: %s", util.NamespaceNameString(new))
@@ -61,6 +51,14 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 	} else {
 		log.V(2).M(new).F().Info("has NO ancestor, use empty base for reconcile. CR: %s", util.NamespaceNameString(new))
 		old = nil
+	}
+
+	common.LogOldAndNew("non-normalized yet (native)", old, new)
+
+	switch {
+	case w.isGenerationTheSame(old, new):
+		log.V(2).M(new).F().Info("isGenerationTheSame() - nothing to do here, exit")
+		return nil
 	}
 
 	log.V(2).M(new).F().Info("Normalized OLD: %s", util.NamespaceNameString(new))
@@ -252,7 +250,7 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 	configMap := w.task.Creator().CreateConfigMap(
 		interfaces.ConfigMapHost,
 		host,
-		chkConfig.NewFilesGeneratorOptions().
+		config.NewFilesGeneratorOptions().
 			SetHost(host).
 			SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings()),
 	)
@@ -495,7 +493,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
-		//metrics.HostReconcilesErrors(ctx, host.GetCR())
 		w.a.V(1).
 			M(host).F().
 			Warning("Reconcile Host interrupted with an error 2. Host: %s Err: %v", host.GetName(), err)
