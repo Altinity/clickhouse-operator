@@ -37,6 +37,8 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 	switch what {
 	case interfaces.LabelConfigMapCommon:
 		return l.labelConfigMapCRCommon()
+	case interfaces.LabelConfigMapHost:
+		return l.labelConfigMapHost(params...)
 
 	default:
 		return l.Labeler.Label(what, params...)
@@ -54,5 +56,23 @@ func (l *Labeler) labelConfigMapCRCommon() map[string]string {
 		l.GetCRScope(),
 		map[string]string{
 			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommon),
+		})
+}
+
+func (l *Labeler) labelConfigMapHost(params ...any) map[string]string {
+	var host *api.Host
+	if len(params) > 0 {
+		host = params[0].(*api.Host)
+		return l._labelConfigMapHost(host)
+	}
+	panic("not enough params for labeler")
+}
+
+// _labelConfigMapHost
+func (l *Labeler) _labelConfigMapHost(host *api.Host) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.GetHostScope(host, false),
+		map[string]string{
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueHost),
 		})
 }
