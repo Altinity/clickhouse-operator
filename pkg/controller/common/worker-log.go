@@ -25,7 +25,7 @@ import (
 // LogCR writes a CR into the log
 func LogCR(name string, cr api.ICustomResource) {
 	log.V(1).M(cr).Info(
-		"logCHI %s start--------------------------------------------:\n%s\nlogCHI %s end--------------------------------------------",
+		"logCR %s start--------------------------------------------:\n%s\nlogCR %s end--------------------------------------------",
 		name,
 		name,
 		cr.YAML(types.CopyCROptions{SkipStatus: true, SkipManagedFields: true}),

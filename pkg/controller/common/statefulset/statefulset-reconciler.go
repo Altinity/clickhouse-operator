@@ -94,16 +94,22 @@ func (r *Reconciler) getStatefulSetStatus(host *api.Host) api.ObjectStatus {
 	r.a.V(2).M(new).S().Info(util.NamespaceNameString(new))
 	defer r.a.V(2).M(new).E().Info(util.NamespaceNameString(new))
 
+	r.a.V(2).M(new).Info("host sts preamble: ancestor: %t cnt: %d added: %d",
+		host.HasAncestor(),
+		host.GetCR().IEnsureStatus().GetHostsCount(),
+		host.GetCR().IEnsureStatus().GetHostsAddedCount(),
+	)
+
 	curStatefulSet, err := r.sts.Get(context.TODO(), new)
 	switch {
 	case curStatefulSet != nil:
-		r.a.V(2).M(new).Info("Have StatefulSet available, try to perform label-based comparison for: %s", util.NamespaceNameString(new))
+		r.a.V(2).M(new).Info("Have StatefulSet available, try to perform label-based comparison for sts: %s", util.NamespaceNameString(new))
 		return common.GetObjectStatusFromMetas(r.labeler, curStatefulSet, new)
 
 	case apiErrors.IsNotFound(err):
 		// StatefulSet is not found at the moment.
 		// However, it may be just deleted
-		r.a.V(2).M(new).Info("No cur StatefulSet available and it is not found. Either new one or deleted for: %s", util.NamespaceNameString(new))
+		r.a.V(2).M(new).Info("No cur StatefulSet available and the reason is - not found. Either new one or a deleted sts: %s", util.NamespaceNameString(new))
 		if host.IsNewOne() {
 			r.a.V(2).M(new).Info("No cur StatefulSet available and it is not found and is a new one. New one for: %s", util.NamespaceNameString(new))
 			return api.ObjectStatusNew
