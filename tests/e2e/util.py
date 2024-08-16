@@ -109,7 +109,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
             "zookeeper": "zookeeper",
             "zookeeper-operator": "zookeeper",
             "clickhouse-keeper": "clickhouse-keeper",
-            "CHK": "clickhouse-keeper"
+            "CHK": "chk-clickhouse-keeper-test-only-0"
         }
         assert (
             docs_count == expected_docs[keeper_type]
@@ -117,10 +117,10 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         with Given(f"Install {keeper_type} {keeper_nodes} nodes"):
             kubectl.apply(get_full_path(keeper_manifest, lookup_in_host=False))
             for pod_num in range(keeper_nodes):
-                kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}", retries=10)
+                kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}-0", retries=10)
             for pod_num in range(keeper_nodes):
-                kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running")
-                kubectl.wait_container_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "true")
+                kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}-0", "Running")
+                kubectl.wait_container_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}-0", "true")
 
 
 def wait_clickhouse_cluster_ready(chi):

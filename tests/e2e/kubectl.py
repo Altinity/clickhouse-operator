@@ -83,6 +83,28 @@ def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
             )
 
 
+def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
+    with When(f"Delete chk {chk}"):
+        launch(
+            f"delete chk {chk} -v 5 --now --timeout=600s",
+            ns=ns,
+            timeout=600,
+            ok_to_fail=ok_to_fail,
+            shell=shell
+        )
+        if wait:
+            wait_objects(
+                chk,
+                {
+                    "statefulset": 0,
+                    "pod": 0,
+                    "service": 0,
+                },
+                ns,
+                shell=shell
+            )
+
+
 def delete_all_chi(ns=None):
     crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
     if "clickhouseinstallations.clickhouse.altinity.com" in crds:

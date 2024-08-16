@@ -4691,16 +4691,18 @@ def test_048(self):
     with And("I insert data in the replicated table"):
         clickhouse.query(chi, f"INSERT INTO test_local_048 select * from numbers({numbers})")
 
-    with Then("Check reploicated table on host 0 has all rows"):
+    with Then("Check replicated table on host 0 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-0-0")
         assert out == f"{numbers}", error()
-    with Then("Check reploicated table on host 1 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-1-0-0")
+    with Then("Check replicated table on host 1 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_048", host=f"chi-{chi}-{cluster}-0-1-0")
         assert out == f"{numbers}", error()
 
     with Finally("I clean up"):
         with By("deleting chi"):
             kubectl.delete_chi(chi)
+        with By("deleting chk"):
+            kubectl.delete_chk("clickhouse-keeper")
         with And("deleting test namespace"):
             delete_test_namespace()
 
