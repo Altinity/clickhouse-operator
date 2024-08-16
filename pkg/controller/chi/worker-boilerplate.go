@@ -151,7 +151,7 @@ func (w *worker) processReconcilePod(ctx context.Context, cmd *cmd_queue.Reconci
 }
 
 func (w *worker) processDropDns(ctx context.Context, cmd *cmd_queue.DropDns) error {
-	if chi, err := w.createCHIFromObjectMeta(cmd.Initiator, false, normalizerCommon.NewOptions()); err == nil {
+	if chi, err := w.createCRFromObjectMeta(cmd.Initiator, false, normalizerCommon.NewOptions()); err == nil {
 		w.a.V(2).M(cmd.Initiator).Info("flushing DNS for CHI %s", chi.Name)
 		_ = w.ensureClusterSchemer(chi.FirstHost()).CHIDropDnsCache(ctx, chi)
 	} else {
