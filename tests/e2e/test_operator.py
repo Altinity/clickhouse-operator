@@ -4344,7 +4344,6 @@ def test_044(self):
     with Given("I change operator statefullSet timeout"):
         util.apply_operator_config("manifests/chopconf/low-timeout.yaml")
 
-
     with And("CHI with 1 replica is installed"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -4850,7 +4849,6 @@ def test_050(self):
             delete_test_namespace()
 
 
-
 @TestModule
 @Name("e2e.test_operator")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_APIVersion("1.0"),
@@ -4872,8 +4870,7 @@ def test(self):
                     with Then(f"Delete ns {ns_name}"):
                         util.delete_namespace(namespace = ns_name, delete_chi=True)
 
-
-    # placeholder for selective test running
+    # Placeholder for selective test running
     # run_tests = [test_008, test_009]
     # for t in run_tests:
     #     if callable(t):
