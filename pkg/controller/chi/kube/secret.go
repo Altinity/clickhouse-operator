@@ -38,7 +38,7 @@ func NewSecret(kubeClient kube.Interface, namer interfaces.INameManager) *Secret
 	}
 }
 
-// Get gets Service. Accepted types:
+// Get gets Secret. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
 func (c *Secret) Get(ctx context.Context, obj any) (*core.Secret, error) {

@@ -22,7 +22,6 @@ import (
 	core "k8s.io/api/core/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sLabels "k8s.io/apimachinery/pkg/labels"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
@@ -32,17 +31,13 @@ import (
 
 // getConfigMap gets ConfigMap either by namespaced name or by labels
 // TODO review byNameOnly params
-func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.ConfigMap, error) {
-	get := c.configMapLister.ConfigMaps(meta.GetNamespace()).Get
-	list := c.configMapLister.ConfigMaps(meta.GetNamespace()).List
-	var objects []*core.ConfigMap
-
+func (c *Controller) getConfigMap(ctx context.Context, meta meta.Object, byNameOnly bool) (*core.ConfigMap, error) {
 	// Check whether object with such name already exists
-	obj, err := get(meta.GetName())
+	configMap, err := c.kube.ConfigMap().Get(ctx, meta.GetNamespace(), meta.GetName())
 
-	if (obj != nil) && (err == nil) {
+	if (configMap != nil) && (err == nil) {
 		// Object found by name
-		return obj, nil
+		return configMap, nil
 	}
 
 	if !apiErrors.IsNotFound(err) {
@@ -58,26 +53,28 @@ func (c *Controller) getConfigMap(meta meta.Object, byNameOnly bool) (*core.Conf
 
 	// Try to find by labels
 
-	var selector k8sLabels.Selector
-	if selector, err = chiLabeler.New(nil).MakeSelectorFromObjectMeta(meta); err != nil {
+	set, err := chiLabeler.New(nil).MakeSetFromObjectMeta(meta)
+	if err != nil {
+		return nil, err
+	}
+	opts := controller.NewListOptions(set)
+
+	configMaps, err := c.kube.ConfigMap().List(ctx, meta.GetNamespace(), opts)
+	if err != nil {
 		return nil, err
 	}
 
-	if objects, err = list(selector); err != nil {
-		return nil, err
-	}
-
-	if len(objects) == 0 {
+	if len(configMaps) == 0 {
 		return nil, apiErrors.NewNotFound(apps.Resource("ConfigMap"), meta.GetName())
 	}
 
-	if len(objects) == 1 {
+	if len(configMaps) == 1 {
 		// Exactly one object found by labels
-		return objects[0], nil
+		return &configMaps[0], nil
 	}
 
 	// Too much objects found by labels
-	return nil, fmt.Errorf("too much objects found %d expecting 1", len(objects))
+	return nil, fmt.Errorf("too much objects found %d expecting 1", len(configMaps))
 }
 
 func (c *Controller) createConfigMap(ctx context.Context, cm *core.ConfigMap) error {
@@ -86,8 +83,7 @@ func (c *Controller) createConfigMap(ctx context.Context, cm *core.ConfigMap) er
 		return nil
 	}
 
-	_, err := c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Create(ctx, cm, controller.NewCreateOptions())
-
+	_, err := c.kube.ConfigMap().Create(ctx, cm)
 	return err
 }
 
@@ -97,5 +93,5 @@ func (c *Controller) updateConfigMap(ctx context.Context, cm *core.ConfigMap) (*
 		return nil, nil
 	}
 
-	return c.kubeClient.CoreV1().ConfigMaps(cm.Namespace).Update(ctx, cm, controller.NewUpdateOptions())
+	return c.kube.ConfigMap().Update(ctx, cm)
 }

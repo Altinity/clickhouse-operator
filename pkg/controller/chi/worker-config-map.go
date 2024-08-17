@@ -42,7 +42,7 @@ func (w *worker) reconcileConfigMap(
 	defer w.a.V(2).M(cr).E().P()
 
 	// Check whether this object already exists in k8s
-	curConfigMap, err := w.c.getConfigMap(configMap.GetObjectMeta(), true)
+	curConfigMap, err := w.c.getConfigMap(ctx, configMap.GetObjectMeta(), true)
 
 	if curConfigMap != nil {
 		// We have ConfigMap - try to update it
