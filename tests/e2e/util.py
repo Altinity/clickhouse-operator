@@ -117,10 +117,15 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         with Given(f"Install {keeper_type} {keeper_nodes} nodes"):
             kubectl.apply(get_full_path(keeper_manifest, lookup_in_host=False))
             for pod_num in range(keeper_nodes):
-                kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}-0", retries=10)
+                if keeper_type == "CHK":
+                    pod_name = f"{expected_pod_prefix[keeper_type]}-{pod_num}-0"
+                else:
+                    pod_name = f"{expected_pod_prefix[keeper_type]}-{pod_num}"
+                kubectl.wait_object("pod", pod_name, retries=10)
+
             for pod_num in range(keeper_nodes):
-                kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}-0", "Running")
-                kubectl.wait_container_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}-0", "true")
+                kubectl.wait_pod_status(pod_name, "Running")
+                kubectl.wait_container_status(pod_name, "true")
 
 
 def wait_clickhouse_cluster_ready(chi):

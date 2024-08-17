@@ -67,7 +67,7 @@ func (l *Labeler) GetReclaimPolicy(meta meta.Object) api.PVCReclaimPolicy {
 }
 
 // makeSetFromObjectMeta makes k8sLabels.Set from ObjectMeta
-func (l *Labeler) makeSetFromObjectMeta(meta meta.Object) (k8sLabels.Set, error) {
+func (l *Labeler) MakeSetFromObjectMeta(meta meta.Object) (k8sLabels.Set, error) {
 	// Check mandatory labels are in place
 	if !util.MapHasKeys(meta.GetLabels(), l.Get(LabelNamespace), l.Get(LabelAppName), l.Get(LabelCRName)) {
 		return nil, fmt.Errorf(
@@ -102,7 +102,7 @@ func (l *Labeler) makeSetFromObjectMeta(meta meta.Object) (k8sLabels.Set, error)
 // MakeSelectorFromObjectMeta makes selector from meta
 // TODO review usage
 func (l *Labeler) MakeSelectorFromObjectMeta(meta meta.Object) (k8sLabels.Selector, error) {
-	set, err := l.makeSetFromObjectMeta(meta)
+	set, err := l.MakeSetFromObjectMeta(meta)
 	if err != nil {
 		// Unable to make set
 		return nil, err

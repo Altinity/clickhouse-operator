@@ -344,7 +344,7 @@ def wait_objects(chi, object_counts, ns=None, shell=None, retries=max_retries):
         assert cur_object_counts == object_counts, error()
 
 
-def wait_object(kind, name, label="", count=1, ns=None, retries=max_retries, backoff=5, shell=None):
+def wait_object(kind, name, names=[], label="", count=1, ns=None, retries=max_retries, backoff=5, shell=None):
     with Then(f"{count} {kind}(s) {name} should be created"):
         for i in range(1, retries):
             cur_count = get_count(kind, ns=ns, name=name, label=label, shell=shell)
