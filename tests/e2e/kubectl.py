@@ -369,6 +369,9 @@ def wait_command(command, result, count=1, ns=None, retries=max_retries):
 def wait_chi_status(chi, status, ns=None, retries=max_retries, throw_error=True, shell=None):
     wait_field("chi", chi, ".status.status", status, ns, retries, throw_error=throw_error, shell=shell)
 
+def wait_chk_status(chk, status, ns=None, retries=max_retries, throw_error=True, shell=None):
+    wait_field("chk", chi, ".status.status", status, ns, retries, throw_error=throw_error, shell=shell)
+
 
 def get_chi_status(chi, ns=None):
     get_field("chi", chi, ".status.status", ns)
