@@ -69,6 +69,7 @@ type IKubePod interface {
 	Get(params ...any) (*core.Pod, error)
 	GetAll(obj any) []*core.Pod
 	Update(ctx context.Context, pod *core.Pod) (*core.Pod, error)
+	Delete(ctx context.Context, namespace, name string) error
 }
 
 type IKubePVC interface {
