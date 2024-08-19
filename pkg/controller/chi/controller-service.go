@@ -19,9 +19,9 @@ import (
 	"time"
 
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -30,12 +30,12 @@ func (c *Controller) getService(ctx context.Context, service *core.Service) (*co
 }
 
 func (c *Controller) createService(ctx context.Context, service *core.Service) error {
-	_, err := c.kubeClient.CoreV1().Services(service.Namespace).Create(ctx, service, controller.NewCreateOptions())
+	_, err := c.kube.Service().Create(ctx, service)
 	return err
 }
 
 func (c *Controller) updateService(ctx context.Context, service *core.Service) error {
-	_, err := c.kubeClient.CoreV1().Services(service.GetNamespace()).Update(ctx, service, controller.NewUpdateOptions())
+	_, err := c.kube.Service().Update(ctx, service)
 	return err
 }
 
@@ -47,7 +47,12 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	}
 
 	// Check specified service exists
-	_, err := c.kubeClient.CoreV1().Services(namespace).Get(ctx, name, controller.NewGetOptions())
+	_, err := c.kube.Service().Get(ctx, &core.Service{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+	})
 
 	if err != nil {
 		// No such a service, nothing to delete
@@ -56,7 +61,7 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	}
 
 	// Delete service
-	err = c.kubeClient.CoreV1().Services(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+	err = c.kube.Service().Delete(ctx, namespace, name)
 	if err == nil {
 		log.V(1).M(namespace, name).F().Info("OK delete Service: %s/%s", namespace, name)
 		// TODO fix this properly

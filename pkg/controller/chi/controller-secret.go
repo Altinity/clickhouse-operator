@@ -20,13 +20,12 @@ import (
 	core "k8s.io/api/core/v1"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // getSecret gets secret
 func (c *Controller) getSecret(ctx context.Context, secret *core.Secret) (*core.Secret, error) {
-	return c.kubeClient.CoreV1().Secrets(secret.Namespace).Get(ctx, secret.Name, controller.NewGetOptions())
+	return c.kube.Secret().Get(ctx, secret)
 }
 
 func (c *Controller) createSecret(ctx context.Context, secret *core.Secret) error {
@@ -37,10 +36,10 @@ func (c *Controller) createSecret(ctx context.Context, secret *core.Secret) erro
 		return nil
 	}
 
-	log.V(1).Info("Create Secret %s/%s", secret.Namespace, secret.Name)
-	if _, err := c.kubeClient.CoreV1().Secrets(secret.Namespace).Create(ctx, secret, controller.NewCreateOptions()); err != nil {
+	log.V(1).Info("Create Secret %s", util.NamespacedName(secret))
+	if _, err := c.kube.Secret().Create(ctx, secret); err != nil {
 		// Unable to create StatefulSet at all
-		log.V(1).Error("Create Secret %s/%s failed err:%v", secret.Namespace, secret.Name, err)
+		log.V(1).Error("Create Secret %s failed err: %v", util.NamespacedName(secret), err)
 		return err
 	}
 
