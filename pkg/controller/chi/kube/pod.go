@@ -124,3 +124,7 @@ func (c *Pod) getPodsOfCHI(cr api.ICustomResource) (pods []*core.Pod) {
 	})
 	return pods
 }
+
+func (c *Pod) Delete(ctx context.Context, namespace, name string) error {
+	return c.kubeClient.CoreV1().Pods(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+}

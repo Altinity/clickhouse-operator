@@ -19,6 +19,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -130,4 +131,14 @@ func (c *Pod) getPodsOfCR(cr api.ICustomResource) (pods []*core.Pod) {
 		return nil
 	})
 	return pods
+}
+
+func (c *Pod) Delete(ctx context.Context, namespace, name string) error {
+	pod := &core.Pod{
+		ObjectMeta: meta.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+	}
+	return c.kubeClient.Delete(ctx, pod)
 }
