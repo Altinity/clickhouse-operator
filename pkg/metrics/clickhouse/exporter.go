@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"net/http"
 	"sync"
 	"time"
@@ -30,11 +29,14 @@ import (
 	kube "k8s.io/client-go/kubernetes"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/apis/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	chopAPI "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
 	chiNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	normalizerCommon "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
 
 // Exporter implements prometheus.Collector interface
@@ -152,10 +154,10 @@ func (e *Exporter) newHostFetcher(host *metrics.WatchedHost) *ClickHouseMetricsF
 	switch clusterConnectionParams.Scheme {
 	case api.ChSchemeAuto:
 		switch {
-		case api.IsPortAssigned(host.HTTPPort):
+		case types.IsPortAssigned(host.HTTPPort):
 			clusterConnectionParams.Scheme = "http"
 			clusterConnectionParams.Port = int(host.HTTPPort)
-		case api.IsPortAssigned(host.HTTPSPort):
+		case types.IsPortAssigned(host.HTTPSPort):
 			clusterConnectionParams.Scheme = "https"
 			clusterConnectionParams.Port = int(host.HTTPSPort)
 		}
@@ -392,16 +394,16 @@ func (e *Exporter) DiscoveryWatchedCHIs(kubeClient kube.Interface, chopClient *c
 			continue
 		}
 
-		if !chi.GetStatus().HasNormalizedCHICompleted() {
+		if !chi.GetStatus().HasNormalizedCRCompleted() {
 			log.V(1).Infof("CHI %s/%s is not completed yet, skip it", chi.Namespace, chi.Name)
 			continue
 		}
 
 		log.V(1).Infof("CHI %s/%s is completed, add it", chi.Namespace, chi.Name)
-		normalizer := chiNormalizer.NewNormalizer(func(namespace, name string) (*core.Secret, error) {
+		normalizer := chiNormalizer.New(func(namespace, name string) (*core.Secret, error) {
 			return kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
 		})
-		normalized, _ := normalizer.CreateTemplatedCHI(chi, chiNormalizer.NewOptions())
+		normalized, _ := normalizer.CreateTemplated(chi, normalizerCommon.NewOptions())
 
 		watchedCHI := metrics.NewWatchedCHI(normalized)
 		e.updateWatched(watchedCHI)

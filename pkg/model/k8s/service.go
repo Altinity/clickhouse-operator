@@ -16,17 +16,16 @@ package k8s
 
 import (
 	"fmt"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 
 	core "k8s.io/api/core/v1"
-
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // ServiceSpecVerifyPorts verifies core.ServiceSpec to have reasonable ports specified
 func ServiceSpecVerifyPorts(spec *core.ServiceSpec) error {
 	for i := range spec.Ports {
 		servicePort := &spec.Ports[i]
-		if api.IsPortInvalid(servicePort.Port) {
+		if types.IsPortInvalid(servicePort.Port) {
 			return fmt.Errorf(fmt.Sprintf("incorrect port :%d", servicePort.Port))
 		}
 	}

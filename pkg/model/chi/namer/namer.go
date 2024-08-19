@@ -14,124 +14,92 @@
 
 package namer
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-
-type NameType string
-
-const (
-	NameConfigMapHost                NameType = "ConfigMapHost"
-	NameConfigMapCommon              NameType = "ConfigMapCommon"
-	NameConfigMapCommonUsers         NameType = "NameConfigMapCommonUsers"
-	NameCHIService                   NameType = "NameCHIService"
-	NameCHIServiceFQDN               NameType = "NameCHIServiceFQDN"
-	NameClusterService               NameType = "NameClusterService"
-	NameShardService                 NameType = "NameShardService"
-	NameShard                        NameType = "NameShard"
-	NameReplica                      NameType = "NameReplica"
-	NameHost                         NameType = "NameHost"
-	NameHostTemplate                 NameType = "NameHostTemplate"
-	NameInstanceHostname             NameType = "NameInstanceHostname"
-	NameStatefulSet                  NameType = "NameStatefulSet"
-	NameStatefulSetService           NameType = "NameStatefulSetService"
-	NamePodHostname                  NameType = "NamePodHostname"
-	NameFQDN                         NameType = "NameFQDN"
-	NameFQDNs                        NameType = "NameFQDNs"
-	NamePodHostnameRegexp            NameType = "NamePodHostnameRegexp"
-	NamePod                          NameType = "NamePod"
-	NamePVCNameByVolumeClaimTemplate NameType = "NamePVCNameByVolumeClaimTemplate"
-	NameClusterAutoSecret            NameType = "NameClusterAutoSecret"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
+	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
-type namer struct {
+type Namer struct {
+	commonNamer *commonNamer.Namer
+	macro       interfaces.IMacro
 }
 
 // New creates new namer with specified context
-func New() *namer {
-	return &namer{}
-}
-
-func (n *namer) Names(what NameType, params ...any) []string {
-	switch what {
-	case NameFQDNs:
-		obj := params[0]
-		scope := params[1]
-		excludeSelf := params[2].(bool)
-		return createFQDNs(obj, scope, excludeSelf)
+func New() *Namer {
+	me := commonMacro.New(macro.List)
+	return &Namer{
+		commonNamer: commonNamer.New(me),
+		macro:       me,
 	}
-	panic("unknown names type")
 }
 
-func (n *namer) Name(what NameType, params ...any) string {
+func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	switch what {
-	case NameConfigMapHost:
+	case interfaces.NameConfigMapHost:
 		host := params[0].(*api.Host)
-		return createConfigMapHostName(host)
-	case NameConfigMapCommon:
+		return n.createConfigMapNameHost(host)
+	case interfaces.NameConfigMapCommon:
 		cr := params[0].(api.ICustomResource)
-		return createConfigMapCommonName(cr)
-	case NameConfigMapCommonUsers:
+		return n.createConfigMapNameCommon(cr)
+	case interfaces.NameConfigMapCommonUsers:
 		cr := params[0].(api.ICustomResource)
-		return createConfigMapCommonUsersName(cr)
-	case NameCHIService:
+		return n.createConfigMapNameCommonUsers(cr)
+
+	case interfaces.NameCRService:
 		cr := params[0].(api.ICustomResource)
-		return createCHIServiceName(cr)
-	case NameCHIServiceFQDN:
+		return n.createCRServiceName(cr)
+	case interfaces.NameCRServiceFQDN:
 		cr := params[0].(api.ICustomResource)
-		namespaceDomainPattern := params[1].(*api.String)
-		return createCHIServiceFQDN(cr, namespaceDomainPattern)
-	case NameClusterService:
+		namespaceDomainPattern := params[1].(*types.String)
+		return n.createCRServiceFQDN(cr, namespaceDomainPattern)
+	case interfaces.NameClusterService:
 		cluster := params[0].(api.ICluster)
-		return createClusterServiceName(cluster)
-	case NameShardService:
+		return n.createClusterServiceName(cluster)
+	case interfaces.NameShardService:
 		shard := params[0].(api.IShard)
-		return createShardServiceName(shard)
-	case NameShard:
-		shard := params[0].(api.IShard)
-		index := params[1].(int)
-		return createShardName(shard, index)
-	case NameReplica:
-		replica := params[0].(api.IReplica)
-		index := params[1].(int)
-		return createReplicaName(replica, index)
-	case NameHost:
+		return n.createShardServiceName(shard)
+	case interfaces.NameInstanceHostname:
 		host := params[0].(*api.Host)
-		shard := params[1].(api.IShard)
-		shardIndex := params[2].(int)
-		replica := params[3].(api.IReplica)
-		replicaIndex := params[4].(int)
-		return createHostName(host, shard, shardIndex, replica, replicaIndex)
-	case NameHostTemplate:
+		return n.createInstanceHostname(host)
+	case interfaces.NameStatefulSet:
 		host := params[0].(*api.Host)
-		return createHostTemplateName(host)
-	case NameInstanceHostname:
+		return n.createStatefulSetName(host)
+	case interfaces.NameStatefulSetService:
 		host := params[0].(*api.Host)
-		return createInstanceHostname(host)
-	case NameStatefulSet:
+		return n.createStatefulSetServiceName(host)
+	case interfaces.NamePodHostname:
 		host := params[0].(*api.Host)
-		return createStatefulSetName(host)
-	case NameStatefulSetService:
+		return n.createPodHostname(host)
+	case interfaces.NameFQDN:
 		host := params[0].(*api.Host)
-		return createStatefulSetServiceName(host)
-	case NamePodHostname:
-		host := params[0].(*api.Host)
-		return createPodHostname(host)
-	case NameFQDN:
-		host := params[0].(*api.Host)
-		return createFQDN(host)
-	case NamePodHostnameRegexp:
-		cr := params[0].(api.ICustomResource)
-		template := params[1].(string)
-		return createPodHostnameRegexp(cr, template)
-	case NamePod:
-		return createPodName(params[0])
-	case NamePVCNameByVolumeClaimTemplate:
+		return n.createFQDN(host)
+	case interfaces.NamePod:
+		return n.createPodName(params[0])
+	case interfaces.NamePVCNameByVolumeClaimTemplate:
 		host := params[0].(*api.Host)
 		volumeClaimTemplate := params[1].(*api.VolumeClaimTemplate)
-		return createPVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
-	case NameClusterAutoSecret:
-		cluster := params[0].(api.ICluster)
-		return createClusterAutoSecretName(cluster)
+		return n.createPVCNameByVolumeClaimTemplate(host, volumeClaimTemplate)
+
+	default:
+		return n.commonNamer.Name(what, params...)
 	}
 
 	panic("unknown name type")
+}
+
+func (n *Namer) Names(what interfaces.NameType, params ...any) []string {
+	switch what {
+	case interfaces.NameFQDNs:
+		obj := params[0]
+		scope := params[1]
+		excludeSelf := params[2].(bool)
+		return n.createFQDNs(obj, scope, excludeSelf)
+	default:
+		return n.commonNamer.Names(what, params...)
+	}
+	panic("unknown names type")
 }

@@ -14,26 +14,66 @@
 
 package v1
 
+import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+)
+
+// ChiShard defines item of a shard section of .spec.configuration.clusters[n].shards
+// TODO unify with ChiReplica based on HostsSet
+type ChiShard struct {
+	Name                string            `json:"name,omitempty"                yaml:"name,omitempty"`
+	Weight              *int              `json:"weight,omitempty"              yaml:"weight,omitempty"`
+	InternalReplication *types.StringBool `json:"internalReplication,omitempty" yaml:"internalReplication,omitempty"`
+	Settings            *Settings         `json:"settings,omitempty"            yaml:"settings,omitempty"`
+	Files               *Settings         `json:"files,omitempty"               yaml:"files,omitempty"`
+	Templates           *TemplatesList    `json:"templates,omitempty"           yaml:"templates,omitempty"`
+	ReplicasCount       int               `json:"replicasCount,omitempty"       yaml:"replicasCount,omitempty"`
+	// TODO refactor into map[string]Host
+	Hosts []*Host `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+
+	Runtime ChiShardRuntime `json:"-" yaml:"-"`
+
+	// DefinitionType is DEPRECATED - to be removed soon
+	DefinitionType string `json:"definitionType,omitempty" yaml:"definitionType,omitempty"`
+}
+
+type ChiShardRuntime struct {
+	Address ChiShardAddress         `json:"-" yaml:"-"`
+	CHI     *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+}
+
+func (r *ChiShardRuntime) GetAddress() IShardAddress {
+	return &r.Address
+}
+
+func (r *ChiShardRuntime) GetCR() ICustomResource {
+	return r.CHI
+}
+
+func (r *ChiShardRuntime) SetCR(cr ICustomResource) {
+	r.CHI = cr.(*ClickHouseInstallation)
+}
+
 func (shard *ChiShard) GetName() string {
 	return shard.Name
 }
 
-func (shard *ChiShard) GetInternalReplication() *StringBool {
+func (shard *ChiShard) GetInternalReplication() *types.StringBool {
 	return shard.InternalReplication
 }
 
 // InheritSettingsFrom inherits settings from specified cluster
-func (shard *ChiShard) InheritSettingsFrom(cluster *Cluster) {
+func (shard *ChiShard) InheritSettingsFrom(cluster *ChiCluster) {
 	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
 }
 
 // InheritFilesFrom inherits files from specified cluster
-func (shard *ChiShard) InheritFilesFrom(cluster *Cluster) {
+func (shard *ChiShard) InheritFilesFrom(cluster *ChiCluster) {
 	shard.Files = shard.Files.MergeFrom(cluster.Files)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
-func (shard *ChiShard) InheritTemplatesFrom(cluster *Cluster) {
+func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
 	shard.Templates = shard.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
 	shard.Templates.HandleDeprecatedFields()
 }
@@ -70,6 +110,22 @@ func (shard *ChiShard) WalkHosts(f func(host *Host) error) []error {
 	}
 
 	return res
+}
+
+// WalkHosts runs specified function on each host
+func (shard *ChiShard) WalkHostsAbortOnError(f func(host *Host) error) error {
+	if shard == nil {
+		return nil
+	}
+
+	for replicaIndex := range shard.Hosts {
+		host := shard.Hosts[replicaIndex]
+		if err := f(host); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // FindHost finds host by name or index.
@@ -119,8 +175,8 @@ func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 }
 
 // GetCluster gets cluster of the shard
-func (shard *ChiShard) GetCluster() *Cluster {
-	return shard.Runtime.CHI.GetSpec().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
+func (shard *ChiShard) GetCluster() *ChiCluster {
+	return shard.Runtime.CHI.GetSpecT().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 
 // HasWeight checks whether shard has applicable weight value specified
@@ -142,10 +198,100 @@ func (shard *ChiShard) GetWeight() int {
 	return 0
 }
 
-type IShardRuntime interface {
-	GetAddress() IShardAddress
+func (shard *ChiShard) GetRuntime() IShardRuntime {
+	if shard == nil {
+		return (*ChiShardRuntime)(nil)
+	}
+	return &shard.Runtime
 }
 
-func (shard *ChiShard) GetRuntime() IShardRuntime {
-	return shard.Runtime
+func (shard *ChiShard) HasSettings() bool {
+	return shard.GetSettings() != nil
+}
+
+func (shard *ChiShard) GetSettings() *Settings {
+	if shard == nil {
+		return nil
+	}
+	return shard.Settings
+}
+
+func (shard *ChiShard) HasFiles() bool {
+	return shard.GetFiles() != nil
+}
+
+func (shard *ChiShard) GetFiles() *Settings {
+	if shard == nil {
+		return nil
+	}
+	return shard.Files
+}
+
+func (shard *ChiShard) HasTemplates() bool {
+	return shard.GetTemplates() != nil
+}
+
+func (shard *ChiShard) GetTemplates() *TemplatesList {
+	if shard == nil {
+		return nil
+	}
+	return shard.Templates
+}
+
+// ChiShardAddress defines address of a shard within ClickHouseInstallation
+type ChiShardAddress struct {
+	Namespace    string `json:"namespace,omitempty"    yaml:"namespace,omitempty"`
+	CHIName      string `json:"chiName,omitempty"      yaml:"chiName,omitempty"`
+	ClusterName  string `json:"clusterName,omitempty"  yaml:"clusterName,omitempty"`
+	ClusterIndex int    `json:"clusterIndex,omitempty" yaml:"clusterIndex,omitempty"`
+	ShardName    string `json:"shardName,omitempty"    yaml:"shardName,omitempty"`
+	ShardIndex   int    `json:"shardIndex,omitempty"   yaml:"shardIndex,omitempty"`
+}
+
+func (a *ChiShardAddress) GetNamespace() string {
+	return a.Namespace
+}
+
+func (a *ChiShardAddress) SetNamespace(namespace string) {
+	a.Namespace = namespace
+}
+
+func (a *ChiShardAddress) GetCRName() string {
+	return a.CHIName
+}
+
+func (a *ChiShardAddress) SetCRName(name string) {
+	a.CHIName = name
+}
+
+func (a *ChiShardAddress) GetClusterName() string {
+	return a.ClusterName
+}
+
+func (a *ChiShardAddress) SetClusterName(name string) {
+	a.ClusterName = name
+}
+
+func (a *ChiShardAddress) GetClusterIndex() int {
+	return a.ClusterIndex
+}
+
+func (a *ChiShardAddress) SetClusterIndex(index int) {
+	a.ClusterIndex = index
+}
+
+func (a *ChiShardAddress) GetShardName() string {
+	return a.ShardName
+}
+
+func (a *ChiShardAddress) SetShardName(name string) {
+	a.ShardName = name
+}
+
+func (a *ChiShardAddress) GetShardIndex() int {
+	return a.ShardIndex
+}
+
+func (a *ChiShardAddress) SetShardIndex(index int) {
+	a.ShardIndex = index
 }

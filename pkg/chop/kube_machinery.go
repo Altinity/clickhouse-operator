@@ -16,7 +16,6 @@ package chop
 
 import (
 	"fmt"
-	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"os"
 	"os/user"
 	"path/filepath"
@@ -29,6 +28,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	v1 "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	chopclientset "github.com/altinity/clickhouse-operator/pkg/client/clientset/versioned"
 	"github.com/altinity/clickhouse-operator/pkg/version"
 )

@@ -16,10 +16,72 @@ package v1
 
 import (
 	"github.com/imdario/mergo"
+
+	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewChiTemplates creates new Templates object
-func NewChiTemplates() *Templates {
+// Templates defines templates section of .spec
+type Templates struct {
+	// Templates
+	HostTemplates        []HostTemplate        `json:"hostTemplates,omitempty"        yaml:"hostTemplates,omitempty"`
+	PodTemplates         []PodTemplate         `json:"podTemplates,omitempty"         yaml:"podTemplates,omitempty"`
+	VolumeClaimTemplates []VolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" yaml:"volumeClaimTemplates,omitempty"`
+	ServiceTemplates     []ServiceTemplate     `json:"serviceTemplates,omitempty"     yaml:"serviceTemplates,omitempty"`
+
+	// Index maps template name to template itself
+	HostTemplatesIndex        *HostTemplatesIndex        `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	PodTemplatesIndex         *PodTemplatesIndex         `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	VolumeClaimTemplatesIndex *VolumeClaimTemplatesIndex `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+	ServiceTemplatesIndex     *ServiceTemplatesIndex     `json:",omitempty" yaml:",omitempty" testdiff:"ignore"`
+}
+
+// HostTemplate defines full Host Template
+type HostTemplate struct {
+	Name             string             `json:"name,omitempty"             yaml:"name,omitempty"`
+	PortDistribution []PortDistribution `json:"portDistribution,omitempty" yaml:"portDistribution,omitempty"`
+	Spec             Host               `json:"spec,omitempty"             yaml:"spec,omitempty"`
+}
+
+// PortDistribution defines port distribution
+type PortDistribution struct {
+	Type string `json:"type,omitempty"   yaml:"type,omitempty"`
+}
+
+// PodTemplate defines full Pod Template, directly used by StatefulSet
+type PodTemplate struct {
+	Name            string            `json:"name"                      yaml:"name"`
+	GenerateName    string            `json:"generateName,omitempty"    yaml:"generateName,omitempty"`
+	Zone            PodTemplateZone   `json:"zone,omitempty"            yaml:"zone,omitempty"`
+	PodDistribution []PodDistribution `json:"podDistribution,omitempty" yaml:"podDistribution,omitempty"`
+	ObjectMeta      meta.ObjectMeta   `json:"metadata,omitempty"        yaml:"metadata,omitempty"`
+	Spec            core.PodSpec      `json:"spec,omitempty"            yaml:"spec,omitempty"`
+}
+
+// PodTemplateZone defines pod template zone
+type PodTemplateZone struct {
+	Key    string   `json:"key,omitempty"    yaml:"key,omitempty"`
+	Values []string `json:"values,omitempty" yaml:"values,omitempty"`
+}
+
+// PodDistribution defines pod distribution
+type PodDistribution struct {
+	Type        string `json:"type,omitempty"        yaml:"type,omitempty"`
+	Scope       string `json:"scope,omitempty"       yaml:"scope,omitempty"`
+	Number      int    `json:"number,omitempty"      yaml:"number,omitempty"`
+	TopologyKey string `json:"topologyKey,omitempty" yaml:"topologyKey,omitempty"`
+}
+
+// ServiceTemplate defines CHI service template
+type ServiceTemplate struct {
+	Name         string           `json:"name"                   yaml:"name"`
+	GenerateName string           `json:"generateName,omitempty" yaml:"generateName,omitempty"`
+	ObjectMeta   meta.ObjectMeta  `json:"metadata,omitempty"     yaml:"metadata,omitempty"`
+	Spec         core.ServiceSpec `json:"spec,omitempty"         yaml:"spec,omitempty"`
+}
+
+// NewTemplates creates new Templates object
+func NewTemplates() *Templates {
 	return new(Templates)
 }
 
@@ -84,7 +146,7 @@ func (templates *Templates) MergeFrom(_from any, _type MergeType) *Templates {
 	}
 
 	if templates == nil {
-		templates = NewChiTemplates()
+		templates = NewTemplates()
 	}
 
 	// Merge sections

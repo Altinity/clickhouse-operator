@@ -15,9 +15,8 @@
 package k8s
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	core "k8s.io/api/core/v1"
-
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
 // PodSpecAddContainer adds container to PodSpec
@@ -88,7 +87,7 @@ func ContainerAppendVolumeMount(container *core.Container, volumeMount core.Volu
 
 // ContainerEnsurePortByName
 func ContainerEnsurePortByName(container *core.Container, name string, port int32) {
-	if api.IsPortUnassigned(port) {
+	if types.IsPortUnassigned(port) {
 		return
 	}
 

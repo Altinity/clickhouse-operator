@@ -106,13 +106,13 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "zk_avg_latency{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperAvgLatency{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
           "legendFormat": "avg {{namespace}}.{{pod_name}}",
           "refId": "A"
         },
         {
-          "expr": "zk_max_latency{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperMaxLatency{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
           "legendFormat": "max {{namespace}}.{{pod_name}}",
           "refId": "B"
@@ -206,7 +206,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "zk_num_alive_connections{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseMetrics_KeeperAliveConnections{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "hide": false,
           "interval": "",
           "legendFormat": "{{namespace}}.{{pod_name}}",
@@ -301,14 +301,14 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(zk_packets_sent{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
+          "expr": "irate(ClickHouseAsyncMetrics_KeeperPacketsSent{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
           "hide": false,
           "interval": "",
           "legendFormat": "OUT {{namespace}}.{{pod_name}}",
           "refId": "A"
         },
         {
-          "expr": "-irate(zk_packets_received{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
+          "expr": "-irate(ClickHouseAsyncMetrics_KeeperPacketsReceived{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
           "interval": "",
           "legendFormat": "IN {{namespace}}.{{pod_name}}",
           "refId": "B"
@@ -402,7 +402,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "zk_znode_count{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperZnodeCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
           "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
@@ -496,7 +496,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "zk_watch_count{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperWatchCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
           "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
@@ -590,7 +590,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "zk_ephemerals_count{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperEphemeralsCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
           "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
@@ -684,7 +684,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "zk_approximate_data_size{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperApproximateDataSize{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
           "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
@@ -784,7 +784,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "irate(zk_outstanding_requests{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
+          "expr": "irate(ClickHouseMetrics_KeeperOutstandingRequests{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}[1m])",
           "interval": "",
           "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
@@ -878,7 +878,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "zk_open_file_descriptor_count{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
+          "expr": "ClickHouseAsyncMetrics_KeeperOpenFileDescriptorCount{namespace=~\"$namespace\", pod_name=~\"$pod_name\", container_name=\"clickhouse-keeper\"}",
           "interval": "",
           "legendFormat": "{{namespace}}.{{pod_name}}",
           "refId": "A"
@@ -941,14 +941,14 @@
         "allValue": ".+",
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(zk_ruok, namespace)",
+        "definition": "label_values(up{container_name=\"clickhouse-keeper\"},namespace}",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
         "name": "namespace",
         "options": [],
-        "query": "label_values(zk_ruok, namespace)",
+        "query": "label_values(up{container_name=\"clickhouse-keeper\"},namespace}",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -963,14 +963,14 @@
         "allValue": ".+",
         "current": {},
         "datasource": "${DS_PROMETHEUS}",
-        "definition": "label_values(zk_ruok, pod_name)",
+        "definition": "label_values(up{container_name=\"clickhouse-keeper\"},pod_name}",
         "hide": 0,
         "includeAll": true,
         "label": null,
         "multi": true,
         "name": "pod_name",
         "options": [],
-        "query": "label_values(zk_ruok, pod_name)",
+        "query": "label_values(up{container_name=\"clickhouse-keeper\"},pod_name}",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,

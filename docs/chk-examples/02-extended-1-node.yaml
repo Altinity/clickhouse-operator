@@ -1,7 +1,7 @@
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
-  name: chk-1-node
+  name: single-node
 spec:
   configuration:
     clusters:
@@ -43,7 +43,6 @@ spec:
     volumeClaimTemplates:
       - name: default
         metadata:
-          # NOTE: one volume that will be used for both coordination/snapshots/ and logs/
           name: both-paths
         spec:
           accessModes:

@@ -14,6 +14,11 @@
 
 package v1
 
+// DistributedDDL defines distributedDDL section of .spec.defaults
+type DistributedDDL struct {
+	Profile string `json:"profile,omitempty" yaml:"profile"`
+}
+
 // NewDistributedDDL creates new DistributedDDL
 func NewDistributedDDL() *DistributedDDL {
 	return new(DistributedDDL)

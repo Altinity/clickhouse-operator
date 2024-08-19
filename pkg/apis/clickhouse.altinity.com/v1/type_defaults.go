@@ -14,27 +14,29 @@
 
 package v1
 
-// ChiDefaults defines defaults section of .spec
-type ChiDefaults struct {
-	ReplicasUseFQDN   *StringBool        `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
+import "github.com/altinity/clickhouse-operator/pkg/apis/common/types"
+
+// Defaults defines defaults section of .spec
+type Defaults struct {
+	ReplicasUseFQDN   *types.StringBool  `json:"replicasUseFQDN,omitempty"    yaml:"replicasUseFQDN,omitempty"`
 	DistributedDDL    *DistributedDDL    `json:"distributedDDL,omitempty"     yaml:"distributedDDL,omitempty"`
 	StorageManagement *StorageManagement `json:"storageManagement,omitempty"  yaml:"storageManagement,omitempty"`
 	Templates         *TemplatesList     `json:"templates,omitempty"          yaml:"templates,omitempty"`
 }
 
-// NewChiDefaults creates new ChiDefaults object
-func NewChiDefaults() *ChiDefaults {
-	return new(ChiDefaults)
+// NewDefaults creates new Defaults object
+func NewDefaults() *Defaults {
+	return new(Defaults)
 }
 
 // MergeFrom merges from specified object
-func (defaults *ChiDefaults) MergeFrom(from *ChiDefaults, _type MergeType) *ChiDefaults {
+func (defaults *Defaults) MergeFrom(from *Defaults, _type MergeType) *Defaults {
 	if from == nil {
 		return defaults
 	}
 
 	if defaults == nil {
-		defaults = NewChiDefaults()
+		defaults = NewDefaults()
 	}
 
 	switch _type {

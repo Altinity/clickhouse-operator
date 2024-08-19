@@ -23,6 +23,7 @@ import (
 
 	"gopkg.in/d4l3k/messagediff.v1"
 
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -351,42 +352,52 @@ func (s *Settings) MarshalJSON() ([]byte, error) {
 }
 
 // fetchPort is the base function to fetch *Int32 port value
-func (s *Settings) fetchPort(name string) *Int32 {
+func (s *Settings) fetchPort(name string) *types.Int32 {
 	return s.Get(name).ScalarInt32Ptr()
 }
 
 // GetTCPPort gets TCP port from settings
-func (s *Settings) GetTCPPort() *Int32 {
+func (s *Settings) GetTCPPort() *types.Int32 {
 	return s.fetchPort("tcp_port")
 }
 
 // GetTCPPortSecure gets TCP port secure from settings
-func (s *Settings) GetTCPPortSecure() *Int32 {
+func (s *Settings) GetTCPPortSecure() *types.Int32 {
 	return s.fetchPort("tcp_port_secure")
 }
 
 // GetHTTPPort gets HTTP port from settings
-func (s *Settings) GetHTTPPort() *Int32 {
+func (s *Settings) GetHTTPPort() *types.Int32 {
 	return s.fetchPort("http_port")
 }
 
 // GetHTTPSPort gets HTTPS port from settings
-func (s *Settings) GetHTTPSPort() *Int32 {
+func (s *Settings) GetHTTPSPort() *types.Int32 {
 	return s.fetchPort("https_port")
 }
 
 // GetInterserverHTTPPort gets interserver HTTP port from settings
-func (s *Settings) GetInterserverHTTPPort() *Int32 {
+func (s *Settings) GetInterserverHTTPPort() *types.Int32 {
 	return s.fetchPort("interserver_http_port")
 }
 
-// MergeFrom merges into `dst` non-empty new-key-values from `src` in case no such `key` already in `src`
-func (s *Settings) MergeFrom(src *Settings) *Settings {
-	if src.Len() == 0 {
+// GetZKPort gets Zookeeper port from settings
+func (s *Settings) GetZKPort() *types.Int32 {
+	return s.fetchPort("keeper_server/tcp_port")
+}
+
+// GetRaftPort gets Raft port from settings
+func (s *Settings) GetRaftPort() *types.Int32 {
+	return s.fetchPort("keeper_server/raft_configuration/server/port")
+}
+
+// MergeFrom merges into `dst` non-empty new-key-values from `from` in case no such `key` already in `src`
+func (s *Settings) MergeFrom(from *Settings) *Settings {
+	if from.Len() == 0 {
 		return s
 	}
 
-	src.Walk(func(name string, value *Setting) {
+	from.Walk(func(name string, value *Setting) {
 		s = s.Ensure().SetIfNotExists(name, value)
 	})
 
@@ -416,7 +427,7 @@ func (s *Settings) GetSection(section SettingsSection, includeSettingWithNoSecti
 	}
 
 	s.WalkKeys(func(key string, setting *Setting) {
-		_section, err := getSectionFromPath(key)
+		_section, err := GetSectionFromPath(key)
 		switch {
 		case (err == nil) && !_section.Equal(section):
 			// Section is specified in this key.
@@ -467,7 +478,7 @@ func (s *Settings) Filter(
 	}
 
 	s.WalkKeys(func(key string, _ *Setting) {
-		section, err := getSectionFromPath(key)
+		section, err := GetSectionFromPath(key)
 
 		if (err != nil) && (err != errorNoSectionSpecified) {
 			// We have a complex error, skip to the next
@@ -602,8 +613,8 @@ func getSuffixFromPath(path string) (string, error) {
 	return suffix, nil
 }
 
-// getSectionFromPath
-func getSectionFromPath(path string) (SettingsSection, error) {
+// GetSectionFromPath
+func GetSectionFromPath(path string) (SettingsSection, error) {
 	// String representation of the section
 	section, err := getPrefixFromPath(path)
 	if err != nil {

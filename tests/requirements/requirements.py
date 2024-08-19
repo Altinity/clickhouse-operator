@@ -1,6 +1,6 @@
 # These requirements were auto generated
 # from software requirements specification (SRS)
-# document by TestFlows v2.0.230917.1131314.
+# document by TestFlows v2.0.240111.1210833.
 # Do not edit by hand but re-generate instead
 # using 'tfs requirements generate' command.
 from testflows.core import Specification
@@ -1736,6 +1736,329 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseOperatorConfiguratio
     num='4.32.4'
 )
 
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support creating clickhouse-keeper cluster by specifying \n'
+        '`ClickHouseKeeperInstallation` custom resource.\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.1'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Replicas = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Replicas',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL provide support to define number of replicas of clickhouse-keeper \n'
+        'instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.replicas` object.\n'
+        '\n'
+        'The user SHALL be able to increase and decrease number of replicas.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  replicas: 3\n'
+        '```\n'
+        '\n'
+        'By default, the number of replicas should be 1.\n'
+        '\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.2'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Logger = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Logger',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL provide support to define the following settings related to logger of clickhouse-keeper\n'
+        'instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:\n'
+        ' * `logger/level`\n'
+        ' * `logger/console`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '      settings:\n'
+        '        logger/level: "trace"\n'
+        '        logger/console: "true"\n'
+        '```\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.3'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Listen_host = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Listen_host',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL provide support to define the listen port of clickhouse-keeper\n'
+        'instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:\n'
+        ' * `listen_host`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '      settings:\n'
+        '        listen_host: "0.0.0.0"\n'
+        '```\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.4'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Keeper_server = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Keeper_server',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL provide support to define the following settings of clickhouse-keeper server\n'
+        'instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:\n'
+        ' * `keeper_server/storage_path`\n'
+        ' * `keeper_server/tcp_port`\n'
+        ' * `keeper_server/four_letter_word_white_list`\n'
+        ' * `keeper_server/coordination_settings/raft_logs_level`\n'
+        ' * `keeper_server/coordination_settings/raft_logs_level`\n'
+        ' * `keeper_server/raft_configuration/server/port`.\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '      settings:\n'
+        '        keeper_server/storage_path: /var/lib/clickhouse-keeper\n'
+        '        keeper_server/tcp_port: "2181"\n'
+        '        keeper_server/four_letter_word_white_list: "*"\n'
+        '        keeper_server/coordination_settings/raft_logs_level: "information"\n'
+        '        keeper_server/raft_configuration/server/port: "9444"\n'
+        '```\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.5'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Prometheus = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Prometheus',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL provide support to define the following settings related to prometheus of clickhouse-keeper\n'
+        'instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:\n'
+        ' * `prometheus/endpoint`\n'
+        ' * `prometheus/port`\n'
+        ' * `prometheus/metrics`\n'
+        ' * `prometheus/events`\n'
+        ' * `prometheus/asynchronous_metrics`\n'
+        ' * `prometheus/status_info`.\n'
+        '\n'
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  configuration:\n'
+        '      settings:\n'
+        '        prometheus/endpoint: "/metrics"\n'
+        '        prometheus/port: "7000"\n'
+        '        prometheus/metrics: "true"\n'
+        '        prometheus/events: "true"\n'
+        '        prometheus/asynchronous_metrics: "true"\n'
+        '        prometheus/status_info: "false"\n'
+        '```\n'
+        '\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.6'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_PodTemplates = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.PodTemplates',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support `.spec.templates.podTemplates` property for the `ClickHouseKeeperInstallation` \n'
+        "resource manifest that SHALL allow customization of clickhouse-keeper `Pod`'s configuration.\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    podTemplates:\n'
+        '      - name: pod1\n'
+        '        metadata:\n'
+        '          labels:\n'
+        '            app: clickhouse-keeper\n'
+        '            what: node\n'
+        '        spec:\n'
+        '          affinity:\n'
+        '            podAntiAffinity:\n'
+        '              preferredDuringSchedulingIgnoredDuringExecution:\n'
+        '                - weight: 50\n'
+        '                  podAffinityTerm:\n'
+        '                    labelSelector:\n'
+        '                      matchExpressions:\n'
+        '                        - key: "app"\n'
+        '                          operator: In\n'
+        '                          values:\n'
+        '                            - clickhouse-keeper\n'
+        '                    topologyKey: "kubernetes.io/hostname"\n'
+        '          containers:\n'
+        '            - name: clickhouse-keeper\n'
+        '              imagePullPolicy: IfNotPresent\n'
+        '              image: "clickhouse/clickhouse-keeper:head-alpine"\n'
+        '              resources:\n'
+        '                requests:\n'
+        '                  memory: "256M"\n'
+        '                  cpu: "1"\n'
+        '                limits:\n'
+        '                  memory: "4Gi"\n'
+        '                  cpu: "2"\n'
+        '```\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.7'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.volumeClaimTemplates',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support `.spec.templates.volumeClaimTemplates` property for the `ClickHouseKeeperInstallation` \n'
+        "resource manifest that SHALL allow customization of clickhouse-keeper `PVC`'s configuration.\n"
+        '\n'
+        'For example,\n'
+        '\n'
+        '```yaml\n'
+        'spec:\n'
+        '  templates:\n'
+        '    volumeClaimTemplates:\n'
+        '      - name: t1\n'
+        '        metadata:\n'
+        '          name: both-paths\n'
+        '        spec:\n'
+        '          accessModes:\n'
+        '            - ReadWriteOnce\n'
+        '          resources:\n'
+        '            requests:\n'
+        '              storage: 25Gi\n'
+        '```\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.8'
+)
+
+RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Connection = Requirement(
+    name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Connection',
+    version='1.0',
+    priority=None,
+    group=None,
+    type=None,
+    uid=None,
+    description=(
+        '[ClickHouse Operator] SHALL support connecting clickhouse server to clickhouse-keeper, \n'
+        'using service that can be used in `ClickHouseInstallation` resource manifest that defines clickhouse cluster configuration.\n'
+        '\n'
+        'For example, \n'
+        '\n'
+        '```yaml\n'
+        'apiVersion: v1\n'
+        'kind: Service\n'
+        'metadata:\n'
+        '  name: clickhouse-keeper\n'
+        '  labels:\n'
+        '    app: clickhouse-keeper\n'
+        'spec:\n'
+        '  ports:\n'
+        '    - port: 2181\n'
+        '      name: client\n'
+        '    - port: 7000\n'
+        '      name: prometheus\n'
+        '  selector:\n'
+        '    app: clickhouse-keeper\n'
+        '    what: node\n'
+        '```\n'
+        '\n'
+        '```yaml\n'
+        'apiVersion: "clickhouse.altinity.com/v1"\n'
+        'kind: "ClickHouseInstallation"\n'
+        'metadata:\n'
+        '  name: clickhouse-with-clickhouse-keeper\n'
+        'spec:\n'
+        '  useTemplates:\n'
+        '    - name: clickhouse-version\n'
+        '  configuration:\n'
+        '    zookeeper:\n'
+        '      nodes:\n'
+        '        - host: clickhouse-keeper\n'
+        '          port: 2181\n'
+        '    clusters:\n'
+        '      - name: default\n'
+        '        layout:\n'
+        '          shardsCount: 2\n'
+        '          replicasCount: 1\n'
+        '```\n'
+        '\n'
+        '\n'
+    ),
+    link=None,
+    level=3,
+    num='4.33.9'
+)
+
 RQ_SRS_026_ClickHouseOperator_CustomResource_Metadata = Requirement(
     name='RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata',
     version='1.0',
@@ -1757,7 +2080,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Metadata = Requirement(
     ),
     link=None,
     level=3,
-    num='4.33.1'
+    num='4.34.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec = Requirement(
@@ -1781,7 +2104,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec = Requirement(
     ),
     link=None,
     level=3,
-    num='4.34.1'
+    num='4.35.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_TaskID = Requirement(
@@ -1801,7 +2124,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_TaskID = Requirement(
     ),
     link=None,
     level=3,
-    num='4.35.1'
+    num='4.36.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Stop = Requirement(
@@ -1833,7 +2156,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Stop = Requirement(
     ),
     link=None,
     level=3,
-    num='4.36.1'
+    num='4.37.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Restart = Requirement(
@@ -1862,7 +2185,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Restart = Requirement(
     ),
     link=None,
     level=3,
-    num='4.37.1'
+    num='4.38.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Troubleshoot = Requirement(
@@ -1889,7 +2212,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Troubleshoot = Requirement(
     ),
     link=None,
     level=3,
-    num='4.38.1'
+    num='4.39.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_NamespaceDomainPattern = Requirement(
@@ -1914,7 +2237,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_NamespaceDomainPattern = Requi
     ),
     link=None,
     level=3,
-    num='4.39.1'
+    num='4.40.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating = Requirement(
@@ -1943,7 +2266,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templating = Requirement(
     ),
     link=None,
     level=3,
-    num='4.40.1'
+    num='4.41.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ReconcilingCycle = Requirement(
@@ -1961,7 +2284,7 @@ RQ_SRS_026_ClickHouseOperator_ReconcilingCycle = Requirement(
     ),
     link=None,
     level=3,
-    num='4.41.1'
+    num='4.42.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ReconcilingCycle_ApplyingConfigMapsBeforeStatefulSets = Requirement(
@@ -1977,7 +2300,7 @@ RQ_SRS_026_ClickHouseOperator_ReconcilingCycle_ApplyingConfigMapsBeforeStatefulS
     ),
     link=None,
     level=4,
-    num='4.41.2.1'
+    num='4.42.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling = Requirement(
@@ -2000,7 +2323,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling = Requirement(
     ),
     link=None,
     level=4,
-    num='4.41.3.1'
+    num='4.42.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy = Requirement(
@@ -2025,7 +2348,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Policy = Requireme
     ),
     link=None,
     level=4,
-    num='4.41.4.1'
+    num='4.42.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_ConfigMapPropagationTimeout = Requirement(
@@ -2054,7 +2377,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_ConfigMapPropagati
     ),
     link=None,
     level=4,
-    num='4.41.5.1'
+    num='4.42.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup = Requirement(
@@ -2079,7 +2402,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup = Requirem
     ),
     link=None,
     level=4,
-    num='4.41.6.1'
+    num='4.42.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup_UnknownObjects = Requirement(
@@ -2126,7 +2449,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup_UnknownObj
     ),
     link=None,
     level=4,
-    num='4.41.7.1'
+    num='4.42.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup_ReconcileFailedObjects = Requirement(
@@ -2159,7 +2482,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Reconciling_Cleanup_ReconcileF
     ),
     link=None,
     level=4,
-    num='4.41.8.1'
+    num='4.42.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults = Requirement(
@@ -2184,7 +2507,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults = Requirement(
     ),
     link=None,
     level=4,
-    num='4.42.8.1'
+    num='4.43.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_StorageManagementProvisioner = Requirement(
@@ -2214,7 +2537,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_StorageManagementProv
     ),
     link=None,
     level=4,
-    num='4.42.9.1'
+    num='4.43.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_ReplicasUseFQDN = Requirement(
@@ -2244,7 +2567,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_ReplicasUseFQDN = Req
     ),
     link=None,
     level=4,
-    num='4.42.10.1'
+    num='4.43.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_DistributedDDL = Requirement(
@@ -2274,7 +2597,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_DistributedDDL = Requ
     ),
     link=None,
     level=4,
-    num='4.42.11.1'
+    num='4.43.11.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates = Requirement(
@@ -2301,7 +2624,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates = Requireme
     ),
     link=None,
     level=4,
-    num='4.42.12.1'
+    num='4.43.12.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_HostTemplate = Requirement(
@@ -2329,7 +2652,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_HostTemplat
     ),
     link=None,
     level=5,
-    num='4.42.12.2.1'
+    num='4.43.12.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_PodTemplate = Requirement(
@@ -2357,7 +2680,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_PodTemplate
     ),
     link=None,
     level=5,
-    num='4.42.12.3.1'
+    num='4.43.12.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_dataVolumeClaimTemplate = Requirement(
@@ -2386,7 +2709,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_dataVolumeC
     ),
     link=None,
     level=5,
-    num='4.42.12.4.1'
+    num='4.43.12.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_logVolumeClaimTemplate = Requirement(
@@ -2417,7 +2740,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_logVolumeCl
     ),
     link=None,
     level=5,
-    num='4.42.12.5.1'
+    num='4.43.12.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ServiceTemplate = Requirement(
@@ -2445,7 +2768,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ServiceTemp
     ),
     link=None,
     level=5,
-    num='4.42.12.6.1'
+    num='4.43.12.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ClusterServiceTemplate = Requirement(
@@ -2474,7 +2797,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ClusterServ
     ),
     link=None,
     level=5,
-    num='4.42.12.7.1'
+    num='4.43.12.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ShardServiceTemplate = Requirement(
@@ -2502,7 +2825,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ShardServic
     ),
     link=None,
     level=5,
-    num='4.42.12.8.1'
+    num='4.43.12.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ReplicaServiceTemplate = Requirement(
@@ -2531,7 +2854,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_ReplicaServ
     ),
     link=None,
     level=5,
-    num='4.42.12.9.1'
+    num='4.43.12.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_VolumeClaimTemplate = Requirement(
@@ -2549,7 +2872,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Defaults_Templates_VolumeClaim
     ),
     link=None,
     level=5,
-    num='4.42.12.10.1'
+    num='4.43.12.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration = Requirement(
@@ -2575,7 +2898,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration = Requirement(
     ),
     link=None,
     level=3,
-    num='4.43.1'
+    num='4.44.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper = Requirement(
@@ -2605,7 +2928,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper = Requ
     ),
     link=None,
     level=4,
-    num='4.43.2.1'
+    num='4.44.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Nodes = Requirement(
@@ -2644,7 +2967,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Nodes 
     ),
     link=None,
     level=5,
-    num='4.43.2.2.1'
+    num='4.44.2.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_SessionTimeoutMs = Requirement(
@@ -2671,7 +2994,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Sessio
     ),
     link=None,
     level=5,
-    num='4.43.2.3.1'
+    num='4.44.2.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_OperationTimeoutMs = Requirement(
@@ -2698,7 +3021,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Operat
     ),
     link=None,
     level=5,
-    num='4.43.2.4.1'
+    num='4.44.2.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Root = Requirement(
@@ -2725,7 +3048,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Root =
     ),
     link=None,
     level=5,
-    num='4.43.2.5.1'
+    num='4.44.2.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Identify = Requirement(
@@ -2752,7 +3075,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_ZooKeeper_Identi
     ),
     link=None,
     level=5,
-    num='4.43.2.6.1'
+    num='4.44.2.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Users = Requirement(
@@ -2799,7 +3122,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Users = Requirem
     ),
     link=None,
     level=4,
-    num='4.43.3.1'
+    num='4.44.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Profiles = Requirement(
@@ -2834,7 +3157,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Profiles = Requi
     ),
     link=None,
     level=4,
-    num='4.43.4.1'
+    num='4.44.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Quotas = Requirement(
@@ -2869,7 +3192,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Quotas = Require
     ),
     link=None,
     level=4,
-    num='4.43.5.1'
+    num='4.44.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Settings = Requirement(
@@ -2905,7 +3228,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Settings = Requi
     ),
     link=None,
     level=4,
-    num='4.43.6.1'
+    num='4.44.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Files = Requirement(
@@ -2955,7 +3278,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Files = Requirem
     ),
     link=None,
     level=4,
-    num='4.43.7.1'
+    num='4.44.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters = Requirement(
@@ -2984,7 +3307,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters = Requi
     ),
     link=None,
     level=3,
-    num='4.44.1'
+    num='4.45.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Name = Requirement(
@@ -3013,7 +3336,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.44.2.1'
+    num='4.45.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_ZooKeeper = Requirement(
@@ -3045,7 +3368,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.44.3.1'
+    num='4.45.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Settings = Requirement(
@@ -3078,7 +3401,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.44.4.1'
+    num='4.45.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Files = Requirement(
@@ -3112,7 +3435,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.44.5.1'
+    num='4.45.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Templates = Requirement(
@@ -3149,7 +3472,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.44.6.1'
+    num='4.45.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout = Requirement(
@@ -3177,7 +3500,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=3,
-    num='4.45.1'
+    num='4.46.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Type = Requirement(
@@ -3194,7 +3517,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.45.2.1'
+    num='4.46.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_ShardsCount = Requirement(
@@ -3226,7 +3549,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.45.3.1'
+    num='4.46.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_ReplicasCount = Requirement(
@@ -3260,7 +3583,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.45.4.1'
+    num='4.46.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards = Requirement(
@@ -3289,7 +3612,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.45.5.1'
+    num='4.46.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Name = Requirement(
@@ -3321,7 +3644,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.2.1'
+    num='4.46.5.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_DefinitionType = Requirement(
@@ -3338,7 +3661,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.3.1'
+    num='4.46.5.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Weight = Requirement(
@@ -3370,7 +3693,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.4.1'
+    num='4.46.5.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_InternalReplication = Requirement(
@@ -3410,7 +3733,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.5.1'
+    num='4.46.5.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Settings = Requirement(
@@ -3446,7 +3769,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.6.1'
+    num='4.46.5.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Files = Requirement(
@@ -3483,7 +3806,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.7.1'
+    num='4.46.5.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Templates = Requirement(
@@ -3524,7 +3847,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.8.1'
+    num='4.46.5.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_ReplicasCount = Requirement(
@@ -3561,7 +3884,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.5.9.1'
+    num='4.46.5.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas = Requirement(
@@ -3592,7 +3915,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.45.6.1'
+    num='4.46.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Name = Requirement(
@@ -3624,7 +3947,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.6.2.1'
+    num='4.46.6.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_TcpPort = Requirement(
@@ -3659,7 +3982,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.6.3.1'
+    num='4.46.6.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_HttpPort = Requirement(
@@ -3694,7 +4017,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.6.4.1'
+    num='4.46.6.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_InterServerHttpPort = Requirement(
@@ -3729,7 +4052,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.6.5.1'
+    num='4.46.6.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Settings = Requirement(
@@ -3768,7 +4091,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.6.6.1'
+    num='4.46.6.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Files = Requirement(
@@ -3808,7 +4131,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.6.7.1'
+    num='4.46.6.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Shards_Replicas_Templates = Requirement(
@@ -3856,7 +4179,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.6.8.1'
+    num='4.46.6.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas = Requirement(
@@ -3886,7 +4209,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.45.7.1'
+    num='4.46.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Name = Requirement(
@@ -3918,7 +4241,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.7.2.1'
+    num='4.46.7.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Settings = Requirement(
@@ -3956,7 +4279,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.7.3.1'
+    num='4.46.7.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Files = Requirement(
@@ -3994,7 +4317,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.7.4.1'
+    num='4.46.7.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Templates = Requirement(
@@ -4037,7 +4360,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.7.5.1'
+    num='4.46.7.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_ShardsCount = Requirement(
@@ -4071,7 +4394,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.7.6.1'
+    num='4.46.7.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards = Requirement(
@@ -4103,7 +4426,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=4,
-    num='4.45.8.1'
+    num='4.46.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Name = Requirement(
@@ -4137,7 +4460,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.8.2.1'
+    num='4.46.8.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_TcpPort = Requirement(
@@ -4172,7 +4495,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.8.3.1'
+    num='4.46.8.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_HttpPort = Requirement(
@@ -4207,7 +4530,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.8.4.1'
+    num='4.46.8.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_InterServerHttpPort = Requirement(
@@ -4242,7 +4565,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.8.5.1'
+    num='4.46.8.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Settings = Requirement(
@@ -4282,7 +4605,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.8.6.1'
+    num='4.46.8.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Files = Requirement(
@@ -4322,7 +4645,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.8.7.1'
+    num='4.46.8.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster_Layout_Replicas_Shards_Templates = Requirement(
@@ -4367,7 +4690,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Configuration_Clusters_Cluster
     ),
     link=None,
     level=5,
-    num='4.45.8.8.1'
+    num='4.46.8.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates = Requirement(
@@ -4392,7 +4715,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates = Requirement(
     ),
     link=None,
     level=3,
-    num='4.46.1'
+    num='4.47.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates = Requirement(
@@ -4418,7 +4741,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates = Requ
     ),
     link=None,
     level=3,
-    num='4.47.1'
+    num='4.48.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Name = Requirement(
@@ -4452,7 +4775,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Name =
     ),
     link=None,
     level=4,
-    num='4.47.2.1'
+    num='4.48.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_PortDistribution = Requirement(
@@ -4480,7 +4803,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_PortDi
     ),
     link=None,
     level=4,
-    num='4.47.3.1'
+    num='4.48.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_PortDistribution_Type = Requirement(
@@ -4520,7 +4843,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_PortDi
     ),
     link=None,
     level=5,
-    num='4.47.3.2.1'
+    num='4.48.3.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec = Requirement(
@@ -4547,7 +4870,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec =
     ),
     link=None,
     level=4,
-    num='4.47.4.1'
+    num='4.48.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Name = Requirement(
@@ -4579,7 +4902,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_N
     ),
     link=None,
     level=5,
-    num='4.47.4.2.1'
+    num='4.48.4.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_TcpPort = Requirement(
@@ -4611,7 +4934,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_T
     ),
     link=None,
     level=5,
-    num='4.47.4.3.1'
+    num='4.48.4.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_HttpPort = Requirement(
@@ -4643,7 +4966,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_H
     ),
     link=None,
     level=5,
-    num='4.47.4.4.1'
+    num='4.48.4.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_InterServerHttpPort = Requirement(
@@ -4673,7 +4996,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_I
     ),
     link=None,
     level=5,
-    num='4.47.4.5.1'
+    num='4.48.4.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Settings = Requirement(
@@ -4707,7 +5030,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_S
     ),
     link=None,
     level=5,
-    num='4.47.4.6.1'
+    num='4.48.4.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Files = Requirement(
@@ -4739,7 +5062,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_F
     ),
     link=None,
     level=5,
-    num='4.47.4.7.1'
+    num='4.48.4.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_Templates = Requirement(
@@ -4768,7 +5091,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_HostTemplates_Spec_T
     ),
     link=None,
     level=5,
-    num='4.47.4.8.1'
+    num='4.48.4.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates = Requirement(
@@ -4795,7 +5118,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates = Requi
     ),
     link=None,
     level=3,
-    num='4.48.1'
+    num='4.49.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Name = Requirement(
@@ -4829,7 +5152,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Name = 
     ),
     link=None,
     level=4,
-    num='4.48.2.1'
+    num='4.49.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_GenerateName = Requirement(
@@ -4895,7 +5218,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Generat
     ),
     link=None,
     level=4,
-    num='4.48.3.1'
+    num='4.49.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone = Requirement(
@@ -4925,7 +5248,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone = 
     ),
     link=None,
     level=4,
-    num='4.48.4.1'
+    num='4.49.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone_Key = Requirement(
@@ -4954,7 +5277,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone_Ke
     ),
     link=None,
     level=5,
-    num='4.48.4.2.1'
+    num='4.49.4.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone_Values = Requirement(
@@ -4985,7 +5308,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Zone_Va
     ),
     link=None,
     level=5,
-    num='4.48.4.3.1'
+    num='4.49.4.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution = Requirement(
@@ -5014,7 +5337,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDist
     ),
     link=None,
     level=4,
-    num='4.48.5.1'
+    num='4.49.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Type = Requirement(
@@ -5049,7 +5372,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDist
     ),
     link=None,
     level=5,
-    num='4.48.5.2.1'
+    num='4.49.5.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Scope = Requirement(
@@ -5075,7 +5398,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDist
     ),
     link=None,
     level=5,
-    num='4.48.5.3.1'
+    num='4.49.5.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_Number = Requirement(
@@ -5094,7 +5417,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDist
     ),
     link=None,
     level=5,
-    num='4.48.5.4.1'
+    num='4.49.5.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDistribution_TopologyKey = Requirement(
@@ -5111,7 +5434,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_podDist
     ),
     link=None,
     level=5,
-    num='4.48.5.5.1'
+    num='4.49.5.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Spec = Requirement(
@@ -5129,7 +5452,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Spec = 
     ),
     link=None,
     level=4,
-    num='4.48.6.1'
+    num='4.49.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Metadata = Requirement(
@@ -5147,7 +5470,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_PodTemplates_Metadat
     ),
     link=None,
     level=4,
-    num='4.48.7.1'
+    num='4.49.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates = Requirement(
@@ -5174,7 +5497,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates
     ),
     link=None,
     level=3,
-    num='4.49.1'
+    num='4.50.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Name = Requirement(
@@ -5208,7 +5531,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates
     ),
     link=None,
     level=4,
-    num='4.49.2.1'
+    num='4.50.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_ReclaimPolicy = Requirement(
@@ -5229,7 +5552,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates
     ),
     link=None,
     level=4,
-    num='4.49.3.1'
+    num='4.50.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Metadata = Requirement(
@@ -5247,7 +5570,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates
     ),
     link=None,
     level=4,
-    num='4.49.4.1'
+    num='4.50.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates_Spec = Requirement(
@@ -5265,7 +5588,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_VolumeClaimTemplates
     ),
     link=None,
     level=4,
-    num='4.49.5.1'
+    num='4.50.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates = Requirement(
@@ -5291,7 +5614,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates = R
     ),
     link=None,
     level=3,
-    num='4.50.1'
+    num='4.51.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Name = Requirement(
@@ -5326,7 +5649,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Nam
     ),
     link=None,
     level=4,
-    num='4.50.2.1'
+    num='4.51.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_GenerateName = Requirement(
@@ -5383,7 +5706,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Gen
     ),
     link=None,
     level=4,
-    num='4.50.3.1'
+    num='4.51.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Metadata = Requirement(
@@ -5403,7 +5726,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Met
     ),
     link=None,
     level=4,
-    num='4.50.4.1'
+    num='4.51.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Spec = Requirement(
@@ -5421,7 +5744,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_Templates_ServiceTemplates_Spe
     ),
     link=None,
     level=4,
-    num='4.50.5.1'
+    num='4.51.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates = Requirement(
@@ -5448,7 +5771,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates = Requirement(
     ),
     link=None,
     level=4,
-    num='4.51.5.1'
+    num='4.52.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Name = Requirement(
@@ -5471,7 +5794,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Name = Requiremen
     ),
     link=None,
     level=4,
-    num='4.51.6.1'
+    num='4.52.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Namespace = Requirement(
@@ -5498,7 +5821,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_Namespace = Requi
     ),
     link=None,
     level=4,
-    num='4.51.7.1'
+    num='4.52.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_UseType = Requirement(
@@ -5518,7 +5841,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_UseTemplates_UseType = Require
     ),
     link=None,
     level=4,
-    num='4.51.8.1'
+    num='4.52.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec = Requirement(
@@ -5546,7 +5869,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec = Requirement(
     ),
     link=None,
     level=3,
-    num='4.52.1'
+    num='4.53.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_WatchNamespaces = Requirement(
@@ -5576,7 +5899,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_WatchNamespaces = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.2.1'
+    num='4.53.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCommonConfigsPath = Requirement(
@@ -5596,7 +5919,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCommonConfigsPath = R
     ),
     link=None,
     level=4,
-    num='4.52.3.1'
+    num='4.53.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseHostConfigsPath = Requirement(
@@ -5616,7 +5939,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseHostConfigsPath = Req
     ),
     link=None,
     level=4,
-    num='4.52.4.1'
+    num='4.53.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseUsersConfigsPath = Requirement(
@@ -5636,7 +5959,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseUsersConfigsPath = Re
     ),
     link=None,
     level=4,
-    num='4.52.5.1'
+    num='4.53.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_TemplatesPath = Requirement(
@@ -5653,7 +5976,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_TemplatesPath = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.6.1'
+    num='4.53.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdateTimeout = Requirement(
@@ -5671,7 +5994,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdateTimeout = Requ
     ),
     link=None,
     level=4,
-    num='4.52.7.1'
+    num='4.53.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdatePollPeriod = Requirement(
@@ -5689,7 +6012,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdatePollPeriod = R
     ),
     link=None,
     level=4,
-    num='4.52.8.1'
+    num='4.53.8.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetCreateFailureAction = Requirement(
@@ -5714,7 +6037,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetCreateFailureAction 
     ),
     link=None,
     level=4,
-    num='4.52.9.1'
+    num='4.53.9.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdateFailureAction = Requirement(
@@ -5739,7 +6062,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StatefulSetUpdateFailureAction 
     ),
     link=None,
     level=4,
-    num='4.52.10.1'
+    num='4.53.10.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultProfile = Requirement(
@@ -5757,7 +6080,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultProf
     ),
     link=None,
     level=4,
-    num='4.52.11.1'
+    num='4.53.11.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultQuota = Requirement(
@@ -5775,7 +6098,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultQuot
     ),
     link=None,
     level=4,
-    num='4.52.12.1'
+    num='4.53.12.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultNetworksIP = Requirement(
@@ -5802,7 +6125,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultNetw
     ),
     link=None,
     level=4,
-    num='4.52.13.1'
+    num='4.53.13.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultPassword = Requirement(
@@ -5827,7 +6150,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigUserDefaultPass
     ),
     link=None,
     level=4,
-    num='4.52.14.1'
+    num='4.53.14.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigNetworksHostRegexpTemplate = Requirement(
@@ -5845,7 +6168,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseConfigNetworksHostReg
     ),
     link=None,
     level=4,
-    num='4.52.15.1'
+    num='4.53.15.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCredentialsSecretNamespace = Requirement(
@@ -5863,7 +6186,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCredentialsSecretName
     ),
     link=None,
     level=4,
-    num='4.52.16.1'
+    num='4.53.16.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCredentialsSecretName = Requirement(
@@ -5881,7 +6204,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHouseCredentialsSecretName
     ),
     link=None,
     level=4,
-    num='4.52.17.1'
+    num='4.53.17.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHousePort = Requirement(
@@ -5899,7 +6222,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ClickHousePort = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.18.1'
+    num='4.53.18.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogToStderr = Requirement(
@@ -5916,7 +6239,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogToStderr = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.19.1'
+    num='4.53.19.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AlsoLogToStderr = Requirement(
@@ -5933,7 +6256,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AlsoLogToStderr = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.20.1'
+    num='4.53.20.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_VerbosityLevel = Requirement(
@@ -5952,7 +6275,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_VerbosityLevel = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.21.1'
+    num='4.53.21.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StderrThreshold = Requirement(
@@ -5969,7 +6292,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_StderrThreshold = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.22.1'
+    num='4.53.22.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_VModule = Requirement(
@@ -5985,7 +6308,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_VModule = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.23.1'
+    num='4.53.23.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogBacktrace = Requirement(
@@ -6001,7 +6324,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_LogBacktrace = Requirement(
     ),
     link=None,
     level=4,
-    num='4.52.24.1'
+    num='4.53.24.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileThreadsNumber = Requirement(
@@ -6021,7 +6344,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileThreadsNumber = Requir
     ),
     link=None,
     level=4,
-    num='4.52.25.1'
+    num='4.53.25.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitExclude = Requirement(
@@ -6037,7 +6360,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitExclude = Requirem
     ),
     link=None,
     level=4,
-    num='4.52.26.1'
+    num='4.53.26.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries = Requirement(
@@ -6053,7 +6376,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitQueries = Requirem
     ),
     link=None,
     level=4,
-    num='4.52.26.2'
+    num='4.53.26.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitInclude = Requirement(
@@ -6069,7 +6392,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ReconcileWaitInclude = Requirem
     ),
     link=None,
     level=4,
-    num='4.52.27.1'
+    num='4.53.27.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ExcludeFromPropagationLabels = Requirement(
@@ -6088,7 +6411,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_ExcludeFromPropagationLabels = 
     ),
     link=None,
     level=4,
-    num='4.52.28.1'
+    num='4.53.28.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AppendScopeLabels = Requirement(
@@ -6117,7 +6440,7 @@ RQ_SRS_026_ClickHouseOperator_Configuration_Spec_AppendScopeLabels = Requirement
     ),
     link=None,
     level=4,
-    num='4.52.29.1'
+    num='4.53.29.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_StatefulSets = Requirement(
@@ -6134,7 +6457,7 @@ RQ_SRS_026_ClickHouseOperator_StatefulSets = Requirement(
     ),
     link=None,
     level=3,
-    num='4.53.1'
+    num='4.54.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_StatefulSets_PodsStickyIdentity = Requirement(
@@ -6151,7 +6474,7 @@ RQ_SRS_026_ClickHouseOperator_StatefulSets_PodsStickyIdentity = Requirement(
     ),
     link=None,
     level=4,
-    num='4.53.2.1'
+    num='4.54.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_StatefulSets_PodsCreatedFromTheSameSpec = Requirement(
@@ -6169,7 +6492,7 @@ RQ_SRS_026_ClickHouseOperator_StatefulSets_PodsCreatedFromTheSameSpec = Requirem
     ),
     link=None,
     level=4,
-    num='4.53.3.1'
+    num='4.54.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling = Requirement(
@@ -6191,7 +6514,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling = Requirement(
     ),
     link=None,
     level=3,
-    num='4.54.1'
+    num='4.55.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_HealthMonitoring = Requirement(
@@ -6208,7 +6531,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_HealthMonitoring = Requirement(
     ),
     link=None,
     level=4,
-    num='4.54.2.1'
+    num='4.55.2.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_PollingForReady = Requirement(
@@ -6225,7 +6548,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_PollingForReady = Requirement(
     ),
     link=None,
     level=4,
-    num='4.54.3.1'
+    num='4.55.3.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_MoveOnReady = Requirement(
@@ -6242,7 +6565,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_MoveOnReady = Requirement(
     ),
     link=None,
     level=4,
-    num='4.54.4.1'
+    num='4.55.4.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_Create = Requirement(
@@ -6271,7 +6594,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_Create = Requirement(
     ),
     link=None,
     level=4,
-    num='4.54.5.1'
+    num='4.55.5.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_Update = Requirement(
@@ -6300,7 +6623,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_Update = Requirement(
     ),
     link=None,
     level=4,
-    num='4.54.6.1'
+    num='4.55.6.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Create = Requirement(
@@ -6316,7 +6639,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Create = Requiremen
     ),
     link=None,
     level=4,
-    num='4.54.7.1'
+    num='4.55.7.1'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Update = Requirement(
@@ -6332,7 +6655,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_Fails_RevertBack_Update = Requiremen
     ),
     link=None,
     level=4,
-    num='4.54.7.2'
+    num='4.55.7.2'
 )
 
 RQ_SRS_026_ClickHouseOperator_ErrorHandling_SuccessfulUpdateBeforeFailed_DoNothing = Requirement(
@@ -6381,7 +6704,7 @@ RQ_SRS_026_ClickHouseOperator_ErrorHandling_SuccessfulUpdateBeforeFailed_DoNothi
     ),
     link=None,
     level=5,
-    num='4.54.8.2.1'
+    num='4.55.8.2.1'
 )
 
 QA_SRS026_ClickHouse_Operator = Specification(
@@ -6598,334 +6921,344 @@ QA_SRS026_ClickHouse_Operator = Specification(
         Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseKeeperInstallation', level=3, num='4.32.2'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate', level=3, num='4.32.3'),
         Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration', level=3, num='4.32.4'),
-        Heading(name='Metadata', level=2, num='4.33'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata', level=3, num='4.33.1'),
-        Heading(name='Cluster Specification', level=2, num='4.34'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec', level=3, num='4.34.1'),
-        Heading(name='Task Identifier', level=2, num='4.35'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID', level=3, num='4.35.1'),
-        Heading(name='Stopping ClickHouse Clusters', level=2, num='4.36'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop', level=3, num='4.36.1'),
-        Heading(name='Restart Policy For StatefulSets', level=2, num='4.37'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart', level=3, num='4.37.1'),
-        Heading(name='Troubleshooting Pods', level=2, num='4.38'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot', level=3, num='4.38.1'),
-        Heading(name='Custom Domain Suffix', level=2, num='4.39'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern', level=3, num='4.39.1'),
-        Heading(name='Policy For Auto Applying Templates', level=2, num='4.40'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating', level=3, num='4.40.1'),
-        Heading(name='Reconciling Cycle', level=2, num='4.41'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle', level=3, num='4.41.1'),
-        Heading(name='Applying ConfigMaps Before StatefulSets', level=3, num='4.41.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets', level=4, num='4.41.2.1'),
-        Heading(name='Configuring Reconciling Cycle', level=3, num='4.41.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling', level=4, num='4.41.3.1'),
-        Heading(name='Reconciliation Policy Name', level=3, num='4.41.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy', level=4, num='4.41.4.1'),
-        Heading(name='ConfigMap Propagation Timeout', level=3, num='4.41.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout', level=4, num='4.41.5.1'),
-        Heading(name='Cleaning Objects', level=3, num='4.41.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup', level=4, num='4.41.6.1'),
-        Heading(name='Cleaning Up Unknown Objects', level=3, num='4.41.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects', level=4, num='4.41.7.1'),
-        Heading(name='Reconciling Failed Objects', level=3, num='4.41.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects', level=4, num='4.41.8.1'),
-        Heading(name='Defaults', level=2, num='4.42'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults', level=4, num='4.42.8.1'),
-        Heading(name='Specifying Storage Management Provisioner', level=3, num='4.42.9'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner', level=4, num='4.42.9.1'),
-        Heading(name='Specifying Replicas By FQDN', level=3, num='4.42.10'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN', level=4, num='4.42.10.1'),
-        Heading(name='Changing Distributed_DDL Settings', level=3, num='4.42.11'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL', level=4, num='4.42.11.1'),
-        Heading(name='Templates', level=3, num='4.42.12'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates', level=4, num='4.42.12.1'),
-        Heading(name='Host Template', level=4, num='4.42.12.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate', level=5, num='4.42.12.2.1'),
-        Heading(name='Pod Template', level=4, num='4.42.12.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate', level=5, num='4.42.12.3.1'),
-        Heading(name='Data Volume Claim Template', level=4, num='4.42.12.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate', level=5, num='4.42.12.4.1'),
-        Heading(name='Log Volume Claim Template', level=4, num='4.42.12.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate', level=5, num='4.42.12.5.1'),
-        Heading(name='Service Template', level=4, num='4.42.12.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate', level=5, num='4.42.12.6.1'),
-        Heading(name='Cluster Service Template', level=4, num='4.42.12.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate', level=5, num='4.42.12.7.1'),
-        Heading(name='Shard Service Template', level=4, num='4.42.12.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate', level=5, num='4.42.12.8.1'),
-        Heading(name='Replica Service Template', level=4, num='4.42.12.9'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate', level=5, num='4.42.12.9.1'),
-        Heading(name='Volume Claim Template', level=4, num='4.42.12.10'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate', level=5, num='4.42.12.10.1'),
-        Heading(name='ClickHouse Server Configuration', level=2, num='4.43'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration', level=3, num='4.43.1'),
-        Heading(name='ZooKeeper', level=3, num='4.43.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper', level=4, num='4.43.2.1'),
-        Heading(name='ZooKeeper Nodes', level=4, num='4.43.2.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes', level=5, num='4.43.2.2.1'),
-        Heading(name='Session Timeout', level=4, num='4.43.2.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs', level=5, num='4.43.2.3.1'),
-        Heading(name='Operation Timeout', level=4, num='4.43.2.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs', level=5, num='4.43.2.4.1'),
-        Heading(name='Root Path', level=4, num='4.43.2.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root', level=5, num='4.43.2.5.1'),
-        Heading(name='Login Credentials', level=4, num='4.43.2.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify', level=5, num='4.43.2.6.1'),
-        Heading(name='Users', level=3, num='4.43.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users', level=4, num='4.43.3.1'),
-        Heading(name='Profiles', level=3, num='4.43.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles', level=4, num='4.43.4.1'),
-        Heading(name='Quotas', level=3, num='4.43.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas', level=4, num='4.43.5.1'),
-        Heading(name='Settings', level=3, num='4.43.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings', level=4, num='4.43.6.1'),
-        Heading(name='Files', level=3, num='4.43.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files', level=4, num='4.43.7.1'),
-        Heading(name='ClickHouse Clusters Configuration', level=2, num='4.44'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters', level=3, num='4.44.1'),
-        Heading(name='Cluster Name', level=3, num='4.44.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name', level=4, num='4.44.2.1'),
-        Heading(name='Cluster ZooKeeper', level=3, num='4.44.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper', level=4, num='4.44.3.1'),
-        Heading(name='Cluster Settings', level=3, num='4.44.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings', level=4, num='4.44.4.1'),
-        Heading(name='Cluster Files', level=3, num='4.44.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files', level=4, num='4.44.5.1'),
-        Heading(name='Cluster Templates', level=3, num='4.44.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates', level=4, num='4.44.6.1'),
-        Heading(name='ClickHouse Cluster Layout', level=2, num='4.45'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout', level=3, num='4.45.1'),
-        Heading(name='Layout Type (Deprecated)', level=3, num='4.45.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type', level=4, num='4.45.2.1'),
-        Heading(name='Layout Shards Count', level=3, num='4.45.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount', level=4, num='4.45.3.1'),
-        Heading(name='Layout Replicas Count', level=3, num='4.45.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount', level=4, num='4.45.4.1'),
-        Heading(name='Layout Shards', level=3, num='4.45.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards', level=4, num='4.45.5.1'),
-        Heading(name='Shard Name', level=4, num='4.45.5.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name', level=5, num='4.45.5.2.1'),
-        Heading(name='Shard Definition Type (Deprecated)', level=4, num='4.45.5.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType', level=5, num='4.45.5.3.1'),
-        Heading(name='Shard Weight', level=4, num='4.45.5.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight', level=5, num='4.45.5.4.1'),
-        Heading(name='Shard Internnal Replication', level=4, num='4.45.5.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication', level=5, num='4.45.5.5.1'),
-        Heading(name='Shard Settings', level=4, num='4.45.5.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings', level=5, num='4.45.5.6.1'),
-        Heading(name='Shard Files', level=4, num='4.45.5.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files', level=5, num='4.45.5.7.1'),
-        Heading(name='Shard Templates', level=4, num='4.45.5.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates', level=5, num='4.45.5.8.1'),
-        Heading(name='Shard Replicas Count', level=4, num='4.45.5.9'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount', level=5, num='4.45.5.9.1'),
-        Heading(name='Layout Shards Replicas', level=3, num='4.45.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas', level=4, num='4.45.6.1'),
-        Heading(name='Shard Replica Name', level=4, num='4.45.6.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name', level=5, num='4.45.6.2.1'),
-        Heading(name='Shard Replica TCP Port', level=4, num='4.45.6.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort', level=5, num='4.45.6.3.1'),
-        Heading(name='Shard Replica HTTP Port', level=4, num='4.45.6.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort', level=5, num='4.45.6.4.1'),
-        Heading(name='Shard Replica Inter-server HTTP Port', level=4, num='4.45.6.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort', level=5, num='4.45.6.5.1'),
-        Heading(name='Shard Replica Settings', level=4, num='4.45.6.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings', level=5, num='4.45.6.6.1'),
-        Heading(name='Shard Replica Files', level=4, num='4.45.6.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files', level=5, num='4.45.6.7.1'),
-        Heading(name='Shard Replica Templates', level=4, num='4.45.6.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates', level=5, num='4.45.6.8.1'),
-        Heading(name='Layout Replicas', level=3, num='4.45.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas', level=4, num='4.45.7.1'),
-        Heading(name='Replica Name', level=4, num='4.45.7.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name', level=5, num='4.45.7.2.1'),
-        Heading(name='Replica Settings', level=4, num='4.45.7.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings', level=5, num='4.45.7.3.1'),
-        Heading(name='Replica Files', level=4, num='4.45.7.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files', level=5, num='4.45.7.4.1'),
-        Heading(name='Replica Templates', level=4, num='4.45.7.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates', level=5, num='4.45.7.5.1'),
-        Heading(name='Replica Shards Count', level=4, num='4.45.7.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount', level=5, num='4.45.7.6.1'),
-        Heading(name='Layout Replicas Shards', level=3, num='4.45.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards', level=4, num='4.45.8.1'),
-        Heading(name='Replica Shard Name', level=4, num='4.45.8.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name', level=5, num='4.45.8.2.1'),
-        Heading(name='Replica Shard TCP Port', level=4, num='4.45.8.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort', level=5, num='4.45.8.3.1'),
-        Heading(name='Replica Shard HTTP Port', level=4, num='4.45.8.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort', level=5, num='4.45.8.4.1'),
-        Heading(name='Replica Shard Inter-server HTTP Port', level=4, num='4.45.8.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort', level=5, num='4.45.8.5.1'),
-        Heading(name='Replica Shard Settings', level=4, num='4.45.8.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings', level=5, num='4.45.8.6.1'),
-        Heading(name='Replica Shard Files', level=4, num='4.45.8.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files', level=5, num='4.45.8.7.1'),
-        Heading(name='Replica Shard Templates', level=4, num='4.45.8.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates', level=5, num='4.45.8.8.1'),
-        Heading(name='User Defined Templates', level=2, num='4.46'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates', level=3, num='4.46.1'),
-        Heading(name='Host Templates', level=2, num='4.47'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates', level=3, num='4.47.1'),
-        Heading(name='Host Template Name', level=3, num='4.47.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name', level=4, num='4.47.2.1'),
-        Heading(name='Host Template Port Distribution', level=3, num='4.47.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution', level=4, num='4.47.3.1'),
-        Heading(name='Port Distribution Type', level=4, num='4.47.3.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type', level=5, num='4.47.3.2.1'),
-        Heading(name='Host Template Specification', level=3, num='4.47.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec', level=4, num='4.47.4.1'),
-        Heading(name='Host Name', level=4, num='4.47.4.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name', level=5, num='4.47.4.2.1'),
-        Heading(name='Host TCP Port', level=4, num='4.47.4.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort', level=5, num='4.47.4.3.1'),
-        Heading(name='Host HTTP Port', level=4, num='4.47.4.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort', level=5, num='4.47.4.4.1'),
-        Heading(name='Host Inter-server HTTP Port', level=4, num='4.47.4.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort', level=5, num='4.47.4.5.1'),
-        Heading(name='Host Settings', level=4, num='4.47.4.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings', level=5, num='4.47.4.6.1'),
-        Heading(name='Host Files', level=4, num='4.47.4.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files', level=5, num='4.47.4.7.1'),
-        Heading(name='Host Overriding Templates', level=4, num='4.47.4.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates', level=5, num='4.47.4.8.1'),
-        Heading(name='Pod Templates', level=2, num='4.48'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates', level=3, num='4.48.1'),
-        Heading(name='Pod Name', level=3, num='4.48.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name', level=4, num='4.48.2.1'),
-        Heading(name='Pod Generate Name', level=3, num='4.48.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName', level=4, num='4.48.3.1'),
-        Heading(name='Pod Zone', level=3, num='4.48.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone', level=4, num='4.48.4.1'),
-        Heading(name='Pod Zone Key', level=4, num='4.48.4.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key', level=5, num='4.48.4.2.1'),
-        Heading(name='Pod Zone Values', level=4, num='4.48.4.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values', level=5, num='4.48.4.3.1'),
-        Heading(name='Pod Distribution', level=3, num='4.48.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution', level=4, num='4.48.5.1'),
-        Heading(name='Pod Distribution Type', level=4, num='4.48.5.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type', level=5, num='4.48.5.2.1'),
-        Heading(name='Pod Distribution Scope', level=4, num='4.48.5.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope', level=5, num='4.48.5.3.1'),
-        Heading(name='Pod Distribution Number', level=4, num='4.48.5.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number', level=5, num='4.48.5.4.1'),
-        Heading(name='Pod Distribution Topology Key', level=4, num='4.48.5.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey', level=5, num='4.48.5.5.1'),
-        Heading(name='Pod Spec', level=3, num='4.48.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec', level=4, num='4.48.6.1'),
-        Heading(name='Pod Metadata', level=3, num='4.48.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata', level=4, num='4.48.7.1'),
-        Heading(name='Volume Claim Templates', level=2, num='4.49'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates', level=3, num='4.49.1'),
-        Heading(name='Volume Claim Name', level=3, num='4.49.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name', level=4, num='4.49.2.1'),
-        Heading(name='Volume Claim Reclaim Policy', level=3, num='4.49.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy', level=4, num='4.49.3.1'),
-        Heading(name='Volume Claim Metadata', level=3, num='4.49.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata', level=4, num='4.49.4.1'),
-        Heading(name='Volume Claim Spec', level=3, num='4.49.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec', level=4, num='4.49.5.1'),
-        Heading(name='Service Templates', level=2, num='4.50'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates', level=3, num='4.50.1'),
-        Heading(name='Service Name', level=3, num='4.50.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name', level=4, num='4.50.2.1'),
-        Heading(name='Service Generate Name', level=3, num='4.50.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName', level=4, num='4.50.3.1'),
-        Heading(name='Service Generate Metadata', level=3, num='4.50.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata', level=4, num='4.50.4.1'),
-        Heading(name='Service Spec', level=3, num='4.50.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec', level=4, num='4.50.5.1'),
-        Heading(name='Use Templates', level=2, num='4.51'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates', level=4, num='4.51.5.1'),
-        Heading(name='Use Template Name', level=3, num='4.51.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name', level=4, num='4.51.6.1'),
-        Heading(name='Use Template Namespace', level=3, num='4.51.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace', level=4, num='4.51.7.1'),
-        Heading(name='Use Template Use Type', level=3, num='4.51.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType', level=4, num='4.51.8.1'),
-        Heading(name='ClickHouse Operator Configuration', level=2, num='4.52'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec', level=3, num='4.52.1'),
-        Heading(name='Watched Namespaces', level=3, num='4.52.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces', level=4, num='4.52.2.1'),
-        Heading(name='ClickHouse Common Configs Path', level=3, num='4.52.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath', level=4, num='4.52.3.1'),
-        Heading(name='ClickHouse Host Configs Path', level=3, num='4.52.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath', level=4, num='4.52.4.1'),
-        Heading(name='ClickHouse Users Configs Path', level=3, num='4.52.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath', level=4, num='4.52.5.1'),
-        Heading(name='Templates Path', level=3, num='4.52.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath', level=4, num='4.52.6.1'),
-        Heading(name='StatefulSet Update Timeout', level=3, num='4.52.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout', level=4, num='4.52.7.1'),
-        Heading(name='StatefulSet Update Poll Period', level=3, num='4.52.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod', level=4, num='4.52.8.1'),
-        Heading(name='StatefulSet Create Failure Action', level=3, num='4.52.9'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction', level=4, num='4.52.9.1'),
-        Heading(name='StatefulSet Update Failure Action', level=3, num='4.52.10'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction', level=4, num='4.52.10.1'),
-        Heading(name='ClickHouse Config User Default Profile', level=3, num='4.52.11'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile', level=4, num='4.52.11.1'),
-        Heading(name='ClickHouse Config User Default Quota', level=3, num='4.52.12'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota', level=4, num='4.52.12.1'),
-        Heading(name='ClickHouse Config User Default Networks IP', level=3, num='4.52.13'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP', level=4, num='4.52.13.1'),
-        Heading(name='ClickHouse Config User Default Password', level=3, num='4.52.14'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword', level=4, num='4.52.14.1'),
-        Heading(name='ClickHouse Config Networks Host Regexp Template', level=3, num='4.52.15'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate', level=4, num='4.52.15.1'),
-        Heading(name='ClickHouse Credentials Secret Namespace', level=3, num='4.52.16'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace', level=4, num='4.52.16.1'),
-        Heading(name='ClickHouse Credentials Secret Name', level=3, num='4.52.17'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName', level=4, num='4.52.17.1'),
-        Heading(name='ClickHouse Port', level=3, num='4.52.18'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort', level=4, num='4.52.18.1'),
-        Heading(name='Log To `stderr`', level=3, num='4.52.19'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr', level=4, num='4.52.19.1'),
-        Heading(name='Log To `stderr` And Files', level=3, num='4.52.20'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr', level=4, num='4.52.20.1'),
-        Heading(name='Verbosity Level', level=3, num='4.52.21'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel', level=4, num='4.52.21.1'),
-        Heading(name='Threshold For `stderr`', level=3, num='4.52.22'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold', level=4, num='4.52.22.1'),
-        Heading(name='V Module', level=3, num='4.52.23'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule', level=4, num='4.52.23.1'),
-        Heading(name='Logging Backtrace', level=3, num='4.52.24'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace', level=4, num='4.52.24.1'),
-        Heading(name='Number Of Threads For Reconciliation Cycle', level=3, num='4.52.25'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber', level=4, num='4.52.25.1'),
-        Heading(name='Wait Exclude For Reconciliation Cycle', level=3, num='4.52.26'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude', level=4, num='4.52.26.1'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries', level=4, num='4.52.26.2'),
-        Heading(name='Wait Include For Reconciliation Cycle', level=3, num='4.52.27'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude', level=4, num='4.52.27.1'),
-        Heading(name='Excluding From Propagation Labels', level=3, num='4.52.28'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels', level=4, num='4.52.28.1'),
-        Heading(name='Appending Scope Labels', level=3, num='4.52.29'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels', level=4, num='4.52.29.1'),
-        Heading(name='Stateful Sets', level=2, num='4.53'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets', level=3, num='4.53.1'),
-        Heading(name='Sticky Identity', level=3, num='4.53.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity', level=4, num='4.53.2.1'),
-        Heading(name='Pods Created From The Same Spec', level=3, num='4.53.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec', level=4, num='4.53.3.1'),
-        Heading(name='Error Handling', level=2, num='4.54'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling', level=3, num='4.54.1'),
-        Heading(name='Health Monitoring', level=3, num='4.54.2'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring', level=4, num='4.54.2.1'),
-        Heading(name='Polling For Ready', level=3, num='4.54.3'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady', level=4, num='4.54.3.1'),
-        Heading(name='Move On Ready', level=3, num='4.54.4'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady', level=4, num='4.54.4.1'),
-        Heading(name='Create Failure', level=3, num='4.54.5'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create', level=4, num='4.54.5.1'),
-        Heading(name='Update Failure', level=3, num='4.54.6'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update', level=4, num='4.54.6.1'),
-        Heading(name='Reverting Back', level=3, num='4.54.7'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create', level=4, num='4.54.7.1'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update', level=4, num='4.54.7.2'),
-        Heading(name='Successful Update Before Failed', level=3, num='4.54.8'),
-        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing', level=5, num='4.54.8.2.1'),
+        Heading(name='ClickHouseKeeperInstallation', level=2, num='4.33'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation', level=3, num='4.33.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Replicas', level=3, num='4.33.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Logger', level=3, num='4.33.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Listen_host', level=3, num='4.33.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Keeper_server', level=3, num='4.33.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Prometheus', level=3, num='4.33.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.PodTemplates', level=3, num='4.33.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.volumeClaimTemplates', level=3, num='4.33.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Connection', level=3, num='4.33.9'),
+        Heading(name='Metadata', level=2, num='4.34'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata', level=3, num='4.34.1'),
+        Heading(name='Cluster Specification', level=2, num='4.35'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec', level=3, num='4.35.1'),
+        Heading(name='Task Identifier', level=2, num='4.36'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID', level=3, num='4.36.1'),
+        Heading(name='Stopping ClickHouse Clusters', level=2, num='4.37'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop', level=3, num='4.37.1'),
+        Heading(name='Restart Policy For StatefulSets', level=2, num='4.38'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart', level=3, num='4.38.1'),
+        Heading(name='Troubleshooting Pods', level=2, num='4.39'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot', level=3, num='4.39.1'),
+        Heading(name='Custom Domain Suffix', level=2, num='4.40'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern', level=3, num='4.40.1'),
+        Heading(name='Policy For Auto Applying Templates', level=2, num='4.41'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating', level=3, num='4.41.1'),
+        Heading(name='Reconciling Cycle', level=2, num='4.42'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle', level=3, num='4.42.1'),
+        Heading(name='Applying ConfigMaps Before StatefulSets', level=3, num='4.42.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets', level=4, num='4.42.2.1'),
+        Heading(name='Configuring Reconciling Cycle', level=3, num='4.42.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling', level=4, num='4.42.3.1'),
+        Heading(name='Reconciliation Policy Name', level=3, num='4.42.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy', level=4, num='4.42.4.1'),
+        Heading(name='ConfigMap Propagation Timeout', level=3, num='4.42.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout', level=4, num='4.42.5.1'),
+        Heading(name='Cleaning Objects', level=3, num='4.42.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup', level=4, num='4.42.6.1'),
+        Heading(name='Cleaning Up Unknown Objects', level=3, num='4.42.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects', level=4, num='4.42.7.1'),
+        Heading(name='Reconciling Failed Objects', level=3, num='4.42.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects', level=4, num='4.42.8.1'),
+        Heading(name='Defaults', level=2, num='4.43'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults', level=4, num='4.43.8.1'),
+        Heading(name='Specifying Storage Management Provisioner', level=3, num='4.43.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner', level=4, num='4.43.9.1'),
+        Heading(name='Specifying Replicas By FQDN', level=3, num='4.43.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN', level=4, num='4.43.10.1'),
+        Heading(name='Changing Distributed_DDL Settings', level=3, num='4.43.11'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL', level=4, num='4.43.11.1'),
+        Heading(name='Templates', level=3, num='4.43.12'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates', level=4, num='4.43.12.1'),
+        Heading(name='Host Template', level=4, num='4.43.12.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate', level=5, num='4.43.12.2.1'),
+        Heading(name='Pod Template', level=4, num='4.43.12.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate', level=5, num='4.43.12.3.1'),
+        Heading(name='Data Volume Claim Template', level=4, num='4.43.12.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate', level=5, num='4.43.12.4.1'),
+        Heading(name='Log Volume Claim Template', level=4, num='4.43.12.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate', level=5, num='4.43.12.5.1'),
+        Heading(name='Service Template', level=4, num='4.43.12.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate', level=5, num='4.43.12.6.1'),
+        Heading(name='Cluster Service Template', level=4, num='4.43.12.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate', level=5, num='4.43.12.7.1'),
+        Heading(name='Shard Service Template', level=4, num='4.43.12.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate', level=5, num='4.43.12.8.1'),
+        Heading(name='Replica Service Template', level=4, num='4.43.12.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate', level=5, num='4.43.12.9.1'),
+        Heading(name='Volume Claim Template', level=4, num='4.43.12.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate', level=5, num='4.43.12.10.1'),
+        Heading(name='ClickHouse Server Configuration', level=2, num='4.44'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration', level=3, num='4.44.1'),
+        Heading(name='ZooKeeper', level=3, num='4.44.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper', level=4, num='4.44.2.1'),
+        Heading(name='ZooKeeper Nodes', level=4, num='4.44.2.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes', level=5, num='4.44.2.2.1'),
+        Heading(name='Session Timeout', level=4, num='4.44.2.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs', level=5, num='4.44.2.3.1'),
+        Heading(name='Operation Timeout', level=4, num='4.44.2.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs', level=5, num='4.44.2.4.1'),
+        Heading(name='Root Path', level=4, num='4.44.2.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root', level=5, num='4.44.2.5.1'),
+        Heading(name='Login Credentials', level=4, num='4.44.2.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify', level=5, num='4.44.2.6.1'),
+        Heading(name='Users', level=3, num='4.44.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users', level=4, num='4.44.3.1'),
+        Heading(name='Profiles', level=3, num='4.44.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles', level=4, num='4.44.4.1'),
+        Heading(name='Quotas', level=3, num='4.44.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas', level=4, num='4.44.5.1'),
+        Heading(name='Settings', level=3, num='4.44.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings', level=4, num='4.44.6.1'),
+        Heading(name='Files', level=3, num='4.44.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files', level=4, num='4.44.7.1'),
+        Heading(name='ClickHouse Clusters Configuration', level=2, num='4.45'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters', level=3, num='4.45.1'),
+        Heading(name='Cluster Name', level=3, num='4.45.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name', level=4, num='4.45.2.1'),
+        Heading(name='Cluster ZooKeeper', level=3, num='4.45.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper', level=4, num='4.45.3.1'),
+        Heading(name='Cluster Settings', level=3, num='4.45.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings', level=4, num='4.45.4.1'),
+        Heading(name='Cluster Files', level=3, num='4.45.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files', level=4, num='4.45.5.1'),
+        Heading(name='Cluster Templates', level=3, num='4.45.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates', level=4, num='4.45.6.1'),
+        Heading(name='ClickHouse Cluster Layout', level=2, num='4.46'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout', level=3, num='4.46.1'),
+        Heading(name='Layout Type (Deprecated)', level=3, num='4.46.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type', level=4, num='4.46.2.1'),
+        Heading(name='Layout Shards Count', level=3, num='4.46.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount', level=4, num='4.46.3.1'),
+        Heading(name='Layout Replicas Count', level=3, num='4.46.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount', level=4, num='4.46.4.1'),
+        Heading(name='Layout Shards', level=3, num='4.46.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards', level=4, num='4.46.5.1'),
+        Heading(name='Shard Name', level=4, num='4.46.5.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name', level=5, num='4.46.5.2.1'),
+        Heading(name='Shard Definition Type (Deprecated)', level=4, num='4.46.5.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType', level=5, num='4.46.5.3.1'),
+        Heading(name='Shard Weight', level=4, num='4.46.5.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight', level=5, num='4.46.5.4.1'),
+        Heading(name='Shard Internnal Replication', level=4, num='4.46.5.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication', level=5, num='4.46.5.5.1'),
+        Heading(name='Shard Settings', level=4, num='4.46.5.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings', level=5, num='4.46.5.6.1'),
+        Heading(name='Shard Files', level=4, num='4.46.5.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files', level=5, num='4.46.5.7.1'),
+        Heading(name='Shard Templates', level=4, num='4.46.5.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates', level=5, num='4.46.5.8.1'),
+        Heading(name='Shard Replicas Count', level=4, num='4.46.5.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount', level=5, num='4.46.5.9.1'),
+        Heading(name='Layout Shards Replicas', level=3, num='4.46.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas', level=4, num='4.46.6.1'),
+        Heading(name='Shard Replica Name', level=4, num='4.46.6.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name', level=5, num='4.46.6.2.1'),
+        Heading(name='Shard Replica TCP Port', level=4, num='4.46.6.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort', level=5, num='4.46.6.3.1'),
+        Heading(name='Shard Replica HTTP Port', level=4, num='4.46.6.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort', level=5, num='4.46.6.4.1'),
+        Heading(name='Shard Replica Inter-server HTTP Port', level=4, num='4.46.6.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort', level=5, num='4.46.6.5.1'),
+        Heading(name='Shard Replica Settings', level=4, num='4.46.6.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings', level=5, num='4.46.6.6.1'),
+        Heading(name='Shard Replica Files', level=4, num='4.46.6.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files', level=5, num='4.46.6.7.1'),
+        Heading(name='Shard Replica Templates', level=4, num='4.46.6.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates', level=5, num='4.46.6.8.1'),
+        Heading(name='Layout Replicas', level=3, num='4.46.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas', level=4, num='4.46.7.1'),
+        Heading(name='Replica Name', level=4, num='4.46.7.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name', level=5, num='4.46.7.2.1'),
+        Heading(name='Replica Settings', level=4, num='4.46.7.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings', level=5, num='4.46.7.3.1'),
+        Heading(name='Replica Files', level=4, num='4.46.7.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files', level=5, num='4.46.7.4.1'),
+        Heading(name='Replica Templates', level=4, num='4.46.7.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates', level=5, num='4.46.7.5.1'),
+        Heading(name='Replica Shards Count', level=4, num='4.46.7.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount', level=5, num='4.46.7.6.1'),
+        Heading(name='Layout Replicas Shards', level=3, num='4.46.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards', level=4, num='4.46.8.1'),
+        Heading(name='Replica Shard Name', level=4, num='4.46.8.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name', level=5, num='4.46.8.2.1'),
+        Heading(name='Replica Shard TCP Port', level=4, num='4.46.8.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort', level=5, num='4.46.8.3.1'),
+        Heading(name='Replica Shard HTTP Port', level=4, num='4.46.8.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort', level=5, num='4.46.8.4.1'),
+        Heading(name='Replica Shard Inter-server HTTP Port', level=4, num='4.46.8.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort', level=5, num='4.46.8.5.1'),
+        Heading(name='Replica Shard Settings', level=4, num='4.46.8.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings', level=5, num='4.46.8.6.1'),
+        Heading(name='Replica Shard Files', level=4, num='4.46.8.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files', level=5, num='4.46.8.7.1'),
+        Heading(name='Replica Shard Templates', level=4, num='4.46.8.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates', level=5, num='4.46.8.8.1'),
+        Heading(name='User Defined Templates', level=2, num='4.47'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates', level=3, num='4.47.1'),
+        Heading(name='Host Templates', level=2, num='4.48'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates', level=3, num='4.48.1'),
+        Heading(name='Host Template Name', level=3, num='4.48.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name', level=4, num='4.48.2.1'),
+        Heading(name='Host Template Port Distribution', level=3, num='4.48.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution', level=4, num='4.48.3.1'),
+        Heading(name='Port Distribution Type', level=4, num='4.48.3.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type', level=5, num='4.48.3.2.1'),
+        Heading(name='Host Template Specification', level=3, num='4.48.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec', level=4, num='4.48.4.1'),
+        Heading(name='Host Name', level=4, num='4.48.4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name', level=5, num='4.48.4.2.1'),
+        Heading(name='Host TCP Port', level=4, num='4.48.4.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort', level=5, num='4.48.4.3.1'),
+        Heading(name='Host HTTP Port', level=4, num='4.48.4.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort', level=5, num='4.48.4.4.1'),
+        Heading(name='Host Inter-server HTTP Port', level=4, num='4.48.4.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort', level=5, num='4.48.4.5.1'),
+        Heading(name='Host Settings', level=4, num='4.48.4.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings', level=5, num='4.48.4.6.1'),
+        Heading(name='Host Files', level=4, num='4.48.4.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files', level=5, num='4.48.4.7.1'),
+        Heading(name='Host Overriding Templates', level=4, num='4.48.4.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates', level=5, num='4.48.4.8.1'),
+        Heading(name='Pod Templates', level=2, num='4.49'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates', level=3, num='4.49.1'),
+        Heading(name='Pod Name', level=3, num='4.49.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name', level=4, num='4.49.2.1'),
+        Heading(name='Pod Generate Name', level=3, num='4.49.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName', level=4, num='4.49.3.1'),
+        Heading(name='Pod Zone', level=3, num='4.49.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone', level=4, num='4.49.4.1'),
+        Heading(name='Pod Zone Key', level=4, num='4.49.4.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key', level=5, num='4.49.4.2.1'),
+        Heading(name='Pod Zone Values', level=4, num='4.49.4.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values', level=5, num='4.49.4.3.1'),
+        Heading(name='Pod Distribution', level=3, num='4.49.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution', level=4, num='4.49.5.1'),
+        Heading(name='Pod Distribution Type', level=4, num='4.49.5.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type', level=5, num='4.49.5.2.1'),
+        Heading(name='Pod Distribution Scope', level=4, num='4.49.5.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope', level=5, num='4.49.5.3.1'),
+        Heading(name='Pod Distribution Number', level=4, num='4.49.5.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number', level=5, num='4.49.5.4.1'),
+        Heading(name='Pod Distribution Topology Key', level=4, num='4.49.5.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey', level=5, num='4.49.5.5.1'),
+        Heading(name='Pod Spec', level=3, num='4.49.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec', level=4, num='4.49.6.1'),
+        Heading(name='Pod Metadata', level=3, num='4.49.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata', level=4, num='4.49.7.1'),
+        Heading(name='Volume Claim Templates', level=2, num='4.50'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates', level=3, num='4.50.1'),
+        Heading(name='Volume Claim Name', level=3, num='4.50.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name', level=4, num='4.50.2.1'),
+        Heading(name='Volume Claim Reclaim Policy', level=3, num='4.50.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy', level=4, num='4.50.3.1'),
+        Heading(name='Volume Claim Metadata', level=3, num='4.50.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata', level=4, num='4.50.4.1'),
+        Heading(name='Volume Claim Spec', level=3, num='4.50.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec', level=4, num='4.50.5.1'),
+        Heading(name='Service Templates', level=2, num='4.51'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates', level=3, num='4.51.1'),
+        Heading(name='Service Name', level=3, num='4.51.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name', level=4, num='4.51.2.1'),
+        Heading(name='Service Generate Name', level=3, num='4.51.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName', level=4, num='4.51.3.1'),
+        Heading(name='Service Generate Metadata', level=3, num='4.51.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata', level=4, num='4.51.4.1'),
+        Heading(name='Service Spec', level=3, num='4.51.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec', level=4, num='4.51.5.1'),
+        Heading(name='Use Templates', level=2, num='4.52'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates', level=4, num='4.52.5.1'),
+        Heading(name='Use Template Name', level=3, num='4.52.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name', level=4, num='4.52.6.1'),
+        Heading(name='Use Template Namespace', level=3, num='4.52.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace', level=4, num='4.52.7.1'),
+        Heading(name='Use Template Use Type', level=3, num='4.52.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType', level=4, num='4.52.8.1'),
+        Heading(name='ClickHouse Operator Configuration', level=2, num='4.53'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec', level=3, num='4.53.1'),
+        Heading(name='Watched Namespaces', level=3, num='4.53.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces', level=4, num='4.53.2.1'),
+        Heading(name='ClickHouse Common Configs Path', level=3, num='4.53.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath', level=4, num='4.53.3.1'),
+        Heading(name='ClickHouse Host Configs Path', level=3, num='4.53.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath', level=4, num='4.53.4.1'),
+        Heading(name='ClickHouse Users Configs Path', level=3, num='4.53.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath', level=4, num='4.53.5.1'),
+        Heading(name='Templates Path', level=3, num='4.53.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath', level=4, num='4.53.6.1'),
+        Heading(name='StatefulSet Update Timeout', level=3, num='4.53.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout', level=4, num='4.53.7.1'),
+        Heading(name='StatefulSet Update Poll Period', level=3, num='4.53.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod', level=4, num='4.53.8.1'),
+        Heading(name='StatefulSet Create Failure Action', level=3, num='4.53.9'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction', level=4, num='4.53.9.1'),
+        Heading(name='StatefulSet Update Failure Action', level=3, num='4.53.10'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction', level=4, num='4.53.10.1'),
+        Heading(name='ClickHouse Config User Default Profile', level=3, num='4.53.11'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile', level=4, num='4.53.11.1'),
+        Heading(name='ClickHouse Config User Default Quota', level=3, num='4.53.12'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota', level=4, num='4.53.12.1'),
+        Heading(name='ClickHouse Config User Default Networks IP', level=3, num='4.53.13'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP', level=4, num='4.53.13.1'),
+        Heading(name='ClickHouse Config User Default Password', level=3, num='4.53.14'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword', level=4, num='4.53.14.1'),
+        Heading(name='ClickHouse Config Networks Host Regexp Template', level=3, num='4.53.15'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate', level=4, num='4.53.15.1'),
+        Heading(name='ClickHouse Credentials Secret Namespace', level=3, num='4.53.16'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace', level=4, num='4.53.16.1'),
+        Heading(name='ClickHouse Credentials Secret Name', level=3, num='4.53.17'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName', level=4, num='4.53.17.1'),
+        Heading(name='ClickHouse Port', level=3, num='4.53.18'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort', level=4, num='4.53.18.1'),
+        Heading(name='Log To `stderr`', level=3, num='4.53.19'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr', level=4, num='4.53.19.1'),
+        Heading(name='Log To `stderr` And Files', level=3, num='4.53.20'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr', level=4, num='4.53.20.1'),
+        Heading(name='Verbosity Level', level=3, num='4.53.21'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel', level=4, num='4.53.21.1'),
+        Heading(name='Threshold For `stderr`', level=3, num='4.53.22'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold', level=4, num='4.53.22.1'),
+        Heading(name='V Module', level=3, num='4.53.23'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule', level=4, num='4.53.23.1'),
+        Heading(name='Logging Backtrace', level=3, num='4.53.24'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace', level=4, num='4.53.24.1'),
+        Heading(name='Number Of Threads For Reconciliation Cycle', level=3, num='4.53.25'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber', level=4, num='4.53.25.1'),
+        Heading(name='Wait Exclude For Reconciliation Cycle', level=3, num='4.53.26'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude', level=4, num='4.53.26.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries', level=4, num='4.53.26.2'),
+        Heading(name='Wait Include For Reconciliation Cycle', level=3, num='4.53.27'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude', level=4, num='4.53.27.1'),
+        Heading(name='Excluding From Propagation Labels', level=3, num='4.53.28'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels', level=4, num='4.53.28.1'),
+        Heading(name='Appending Scope Labels', level=3, num='4.53.29'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels', level=4, num='4.53.29.1'),
+        Heading(name='Stateful Sets', level=2, num='4.54'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets', level=3, num='4.54.1'),
+        Heading(name='Sticky Identity', level=3, num='4.54.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity', level=4, num='4.54.2.1'),
+        Heading(name='Pods Created From The Same Spec', level=3, num='4.54.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec', level=4, num='4.54.3.1'),
+        Heading(name='Error Handling', level=2, num='4.55'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling', level=3, num='4.55.1'),
+        Heading(name='Health Monitoring', level=3, num='4.55.2'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring', level=4, num='4.55.2.1'),
+        Heading(name='Polling For Ready', level=3, num='4.55.3'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady', level=4, num='4.55.3.1'),
+        Heading(name='Move On Ready', level=3, num='4.55.4'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady', level=4, num='4.55.4.1'),
+        Heading(name='Create Failure', level=3, num='4.55.5'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create', level=4, num='4.55.5.1'),
+        Heading(name='Update Failure', level=3, num='4.55.6'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update', level=4, num='4.55.6.1'),
+        Heading(name='Reverting Back', level=3, num='4.55.7'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create', level=4, num='4.55.7.1'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update', level=4, num='4.55.7.2'),
+        Heading(name='Successful Update Before Failed', level=3, num='4.55.8'),
+        Heading(name='RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing', level=5, num='4.55.8.2.1'),
         ),
     requirements=(
         RQ_SRS_026_ClickHouseOperator,
@@ -7016,6 +7349,15 @@ QA_SRS026_ClickHouse_Operator = Specification(
         RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseInstallationTemplate,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseOperatorConfiguration,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Replicas,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Logger,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Listen_host,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Keeper_server,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Settings_Prometheus,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_PodTemplates,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_volumeClaimTemplates,
+        RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_Connection,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Metadata,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Spec,
         RQ_SRS_026_ClickHouseOperator_CustomResource_Spec_TaskID,
@@ -7220,14 +7562,15 @@ QA_SRS026_ClickHouse_Operator = Specification(
     * 3.9 [Service](#service)
     * 3.10 [PVC](#pvc)
     * 3.11 [CHI](#chi)
-    * 3.12 [Shard](#shard)
-    * 3.13 [Replica](#replica)
-    * 3.14 [ConfigMap](#configmap)
-    * 3.15 [StatefulSet](#statefulset)
-    * 3.16 [`bool enum` Type](#bool-enum-type)
-    * 3.17 [`string` Type](#string-type)
-    * 3.18 [`integer` Type](#integer-type)
-    * 3.19 [`array` Type](#array-type)
+    * 3.12 [CHKI](#chki)
+    * 3.13 [Shard](#shard)
+    * 3.14 [Replica](#replica)
+    * 3.15 [ConfigMap](#configmap)
+    * 3.16 [StatefulSet](#statefulset)
+    * 3.17 [`bool enum` Type](#bool-enum-type)
+    * 3.18 [`string` Type](#string-type)
+    * 3.19 [`integer` Type](#integer-type)
+    * 3.20 [`array` Type](#array-type)
 * 4 [Requirements](#requirements)
     * 4.1 [General](#general)
             * 4.1.0.1 [RQ.SRS-026.ClickHouseOperator](#rqsrs-026clickhouseoperator)
@@ -7399,336 +7742,348 @@ QA_SRS026_ClickHouse_Operator = Specification(
         * 4.31.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.APIVersion](#rqsrs-026clickhouseoperatorcustomresourceapiversion)
     * 4.32 [Resource Kind](#resource-kind)
         * 4.32.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallation](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseinstallation)
-        * 4.32.2 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseinstallationtemplate)
-        * 4.32.3 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseoperatorconfiguration)
-    * 4.33 [Metadata](#metadata)
-        * 4.33.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata](#rqsrs-026clickhouseoperatorcustomresourcemetadata)
-    * 4.34 [Cluster Specification](#cluster-specification)
-        * 4.34.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec](#rqsrs-026clickhouseoperatorcustomresourcespec)
-    * 4.35 [Task Identifier](#task-identifier)
-        * 4.35.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID](#rqsrs-026clickhouseoperatorcustomresourcespectaskid)
-    * 4.36 [Stopping ClickHouse Clusters](#stopping-clickhouse-clusters)
-        * 4.36.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop](#rqsrs-026clickhouseoperatorcustomresourcespecstop)
-    * 4.37 [Restart Policy For StatefulSets](#restart-policy-for-statefulsets)
-        * 4.37.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart](#rqsrs-026clickhouseoperatorcustomresourcespecrestart)
-    * 4.38 [Troubleshooting Pods](#troubleshooting-pods)
-        * 4.38.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot](#rqsrs-026clickhouseoperatorcustomresourcespectroubleshoot)
-    * 4.39 [Custom Domain Suffix](#custom-domain-suffix)
-        * 4.39.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern](#rqsrs-026clickhouseoperatorcustomresourcespecnamespacedomainpattern)
-    * 4.40 [Policy For Auto Applying Templates](#policy-for-auto-applying-templates)
-        * 4.40.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating](#rqsrs-026clickhouseoperatorcustomresourcespectemplating)
-    * 4.41 [Reconciling Cycle](#reconciling-cycle)
-        * 4.41.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle](#rqsrs-026clickhouseoperatorreconcilingcycle)
-        * 4.41.2 [Applying ConfigMaps Before StatefulSets](#applying-configmaps-before-statefulsets)
-            * 4.41.2.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets](#rqsrs-026clickhouseoperatorreconcilingcycleapplyingconfigmapsbeforestatefulsets)
-        * 4.41.3 [Configuring Reconciling Cycle](#configuring-reconciling-cycle)
-            * 4.41.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling](#rqsrs-026clickhouseoperatorcustomresourcespecreconciling)
-        * 4.41.4 [Reconciliation Policy Name](#reconciliation-policy-name)
-            * 4.41.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingpolicy)
-        * 4.41.5 [ConfigMap Propagation Timeout](#configmap-propagation-timeout)
-            * 4.41.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingconfigmappropagationtimeout)
-        * 4.41.6 [Cleaning Objects](#cleaning-objects)
-            * 4.41.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanup)
-        * 4.41.7 [Cleaning Up Unknown Objects](#cleaning-up-unknown-objects)
-            * 4.41.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupunknownobjects)
-        * 4.41.8 [Reconciling Failed Objects](#reconciling-failed-objects)
-            * 4.41.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupreconcilefailedobjects)
-    * 4.42 [Defaults](#defaults)
-            * 4.42.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults](#rqsrs-026clickhouseoperatorcustomresourcespecdefaults)
-        * 4.42.9 [Specifying Storage Management Provisioner](#specifying-storage-management-provisioner)
-            * 4.42.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsstoragemanagementprovisioner)
-        * 4.42.10 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
-            * 4.42.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
-        * 4.42.11 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
-            * 4.42.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
-        * 4.42.12 [Templates](#templates)
-            * 4.42.12.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
-            * 4.42.12.2 [Host Template](#host-template)
-                * 4.42.12.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
-            * 4.42.12.3 [Pod Template](#pod-template)
-                * 4.42.12.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
-            * 4.42.12.4 [Data Volume Claim Template](#data-volume-claim-template)
-                * 4.42.12.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
-            * 4.42.12.5 [Log Volume Claim Template](#log-volume-claim-template)
-                * 4.42.12.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
-            * 4.42.12.6 [Service Template](#service-template)
-                * 4.42.12.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
-            * 4.42.12.7 [Cluster Service Template](#cluster-service-template)
-                * 4.42.12.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
-            * 4.42.12.8 [Shard Service Template](#shard-service-template)
-                * 4.42.12.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
-            * 4.42.12.9 [Replica Service Template](#replica-service-template)
-                * 4.42.12.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
-            * 4.42.12.10 [Volume Claim Template](#volume-claim-template)
-                * 4.42.12.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
-    * 4.43 [ClickHouse Server Configuration](#clickhouse-server-configuration)
-        * 4.43.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration](#rqsrs-026clickhouseoperatorcustomresourcespecconfiguration)
-        * 4.43.2 [ZooKeeper](#zookeeper)
-            * 4.43.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeper)
-            * 4.43.2.2 [ZooKeeper Nodes](#zookeeper-nodes)
-                * 4.43.2.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepernodes)
-            * 4.43.2.3 [Session Timeout](#session-timeout)
-                * 4.43.2.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepersessiontimeoutms)
-            * 4.43.2.4 [Operation Timeout](#operation-timeout)
-                * 4.43.2.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperoperationtimeoutms)
-            * 4.43.2.5 [Root Path](#root-path)
-                * 4.43.2.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperroot)
-            * 4.43.2.6 [Login Credentials](#login-credentials)
-                * 4.43.2.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperidentify)
-        * 4.43.3 [Users](#users)
-            * 4.43.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationusers)
-        * 4.43.4 [Profiles](#profiles)
-            * 4.43.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationprofiles)
-        * 4.43.5 [Quotas](#quotas)
-            * 4.43.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationquotas)
-        * 4.43.6 [Settings](#settings)
-            * 4.43.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationsettings)
-        * 4.43.7 [Files](#files)
-            * 4.43.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationfiles)
-    * 4.44 [ClickHouse Clusters Configuration](#clickhouse-clusters-configuration)
-        * 4.44.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclusters)
-        * 4.44.2 [Cluster Name](#cluster-name)
-            * 4.44.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustername)
-        * 4.44.3 [Cluster ZooKeeper](#cluster-zookeeper)
-            * 4.44.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterzookeeper)
-        * 4.44.4 [Cluster Settings](#cluster-settings)
-            * 4.44.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustersettings)
-        * 4.44.5 [Cluster Files](#cluster-files)
-            * 4.44.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterfiles)
-        * 4.44.6 [Cluster Templates](#cluster-templates)
-            * 4.44.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustertemplates)
-    * 4.45 [ClickHouse Cluster Layout](#clickhouse-cluster-layout)
-        * 4.45.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayout)
-        * 4.45.2 [Layout Type (Deprecated)](#layout-type-deprecated)
-            * 4.45.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayouttype)
-        * 4.45.3 [Layout Shards Count](#layout-shards-count)
-            * 4.45.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardscount)
-        * 4.45.4 [Layout Replicas Count](#layout-replicas-count)
-            * 4.45.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicascount)
-        * 4.45.5 [Layout Shards](#layout-shards)
-            * 4.45.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshards)
-            * 4.45.5.2 [Shard Name](#shard-name)
-                * 4.45.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsname)
-            * 4.45.5.3 [Shard Definition Type (Deprecated)](#shard-definition-type-deprecated)
-                * 4.45.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsdefinitiontype)
-            * 4.45.5.4 [Shard Weight](#shard-weight)
-                * 4.45.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsweight)
-            * 4.45.5.5 [Shard Internnal Replication](#shard-internnal-replication)
-                * 4.45.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsinternalreplication)
-            * 4.45.5.6 [Shard Settings](#shard-settings)
-                * 4.45.5.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardssettings)
-            * 4.45.5.7 [Shard Files](#shard-files)
-                * 4.45.5.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsfiles)
-            * 4.45.5.8 [Shard Templates](#shard-templates)
-                * 4.45.5.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardstemplates)
-            * 4.45.5.9 [Shard Replicas Count](#shard-replicas-count)
-                * 4.45.5.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicascount)
-        * 4.45.6 [Layout Shards Replicas](#layout-shards-replicas)
-            * 4.45.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicas)
-            * 4.45.6.2 [Shard Replica Name](#shard-replica-name)
-                * 4.45.6.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasname)
-            * 4.45.6.3 [Shard Replica TCP Port](#shard-replica-tcp-port)
-                * 4.45.6.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastcpport)
-            * 4.45.6.4 [Shard Replica HTTP Port](#shard-replica-http-port)
-                * 4.45.6.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicashttpport)
-            * 4.45.6.5 [Shard Replica Inter-server HTTP Port](#shard-replica-inter-server-http-port)
-                * 4.45.6.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasinterserverhttpport)
-            * 4.45.6.6 [Shard Replica Settings](#shard-replica-settings)
-                * 4.45.6.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicassettings)
-            * 4.45.6.7 [Shard Replica Files](#shard-replica-files)
-                * 4.45.6.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasfiles)
-            * 4.45.6.8 [Shard Replica Templates](#shard-replica-templates)
-                * 4.45.6.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastemplates)
-        * 4.45.7 [Layout Replicas](#layout-replicas)
-            * 4.45.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicas)
-            * 4.45.7.2 [Replica Name](#replica-name)
-                * 4.45.7.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasname)
-            * 4.45.7.3 [Replica Settings](#replica-settings)
-                * 4.45.7.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicassettings)
-            * 4.45.7.4 [Replica Files](#replica-files)
-                * 4.45.7.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasfiles)
-            * 4.45.7.5 [Replica Templates](#replica-templates)
-                * 4.45.7.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicastemplates)
-            * 4.45.7.6 [Replica Shards Count](#replica-shards-count)
-                * 4.45.7.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardscount)
-        * 4.45.8 [Layout Replicas Shards](#layout-replicas-shards)
-            * 4.45.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshards)
-            * 4.45.8.2 [Replica Shard Name](#replica-shard-name)
-                * 4.45.8.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsname)
-            * 4.45.8.3 [Replica Shard TCP Port](#replica-shard-tcp-port)
-                * 4.45.8.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstcpport)
-            * 4.45.8.4 [Replica Shard HTTP Port](#replica-shard-http-port)
-                * 4.45.8.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardshttpport)
-            * 4.45.8.5 [Replica Shard Inter-server HTTP Port](#replica-shard-inter-server-http-port)
-                * 4.45.8.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsinterserverhttpport)
-            * 4.45.8.6 [Replica Shard Settings](#replica-shard-settings)
-                * 4.45.8.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardssettings)
-            * 4.45.8.7 [Replica Shard Files](#replica-shard-files)
-                * 4.45.8.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsfiles)
-            * 4.45.8.8 [Replica Shard Templates](#replica-shard-templates)
-                * 4.45.8.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstemplates)
-    * 4.46 [User Defined Templates](#user-defined-templates)
-        * 4.46.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplates)
-    * 4.47 [Host Templates](#host-templates)
-        * 4.47.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplates)
-        * 4.47.2 [Host Template Name](#host-template-name)
-            * 4.47.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesname)
-        * 4.47.3 [Host Template Port Distribution](#host-template-port-distribution)
-            * 4.47.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistribution)
-            * 4.47.3.2 [Port Distribution Type](#port-distribution-type)
-                * 4.47.3.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistributiontype)
-        * 4.47.4 [Host Template Specification](#host-template-specification)
-            * 4.47.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspec)
-            * 4.47.4.2 [Host Name](#host-name)
-                * 4.47.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecname)
-            * 4.47.4.3 [Host TCP Port](#host-tcp-port)
-                * 4.47.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectcpport)
-            * 4.47.4.4 [Host HTTP Port](#host-http-port)
-                * 4.47.4.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspechttpport)
-            * 4.47.4.5 [Host Inter-server HTTP Port](#host-inter-server-http-port)
-                * 4.47.4.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecinterserverhttpport)
-            * 4.47.4.6 [Host Settings](#host-settings)
-                * 4.47.4.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecsettings)
-            * 4.47.4.7 [Host Files](#host-files)
-                * 4.47.4.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecfiles)
-            * 4.47.4.8 [Host Overriding Templates](#host-overriding-templates)
-                * 4.47.4.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectemplates)
-    * 4.48 [Pod Templates](#pod-templates)
-        * 4.48.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplates)
-        * 4.48.2 [Pod Name](#pod-name)
-            * 4.48.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesname)
-        * 4.48.3 [Pod Generate Name](#pod-generate-name)
-            * 4.48.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesgeneratename)
-        * 4.48.4 [Pod Zone](#pod-zone)
-            * 4.48.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszone)
-            * 4.48.4.2 [Pod Zone Key](#pod-zone-key)
-                * 4.48.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonekey)
-            * 4.48.4.3 [Pod Zone Values](#pod-zone-values)
-                * 4.48.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonevalues)
-        * 4.48.5 [Pod Distribution](#pod-distribution)
-            * 4.48.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistribution)
-            * 4.48.5.2 [Pod Distribution Type](#pod-distribution-type)
-                * 4.48.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontype)
-            * 4.48.5.3 [Pod Distribution Scope](#pod-distribution-scope)
-                * 4.48.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionscope)
-            * 4.48.5.4 [Pod Distribution Number](#pod-distribution-number)
-                * 4.48.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionnumber)
-            * 4.48.5.5 [Pod Distribution Topology Key](#pod-distribution-topology-key)
-                * 4.48.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontopologykey)
-        * 4.48.6 [Pod Spec](#pod-spec)
-            * 4.48.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesspec)
-        * 4.48.7 [Pod Metadata](#pod-metadata)
-            * 4.48.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesmetadata)
-    * 4.49 [Volume Claim Templates](#volume-claim-templates)
-        * 4.49.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplates)
-        * 4.49.2 [Volume Claim Name](#volume-claim-name)
-            * 4.49.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesname)
-        * 4.49.3 [Volume Claim Reclaim Policy](#volume-claim-reclaim-policy)
-            * 4.49.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesreclaimpolicy)
-        * 4.49.4 [Volume Claim Metadata](#volume-claim-metadata)
-            * 4.49.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesmetadata)
-        * 4.49.5 [Volume Claim Spec](#volume-claim-spec)
-            * 4.49.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesspec)
-    * 4.50 [Service Templates](#service-templates)
-        * 4.50.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplates)
-        * 4.50.2 [Service Name](#service-name)
-            * 4.50.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesname)
-        * 4.50.3 [Service Generate Name](#service-generate-name)
-            * 4.50.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesgeneratename)
-        * 4.50.4 [Service Generate Metadata](#service-generate-metadata)
-            * 4.50.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesmetadata)
-        * 4.50.5 [Service Spec](#service-spec)
-            * 4.50.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesspec)
-    * 4.51 [Use Templates](#use-templates)
-            * 4.51.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplates)
-        * 4.51.6 [Use Template Name](#use-template-name)
-            * 4.51.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesname)
-        * 4.51.7 [Use Template Namespace](#use-template-namespace)
-            * 4.51.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesnamespace)
-        * 4.51.8 [Use Template Use Type](#use-template-use-type)
-            * 4.51.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesusetype)
-    * 4.52 [ClickHouse Operator Configuration](#clickhouse-operator-configuration)
-        * 4.52.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec](#rqsrs-026clickhouseoperatorconfigurationspec)
-        * 4.52.2 [Watched Namespaces](#watched-namespaces)
-            * 4.52.2.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces](#rqsrs-026clickhouseoperatorconfigurationspecwatchnamespaces)
-        * 4.52.3 [ClickHouse Common Configs Path](#clickhouse-common-configs-path)
-            * 4.52.3.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecommonconfigspath)
-        * 4.52.4 [ClickHouse Host Configs Path](#clickhouse-host-configs-path)
-            * 4.52.4.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousehostconfigspath)
-        * 4.52.5 [ClickHouse Users Configs Path](#clickhouse-users-configs-path)
-            * 4.52.5.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseusersconfigspath)
-        * 4.52.6 [Templates Path](#templates-path)
-            * 4.52.6.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath](#rqsrs-026clickhouseoperatorconfigurationspectemplatespath)
-        * 4.52.7 [StatefulSet Update Timeout](#statefulset-update-timeout)
-            * 4.52.7.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatetimeout)
-        * 4.52.8 [StatefulSet Update Poll Period](#statefulset-update-poll-period)
-            * 4.52.8.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatepollperiod)
-        * 4.52.9 [StatefulSet Create Failure Action](#statefulset-create-failure-action)
-            * 4.52.9.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetcreatefailureaction)
-        * 4.52.10 [StatefulSet Update Failure Action](#statefulset-update-failure-action)
-            * 4.52.10.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatefailureaction)
-        * 4.52.11 [ClickHouse Config User Default Profile](#clickhouse-config-user-default-profile)
-            * 4.52.11.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultprofile)
-        * 4.52.12 [ClickHouse Config User Default Quota](#clickhouse-config-user-default-quota)
-            * 4.52.12.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultquota)
-        * 4.52.13 [ClickHouse Config User Default Networks IP](#clickhouse-config-user-default-networks-ip)
-            * 4.52.13.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultnetworksip)
-        * 4.52.14 [ClickHouse Config User Default Password](#clickhouse-config-user-default-password)
-            * 4.52.14.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultpassword)
-        * 4.52.15 [ClickHouse Config Networks Host Regexp Template](#clickhouse-config-networks-host-regexp-template)
-            * 4.52.15.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfignetworkshostregexptemplate)
-        * 4.52.16 [ClickHouse Credentials Secret Namespace](#clickhouse-credentials-secret-namespace)
-            * 4.52.16.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretnamespace)
-        * 4.52.17 [ClickHouse Credentials Secret Name](#clickhouse-credentials-secret-name)
-            * 4.52.17.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretname)
-        * 4.52.18 [ClickHouse Port](#clickhouse-port)
-            * 4.52.18.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseport)
-        * 4.52.19 [Log To `stderr`](#log-to-stderr)
-            * 4.52.19.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr](#rqsrs-026clickhouseoperatorconfigurationspeclogtostderr)
-        * 4.52.20 [Log To `stderr` And Files](#log-to-stderr-and-files)
-            * 4.52.20.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr](#rqsrs-026clickhouseoperatorconfigurationspecalsologtostderr)
-        * 4.52.21 [Verbosity Level](#verbosity-level)
-            * 4.52.21.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel](#rqsrs-026clickhouseoperatorconfigurationspecverbositylevel)
-        * 4.52.22 [Threshold For `stderr`](#threshold-for-stderr)
-            * 4.52.22.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold](#rqsrs-026clickhouseoperatorconfigurationspecstderrthreshold)
-        * 4.52.23 [V Module](#v-module)
-            * 4.52.23.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule](#rqsrs-026clickhouseoperatorconfigurationspecvmodule)
-        * 4.52.24 [Logging Backtrace](#logging-backtrace)
-            * 4.52.24.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace](#rqsrs-026clickhouseoperatorconfigurationspeclogbacktrace)
-        * 4.52.25 [Number Of Threads For Reconciliation Cycle](#number-of-threads-for-reconciliation-cycle)
-            * 4.52.25.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber](#rqsrs-026clickhouseoperatorconfigurationspecreconcilethreadsnumber)
-        * 4.52.26 [Wait Exclude For Reconciliation Cycle](#wait-exclude-for-reconciliation-cycle)
-            * 4.52.26.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitexclude)
-            * 4.52.26.2 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitqueries)
-        * 4.52.27 [Wait Include For Reconciliation Cycle](#wait-include-for-reconciliation-cycle)
-            * 4.52.27.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitinclude)
-        * 4.52.28 [Excluding From Propagation Labels](#excluding-from-propagation-labels)
-            * 4.52.28.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels](#rqsrs-026clickhouseoperatorconfigurationspecexcludefrompropagationlabels)
-        * 4.52.29 [Appending Scope Labels](#appending-scope-labels)
-            * 4.52.29.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels](#rqsrs-026clickhouseoperatorconfigurationspecappendscopelabels)
-    * 4.53 [Stateful Sets](#stateful-sets)
-        * 4.53.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets](#rqsrs-026clickhouseoperatorstatefulsets)
-        * 4.53.2 [Sticky Identity](#sticky-identity)
-            * 4.53.2.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity](#rqsrs-026clickhouseoperatorstatefulsetspodsstickyidentity)
-        * 4.53.3 [Pods Created From The Same Spec](#pods-created-from-the-same-spec)
-            * 4.53.3.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec](#rqsrs-026clickhouseoperatorstatefulsetspodscreatedfromthesamespec)
-    * 4.54 [Error Handling](#error-handling)
-        * 4.54.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling](#rqsrs-026clickhouseoperatorerrorhandling)
-        * 4.54.2 [Health Monitoring](#health-monitoring)
-            * 4.54.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring](#rqsrs-026clickhouseoperatorerrorhandlinghealthmonitoring)
-        * 4.54.3 [Polling For Ready](#polling-for-ready)
-            * 4.54.3.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady](#rqsrs-026clickhouseoperatorerrorhandlingpollingforready)
-        * 4.54.4 [Move On Ready](#move-on-ready)
-            * 4.54.4.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady](#rqsrs-026clickhouseoperatorerrorhandlingmoveonready)
-        * 4.54.5 [Create Failure](#create-failure)
-            * 4.54.5.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create](#rqsrs-026clickhouseoperatorerrorhandlingcreate)
-        * 4.54.6 [Update Failure](#update-failure)
-            * 4.54.6.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update](#rqsrs-026clickhouseoperatorerrorhandlingupdate)
-        * 4.54.7 [Reverting Back](#reverting-back)
-            * 4.54.7.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackcreate)
-            * 4.54.7.2 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackupdate)
-        * 4.54.8 [Successful Update Before Failed](#successful-update-before-failed)
-                * 4.54.8.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing](#rqsrs-026clickhouseoperatorerrorhandlingsuccessfulupdatebeforefaileddonothing)
+        * 4.32.2 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseKeeperInstallation](#rqsrs-026clickhouseoperatorcustomresourcekindclickhousekeeperinstallation)
+        * 4.32.3 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseInstallationTemplate](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseinstallationtemplate)
+        * 4.32.4 [RQ.SRS-026.ClickHouseOperator.CustomResource.Kind.ClickHouseOperatorConfiguration](#rqsrs-026clickhouseoperatorcustomresourcekindclickhouseoperatorconfiguration)
+    * 4.33 [ClickHouseKeeperInstallation](#clickhousekeeperinstallation)
+        * 4.33.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallation)
+        * 4.33.2 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Replicas](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationreplicas)
+        * 4.33.3 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Logger](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationsettingslogger)
+        * 4.33.4 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Listen_host](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationsettingslisten_host)
+        * 4.33.5 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Keeper_server](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationsettingskeeper_server)
+        * 4.33.6 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Prometheus](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationsettingsprometheus)
+        * 4.33.7 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.PodTemplates](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationpodtemplates)
+        * 4.33.8 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.volumeClaimTemplates](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationvolumeclaimtemplates)
+        * 4.33.9 [RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Connection](#rqsrs-026clickhouseoperatorcustomresourceclickhousekeeperinstallationconnection)
+    * 4.34 [Metadata](#metadata)
+        * 4.34.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Metadata](#rqsrs-026clickhouseoperatorcustomresourcemetadata)
+    * 4.35 [Cluster Specification](#cluster-specification)
+        * 4.35.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec](#rqsrs-026clickhouseoperatorcustomresourcespec)
+    * 4.36 [Task Identifier](#task-identifier)
+        * 4.36.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.TaskID](#rqsrs-026clickhouseoperatorcustomresourcespectaskid)
+    * 4.37 [Stopping ClickHouse Clusters](#stopping-clickhouse-clusters)
+        * 4.37.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Stop](#rqsrs-026clickhouseoperatorcustomresourcespecstop)
+    * 4.38 [Restart Policy For StatefulSets](#restart-policy-for-statefulsets)
+        * 4.38.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Restart](#rqsrs-026clickhouseoperatorcustomresourcespecrestart)
+    * 4.39 [Troubleshooting Pods](#troubleshooting-pods)
+        * 4.39.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Troubleshoot](#rqsrs-026clickhouseoperatorcustomresourcespectroubleshoot)
+    * 4.40 [Custom Domain Suffix](#custom-domain-suffix)
+        * 4.40.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.NamespaceDomainPattern](#rqsrs-026clickhouseoperatorcustomresourcespecnamespacedomainpattern)
+    * 4.41 [Policy For Auto Applying Templates](#policy-for-auto-applying-templates)
+        * 4.41.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templating](#rqsrs-026clickhouseoperatorcustomresourcespectemplating)
+    * 4.42 [Reconciling Cycle](#reconciling-cycle)
+        * 4.42.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle](#rqsrs-026clickhouseoperatorreconcilingcycle)
+        * 4.42.2 [Applying ConfigMaps Before StatefulSets](#applying-configmaps-before-statefulsets)
+            * 4.42.2.1 [RQ.SRS-026.ClickHouseOperator.ReconcilingCycle.ApplyingConfigMapsBeforeStatefulSets](#rqsrs-026clickhouseoperatorreconcilingcycleapplyingconfigmapsbeforestatefulsets)
+        * 4.42.3 [Configuring Reconciling Cycle](#configuring-reconciling-cycle)
+            * 4.42.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling](#rqsrs-026clickhouseoperatorcustomresourcespecreconciling)
+        * 4.42.4 [Reconciliation Policy Name](#reconciliation-policy-name)
+            * 4.42.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Policy](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingpolicy)
+        * 4.42.5 [ConfigMap Propagation Timeout](#configmap-propagation-timeout)
+            * 4.42.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.ConfigMapPropagationTimeout](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingconfigmappropagationtimeout)
+        * 4.42.6 [Cleaning Objects](#cleaning-objects)
+            * 4.42.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanup)
+        * 4.42.7 [Cleaning Up Unknown Objects](#cleaning-up-unknown-objects)
+            * 4.42.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.UnknownObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupunknownobjects)
+        * 4.42.8 [Reconciling Failed Objects](#reconciling-failed-objects)
+            * 4.42.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Reconciling.Cleanup.ReconcileFailedObjects](#rqsrs-026clickhouseoperatorcustomresourcespecreconcilingcleanupreconcilefailedobjects)
+    * 4.43 [Defaults](#defaults)
+            * 4.43.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults](#rqsrs-026clickhouseoperatorcustomresourcespecdefaults)
+        * 4.43.9 [Specifying Storage Management Provisioner](#specifying-storage-management-provisioner)
+            * 4.43.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.StorageManagementProvisioner](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsstoragemanagementprovisioner)
+        * 4.43.10 [Specifying Replicas By FQDN](#specifying-replicas-by-fqdn)
+            * 4.43.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.ReplicasUseFQDN](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsreplicasusefqdn)
+        * 4.43.11 [Changing Distributed_DDL Settings](#changing-distributed_ddl-settings)
+            * 4.43.11.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.DistributedDDL](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultsdistributedddl)
+        * 4.43.12 [Templates](#templates)
+            * 4.43.12.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplates)
+            * 4.43.12.2 [Host Template](#host-template)
+                * 4.43.12.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.HostTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateshosttemplate)
+            * 4.43.12.3 [Pod Template](#pod-template)
+                * 4.43.12.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.PodTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatespodtemplate)
+            * 4.43.12.4 [Data Volume Claim Template](#data-volume-claim-template)
+                * 4.43.12.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.dataVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesdatavolumeclaimtemplate)
+            * 4.43.12.5 [Log Volume Claim Template](#log-volume-claim-template)
+                * 4.43.12.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.logVolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplateslogvolumeclaimtemplate)
+            * 4.43.12.6 [Service Template](#service-template)
+                * 4.43.12.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesservicetemplate)
+            * 4.43.12.7 [Cluster Service Template](#cluster-service-template)
+                * 4.43.12.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ClusterServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesclusterservicetemplate)
+            * 4.43.12.8 [Shard Service Template](#shard-service-template)
+                * 4.43.12.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ShardServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesshardservicetemplate)
+            * 4.43.12.9 [Replica Service Template](#replica-service-template)
+                * 4.43.12.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.ReplicaServiceTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesreplicaservicetemplate)
+            * 4.43.12.10 [Volume Claim Template](#volume-claim-template)
+                * 4.43.12.10.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Defaults.Templates.VolumeClaimTemplate](#rqsrs-026clickhouseoperatorcustomresourcespecdefaultstemplatesvolumeclaimtemplate)
+    * 4.44 [ClickHouse Server Configuration](#clickhouse-server-configuration)
+        * 4.44.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration](#rqsrs-026clickhouseoperatorcustomresourcespecconfiguration)
+        * 4.44.2 [ZooKeeper](#zookeeper)
+            * 4.44.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeper)
+            * 4.44.2.2 [ZooKeeper Nodes](#zookeeper-nodes)
+                * 4.44.2.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Nodes](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepernodes)
+            * 4.44.2.3 [Session Timeout](#session-timeout)
+                * 4.44.2.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.SessionTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeepersessiontimeoutms)
+            * 4.44.2.4 [Operation Timeout](#operation-timeout)
+                * 4.44.2.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.OperationTimeoutMs](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperoperationtimeoutms)
+            * 4.44.2.5 [Root Path](#root-path)
+                * 4.44.2.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Root](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperroot)
+            * 4.44.2.6 [Login Credentials](#login-credentials)
+                * 4.44.2.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.ZooKeeper.Identify](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationzookeeperidentify)
+        * 4.44.3 [Users](#users)
+            * 4.44.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Users](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationusers)
+        * 4.44.4 [Profiles](#profiles)
+            * 4.44.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Profiles](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationprofiles)
+        * 4.44.5 [Quotas](#quotas)
+            * 4.44.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Quotas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationquotas)
+        * 4.44.6 [Settings](#settings)
+            * 4.44.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationsettings)
+        * 4.44.7 [Files](#files)
+            * 4.44.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationfiles)
+    * 4.45 [ClickHouse Clusters Configuration](#clickhouse-clusters-configuration)
+        * 4.45.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclusters)
+        * 4.45.2 [Cluster Name](#cluster-name)
+            * 4.45.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustername)
+        * 4.45.3 [Cluster ZooKeeper](#cluster-zookeeper)
+            * 4.45.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.ZooKeeper](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterzookeeper)
+        * 4.45.4 [Cluster Settings](#cluster-settings)
+            * 4.45.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustersettings)
+        * 4.45.5 [Cluster Files](#cluster-files)
+            * 4.45.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterfiles)
+        * 4.45.6 [Cluster Templates](#cluster-templates)
+            * 4.45.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclustertemplates)
+    * 4.46 [ClickHouse Cluster Layout](#clickhouse-cluster-layout)
+        * 4.46.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayout)
+        * 4.46.2 [Layout Type (Deprecated)](#layout-type-deprecated)
+            * 4.46.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Type](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayouttype)
+        * 4.46.3 [Layout Shards Count](#layout-shards-count)
+            * 4.46.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardscount)
+        * 4.46.4 [Layout Replicas Count](#layout-replicas-count)
+            * 4.46.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicascount)
+        * 4.46.5 [Layout Shards](#layout-shards)
+            * 4.46.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshards)
+            * 4.46.5.2 [Shard Name](#shard-name)
+                * 4.46.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsname)
+            * 4.46.5.3 [Shard Definition Type (Deprecated)](#shard-definition-type-deprecated)
+                * 4.46.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.DefinitionType](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsdefinitiontype)
+            * 4.46.5.4 [Shard Weight](#shard-weight)
+                * 4.46.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Weight](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsweight)
+            * 4.46.5.5 [Shard Internnal Replication](#shard-internnal-replication)
+                * 4.46.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.InternalReplication](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsinternalreplication)
+            * 4.46.5.6 [Shard Settings](#shard-settings)
+                * 4.46.5.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardssettings)
+            * 4.46.5.7 [Shard Files](#shard-files)
+                * 4.46.5.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsfiles)
+            * 4.46.5.8 [Shard Templates](#shard-templates)
+                * 4.46.5.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardstemplates)
+            * 4.46.5.9 [Shard Replicas Count](#shard-replicas-count)
+                * 4.46.5.9.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.ReplicasCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicascount)
+        * 4.46.6 [Layout Shards Replicas](#layout-shards-replicas)
+            * 4.46.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicas)
+            * 4.46.6.2 [Shard Replica Name](#shard-replica-name)
+                * 4.46.6.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasname)
+            * 4.46.6.3 [Shard Replica TCP Port](#shard-replica-tcp-port)
+                * 4.46.6.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastcpport)
+            * 4.46.6.4 [Shard Replica HTTP Port](#shard-replica-http-port)
+                * 4.46.6.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicashttpport)
+            * 4.46.6.5 [Shard Replica Inter-server HTTP Port](#shard-replica-inter-server-http-port)
+                * 4.46.6.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasinterserverhttpport)
+            * 4.46.6.6 [Shard Replica Settings](#shard-replica-settings)
+                * 4.46.6.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicassettings)
+            * 4.46.6.7 [Shard Replica Files](#shard-replica-files)
+                * 4.46.6.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicasfiles)
+            * 4.46.6.8 [Shard Replica Templates](#shard-replica-templates)
+                * 4.46.6.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Shards.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutshardsreplicastemplates)
+        * 4.46.7 [Layout Replicas](#layout-replicas)
+            * 4.46.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicas)
+            * 4.46.7.2 [Replica Name](#replica-name)
+                * 4.46.7.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasname)
+            * 4.46.7.3 [Replica Settings](#replica-settings)
+                * 4.46.7.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicassettings)
+            * 4.46.7.4 [Replica Files](#replica-files)
+                * 4.46.7.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasfiles)
+            * 4.46.7.5 [Replica Templates](#replica-templates)
+                * 4.46.7.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicastemplates)
+            * 4.46.7.6 [Replica Shards Count](#replica-shards-count)
+                * 4.46.7.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.ShardsCount](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardscount)
+        * 4.46.8 [Layout Replicas Shards](#layout-replicas-shards)
+            * 4.46.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshards)
+            * 4.46.8.2 [Replica Shard Name](#replica-shard-name)
+                * 4.46.8.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Name](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsname)
+            * 4.46.8.3 [Replica Shard TCP Port](#replica-shard-tcp-port)
+                * 4.46.8.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstcpport)
+            * 4.46.8.4 [Replica Shard HTTP Port](#replica-shard-http-port)
+                * 4.46.8.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardshttpport)
+            * 4.46.8.5 [Replica Shard Inter-server HTTP Port](#replica-shard-inter-server-http-port)
+                * 4.46.8.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsinterserverhttpport)
+            * 4.46.8.6 [Replica Shard Settings](#replica-shard-settings)
+                * 4.46.8.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Settings](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardssettings)
+            * 4.46.8.7 [Replica Shard Files](#replica-shard-files)
+                * 4.46.8.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Files](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardsfiles)
+            * 4.46.8.8 [Replica Shard Templates](#replica-shard-templates)
+                * 4.46.8.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Configuration.Clusters.Cluster.Layout.Replicas.Shards.Templates](#rqsrs-026clickhouseoperatorcustomresourcespecconfigurationclustersclusterlayoutreplicasshardstemplates)
+    * 4.47 [User Defined Templates](#user-defined-templates)
+        * 4.47.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplates)
+    * 4.48 [Host Templates](#host-templates)
+        * 4.48.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplates)
+        * 4.48.2 [Host Template Name](#host-template-name)
+            * 4.48.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesname)
+        * 4.48.3 [Host Template Port Distribution](#host-template-port-distribution)
+            * 4.48.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistribution)
+            * 4.48.3.2 [Port Distribution Type](#port-distribution-type)
+                * 4.48.3.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.PortDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesportdistributiontype)
+        * 4.48.4 [Host Template Specification](#host-template-specification)
+            * 4.48.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspec)
+            * 4.48.4.2 [Host Name](#host-name)
+                * 4.48.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecname)
+            * 4.48.4.3 [Host TCP Port](#host-tcp-port)
+                * 4.48.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.TcpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectcpport)
+            * 4.48.4.4 [Host HTTP Port](#host-http-port)
+                * 4.48.4.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.HttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspechttpport)
+            * 4.48.4.5 [Host Inter-server HTTP Port](#host-inter-server-http-port)
+                * 4.48.4.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.InterServerHttpPort](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecinterserverhttpport)
+            * 4.48.4.6 [Host Settings](#host-settings)
+                * 4.48.4.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Settings](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecsettings)
+            * 4.48.4.7 [Host Files](#host-files)
+                * 4.48.4.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Files](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspecfiles)
+            * 4.48.4.8 [Host Overriding Templates](#host-overriding-templates)
+                * 4.48.4.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.HostTemplates.Spec.Templates](#rqsrs-026clickhouseoperatorcustomresourcespectemplateshosttemplatesspectemplates)
+    * 4.49 [Pod Templates](#pod-templates)
+        * 4.49.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplates)
+        * 4.49.2 [Pod Name](#pod-name)
+            * 4.49.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesname)
+        * 4.49.3 [Pod Generate Name](#pod-generate-name)
+            * 4.49.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesgeneratename)
+        * 4.49.4 [Pod Zone](#pod-zone)
+            * 4.49.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszone)
+            * 4.49.4.2 [Pod Zone Key](#pod-zone-key)
+                * 4.49.4.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Key](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonekey)
+            * 4.49.4.3 [Pod Zone Values](#pod-zone-values)
+                * 4.49.4.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Zone.Values](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplateszonevalues)
+        * 4.49.5 [Pod Distribution](#pod-distribution)
+            * 4.49.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistribution)
+            * 4.49.5.2 [Pod Distribution Type](#pod-distribution-type)
+                * 4.49.5.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Type](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontype)
+            * 4.49.5.3 [Pod Distribution Scope](#pod-distribution-scope)
+                * 4.49.5.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Scope](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionscope)
+            * 4.49.5.4 [Pod Distribution Number](#pod-distribution-number)
+                * 4.49.5.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.Number](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributionnumber)
+            * 4.49.5.5 [Pod Distribution Topology Key](#pod-distribution-topology-key)
+                * 4.49.5.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.podDistribution.TopologyKey](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatespoddistributiontopologykey)
+        * 4.49.6 [Pod Spec](#pod-spec)
+            * 4.49.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesspec)
+        * 4.49.7 [Pod Metadata](#pod-metadata)
+            * 4.49.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.PodTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatespodtemplatesmetadata)
+    * 4.50 [Volume Claim Templates](#volume-claim-templates)
+        * 4.50.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplates)
+        * 4.50.2 [Volume Claim Name](#volume-claim-name)
+            * 4.50.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesname)
+        * 4.50.3 [Volume Claim Reclaim Policy](#volume-claim-reclaim-policy)
+            * 4.50.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.ReclaimPolicy](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesreclaimpolicy)
+        * 4.50.4 [Volume Claim Metadata](#volume-claim-metadata)
+            * 4.50.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesmetadata)
+        * 4.50.5 [Volume Claim Spec](#volume-claim-spec)
+            * 4.50.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.VolumeClaimTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesvolumeclaimtemplatesspec)
+    * 4.51 [Service Templates](#service-templates)
+        * 4.51.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplates)
+        * 4.51.2 [Service Name](#service-name)
+            * 4.51.2.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesname)
+        * 4.51.3 [Service Generate Name](#service-generate-name)
+            * 4.51.3.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.GenerateName](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesgeneratename)
+        * 4.51.4 [Service Generate Metadata](#service-generate-metadata)
+            * 4.51.4.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Metadata](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesmetadata)
+        * 4.51.5 [Service Spec](#service-spec)
+            * 4.51.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.Templates.ServiceTemplates.Spec](#rqsrs-026clickhouseoperatorcustomresourcespectemplatesservicetemplatesspec)
+    * 4.52 [Use Templates](#use-templates)
+            * 4.52.5.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplates)
+        * 4.52.6 [Use Template Name](#use-template-name)
+            * 4.52.6.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Name](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesname)
+        * 4.52.7 [Use Template Namespace](#use-template-namespace)
+            * 4.52.7.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.Namespace](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesnamespace)
+        * 4.52.8 [Use Template Use Type](#use-template-use-type)
+            * 4.52.8.1 [RQ.SRS-026.ClickHouseOperator.CustomResource.Spec.UseTemplates.UseType](#rqsrs-026clickhouseoperatorcustomresourcespecusetemplatesusetype)
+    * 4.53 [ClickHouse Operator Configuration](#clickhouse-operator-configuration)
+        * 4.53.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec](#rqsrs-026clickhouseoperatorconfigurationspec)
+        * 4.53.2 [Watched Namespaces](#watched-namespaces)
+            * 4.53.2.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.WatchNamespaces](#rqsrs-026clickhouseoperatorconfigurationspecwatchnamespaces)
+        * 4.53.3 [ClickHouse Common Configs Path](#clickhouse-common-configs-path)
+            * 4.53.3.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCommonConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecommonconfigspath)
+        * 4.53.4 [ClickHouse Host Configs Path](#clickhouse-host-configs-path)
+            * 4.53.4.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseHostConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhousehostconfigspath)
+        * 4.53.5 [ClickHouse Users Configs Path](#clickhouse-users-configs-path)
+            * 4.53.5.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseUsersConfigsPath](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseusersconfigspath)
+        * 4.53.6 [Templates Path](#templates-path)
+            * 4.53.6.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.TemplatesPath](#rqsrs-026clickhouseoperatorconfigurationspectemplatespath)
+        * 4.53.7 [StatefulSet Update Timeout](#statefulset-update-timeout)
+            * 4.53.7.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateTimeout](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatetimeout)
+        * 4.53.8 [StatefulSet Update Poll Period](#statefulset-update-poll-period)
+            * 4.53.8.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdatePollPeriod](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatepollperiod)
+        * 4.53.9 [StatefulSet Create Failure Action](#statefulset-create-failure-action)
+            * 4.53.9.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetCreateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetcreatefailureaction)
+        * 4.53.10 [StatefulSet Update Failure Action](#statefulset-update-failure-action)
+            * 4.53.10.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StatefulSetUpdateFailureAction](#rqsrs-026clickhouseoperatorconfigurationspecstatefulsetupdatefailureaction)
+        * 4.53.11 [ClickHouse Config User Default Profile](#clickhouse-config-user-default-profile)
+            * 4.53.11.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultProfile](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultprofile)
+        * 4.53.12 [ClickHouse Config User Default Quota](#clickhouse-config-user-default-quota)
+            * 4.53.12.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultQuota](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultquota)
+        * 4.53.13 [ClickHouse Config User Default Networks IP](#clickhouse-config-user-default-networks-ip)
+            * 4.53.13.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultNetworksIP](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultnetworksip)
+        * 4.53.14 [ClickHouse Config User Default Password](#clickhouse-config-user-default-password)
+            * 4.53.14.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigUserDefaultPassword](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfiguserdefaultpassword)
+        * 4.53.15 [ClickHouse Config Networks Host Regexp Template](#clickhouse-config-networks-host-regexp-template)
+            * 4.53.15.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseConfigNetworksHostRegexpTemplate](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseconfignetworkshostregexptemplate)
+        * 4.53.16 [ClickHouse Credentials Secret Namespace](#clickhouse-credentials-secret-namespace)
+            * 4.53.16.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretNamespace](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretnamespace)
+        * 4.53.17 [ClickHouse Credentials Secret Name](#clickhouse-credentials-secret-name)
+            * 4.53.17.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHouseCredentialsSecretName](#rqsrs-026clickhouseoperatorconfigurationspecclickhousecredentialssecretname)
+        * 4.53.18 [ClickHouse Port](#clickhouse-port)
+            * 4.53.18.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ClickHousePort](#rqsrs-026clickhouseoperatorconfigurationspecclickhouseport)
+        * 4.53.19 [Log To `stderr`](#log-to-stderr)
+            * 4.53.19.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogToStderr](#rqsrs-026clickhouseoperatorconfigurationspeclogtostderr)
+        * 4.53.20 [Log To `stderr` And Files](#log-to-stderr-and-files)
+            * 4.53.20.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AlsoLogToStderr](#rqsrs-026clickhouseoperatorconfigurationspecalsologtostderr)
+        * 4.53.21 [Verbosity Level](#verbosity-level)
+            * 4.53.21.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VerbosityLevel](#rqsrs-026clickhouseoperatorconfigurationspecverbositylevel)
+        * 4.53.22 [Threshold For `stderr`](#threshold-for-stderr)
+            * 4.53.22.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.StderrThreshold](#rqsrs-026clickhouseoperatorconfigurationspecstderrthreshold)
+        * 4.53.23 [V Module](#v-module)
+            * 4.53.23.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.VModule](#rqsrs-026clickhouseoperatorconfigurationspecvmodule)
+        * 4.53.24 [Logging Backtrace](#logging-backtrace)
+            * 4.53.24.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.LogBacktrace](#rqsrs-026clickhouseoperatorconfigurationspeclogbacktrace)
+        * 4.53.25 [Number Of Threads For Reconciliation Cycle](#number-of-threads-for-reconciliation-cycle)
+            * 4.53.25.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileThreadsNumber](#rqsrs-026clickhouseoperatorconfigurationspecreconcilethreadsnumber)
+        * 4.53.26 [Wait Exclude For Reconciliation Cycle](#wait-exclude-for-reconciliation-cycle)
+            * 4.53.26.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitExclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitexclude)
+            * 4.53.26.2 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitQueries](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitqueries)
+        * 4.53.27 [Wait Include For Reconciliation Cycle](#wait-include-for-reconciliation-cycle)
+            * 4.53.27.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ReconcileWaitInclude](#rqsrs-026clickhouseoperatorconfigurationspecreconcilewaitinclude)
+        * 4.53.28 [Excluding From Propagation Labels](#excluding-from-propagation-labels)
+            * 4.53.28.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.ExcludeFromPropagationLabels](#rqsrs-026clickhouseoperatorconfigurationspecexcludefrompropagationlabels)
+        * 4.53.29 [Appending Scope Labels](#appending-scope-labels)
+            * 4.53.29.1 [RQ.SRS-026.ClickHouseOperator.Configuration.Spec.AppendScopeLabels](#rqsrs-026clickhouseoperatorconfigurationspecappendscopelabels)
+    * 4.54 [Stateful Sets](#stateful-sets)
+        * 4.54.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets](#rqsrs-026clickhouseoperatorstatefulsets)
+        * 4.54.2 [Sticky Identity](#sticky-identity)
+            * 4.54.2.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsStickyIdentity](#rqsrs-026clickhouseoperatorstatefulsetspodsstickyidentity)
+        * 4.54.3 [Pods Created From The Same Spec](#pods-created-from-the-same-spec)
+            * 4.54.3.1 [RQ.SRS-026.ClickHouseOperator.StatefulSets.PodsCreatedFromTheSameSpec](#rqsrs-026clickhouseoperatorstatefulsetspodscreatedfromthesamespec)
+    * 4.55 [Error Handling](#error-handling)
+        * 4.55.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling](#rqsrs-026clickhouseoperatorerrorhandling)
+        * 4.55.2 [Health Monitoring](#health-monitoring)
+            * 4.55.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.HealthMonitoring](#rqsrs-026clickhouseoperatorerrorhandlinghealthmonitoring)
+        * 4.55.3 [Polling For Ready](#polling-for-ready)
+            * 4.55.3.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.PollingForReady](#rqsrs-026clickhouseoperatorerrorhandlingpollingforready)
+        * 4.55.4 [Move On Ready](#move-on-ready)
+            * 4.55.4.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.MoveOnReady](#rqsrs-026clickhouseoperatorerrorhandlingmoveonready)
+        * 4.55.5 [Create Failure](#create-failure)
+            * 4.55.5.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Create](#rqsrs-026clickhouseoperatorerrorhandlingcreate)
+        * 4.55.6 [Update Failure](#update-failure)
+            * 4.55.6.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Update](#rqsrs-026clickhouseoperatorerrorhandlingupdate)
+        * 4.55.7 [Reverting Back](#reverting-back)
+            * 4.55.7.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Create](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackcreate)
+            * 4.55.7.2 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.Fails.RevertBack.Update](#rqsrs-026clickhouseoperatorerrorhandlingfailsrevertbackupdate)
+        * 4.55.8 [Successful Update Before Failed](#successful-update-before-failed)
+                * 4.55.8.2.1 [RQ.SRS-026.ClickHouseOperator.ErrorHandling.SuccessfulUpdateBeforeFailed.DoNothing](#rqsrs-026clickhouseoperatorerrorhandlingsuccessfulupdatebeforefaileddonothing)
+
 
 ## Revision History
 
@@ -8818,6 +9173,232 @@ For example,
 ```yaml
 kind: "ClickHouseOperatorConfiguration"
 ```
+
+### ClickHouseKeeperInstallation
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation
+version: 1.0
+
+[ClickHouse Operator] SHALL support creating clickhouse-keeper cluster by specifying 
+`ClickHouseKeeperInstallation` custom resource.
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Replicas
+version: 1.0
+
+[ClickHouse Operator] SHALL provide support to define number of replicas of clickhouse-keeper 
+instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.replicas` object.
+
+The user SHALL be able to increase and decrease number of replicas.
+
+For example,
+
+```yaml
+spec:
+  replicas: 3
+```
+
+By default, the number of replicas should be 1.
+
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Logger
+version: 1.0
+
+[ClickHouse Operator] SHALL provide support to define the following settings related to logger of clickhouse-keeper
+instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:
+ * `logger/level`
+ * `logger/console`.
+
+For example,
+
+```yaml
+spec:
+  configuration:
+      settings:
+        logger/level: "trace"
+        logger/console: "true"
+```
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Listen_host
+version: 1.0
+
+[ClickHouse Operator] SHALL provide support to define the listen port of clickhouse-keeper
+instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:
+ * `listen_host`.
+
+For example,
+
+```yaml
+spec:
+  configuration:
+      settings:
+        listen_host: "0.0.0.0"
+```
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Keeper_server
+version: 1.0
+
+[ClickHouse Operator] SHALL provide support to define the following settings of clickhouse-keeper server
+instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:
+ * `keeper_server/storage_path`
+ * `keeper_server/tcp_port`
+ * `keeper_server/four_letter_word_white_list`
+ * `keeper_server/coordination_settings/raft_logs_level`
+ * `keeper_server/coordination_settings/raft_logs_level`
+ * `keeper_server/raft_configuration/server/port`.
+
+For example,
+
+```yaml
+spec:
+  configuration:
+      settings:
+        keeper_server/storage_path: /var/lib/clickhouse-keeper
+        keeper_server/tcp_port: "2181"
+        keeper_server/four_letter_word_white_list: "*"
+        keeper_server/coordination_settings/raft_logs_level: "information"
+        keeper_server/raft_configuration/server/port: "9444"
+```
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Settings.Prometheus
+version: 1.0
+
+[ClickHouse Operator] SHALL provide support to define the following settings related to prometheus of clickhouse-keeper
+instances for the `ClickHouseKeeperInstallation` resource manifest using `.spec.configuration.settings` object:
+ * `prometheus/endpoint`
+ * `prometheus/port`
+ * `prometheus/metrics`
+ * `prometheus/events`
+ * `prometheus/asynchronous_metrics`
+ * `prometheus/status_info`.
+
+
+For example,
+
+```yaml
+spec:
+  configuration:
+      settings:
+        prometheus/endpoint: "/metrics"
+        prometheus/port: "7000"
+        prometheus/metrics: "true"
+        prometheus/events: "true"
+        prometheus/asynchronous_metrics: "true"
+        prometheus/status_info: "false"
+```
+
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.PodTemplates
+version: 1.0
+
+[ClickHouse Operator] SHALL support `.spec.templates.podTemplates` property for the `ClickHouseKeeperInstallation` 
+resource manifest that SHALL allow customization of clickhouse-keeper `Pod`'s configuration.
+
+For example,
+
+```yaml
+spec:
+  templates:
+    podTemplates:
+      - name: pod1
+        metadata:
+          labels:
+            app: clickhouse-keeper
+            what: node
+        spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 50
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: "app"
+                          operator: In
+                          values:
+                            - clickhouse-keeper
+                    topologyKey: "kubernetes.io/hostname"
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:head-alpine"
+              resources:
+                requests:
+                  memory: "256M"
+                  cpu: "1"
+                limits:
+                  memory: "4Gi"
+                  cpu: "2"
+```
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.volumeClaimTemplates
+version: 1.0
+
+[ClickHouse Operator] SHALL support `.spec.templates.volumeClaimTemplates` property for the `ClickHouseKeeperInstallation` 
+resource manifest that SHALL allow customization of clickhouse-keeper `PVC`'s configuration.
+
+For example,
+
+```yaml
+spec:
+  templates:
+    volumeClaimTemplates:
+      - name: t1
+        metadata:
+          name: both-paths
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 25Gi
+```
+
+#### RQ.SRS-026.ClickHouseOperator.CustomResource.ClickHouseKeeperInstallation.Connection
+version: 1.0
+
+[ClickHouse Operator] SHALL support connecting clickhouse server to clickhouse-keeper, 
+using service that can be used in `ClickHouseInstallation` resource manifest that defines clickhouse cluster configuration.
+
+For example, 
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse-keeper
+  labels:
+    app: clickhouse-keeper
+spec:
+  ports:
+    - port: 2181
+      name: client
+    - port: 7000
+      name: prometheus
+  selector:
+    app: clickhouse-keeper
+    what: node
+```
+
+```yaml
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallation"
+metadata:
+  name: clickhouse-with-clickhouse-keeper
+spec:
+  useTemplates:
+    - name: clickhouse-version
+  configuration:
+    zookeeper:
+      nodes:
+        - host: clickhouse-keeper
+          port: 2181
+    clusters:
+      - name: default
+        layout:
+          shardsCount: 2
+          replicasCount: 1
+```
+
 
 ### Metadata
 

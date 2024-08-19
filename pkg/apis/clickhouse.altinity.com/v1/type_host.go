@@ -15,9 +15,12 @@
 package v1
 
 import (
-	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
+
+	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Host defines host (a data replica within a shard) of .spec.configuration.clusters[n].shards[m]
@@ -32,19 +35,21 @@ type Host struct {
 }
 
 type HostSecure struct {
-	Insecure *StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
-	Secure   *StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
+	Insecure *types.StringBool `json:"insecure,omitempty"            yaml:"insecure,omitempty"`
+	Secure   *types.StringBool `json:"secure,omitempty"              yaml:"secure,omitempty"`
 }
 
 type HostPorts struct {
 	// DEPRECATED - to be removed soon
-	Port *Int32 `json:"port,omitempty"  yaml:"port,omitempty"`
+	Port *types.Int32 `json:"port,omitempty"  yaml:"port,omitempty"`
 
-	TCPPort             *Int32 `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
-	TLSPort             *Int32 `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
-	HTTPPort            *Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
-	HTTPSPort           *Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
-	InterserverHTTPPort *Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	TCPPort             *types.Int32 `json:"tcpPort,omitempty"             yaml:"tcpPort,omitempty"`
+	TLSPort             *types.Int32 `json:"tlsPort,omitempty"             yaml:"tlsPort,omitempty"`
+	HTTPPort            *types.Int32 `json:"httpPort,omitempty"            yaml:"httpPort,omitempty"`
+	HTTPSPort           *types.Int32 `json:"httpsPort,omitempty"           yaml:"httpsPort,omitempty"`
+	InterserverHTTPPort *types.Int32 `json:"interserverHTTPPort,omitempty" yaml:"interserverHTTPPort,omitempty"`
+	ZKPort              *types.Int32 `json:"zkPort,omitempty"              yaml:"zkPort,omitempty"`
+	RaftPort            *types.Int32 `json:"raftPort,omitempty"            yaml:"raftPort,omitempty"`
 }
 
 type HostSettings struct {
@@ -57,26 +62,31 @@ type HostRuntime struct {
 	Address             HostAddress                `json:"-" yaml:"-"`
 	Version             *swversion.SoftWareVersion `json:"-" yaml:"-"`
 	reconcileAttributes *HostReconcileAttributes   `json:"-" yaml:"-" testdiff:"ignore"`
-	replicas            *Int32                     `json:"-" yaml:"-"`
+	replicas            *types.Int32               `json:"-" yaml:"-"`
+	hasData             bool                       `json:"-" yaml:"-"`
 
 	// CurStatefulSet is a current stateful set, fetched from k8s
 	CurStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 	// DesiredStatefulSet is a desired stateful set - reconcile target
 	DesiredStatefulSet *apps.StatefulSet `json:"-" yaml:"-" testdiff:"ignore"`
 
-	CHI *ClickHouseInstallation `json:"-" yaml:"-" testdiff:"ignore"`
+	cr ICustomResource `json:"-" yaml:"-" testdiff:"ignore"`
 }
 
-func (r HostRuntime) GetAddress() IHostAddress {
-	return r.Address
+func (r *HostRuntime) GetAddress() IHostAddress {
+	return &r.Address
 }
 
-type IHostRuntime interface {
-	GetAddress() IHostAddress
+func (r *HostRuntime) SetCR(cr ICustomResource) {
+	r.cr = cr
+}
+
+func (r *HostRuntime) GetCR() ICustomResource {
+	return r.cr.(ICustomResource)
 }
 
 func (host *Host) GetRuntime() IHostRuntime {
-	return host.Runtime
+	return &host.Runtime
 }
 
 // GetReconcileAttributes is an ensurer getter
@@ -85,45 +95,53 @@ func (host *Host) GetReconcileAttributes() *HostReconcileAttributes {
 		return nil
 	}
 	if host.Runtime.reconcileAttributes == nil {
-		host.Runtime.reconcileAttributes = NewChiHostReconcileAttributes()
+		host.Runtime.reconcileAttributes = NewHostReconcileAttributes()
 	}
 	return host.Runtime.reconcileAttributes
 }
 
 // InheritSettingsFrom inherits settings from specified shard and replica
-func (host *Host) InheritSettingsFrom(shard *ChiShard, replica *ChiReplica) {
-	if shard != nil {
-		host.Settings = host.Settings.MergeFrom(shard.Settings)
+func (host *Host) InheritSettingsFrom(shard IShard, replica IReplica) {
+	if (shard != nil) && shard.HasSettings() {
+		host.Settings = host.Settings.MergeFrom(shard.GetSettings())
 	}
 
-	if replica != nil {
-		host.Settings = host.Settings.MergeFrom(replica.Settings)
+	if (replica != nil) && replica.HasSettings() {
+		host.Settings = host.Settings.MergeFrom(replica.GetSettings())
 	}
 }
 
 // InheritFilesFrom inherits files from specified shard and replica
-func (host *Host) InheritFilesFrom(shard *ChiShard, replica *ChiReplica) {
-	if shard != nil {
-		host.Files = host.Files.MergeFrom(shard.Files)
+func (host *Host) InheritFilesFrom(shard IShard, replica IReplica) {
+	if (shard != nil) && shard.HasFiles() {
+		host.Files = host.Files.MergeFrom(shard.GetFiles())
 	}
 
-	if replica != nil {
-		host.Files = host.Files.MergeFrom(replica.Files)
+	if (replica != nil) && replica.HasFiles() {
+		host.Files = host.Files.MergeFrom(replica.GetFiles())
 	}
 }
 
-// InheritTemplatesFrom inherits templates from specified shard and replica
-func (host *Host) InheritTemplatesFrom(shard *ChiShard, replica *ChiReplica, template *HostTemplate) {
-	if shard != nil {
-		host.Templates = host.Templates.MergeFrom(shard.Templates, MergeTypeFillEmptyValues)
-	}
-
-	if replica != nil {
-		host.Templates = host.Templates.MergeFrom(replica.Templates, MergeTypeFillEmptyValues)
-	}
-
-	if template != nil {
-		host.Templates = host.Templates.MergeFrom(template.Spec.Templates, MergeTypeFillEmptyValues)
+// InheritTemplatesFrom inherits templates from specified shard, replica or template
+func (host *Host) InheritTemplatesFrom(sources ...any) {
+	for _, source := range sources {
+		switch typed := source.(type) {
+		case IShard:
+			shard := typed
+			if shard.HasTemplates() {
+				host.Templates = host.Templates.MergeFrom(shard.GetTemplates(), MergeTypeFillEmptyValues)
+			}
+		case IReplica:
+			replica := typed
+			if replica.HasTemplates() {
+				host.Templates = host.Templates.MergeFrom(replica.GetTemplates(), MergeTypeFillEmptyValues)
+			}
+		case *HostTemplate:
+			template := typed
+			if template != nil {
+				host.Templates = host.Templates.MergeFrom(template.Spec.Templates, MergeTypeFillEmptyValues)
+			}
+		}
 	}
 
 	host.Templates.HandleDeprecatedFields()
@@ -152,6 +170,12 @@ func (host *Host) MergeFrom(from *Host) {
 	}
 	if !host.InterserverHTTPPort.HasValue() {
 		host.InterserverHTTPPort.MergeFrom(from.InterserverHTTPPort)
+	}
+	if !host.ZKPort.HasValue() {
+		host.ZKPort.MergeFrom(from.ZKPort)
+	}
+	if !host.RaftPort.HasValue() {
+		host.RaftPort.MergeFrom(from.RaftPort)
 	}
 
 	host.Templates = host.Templates.MergeFrom(from.Templates, MergeTypeFillEmptyValues)
@@ -207,9 +231,9 @@ func (host *Host) GetSettings() *Settings {
 }
 
 // GetZookeeper gets zookeeper
-func (host *Host) GetZookeeper() *ChiZookeeperConfig {
+func (host *Host) GetZookeeper() *ZookeeperConfig {
 	cluster := host.GetCluster()
-	return cluster.Zookeeper
+	return cluster.GetZookeeper()
 }
 
 // GetName gets name
@@ -221,11 +245,8 @@ func (host *Host) GetName() string {
 }
 
 // GetCR gets CHI
-func (host *Host) GetCR() *ClickHouseInstallation {
-	if host == nil {
-		return nil
-	}
-	return host.Runtime.CHI
+func (host *Host) GetCR() ICustomResource {
+	return host.GetRuntime().GetCR()
 }
 
 // HasCR checks whether host has CHI
@@ -233,25 +254,28 @@ func (host *Host) HasCR() bool {
 	return host.GetCR() != nil
 }
 
-func (host *Host) SetCR(chi *ClickHouseInstallation) {
-	host.Runtime.CHI = chi
+func (host *Host) SetCR(chi ICustomResource) {
+	host.GetRuntime().SetCR(chi)
 }
 
 // GetCluster gets cluster
-func (host *Host) GetCluster() *Cluster {
+func (host *Host) GetCluster() ICluster {
 	// Host has to have filled Address
 	return host.GetCR().FindCluster(host.Runtime.Address.ClusterName)
 }
 
 // GetShard gets shard
-func (host *Host) GetShard() *ChiShard {
+func (host *Host) GetShard() IShard {
 	// Host has to have filled Address
 	return host.GetCR().FindShard(host.Runtime.Address.ClusterName, host.Runtime.Address.ShardName)
 }
 
 // GetAncestor gets ancestor of a host
 func (host *Host) GetAncestor() *Host {
-	return host.GetCR().GetAncestor().FindHost(
+	if !host.HasAncestorCR() {
+		return nil
+	}
+	return host.GetAncestorCR().FindHost(
 		host.Runtime.Address.ClusterName,
 		host.Runtime.Address.ShardName,
 		host.Runtime.Address.HostName,
@@ -263,14 +287,14 @@ func (host *Host) HasAncestor() bool {
 	return host.GetAncestor() != nil
 }
 
-// GetAncestorCHI gets ancestor of a host
-func (host *Host) GetAncestorCHI() *ClickHouseInstallation {
+// GetAncestorCR gets ancestor of a host
+func (host *Host) GetAncestorCR() ICustomResource {
 	return host.GetCR().GetAncestor()
 }
 
-// HasAncestorCHI checks whether host has an ancestor
-func (host *Host) HasAncestorCHI() bool {
-	return host.GetAncestorCHI() != nil
+// HasAncestorCR checks whether host has an ancestor
+func (host *Host) HasAncestorCR() bool {
+	return host.GetAncestorCR().IsNonZero()
 }
 
 // WalkVolumeClaimTemplates walks VolumeClaimTemplate(s)
@@ -286,7 +310,7 @@ func (host *Host) IsStopped() bool {
 // IsNewOne checks whether host is a new one
 // TODO unify with model HostIsNewOne
 func (host *Host) IsNewOne() bool {
-	return !host.HasAncestor() && (host.GetCR().EnsureStatus().GetHostsCount() == host.GetCR().EnsureStatus().GetHostsAddedCount())
+	return !host.HasAncestor() && (host.GetCR().IEnsureStatus().GetHostsCount() == host.GetCR().IEnsureStatus().GetHostsAddedCount())
 }
 
 // WhichStatefulSet specifies which StatefulSet we are going to process in host functions
@@ -435,9 +459,15 @@ const (
 	ChDefaultHTTPSPortNumber           = int32(8443)
 	ChDefaultInterserverHTTPPortName   = "interserver"
 	ChDefaultInterserverHTTPPortNumber = int32(9009)
+
+	// Keeper open ports names and values
+	KpDefaultZKPortName     = "zk"
+	KpDefaultZKPortNumber   = int32(2181)
+	KpDefaultRaftPortName   = "raft"
+	KpDefaultRaftPortNumber = int32(9444)
 )
 
-func (host *Host) WalkPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+func (host *Host) WalkPorts(f func(name string, port *types.Int32, protocol core.Protocol) bool) {
 	if host == nil {
 		return
 	}
@@ -459,17 +489,62 @@ func (host *Host) WalkPorts(f func(name string, port *Int32, protocol core.Proto
 	if f(ChDefaultInterserverHTTPPortName, host.InterserverHTTPPort, core.ProtocolTCP) {
 		return
 	}
+	if f(KpDefaultZKPortName, host.ZKPort, core.ProtocolTCP) {
+		return
+	}
+	if f(KpDefaultRaftPortName, host.RaftPort, core.ProtocolTCP) {
+		return
+	}
 }
 
-func (host *Host) WalkAssignedPorts(f func(name string, port *Int32, protocol core.Protocol) bool) {
+func (host *Host) WalkSpecifiedPorts(f func(name string, port *types.Int32, protocol core.Protocol) bool) {
 	host.WalkPorts(
-		func(_name string, _port *Int32, _protocol core.Protocol) bool {
+		func(_name string, _port *types.Int32, _protocol core.Protocol) bool {
 			if _port.HasValue() {
-				// Port is assigned - call provided function on it
+				// Port is explicitly specified - call provided function on it
 				return f(_name, _port, _protocol)
 			}
 			// Do not break, continue iterating
 			return false
 		},
 	)
+}
+
+func (host *Host) AppendSpecifiedPortsToContainer(container *core.Container) {
+	// Walk over all assigned ports of the host and append each port to the list of container's ports
+	host.WalkSpecifiedPorts(
+		func(name string, port *types.Int32, protocol core.Protocol) bool {
+			// Append assigned port to the list of container's ports
+			container.Ports = append(container.Ports,
+				core.ContainerPort{
+					Name:          name,
+					ContainerPort: port.Value(),
+					Protocol:      protocol,
+				},
+			)
+			// Do not abort, continue iterating
+			return false
+		},
+	)
+}
+
+func (host *Host) HasListedTablesCreated(name string) bool {
+	return util.InArray(
+		name,
+		host.GetCR().IEnsureStatus().GetHostsWithTablesCreated(),
+	)
+}
+
+func (host *Host) HasData() bool {
+	if host == nil {
+		return false
+	}
+	return host.Runtime.hasData
+}
+
+func (host *Host) SetHasData(hasData bool) {
+	if host == nil {
+		return
+	}
+	host.Runtime.hasData = hasData
 }

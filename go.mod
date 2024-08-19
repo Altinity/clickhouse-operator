@@ -1,6 +1,6 @@
 module github.com/altinity/clickhouse-operator
 
-go 1.20
+go 1.21
 
 replace (
 	github.com/emicklei/go-restful/v3 => github.com/emicklei/go-restful/v3 v3.10.0
@@ -30,6 +30,7 @@ require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Masterminds/semver/v3 v3.2.0
 	github.com/go-logr/logr v1.4.1
+	github.com/go-zookeeper/zk v1.0.3
 	github.com/golang/glog v1.0.0
 	github.com/google/uuid v1.4.0
 	github.com/imdario/mergo v0.3.15
@@ -45,6 +46,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.24.0
 	go.opentelemetry.io/otel/sdk v1.24.0
 	go.opentelemetry.io/otel/sdk/metric v1.24.0
+	golang.org/x/sync v0.3.0
 	gopkg.in/d4l3k/messagediff.v1 v1.2.1
 	gopkg.in/yaml.v3 v3.0.1
 	sigs.k8s.io/controller-runtime v0.15.1

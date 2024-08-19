@@ -513,3 +513,22 @@ spec:
               `broken` - part was marks as broken during startup or merging (check disk, memory, network hardware faillures), look to clickhouse-server.log for details
               `noquorum` - part was detached, cause  part was created during insert into Distributed table with quorum, but quorum was failed.
               `covered-by-broken` - Broken part itself either already moved to detached or does not exist.
+
+        - alert: ClickHouseBackgroundMessageBrokerSchedulePoolUtilizationHigh
+          expr: |
+            (chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize - chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask) < 1
+          for: 10m
+          labels:
+            severity: warning
+            team: ClickHouse
+          annotations:
+            identifier: "{{ $labels.hostname }}"
+            summary: "Background Message Broker Schedule pool utilised high"
+            description: |-
+              chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolTask{tenant='%s',chi='%s',hostname='%s'}" .Labels.tenant .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize = {{ with printf "chi_clickhouse_metric_BackgroundMessageBrokerSchedulePoolSize{tenant='%s',chi='%s',hostname='%s'}" .Labels.tenant .Labels.chi .Labels.hostname | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              - https://kb.altinity.com/altinity-kb-integrations/altinity-kb-kafka/background_message_broker_schedule_pool_size/
+              - https://clickhouse.com/docs/en/operations/server-configuration-parameters/settings#background_message_broker_schedule_pool_size
+              - https://clickhouse.com/docs/en/operations/system-tables/metrics#backgroundmessagebrokerschedulepoolsize
+              This pool is used for tasks related to message streaming from Apache Kafka or other message brokers.
+              You need to increase `background_message_broker_schedule_pool_size` to fix the problem.

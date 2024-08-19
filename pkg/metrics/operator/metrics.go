@@ -132,16 +132,16 @@ func getLabelsFromAnnotations(chi BaseInfoGetter) (labels []string, values []str
 	)
 }
 
-func GetMandatoryLabelsAndValues(chi BaseInfoGetter) (labels []string, values []string) {
-	labelsFromNames, valuesFromNames := getLabelsFromName(chi)
+func GetMandatoryLabelsAndValues(cr BaseInfoGetter) (labels []string, values []string) {
+	labelsFromNames, valuesFromNames := getLabelsFromName(cr)
 	labels = append(labels, labelsFromNames...)
 	values = append(values, valuesFromNames...)
 
-	labelsFromLabels, valuesFromLabels := getLabelsFromLabels(chi)
+	labelsFromLabels, valuesFromLabels := getLabelsFromLabels(cr)
 	labels = append(labels, labelsFromLabels...)
 	values = append(values, valuesFromLabels...)
 
-	labelsFromAnnotations, valuesFromAnnotations := getLabelsFromAnnotations(chi)
+	labelsFromAnnotations, valuesFromAnnotations := getLabelsFromAnnotations(cr)
 	labels = append(labels, labelsFromAnnotations...)
 	values = append(values, valuesFromAnnotations...)
 

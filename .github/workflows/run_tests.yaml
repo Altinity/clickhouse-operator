@@ -4,6 +4,17 @@ on:
     branches:
       - '*'
   workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode'
+        type: choice
+        options:
+        - Run all
+        - Fail fast
+      test_mask:
+        description: 'Wildcard mask to run only some tests. Empty means all.'
+        type: string
+        required: false
 jobs:
   run_tests:
     name: Run Tests
@@ -42,44 +53,50 @@ jobs:
 
       - name: Build clickhouse-operator locally without push to registry
         run: |
-          minikube status          
+          minikube status
           export CHO_RELEASE=$(cat release)
           echo "current release=$CHO_RELEASE"
-          
+
           docker build -f dockerfile/operator/Dockerfile -t altinity/clickhouse-operator:${CHO_RELEASE} --pull .
           docker build -f dockerfile/metrics-exporter/Dockerfile -t altinity/metrics-exporter:${CHO_RELEASE} --pull .
-          
-          docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar 
+
+          docker image save altinity/clickhouse-operator:${CHO_RELEASE} -o operator.tar
           docker image save altinity/metrics-exporter:${CHO_RELEASE} -o metrics-exporter.tar
 
-          minikube image load operator.tar 
+          minikube image load operator.tar
           minikube image load metrics-exporter.tar
 
       - name: Run Tests
+        id: run-tests
+        continue-on-error: true
         run: |
           source ~/venv/qa/bin/activate
           set -x
-        
-          # bash -xe ./deploy/prometheus/create-prometheus.sh
-          # bash -xe ./deploy/minio/install-minio-operator.sh
-          # bash -xe ./deploy/minio/install-minio-tenant.sh
+          set +e # disable the "exit on failure"
 
-          # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-operator.sh
-          # bash -xe /deploy/grafana/grafana-with-grafana-operator/install-grafana-with-operator.sh
-          
-          # docker compose -f ./tests/docker-compose/docker-compose.yml pull runner
-          # ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/*" --trim-results on --debug --log ./tests/raw.log
-
-          # bash ./tests/e2e/run_tests_parallel.sh
           sudo ln -snvf ~/venv/qa/bin/tfs /bin/tfs
-          ONLY='*'
-          # ONLY='*test_008_2*'
 
-          ~/venv/qa/bin/python3 ./tests/regression.py --only "/regression/e2e.test_operator/${ONLY}" --trim-results on --debug --native --log ./tests/raw.log
-          ~/venv/qa/bin/tfs --debug --no-colors transform compact ./tests/raw.log ./tests/compact.log
-          ~/venv/qa/bin/tfs --debug --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
-          ~/venv/qa/bin/tfs --debug --no-colors transform short ./tests/raw.log ./tests/short.log.txt
-          ~/venv/qa/bin/tfs --debug --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity LTD" --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
+          if [[ "${{ github.event.inputs.test_mask }}" != '' ]]
+          then
+            ONLY="${{ github.event.inputs.test_mask }}"
+          else
+            ONLY="*"
+          fi
+
+          if [[ "${{ github.event.inputs.test_mode }}" == 'Run all' ]]
+          then
+            test_mode="--test-to-end"
+          fi
+
+          ~/venv/qa/bin/python3 ./tests/regression.py --only=/regression/e2e.test_operator/${ONLY} $test_mode --trim-results on -o short --native --log ./tests/raw.log
+          test_result=$?
+          ~/venv/qa/bin/tfs --no-colors transform compact ./tests/raw.log ./tests/compact.log
+          ~/venv/qa/bin/tfs --no-colors transform nice ./tests/raw.log ./tests/nice.log.txt
+          ~/venv/qa/bin/tfs --no-colors transform short ./tests/raw.log ./tests/short.log.txt
+          ~/venv/qa/bin/tfs --no-colors report results -a "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/" ./tests/raw.log - --confidential --copyright "Altinity Inc." --logo ./tests/altinity.png | ~/venv/qa/bin/tfs --debug --no-colors document convert > ./tests/report.html
+
+          echo "test_result=$test_result" >> $GITHUB_OUTPUT
+          exit "$test_result"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -96,4 +113,11 @@ jobs:
           path: |
             tests/report.html
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 90
+
+      - name: Test Failed
+        if: ${{ steps.vars.outputs.test_result != '0' }}
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed('Test suite has failures! Check test run status and logs.')

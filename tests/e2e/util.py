@@ -83,7 +83,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
-        if keeper_type == "clickhouse-keeper_with_CHKI":
+        if keeper_type == "CHK":
             keeper_manifest = (
                 "clickhouse-keeper-1-node-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
@@ -102,14 +102,14 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         expected_docs = {
             "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
             "clickhouse-keeper": 7,
-            "clickhouse-keeper_with_CHKI": 2,
+            "CHK": 2,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
         expected_pod_prefix = {
             "zookeeper": "zookeeper",
             "zookeeper-operator": "zookeeper",
             "clickhouse-keeper": "clickhouse-keeper",
-            "clickhouse-keeper_with_CHKI": "clickhouse-keeper"
+            "CHK": "chk-clickhouse-keeper-test-only-0"
         }
         assert (
             docs_count == expected_docs[keeper_type]
@@ -117,10 +117,15 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         with Given(f"Install {keeper_type} {keeper_nodes} nodes"):
             kubectl.apply(get_full_path(keeper_manifest, lookup_in_host=False))
             for pod_num in range(keeper_nodes):
-                kubectl.wait_object("pod", f"{expected_pod_prefix[keeper_type]}-{pod_num}")
+                if keeper_type == "CHK":
+                    pod_name = f"{expected_pod_prefix[keeper_type]}-{pod_num}-0"
+                else:
+                    pod_name = f"{expected_pod_prefix[keeper_type]}-{pod_num}"
+                kubectl.wait_object("pod", pod_name, retries=10)
+
             for pod_num in range(keeper_nodes):
-                kubectl.wait_pod_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "Running")
-                kubectl.wait_container_status(f"{expected_pod_prefix[keeper_type]}-{pod_num}", "true")
+                kubectl.wait_pod_status(pod_name, "Running")
+                kubectl.wait_container_status(pod_name, "true")
 
 
 def wait_clickhouse_cluster_ready(chi):
@@ -310,9 +315,11 @@ def install_operator_version(version, shell=None):
         shell=shell
     )
 
+
 def apply_operator_config(chopconf):
     kubectl.apply(util.get_full_path(chopconf, lookup_in_host=False), current().context.operator_namespace)
     util.restart_operator()
+
 
 def wait_clickhouse_no_readonly_replicas(chi, retries=20):
     expected_replicas = 1

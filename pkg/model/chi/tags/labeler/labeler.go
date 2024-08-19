@@ -14,123 +14,76 @@
 
 package labeler
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
-
-type LabelType string
-
-const (
-	LabelConfigMapCommon      LabelType = "Label cm common"
-	LabelConfigMapCommonUsers LabelType = "Label cm common users"
-	LabelConfigMapHost        LabelType = "Label cm host"
-
-	LabelServiceCR      LabelType = "Label svc chi"
-	LabelServiceCluster LabelType = "Label svc cluster"
-	LabelServiceShard   LabelType = "Label svc shard"
-	LabelServiceHost    LabelType = "Label svc host"
-
-	LabelExistingPV  LabelType = "Label existing pv"
-	LabelNewPVC      LabelType = "Label new pvc"
-	LabelExistingPVC LabelType = "Label existing pvc"
-
-	LabelPDB LabelType = "Label pdb"
-
-	LabelSTS LabelType = "Label STS"
-
-	LabelPodTemplate LabelType = "Label PodTemplate"
-)
-
-type SelectorType string
-
-const (
-	SelectorCHIScope          SelectorType = "SelectorCHIScope"
-	SelectorCHIScopeReady     SelectorType = "SelectorCHIScopeReady"
-	SelectorClusterScope      SelectorType = "SelectorClusterScope"
-	SelectorClusterScopeReady SelectorType = "SelectorClusterScopeReady"
-	SelectorShardScopeReady   SelectorType = "SelectorShardScopeReady"
-	SelectorHostScope         SelectorType = "getSelectorHostScope"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // Labeler is an entity which can label CHI artifacts
 type Labeler struct {
-	Config
-	cr api.ICustomResource
+	*labeler.Labeler
 }
 
-type Config struct {
-	AppendScope bool
-	Include     []string
-	Exclude     []string
-}
-
-// NewLabeler creates new labeler with context
-func NewLabeler(cr api.ICustomResource, config Config) *Labeler {
+// New creates new labeler with context
+func New(cr api.ICustomResource, config ...*labeler.Config) *Labeler {
 	return &Labeler{
-		Config: config,
-		cr:     cr,
+		Labeler: labeler.New(cr, list, config...),
 	}
 }
 
-func (l *Labeler) Label(what LabelType, params ...any) map[string]string {
+func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]string {
 	switch what {
-	case LabelServiceCR:
-		return l.labelServiceCR()
-	case LabelServiceCluster:
-		return l.labelServiceCluster(params...)
-	case LabelServiceShard:
-		return l.labelServiceShard(params...)
-	case LabelServiceHost:
-		return l.labelServiceHost(params...)
+	case interfaces.LabelConfigMapCommon:
+		return l.labelConfigMapCRCommon()
+	case interfaces.LabelConfigMapCommonUsers:
+		return l.labelConfigMapCRCommonUsers()
+	case interfaces.LabelConfigMapHost:
+		return l.labelConfigMapHost(params...)
 
-	case LabelExistingPV:
-		return l.labelExistingPV(params...)
-
-	case LabelNewPVC:
-		return l.labelNewPVC(params...)
-	case LabelExistingPVC:
-		return l.labelExistingPVC(params...)
-
-	case LabelPDB:
-		return l.labelPDB(params...)
-
-	case LabelSTS:
-		return l.labelSTS(params...)
-
-	case LabelPodTemplate:
-		return l.labelPodTemplate(params...)
+	default:
+		return l.Labeler.Label(what, params...)
 	}
 	panic("unknown label type")
 }
 
-func (l *Labeler) Selector(what SelectorType, params ...any) map[string]string {
-	switch what {
-	case SelectorCHIScope:
-		return l.getSelectorCRScope()
-	case SelectorCHIScopeReady:
-		return l.getSelectorCRScopeReady()
-	case SelectorClusterScope:
-		var cluster api.ICluster
-		if len(params) > 0 {
-			cluster = params[0].(api.ICluster)
-			return l.getSelectorClusterScope(cluster)
-		}
-	case SelectorClusterScopeReady:
-		var cluster api.ICluster
-		if len(params) > 0 {
-			cluster = params[0].(api.ICluster)
-			return l.getSelectorClusterScopeReady(cluster)
-		}
-	case SelectorShardScopeReady:
-		var shard api.IShard
-		if len(params) > 0 {
-			shard = params[0].(api.IShard)
-			return l.getSelectorShardScopeReady(shard)
-		}
-	case SelectorHostScope:
-		var host *api.Host
-		if len(params) > 0 {
-			host = params[0].(*api.Host)
-			return l.getSelectorHostScope(host)
-		}
+func (l *Labeler) Selector(what interfaces.SelectorType, params ...any) map[string]string {
+	return l.Labeler.Selector(what, params...)
+}
+
+// labelConfigMapCRCommon
+func (l *Labeler) labelConfigMapCRCommon() map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.GetCRScope(),
+		map[string]string{
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommon),
+		})
+}
+
+// labelConfigMapCRCommonUsers
+func (l *Labeler) labelConfigMapCRCommonUsers() map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.GetCRScope(),
+		map[string]string{
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommonUsers),
+		})
+}
+
+func (l *Labeler) labelConfigMapHost(params ...any) map[string]string {
+	var host *api.Host
+	if len(params) > 0 {
+		host = params[0].(*api.Host)
+		return l._labelConfigMapHost(host)
 	}
-	panic("unknown selector type")
+	panic("not enough params for labeler")
+}
+
+// _labelConfigMapHost
+func (l *Labeler) _labelConfigMapHost(host *api.Host) map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.GetHostScope(host, false),
+		map[string]string{
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueHost),
+		})
 }

@@ -16,32 +16,97 @@ package creator
 
 import (
 	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 )
 
-type ProbeType string
-
-const (
-	ProbeDefaultLiveness  ProbeType = "ProbeDefaultLiveness"
-	ProbeDefaultReadiness ProbeType = "ProbeDefaultReadiness"
-)
-
-type IProbeManager interface {
-	CreateProbe(what ProbeType, host *api.Host) *core.Probe
+type ProbeManager struct {
 }
 
-type ProbeManagerType string
+func NewProbeManager() *ProbeManager {
+	return &ProbeManager{}
+}
 
-const (
-	ProbeManagerTypeClickHouse ProbeManagerType = "clickhouse"
-	ProbeManagerTypeKeeper     ProbeManagerType = "keeper"
-)
-
-func NewProbeManager(what ProbeManagerType) IProbeManager {
+func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
 	switch what {
-	case ProbeManagerTypeClickHouse:
-		return NewProbeManagerClickHouse()
+	case interfaces.ProbeDefaultLiveness:
+		return m.createDefaultClickHouseLivenessProbe(host)
+	case interfaces.ProbeDefaultReadiness:
+		return m.createDefaultClickHouseReadinessProbe(host)
 	}
-	panic("unknown probe manager type")
+	panic("unknown probe type")
+}
+
+// createDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
+func (m *ProbeManager) createDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
+	// Introduce http probe in case http port is specified
+	if host.HTTPPort.HasValue() {
+		return &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				HTTPGet: &core.HTTPGetAction{
+					Path: "/ping",
+					Port: intstr.Parse(api.ChDefaultHTTPPortName), // What if it is not a default?
+				},
+			},
+			InitialDelaySeconds: 60,
+			PeriodSeconds:       3,
+			FailureThreshold:    10,
+		}
+	}
+
+	// Introduce https probe in case https port is specified
+	if host.HTTPSPort.HasValue() {
+		return &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				HTTPGet: &core.HTTPGetAction{
+					Path:   "/ping",
+					Port:   intstr.Parse(api.ChDefaultHTTPSPortName), // What if it is not a default?
+					Scheme: core.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 60,
+			PeriodSeconds:       3,
+			FailureThreshold:    10,
+		}
+	}
+
+	// Probe is not available
+	return nil
+}
+
+// createDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
+func (m *ProbeManager) createDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
+	// Introduce http probe in case http port is specified
+	if host.HTTPPort.HasValue() {
+		return &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				HTTPGet: &core.HTTPGetAction{
+					Path: "/ping",
+					Port: intstr.Parse(api.ChDefaultHTTPPortName), // What if port name is not a default?
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       3,
+		}
+	}
+
+	// Introduce https probe in case https port is specified
+	if host.HTTPSPort.HasValue() {
+		return &core.Probe{
+			ProbeHandler: core.ProbeHandler{
+				HTTPGet: &core.HTTPGetAction{
+					Path:   "/ping",
+					Port:   intstr.Parse(api.ChDefaultHTTPSPortName), // What if port name is not a default?
+					Scheme: core.URISchemeHTTPS,
+				},
+			},
+			InitialDelaySeconds: 10,
+			PeriodSeconds:       3,
+		}
+	}
+
+	// Probe is not available
+	return nil
 }

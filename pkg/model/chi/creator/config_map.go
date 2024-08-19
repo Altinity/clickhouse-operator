@@ -16,44 +16,128 @@ package creator
 
 import (
 	core "k8s.io/api/core/v1"
+	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/macro"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/chi/tags/labeler"
+	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 )
 
-type ConfigMapType string
-
-const (
-	ConfigMapCHICommon      ConfigMapType = "chi common"
-	ConfigMapCHICommonUsers ConfigMapType = "chi common users"
-	ConfigMapCHIHost        ConfigMapType = "chi host"
-)
-
-type IConfigMapManager interface {
-	CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap
-	SetCR(cr api.ICustomResource)
-	SetTagger(tagger iTagger)
-	SetConfigFilesGenerator(configFilesGenerator config.IConfigFilesGenerator)
+type ConfigMapManager struct {
+	cr                   api.ICustomResource
+	or                   interfaces.IOwnerReferencesManager
+	tagger               interfaces.ITagger
+	configFilesGenerator interfaces.IConfigFilesGenerator
+	macro                interfaces.IMacro
+	namer                interfaces.INameManager
+	labeler              interfaces.ILabeler
 }
 
-type ConfigMapManagerType string
-
-const (
-	ConfigMapManagerTypeClickHouse ConfigMapManagerType = "clickhouse"
-	ConfigMapManagerTypeKeeper     ConfigMapManagerType = "keeper"
-)
-
-func NewConfigMapManager(what ConfigMapManagerType) IConfigMapManager {
-	switch what {
-	case ConfigMapManagerTypeClickHouse:
-		return NewConfigMapManagerClickHouse()
+func NewConfigMapManager() *ConfigMapManager {
+	return &ConfigMapManager{
+		or:      NewOwnerReferencer(),
+		macro:   commonMacro.New(macro.List),
+		namer:   namer.New(),
+		labeler: nil,
 	}
-	panic("unknown config map manager type")
 }
 
-func (c *Creator) CreateConfigMap(what ConfigMapType, params ...any) *core.ConfigMap {
-	c.cmm.SetCR(c.cr)
-	c.cmm.SetTagger(c.tagger)
-	c.cmm.SetConfigFilesGenerator(c.configFilesGenerator)
-	return c.cmm.CreateConfigMap(what, params...)
+func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
+	switch what {
+	case interfaces.ConfigMapCommon:
+		var options *config.FilesGeneratorOptions
+		if len(params) > 0 {
+			options = params[0].(*config.FilesGeneratorOptions)
+			return m.createConfigMapCHICommon(options)
+		}
+	case interfaces.ConfigMapCommonUsers:
+		return m.createConfigMapCHICommonUsers()
+	case interfaces.ConfigMapHost:
+		var host *api.Host
+		if len(params) > 0 {
+			host = params[0].(*api.Host)
+			return m.createConfigMapHost(host)
+		}
+	}
+	panic("unknown config map type")
+}
+
+func (m *ConfigMapManager) SetCR(cr api.ICustomResource) {
+	m.cr = cr
+	m.labeler = labeler.New(cr)
+}
+func (m *ConfigMapManager) SetTagger(tagger interfaces.ITagger) {
+	m.tagger = tagger
+}
+func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfaces.IConfigFilesGenerator) {
+	m.configFilesGenerator = configFilesGenerator
+}
+
+// createConfigMapCHICommon creates new core.ConfigMap
+func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGeneratorOptions) *core.ConfigMap {
+	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta.ObjectMeta{
+			Name:            m.namer.Name(interfaces.NameConfigMapCommon, m.cr),
+			Namespace:       m.cr.GetNamespace(),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommon)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupCommon, options),
+	}
+	// And after the object is ready we can put version label
+	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	return cm
+}
+
+// createConfigMapCHICommonUsers creates new core.ConfigMap
+func (m *ConfigMapManager) createConfigMapCHICommonUsers() *core.ConfigMap {
+	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta.ObjectMeta{
+			Name:            m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr),
+			Namespace:       m.cr.GetNamespace(),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommonUsers)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommonUsers)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupUsers),
+	}
+	// And after the object is ready we can put version label
+	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	return cm
+}
+
+// createConfigMapHost creates config map for a host
+func (m *ConfigMapManager) createConfigMapHost(host *api.Host) *core.ConfigMap {
+	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta.ObjectMeta{
+			Name:            m.namer.Name(interfaces.NameConfigMapHost, host),
+			Namespace:       host.GetRuntime().GetAddress().GetNamespace(),
+			Labels:          m.macro.Scope(host).Map(m.tagger.Label(interfaces.LabelConfigMapHost, host)),
+			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
+		},
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, host),
+	}
+	// And after the object is ready we can put version label
+	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	return cm
 }

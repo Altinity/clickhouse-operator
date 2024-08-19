@@ -14,41 +14,27 @@
 
 package normalizer
 
-import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
+)
 
-// Context specifies CHI-related normalization context
+// Context specifies normalization context
 type Context struct {
-	// chi specifies current CHI being normalized
-	chi *api.ClickHouseInstallation
-	// options specifies normalization options
-	options *Options
+	*normalizer.Context
 }
 
 // NewContext creates new Context
-func NewContext(options *Options) *Context {
+func NewContext(options *normalizer.Options) *Context {
 	return &Context{
-		options: options,
+		normalizer.NewContext(options),
 	}
 }
 
 func (c *Context) GetTarget() *api.ClickHouseInstallation {
-	if c == nil {
-		return nil
-	}
-	return c.chi
+	return c.Context.GetTarget().(*api.ClickHouseInstallation)
 }
 
-func (c *Context) SetTarget(chi *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	if c == nil {
-		return nil
-	}
-	c.chi = chi
-	return c.chi
-}
-
-func (c *Context) Options() *Options {
-	if c == nil {
-		return nil
-	}
-	return c.options
+func (c *Context) SetTarget(target *api.ClickHouseInstallation) *api.ClickHouseInstallation {
+	return c.Context.SetTarget(target).(*api.ClickHouseInstallation)
 }

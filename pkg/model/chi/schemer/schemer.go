@@ -16,20 +16,21 @@ package schemer
 
 import (
 	"context"
-	"github.com/altinity/clickhouse-operator/pkg/model/chi/namer"
 	"time"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/clickhouse"
+	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
 // ClusterSchemer specifies cluster schema manager
 type ClusterSchemer struct {
 	*Cluster
-	namer.INameManager
+	interfaces.INameManager
 	version *swversion.SoftWareVersion
 }
 
@@ -37,7 +38,7 @@ type ClusterSchemer struct {
 func NewClusterSchemer(clusterConnectionParams *clickhouse.ClusterConnectionParams, version *swversion.SoftWareVersion) *ClusterSchemer {
 	return &ClusterSchemer{
 		Cluster:      NewCluster().SetClusterConnectionParams(clusterConnectionParams),
-		INameManager: namer.NewNameManager(namer.NameManagerTypeClickHouse),
+		INameManager: managers.NewNameManager(managers.NameManagerTypeClickHouse),
 		version:      version,
 	}
 }
@@ -53,7 +54,7 @@ func (s *ClusterSchemer) HostSyncTables(ctx context.Context, host *api.Host) err
 
 // HostDropReplica calls SYSTEM DROP REPLICA
 func (s *ClusterSchemer) HostDropReplica(ctx context.Context, hostToRunOn, hostToDrop *api.Host) error {
-	replica := s.Name(namer.NameInstanceHostname, hostToDrop)
+	replica := s.Name(interfaces.NameInstanceHostname, hostToDrop)
 	shard := hostToRunOn.Runtime.Address.ShardIndex
 	log.V(1).M(hostToRunOn).F().Info("Drop replica: %v at %v", replica, hostToRunOn.Runtime.Address.HostName)
 	return s.ExecHost(ctx, hostToRunOn, s.sqlDropReplica(shard, replica), clickhouse.NewQueryOptions().SetRetry(false))
