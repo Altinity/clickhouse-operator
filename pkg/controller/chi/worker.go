@@ -28,7 +28,6 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
@@ -92,7 +91,12 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 		schemer: nil,
 
 		normalizer: normalizer.New(func(namespace, name string) (*core.Secret, error) {
-			return c.kubeClient.CoreV1().Secrets(namespace).Get(context.TODO(), name, controller.NewGetOptions())
+			return c.kube.Secret().Get(context.TODO(), &core.Secret{
+				ObjectMeta: meta.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+			})
 		}),
 		start: start,
 		task:  nil,

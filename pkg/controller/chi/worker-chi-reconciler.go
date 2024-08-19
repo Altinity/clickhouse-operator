@@ -25,7 +25,6 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller/chi/kube"
 	"github.com/altinity/clickhouse-operator/pkg/controller/chi/metrics"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
@@ -609,7 +608,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		storage.NewStorageReconciler(
 			w.task,
 			w.c.namer,
-			storage.NewStoragePVC(kube.NewPVC(w.c.kubeClient)),
+			storage.NewStoragePVC(w.c.kube.Storage()),
 		).ReconcilePVCs(ctx, host, api.DesiredStatefulSet),
 	) {
 		// In case of data loss detection on existing volumes, we need to:
@@ -636,7 +635,7 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 	_ = storage.NewStorageReconciler(
 		w.task,
 		w.c.namer,
-		storage.NewStoragePVC(kube.NewPVC(w.c.kubeClient)),
+		storage.NewStoragePVC(w.c.kube.Storage()),
 	).ReconcilePVCs(ctx, host, api.DesiredStatefulSet)
 
 	_ = w.reconcileHostService(ctx, host)
