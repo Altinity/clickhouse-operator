@@ -60,7 +60,7 @@ func (c *PVC) UpdateOrCreate(ctx context.Context, pvc *core.PersistentVolumeClai
 			return pvc, err
 		}
 		// In case of any non-NotFound API error - unable to proceed
-		log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s/%s) err: %v", pvc.Namespace, pvc.Name, err)
+		log.V(1).M(pvc).F().Error("ERROR unable to get PVC(%s) err: %v", util.NamespacedName(pvc), err)
 		return nil, err
 	}
 

@@ -146,7 +146,7 @@ func (w *Reconciler) reconcilePVCFromVolumeMount(
 		w.task.RegistryReconciled().RegisterPVC(pvcReconciled.GetObjectMeta())
 	default:
 		w.task.RegistryFailed().RegisterPVC(pvc.GetObjectMeta())
-		log.M(host).F().Error("Unable to reconcile PVC: %s/%s err: %v", pvc.Namespace, pvc.Name, err)
+		log.M(host).F().Error("Unable to reconcile PVC: %s err: %v", util.NamespacedName(pvc), err)
 	}
 
 	// It still may return data loss errors
@@ -252,8 +252,8 @@ func (w *Reconciler) reconcilePVC(
 		return nil, errNilPVC
 	}
 
-	log.V(2).M(host).S().Info("reconcile PVC (%s/%s/%s)", pvc.Namespace, pvc.Name, host.GetName())
-	defer log.V(2).M(host).E().Info("reconcile PVC (%s/%s/%s)", pvc.Namespace, pvc.Name, host.GetName())
+	log.V(2).M(host).S().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
+	defer log.V(2).M(host).E().Info("reconcile PVC (%s/%s)", util.NamespacedName(pvc), host.GetName())
 
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -266,28 +266,28 @@ func (w *Reconciler) reconcilePVC(
 }
 
 func (w *Reconciler) deletePVC(ctx context.Context, pvc *core.PersistentVolumeClaim) bool {
-	log.V(1).M(pvc).F().S().Info("delete PVC with lost PV start: %s/%s", pvc.Namespace, pvc.Name)
-	defer log.V(1).M(pvc).F().E().Info("delete PVC with lost PV end: %s/%s", pvc.Namespace, pvc.Name)
+	log.V(1).M(pvc).F().S().Info("delete PVC with lost PV start: %s", util.NamespacedName(pvc))
+	defer log.V(1).M(pvc).F().E().Info("delete PVC with lost PV end: %s", util.NamespacedName(pvc))
 
-	log.V(2).M(pvc).F().Info("PVC with lost PV about to be deleted: %s/%s", pvc.Namespace, pvc.Name)
+	log.V(2).M(pvc).F().Info("PVC with lost PV about to be deleted: %s", util.NamespacedName(pvc))
 	w.pvc.Delete(ctx, pvc.Namespace, pvc.Name)
 
 	for i := 0; i < 360; i++ {
 
 		// Check availability
-		log.V(2).M(pvc).F().Info("check PVC with lost PV availability: %s/%s", pvc.Namespace, pvc.Name)
+		log.V(2).M(pvc).F().Info("check PVC with lost PV availability: %s", util.NamespacedName(pvc))
 		curPVC, err := w.pvc.Get(ctx, pvc.Namespace, pvc.Name)
 		if err != nil {
 			if apiErrors.IsNotFound(err) {
-				// Not available - concider to bbe deleted
-				log.V(1).M(pvc).F().Warning("PVC with lost PV was deleted: %s/%s", pvc.Namespace, pvc.Name)
+				// Not available - consider it to be deleted
+				log.V(1).M(pvc).F().Warning("PVC with lost PV was deleted: %s", util.NamespacedName(pvc))
 				return true
 			}
 		}
 
 		// PVC is not deleted (yet?). May be it has finalizers installed. Need to clean them.
 		if len(curPVC.Finalizers) > 0 {
-			log.V(2).M(pvc).F().Info("clean finalizers for PVC with lost PV: %s/%s", pvc.Namespace, pvc.Name)
+			log.V(2).M(pvc).F().Info("clean finalizers for PVC with lost PV: %s", util.NamespacedName(pvc))
 			curPVC.Finalizers = nil
 			w.pvc.UpdateOrCreate(ctx, curPVC)
 		}
