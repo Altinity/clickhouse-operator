@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package subst_settings
+package subst
 
 import (
 	"fmt"
@@ -83,8 +83,8 @@ func substSettingsFieldWithDataFromDataSource(
 	return true
 }
 
-// SubstSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
-func SubstSettingsFieldWithSecretFieldValue(
+// ReplaceSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
+func ReplaceSettingsFieldWithSecretFieldValue(
 	req req,
 	settings settings,
 	dstField string,
@@ -102,8 +102,8 @@ func SubstSettingsFieldWithSecretFieldValue(
 		})
 }
 
-// SubstSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
-func SubstSettingsFieldWithEnvRefToSecretField(
+// ReplaceSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
+func ReplaceSettingsFieldWithEnvRefToSecretField(
 	req req,
 	settings settings,
 	dstField string,
@@ -134,7 +134,7 @@ func SubstSettingsFieldWithEnvRefToSecretField(
 		})
 }
 
-func SubstSettingsFieldWithMountedFile(
+func ReplaceSettingsFieldWithMountedFile(
 	req req,
 	settings *api.Settings,
 	srcSecretRefField string,
