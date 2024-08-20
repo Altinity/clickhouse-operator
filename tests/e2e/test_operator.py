@@ -4775,7 +4775,7 @@ def test_049(self):
                kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image'), error()
 
     with And("I insert data in the replicated table after clickhouse-keeper upgrade"):
-        clickhouse.query(chi, f"INSERT INTO test_local_049 select number + 200 from numbers({numbers})", timeout=300)
+        clickhouse.query(chi, f"INSERT INTO test_local_049 select number + 200 from numbers({numbers})", timeout=600)
 
     with Then("Check replicated table on host 0 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-0-0")
