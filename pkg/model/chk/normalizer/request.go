@@ -19,22 +19,22 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 )
 
-// Context specifies normalization context
-type Context struct {
-	*normalizer.Context
+// Request specifies normalization Request
+type Request struct {
+	*normalizer.Request
 }
 
-// NewContext creates new Context
-func NewContext(options *normalizer.Options) *Context {
-	return &Context{
-		normalizer.NewContext(options),
+// NewRequest creates new Request
+func NewRequest(options *normalizer.Options) *Request {
+	return &Request{
+		normalizer.NewRequest(options),
 	}
 }
 
-func (c *Context) GetTarget() *api.ClickHouseKeeperInstallation {
-	return c.Context.GetTarget().(*api.ClickHouseKeeperInstallation)
+func (c *Request) GetTarget() *api.ClickHouseKeeperInstallation {
+	return c.Request.GetTarget().(*api.ClickHouseKeeperInstallation)
 }
 
-func (c *Context) SetTarget(target *api.ClickHouseKeeperInstallation) *api.ClickHouseKeeperInstallation {
-	return c.Context.SetTarget(target).(*api.ClickHouseKeeperInstallation)
+func (c *Request) SetTarget(target *api.ClickHouseKeeperInstallation) *api.ClickHouseKeeperInstallation {
+	return c.Request.SetTarget(target).(*api.ClickHouseKeeperInstallation)
 }
