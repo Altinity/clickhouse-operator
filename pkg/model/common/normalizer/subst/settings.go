@@ -34,7 +34,7 @@ type settings interface {
 	Name2Key(string) string
 }
 
-type ctx interface {
+type req interface {
 	GetTargetNamespace() string
 	AppendAdditionalEnvVar(envVar core.EnvVar)
 	AppendAdditionalVolume(volume core.Volume)
@@ -85,13 +85,13 @@ func substSettingsFieldWithDataFromDataSource(
 
 // SubstSettingsFieldWithSecretFieldValue substitute users settings field with the value read from k8s secret
 func SubstSettingsFieldWithSecretFieldValue(
-	ctx ctx,
+	req req,
 	settings settings,
 	dstField string,
 	srcSecretRefField string,
 	secretGet SecretGetter,
 ) bool {
-	return substSettingsFieldWithDataFromDataSource(settings, ctx.GetTargetNamespace(), dstField, srcSecretRefField, true,
+	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), dstField, srcSecretRefField, true,
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			secretFieldValue, err := fetchSecretFieldValue(secretAddress, secretGet)
 			if err != nil {
@@ -104,19 +104,19 @@ func SubstSettingsFieldWithSecretFieldValue(
 
 // SubstSettingsFieldWithEnvRefToSecretField substitute users settings field with ref to ENV var where value from k8s secret is stored in
 func SubstSettingsFieldWithEnvRefToSecretField(
-	ctx ctx,
+	req req,
 	settings settings,
 	dstField string,
 	srcSecretRefField string,
 	envVarNamePrefix string,
 	parseScalarString bool,
 ) bool {
-	return substSettingsFieldWithDataFromDataSource(settings, ctx.GetTargetNamespace(), dstField, srcSecretRefField, parseScalarString,
+	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), dstField, srcSecretRefField, parseScalarString,
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			// ENV VAR name and value
 			// In case not OK env var name will be empty and config will be incorrect. CH may not start
 			envVarName, _ := util.BuildShellEnvVarName(envVarNamePrefix + "_" + settings.Name2Key(dstField))
-			ctx.AppendAdditionalEnvVar(
+			req.AppendAdditionalEnvVar(
 				core.EnvVar{
 					Name: envVarName,
 					ValueFrom: &core.EnvVarSource{
@@ -135,12 +135,12 @@ func SubstSettingsFieldWithEnvRefToSecretField(
 }
 
 func SubstSettingsFieldWithMountedFile(
-	ctx ctx,
+	req req,
 	settings *api.Settings,
 	srcSecretRefField string,
 ) bool {
 	var defaultMode int32 = 0644
-	return substSettingsFieldWithDataFromDataSource(settings, ctx.GetTargetNamespace(), "", srcSecretRefField, false,
+	return substSettingsFieldWithDataFromDataSource(settings, req.GetTargetNamespace(), "", srcSecretRefField, false,
 		func(secretAddress api.ObjectAddress) (*api.Setting, error) {
 			volumeName, ok1 := util.BuildRFC1035Label(srcSecretRefField)
 			volumeMountName, ok2 := util.BuildRFC1035Label(srcSecretRefField)
@@ -151,7 +151,7 @@ func SubstSettingsFieldWithMountedFile(
 				return nil, fmt.Errorf("unable to build k8s object name")
 			}
 
-			ctx.AppendAdditionalVolume(core.Volume{
+			req.AppendAdditionalVolume(core.Volume{
 				Name: volumeName,
 				VolumeSource: core.VolumeSource{
 					Secret: &core.SecretVolumeSource{
@@ -174,7 +174,7 @@ func SubstSettingsFieldWithMountedFile(
 			//subPath := filename
 			// Mount as folder
 			subPath := ""
-			ctx.AppendAdditionalVolumeMount(core.VolumeMount{
+			req.AppendAdditionalVolumeMount(core.VolumeMount{
 				Name:      volumeMountName,
 				ReadOnly:  true,
 				MountPath: mountPath,
