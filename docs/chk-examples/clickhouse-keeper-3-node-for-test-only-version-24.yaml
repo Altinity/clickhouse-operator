@@ -33,6 +33,9 @@ spec:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
               image: "clickhouse/clickhouse-keeper:24.3.5.46"
+              volumeMounts:
+                - name: default
+                  mountPath: /var/lib/clickhouse-keeper
     volumeClaimTemplates:
       - name: default
         spec:
