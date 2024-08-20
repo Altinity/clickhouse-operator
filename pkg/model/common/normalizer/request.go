@@ -28,8 +28,8 @@ type Request struct {
 	options *Options
 }
 
-// NewContext creates new Context
-func NewContext(options *Options) *Request {
+// NewRequest creates new Context
+func NewRequest(options *Options) *Request {
 	return &Request{
 		options: options,
 	}
