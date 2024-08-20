@@ -4757,7 +4757,7 @@ def test_049(self):
         assert keeper_version_from in \
                kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
 
-    with Then("I change keeper version"):
+    with Then(f"I change keeper version to {keeper_version_to}"):
         cmd = f"""patch chk clickhouse-keeper --type='json' --patch='[{{"op":"replace","path":"/spec/templates/podTemplates/0/spec/containers/0/image","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]'"""
         kubectl.launch(cmd)
 

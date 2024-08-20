@@ -33,6 +33,14 @@ spec:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
               image: "clickhouse/clickhouse-keeper:24.3.5.46"
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
   configuration:
     clusters:
       - name: "test-only"
