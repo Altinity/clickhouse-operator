@@ -4728,7 +4728,7 @@ def test_049(self):
                 "do_not_delete": 1,
             },
         )
-    numbers = 100
+
     with When("I create replicated table"):
         create_table = """
             CREATE TABLE test_local_049 ON CLUSTER 'default' (a UInt32)
@@ -4754,26 +4754,28 @@ def test_049(self):
         assert out == f"{numbers}", error()
 
     with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
-        assert keeper_version_to in \
+        assert keeper_version_from in \
                kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
 
     with Then("I change keeper version"):
-        cmd = f'patch chk clickhouse-keeper --type=\'json\' --patch=\'[{{"op":"replace","path":"/spec/templates/podTemplates[0]/spec/containers[0]/imaage","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]\''
-        kubectl.exec(cmd)
+        cmd = f"""patch chk clickhouse-keeper --type='json' --patch='[{{"op":"replace","path":"/spec/templates/podTemplates/0/spec/containers/0/image","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]'"""
+        kubectl.launch(cmd)
+
+    with Then("I wait CHK status 1"):
         kubectl.wait_chk_status('clickhouse-keeper', 'InProgress')
+    with Then("I wait CHK status 2"):
         kubectl.wait_chk_status('clickhouse-keeper', 'Completed')
 
     with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
         assert keeper_version_to in \
-                kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
         assert keeper_version_to in \
-                kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image'), error()
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image'), error()
         assert keeper_version_to in \
-                kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image'), error()
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image'), error()
 
     with And("I insert data in the replicated table after clickhouse-keeper upgrade"):
-        clickhouse.query(chi, f"INSERT INTO test_local_049 select number + 200 from numbers({numbers})",
-                         host=f"chi-{chi}-{cluster}-0-0-0")
+        clickhouse.query(chi, f"INSERT INTO test_local_049 select number + 200 from numbers({numbers})")
 
     with Then("Check replicated table on host 0 has all rows"):
         out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-0-0")
@@ -4785,6 +4787,8 @@ def test_049(self):
     with Finally("I clean up"):
         with By("deleting chi"):
             kubectl.delete_chi(chi)
+        with By("deleting chk"):
+            kubectl.delete_chk("clickhouse-keeper")
         with And("deleting test namespace"):
             delete_test_namespace()
 
