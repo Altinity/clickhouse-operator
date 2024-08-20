@@ -23,7 +23,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst_settings"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 )
 
 const envVarNamePrefixConfigurationUsers = "CONFIGURATION_USERS"
@@ -40,8 +40,8 @@ func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser)
 			// TODO remove as obsoleted
 			// Skip this user field, it will be processed later
 		} else {
-			subst_settings.SubstSettingsFieldWithEnvRefToSecretField(
-				n.ctx,
+			subst.ReplaceSettingsFieldWithEnvRefToSecretField(
+				n.req,
 				user,
 				name,
 				name,
@@ -55,14 +55,14 @@ func (n *Normalizer) normalizeConfigurationUserSecretRef(user *api.SettingsUser)
 // normalizeConfigurationUserPassword deals with user passwords
 func (n *Normalizer) normalizeConfigurationUserPassword(user *api.SettingsUser) {
 	// Values from the secret have higher priority than explicitly specified settings
-	subst_settings.SubstSettingsFieldWithSecretFieldValue(n.ctx, user, "password", "k8s_secret_password", n.secretGet)
-	subst_settings.SubstSettingsFieldWithSecretFieldValue(n.ctx, user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex", n.secretGet)
-	subst_settings.SubstSettingsFieldWithSecretFieldValue(n.ctx, user, "password_sha256_hex", "k8s_secret_password_sha256_hex", n.secretGet)
+	subst.ReplaceSettingsFieldWithSecretFieldValue(n.req, user, "password", "k8s_secret_password", n.secretGet)
+	subst.ReplaceSettingsFieldWithSecretFieldValue(n.req, user, "password_double_sha1_hex", "k8s_secret_password_double_sha1_hex", n.secretGet)
+	subst.ReplaceSettingsFieldWithSecretFieldValue(n.req, user, "password_sha256_hex", "k8s_secret_password_sha256_hex", n.secretGet)
 
 	// Values from the secret passed via ENV have even higher priority
-	subst_settings.SubstSettingsFieldWithEnvRefToSecretField(n.ctx, user, "password", "k8s_secret_env_password", envVarNamePrefixConfigurationUsers, true)
-	subst_settings.SubstSettingsFieldWithEnvRefToSecretField(n.ctx, user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", envVarNamePrefixConfigurationUsers, true)
-	subst_settings.SubstSettingsFieldWithEnvRefToSecretField(n.ctx, user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", envVarNamePrefixConfigurationUsers, true)
+	subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, user, "password", "k8s_secret_env_password", envVarNamePrefixConfigurationUsers, true)
+	subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, user, "password_sha256_hex", "k8s_secret_env_password_sha256_hex", envVarNamePrefixConfigurationUsers, true)
+	subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, user, "password_double_sha1_hex", "k8s_secret_env_password_double_sha1_hex", envVarNamePrefixConfigurationUsers, true)
 
 	// Out of all passwords, password_double_sha1_hex has top priority, thus keep it only
 	if user.Has("password_double_sha1_hex") {
@@ -139,14 +139,14 @@ func (n *Normalizer) normalizeConfigurationUserEnsureMandatoryFields(user *api.S
 	profile := chop.Config().ClickHouse.Config.User.Default.Profile
 	quota := chop.Config().ClickHouse.Config.User.Default.Quota
 	ips := append([]string{}, chop.Config().ClickHouse.Config.User.Default.NetworksIP...)
-	hostRegexp := n.namer.Name(interfaces.NamePodHostnameRegexp, n.ctx.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
+	hostRegexp := n.namer.Name(interfaces.NamePodHostnameRegexp, n.req.GetTarget(), chop.Config().ClickHouse.Config.Network.HostRegexpTemplate)
 
 	// Some users may have special options for mandatory fields
 	switch user.Username() {
 	case defaultUsername:
 		// "default" user
-		ips = append(ips, n.ctx.Options().DefaultUserAdditionalIPs...)
-		if !n.ctx.Options().DefaultUserInsertHostRegex {
+		ips = append(ips, n.req.Options().DefaultUserAdditionalIPs...)
+		if !n.req.Options().DefaultUserInsertHostRegex {
 			hostRegexp = ""
 		}
 	case chop.Config().ClickHouse.Access.Username:

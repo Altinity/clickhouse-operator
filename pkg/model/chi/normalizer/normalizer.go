@@ -36,7 +36,7 @@ import (
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
-	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst_settings"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/subst"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/normalizer/templates"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -44,15 +44,15 @@ import (
 
 // Normalizer specifies structures normalizer
 type Normalizer struct {
-	secretGet subst_settings.SecretGetter
-	ctx       *Context
+	secretGet subst.SecretGetter
+	req       *Request
 	namer     interfaces.INameManager
 	macro     interfaces.IMacro
 	labeler   interfaces.ILabeler
 }
 
 // New creates new normalizer
-func New(secretGet subst_settings.SecretGetter) *Normalizer {
+func New(secretGet subst.SecretGetter) *Normalizer {
 	return &Normalizer{
 		secretGet: secretGet,
 		namer:     managers.NewNameManager(managers.NameManagerTypeClickHouse),
@@ -66,8 +66,8 @@ func (n *Normalizer) CreateTemplated(subj *api.ClickHouseInstallation, options *
 	*api.ClickHouseInstallation,
 	error,
 ) {
-	// Normalization starts with a new context
-	n.buildContext(options)
+	// Normalization starts with a new request
+	n.buildRequest(options)
 	// Ensure normalization subject presence
 	subj = n.ensureSubject(subj)
 	// Build target from all templates and subject
@@ -76,26 +76,26 @@ func (n *Normalizer) CreateTemplated(subj *api.ClickHouseInstallation, options *
 	return n.normalizeTarget()
 }
 
-func (n *Normalizer) buildContext(options *normalizer.Options) {
-	n.ctx = NewContext(options)
+func (n *Normalizer) buildRequest(options *normalizer.Options) {
+	n.req = NewRequest(options)
 }
 
 func (n *Normalizer) buildTargetFromTemplates(subj *api.ClickHouseInstallation) {
 	// Create new target that will be populated with data during normalization process
-	n.ctx.SetTarget(n.createTarget())
+	n.req.SetTarget(n.createTarget())
 
-	// At this moment we have target available - is either newly created or a system-wide template
+	// At this moment we have target available - it is either newly created or a system-wide template
 
-	// Apply templates - both auto and explicitly requested - on top of target
-	n.applyTemplatesOnTarget(subj)
+	// Apply CR templates - both auto and explicitly requested - on top of target
+	n.applyCRTemplatesOnTarget(subj)
 
-	// After all templates applied, place provided 'subject' on top of the whole stack (target)
-	n.ctx.GetTarget().MergeFrom(subj, api.MergeTypeOverrideByNonEmptyValues)
+	// After all CR templates applied, place provided 'subject' on top of the whole stack (target)
+	n.req.GetTarget().MergeFrom(subj, api.MergeTypeOverrideByNonEmptyValues)
 }
 
-func (n *Normalizer) applyTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
-	for _, template := range crTemplatesNormalizer.ApplyTemplates(n.ctx.GetTarget(), subj) {
-		n.ctx.GetTarget().EnsureStatus().PushUsedTemplate(template)
+func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
+	for _, template := range crTemplatesNormalizer.ApplyTemplates(n.req.GetTarget(), subj) {
+		n.req.GetTarget().EnsureStatus().PushUsedTemplate(template)
 	}
 }
 
@@ -114,7 +114,7 @@ func (n *Normalizer) shouldCreateDefaultCluster(subj *api.ClickHouseInstallation
 }
 
 func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickHouseInstallation {
-	n.ctx.Options().WithDefaultCluster = n.shouldCreateDefaultCluster(subj)
+	n.req.Options().WithDefaultCluster = n.shouldCreateDefaultCluster(subj)
 
 	if subj == nil {
 		// Need to create subject
@@ -125,18 +125,18 @@ func (n *Normalizer) ensureSubject(subj *api.ClickHouseInstallation) *api.ClickH
 	}
 }
 
-func (n *Normalizer) GetTargetTemplate() *api.ClickHouseInstallation {
+func (n *Normalizer) getTargetTemplate() *api.ClickHouseInstallation {
 	return chop.Config().Template.CHI.Runtime.Template
 }
 
-func (n *Normalizer) HasTargetTemplate() bool {
-	return n.GetTargetTemplate() != nil
+func (n *Normalizer) hasTargetTemplate() bool {
+	return n.getTargetTemplate() != nil
 }
 
 func (n *Normalizer) createTarget() *api.ClickHouseInstallation {
-	if n.HasTargetTemplate() {
+	if n.hasTargetTemplate() {
 		// Template specified - start with template
-		return n.GetTargetTemplate().DeepCopy()
+		return n.getTargetTemplate().DeepCopy()
 	} else {
 		// No template specified - start with clear page
 		return n.newSubject()
@@ -149,38 +149,38 @@ func (n *Normalizer) normalizeTarget() (*api.ClickHouseInstallation, error) {
 	n.finalize()
 	n.fillStatus()
 
-	return n.ctx.GetTarget(), nil
+	return n.req.GetTarget(), nil
 }
 
 func (n *Normalizer) normalizeSpec() {
 	// Walk over Spec datatype fields
-	n.ctx.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.ctx.GetTarget().GetSpecT().TaskID)
-	n.ctx.GetTarget().GetSpecT().UseTemplates = n.normalizeUseTemplates(n.ctx.GetTarget().GetSpecT().UseTemplates)
-	n.ctx.GetTarget().GetSpecT().Stop = n.normalizeStop(n.ctx.GetTarget().GetSpecT().Stop)
-	n.ctx.GetTarget().GetSpecT().Restart = n.normalizeRestart(n.ctx.GetTarget().GetSpecT().Restart)
-	n.ctx.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.ctx.GetTarget().GetSpecT().Troubleshoot)
-	n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.ctx.GetTarget().GetSpecT().NamespaceDomainPattern)
-	n.ctx.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.ctx.GetTarget().GetSpecT().Templating)
-	n.ctx.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.ctx.GetTarget().GetSpecT().Reconciling)
-	n.ctx.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.ctx.GetTarget().GetSpecT().Defaults)
-	n.ctx.GetTarget().GetSpecT().Configuration = n.normalizeConfiguration(n.ctx.GetTarget().GetSpecT().Configuration)
-	n.ctx.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.ctx.GetTarget().GetSpecT().Templates)
+	n.req.GetTarget().GetSpecT().TaskID = n.normalizeTaskID(n.req.GetTarget().GetSpecT().TaskID)
+	n.req.GetTarget().GetSpecT().UseTemplates = n.normalizeUseTemplates(n.req.GetTarget().GetSpecT().UseTemplates)
+	n.req.GetTarget().GetSpecT().Stop = n.normalizeStop(n.req.GetTarget().GetSpecT().Stop)
+	n.req.GetTarget().GetSpecT().Restart = n.normalizeRestart(n.req.GetTarget().GetSpecT().Restart)
+	n.req.GetTarget().GetSpecT().Troubleshoot = n.normalizeTroubleshoot(n.req.GetTarget().GetSpecT().Troubleshoot)
+	n.req.GetTarget().GetSpecT().NamespaceDomainPattern = n.normalizeNamespaceDomainPattern(n.req.GetTarget().GetSpecT().NamespaceDomainPattern)
+	n.req.GetTarget().GetSpecT().Templating = n.normalizeTemplating(n.req.GetTarget().GetSpecT().Templating)
+	n.req.GetTarget().GetSpecT().Reconciling = n.normalizeReconciling(n.req.GetTarget().GetSpecT().Reconciling)
+	n.req.GetTarget().GetSpecT().Defaults = n.normalizeDefaults(n.req.GetTarget().GetSpecT().Defaults)
+	n.req.GetTarget().GetSpecT().Configuration = n.normalizeConfiguration(n.req.GetTarget().GetSpecT().Configuration)
+	n.req.GetTarget().GetSpecT().Templates = n.normalizeTemplates(n.req.GetTarget().GetSpecT().Templates)
 	// UseTemplates already done
 }
 
 // finalize performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalize() {
-	n.ctx.GetTarget().Fill()
-	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
+	n.req.GetTarget().Fill()
+	n.req.GetTarget().WalkHosts(func(host *api.Host) error {
 		n.hostApplyHostTemplateSpecifiedOrDefault(host)
 		return nil
 	})
-	n.fillCHIAddressInfo()
+	n.fillCRAddressInfo()
 }
 
-// fillCHIAddressInfo
-func (n *Normalizer) fillCHIAddressInfo() {
-	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
+// fillCRAddressInfo
+func (n *Normalizer) fillCRAddressInfo() {
+	n.req.GetTarget().WalkHosts(func(host *api.Host) error {
 		host.Runtime.Address.StatefulSet = n.namer.Name(interfaces.NameStatefulSet, host)
 		host.Runtime.Address.FQDN = n.namer.Name(interfaces.NameFQDN, host)
 		return nil
@@ -189,16 +189,16 @@ func (n *Normalizer) fillCHIAddressInfo() {
 
 // fillStatus fills .status section of a CHI with values based on current CHI
 func (n *Normalizer) fillStatus() {
-	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.ctx.GetTarget(), n.ctx.GetTarget().GetSpec().GetNamespaceDomainPattern())
+	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
-	n.ctx.GetTarget().WalkHosts(func(host *api.Host) error {
+	n.req.GetTarget().WalkHosts(func(host *api.Host) error {
 		pods = append(pods, n.namer.Name(interfaces.NamePod, host))
 		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
 		return nil
 	})
 	ip, _ := chop.Get().ConfigManager.GetRuntimeParam(deployment.OPERATOR_POD_IP)
-	n.ctx.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
+	n.req.GetTarget().FillStatus(endpoint, pods, fqdns, ip)
 }
 
 // normalizeTaskID normalizes .spec.taskID
@@ -424,33 +424,33 @@ func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
 func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
 	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
-	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
 func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
-	if len(n.ctx.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
-		replicasCount = n.ctx.GetTarget().GetSpecT().Configuration.Clusters[0].Layout.ReplicasCount
+	if len(n.req.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
+		replicasCount = n.req.GetTarget().GetSpecT().Configuration.Clusters[0].Layout.ReplicasCount
 	}
 	templates.NormalizePodTemplate(n.macro, n.labeler, replicasCount, template)
 	// Introduce PodTemplate into Index
-	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsurePodTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
 func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
 	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
-	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
 func (n *Normalizer) normalizeServiceTemplate(template *api.ServiceTemplate) {
 	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
-	n.ctx.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
+	n.req.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeUseTemplates is a wrapper to hold the name of normalized section
@@ -477,7 +477,7 @@ func (n *Normalizer) ensureClusters(clusters []*api.ChiCluster) []*api.ChiCluste
 	}
 
 	// In case no clusters available, we may want to create a default one
-	if n.ctx.Options().WithDefaultCluster {
+	if n.req.Options().WithDefaultCluster {
 		return []*api.ChiCluster{
 			commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*api.ChiCluster),
 		}
@@ -518,8 +518,8 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 		return
 	case api.ClusterSecretSourceSecretRef:
 		// Secret has explicit SecretKeyRef
-		// Set the password for internode communication using an ENV VAR
-		n.ctx.AppendAdditionalEnvVar(
+		// Set the password for inter-node communication using an ENV VAR
+		n.req.AppendAdditionalEnvVar(
 			core.EnvVar{
 				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -529,8 +529,8 @@ func (n *Normalizer) appendClusterSecretEnvVar(cluster api.ICluster) {
 		)
 	case api.ClusterSecretSourceAuto:
 		// Secret is auto-generated
-		// Set the password for internode communication using an ENV VAR
-		n.ctx.AppendAdditionalEnvVar(
+		// Set the password for inter-node communication using an ENV VAR
+		n.req.AppendAdditionalEnvVar(
 			core.EnvVar{
 				Name: config.InternodeClusterSecretEnvName,
 				ValueFrom: &core.EnvVarSource{
@@ -621,7 +621,7 @@ func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api
 	settings.Normalize()
 
 	settings.WalkSafe(func(name string, setting *api.Setting) {
-		subst_settings.SubstSettingsFieldWithEnvRefToSecretField(n.ctx, settings, name, name, envVarNamePrefixConfigurationSettings, false)
+		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings, false)
 	})
 	return settings
 }
@@ -634,29 +634,34 @@ func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Setti
 	files.Normalize()
 
 	files.WalkSafe(func(key string, setting *api.Setting) {
-		subst_settings.SubstSettingsFieldWithMountedFile(n.ctx, files, key)
+		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
 	})
 
 	return files
 }
 
+func ensureCluster(cluster *api.ChiCluster) *api.ChiCluster {
+	if cluster == nil {
+		return commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*api.ChiCluster)
+	} else {
+		return cluster
+	}
+}
+
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
 func (n *Normalizer) normalizeCluster(cluster *api.ChiCluster) *api.ChiCluster {
-	// Ensure cluster
-	if cluster == nil {
-		cluster = commonCreator.CreateCluster(interfaces.ClusterCHIDefault).(*api.ChiCluster)
-	}
+	cluster = ensureCluster(cluster)
 
 	// Runtime has to be prepared first
-	cluster.GetRuntime().SetCR(n.ctx.GetTarget())
+	cluster.GetRuntime().SetCR(n.req.GetTarget())
 
 	// Then we need to inherit values from the parent
 	// Inherit from .spec.configuration.zookeeper
-	cluster.InheritZookeeperFrom(n.ctx.GetTarget())
+	cluster.InheritZookeeperFrom(n.req.GetTarget())
 	// Inherit from .spec.configuration.files
-	cluster.InheritFilesFrom(n.ctx.GetTarget())
+	cluster.InheritFilesFrom(n.req.GetTarget())
 	// Inherit from .spec.defaults
-	cluster.InheritTemplatesFrom(n.ctx.GetTarget())
+	cluster.InheritTemplatesFrom(n.req.GetTarget())
 
 	cluster.Zookeeper = n.normalizeConfigurationZookeeper(cluster.Zookeeper)
 	cluster.Settings = n.normalizeConfigurationSettings(cluster.Settings)
