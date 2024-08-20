@@ -22,6 +22,9 @@ kind: "ClickHouseKeeperInstallation"
 metadata:
   name: clickhouse-keeper
 spec:
+  defaults:
+    templates:
+      podTemplate: default
   templates:
     podTemplates:
       - name: default
