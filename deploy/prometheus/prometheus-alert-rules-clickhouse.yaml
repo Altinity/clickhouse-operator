@@ -251,9 +251,9 @@ spec:
             identifier: "{{ $labels.hostname }}"
             summary: "Total connections > 100"
             description: |-
-              `chi_clickhouse_metric_HTTPConnection` = {{ with printf "chi_clickhouse_metric_HTTPConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
-              `chi_clickhouse_metric_TCPConnection` = {{ with printf "chi_clickhouse_metric_TCPConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
-              `chi_clickhouse_metric_MySQLConnection` = {{ with printf "chi_clickhouse_metric_MySQLConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
+              `chi_clickhouse_metric_HTTPConnection{hostname='{{ .Labels.hostname }}'}` = {{ with printf "chi_clickhouse_metric_HTTPConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
+              `chi_clickhouse_metric_TCPConnection{hostname='{{ .Labels.hostname }}'}` = {{ with printf "chi_clickhouse_metric_TCPConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
+              `chi_clickhouse_metric_MySQLConnection{hostname='{{ .Labels.hostname }}'}` = {{ with printf "chi_clickhouse_metric_MySQLConnection{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value }} connections{{ end }}
 
               `clickhouse-server` have many open connections.
               The ClickHouse is adapted to run not a very large number of parallel SQL requests, not every HTTP/TCP(Native)/MySQL protocol connection means a running SQL request, but a large number of open connections can cause a spike in sudden SQL requests, resulting in performance degradation.
@@ -270,9 +270,8 @@ spec:
             identifier: "{{ $labels.hostname }}"
             summary: "Too much running queries"
             description: |-
-              `clickhouse-server` have 
-              {{ with printf "chi_clickhouse_metric_Query{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} running queries{{ end }}
-              {{ with printf "chi_clickhouse_metric_PendingAsyncInsert{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} async inserts{{ end }}
+              `chi_clickhouse_metric_Query{hostname='{{ .Labels.hostname }}'}` = {{ with printf "chi_clickhouse_metric_Query{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} running queries{{ end }}
+              `chi_clickhouse_metric_PendingAsyncInsert{hostname='{{ .Labels.hostname }}'}` = {{ with printf "chi_clickhouse_metric_PendingAsyncInsert{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }} async inserts{{ end }}
               Please analyze your workload.
               Each concurrent SELECT query use memory in JOINs use CPU for running aggregation function and can read lot of data from disk when scan parts in partitions and utilize disk I/O.
               Each concurrent INSERT query, allocate around 1MB per each column in an inserted table and utilize disk I/O.
@@ -291,7 +290,7 @@ spec:
             identifier: "{{ $labels.hostname }}"
             summary: "`system.settings` changed"
             description: |-
-              `clickhouse-server` changed `chi_clickhouse_metric_ChangedSettingsHash` = {{ with printf "chi_clickhouse_metric_ChangedSettingsHash{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              changed `chi_clickhouse_metric_ChangedSettingsHash{hostname='{{ .Labels.hostname }}'}` = {{ with printf "chi_clickhouse_metric_ChangedSettingsHash{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
 
         - alert: ClickHouseVersionChanged
           expr: delta(chi_clickhouse_metric_VersionInteger[5m]) != 0
@@ -301,7 +300,7 @@ spec:
             identifier: "{{ $labels.hostname }}"
             summary: "ClickHouse version changed"
             description: |-
-              `clickhouse-server` changed `chi_clickhouse_metric_VersionInteger` = {{ with printf "chi_clickhouse_metric_VersionInteger{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
+              changed `chi_clickhouse_metric_VersionInteger{hostname='{{ .Labels.hostname }}'}` = {{ with printf "chi_clickhouse_metric_VersionInteger{hostname='%s',exported_namespace='%s'}" .Labels.hostname .Labels.exported_namespace | query }}{{ . | first | value | printf "%.0f" }}{{ end }}
 
         - alert: ClickHouseZooKeeperHardwareExceptions
           expr: increase(chi_clickhouse_event_ZooKeeperHardwareExceptions[1m]) > 0
