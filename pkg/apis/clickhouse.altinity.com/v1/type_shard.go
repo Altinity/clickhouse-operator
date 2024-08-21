@@ -169,7 +169,7 @@ func (shard *ChiShard) HostsCount() int {
 	return count
 }
 
-// GetCHI gets CHI of the shard
+// GetCHI gets Custom Resource of the shard
 func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 	return shard.Runtime.CHI
 }

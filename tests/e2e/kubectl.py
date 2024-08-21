@@ -241,7 +241,7 @@ def get_count(kind, name="", label="", chi="", ns=None, shell=None):
     if chi != "" and label == "":
         label = f"-l clickhouse.altinity.com/chi={chi}"
 
-    if ns == None:
+    if ns is None:
         ns = current().context.test_namespace
 
     if kind == "pv":
@@ -368,6 +368,10 @@ def wait_command(command, result, count=1, ns=None, retries=max_retries):
 
 def wait_chi_status(chi, status, ns=None, retries=max_retries, throw_error=True, shell=None):
     wait_field("chi", chi, ".status.status", status, ns, retries, throw_error=throw_error, shell=shell)
+
+
+def wait_chk_status(chk, status, ns=None, retries=max_retries, throw_error=True, shell=None):
+    wait_field("chk", chk, ".status.status", status, ns, retries, throw_error=throw_error, shell=shell)
 
 
 def get_chi_status(chi, ns=None):

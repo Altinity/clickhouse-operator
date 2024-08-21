@@ -20,29 +20,29 @@ import (
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-// Context specifies normalization context
-type Context struct {
+// Request specifies normalization request
+type Request struct {
 	// target specifies current target being normalized
 	target api.ICustomResource
 	// options specifies normalization options
 	options *Options
 }
 
-// NewContext creates new Context
-func NewContext(options *Options) *Context {
-	return &Context{
+// NewRequest creates new Context
+func NewRequest(options *Options) *Request {
+	return &Request{
 		options: options,
 	}
 }
 
-func (c *Context) GetTarget() api.ICustomResource {
+func (c *Request) GetTarget() api.ICustomResource {
 	if c == nil {
 		return nil
 	}
 	return c.target
 }
 
-func (c *Context) SetTarget(target api.ICustomResource) api.ICustomResource {
+func (c *Request) SetTarget(target api.ICustomResource) api.ICustomResource {
 	if c == nil {
 		return nil
 	}
@@ -50,32 +50,32 @@ func (c *Context) SetTarget(target api.ICustomResource) api.ICustomResource {
 	return c.target
 }
 
-func (c *Context) Options() *Options {
+func (c *Request) Options() *Options {
 	if c == nil {
 		return nil
 	}
 	return c.options
 }
 
-func (c *Context) GetTargetNamespace() string {
+func (c *Request) GetTargetNamespace() string {
 	return c.GetTarget().GetNamespace()
 }
 
-func (c *Context) AppendAdditionalEnvVar(envVar core.EnvVar) {
+func (c *Request) AppendAdditionalEnvVar(envVar core.EnvVar) {
 	if c == nil {
 		return
 	}
 	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(envVar)
 }
 
-func (c *Context) AppendAdditionalVolume(volume core.Volume) {
+func (c *Request) AppendAdditionalVolume(volume core.Volume) {
 	if c == nil {
 		return
 	}
 	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalVolumeIfNotExists(volume)
 }
 
-func (c *Context) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
+func (c *Request) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 	if c == nil {
 		return
 	}

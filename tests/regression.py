@@ -8,9 +8,8 @@ from requirements.requirements import *
 xfails = {
     # test_operator.py
     "/regression/e2e.test_operator/test_008*": [(Fail, "Test 008 sometimes fails due to unknown reasons")],
-    "/regression/e2e.test_operator/test_032:": [(Fail, "Test 032 sometimes fails due to unknown reasons")],    
-    "/regression/e2e.test_operator/test_048:": [(Fail, "Test 048 is not ready")],
-    "/regression/e2e.test_operator/test_049:": [(Fail, "Test 049 is not ready")],
+    "/regression/e2e.test_operator/test_032:": [(Fail, "Test 032 sometimes fails due to unknown reasons")],
+    "/regression/e2e.test_operator/test_049:": [(Fail, "Test 049 fails locally due to CH in readonly")],
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py

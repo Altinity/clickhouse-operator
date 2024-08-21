@@ -23,14 +23,24 @@ spec:
       prometheus/events: "true"
       prometheus/asynchronous_metrics: "true"
       prometheus/status_info: "false"
+
+  defaults:
+    templates:
+      # Templates are specified as default for all clusters
+      podTemplate: default
+
   templates:
+
     podTemplates:
       - name: default
         spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:latest"
+              image: "clickhouse/clickhouse-keeper:24.3.5.46"
+              volumeMounts:
+                - name: default
+                  mountPath: /var/lib/clickhouse
               resources:
                 requests:
                   memory: "256M"
@@ -40,13 +50,12 @@ spec:
                   cpu: "2"
           securityContext:
             fsGroup: 101
+
     volumeClaimTemplates:
       - name: default
-        metadata:
-          name: both-paths
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 25Gi
+              storage: 10Gi

@@ -4718,8 +4718,8 @@ def test_049(self):
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
     chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
     cluster = "default"
-    keeper_version_from = "23.8.8.20"
-    keeper_version_to = "24.3.2.23"
+    keeper_version_from = "24.3.5.46"
+    keeper_version_to = "24.5"
     with Given("CHI with 2 replicas"):
         kubectl.create_and_check(
             manifest=manifest,
@@ -4728,7 +4728,7 @@ def test_049(self):
                 "do_not_delete": 1,
             },
         )
-    numbers = 100
+
     with When("I create replicated table"):
         create_table = """
             CREATE TABLE test_local_049 ON CLUSTER 'default' (a UInt32)
@@ -4740,66 +4740,55 @@ def test_049(self):
         ).replace(
             "\n", ""
         )
-        clickhouse.query(chi, create_table, host=f"chi-{chi}-{cluster}-0-0-0")
-        clickhouse.query(
-            chi,
-            "CREATE TABLE test_distr_049 ON CLUSTER 'default' AS test_local_049 "
-            "Engine = Distributed('default', default, test_local_049, a%2)",
-        )
+        clickhouse.query(chi, create_table)
+
+    numbers = 100
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_local_049 select * from numbers({numbers})")
+
+    with Then("Check replicated table on host 0 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers}", error()
+    with Then("Check replicated table on host 1 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-1-0")
+        assert out == f"{numbers}", error()
 
     with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
-        for attempt in retries(timeout=60, delay=5):
-            with attempt:
-                assert keeper_version_from in \
-                       kubectl.get(kind='pod', name='clickhouse-keeper-0')["spec"]["containers"][0]["image"], error()
-                assert keeper_version_from in \
-                       kubectl.get(kind='pod', name='clickhouse-keeper-1')["spec"]["containers"][0]["image"], error()
-                assert keeper_version_from in \
-                       kubectl.get(kind='pod', name='clickhouse-keeper-2')["spec"]["containers"][0]["image"], error()
+        assert keeper_version_from in \
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
 
-    with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number from numbers({numbers})",
-                         host=f"chi-{chi}-{cluster}-0-0-0")
-        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number + 100 from numbers({numbers})",
-                         host=f"chi-{chi}-{cluster}-0-1-0")
+    with Then(f"I change keeper version to {keeper_version_to}"):
+        cmd = f"""patch chk clickhouse-keeper --type='json' --patch='[{{"op":"replace","path":"/spec/templates/podTemplates/0/spec/containers/0/image","value":"clickhouse/clickhouse-keeper:{keeper_version_to}"}}]'"""
+        kubectl.launch(cmd)
 
-    with Then("I check clickhouse-keeper properly works"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-0-0")
-        assert out == f"{numbers * 2}", error()
-        out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert out == f"{numbers * 2}", error()
-
-    with Then("I change keeper version"):
-        util.require_keeper(keeper_type="clickhouse-keeper_with_CHKI",
-                            keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
+    with Then("I wait CHK status 1"):
+        kubectl.wait_chk_status('clickhouse-keeper', 'InProgress')
+    with Then("I wait CHK status 2"):
+        kubectl.wait_chk_status('clickhouse-keeper', 'Completed')
 
     with When(f"I check clickhouse-keeper version is changed to {keeper_version_to}"):
-        for attempt in retries(timeout=60, delay=5):
-            with attempt:
-                assert keeper_version_to in \
-                       kubectl.get(kind='pod', name='clickhouse-keeper-0')["spec"]["containers"][0]["image"], error()
-                assert keeper_version_to in \
-                       kubectl.get(kind='pod', name='clickhouse-keeper-1')["spec"]["containers"][0]["image"], error()
-                assert keeper_version_to in \
-                       kubectl.get(kind='pod', name='clickhouse-keeper-2')["spec"]["containers"][0]["image"], error()
+        assert keeper_version_to in \
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-0-0', '.spec.containers[0].image'), error()
+        assert keeper_version_to in \
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-1-0', '.spec.containers[0].image'), error()
+        assert keeper_version_to in \
+               kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image'), error()
 
     with And("I insert data in the replicated table after clickhouse-keeper upgrade"):
-        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number + 200 from numbers({numbers})",
-                         host=f"chi-{chi}-{cluster}-0-0-0")
-        clickhouse.query(chi, f"INSERT INTO test_distr_049 select number + 300 from numbers({numbers})",
-                         host=f"chi-{chi}-{cluster}-0-1-0")
+        clickhouse.query(chi, f"INSERT INTO test_local_049 select number + 200 from numbers({numbers})", timeout=600)
 
-    with Then("I check clickhouse-keeper properly works"):
-        for attempt in retries(timeout=60, delay=5):
-            with attempt:
-                out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-0-0")
-                assert out == f"{numbers * 4}", error()
-                out = clickhouse.query(chi, "SELECT count(*) from test_distr_049", host=f"chi-{chi}-{cluster}-0-1-0")
-                assert out == f"{numbers * 4}", error()
+    with Then("Check replicated table on host 0 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-0-0")
+        assert out == f"{numbers*2}", error()
+    with Then("Check replicated table on host 1 has all rows"):
+        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-1-0")
+        assert out == f"{numbers*2}", error()
 
     with Finally("I clean up"):
         with By("deleting chi"):
             kubectl.delete_chi(chi)
+        with By("deleting chk"):
+            kubectl.delete_chk("clickhouse-keeper")
         with And("deleting test namespace"):
             delete_test_namespace()
 

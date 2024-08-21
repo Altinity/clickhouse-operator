@@ -8,7 +8,7 @@ spec:
   configuration:
     zookeeper:
       nodes:
-        - host: clickhouse-keeper
+        - host: keeper-clickhouse-keeper
           port: 2181
     clusters:
       - name: default

@@ -65,18 +65,18 @@ func (shard *ChkShard) GetInternalReplication() *types.StringBool {
 
 // InheritSettingsFrom inherits settings from specified cluster
 func (shard *ChkShard) InheritSettingsFrom(cluster *ChkCluster) {
-	//shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
+	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
 }
 
 // InheritFilesFrom inherits files from specified cluster
 func (shard *ChkShard) InheritFilesFrom(cluster *ChkCluster) {
-	//shard.Files = shard.Files.MergeFrom(cluster.Files)
+	shard.Files = shard.Files.MergeFrom(cluster.Files)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
 func (shard *ChkShard) InheritTemplatesFrom(cluster *ChkCluster) {
-	//shard.Templates = shard.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
-	//shard.Templates.HandleDeprecatedFields()
+	shard.Templates = shard.Templates.MergeFrom(cluster.Templates, apiChi.MergeTypeFillEmptyValues)
+	shard.Templates.HandleDeprecatedFields()
 }
 
 // GetServiceTemplate gets service template
@@ -170,7 +170,7 @@ func (shard *ChkShard) HostsCount() int {
 	return count
 }
 
-// GetCHI gets CHI of the shard
+// GetCHK gets Custom Resource of the shard
 func (shard *ChkShard) GetCHK() *ClickHouseKeeperInstallation {
 	return shard.Runtime.CHK
 }

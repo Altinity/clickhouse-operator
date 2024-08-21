@@ -22,6 +22,9 @@ kind: "ClickHouseKeeperInstallation"
 metadata:
   name: clickhouse-keeper
 spec:
+  defaults:
+    templates:
+      podTemplate: default
   templates:
     podTemplates:
       - name: default
@@ -30,6 +33,17 @@ spec:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
               image: "clickhouse/clickhouse-keeper:24.3.5.46"
+              volumeMounts:
+                - name: default
+                  mountPath: /var/lib/clickhouse
+    volumeClaimTemplates:
+      - name: default
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
   configuration:
     clusters:
       - name: "test-only"
@@ -39,7 +53,7 @@ spec:
       logger/level: "trace"
       logger/console: "true"
       listen_host: "0.0.0.0"
-      keeper_server/storage_path: /var/lib/clickhouse-keeper
+      keeper_server/storage_path: /var/lib/clickhouse
       keeper_server/tcp_port: "2181"
       keeper_server/four_letter_word_white_list: "*"
       keeper_server/coordination_settings/raft_logs_level: "information"
