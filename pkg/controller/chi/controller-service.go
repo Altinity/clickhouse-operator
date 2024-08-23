@@ -16,8 +16,6 @@ package chi
 
 import (
 	"context"
-	"time"
-
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -64,8 +62,6 @@ func (c *Controller) deleteServiceIfExists(ctx context.Context, namespace, name 
 	err = c.kube.Service().Delete(ctx, namespace, name)
 	if err == nil {
 		log.V(1).M(namespace, name).F().Info("OK delete Service: %s/%s", namespace, name)
-		// TODO fix this properly
-		time.Sleep(75 * time.Second)
 		log.V(1).M(namespace, name).F().Info("OK delete Service -- proceed further: %s/%s", namespace, name)
 	} else {
 		log.V(1).M(namespace, name).F().Error("FAIL delete Service: %s/%s err: %v", namespace, name, err)
