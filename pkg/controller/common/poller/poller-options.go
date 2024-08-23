@@ -35,15 +35,15 @@ type Options struct {
 	BackgroundInterval         time.Duration
 }
 
-// NewPollerOptions creates new poll options
-func NewPollerOptions() *Options {
+// NewOptions creates new poll options
+func NewOptions() *Options {
 	return &Options{}
 }
 
 // Ensure ensures poll options do exist
 func (o *Options) Ensure() *Options {
 	if o == nil {
-		return NewPollerOptions()
+		return NewOptions()
 	}
 	return o
 }
