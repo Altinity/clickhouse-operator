@@ -91,12 +91,12 @@ type IKubeCR interface {
 }
 
 type IKubeReplicaSet interface {
-	Get(namespace, name string) (*apps.ReplicaSet, error)
-	Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error)
+	Get(ctx context.Context, namespace, name string) (*apps.ReplicaSet, error)
+	Update(ctx context.Context, replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error)
 }
 
 type IKubeSecret interface {
-	Get(ctx context.Context, obj any) (*core.Secret, error)
+	Get(ctx context.Context, params ...any) (*core.Secret, error)
 	Create(ctx context.Context, svc *core.Secret) (*core.Secret, error)
 	Update(ctx context.Context, svc *core.Secret) (*core.Secret, error)
 	Delete(ctx context.Context, namespace, name string) error
@@ -104,7 +104,7 @@ type IKubeSecret interface {
 }
 
 type IKubeService interface {
-	Get(ctx context.Context, obj any) (*core.Service, error)
+	Get(ctx context.Context, params ...any) (*core.Service, error)
 	Create(ctx context.Context, svc *core.Service) (*core.Service, error)
 	Update(ctx context.Context, svc *core.Service) (*core.Service, error)
 	Delete(ctx context.Context, namespace, name string) error
@@ -112,7 +112,7 @@ type IKubeService interface {
 }
 
 type IKubeSTS interface {
-	Get(ctx context.Context, obj any) (*apps.StatefulSet, error)
+	Get(ctx context.Context, params ...any) (*apps.StatefulSet, error)
 	Create(ctx context.Context, statefulSet *apps.StatefulSet) (*apps.StatefulSet, error)
 	Update(ctx context.Context, sts *apps.StatefulSet) (*apps.StatefulSet, error)
 	Delete(ctx context.Context, namespace, name string) error
