@@ -21,7 +21,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -337,19 +337,19 @@ func (w *worker) shouldWaitIncludeHost(host *api.Host) bool {
 
 // waitHostInCluster
 func (w *worker) waitHostInCluster(ctx context.Context, host *api.Host) error {
-	return poller.PollHost(ctx, host, nil, w.ensureClusterSchemer(host).IsHostInCluster)
+	return domain.PollHost(ctx, host, w.ensureClusterSchemer(host).IsHostInCluster)
 }
 
 // waitHostNotInCluster
 func (w *worker) waitHostNotInCluster(ctx context.Context, host *api.Host) error {
-	return poller.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
+	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
 		return !w.ensureClusterSchemer(host).IsHostInCluster(ctx, host)
 	})
 }
 
 // waitHostNoActiveQueries
 func (w *worker) waitHostNoActiveQueries(ctx context.Context, host *api.Host) error {
-	return poller.PollHost(ctx, host, nil, func(ctx context.Context, host *api.Host) bool {
+	return domain.PollHost(ctx, host, func(ctx context.Context, host *api.Host) bool {
 		n, _ := w.ensureClusterSchemer(host).HostActiveQueriesNum(ctx, host)
 		return n <= 1
 	})

@@ -29,7 +29,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/statefulset"
 	"github.com/altinity/clickhouse-operator/pkg/controller/common/storage"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
@@ -137,7 +137,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 	w.stsReconciler = statefulset.NewReconciler(
 		w.a,
 		w.task,
-		poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.ctrlLabeler),
+		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.ctrlLabeler),
 		w.c.namer,
 		labeler.New(chi),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),

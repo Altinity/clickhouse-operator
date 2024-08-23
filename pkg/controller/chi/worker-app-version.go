@@ -19,7 +19,7 @@ import (
 
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/swversion"
-	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller/domain"
 )
 
 // getHostClickHouseVersion gets host ClickHouse version
@@ -41,10 +41,9 @@ func (w *worker) getHostClickHouseVersion(ctx context.Context, host *api.Host, o
 }
 
 func (w *worker) pollHostForClickHouseVersion(ctx context.Context, host *api.Host) (version string, err error) {
-	err = poller.PollHost(
+	err = domain.PollHost(
 		ctx,
 		host,
-		nil,
 		func(_ctx context.Context, _host *api.Host) bool {
 			var e error
 			version, e = w.getHostClickHouseVersion(_ctx, _host, versionOptions{skipStopped: true})
