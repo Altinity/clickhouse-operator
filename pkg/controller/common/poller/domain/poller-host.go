@@ -13,14 +13,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package poller
+package domain
 
 import (
 	"context"
+	"fmt"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -28,7 +30,6 @@ import (
 func PollHost(
 	ctx context.Context,
 	host *api.Host,
-	opts *Options,
 	isDoneFn func(ctx context.Context, host *api.Host) bool,
 ) error {
 	if util.IsContextDone(ctx) {
@@ -36,19 +37,11 @@ func PollHost(
 		return nil
 	}
 
-	opts = opts.Ensure().FromConfig(chop.Config())
-	namespace := host.Runtime.Address.Namespace
-	name := host.Runtime.Address.HostName
-
-	return Poll(
-		ctx,
-		namespace, name,
-		opts,
-		&Functions{
+	return poller.New(ctx, fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.HostName)).
+		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
+		WithMain(&poller.Functions{
 			IsDone: func(_ctx context.Context, _ any) bool {
 				return isDoneFn(_ctx, host)
 			},
-		},
-		nil,
-	)
+		}).Poll()
 }

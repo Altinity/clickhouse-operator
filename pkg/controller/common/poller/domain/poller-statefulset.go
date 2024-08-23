@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package poller
+package domain
 
 import (
 	"context"
+	"fmt"
 
 	apps "k8s.io/api/apps/v1"
 	apiErrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,6 +24,7 @@ import (
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
@@ -38,10 +40,9 @@ func NewStatefulSetPoller(kube interfaces.IKube) *StatefulSetPoller {
 }
 
 // pollHostStatefulSet polls host's StatefulSet
-func (poller *StatefulSetPoller) PollHostStatefulSet(
+func (p *StatefulSetPoller) PollHostStatefulSet(
 	ctx context.Context,
 	host *api.Host,
-	opts *Options,
 	isDoneFn func(context.Context, *apps.StatefulSet) bool,
 	backFn func(context.Context),
 ) error {
@@ -50,20 +51,15 @@ func (poller *StatefulSetPoller) PollHostStatefulSet(
 		return nil
 	}
 
-	if opts == nil {
-		opts = NewPollerOptions().FromConfig(chop.Config())
-	}
-
-	namespace := host.Runtime.Address.Namespace
-	name := host.Runtime.Address.StatefulSet
-
-	return Poll(
+	return poller.New(
 		ctx,
-		namespace, name,
-		opts,
-		&Functions{
+		fmt.Sprintf("%s/%s", host.Runtime.Address.Namespace, host.Runtime.Address.StatefulSet),
+	).WithOptions(
+		poller.NewOptions().FromConfig(chop.Config()),
+	).WithMain(
+		&poller.Functions{
 			Get: func(_ctx context.Context) (any, error) {
-				return poller.kubeSTS.Get(ctx, host)
+				return p.kubeSTS.Get(ctx, host)
 			},
 			IsDone: func(_ctx context.Context, a any) bool {
 				return isDoneFn(_ctx, a.(*apps.StatefulSet))
@@ -72,8 +68,9 @@ func (poller *StatefulSetPoller) PollHostStatefulSet(
 				return apiErrors.IsNotFound(e)
 			},
 		},
-		&BackgroundFunctions{
+	).WithBackground(
+		&poller.BackgroundFunctions{
 			F: backFn,
 		},
-	)
+	).Poll()
 }
