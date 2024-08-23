@@ -15,6 +15,8 @@
 package kube
 
 import (
+	"context"
+
 	apps "k8s.io/api/apps/v1"
 	kube "k8s.io/client-go/kubernetes"
 
@@ -31,10 +33,10 @@ func NewReplicaSet(kubeClient kube.Interface) *ReplicaSet {
 	}
 }
 
-func (c *ReplicaSet) Get(namespace, name string) (*apps.ReplicaSet, error) {
-	return c.kubeClient.AppsV1().ReplicaSets(namespace).Get(controller.NewContext(), name, controller.NewGetOptions())
+func (c *ReplicaSet) Get(ctx context.Context, namespace, name string) (*apps.ReplicaSet, error) {
+	return c.kubeClient.AppsV1().ReplicaSets(namespace).Get(ctx, name, controller.NewGetOptions())
 }
 
-func (c *ReplicaSet) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	return c.kubeClient.AppsV1().ReplicaSets(replicaSet.Namespace).Update(controller.NewContext(), replicaSet, controller.NewUpdateOptions())
+func (c *ReplicaSet) Update(ctx context.Context, replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+	return c.kubeClient.AppsV1().ReplicaSets(replicaSet.Namespace).Update(ctx, replicaSet, controller.NewUpdateOptions())
 }

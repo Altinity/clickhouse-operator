@@ -16,12 +16,16 @@ package kube
 
 import (
 	"context"
+	"fmt"
 
 	policy "k8s.io/api/policy/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kube "k8s.io/client-go/kubernetes"
 
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/controller"
+	"github.com/altinity/clickhouse-operator/pkg/controller/common/poller"
 )
 
 type PDB struct {
@@ -47,7 +51,15 @@ func (c *PDB) Update(ctx context.Context, pdb *policy.PodDisruptionBudget) (*pol
 }
 
 func (c *PDB) Delete(ctx context.Context, namespace, name string) error {
-	return c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+	c.kubeClient.PolicyV1().PodDisruptionBudgets(namespace).Delete(ctx, name, controller.NewDeleteOptions())
+	return poller.New(ctx, fmt.Sprintf("%s/%s", namespace, name)).
+		WithOptions(poller.NewOptions().FromConfig(chop.Config())).
+		WithMain(&poller.Functions{
+			IsDone: func(_ctx context.Context, _ any) bool {
+				_, err := c.Get(ctx, namespace, name)
+				return errors.IsNotFound(err)
+			},
+		}).Poll()
 }
 
 func (c *PDB) List(ctx context.Context, namespace string, opts meta.ListOptions) ([]policy.PodDisruptionBudget, error) {
