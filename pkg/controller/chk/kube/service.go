@@ -42,15 +42,24 @@ func NewService(kubeClient client.Client, namer interfaces.INameManager) *Servic
 // Get gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
-func (c *Service) Get(ctx context.Context, obj any) (*core.Service, error) {
+func (c *Service) Get(ctx context.Context, params ...any) (*core.Service, error) {
 	var name, namespace string
-	switch typedObj := obj.(type) {
-	case *core.Service:
-		name = typedObj.Name
-		namespace = typedObj.Namespace
-	case *api.Host:
-		name = c.namer.Name(interfaces.NameStatefulSetService, typedObj)
-		namespace = typedObj.Runtime.Address.Namespace
+	switch len(params) {
+	case 2:
+		// Expecting namespace name
+		namespace = params[0].(string)
+		name = params[1].(string)
+	case 1:
+		// Expecting obj
+		obj := params[0]
+		switch typedObj := obj.(type) {
+		case *core.Service:
+			name = typedObj.Name
+			namespace = typedObj.Namespace
+		case *api.Host:
+			name = c.namer.Name(interfaces.NameStatefulSetService, typedObj)
+			namespace = typedObj.Runtime.Address.Namespace
+		}
 	}
 	service := &core.Service{}
 	err := c.kubeClient.Get(ctx, types.NamespacedName{

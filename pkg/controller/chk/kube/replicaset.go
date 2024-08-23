@@ -15,11 +15,11 @@
 package kube
 
 import (
+	"context"
+
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/altinity/clickhouse-operator/pkg/controller"
 )
 
 type ReplicaSet struct {
@@ -32,9 +32,9 @@ func NewReplicaSet(kubeClient client.Client) *ReplicaSet {
 	}
 }
 
-func (c *ReplicaSet) Get(namespace, name string) (*apps.ReplicaSet, error) {
+func (c *ReplicaSet) Get(ctx context.Context, namespace, name string) (*apps.ReplicaSet, error) {
 	rs := &apps.ReplicaSet{}
-	err := c.kubeClient.Get(controller.NewContext(), types.NamespacedName{
+	err := c.kubeClient.Get(ctx, types.NamespacedName{
 		Namespace: namespace,
 		Name:      name,
 	}, rs)
@@ -45,7 +45,7 @@ func (c *ReplicaSet) Get(namespace, name string) (*apps.ReplicaSet, error) {
 	}
 }
 
-func (c *ReplicaSet) Update(replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
-	err := c.kubeClient.Update(controller.NewContext(), replicaSet)
+func (c *ReplicaSet) Update(ctx context.Context, replicaSet *apps.ReplicaSet) (*apps.ReplicaSet, error) {
+	err := c.kubeClient.Update(ctx, replicaSet)
 	return replicaSet, err
 }

@@ -42,15 +42,24 @@ func NewSecret(kubeClient client.Client, namer interfaces.INameManager) *Secret 
 // Get gets Service. Accepted types:
 //  1. *core.Service
 //  2. *chop.Host
-func (c *Secret) Get(ctx context.Context, obj any) (*core.Secret, error) {
+func (c *Secret) Get(ctx context.Context, params ...any) (*core.Secret, error) {
 	var name, namespace string
-	switch typedObj := obj.(type) {
-	case *core.Secret:
-		name = typedObj.Name
-		namespace = typedObj.Namespace
-	case *api.Host:
-		name = c.namer.Name(interfaces.NameStatefulSetService, typedObj)
-		namespace = typedObj.Runtime.Address.Namespace
+	switch len(params) {
+	case 2:
+		// Expecting namespace name
+		namespace = params[0].(string)
+		name = params[1].(string)
+	case 1:
+		// Expecting obj
+		obj := params[0]
+		switch typedObj := obj.(type) {
+		case *core.Secret:
+			name = typedObj.Name
+			namespace = typedObj.Namespace
+		case *api.Host:
+			name = c.namer.Name(interfaces.NameStatefulSetService, typedObj)
+			namespace = typedObj.Runtime.Address.Namespace
+		}
 	}
 	service := &core.Secret{}
 	err := c.kubeClient.Get(ctx, types.NamespacedName{
