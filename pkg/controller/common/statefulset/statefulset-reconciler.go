@@ -485,7 +485,7 @@ func (r *Reconciler) doDeleteStatefulSet(ctx context.Context, host *api.Host) er
 	// And now delete empty StatefulSet
 	if err := r.sts.Delete(ctx, namespace, name); err == nil {
 		log.V(1).M(host).Info("OK delete StatefulSet %s/%s", namespace, name)
-		r.hostSTSPoller.WaitHostStatefulSetDeleted(host)
+		//		r.hostSTSPoller.WaitHostStatefulSetDeleted(host)
 	} else if apiErrors.IsNotFound(err) {
 		log.V(1).M(host).Info("NEUTRAL not found StatefulSet %s/%s", namespace, name)
 	} else {

@@ -28,7 +28,6 @@ import (
 
 type IHostStatefulSetPoller interface {
 	WaitHostStatefulSetReady(ctx context.Context, host *api.Host) error
-	WaitHostStatefulSetDeleted(host *api.Host)
 }
 
 type fallback interface {
