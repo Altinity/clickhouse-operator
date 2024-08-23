@@ -171,7 +171,7 @@ func (l *Labeler) labelReplicaSet(ctx context.Context, pod *core.Pod) (*apps.Rep
 	}
 
 	// ReplicaSet namespaced name found, fetch the ReplicaSet
-	replicaSet, err := l.replicaSet.Get(pod.Namespace, replicaSetName)
+	replicaSet, err := l.replicaSet.Get(ctx, pod.Namespace, replicaSetName)
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR get ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
@@ -184,7 +184,7 @@ func (l *Labeler) labelReplicaSet(ctx context.Context, pod *core.Pod) (*apps.Rep
 
 	// Put label on the ReplicaSet
 	replicaSet.Labels = l.addLabels(replicaSet.Labels)
-	replicaSet, err = l.replicaSet.Update(replicaSet)
+	replicaSet, err = l.replicaSet.Update(ctx, replicaSet)
 	if err != nil {
 		log.V(1).M(pod.Namespace, replicaSetName).F().Error("ERROR put label on ReplicaSet %s/%s %v", pod.Namespace, replicaSetName, err)
 		return nil, err
