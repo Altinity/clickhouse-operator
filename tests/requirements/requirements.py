@@ -1951,7 +1951,7 @@ RQ_SRS_026_ClickHouseOperator_CustomResource_ClickHouseKeeperInstallation_PodTem
         '          containers:\n'
         '            - name: clickhouse-keeper\n'
         '              imagePullPolicy: IfNotPresent\n'
-        '              image: "clickhouse/clickhouse-keeper:head-alpine"\n'
+        '              image: "clickhouse/clickhouse-keeper:latest"\n'
         '              resources:\n'
         '                requests:\n'
         '                  memory: "256M"\n'
@@ -9320,7 +9320,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:head-alpine"
+              image: "clickhouse/clickhouse-keeper:latest"
               resources:
                 requests:
                   memory: "256M"

@@ -1793,7 +1793,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:head-alpine"
+              image: "clickhouse/clickhouse-keeper:latest"
               resources:
                 requests:
                   memory: "256M"
