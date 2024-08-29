@@ -14,8 +14,23 @@
 
 package types
 
+import (
+	apps "k8s.io/api/apps/v1"
+	"time"
+)
+
 type List map[string]string
 
 func (l List) Get(name string) string {
 	return l[name]
 }
+
+func markPodRestartedNow(sts *apps.StatefulSet) {
+	v, _ := time.Now().UTC().MarshalText()
+	// Instantiate new annotations if they don't exist yet, otherwise append the new annotation
+	if sts.Spec.Template.Annotations == nil {
+		sts.Spec.Template.Annotations = make(map[string]string)
+	}
+	sts.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = string(v)
+}
+
