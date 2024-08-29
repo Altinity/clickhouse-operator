@@ -175,7 +175,7 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         wait_object(
             "pod",
             "",
-            label=f"-l clickhouse.altinity.com/chi={chi_name}",
+            label=f"-l clickhouse.altinity.com/{kind}={chi_name}",
             count=check["pod_count"],
             ns=ns,
             shell=shell

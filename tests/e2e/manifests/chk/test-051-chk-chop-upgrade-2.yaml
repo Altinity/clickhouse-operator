@@ -1,0 +1,38 @@
+apiVersion: "clickhouse-keeper.altinity.com/v1"
+kind: "ClickHouseKeeperInstallation"
+metadata:
+  name: test-051-chk
+spec:
+  templates:
+    podTemplates:
+      - name: default
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: IfNotPresent
+              image: "clickhouse/clickhouse-keeper:24.3.5.46"
+              # volumeMounts:
+              #  - name: default
+              #    mountPath: /var/lib/clickhouse
+    volumeClaimTemplates:
+      - name: default
+        # metadata:
+        #  name: both-paths # this is a compatibility settings for operator 0.23.x
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+  configuration:
+    clusters:
+      - name: single
+    settings:
+      logger/level: "trace"
+      # logger/console: "true"
+      # listen_host: "0.0.0.0"
+      # keeper_server/storage_path: /var/lib/clickhouse
+      keeper_server/tcp_port: "2181"
+      # keeper_server/four_letter_word_white_list: "*"
+      # keeper_server/coordination_settings/raft_logs_level: "information"
+      # keeper_server/raft_configuration/server/port: "9444"

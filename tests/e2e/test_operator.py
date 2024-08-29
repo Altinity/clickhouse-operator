@@ -4742,16 +4742,13 @@ def test_049(self):
         )
         clickhouse.query(chi, create_table)
 
-    numbers = 100
     with And("I insert data in the replicated table"):
-        clickhouse.query(chi, f"INSERT INTO test_local_049 select * from numbers({numbers})")
+        clickhouse.query(chi, f"INSERT INTO test_local_049 select 1")
 
-    with Then("Check replicated table on host 0 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-0-0")
-        assert out == f"{numbers}", error()
-    with Then("Check replicated table on host 1 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert out == f"{numbers}", error()
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "1", error()
 
     with When(f"I check clickhouse-keeper version is {keeper_version_from}"):
         assert keeper_version_from in \
@@ -4775,14 +4772,12 @@ def test_049(self):
                kubectl.get_field('pod', 'chk-clickhouse-keeper-test-only-0-2-0', '.spec.containers[0].image'), error()
 
     with And("I insert data in the replicated table after clickhouse-keeper upgrade"):
-        clickhouse.query(chi, f"INSERT INTO test_local_049 select number + 200 from numbers({numbers})", timeout=600)
+        clickhouse.query(chi, f"INSERT INTO test_local_049 select 2", timeout=600)
 
-    with Then("Check replicated table on host 0 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-0-0")
-        assert out == f"{numbers*2}", error()
-    with Then("Check replicated table on host 1 has all rows"):
-        out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-1-0")
-        assert out == f"{numbers*2}", error()
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_049", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "2", error()
 
     with Finally("I clean up"):
         with By("deleting chi"):
@@ -4830,6 +4825,96 @@ def test_050(self):
     test_labels(chi, "include_this_label", "test-050")
 
     test_labels(chi, "exclude_this_label", "<none>")
+
+    with Finally("I clean up"):
+        with By("deleting chi"):
+            kubectl.delete_chi(chi)
+        with And("deleting test namespace"):
+            delete_test_namespace()
+
+@TestScenario
+@Name("test_051. Test CHK upgrade from 0.23.x operator version")
+def test_051(self):
+    version_from="0.23.7"
+    version_to = current().context.operator_version # "0.24.0"
+    create_shell_namespace_clickhouse_template()
+
+    with Given(f"clickhouse-operator from {version_from}"):
+        util.install_operator_version(version_from)
+        time.sleep(15)
+
+    chi_manifest = f"manifests/chi/test-051-chk-chop-upgrade.yaml"
+    chk_manifest = f"manifests/chk/test-051-chk-chop-upgrade.yaml"
+    chi = yaml_manifest.get_chi_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_chi_name(util.get_full_path(chk_manifest))
+    cluster = "default"
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest, kind="chk",
+            check={
+                # "pod_count": 1, # do not work in 0.23.7
+                "do_not_delete": 1,
+            },
+        )
+
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I create replicated table"):
+        create_table = """
+            CREATE TABLE test_local_051 ON CLUSTER 'default' (a UInt32)
+            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
+            PARTITION BY tuple()
+            ORDER BY a
+            """.replace(
+            "\r", ""
+        ).replace(
+            "\n", ""
+        )
+        clickhouse.query(chi, create_table)
+
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_local_051 select 1")
+
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "1", error()
+
+    with When(f"upgrade operator to {version_to}"):
+        util.install_operator_version(version_to)
+        time.sleep(15)
+
+        kubectl.wait_chi_status(chi, "Completed")
+        kubectl.wait_chk_status(chk, "Completed")
+
+    with Given("Trigger CHK reconcile"):
+        kubectl.create_and_check(
+            manifest="manifests/chk/test-051-chk-chop-upgrade-2.yaml", kind="chk",
+            check={
+                # "pod_count": 1,
+                "do_not_delete": 1,
+            },
+        )
+
+    with Then("Check there are no read-only replicas"):
+        out = clickhouse.query(chi, "SELECT count(*) from system.replicas where is_readonly")
+        assert out == "0", error()
+
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_local_051 select 2")
+
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "2", error()
 
     with Finally("I clean up"):
         with By("deleting chi"):
