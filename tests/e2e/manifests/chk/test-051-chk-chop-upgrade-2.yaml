@@ -3,6 +3,10 @@ kind: "ClickHouseKeeperInstallation"
 metadata:
   name: test-051-chk
 spec:
+  defaults:
+    templates:
+      # Templates are specified as default for all clusters
+      podTemplate: default
   templates:
     podTemplates:
       - name: default
@@ -11,13 +15,11 @@ spec:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
               image: "clickhouse/clickhouse-keeper:24.3.5.46"
-              # volumeMounts:
-              #  - name: default
-              #    mountPath: /var/lib/clickhouse
+              volumeMounts:
+                - name: default
+                  mountPath: /var/lib/clickhouse
     volumeClaimTemplates:
       - name: default
-        # metadata:
-        #  name: both-paths # this is a compatibility settings for operator 0.23.x
         spec:
           accessModes:
             - ReadWriteOnce
@@ -31,7 +33,7 @@ spec:
       logger/level: "trace"
       # logger/console: "true"
       # listen_host: "0.0.0.0"
-      # keeper_server/storage_path: /var/lib/clickhouse
+      keeper_server/storage_path: /var/lib/clickhouse
       keeper_server/tcp_port: "2181"
       # keeper_server/four_letter_word_white_list: "*"
       # keeper_server/coordination_settings/raft_logs_level: "information"
