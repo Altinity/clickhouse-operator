@@ -16,7 +16,12 @@ EOT
 function check_required_tools() {
   for cmd in yq jq helm-docs perl; do
     if ! command -v "${cmd}" &> /dev/null; then
+      echo "======================================"
       usage
+      echo "======================================"
+      echo "The following tool is missing: ${cmd}"
+      echo "Please install it."
+      echo "Abort."
       exit 1
     fi
   done
