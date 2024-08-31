@@ -49,6 +49,7 @@ if [[ ! -z "${DOCKER_VERSION}" ]]; then
     if [[ "${MAJOR_VERSION}" -gt "24" ]]; then
         echo "Need to downgrade docker to 24"
         VERSION_STRING=5:24.0.8-1~ubuntu.20.04~focal
+        #VERSION_STRING=5:24.0.8-1~ubuntu.22.04~jammy
         sudo apt-get install -y --allow-downgrades docker-ce=${VERSION_STRING} docker-ce-cli=${VERSION_STRING} containerd.io docker-buildx-plugin docker-compose-plugin
         echo "updated docker version"
         docker version | grep Version -B1 | grep -v '\-\-'
