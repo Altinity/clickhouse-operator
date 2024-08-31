@@ -54,7 +54,15 @@ else
     fi
 fi
 
-if [[ "0" == $(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive') ]]; then
+if docker buildx > /dev/null; then
+    echo "docker buildx available, continue"
+else
+    echo "No docker buildx available. Abort."
+    exit 1
+fi
+
+DOCKER_BUILDX_NUM=$(docker buildx ls | grep -E 'linux/arm.+\*' | grep -E 'running|inactive' | wc -l)
+if [[ "${DOCKER_BUILDX_NUM}" == "0" ]]; then
     echo "Looks like there is no appropriate buildx instance available."
     echo "Create a new buildx instance."
     docker buildx create --use --name multi-platform --platform=linux/amd64,linux/arm64
