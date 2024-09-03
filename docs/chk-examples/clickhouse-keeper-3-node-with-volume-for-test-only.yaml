@@ -14,8 +14,8 @@ spec:
     - port: 7000
       name: prometheus
   selector:
-    app: clickhouse-keeper
-    what: node
+    clickhouse-keeper.altinity.com/chk: clickhouse-keeper
+    clickhouse-keeper.altinity.com/ready: "yes"
 ---
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
@@ -31,7 +31,7 @@ spec:
       logger/level: "trace"
       logger/console: "true"
       listen_host: "0.0.0.0"
-      keeper_server/storage_path: /var/lib/clickhouse-keeper
+      keeper_server/storage_path: /var/lib/clickhouse
       keeper_server/tcp_port: "2181"
       keeper_server/four_letter_word_white_list: "*"
       keeper_server/coordination_settings/raft_logs_level: "information"

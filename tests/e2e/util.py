@@ -83,7 +83,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             keeper_manifest = f"../../deploy/clickhouse-keeper/clickhouse-keeper-manually/{keeper_manifest}"
-        if keeper_type == "CHK":
+        if keeper_type == "CHK" or keeper_type == "clickhouse-keeper_with_chk":
             keeper_manifest = (
                 "clickhouse-keeper-1-node-for-test-only.yaml" if keeper_manifest == "" else keeper_manifest
             )
@@ -102,6 +102,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         expected_docs = {
             "zookeeper": 5 if "scaleout-pvc" in keeper_manifest else 4,
             "clickhouse-keeper": 7,
+            "clickhouse-keeper_with_chk": 2,
             "CHK": 2,
             "zookeeper-operator": 3 if "probes" in keeper_manifest else 1,
         }
@@ -109,6 +110,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
             "zookeeper": "zookeeper",
             "zookeeper-operator": "zookeeper",
             "clickhouse-keeper": "clickhouse-keeper",
+            "clickhouse-keeper_with_chk": "chk-clickhouse-keeper-test-only-0",
             "CHK": "chk-clickhouse-keeper-test-only-0"
         }
         assert (
@@ -117,7 +119,7 @@ def require_keeper(keeper_manifest="", keeper_type=settings.keeper_type, force_i
         with Given(f"Install {keeper_type} {keeper_nodes} nodes"):
             kubectl.apply(get_full_path(keeper_manifest, lookup_in_host=False))
             for pod_num in range(keeper_nodes):
-                if keeper_type == "CHK":
+                if keeper_type == "CHK" or keeper_type == "clickhouse-keeper_with_chk" :
                     pod_name = f"{expected_pod_prefix[keeper_type]}-{pod_num}-0"
                 else:
                     pod_name = f"{expected_pod_prefix[keeper_type]}-{pod_num}"
@@ -164,7 +166,7 @@ def install_clickhouse_and_keeper(
             keeper_manifest = "zookeeper-1-node-1GB-for-tests-only.yaml"
         if keeper_type == "clickhouse-keeper":
             keeper_manifest = "clickhouse-keeper-1-node-256M-for-test-only.yaml"
-        if keeper_type == "clickhouse-keeper_with_CHKI":
+        if keeper_type == "clickhouse-keeper_with_chk" or keeper_type == "CHK":
             keeper_manifest = "clickhouse-keeper-1-node-for-test-only.yaml"
         if keeper_type == "zookeeper-operator":
             keeper_manifest = "zookeeper-operator-1-node.yaml"

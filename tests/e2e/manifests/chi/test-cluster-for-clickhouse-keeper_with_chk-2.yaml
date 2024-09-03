@@ -9,10 +9,10 @@ spec:
   configuration:
     zookeeper:
       nodes:
-        - host: clickhouse-keeper
+        - host: keeper-clickhouse-keeper
           port: 2181
     clusters:
       - name: default
         layout:
           shardsCount: 1
-          replicasCount: 1
+          replicasCount: 2
