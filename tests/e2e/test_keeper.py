@@ -106,7 +106,8 @@ def check_zk_root_znode(chi, keeper_type, pod_count, retry_count=15):
             "zookeeper": "2",
             "zookeeper-operator": "3",
             "clickhouse-keeper": "2",
-            "clickhouse-keeper_with_CHKI": "2",
+            "clickhouse-keeper_with_chk": "2",
+            "CHK": "2",
         }
         if expected_out[keeper_type] != out.strip(" \t\r\n") and i + 1 < retry_count:
             with Then(f"{keeper_type} system.zookeeper not ready, wait {(i + 1) * 3} sec"):
@@ -353,7 +354,7 @@ def test_clickhouse_keeper_rescale(self):
 
 
 @TestScenario
-@Name("test_clickhouse_keeper_rescale_CHKI using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
+@Name("test_clickhouse_keeper_rescale_chk. Using ClickHouseKeeperInstallation. Check KEEPER scale-up / scale-down cases")
 @Requirements(RQ_SRS_026_ClickHouseOperator_CustomResource_Kind_ClickHouseKeeperInstallation("1.0"))
 def test_clickhouse_keeper_rescale_chk(self):
     test_keeper_rescale_outline(
