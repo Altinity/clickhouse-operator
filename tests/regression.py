@@ -13,9 +13,9 @@ xfails = {
     # test_clickhouse.py
     "/regression/e2e.test_clickhouse/test_ch_001*": [(Fail, "Insert Quorum test need to refactoring")],
     # test_metrics_alerts.py
-    "/regression/e2e.test_metrics_alerts/test_clickhouse_keeper_alerts*": [
-        (Fail, "clickhouse-keeper wrong prometheus endpoint format, look https://github.com/ClickHouse/ClickHouse/issues/46136")
-    ],
+    # "/regression/e2e.test_metrics_alerts/test_clickhouse_keeper_alerts*": [
+    #     (Fail, "clickhouse-keeper wrong prometheus endpoint format, look https://github.com/ClickHouse/ClickHouse/issues/46136")
+    # ],
     # test_keeper.py
     # "/regression/e2e.test_keeper/test_clickhouse_keeper_rescale*": [
     #     (Fail, "need `ruok` before quorum https://github.com/ClickHouse/ClickHouse/issues/35464, need apply file config instead use commited data for quorum https://github.com/ClickHouse/ClickHouse/issues/35465. --force-recovery useless https://github.com/ClickHouse/ClickHouse/issues/37434"),

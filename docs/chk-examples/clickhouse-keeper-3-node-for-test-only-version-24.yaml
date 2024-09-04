@@ -14,8 +14,8 @@ spec:
     - port: 7000
       name: prometheus
   selector:
-    app: clickhouse-keeper
-    what: node
+    clickhouse-keeper.altinity.com/chk: clickhouse-keeper
+    clickhouse-keeper.altinity.com/ready: "yes"
 ---
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
@@ -32,7 +32,7 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:24.3.5.46"
+              image: "clickhouse/clickhouse-keeper:24.8"
               volumeMounts:
                 - name: default
                   mountPath: /var/lib/clickhouse

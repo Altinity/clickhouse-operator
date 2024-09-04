@@ -14,14 +14,21 @@ spec:
     - port: 7000
       name: prometheus
   selector:
-    app: clickhouse-keeper
-    what: node
+    clickhouse-keeper.altinity.com/chk: clickhouse-keeper
+    clickhouse-keeper.altinity.com/ready: "yes"
 ---
 apiVersion: "clickhouse-keeper.altinity.com/v1"
 kind: "ClickHouseKeeperInstallation"
 metadata:
   name: clickhouse-keeper
+  labels:
+    app: clickhouse-keeper
 spec:
+  defaults:
+    templates:
+      dataVolumeClaimTemplate: data-volume
+      logVolumeClaimTemplate: log-volume
+      podTemplate: latest-with-volume-mounts
   configuration:
     clusters:
       - name: "test-only"
@@ -31,7 +38,8 @@ spec:
       logger/level: "trace"
       logger/console: "true"
       listen_host: "0.0.0.0"
-      keeper_server/storage_path: /var/lib/clickhouse-keeper
+      http_control/port: 9182
+      http_control/readiness/endpoint: /ready
       keeper_server/tcp_port: "2181"
       keeper_server/four_letter_word_white_list: "*"
       keeper_server/coordination_settings/raft_logs_level: "information"
@@ -43,11 +51,28 @@ spec:
       prometheus/asynchronous_metrics: "true"
       prometheus/status_info: "false"
   templates:
+    podTemplates:
+      - name: latest-with-volume-mounts
+        spec:
+          containers:
+            - name: clickhouse-keeper
+              imagePullPolicy: Always
+              image: "clickhouse/clickhouse-keeper:latest-alpine"
+              volumeMounts:
+                - name: data-volume
+                  mountPath: /var/lib/clickhouse
     volumeClaimTemplates:
-      - name: both-paths
+      - name: data-volume
         spec:
           accessModes:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 5Gi
+              storage: 1Gi
+      - name: log-volume
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
