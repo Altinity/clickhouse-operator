@@ -98,7 +98,6 @@ def test_003(self):
             delete_test_namespace()
 
 
-
 @TestScenario
 @Name("test_004. Compatibility test if old syntax with volumeClaimTemplate is still supported")
 @Requirements(
@@ -815,6 +814,7 @@ def test_011_1(self):
         with By("deleting test namespace"):
             delete_test_namespace()
 
+
 @TestScenario
 @Name("test_011_2. Test default user security")
 @Requirements(RQ_SRS_026_ClickHouseOperator_DefaultUsers("1.0"))
@@ -904,8 +904,8 @@ def test_011_3(self):
             assert out == "OK"
 
         with And("Connection to localhost should succeed with user5/password defined in valueFrom/secretKeyRef"):
-           out = clickhouse.query_with_error(chi, "select 'OK'", user="user5", pwd="pwduser5")
-           assert out == "OK"
+            out = clickhouse.query_with_error(chi, "select 'OK'", user="user5", pwd="pwduser5")
+            assert out == "OK"
 
         with And("Settings should be securely populated from a secret"):
             pod = kubectl.get_pod_spec(chi)
@@ -915,11 +915,11 @@ def test_011_3(self):
             sasl_password_env = ""
             for e in envs:
                 if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_USERNAME":
-                     sasl_username_env = e["name"]
+                    sasl_username_env = e["name"]
                 if e["valueFrom"]["secretKeyRef"]["key"] == "KAFKA_SASL_PASSWORD":
-                     sasl_password_env = e["name"]
+                    sasl_password_env = e["name"]
                 if e["valueFrom"]["secretKeyRef"]["key"] == "pwduser5":
-                     user5_password_env = e["name"]
+                    user5_password_env = e["name"]
 
             with By("Secrets are properly propagated to env variables"):
                 print(f"Found env variables: {sasl_username_env} {sasl_password_env} {user5_password_env}")
@@ -1329,7 +1329,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wai
                             time.sleep(i * 5)
                     assert shards == str(num_shards)
 
-        if num_replicas>0:
+        if num_replicas > 0:
             with By(f"ClickHouse recognizes {num_replicas} replicas in the cluster"):
                 for replica in range(num_replicas):
                     replicas = ""
@@ -1346,6 +1346,7 @@ def wait_for_cluster(chi, cluster, num_shards, num_replicas=0, pwd="", force_wai
                         with Then("Not ready. Wait for " + str(i * 5) + " seconds"):
                             time.sleep(i * 5)
                     assert replicas == str(num_replicas)
+
 
 @TestScenario
 @Name("test_014_0. Test that schema is correctly propagated on replicas")
@@ -1941,8 +1942,6 @@ def test_016(self):
         with And("ClickHouse SHOULD NOT BE restarted"):
             new_start_time = kubectl.get_field("pod", f"chi-{chi}-default-0-0-0", ".status.startTime")
             assert start_time == new_start_time
-
-
 
     with Finally("I clean up"):
         with By("deleting test namespace"):
@@ -4832,10 +4831,11 @@ def test_050(self):
         with And("deleting test namespace"):
             delete_test_namespace()
 
+
 @TestScenario
 @Name("test_051. Test CHK upgrade from 0.23.x operator version")
 def test_051(self):
-    version_from="0.23.7"
+    version_from = "0.23.7"
     version_to = current().context.operator_version # "0.24.0"
     create_shell_namespace_clickhouse_template()
 
@@ -4936,7 +4936,7 @@ def test(self):
         self.context.shell = shell
 
     with Given("Cleanup CHIs"):
-        ns = kubectl.get("ns", name="", ns = "--all-namespaces")
+        ns = kubectl.get("ns", name="", ns="--all-namespaces")
         if "items" in ns:
             for n in ns["items"]:
                 ns_name = n["metadata"]["name"]
