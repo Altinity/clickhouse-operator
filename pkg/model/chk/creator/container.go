@@ -69,7 +69,7 @@ func (cm *ContainerManager) newDefaultContainerKeeper(host *apiChi.Host) core.Co
 	container := core.Container{
 		Name:          config.KeeperContainerName,
 		Image:         config.DefaultKeeperDockerImage,
-		LivenessProbe: cm.probe.createDefaultKeeperLivenessProbe(host),
+		LivenessProbe: cm.probe.createDefaultLivenessProbe(host),
 	}
 	return container
 }

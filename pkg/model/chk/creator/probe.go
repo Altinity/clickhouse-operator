@@ -33,31 +33,22 @@ func NewProbeManager() *ProbeManager {
 func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
 	switch what {
 	case interfaces.ProbeDefaultLiveness:
-		return m.createDefaultKeeperLivenessProbe(host)
+		return m.createDefaultLivenessProbe(host)
 	case interfaces.ProbeDefaultReadiness:
 		return nil
 	}
 	panic("unknown probe type")
 }
 
-func probeScript(port int) string {
-	return fmt.Sprintf(
-		`date && `+
-			`OK=$(exec 3<>/dev/tcp/127.0.0.1/%d; printf 'ruok' >&3; IFS=; tee <&3; exec 3<&-;);`+
-			`if [[ "${OK}" == "imok" ]]; then exit 0; else exit 1; fi`,
-		port,
-	)
-}
-
-// createDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
-func (m *ProbeManager) createDefaultKeeperLivenessProbe(host *api.Host) *core.Probe {
+// createDefaultLivenessProbe returns default liveness probe
+func (m *ProbeManager) createDefaultLivenessProbe(host *api.Host) *core.Probe {
 	return &core.Probe{
 		ProbeHandler: core.ProbeHandler{
 			Exec: &core.ExecAction{
 				Command: []string{
 					"bash",
 					"-xc",
-					probeScript(host.ZKPort.IntValue()),
+					livenessProbeScript(host.ZKPort.IntValue()),
 				},
 			},
 		},
@@ -66,3 +57,13 @@ func (m *ProbeManager) createDefaultKeeperLivenessProbe(host *api.Host) *core.Pr
 		FailureThreshold:    10,
 	}
 }
+
+func livenessProbeScript(port int) string {
+	return fmt.Sprintf(
+		`date && `+
+			`OK=$(exec 3<>/dev/tcp/127.0.0.1/%d; printf 'ruok' >&3; IFS=; tee <&3; exec 3<&-;);`+
+			`if [[ "${OK}" == "imok" ]]; then exit 0; else exit 1; fi`,
+		port,
+	)
+}
+
