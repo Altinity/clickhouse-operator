@@ -120,7 +120,6 @@ def delete_all_chi(ns=None):
                 wait_object("chi", chi["metadata"]["name"], ns=ns, count=0)
 
 
-
 def delete_all_keeper(ns=None):
     for keeper_type in ("zookeeper-operator", "zookeeper", "clickhouse-keeper"):
         expected_resource_types = (
@@ -221,7 +220,7 @@ def create_ns(ns):
 
 
 def delete_ns(ns = None, delete_chi=False, ok_to_fail=False, timeout=1000):
-    if ns == None:
+    if ns is None:
         ns = current().context.test_namespace
     if delete_chi:
         delete_all_chi(ns)

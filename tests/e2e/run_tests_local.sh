@@ -21,7 +21,7 @@ WHAT="${WHAT}"
 # Possible options are:
 #  1. replace
 #  2. apply
-KUBECTL_MODE="${KUBECTL_MODE:-"replace"}"
+KUBECTL_MODE="${KUBECTL_MODE:-"apply"}"
 
 #
 #
