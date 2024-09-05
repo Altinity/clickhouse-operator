@@ -65,6 +65,9 @@ spec:
           containers:
             - name: clickhouse
               image: clickhouse/clickhouse-server:latest
+              env:
+                - name: CLICKHOUSE_ALWAYS_RUN_INITDB_SCRIPTS
+                  value: "true"
               volumeMounts:
                 - name: initdb-volume
                   mountPath: /docker-entrypoint-initdb.d
