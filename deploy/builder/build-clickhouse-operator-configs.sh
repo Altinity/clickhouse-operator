@@ -27,8 +27,9 @@ function render_file() {
     local src="${1}"
     local dst="${2}"
 
-    # Render header
+    # Render file header
     if [[ "${dst: -4}" == ".xml" ]]; then
+        # XML file
         cat <<EOF > "${dst}"
 <!-- IMPORTANT -->
 <!-- This file is auto-generated -->
@@ -38,6 +39,7 @@ function render_file() {
 <!-- IMPORTANT -->
 EOF
     elif [[ "${dst: -5}" == ".yaml" ]]; then
+        # YAML file
         cat <<EOF > "${dst}"
 # IMPORTANT
 # This file is auto-generated
@@ -47,6 +49,7 @@ EOF
 # IMPORTANT
 EOF
     else
+        # Unknown file
         echo -n "" > "${dst}"
     fi
     # Render file body
@@ -61,36 +64,21 @@ EOF
         >> "${dst}"
 }
 
-# Process files in the root folder
-# List files only
-for f in $(ls -pa "${TEMPLATES_DIR}" | grep -v /); do
+# Iterate recursively over files in "${TEMPLATES_DIR}" and render them
+find "${TEMPLATES_DIR}" -type f -printf '%P\n' | while read -r relative_file_name
+do
     # Source
-    SRC_FILE_PATH=$(realpath "${TEMPLATES_DIR}/${f}")
-    FILE_NAME=$(basename "${SRC_FILE_PATH}")
+    # Full path to source file
+    src_file_path=$(realpath "${TEMPLATES_DIR}/${relative_file_name}")
+    relative_dirname=$(dirname "${relative_file_name}")
 
     # Destination
-    mkdir -p "${CONFIG_DIR}"
-    DST_FILE_PATH=$(realpath "${CONFIG_DIR}/${FILE_NAME}")
+    dst_dir="${CONFIG_DIR}/${relative_dirname}"
+    #echo "create dst dir: ${dst_dir}"
+    mkdir -p "${dst_dir}"
 
-    #echo "${SRC_FILE_PATH} ======> ${DST_FILE_PATH}"
-    render_file "${SRC_FILE_PATH}" "${DST_FILE_PATH}"
-done
-
-# Process files in sub-folders
-for SUB_TEMPLATES_DIR in $(ls -d "${TEMPLATES_DIR}"/*/); do
-    # List files only
-    for f in $(ls -pa "${SUB_TEMPLATES_DIR}" | grep -v /); do
-        # Source
-        SRC_FILE_PATH=$(realpath "${SUB_TEMPLATES_DIR}/${f}")
-        SUB_DIR=$(basename "${SUB_TEMPLATES_DIR}")
-        FILE_NAME=$(basename "${SRC_FILE_PATH}")
-
-        # Destination
-        SUB_CONFIG_DIR=$(realpath "${CONFIG_DIR}/${SUB_DIR}")
-        mkdir -p "${SUB_CONFIG_DIR}"
-        DST_FILE_PATH=$(realpath "${SUB_CONFIG_DIR}/${FILE_NAME}")
-
-        #echo "${SRC_FILE_PATH} ======> ${DST_FILE_PATH}"
-        render_file "${SRC_FILE_PATH}" "${DST_FILE_PATH}"
-    done
+    dst_file_path="${CONFIG_DIR}/${relative_file_name}"
+    #echo "render ${dst_file_path}"
+    #echo "from   ${src_file_path}"
+    render_file "${src_file_path}" "${dst_file_path}"
 done
