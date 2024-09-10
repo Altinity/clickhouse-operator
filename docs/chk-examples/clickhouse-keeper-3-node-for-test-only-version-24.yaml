@@ -32,7 +32,10 @@ spec:
           containers:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
-              image: "clickhouse/clickhouse-keeper:24.8"
+              # IMPORTANT !!!
+              # clickhouse-keeper:24.3.5.46 version can be changed with TESTS only!
+              # DO NOT CHANGE THE VERSION !
+              image: "clickhouse/clickhouse-keeper:24.3.5.46"
               volumeMounts:
                 - name: default
                   mountPath: /var/lib/clickhouse
