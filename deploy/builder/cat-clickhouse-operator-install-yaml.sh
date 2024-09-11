@@ -43,19 +43,19 @@ TMP_CONFIG_FILE="${TMP_CONFIG_DIR}/config.yaml"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/conf.d folder
-TMP_CONFD_DIR="${TMP_CONFIG_DIR}/conf.d"
+TMP_CONFD_DIR="${TMP_CONFIG_DIR}/chi/conf.d"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/config.d folder
-TMP_CONFIGD_DIR="${TMP_CONFIG_DIR}/config.d"
+TMP_CONFIGD_DIR="${TMP_CONFIG_DIR}/chi/config.d"
 
 # Local path to folder with operator's .yaml template files which will be injected into .yaml
 # as content of /etc/clickhouse-server/templates.d folder
-TMP_TEMPLATESD_DIR="${TMP_CONFIG_DIR}/templates.d"
+TMP_TEMPLATESD_DIR="${TMP_CONFIG_DIR}/chi/templates.d"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
 # as content of /etc/clickhouse-server/users.d folder
-TMP_USERSD_DIR="${TMP_CONFIG_DIR}/users.d"
+TMP_USERSD_DIR="${TMP_CONFIG_DIR}/chi/users.d"
 
 # Generate and cleanup configs
 "${CUR_DIR}"/build-clickhouse-operator-configs.sh "${TMP_CONFIG_DIR}"
@@ -302,12 +302,12 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             done
         else
             # Fetch from github and apply
-            # config/config.d/01-clickhouse-listen.xml
-            # config/config.d/02-clickhouse-logger.xml
-            download_file "${CUR_DIR}" "01-clickhouse-listen.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/config.d"
-            download_file "${CUR_DIR}" "02-clickhouse-logger.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/config.d"
-            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-listen.xml"
-            render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-logger.xml"
+            # config/chi/config.d/01-clickhouse-listen.xml
+            # config/chi/config.d/02-clickhouse-logger.xml
+            download_file "${CUR_DIR}" "01-clickhouse-01-listen.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/chi/config.d"
+            download_file "${CUR_DIR}" "02-clickhouse-02-logger.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/chi/config.d"
+            render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-01-listen.xml"
+            render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-02-logger.xml"
         fi
 
         # Render templates.d files
@@ -330,8 +330,8 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             done
         else
             # Fetch from github and apply
-            # config/users.d/01-clickhouse-user.xml
-            download_file "${CUR_DIR}" "01-clickhouse-user.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/users.d"
+            # config/chi/users.d/01-clickhouse-user.xml
+            download_file "${CUR_DIR}" "01-clickhouse-user.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/chi/users.d"
             render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-user.xml"
         fi
 
