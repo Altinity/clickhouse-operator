@@ -79,15 +79,15 @@ DOCKER_CMD="docker buildx build --progress plain"
 
 # Append arch
 if [[ "${DOCKER_IMAGE}" =~ ":dev" || "${MINIKUBE}" == "yes" ]]; then
-    echo "Building dev images for amd64 only, skip arm arch."
-    DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64 --output type=image,name=${DOCKER_IMAGE}"
+    echo "Build image (dev) for amd64 only, skip arm arch."
+    DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64 --output type=docker --output type=image,name=${DOCKER_IMAGE}"
 else
-    echo "Going to build for both amd64 and arm64."
+    echo "Build image for both amd64 and arm64."
     DOCKER_CMD="${DOCKER_CMD} --platform=linux/amd64,linux/arm64"
 fi
 
 # Append VERSION and RELEASE
-DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev} --build-arg RELEASE=${RELEASE:-1}"
+DOCKER_CMD="${DOCKER_CMD} --build-arg VERSION=${VERSION:-dev}"
 
 # Append GC flags if present
 if [[ ! -z "${GCFLAGS}" ]]; then
