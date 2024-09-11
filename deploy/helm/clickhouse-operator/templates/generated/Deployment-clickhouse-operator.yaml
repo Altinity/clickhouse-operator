@@ -55,13 +55,13 @@ spec:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
             - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
+              mountPath: /etc/clickhouse-operator/chi/conf.d
             - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
+              mountPath: /etc/clickhouse-operator/chi/config.d
             - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
+              mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
+              mountPath: /etc/clickhouse-operator/chi/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -125,13 +125,13 @@ spec:
             - name: etc-clickhouse-operator-folder
               mountPath: /etc/clickhouse-operator
             - name: etc-clickhouse-operator-confd-folder
-              mountPath: /etc/clickhouse-operator/conf.d
+              mountPath: /etc/clickhouse-operator/chi/conf.d
             - name: etc-clickhouse-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/config.d
+              mountPath: /etc/clickhouse-operator/chi/config.d
             - name: etc-clickhouse-operator-templatesd-folder
-              mountPath: /etc/clickhouse-operator/templates.d
+              mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
-              mountPath: /etc/clickhouse-operator/users.d
+              mountPath: /etc/clickhouse-operator/chi/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal

@@ -39,12 +39,12 @@ clickhouse:
       # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
       path:
         # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
-        common: config.d
+        common: chi/config.d
         # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
-        host: conf.d
+        host: chi/conf.d
         # Path to the folder where ClickHouse configuration files with users' settings are located.
         # Files are common for all instances within a CHI.
-        user: users.d
+        user: chi/users.d
     ################################################
     ##
     ## Configuration users section
@@ -208,7 +208,7 @@ template:
     # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
     # Templates are added to the list of all templates and used when CHI is reconciled.
     # Templates are applied in sorted alpha-numeric order.
-    path: templates.d
+    path: chi/templates.d
 
 ################################################
 ##

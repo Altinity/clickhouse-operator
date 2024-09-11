@@ -1,0 +1,14 @@
+apiVersion: "clickhouse.altinity.com/v1"
+kind: "ClickHouseInstallationTemplate"
+metadata:
+  name: "default-storage-template-2Gi"
+spec:
+  templates:
+    volumeClaimTemplates:
+      - name: default-storage-template-2Gi
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 2Gi
