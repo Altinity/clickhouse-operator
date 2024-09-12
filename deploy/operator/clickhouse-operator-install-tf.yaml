@@ -4745,6 +4745,72 @@ data:
       </profiles>
     </yandex>
 ---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-confd-files
+# NAMESPACE=${namespace}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-confd-files
+  namespace: ${namespace}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-configd-files
+# NAMESPACE=${namespace}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-configd-files
+  namespace: ${namespace}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-templatesd-files
+# NAMESPACE=${namespace}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-templatesd-files
+  namespace: ${namespace}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+  readme: |
+    Templates in this folder are packaged with an operator and available via 'useTemplate'
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-usersd-files
+# NAMESPACE=${namespace}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-usersd-files
+  namespace: ${namespace}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
+---
 #
 # Template parameters available:
 #   NAMESPACE=${namespace}
@@ -4817,6 +4883,18 @@ spec:
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
+        - name: etc-keeper-operator-confd-folder
+          configMap:
+            name: etc-keeper-operator-confd-files
+        - name: etc-keeper-operator-configd-folder
+          configMap:
+            name: etc-keeper-operator-configd-files
+        - name: etc-keeper-operator-templatesd-folder
+          configMap:
+            name: etc-keeper-operator-templatesd-files
+        - name: etc-keeper-operator-usersd-folder
+          configMap:
+            name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
           image: altinity/clickhouse-operator:0.24.0
@@ -4832,6 +4910,14 @@ spec:
               mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -4900,6 +4986,14 @@ spec:
               mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
