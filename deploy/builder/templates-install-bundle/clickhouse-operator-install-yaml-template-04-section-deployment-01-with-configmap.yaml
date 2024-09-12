@@ -49,6 +49,18 @@ spec:
         - name: etc-clickhouse-operator-usersd-folder
           configMap:
             name: etc-clickhouse-operator-usersd-files
+        - name: etc-keeper-operator-confd-folder
+          configMap:
+            name: etc-keeper-operator-confd-files
+        - name: etc-keeper-operator-configd-folder
+          configMap:
+            name: etc-keeper-operator-configd-files
+        - name: etc-keeper-operator-templatesd-folder
+          configMap:
+            name: etc-keeper-operator-templatesd-files
+        - name: etc-keeper-operator-usersd-folder
+          configMap:
+            name: etc-keeper-operator-usersd-files
       containers:
         - name: clickhouse-operator
           image: ${OPERATOR_IMAGE}
@@ -64,6 +76,14 @@ spec:
               mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
@@ -132,6 +152,14 @@ spec:
               mountPath: /etc/clickhouse-operator/chi/templates.d
             - name: etc-clickhouse-operator-usersd-folder
               mountPath: /etc/clickhouse-operator/chi/users.d
+            - name: etc-keeper-operator-confd-folder
+              mountPath: /etc/clickhouse-operator/chk/conf.d
+            - name: etc-keeper-operator-configd-folder
+              mountPath: /etc/clickhouse-operator/chk/config.d
+            - name: etc-keeper-operator-templatesd-folder
+              mountPath: /etc/clickhouse-operator/chk/templates.d
+            - name: etc-keeper-operator-usersd-folder
+              mountPath: /etc/clickhouse-operator/chk/users.d
           env:
             # Pod-specific
             # spec.nodeName: ip-172-20-52-62.ec2.internal
