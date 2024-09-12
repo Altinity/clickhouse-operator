@@ -42,20 +42,36 @@ TMP_CONFIG_DIR="${PROJECT_TEMP}/$(date +%s)"
 TMP_CONFIG_FILE="${TMP_CONFIG_DIR}/config.yaml"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
-# as content of /etc/clickhouse-server/conf.d folder
-TMP_CONFD_DIR="${TMP_CONFIG_DIR}/chi/conf.d"
+# as content of /etc/clickhouse-server/chi/conf.d folder
+TMP_CHI_CONFD_DIR="${TMP_CONFIG_DIR}/chi/conf.d"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
-# as content of /etc/clickhouse-server/config.d folder
-TMP_CONFIGD_DIR="${TMP_CONFIG_DIR}/chi/config.d"
+# as content of /etc/clickhouse-server/chi/config.d folder
+TMP_CHI_CONFIGD_DIR="${TMP_CONFIG_DIR}/chi/config.d"
 
 # Local path to folder with operator's .yaml template files which will be injected into .yaml
-# as content of /etc/clickhouse-server/templates.d folder
-TMP_TEMPLATESD_DIR="${TMP_CONFIG_DIR}/chi/templates.d"
+# as content of /etc/clickhouse-server/chi/templates.d folder
+TMP_CHI_TEMPLATESD_DIR="${TMP_CONFIG_DIR}/chi/templates.d"
 
 # Local path to folder with ClickHouse's .xml configuration files which will be injected into .yaml
-# as content of /etc/clickhouse-server/users.d folder
-TMP_USERSD_DIR="${TMP_CONFIG_DIR}/chi/users.d"
+# as content of /etc/clickhouse-server/chi/users.d folder
+TMP_CHI_USERSD_DIR="${TMP_CONFIG_DIR}/chi/users.d"
+
+# Local path to folder with Keeper's .xml configuration files which will be injected into .yaml
+# as content of /etc/clickhouse-server/chk/conf.d folder
+TMP_CHK_CONFD_DIR="${TMP_CONFIG_DIR}/chk/conf.d"
+
+# Local path to folder with Keeper's .xml configuration files which will be injected into .yaml
+# as content of /etc/clickhouse-server/chk/config.d folder
+TMP_CHK_CONFIGD_DIR="${TMP_CONFIG_DIR}/chk/config.d"
+
+# Local path to folder with operator's .yaml template files which will be injected into .yaml
+# as content of /etc/clickhouse-server/chk/templates.d folder
+TMP_CHK_TEMPLATESD_DIR="${TMP_CONFIG_DIR}/chk/templates.d"
+
+# Local path to folder with Keeper's .xml configuration files which will be injected into .yaml
+# as content of /etc/clickhouse-server/chk/users.d folder
+TMP_CHK_USERSD_DIR="${TMP_CONFIG_DIR}/chk/users.d"
 
 # Generate and cleanup configs
 "${CUR_DIR}"/build-clickhouse-operator-configs.sh "${TMP_CONFIG_DIR}"
@@ -282,22 +298,22 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             render_configmap_data_section_file "${CUR_DIR}/config.yaml"
         fi
 
-        # Render confd.d files
+        # Render chi/conf.d files
         render_separator
         render_configmap_header "etc-clickhouse-operator-confd-files"
-        if [[ ! -z "${TMP_CONFD_DIR}" ]] && [[ -d "${TMP_CONFD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CONFD_DIR}")" ]]; then
+        if [[ ! -z "${TMP_CHI_CONFD_DIR}" ]] && [[ -d "${TMP_CHI_CONFD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHI_CONFD_DIR}")" ]]; then
             # Looks like at least one file is available, let's render it
-            for FILE in "${TMP_CONFD_DIR}"/*; do
+            for FILE in "${TMP_CHI_CONFD_DIR}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         fi
 
-        # Render configd.d files
+        # Render chi/config.d files
         render_separator
         render_configmap_header "etc-clickhouse-operator-configd-files"
-        if [[ ! -z "${TMP_CONFIGD_DIR}" ]] && [[ -d "${TMP_CONFIGD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CONFIGD_DIR}")" ]]; then
+        if [[ ! -z "${TMP_CHI_CONFIGD_DIR}" ]] && [[ -d "${TMP_CHI_CONFIGD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHI_CONFIGD_DIR}")" ]]; then
             # Looks like at least one file is available, let's render it
-            for FILE in "${TMP_CONFIGD_DIR}"/*; do
+            for FILE in "${TMP_CHI_CONFIGD_DIR}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         else
@@ -310,22 +326,22 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             render_configmap_data_section_file "${CUR_DIR}/02-clickhouse-02-logger.xml"
         fi
 
-        # Render templates.d files
+        # Render chi/templates.d files
         render_separator
         render_configmap_header "etc-clickhouse-operator-templatesd-files"
-        if [[ ! -z "${TMP_TEMPLATESD_DIR}" ]] && [[ -d "${TMP_TEMPLATESD_DIR}" ]] && [[ ! -z "$(ls "${TMP_TEMPLATESD_DIR}")" ]]; then
+        if [[ ! -z "${TMP_CHI_TEMPLATESD_DIR}" ]] && [[ -d "${TMP_CHI_TEMPLATESD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHI_TEMPLATESD_DIR}")" ]]; then
             # Looks like at least one file is available, let's render it
-            for FILE in "${TMP_TEMPLATESD_DIR}"/*; do
+            for FILE in "${TMP_CHI_TEMPLATESD_DIR}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         fi
 
-        # Render users.d files
+        # Render chi/users.d files
         render_separator
         render_configmap_header "etc-clickhouse-operator-usersd-files"
-        if [[ ! -z "${TMP_USERSD_DIR}" ]] && [[ -d "${TMP_USERSD_DIR}" ]] && [[ ! -z "$(ls "${TMP_USERSD_DIR}")" ]]; then
+        if [[ ! -z "${TMP_CHI_USERSD_DIR}" ]] && [[ -d "${TMP_CHI_USERSD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHI_USERSD_DIR}")" ]]; then
             # Looks like at least one file is available, let's render it
-            for FILE in "${TMP_USERSD_DIR}"/*; do
+            for FILE in "${TMP_CHI_USERSD_DIR}"/*; do
                 render_configmap_data_section_file "${FILE}"
             done
         else
@@ -333,6 +349,46 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             # config/chi/users.d/01-clickhouse-user.xml
             download_file "${CUR_DIR}" "01-clickhouse-user.xml" "${REPO_PATH_OPERATOR_CONFIG_DIR}/chi/users.d"
             render_configmap_data_section_file "${CUR_DIR}/01-clickhouse-user.xml"
+        fi
+
+        # Render chk/conf.d files
+        render_separator
+        render_configmap_header "etc-keeper-operator-confd-files"
+        if [[ ! -z "${TMP_CHK_CONFD_DIR}" ]] && [[ -d "${TMP_CHK_CONFD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHK_CONFD_DIR}")" ]]; then
+            # Looks like at least one file is available, let's render it
+            for FILE in "${TMP_CHK_CONFD_DIR}"/*; do
+                render_configmap_data_section_file "${FILE}"
+            done
+        fi
+
+        # Render chk/config.d files
+        render_separator
+        render_configmap_header "etc-keeper-operator-configd-files"
+        if [[ ! -z "${TMP_CHK_CONFIGD_DIR}" ]] && [[ -d "${TMP_CHK_CONFIGD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHK_CONFIGD_DIR}")" ]]; then
+            # Looks like at least one file is available, let's render it
+            for FILE in "${TMP_CHK_CONFIGD_DIR}"/*; do
+                render_configmap_data_section_file "${FILE}"
+            done
+        fi
+
+        # Render chk/templates.d files
+        render_separator
+        render_configmap_header "etc-keeper-operator-templatesd-files"
+        if [[ ! -z "${TMP_CHK_TEMPLATESD_DIR}" ]] && [[ -d "${TMP_CHK_TEMPLATESD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHK_TEMPLATESD_DIR}")" ]]; then
+            # Looks like at least one file is available, let's render it
+            for FILE in "${TMP_CHK_TEMPLATESD_DIR}"/*; do
+                render_configmap_data_section_file "${FILE}"
+            done
+        fi
+
+        # Render chk/users.d files
+        render_separator
+        render_configmap_header "etc-keeper-operator-usersd-files"
+        if [[ ! -z "${TMP_CHK_USERSD_DIR}" ]] && [[ -d "${TMP_CHK_USERSD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHK_USERSD_DIR}")" ]]; then
+            # Looks like at least one file is available, let's render it
+            for FILE in "${TMP_CHK_USERSD_DIR}"/*; do
+                render_configmap_data_section_file "${FILE}"
+            done
         fi
 
         # Render secret

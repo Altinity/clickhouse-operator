@@ -70,10 +70,12 @@ do
     # Source
     # Full path to source file
     src_file_path=$(realpath "${TEMPLATES_DIR}/${relative_file_name}")
-    relative_dirname=$(dirname "${relative_file_name}")
+    relative_dir_name=$(dirname "${relative_file_name}")
 
     # Destination
-    dst_dir="${CONFIG_DIR}/${relative_dirname}"
+    dst_dir="${CONFIG_DIR}/${relative_dir_name}"
+    #echo "relative_file_name: ${relative_file_name}"
+    #echo "relative_dir_name: ${relative_dir_name}"
     #echo "create dst dir: ${dst_dir}"
     mkdir -p "${dst_dir}"
 
