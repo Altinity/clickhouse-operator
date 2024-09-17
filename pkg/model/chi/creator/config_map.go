@@ -135,7 +135,7 @@ func (m *ConfigMapManager) createConfigMapHost(host *api.Host) *core.ConfigMap {
 			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
-		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, host),
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, config.NewFilesGeneratorOptions().SetHost(host)),
 	}
 	// And after the object is ready we can put version label
 	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
