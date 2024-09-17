@@ -228,7 +228,7 @@ stringData:
   AWS_ACCESS_KEY_ID: *****
 ```
 
-Secret can be referred in ```ClickHouseInstllation``` as follows:
+Secret can be referred in ```ClickHouseInstallation``` as follows:
 
 ```yaml
 spec:
