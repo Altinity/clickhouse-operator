@@ -199,15 +199,15 @@ type OperatorConfigFile struct {
 		User   string `json:"user"   yaml:"user"`
 	} `json:"path" yaml:"path"`
 
-	Runtime OperatorConfigFileRuntime `json:"runtime,omitempty" yaml:"runtime,omitempty"`
+	Runtime OperatorConfigFileRuntime `json:"-" yaml:"-"`
 }
 
 // OperatorConfigFileRuntime specifies runtime section
 type OperatorConfigFileRuntime struct {
 	// OperatorConfig files fetched from paths specified above. Maps "file name->file content"
-	CommonConfigFiles map[string]string `json:"commonConfigFiles,omitempty" yaml:"commonConfigFiles,omitempty"`
-	HostConfigFiles   map[string]string `json:"hostConfigFiles,omitempty"   yaml:"hostConfigFiles,omitempty"`
-	UsersConfigFiles  map[string]string `json:"usersConfigFiles,omitempty"  yaml:"usersConfigFiles,omitempty"`
+	CommonConfigFiles map[string]string `json:"-" yaml:"-"`
+	HostConfigFiles   map[string]string `json:"-" yaml:"-"`
+	UsersConfigFiles  map[string]string `json:"-" yaml:"-"`
 }
 
 // OperatorConfigUser specifies User section
@@ -278,6 +278,11 @@ type OperatorConfigClickHouse struct {
 			Collect time.Duration `json:"collect" yaml:"collect"`
 		} `json:"timeouts" yaml:"timeouts"`
 	} `json:"metrics" yaml:"metrics"`
+}
+
+// OperatorConfigKeeper specifies Keeper section
+type OperatorConfigKeeper struct {
+	Config OperatorConfigConfig `json:"configuration" yaml:"configuration"`
 }
 
 // OperatorConfigTemplate specifies template section
@@ -401,6 +406,7 @@ type OperatorConfig struct {
 	Runtime     OperatorConfigRuntime    `json:"runtime"    yaml:"runtime"`
 	Watch       OperatorConfigWatch      `json:"watch"      yaml:"watch"`
 	ClickHouse  OperatorConfigClickHouse `json:"clickhouse" yaml:"clickhouse"`
+	Keeper      OperatorConfigKeeper     `json:"keeper" yaml:"keeper"`
 	Template    OperatorConfigTemplate   `json:"template"   yaml:"template"`
 	Reconcile   OperatorConfigReconcile  `json:"reconcile"  yaml:"reconcile"`
 	Annotation  OperatorConfigAnnotation `json:"annotation" yaml:"annotation"`
@@ -697,6 +703,7 @@ func (c *OperatorConfig) DeleteCHITemplate(template *ClickHouseInstallation) {
 func (c *OperatorConfig) Postprocess() {
 	c.normalize()
 	c.readClickHouseCustomConfigFiles()
+	c.readKeeperCustomConfigFiles()
 	c.readCHITemplates()
 	c.applyEnvVarParams()
 	c.applyDefaultWatchNamespace()
@@ -708,6 +715,14 @@ func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
 	util.PreparePath(&c.ClickHouse.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
+}
+
+func (c *OperatorConfig) normalizeSectionKeeperConfigurationFile() {
+	// Process Keeper configuration files section
+	// Apply default paths in case nothing specified
+	util.PreparePath(&c.Keeper.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
+	util.PreparePath(&c.Keeper.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
+	util.PreparePath(&c.Keeper.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
 }
 
 func (c *OperatorConfig) normalizeSectionTemplate() {
@@ -892,6 +907,7 @@ func (c *OperatorConfig) normalize() {
 	c.normalizeSectionClickHouseConfigurationUserDefault()
 	c.normalizeSectionClickHouseAccess()
 	c.normalizeSectionClickHouseMetrics()
+	c.normalizeSectionKeeperConfigurationFile()
 	c.normalizeSectionTemplate()
 	c.normalizeSectionReconcileStatefulSet()
 	c.normalizeSectionReconcileRuntime()
@@ -954,6 +970,13 @@ func (c *OperatorConfig) readClickHouseCustomConfigFiles() {
 	c.ClickHouse.Config.File.Runtime.CommonConfigFiles = util.ReadFilesIntoMap(c.ClickHouse.Config.File.Path.Common, c.isCHConfigExt)
 	c.ClickHouse.Config.File.Runtime.HostConfigFiles = util.ReadFilesIntoMap(c.ClickHouse.Config.File.Path.Host, c.isCHConfigExt)
 	c.ClickHouse.Config.File.Runtime.UsersConfigFiles = util.ReadFilesIntoMap(c.ClickHouse.Config.File.Path.User, c.isCHConfigExt)
+}
+
+// readKeeperCustomConfigFiles reads all extra user-specified Keeper config files
+func (c *OperatorConfig) readKeeperCustomConfigFiles() {
+	c.Keeper.Config.File.Runtime.CommonConfigFiles = util.ReadFilesIntoMap(c.Keeper.Config.File.Path.Common, c.isCHConfigExt)
+	c.Keeper.Config.File.Runtime.HostConfigFiles = util.ReadFilesIntoMap(c.Keeper.Config.File.Path.Host, c.isCHConfigExt)
+	c.Keeper.Config.File.Runtime.UsersConfigFiles = util.ReadFilesIntoMap(c.Keeper.Config.File.Path.User, c.isCHConfigExt)
 }
 
 // isCHConfigExt returns true in case specified file has proper extension for a ClickHouse config file
