@@ -66,4 +66,3 @@ func livenessProbeScript(port int) string {
 		port,
 	)
 }
-
