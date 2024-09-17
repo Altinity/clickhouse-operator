@@ -15,25 +15,37 @@
 package config
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
-// FilesGenerator specifies keeper configuration generator object
+// FilesGenerator specifies configuration generator object
 type FilesGenerator struct {
 	configGenerator *Generator
+	// clickhouse-operator configuration
+	chopConfig *chi.OperatorConfig
 }
 
 // NewFilesGenerator creates new configuration files generator object
-func NewFilesGenerator(cr api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *FilesGenerator {
+func NewFilesGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *FilesGenerator {
 	return &FilesGenerator{
 		configGenerator: newGenerator(cr, namer, opts),
+		chopConfig:      chop.Config(),
 	}
 }
 
 func (c *FilesGenerator) CreateConfigFiles(what interfaces.FilesGroupType, params ...any) map[string]string {
 	switch what {
+	case interfaces.FilesGroupCommon:
+		var options *FilesGeneratorOptions
+		if len(params) > 0 {
+			options = params[0].(*FilesGeneratorOptions)
+			return c.createConfigFilesGroupCommon(options)
+		}
+	case interfaces.FilesGroupUsers:
+		return c.createConfigFilesGroupUsers()
 	case interfaces.FilesGroupHost:
 		var options *FilesGeneratorOptions
 		if len(params) > 0 {
@@ -44,11 +56,43 @@ func (c *FilesGenerator) CreateConfigFiles(what interfaces.FilesGroupType, param
 	return nil
 }
 
+// createConfigFilesGroupCommon creates common config files
+func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOptions) map[string]string {
+	if options == nil {
+		options = defaultFilesGeneratorOptions()
+	}
+	// Common ConfigSections maps section name to section XML
+	configSections := make(map[string]string)
+	// common settings
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettingsGlobal())
+	// common files
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionCommon, true, nil))
+	// Extra user-specified config files
+	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.CommonConfigFiles)
+
+	return configSections
+}
+
+// createConfigFilesGroupUsers creates users config files
+func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
+	// CommonUsers ConfigSections maps section name to section XML
+	configSections := make(map[string]string)
+	// user files
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionUsers, false, nil))
+	// Extra user-specified config files
+	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.UsersConfigFiles)
+
+	return configSections
+}
+
 // createConfigFilesGroupHost creates host config files
 func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptions) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	configSections := make(map[string]string)
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getHostConfig(options.GetHost(), options.GetSettings()))
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionHost, true, options.GetHost()))
+	// Extra user-specified config files
+	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.HostConfigFiles)
 
 	return configSections
 }
@@ -57,5 +101,4 @@ func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptio
 // filename depends on a section which it will contain
 func createConfigSectionFilename(section string) string {
 	return "chop-generated-" + section + ".xml"
-	//return "keeper_config.xml"
 }

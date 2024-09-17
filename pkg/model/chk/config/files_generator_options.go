@@ -22,6 +22,11 @@ type FilesGeneratorOptions struct {
 	settings *api.Settings
 }
 
+// defaultFilesGeneratorOptions creates new default options for files generator
+func defaultFilesGeneratorOptions() *FilesGeneratorOptions {
+	return NewFilesGeneratorOptions()
+}
+
 // NewFilesGeneratorOptions creates new options for configuration files generator
 func NewFilesGeneratorOptions() *FilesGeneratorOptions {
 	return &FilesGeneratorOptions{}

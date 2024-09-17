@@ -21,6 +21,20 @@ import (
 const (
 	DirPathConfigRoot = "/etc/clickhouse-keeper"
 
+	// DirPathConfigCommon specifies full path to folder,
+	// where generated common XML files for the following sections would be placed:
+	// 1. remote servers
+	// 2. operator-provided additional config files
+	DirPathConfigCommon = DirPathConfigRoot + "/" + api.CommonConfigDir + "/"
+
+	// DirPathConfigUsers specifies full path to folder, where generated users XML files would be placed
+	// for the following sections:
+	// 1. users
+	// 2. quotas
+	// 3. profiles
+	// 4. operator-provided additional config files
+	DirPathConfigUsers = DirPathConfigRoot + "/" + api.UsersConfigDir + "/"
+
 	// DirPathConfigHost specifies full path to folder, where generated host XML files would be placed
 	// for the following sections:
 	// 1. macros
@@ -43,6 +57,10 @@ const (
 
 	// KeeperContainerName specifies name of the clickhouse container in the pod
 	KeeperContainerName = "clickhouse-keeper"
+)
+
+const (
+	xmlTagYandex = "yandex"
 )
 
 const (

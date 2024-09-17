@@ -14,5 +14,11 @@
 
 package config
 
+import (
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+)
+
 type GeneratorOptions struct {
+	Settings *api.Settings
+	Files    *api.Settings
 }
