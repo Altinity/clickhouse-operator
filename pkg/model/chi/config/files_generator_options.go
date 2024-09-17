@@ -14,14 +14,38 @@
 
 package config
 
+import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
 // FilesGeneratorOptions specifies options for configuration files generator
 type FilesGeneratorOptions struct {
 	RemoteServersOptions *RemoteServersOptions
+	host                 *api.Host
+}
+
+// defaultFilesGeneratorOptions creates new default options for files generator
+func defaultFilesGeneratorOptions() *FilesGeneratorOptions {
+	return NewFilesGeneratorOptions()
 }
 
 // NewFilesGeneratorOptions creates new options for configuration files generator
 func NewFilesGeneratorOptions() *FilesGeneratorOptions {
 	return &FilesGeneratorOptions{}
+}
+
+func (o *FilesGeneratorOptions) GetHost() *api.Host {
+	if o == nil {
+		return nil
+	}
+	return o.host
+}
+
+func (o *FilesGeneratorOptions) SetHost(host *api.Host) *FilesGeneratorOptions {
+	if o == nil {
+		return nil
+	}
+	o.host = host
+
+	return o
 }
 
 // GetRemoteServersOptions gets remote-servers generator options
@@ -40,9 +64,4 @@ func (o *FilesGeneratorOptions) SetRemoteServersOptions(opts *RemoteServersOptio
 	o.RemoteServersOptions = opts
 
 	return o
-}
-
-// defaultFilesGeneratorOptions creates new default options for clickhouse config generator
-func defaultFilesGeneratorOptions() *FilesGeneratorOptions {
-	return NewFilesGeneratorOptions()
 }

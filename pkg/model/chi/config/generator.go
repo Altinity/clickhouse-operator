@@ -19,7 +19,7 @@ import (
 	"fmt"
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 	"github.com/altinity/clickhouse-operator/pkg/xml"
@@ -41,22 +41,67 @@ const (
 	AllClustersClusterName         = "all-clusters"
 )
 
-// Generator generates ClickHouse configuration files content for specified CHI
-// ClickHouse configuration files content is an XML ATM, so config generator provides set of Get*() functions
-// which produces XML which are parts of ClickHouse configuration and can/should be used as ClickHouse config files.
+// Generator generates configuration files content for specified CR
+// Configuration files content is an XML ATM, so config generator provides set of Get*() functions
+// which produces XML which are parts of configuration and can/should be used as content of config files.
 type Generator struct {
-	cr    api.ICustomResource
+	cr    chi.ICustomResource
 	namer interfaces.INameManager
 	opts  *GeneratorOptions
 }
 
-// newGenerator returns new GeneratorClickHouse struct
-func newGenerator(cr api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *Generator {
+// newGenerator returns new Generator struct
+func newGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *Generator {
 	return &Generator{
 		cr:    cr,
 		namer: namer,
 		opts:  opts,
 	}
+}
+
+// generateXMLConfig creates XML using map[string]string definitions
+func (c *Generator) generateXMLConfig(settings *chi.Settings, prefix string) string {
+	if settings.Len() == 0 {
+		return ""
+	}
+
+	b := &bytes.Buffer{}
+	// <yandex>
+	// XML code
+	// </yandex>
+	util.Iline(b, 0, "<"+xmlTagYandex+">")
+	xml.GenerateFromSettings(b, settings, prefix)
+	util.Iline(b, 0, "</"+xmlTagYandex+">")
+
+	return b.String()
+}
+
+// getSettingsGlobal creates data for global section of "settings.xml"
+func (c *Generator) getSettingsGlobal() string {
+	// No host specified means request to generate common config
+	return c.generateXMLConfig(c.opts.Settings, "")
+}
+
+// getSettingsHost creates data for host section of "settings.xml"
+func (c *Generator) getSettingsHost(host *chi.Host) string {
+	// Generate config for the specified host
+	return c.generateXMLConfig(host.Settings, "")
+}
+
+// getSectionFromFiles creates data for custom common config files
+func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnspecified bool, host *chi.Host) map[string]string {
+	var files *chi.Settings
+	if host == nil {
+		// We are looking into Common files
+		files = c.opts.Files
+	} else {
+		// We are looking into host's personal files
+		files = host.Files
+	}
+
+	// Extract particular section from files
+
+	return files.GetSection(section, includeUnspecified)
 }
 
 // getUsers creates data for users section. Used as "users.xml"
@@ -74,36 +119,8 @@ func (c *Generator) getQuotas() string {
 	return c.generateXMLConfig(c.opts.Quotas, configQuotas)
 }
 
-// getSettingsGlobal creates data for "settings.xml"
-func (c *Generator) getSettingsGlobal() string {
-	// No host specified means request to generate common config
-	return c.generateXMLConfig(c.opts.Settings, "")
-}
-
-// getSettings creates data for "settings.xml"
-func (c *Generator) getSettings(host *api.Host) string {
-	// Generate config for the specified host
-	return c.generateXMLConfig(host.Settings, "")
-}
-
-// getSectionFromFiles creates data for custom common config files
-func (c *Generator) getSectionFromFiles(section api.SettingsSection, includeUnspecified bool, host *api.Host) map[string]string {
-	var files *api.Settings
-	if host == nil {
-		// We are looking into Common files
-		files = c.opts.Files
-	} else {
-		// We are looking into host's personal files
-		files = host.Files
-	}
-
-	// Extract particular section from files
-
-	return files.GetSection(section, includeUnspecified)
-}
-
 // getHostZookeeper creates data for "zookeeper.xml"
-func (c *Generator) getHostZookeeper(host *api.Host) string {
+func (c *Generator) getHostZookeeper(host *chi.Host) string {
 	zk := host.GetZookeeper()
 
 	if zk.IsEmpty() {
@@ -183,7 +200,7 @@ func (c *Generator) getHostZookeeper(host *api.Host) string {
 // chiHostsNum count hosts according to the options
 func (c *Generator) chiHostsNum(options *RemoteServersOptions) int {
 	num := 0
-	c.cr.WalkHosts(func(host *api.Host) error {
+	c.cr.WalkHosts(func(host *chi.Host) error {
 		if options.Include(host) {
 			num++
 		}
@@ -193,10 +210,10 @@ func (c *Generator) chiHostsNum(options *RemoteServersOptions) int {
 }
 
 // clusterHostsNum count hosts according to the options
-func (c *Generator) clusterHostsNum(cluster api.ICluster, options *RemoteServersOptions) int {
+func (c *Generator) clusterHostsNum(cluster chi.ICluster, options *RemoteServersOptions) int {
 	num := 0
 	// Build each shard XML
-	cluster.WalkShards(func(index int, shard api.IShard) error {
+	cluster.WalkShards(func(index int, shard chi.IShard) error {
 		num += c.shardHostsNum(shard, options)
 		return nil
 	})
@@ -204,9 +221,9 @@ func (c *Generator) clusterHostsNum(cluster api.ICluster, options *RemoteServers
 }
 
 // shardHostsNum count hosts according to the options
-func (c *Generator) shardHostsNum(shard api.IShard, options *RemoteServersOptions) int {
+func (c *Generator) shardHostsNum(shard chi.IShard, options *RemoteServersOptions) int {
 	num := 0
-	shard.WalkHosts(func(host *api.Host) error {
+	shard.WalkHosts(func(host *chi.Host) error {
 		if options.Include(host) {
 			num++
 		}
@@ -215,7 +232,7 @@ func (c *Generator) shardHostsNum(shard api.IShard, options *RemoteServersOption
 	return num
 }
 
-func (c *Generator) getRemoteServersReplica(host *api.Host, b *bytes.Buffer) {
+func (c *Generator) getRemoteServersReplica(host *chi.Host, b *bytes.Buffer) {
 	// <replica>
 	//		<host>XXX</host>
 	//		<port>XXX</port>
@@ -250,7 +267,7 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 	util.Iline(b, 8, "<!-- User-specified clusters -->")
 
 	// Build each cluster XML
-	c.cr.WalkClusters(func(cluster api.ICluster) error {
+	c.cr.WalkClusters(func(cluster chi.ICluster) error {
 		if c.clusterHostsNum(cluster, options) < 1 {
 			// Skip empty cluster
 			return nil
@@ -260,16 +277,16 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 
 		// <secret>VALUE</secret>
 		switch cluster.GetSecret().Source() {
-		case api.ClusterSecretSourcePlaintext:
+		case chi.ClusterSecretSourcePlaintext:
 			// Secret value is explicitly specified
 			util.Iline(b, 12, "<secret>%s</secret>", cluster.GetSecret().Value)
-		case api.ClusterSecretSourceSecretRef, api.ClusterSecretSourceAuto:
+		case chi.ClusterSecretSourceSecretRef, chi.ClusterSecretSourceAuto:
 			// Use secret via ENV var from secret
 			util.Iline(b, 12, `<secret from_env="%s" />`, InternodeClusterSecretEnvName)
 		}
 
 		// Build each shard XML
-		cluster.WalkShards(func(index int, shard api.IShard) error {
+		cluster.WalkShards(func(index int, shard chi.IShard) error {
 			if c.shardHostsNum(shard, options) < 1 {
 				// Skip empty shard
 				return nil
@@ -285,7 +302,7 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 				util.Iline(b, 16, "<weight>%d</weight>", shard.GetWeight())
 			}
 
-			shard.WalkHosts(func(host *api.Host) error {
+			shard.WalkHosts(func(host *chi.Host) error {
 				if options.Include(host) {
 					c.getRemoteServersReplica(host, b)
 					log.V(2).M(host).Info("Adding host to remote servers: %s", host.GetName())
@@ -321,7 +338,7 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 		util.Iline(b, 8, "<%s>", clusterName)
 		util.Iline(b, 8, "    <shard>")
 		util.Iline(b, 8, "        <internal_replication>true</internal_replication>")
-		c.cr.WalkHosts(func(host *api.Host) error {
+		c.cr.WalkHosts(func(host *chi.Host) error {
 			if options.Include(host) {
 				c.getRemoteServersReplica(host, b)
 			}
@@ -338,7 +355,7 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 		// <all-sharded>
 		clusterName = AllShardsOneReplicaClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
-		c.cr.WalkHosts(func(host *api.Host) error {
+		c.cr.WalkHosts(func(host *chi.Host) error {
 			if options.Include(host) {
 				// <shard>
 				//     <internal_replication>
@@ -360,8 +377,8 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 		// <all-clusters>
 		clusterName = AllClustersClusterName
 		util.Iline(b, 8, "<%s>", clusterName)
-		c.cr.WalkClusters(func(cluster api.ICluster) error {
-			cluster.WalkShards(func(index int, shard api.IShard) error {
+		c.cr.WalkClusters(func(cluster chi.ICluster) error {
+			cluster.WalkShards(func(index int, shard chi.IShard) error {
 				if c.shardHostsNum(shard, options) < 1 {
 					// Skip empty shard
 					return nil
@@ -369,7 +386,7 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 				util.Iline(b, 12, "<shard>")
 				util.Iline(b, 12, "    <internal_replication>%s</internal_replication>", shard.GetInternalReplication())
 
-				shard.WalkHosts(func(host *api.Host) error {
+				shard.WalkHosts(func(host *chi.Host) error {
 					if options.Include(host) {
 						c.getRemoteServersReplica(host, b)
 					}
@@ -395,7 +412,7 @@ func (c *Generator) getRemoteServers(options *RemoteServersOptions) string {
 }
 
 // getHostMacros creates "macros.xml" content
-func (c *Generator) getHostMacros(host *api.Host) string {
+func (c *Generator) getHostMacros(host *chi.Host) string {
 	b := &bytes.Buffer{}
 
 	// <yandex>
@@ -433,50 +450,33 @@ func (c *Generator) getHostMacros(host *api.Host) string {
 }
 
 // getHostHostnameAndPorts creates "ports.xml" content
-func (c *Generator) getHostHostnameAndPorts(host *api.Host) string {
+func (c *Generator) getHostHostnameAndPorts(host *chi.Host) string {
 
 	b := &bytes.Buffer{}
 
 	// <yandex>
 	util.Iline(b, 0, "<"+xmlTagYandex+">")
 
-	if host.TCPPort.Value() != api.ChDefaultTCPPortNumber {
+	if host.TCPPort.Value() != chi.ChDefaultTCPPortNumber {
 		util.Iline(b, 4, "<tcp_port>%d</tcp_port>", host.TCPPort.Value())
 	}
-	if host.TLSPort.Value() != api.ChDefaultTLSPortNumber {
+	if host.TLSPort.Value() != chi.ChDefaultTLSPortNumber {
 		util.Iline(b, 4, "<tcp_port_secure>%d</tcp_port_secure>", host.TLSPort.Value())
 	}
-	if host.HTTPPort.Value() != api.ChDefaultHTTPPortNumber {
+	if host.HTTPPort.Value() != chi.ChDefaultHTTPPortNumber {
 		util.Iline(b, 4, "<http_port>%d</http_port>", host.HTTPPort.Value())
 	}
-	if host.HTTPSPort.Value() != api.ChDefaultHTTPSPortNumber {
+	if host.HTTPSPort.Value() != chi.ChDefaultHTTPSPortNumber {
 		util.Iline(b, 4, "<https_port>%d</https_port>", host.HTTPSPort.Value())
 	}
 
 	// Interserver host and port
 	util.Iline(b, 4, "<interserver_http_host>%s</interserver_http_host>", c.getRemoteServersReplicaHostname(host))
-	if host.InterserverHTTPPort.Value() != api.ChDefaultInterserverHTTPPortNumber {
+	if host.InterserverHTTPPort.Value() != chi.ChDefaultInterserverHTTPPortNumber {
 		util.Iline(b, 4, "<interserver_http_port>%d</interserver_http_port>", host.InterserverHTTPPort.Value())
 	}
 
 	// </yandex>
-	util.Iline(b, 0, "</"+xmlTagYandex+">")
-
-	return b.String()
-}
-
-// generateXMLConfig creates XML using map[string]string definitions
-func (c *Generator) generateXMLConfig(settings *api.Settings, prefix string) string {
-	if settings.Len() == 0 {
-		return ""
-	}
-
-	b := &bytes.Buffer{}
-	// <yandex>
-	// XML code
-	// </yandex>
-	util.Iline(b, 0, "<"+xmlTagYandex+">")
-	xml.GenerateFromSettings(b, settings, prefix)
 	util.Iline(b, 0, "</"+xmlTagYandex+">")
 
 	return b.String()
@@ -493,7 +493,7 @@ func (c *Generator) getDistributedDDLPath() string {
 
 // getRemoteServersReplicaHostname returns hostname (podhostname + service or FQDN) for "remote_servers.xml"
 // based on .Spec.Defaults.ReplicasUseFQDN
-func (c *Generator) getRemoteServersReplicaHostname(host *api.Host) string {
+func (c *Generator) getRemoteServersReplicaHostname(host *chi.Host) string {
 	return c.namer.Name(interfaces.NameInstanceHostname, host)
 }
 

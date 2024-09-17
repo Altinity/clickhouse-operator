@@ -15,7 +15,7 @@
 package config
 
 import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -23,15 +23,14 @@ import (
 
 // FilesGenerator specifies configuration generator object
 type FilesGenerator struct {
-	// ClickHouse config generator
 	configGenerator *Generator
 	// clickhouse-operator configuration
-	chopConfig *api.OperatorConfig
+	chopConfig *chi.OperatorConfig
 	namer      interfaces.INameManager
 }
 
 // NewFilesGenerator creates new configuration files generator object
-func NewFilesGenerator(cr api.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *FilesGenerator {
+func NewFilesGenerator(cr chi.ICustomResource, namer interfaces.INameManager, opts *GeneratorOptions) *FilesGenerator {
 	return &FilesGenerator{
 		configGenerator: newGenerator(cr, namer, opts),
 		chopConfig:      chop.Config(),
@@ -50,10 +49,10 @@ func (c *FilesGenerator) CreateConfigFiles(what interfaces.FilesGroupType, param
 	case interfaces.FilesGroupUsers:
 		return c.createConfigFilesGroupUsers()
 	case interfaces.FilesGroupHost:
-		var host *api.Host
+		var options *FilesGeneratorOptions
 		if len(params) > 0 {
-			host = params[0].(*api.Host)
-			return c.createConfigFilesGroupHost(host)
+			options = params[0].(*FilesGeneratorOptions)
+			return c.createConfigFilesGroupHost(options)
 		}
 	}
 	return nil
@@ -64,14 +63,14 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 	if options == nil {
 		options = defaultFilesGeneratorOptions()
 	}
+	// Common ConfigSections maps section name to section XML
 	configSections := make(map[string]string)
-	// commonConfigSections maps section name to section XML chopConfig of the following sections:
-	// 1. remote servers
-	// 2. common settings
-	// 3. common files
+	// remote servers
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRemoteServers), c.configGenerator.getRemoteServers(options.GetRemoteServersOptions()))
+	// common settings
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettingsGlobal())
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(api.SectionCommon, true, nil))
+	// common files
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionCommon, true, nil))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.chopConfig.ClickHouse.Config.File.Runtime.CommonConfigFiles)
 
@@ -80,16 +79,16 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 
 // createConfigFilesGroupUsers creates users config files
 func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
+	// CommonUsers ConfigSections maps section name to section XML
 	configSections := make(map[string]string)
-	// commonUsersConfigSections maps section name to section XML chopConfig of the following sections:
-	// 1. users
-	// 2. quotas
-	// 3. profiles
-	// 4. user files
+	// users
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configUsers), c.configGenerator.getUsers())
+	// quotas
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configQuotas), c.configGenerator.getQuotas())
+	// profiles
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configProfiles), c.configGenerator.getProfiles())
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(api.SectionUsers, false, nil))
+	// user files
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionUsers, false, nil))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.chopConfig.ClickHouse.Config.File.Runtime.UsersConfigFiles)
 
@@ -97,14 +96,14 @@ func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
 }
 
 // createConfigFilesGroupHost creates host config files
-func (c *FilesGenerator) createConfigFilesGroupHost(host *api.Host) map[string]string {
+func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptions) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	configSections := make(map[string]string)
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(host))
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configHostnamePorts), c.configGenerator.getHostHostnameAndPorts(host))
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configZookeeper), c.configGenerator.getHostZookeeper(host))
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettings(host))
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(api.SectionHost, true, host))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configHostnamePorts), c.configGenerator.getHostHostnameAndPorts(options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configZookeeper), c.configGenerator.getHostZookeeper(options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettingsHost(options.GetHost()))
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionHost, true, options.GetHost()))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.chopConfig.ClickHouse.Config.File.Runtime.HostConfigFiles)
 
