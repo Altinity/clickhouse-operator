@@ -15,7 +15,7 @@
 package labeler
 
 import (
-	clickhouse_keeper_altinity_com "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com"
+	"github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/tags/labeler"
 )

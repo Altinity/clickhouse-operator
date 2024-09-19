@@ -15,6 +15,12 @@
 package namer
 
 const (
+	// patternConfigMapCommonName is a template of common settings for the CHI ConfigMap. "chi-{chi}-common-configd"
+	patternConfigMapCommonName = "chk- + macro.List.Get(macroCommon.MacrosCRName) + -common-configd"
+
+	// patternConfigMapCommonUsersName is a template of common users settings for the CHI ConfigMap. "chi-{chi}-common-usersd"
+	patternConfigMapCommonUsersName = "chk- + macro.List.Get(macroCommon.MacrosCRName) + -common-usersd"
+
 	// patternConfigMapHostName is a template of macros ConfigMap. "chi-{chi}-deploy-confd-{cluster}-{shard}-{host}"
 	patternConfigMapHostName = "chk- + macro.MacrosCRName + -deploy-confd- + macro.MacrosClusterName + - + macro.MacrosHostName"
 

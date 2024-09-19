@@ -23,6 +23,16 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
+// createConfigMapNameCommon returns a name for a ConfigMap for replica's common config
+func (n *Namer) createConfigMapNameCommon(chi api.ICustomResource) string {
+	return n.macro.Scope(chi).Line(patterns.Get(patternConfigMapCommonName))
+}
+
+// createConfigMapNameCommonUsers returns a name for a ConfigMap for replica's common users config
+func (n *Namer) createConfigMapNameCommonUsers(chi api.ICustomResource) string {
+	return n.macro.Scope(chi).Line(patterns.Get(patternConfigMapCommonUsersName))
+}
+
 // createConfigMapNameHost returns a name for a ConfigMap for replica's personal config
 func (n *Namer) createConfigMapNameHost(host *api.Host) string {
 	return n.macro.Scope(host).Line(patterns.Get(patternConfigMapHostName))

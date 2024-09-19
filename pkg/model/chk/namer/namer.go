@@ -42,6 +42,12 @@ func (n *Namer) Name(what interfaces.NameType, params ...any) string {
 	case interfaces.NameConfigMapHost:
 		host := params[0].(*api.Host)
 		return n.createConfigMapNameHost(host)
+	case interfaces.NameConfigMapCommon:
+		cr := params[0].(api.ICustomResource)
+		return n.createConfigMapNameCommon(cr)
+	case interfaces.NameConfigMapCommonUsers:
+		cr := params[0].(api.ICustomResource)
+		return n.createConfigMapNameCommonUsers(cr)
 
 	case interfaces.NameCRService:
 		cr := params[0].(api.ICustomResource)

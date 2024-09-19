@@ -37,6 +37,8 @@ func (l *Labeler) Label(what interfaces.LabelType, params ...any) map[string]str
 	switch what {
 	case interfaces.LabelConfigMapCommon:
 		return l.labelConfigMapCRCommon()
+	case interfaces.LabelConfigMapCommonUsers:
+		return l.labelConfigMapCRCommonUsers()
 	case interfaces.LabelConfigMapHost:
 		return l.labelConfigMapHost(params...)
 
@@ -56,6 +58,15 @@ func (l *Labeler) labelConfigMapCRCommon() map[string]string {
 		l.GetCRScope(),
 		map[string]string{
 			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommon),
+		})
+}
+
+// labelConfigMapCRCommonUsers
+func (l *Labeler) labelConfigMapCRCommonUsers() map[string]string {
+	return util.MergeStringMapsOverwrite(
+		l.GetCRScope(),
+		map[string]string{
+			l.Get(labeler.LabelConfigMap): l.Get(labeler.LabelConfigMapValueCRCommonUsers),
 		})
 }
 
