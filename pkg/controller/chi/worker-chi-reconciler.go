@@ -180,7 +180,7 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *api.C
 	}
 	cr.GetRuntime().UnlockCommonConfig()
 
-	// CHI users ConfigMap - common for all hosts
+	// CR users ConfigMap - common for all hosts
 	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
 		w.a.F().Error("failed to reconcile config map users. err: %v", err)
 	}
@@ -285,10 +285,7 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 	}
 
 	// ConfigMap for a host
-	configMap := w.task.Creator().CreateConfigMap(
-		interfaces.ConfigMapHost,
-		host,
-	)
+	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())
