@@ -158,10 +158,15 @@ func (w *worker) reconcileCRAuxObjectsPreliminary(ctx context.Context, cr *apiCh
 
 	// CR common ConfigMap without added hosts
 	cr.GetRuntime().LockCommonConfig()
-	if err := w.reconcileConfigMapCommon(ctx, cr); err != nil {
+	if err := w.reconcileConfigMapCommon(ctx, cr, w.options()); err != nil {
 		w.a.F().Error("failed to reconcile config map common. err: %v", err)
 	}
 	cr.GetRuntime().UnlockCommonConfig()
+
+	// CR users ConfigMap - common for all hosts
+	if err := w.reconcileConfigMapCommonUsers(ctx, cr); err != nil {
+		w.a.F().Error("failed to reconcile config map users. err: %v", err)
+	}
 
 	return nil
 }
@@ -207,7 +212,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.Clic
 
 	// CR ConfigMaps with update
 	cr.GetRuntime().LockCommonConfig()
-	err = w.reconcileConfigMapCommon(ctx, cr)
+	err = w.reconcileConfigMapCommon(ctx, cr, nil)
 	cr.GetRuntime().UnlockCommonConfig()
 	return err
 }
@@ -216,6 +221,7 @@ func (w *worker) reconcileCRAuxObjectsFinal(ctx context.Context, cr *apiChk.Clic
 func (w *worker) reconcileConfigMapCommon(
 	ctx context.Context,
 	cr api.ICustomResource,
+	options *config.FilesGeneratorOptions,
 ) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
@@ -225,18 +231,33 @@ func (w *worker) reconcileConfigMapCommon(
 	// ConfigMap common for all resources in CHI
 	// contains several sections, mapped as separated chopConfig files,
 	// such as remote servers, zookeeper setup, etc
-	//configMapCommon := w.task.Creator().CreateConfigMap(
-	//	interfaces.ConfigMapConfig,
-	//	chkConfig.NewFilesGeneratorOptions().SetSettings(chk.GetSpec().GetConfiguration().GetSettings()),
-	//)
-	//err := w.reconcileConfigMap(ctx, chk, configMapCommon)
-	//if err == nil {
-	//	w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
-	//} else {
-	//	w.task.RegistryFailed().RegisterConfigMap(configMapCommon.GetObjectMeta())
-	//}
-	//return err
-	return nil
+	configMapCommon := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommon, options)
+	err := w.reconcileConfigMap(ctx, cr, configMapCommon)
+	if err == nil {
+		w.task.RegistryReconciled().RegisterConfigMap(configMapCommon.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterConfigMap(configMapCommon.GetObjectMeta())
+	}
+	return err
+}
+
+// reconcileConfigMapCommonUsers reconciles all CHI's users ConfigMap
+// ConfigMap common for all users resources in CHI
+func (w *worker) reconcileConfigMapCommonUsers(ctx context.Context, cr api.ICustomResource) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	// ConfigMap common for all users resources in CHI
+	configMapUsers := w.task.Creator().CreateConfigMap(interfaces.ConfigMapCommonUsers)
+	err := w.reconcileConfigMap(ctx, cr, configMapUsers)
+	if err == nil {
+		w.task.RegistryReconciled().RegisterConfigMap(configMapUsers.GetObjectMeta())
+	} else {
+		w.task.RegistryFailed().RegisterConfigMap(configMapUsers.GetObjectMeta())
+	}
+	return err
 }
 
 // reconcileConfigMapHost reconciles host's personal ConfigMap
@@ -247,13 +268,7 @@ func (w *worker) reconcileConfigMapHost(ctx context.Context, host *api.Host) err
 	}
 
 	// ConfigMap for a host
-	configMap := w.task.Creator().CreateConfigMap(
-		interfaces.ConfigMapHost,
-		host,
-		config.NewFilesGeneratorOptions().
-			SetHost(host).
-			SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings()),
-	)
+	configMap := w.task.Creator().CreateConfigMap(interfaces.ConfigMapHost, host)
 	err := w.reconcileConfigMap(ctx, host.GetCR(), configMap)
 	if err == nil {
 		w.task.RegistryReconciled().RegisterConfigMap(configMap.GetObjectMeta())

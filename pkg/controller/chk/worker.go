@@ -80,7 +80,10 @@ func (c *Controller) newWorker() *worker {
 }
 
 func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *config.GeneratorOptions {
-	return &config.GeneratorOptions{}
+	return &config.GeneratorOptions{
+		Settings: chk.GetSpecT().Configuration.Settings,
+		Files:    chk.GetSpecT().Configuration.Files,
+	}
 }
 
 func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
@@ -390,6 +393,11 @@ func (w *worker) walkHosts(ctx context.Context, chk *apiChk.ClickHouseKeeperInst
 		}
 		return nil
 	})
+}
+
+// options build FilesGeneratorOptionsClickHouse
+func (w *worker) options() *config.FilesGeneratorOptions {
+	return config.NewFilesGeneratorOptions()
 }
 
 // createCHIFromObjectMeta
