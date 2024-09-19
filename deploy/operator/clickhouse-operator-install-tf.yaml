@@ -4305,6 +4305,26 @@ data:
           # All collected metrics are returned.
           collect: 9
     
+    keeper:
+      configuration:
+        ################################################
+        ##
+        ## Configuration files section
+        ##
+        ################################################
+        file:
+          # Each 'path' can be either absolute or relative.
+          # In case path is absolute - it is used as is
+          # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
+          path:
+            # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
+            common: chk/config.d
+            # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
+            host: chk/conf.d
+            # Path to the folder where ClickHouse configuration files with users' settings are located.
+            # Files are common for all instances within a CHI.
+            user: chk/users.d
+    
     ################################################
     ##
     ## Template(s) management section
@@ -4322,6 +4342,17 @@ data:
         # Templates are added to the list of all templates and used when CHI is reconciled.
         # Templates are applied in sorted alpha-numeric order.
         path: chi/templates.d
+      chk:
+        # CHK template updates handling policy
+        # Possible policy values:
+        #   - ReadOnStart. Accept CHIT updates on the operators start only.
+        #   - ApplyOnNextReconcile. Accept CHIT updates at all time. Apply news CHITs on next regular reconcile of the CHI
+        policy: ApplyOnNextReconcile
+    
+        # Path to the folder where ClickHouseInstallation templates .yaml manifests are located.
+        # Templates are added to the list of all templates and used when CHI is reconciled.
+        # Templates are applied in sorted alpha-numeric order.
+        path: chk/templates.d
     
     ################################################
     ##
