@@ -52,15 +52,17 @@ func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params
 		var options *config.FilesGeneratorOptions
 		if len(params) > 0 {
 			options = params[0].(*config.FilesGeneratorOptions)
-			return m.createConfigMapCHICommon(options)
+			return m.createConfigMapCommon(options)
 		}
 	case interfaces.ConfigMapCommonUsers:
-		return m.createConfigMapCHICommonUsers()
+		return m.createConfigMapCommonUsers()
 	case interfaces.ConfigMapHost:
 		var host *api.Host
+		var options *config.FilesGeneratorOptions
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			return m.createConfigMapHost(host)
+			options = config.NewFilesGeneratorOptions().SetHost(host)
+			return m.createConfigMapHost(host, options)
 		}
 	}
 	panic("unknown config map type")
@@ -77,8 +79,8 @@ func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfac
 	m.configFilesGenerator = configFilesGenerator
 }
 
-// createConfigMapCHICommon creates new core.ConfigMap
-func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGeneratorOptions) *core.ConfigMap {
+// createConfigMapCommon creates new core.ConfigMap
+func (m *ConfigMapManager) createConfigMapCommon(options *config.FilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
@@ -99,8 +101,8 @@ func (m *ConfigMapManager) createConfigMapCHICommon(options *config.FilesGenerat
 	return cm
 }
 
-// createConfigMapCHICommonUsers creates new core.ConfigMap
-func (m *ConfigMapManager) createConfigMapCHICommonUsers() *core.ConfigMap {
+// createConfigMapCommonUsers creates new core.ConfigMap
+func (m *ConfigMapManager) createConfigMapCommonUsers() *core.ConfigMap {
 	cm := &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
@@ -122,7 +124,7 @@ func (m *ConfigMapManager) createConfigMapCHICommonUsers() *core.ConfigMap {
 }
 
 // createConfigMapHost creates config map for a host
-func (m *ConfigMapManager) createConfigMapHost(host *api.Host) *core.ConfigMap {
+func (m *ConfigMapManager) createConfigMapHost(host *api.Host, options *config.FilesGeneratorOptions) *core.ConfigMap {
 	cm := &core.ConfigMap{
 		TypeMeta: meta.TypeMeta{
 			Kind:       "ConfigMap",
@@ -135,7 +137,7 @@ func (m *ConfigMapManager) createConfigMapHost(host *api.Host) *core.ConfigMap {
 			Annotations:     m.macro.Scope(host).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapHost, host)),
 			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
 		},
-		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, config.NewFilesGeneratorOptions().SetHost(host)),
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupHost, options),
 	}
 	// And after the object is ready we can put version label
 	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
