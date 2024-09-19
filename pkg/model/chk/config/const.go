@@ -66,7 +66,3 @@ const (
 const (
 	configSettings = "settings"
 )
-
-const (
-	configMain = "main"
-)

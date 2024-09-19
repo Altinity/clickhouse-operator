@@ -18,8 +18,8 @@ import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity
 
 // FilesGeneratorOptions specifies options for configuration files generator
 type FilesGeneratorOptions struct {
-	host     *api.Host
 	settings *api.Settings
+	host     *api.Host
 }
 
 // defaultFilesGeneratorOptions creates new default options for files generator

@@ -48,12 +48,21 @@ func NewConfigMapManager() *ConfigMapManager {
 
 func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params ...any) *core.ConfigMap {
 	switch what {
+	case interfaces.ConfigMapCommon:
+		var options *config.FilesGeneratorOptions
+		if len(params) > 0 {
+			options = params[0].(*config.FilesGeneratorOptions)
+			return m.createConfigMapCommon(options)
+		}
+	case interfaces.ConfigMapCommonUsers:
+		return m.createConfigMapCommonUsers()
 	case interfaces.ConfigMapHost:
 		var host *api.Host
 		var options *config.FilesGeneratorOptions
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			options = params[1].(*config.FilesGeneratorOptions)
+			options = config.NewFilesGeneratorOptions().SetHost(host).
+				SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings())
 			return m.createConfigMapHost(host, options)
 		}
 	}
@@ -69,6 +78,50 @@ func (m *ConfigMapManager) SetTagger(tagger interfaces.ITagger) {
 }
 func (m *ConfigMapManager) SetConfigFilesGenerator(configFilesGenerator interfaces.IConfigFilesGenerator) {
 	m.configFilesGenerator = configFilesGenerator
+}
+
+// createConfigMapCommon creates new core.ConfigMap
+func (m *ConfigMapManager) createConfigMapCommon(options *config.FilesGeneratorOptions) *core.ConfigMap {
+	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta.ObjectMeta{
+			Name:            m.namer.Name(interfaces.NameConfigMapCommon, m.cr),
+			Namespace:       m.cr.GetNamespace(),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommon)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommon)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupCommon, options),
+	}
+	// And after the object is ready we can put version label
+	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	return cm
+}
+
+// createConfigMapCommonUsers creates new core.ConfigMap
+func (m *ConfigMapManager) createConfigMapCommonUsers() *core.ConfigMap {
+	cm := &core.ConfigMap{
+		TypeMeta: meta.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: meta.ObjectMeta{
+			Name:            m.namer.Name(interfaces.NameConfigMapCommonUsers, m.cr),
+			Namespace:       m.cr.GetNamespace(),
+			Labels:          m.macro.Scope(m.cr).Map(m.tagger.Label(interfaces.LabelConfigMapCommonUsers)),
+			Annotations:     m.macro.Scope(m.cr).Map(m.tagger.Annotate(interfaces.AnnotateConfigMapCommonUsers)),
+			OwnerReferences: m.or.CreateOwnerReferences(m.cr),
+		},
+		// Data contains several sections which are to be several xml chopConfig files
+		Data: m.configFilesGenerator.CreateConfigFiles(interfaces.FilesGroupUsers),
+	}
+	// And after the object is ready we can put version label
+	m.labeler.MakeObjectVersion(cm.GetObjectMeta(), cm)
+	return cm
 }
 
 // createConfigMapHost creates config map for a host
