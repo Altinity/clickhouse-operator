@@ -18,9 +18,8 @@ import (
 	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
-func DefaultSettings() *apiChi.Settings {
-	settings := apiChi.NewSettings()
-	settings.SetScalarsFromMap(
+func defaultSettings() *apiChi.Settings {
+	return apiChi.NewSettings().SetScalarsFromMap(
 		map[string]string{
 			"logger/level":   "information",
 			"logger/console": "1",
@@ -48,5 +47,4 @@ func DefaultSettings() *apiChi.Settings {
 			"openSSL/server/preferServerCiphers": "true",
 		},
 	)
-	return settings
 }

@@ -68,7 +68,7 @@ func (c *Generator) getSettingsGlobal() string {
 // getSettingsHost creates data for host section of "settings.xml"
 func (c *Generator) getSettingsHost(host *chi.Host) string {
 	// Generate config for the specified host
-	return c.generateXMLConfig(host.Settings, "")
+	return c.getHostConfig(host, host.Settings.MergeFrom(defaultSettings()))
 }
 
 // getSectionFromFiles creates data for custom common config files
@@ -87,6 +87,7 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 	return files.GetSection(section, includeUnspecified)
 }
 
+// getHostConfig builds string host config based on provided `settings`
 func (c *Generator) getHostConfig(host *chi.Host, settings *chi.Settings) string {
 	if settings.Len() == 0 {
 		return ""

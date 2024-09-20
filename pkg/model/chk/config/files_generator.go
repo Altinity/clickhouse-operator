@@ -89,7 +89,7 @@ func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
 func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptions) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	configSections := make(map[string]string)
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getHostConfig(options.GetHost(), options.GetSettings()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getSettingsHost(options.GetHost()))
 	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionHost, true, options.GetHost()))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.HostConfigFiles)
