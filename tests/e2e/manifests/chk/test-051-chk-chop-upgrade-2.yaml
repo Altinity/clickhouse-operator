@@ -7,6 +7,7 @@ spec:
     templates:
       # Templates are specified as default for all clusters
       podTemplate: default
+      serviceTemplate: backwards-compatible
   templates:
     podTemplates:
       - name: default
@@ -16,8 +17,8 @@ spec:
               imagePullPolicy: IfNotPresent
               image: "clickhouse/clickhouse-keeper:24.3.5.46"
               volumeMounts:
-                - name: default
-                  mountPath: /var/lib/clickhouse
+               - name: default
+                 mountPath: /var/lib/clickhouse
     volumeClaimTemplates:
       - name: default
         spec:
@@ -26,6 +27,15 @@ spec:
           resources:
             requests:
               storage: 1Gi
+    serviceTemplates:
+      - name: backwards-compatible # operator 0.24 default service name is keeper-test-051-chk
+        generateName: "test-051-chk"
+        spec:
+          ports:
+            - name: zk
+              port: 2181
+          type: ClusterIP
+          clusterIP: None
   configuration:
     clusters:
       - name: single
@@ -35,6 +45,4 @@ spec:
       # listen_host: "0.0.0.0"
       keeper_server/storage_path: /var/lib/clickhouse
       keeper_server/tcp_port: "2181"
-      # keeper_server/four_letter_word_white_list: "*"
-      # keeper_server/coordination_settings/raft_logs_level: "information"
-      # keeper_server/raft_configuration/server/port: "9444"
+

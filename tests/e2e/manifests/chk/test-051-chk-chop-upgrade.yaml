@@ -33,6 +33,4 @@ spec:
       # listen_host: "0.0.0.0"
       # keeper_server/storage_path: /var/lib/clickhouse
       keeper_server/tcp_port: "2181"
-      # keeper_server/four_letter_word_white_list: "*"
-      # keeper_server/coordination_settings/raft_logs_level: "information"
-      # keeper_server/raft_configuration/server/port: "9444"
+

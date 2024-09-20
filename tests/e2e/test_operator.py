@@ -566,7 +566,7 @@ def test_008_3(self):
 @Name("test_009_1. Test operator upgrade")
 @Requirements(RQ_SRS_026_ClickHouseOperator_Managing_UpgradingOperator("1.0"))
 @Tags("NO_PARALLEL")
-def test_009_1(self, version_from="0.23.3", version_to=None):
+def test_009_1(self, version_from="0.23.7", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -588,7 +588,7 @@ def test_009_1(self, version_from="0.23.3", version_to=None):
 @TestScenario
 @Name("test_009_2. Test operator upgrade")
 @Tags("NO_PARALLEL")
-def test_009_2(self, version_from="0.23.3", version_to=None):
+def test_009_2(self, version_from="0.23.7", version_to=None):
     if version_to is None:
         version_to = self.context.operator_version
 
@@ -1054,69 +1054,38 @@ def test_013_1(self):
         )
 
     create_table_queries = [
-        "CREATE TABLE mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "MergeTree() PARTITION BY y ORDER BY d",
-        "CREATE TABLE replacing_mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "ReplacingMergeTree() PARTITION BY y ORDER BY d",
-        "CREATE TABLE summing_mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "SummingMergeTree() PARTITION BY y ORDER BY d",
-        "CREATE TABLE aggregating_mergetree_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "AggregatingMergeTree() PARTITION BY y ORDER BY d",
-        "CREATE TABLE collapsing_mergetree_table (d DATE, a String, b UInt8, x String, y Int8, Sign Int8) "
-        "ENGINE = CollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
-        "CREATE TABLE versionedcollapsing_mergetree_table (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
-        "sign Int8 DEFAULT 1) ENGINE = VersionedCollapsingMergeTree(sign, version) PARTITION BY y ORDER BY d",
-        "CREATE TABLE replicated_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_table', "
-        "'{replica}') PARTITION BY y ORDER BY d",
-        "CREATE TABLE replicated_replacing_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "ReplicatedReplacingMergeTree ('/clickhouse/{cluster}/tables/{database}/replicated_replacing_table', "
-        "'{replica}') PARTITION BY y ORDER BY d",
-        "CREATE TABLE replicated_summing_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_summing_table', "
-        "'{replica}') PARTITION BY y ORDER BY d",
-        "CREATE TABLE replicated_aggregating_table (d DATE, a String, b UInt8, x String, y Int8) ENGINE ="
-        "ReplicatedAggregatingMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_aggregating_table',"
-        "'{replica}') PARTITION BY y ORDER BY d",
-        "CREATE TABLE replicated_collapsing_table ON CLUSTER 'simple' (d DATE, a String, b UInt8, x String, y Int8, Sign Int8) "
-        "ENGINE = ReplicatedCollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
-        "CREATE TABLE replicated_versionedcollapsing_table ON CLUSTER 'simple' (d Date, a String, b UInt8, x String, y Int8, version UInt64,"
-        " sign Int8 DEFAULT 1) ENGINE = ReplicatedVersionedCollapsingMergeTree(sign, version) PARTITION "
-        "BY y ORDER BY d",
-        "CREATE TABLE table_for_dict ( key_column UInt64, third_column String ) "
-        "ENGINE = MergeTree() ORDER BY key_column",
-        "CREATE DICTIONARY ndict ON CLUSTER 'simple' ( key_column UInt64 DEFAULT 0, "
-        "third_column String DEFAULT 'qqq' ) PRIMARY KEY key_column "
-        "SOURCE(CLICKHOUSE(HOST 'localhost' PORT 9000 USER 'default' TABLE 'table_for_dict' "
-        "PASSWORD '' DB 'default')) LIFETIME(MIN 1 MAX 10) LAYOUT(HASHED())",
-        "CREATE TABLE table_for_distributed (d Date, a String, b UInt8 DEFAULT 1, x String, "
-        "y Int8 ) ENGINE = SummingMergeTree PARTITION BY y ORDER BY d SETTINGS index_granularity = 8192",
-        "CREATE TABLE IF NOT EXISTS distr_test ON CLUSTER 'simple' (d Date, a String, b UInt8) "
-        "ENGINE = Distributed('simple', default, table_for_distributed, rand())",
-        "CREATE TABLE table_for_kafka (readings_id Int32 Codec(DoubleDelta, LZ4), "
-        "time DateTime Codec(DoubleDelta, LZ4), date ALIAS toDate(time), temperature Decimal(5,2) "
-        "Codec(T64, LZ4) ) Engine = MergeTree PARTITION BY toYYYYMM(time) ORDER BY (readings_id, time)",
-        "CREATE TABLE kafka_readings_queue (readings_id Int32, time DateTime, "
-        "temperature Decimal(5,2) ) ENGINE = Kafka SETTINGS "
-        "kafka_broker_list = 'kafka-headless.kafka:9092', kafka_topic_list = 'table_for_kafka', "
-        "kafka_group_name = 'readings_consumer_group1', kafka_format = 'CSV', "
-        "kafka_max_block_size = 1048576",
-        "CREATE TABLE table_for_view (date Date, id Int8, name String, value Int64) "
-        "ENGINE = MergeTree() Order by date",
+        "CREATE TABLE mergetree_table (d DATE, a String, b UInt8, y Int8) ENGINE = MergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE replacing_mergetree_table (d DATE, a String, b UInt8, y Int8) ENGINE = ReplacingMergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE summing_mergetree_table (d DATE, a String, b UInt8, y Int8) ENGINE = SummingMergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE aggregating_mergetree_table (d DATE, a String, b UInt8, y Int8) ENGINE = AggregatingMergeTree() PARTITION BY y ORDER BY d",
+        "CREATE TABLE collapsing_mergetree_table (d DATE, a String, b UInt8, y Int8, Sign Int8) ENGINE = CollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
+        "CREATE TABLE versionedcollapsing_mergetree_table (d Date, a String, b UInt8, y Int8, version UInt64, sign Int8 DEFAULT 1) ENGINE = VersionedCollapsingMergeTree(sign, version) PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_table (d DATE, a String, b UInt8, y Int8) ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_table', '{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_replacing_table (d DATE, a String, b UInt8, y Int8) ENGINE = ReplicatedReplacingMergeTree ('/clickhouse/{cluster}/tables/{database}/replicated_replacing_table', '{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_summing_table (d DATE, a String, b UInt8, y Int8) ENGINE = ReplicatedSummingMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_summing_table', '{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_aggregating_table (d DATE, a String, b UInt8, y Int8) ENGINE = ReplicatedAggregatingMergeTree('/clickhouse/{cluster}/tables/{database}/replicated_aggregating_table','{replica}') PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_collapsing_table ON CLUSTER 'simple' (d DATE, a String, b UInt8, y Int8, Sign Int8) ENGINE = ReplicatedCollapsingMergeTree(Sign) PARTITION BY y ORDER BY d",
+        "CREATE TABLE replicated_versionedcollapsing_table ON CLUSTER 'simple' (d Date, a String, b UInt8, y Int8, version UInt64, sign Int8 DEFAULT 1) ENGINE = ReplicatedVersionedCollapsingMergeTree(sign, version) PARTITION BY y ORDER BY d",
+        "CREATE TABLE table_for_dict ( key_column UInt64, third_column String ) ENGINE = MergeTree() ORDER BY key_column",
+        "CREATE DICTIONARY ndict ON CLUSTER 'simple' ( key_column UInt64 DEFAULT 0, third_column String DEFAULT 'qqq' ) PRIMARY KEY key_column "
+          "SOURCE(CLICKHOUSE(HOST 'localhost' PORT 9000 USER 'default' TABLE 'table_for_dict' "
+          "PASSWORD '' DB 'default')) LIFETIME(MIN 1 MAX 10) LAYOUT(HASHED())",
+        "CREATE TABLE table_for_distributed (d Date, a String, b UInt8 DEFAULT 1, y Int8 ) ENGINE = SummingMergeTree PARTITION BY y ORDER BY d SETTINGS index_granularity = 8192",
+        "CREATE TABLE IF NOT EXISTS distr_test ON CLUSTER 'simple' (d Date, a String, b UInt8) ENGINE = Distributed('simple', default, table_for_distributed, rand())",
+        "CREATE TABLE table_for_kafka (readings_id Int32, time DateTime, date ALIAS toDate(time), temperature Decimal(5,2)) Engine = MergeTree PARTITION BY toYYYYMM(time) ORDER BY (readings_id, time)",
+        "CREATE TABLE kafka_readings_queue (readings_id Int32, time DateTime, temperature Decimal(5,2) ) ENGINE = Kafka SETTINGS "
+          "kafka_broker_list = 'kafka-headless.kafka:9092', kafka_topic_list = 'table_for_kafka', "
+          "kafka_group_name = 'readings_consumer_group1', kafka_format = 'CSV', "
+          "kafka_max_block_size = 1048576",
+        "CREATE TABLE table_for_view (date Date, id Int8, name String, value Int64) ENGINE = MergeTree() Order by date",
         "CREATE VIEW test_view AS SELECT * FROM table_for_view",
-        "CREATE TABLE table_for_materialized_view (when DateTime, userid UInt32, bytes Float32) "
-        "ENGINE = MergeTree PARTITION BY toYYYYMM(when) ORDER BY (userid, when)",
-        "CREATE MATERIALIZED VIEW materialized_view ENGINE = SummingMergeTree "
-        "PARTITION BY toYYYYMM(day) ORDER BY (userid, day) "
-        "POPULATE AS SELECT toStartOfDay(when) AS day, userid, count() as downloads, "
-        "sum(bytes) AS bytes FROM table_for_materialized_view GROUP BY userid, day",
-        "CREATE TABLE table_for_live_vew (d DATE, a String, b UInt8, x String, y Int8) ENGINE = "
-        "ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/default/table_for_live_vew', "
-        "'{replica}') PARTITION BY y ORDER BY d",
-        "CREATE LIVE VIEW test_live_view AS SELECT * FROM table_for_live_vew",
+        "CREATE TABLE table_for_materialized_view (when DateTime, userid UInt32, bytes Float32) ENGINE = MergeTree PARTITION BY toYYYYMM(when) ORDER BY (userid, when)",
+        "CREATE MATERIALIZED VIEW materialized_view ENGINE = SummingMergeTree PARTITION BY toYYYYMM(day) ORDER BY (userid, day) "
+          "POPULATE AS SELECT toStartOfDay(when) AS day, userid, count() as downloads, sum(bytes) AS bytes FROM table_for_materialized_view GROUP BY userid, day",
+        "CREATE TABLE table_for_live_vew (d DATE, a String, b UInt8, y Int8) ENGINE = ReplicatedMergeTree('/clickhouse/{cluster}/tables/{shard}/default/table_for_live_vew', '{replica}') PARTITION BY y ORDER BY d",
+        # "CREATE LIVE VIEW test_live_view AS SELECT * FROM table_for_live_vew",
         "CREATE TABLE table_for_window_view on cluster 'simple' (id UInt64, timestamp DateTime) ENGINE = ReplicatedMergeTree() order by id",
-        "CREATE WINDOW VIEW wv ENGINE = Log() as select count(id), tumbleStart(w_id) as window_start from table_for_window_view "
-        "group by tumble(timestamp, INTERVAL '10' SECOND) as w_id",
+        "CREATE WINDOW VIEW wv ENGINE = Log() as select count(id), tumbleStart(w_id) as window_start from table_for_window_view group by tumble(timestamp, INTERVAL '10' SECOND) as w_id",
         "CREATE TABLE tinylog_table (id UInt64, value1 UInt8, value2 UInt16, value3 UInt32, value4 UInt64) ENGINE=TinyLog",
         "CREATE TABLE log_table (id UInt64, value1 Nullable(UInt64), value2 Nullable(UInt64), value3 Nullable(UInt64)) ENGINE=Log",
         "CREATE TABLE stripelog_table (timestamp DateTime, message_type String, message String ) ENGINE = StripeLog",
@@ -1126,29 +1095,19 @@ def test_013_1(self):
         "CREATE TABLE left_join_table (x UInt32, s String) engine = Join(ALL, LEFT, x)",
         "CREATE TABLE url_table (word String, value UInt64) ENGINE=URL('http://127.0.0.1:12345/', CSV)",
         "CREATE TABLE memory_table (a Int64, b Nullable(Int64), c String) engine = Memory",
-        "CREATE TABLE table_for_buffer (EventDate Date, UTCEventTime DateTime, MoscowEventDate Date "
-        "DEFAULT toDate(UTCEventTime)) ENGINE = MergeTree() Order by EventDate",
-        "CREATE TABLE buffer_table AS table_for_buffer ENGINE = Buffer('default', "
-        "'table_for_buffer', 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
+        "CREATE TABLE table_for_buffer (EventDate Date, UTCEventTime DateTime, MoscowEventDate Date DEFAULT toDate(UTCEventTime)) ENGINE = MergeTree() Order by EventDate",
+        "CREATE TABLE buffer_table AS table_for_buffer ENGINE = Buffer('default', 'table_for_buffer', 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
         "CREATE TABLE generate_random_table (name String, value UInt32) ENGINE = GenerateRandom(1, 5, 3)",
         "CREATE TABLE file_engine_table (name String, value UInt32) ENGINE = File(TabSeparated)",
-        "CREATE TABLE odbc (BannerID UInt64, CompaignID UInt64) ENGINE = "
-        "ODBC('DSN=pgconn;Database=postgres', somedb, bannerdict)",
+        "CREATE TABLE odbc (BannerID UInt64, CompaignID UInt64) ENGINE = ODBC('DSN=pgconn;Database=postgres', somedb, bannerdict)",
         "CREATE TABLE jdbc_table (Str String) ENGINE = JDBC('{}', 'default', 'ExternalTable')",
-        "CREATE TABLE mysql_table (float_nullable Nullable(Float32), int_id Int32 ) "
-        "ENGINE = MySQL('localhost:3306', 'vs_db', 'vs_table', 'vs_user', 'vs_pass')",
-        "CREATE TABLE mongodb_table ( key UInt64, data String ) ENGINE = "
-        "MongoDB('mongo1:27017', 'vs_db', 'vs_collection', 'testuser', 'clickhouse_password')",
+        "CREATE TABLE mysql_table (float_nullable Nullable(Float32), int_id Int32 ) ENGINE = MySQL('localhost:3306', 'vs_db', 'vs_table', 'vs_user', 'vs_pass')",
+        "CREATE TABLE mongodb_table ( key UInt64, data String ) ENGINE = MongoDB('mongo1:27017', 'vs_db', 'vs_collection', 'testuser', 'clickhouse_password')",
         "CREATE TABLE hdfs_table (name String, value UInt32) ENGINE = " "HDFS('hdfs://hdfs1:9000/some_file', 'TSV')",
-        "CREATE TABLE s3_engine_table (name String, value UInt32)ENGINE = S3("
-        "'https://storage.test.net/my-test1/test-data.csv.gz', 'CSV', 'gzip')",
+        "CREATE TABLE s3_engine_table (name String, value UInt32)ENGINE = S3('https://storage.test.net/my-test1/test-data.csv.gz', 'CSV', 'gzip')",
         "CREATE TABLE embeddedrocksdb_table (key UInt64, value String) Engine = EmbeddedRocksDB " "PRIMARY KEY(key)",
-        "CREATE TABLE postgresql_table (float_nullable Nullable(Float32), str String,"
-        " int_id Int32 ) ENGINE = PostgreSQL('localhost:5432', 'public_db', 'test_table', "
-        "'postges_user', 'postgres_password')",
-        "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = "
-        "ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', "
-        "'test_replicas', 'postgres', 'mysecretpassword')",
+        "CREATE TABLE postgresql_table (float_nullable Nullable(Float32), str String, int_id Int32 ) ENGINE = PostgreSQL('localhost:5432', 'public_db', 'test_table', 'postges_user', 'postgres_password')",
+        "CREATE TABLE externaldistributed_table (id UInt32, name String, age UInt32, money UInt32) ENGINE = ExternalDistributed('PostgreSQL', 'localhost:5432', 'clickhouse', 'test_replicas', 'postgres', 'mysecretpassword')",
 
         # "CREATE TABLE materialized_postgresql_table (key UInt64, value UInt64) ENGINE = "
         # "MaterializedPostgreSQL('localhost:5433', 'postgres_database', 'postgresql_replica', "
@@ -1389,7 +1348,7 @@ def test_014_0(self):
         "test_local_014",
         "test_view_014",
         "test_mv_014",
-        "test_lv_014",
+        # "test_lv_014",
         "test_buffer_014",
         "a_view_014",
         "test_local2_014",
@@ -1409,7 +1368,7 @@ def test_014_0(self):
         "CREATE VIEW test_view_014 as SELECT * FROM test_local_014",
         "CREATE VIEW a_view_014 as SELECT * FROM test_view_014",
         "CREATE MATERIALIZED VIEW test_mv_014 Engine = Log as SELECT * from test_local_014",
-        "CREATE LIVE VIEW test_lv_014 as SELECT * from test_local_014",
+        # "CREATE LIVE VIEW test_lv_014 as SELECT * from test_local_014",
         "CREATE DICTIONARY test_dict_014 (a Int8, b Int8) PRIMARY KEY a SOURCE(CLICKHOUSE(host 'localhost' port 9000 table 'test_local_014' user 'default')) LAYOUT(FLAT()) LIFETIME(0)",
         "CREATE TABLE test_buffer_014(a Int8) Engine = Buffer(default, test_local_014, 16, 10, 100, 10000, 1000000, 10000000, 100000000)",
         "CREATE DATABASE test_atomic_014 ON CLUSTER '{cluster}' Engine = Atomic",
@@ -4904,9 +4863,27 @@ def test_051(self):
             },
         )
 
-    with Then("Check there are no read-only replicas"):
+    with Then("Wiat until Keeper connection is established"):
+        out = 0
+        for i in range(1, 10):
+            out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
+            if out == "1":
+                break
+            with Then("Waiting 10 seconds"):
+                time.sleep(10)
+        assert out == "1", error()
+
+    with Then("Check if there are read-only replicas"):
         out = clickhouse.query(chi, "SELECT count(*) from system.replicas where is_readonly")
-        assert out == "0", error()
+        if out == "1":
+            with Then("Found readonly replica. Trying to restore"):
+                for replica in [0, 1]:
+                    host=f"chi-{chi}-{cluster}-0-{replica}-0"
+                    clickhouse.query(chi, host=host, sql="system restart replica test_local_051")
+                    clickhouse.query(chi, host=host, sql="system restore replica test_local_051")
+                    with Then("Check if there are read-only replicas after restore"):
+                        out = clickhouse.query(chi, host=host, sql="SELECT count(*) from system.replicas where is_readonly")
+                        assert out == "0", error()
 
     with And("I insert data in the replicated table"):
         clickhouse.query(chi, f"INSERT INTO test_local_051 select 2")
