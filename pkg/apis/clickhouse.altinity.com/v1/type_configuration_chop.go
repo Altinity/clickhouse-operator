@@ -712,17 +712,17 @@ func (c *OperatorConfig) Postprocess() {
 func (c *OperatorConfig) normalizeSectionClickHouseConfigurationFile() {
 	// Process ClickHouse configuration files section
 	// Apply default paths in case nothing specified
-	util.PreparePath(&c.ClickHouse.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
-	util.PreparePath(&c.ClickHouse.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
-	util.PreparePath(&c.ClickHouse.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
+	util.PreparePath(&c.ClickHouse.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDirClickHouse)
+	util.PreparePath(&c.ClickHouse.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDirClickHouse)
+	util.PreparePath(&c.ClickHouse.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDirClickHouse)
 }
 
 func (c *OperatorConfig) normalizeSectionKeeperConfigurationFile() {
 	// Process Keeper configuration files section
 	// Apply default paths in case nothing specified
-	util.PreparePath(&c.Keeper.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDir)
-	util.PreparePath(&c.Keeper.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDir)
-	util.PreparePath(&c.Keeper.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDir)
+	util.PreparePath(&c.Keeper.Config.File.Path.Common, c.Runtime.ConfigFolderPath, CommonConfigDirKeeper)
+	util.PreparePath(&c.Keeper.Config.File.Path.Host, c.Runtime.ConfigFolderPath, HostConfigDirKeeper)
+	util.PreparePath(&c.Keeper.Config.File.Path.User, c.Runtime.ConfigFolderPath, UsersConfigDirKeeper)
 }
 
 func (c *OperatorConfig) normalizeSectionTemplate() {
@@ -737,7 +737,7 @@ func (c *OperatorConfig) normalizeSectionTemplate() {
 	}
 
 	// Process ClickHouseInstallation templates section
-	util.PreparePath(&c.Template.CHI.Path, c.Runtime.ConfigFolderPath, TemplatesDir)
+	util.PreparePath(&c.Template.CHI.Path, c.Runtime.ConfigFolderPath, TemplatesDirClickHouse)
 }
 
 func (c *OperatorConfig) normalizeSectionReconcileStatefulSet() {
