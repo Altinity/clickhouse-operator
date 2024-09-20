@@ -697,8 +697,7 @@ configs:
           </default>
         </profiles>
       </yandex>
-  etcKeeperOperatorConfdFiles: null
-  etcKeeperOperatorConfigdFiles:
+  etcKeeperOperatorConfdFiles:
     01-keeper-01-readiness.xml: |-
       <!-- IMPORTANT -->
       <!-- This file is auto-generated -->
@@ -716,6 +715,7 @@ configs:
               </http_control>
           </keeper_server>
       </clickhouse>
+  etcKeeperOperatorConfigdFiles: null
   etcKeeperOperatorTemplatesdFiles:
     readme: |-
       Templates in this folder are packaged with an operator and available via 'useTemplate'

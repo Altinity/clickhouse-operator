@@ -4677,22 +4677,6 @@ metadata:
     clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 data:
----
-# Template Parameters:
-#
-# NAME=etc-keeper-operator-configd-files
-# NAMESPACE=${OPERATOR_NAMESPACE}
-# COMMENT=
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: etc-keeper-operator-configd-files
-  namespace: ${OPERATOR_NAMESPACE}
-  labels:
-    clickhouse.altinity.com/chop: 0.24.0
-    app: clickhouse-operator
-data:
   01-keeper-01-readiness.xml: |
     <!-- IMPORTANT -->
     <!-- This file is auto-generated -->
@@ -4710,6 +4694,22 @@ data:
             </http_control>
         </keeper_server>
     </clickhouse>
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-configd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-configd-files
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
 ---
 # Template Parameters:
 #
