@@ -62,8 +62,8 @@ TMP_CHI_USERSD_DIR="${TMP_CONFIG_DIR}/chi/users.d"
 TMP_CHK_CONFD_DIR="${TMP_CONFIG_DIR}/chk/conf.d"
 
 # Local path to folder with Keeper's .xml configuration files which will be injected into .yaml
-# as content of /etc/clickhouse-server/chk/config.d folder
-TMP_CHK_CONFIGD_DIR="${TMP_CONFIG_DIR}/chk/config.d"
+# as content of /etc/clickhouse-server/chk/keeper_config.d folder
+TMP_CHK_CONFIGD_DIR="${TMP_CONFIG_DIR}/chk/keeper_config.d"
 
 # Local path to folder with operator's .yaml template files which will be injected into .yaml
 # as content of /etc/clickhouse-server/chk/templates.d folder
@@ -361,7 +361,7 @@ if [[ "${MANIFEST_PRINT_DEPLOYMENT}" == "yes" ]]; then
             done
         fi
 
-        # Render chk/config.d files
+        # Render chk/keeper_config.d files
         render_separator
         render_configmap_header "etc-keeper-operator-configd-files"
         if [[ ! -z "${TMP_CHK_CONFIGD_DIR}" ]] && [[ -d "${TMP_CHK_CONFIGD_DIR}" ]] && [[ ! -z "$(ls "${TMP_CHK_CONFIGD_DIR}")" ]]; then
