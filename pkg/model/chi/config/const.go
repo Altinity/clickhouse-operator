@@ -14,8 +14,20 @@
 
 package config
 
-import (
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+
+const (
+	// CommonConfigDir specifies folder's name, where generated common XML files for ClickHouse would be placed
+	CommonConfigDir = api.CommonConfigDirClickHouse
+
+	// UsersConfigDir specifies folder's name, where generated users XML files for ClickHouse would be placed
+	UsersConfigDir = api.UsersConfigDirClickHouse
+
+	// HostConfigDir specifies folder's name, where generated host XML files for ClickHouse would be placed
+	HostConfigDir = api.HostConfigDirClickHouse
+
+	// TemplatesDir specifies folder's name where ClickHouseInstallationTemplates are located
+	TemplatesDir = api.TemplatesDirClickHouse
 )
 
 const (
@@ -25,7 +37,7 @@ const (
 	// where generated common XML files for the following sections would be placed:
 	// 1. remote servers
 	// 2. operator-provided additional config files
-	DirPathConfigCommon = DirPathConfigRoot + "/" + api.CommonConfigDir + "/"
+	DirPathConfigCommon = DirPathConfigRoot + "/" + CommonConfigDir + "/"
 
 	// DirPathConfigUsers specifies full path to folder, where generated users XML files would be placed
 	// for the following sections:
@@ -33,7 +45,7 @@ const (
 	// 2. quotas
 	// 3. profiles
 	// 4. operator-provided additional config files
-	DirPathConfigUsers = DirPathConfigRoot + "/" + api.UsersConfigDir + "/"
+	DirPathConfigUsers = DirPathConfigRoot + "/" + UsersConfigDir + "/"
 
 	// DirPathConfigHost specifies full path to folder, where generated host XML files would be placed
 	// for the following sections:
@@ -42,7 +54,7 @@ const (
 	// 3. settings
 	// 4. files
 	// 5. operator-provided additional config files
-	DirPathConfigHost = DirPathConfigRoot + "/" + api.HostConfigDir + "/"
+	DirPathConfigHost = DirPathConfigRoot + "/" + HostConfigDir + "/"
 
 	// DirPathSecretFilesConfig specifies full path to folder, where secrets are mounted
 	DirPathSecretFilesConfig = DirPathConfigRoot + "/" + "secrets.d" + "/"
