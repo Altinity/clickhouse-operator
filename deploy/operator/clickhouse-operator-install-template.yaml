@@ -4117,7 +4117,7 @@ data:
     #   CH_PASSWORD_PLAIN=
     #   CH_CREDENTIALS_SECRET_NAMESPACE=
     #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
-    #   VERBOSITY=1
+    #   VERBOSITY=2
     
     ################################################
     ##
@@ -4310,11 +4310,11 @@ data:
           # In case path is absolute - it is used as is
           # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
           path:
-            # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
-            common: chk/config.d
-            # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
+            # Path to the folder where Keeper configuration files common for all instances within a CHK are located.
+            common: chk/keeper_config.d
+            # Path to the folder where Keeper configuration files unique for each instance (host) within a CHK are located.
             host: chk/conf.d
-            # Path to the folder where ClickHouse configuration files with users' settings are located.
+            # Path to the folder where Keeper configuration files with users' settings are located.
             # Files are common for all instances within a CHI.
             user: chk/users.d
     
@@ -4485,7 +4485,7 @@ data:
     logger:
       logtostderr: "true"
       alsologtostderr: "false"
-      v: "1"
+      v: "2"
       stderrthreshold: ""
       vmodule: ""
       log_backtrace_at: ""
@@ -4784,6 +4784,22 @@ metadata:
     clickhouse.altinity.com/chop: 0.24.0
     app: clickhouse-operator
 data:
+---
+# Template Parameters:
+#
+# NAME=etc-keeper-operator-configd-files
+# NAMESPACE=${OPERATOR_NAMESPACE}
+# COMMENT=
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: etc-keeper-operator-configd-files
+  namespace: ${OPERATOR_NAMESPACE}
+  labels:
+    clickhouse.altinity.com/chop: 0.24.0
+    app: clickhouse-operator
+data:
   01-keeper-01-readiness.xml: |
     <!-- IMPORTANT -->
     <!-- This file is auto-generated -->
@@ -4802,22 +4818,6 @@ data:
         </keeper_server>
     </clickhouse>
 
----
-# Template Parameters:
-#
-# NAME=etc-keeper-operator-configd-files
-# NAMESPACE=${OPERATOR_NAMESPACE}
-# COMMENT=
-#
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: etc-keeper-operator-configd-files
-  namespace: ${OPERATOR_NAMESPACE}
-  labels:
-    clickhouse.altinity.com/chop: 0.24.0
-    app: clickhouse-operator
-data:
 ---
 # Template Parameters:
 #
@@ -4955,7 +4955,7 @@ spec:
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/chk/config.d
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
             - name: etc-keeper-operator-templatesd-folder
               mountPath: /etc/clickhouse-operator/chk/templates.d
             - name: etc-keeper-operator-usersd-folder
@@ -5031,7 +5031,7 @@ spec:
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/chk/config.d
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
             - name: etc-keeper-operator-templatesd-folder
               mountPath: /etc/clickhouse-operator/chk/templates.d
             - name: etc-keeper-operator-usersd-folder

@@ -401,11 +401,11 @@ configs:
             # In case path is absolute - it is used as is
             # In case path is relative - it is relative to the folder where configuration file you are reading right now is located.
             path:
-              # Path to the folder where ClickHouse configuration files common for all instances within a CHI are located.
-              common: chk/config.d
-              # Path to the folder where ClickHouse configuration files unique for each instance (host) within a CHI are located.
+              # Path to the folder where Keeper configuration files common for all instances within a CHK are located.
+              common: chk/keeper_config.d
+              # Path to the folder where Keeper configuration files unique for each instance (host) within a CHK are located.
               host: chk/conf.d
-              # Path to the folder where ClickHouse configuration files with users' settings are located.
+              # Path to the folder where Keeper configuration files with users' settings are located.
               # Files are common for all instances within a CHI.
               user: chk/users.d
       ################################################
@@ -697,7 +697,8 @@ configs:
           </default>
         </profiles>
       </yandex>
-  etcKeeperOperatorConfdFiles:
+  etcKeeperOperatorConfdFiles: null
+  etcKeeperOperatorConfigdFiles:
     01-keeper-01-readiness.xml: |-
       <!-- IMPORTANT -->
       <!-- This file is auto-generated -->
@@ -715,7 +716,6 @@ configs:
               </http_control>
           </keeper_server>
       </clickhouse>
-  etcKeeperOperatorConfigdFiles: null
   etcKeeperOperatorTemplatesdFiles:
     readme: |-
       Templates in this folder are packaged with an operator and available via 'useTemplate'
