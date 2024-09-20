@@ -16,6 +16,7 @@ package creator
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	core "k8s.io/api/core/v1"
 
@@ -35,7 +36,7 @@ func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *c
 	case interfaces.ProbeDefaultLiveness:
 		return m.createDefaultLivenessProbe(host)
 	case interfaces.ProbeDefaultReadiness:
-		return nil
+		return m.createDefaultReadinessProbe(host)
 	}
 	panic("unknown probe type")
 }
@@ -65,4 +66,18 @@ func livenessProbeScript(port int) string {
 			`if [[ "${OK}" == "imok" ]]; then exit 0; else exit 1; fi`,
 		port,
 	)
+}
+
+// createDefaultReadinessProbe returns default readiness probe
+func (m *ProbeManager) createDefaultReadinessProbe(host *api.Host) *core.Probe {
+	return &core.Probe{
+		ProbeHandler: core.ProbeHandler{
+			HTTPGet: &core.HTTPGetAction{
+				Path: "/ready",
+				Port: intstr.Parse("9182"),
+			},
+		},
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       3,
+	}
 }
