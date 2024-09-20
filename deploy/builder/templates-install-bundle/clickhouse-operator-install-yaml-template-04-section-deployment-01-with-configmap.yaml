@@ -79,7 +79,7 @@ spec:
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/chk/config.d
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
             - name: etc-keeper-operator-templatesd-folder
               mountPath: /etc/clickhouse-operator/chk/templates.d
             - name: etc-keeper-operator-usersd-folder
@@ -155,7 +155,7 @@ spec:
             - name: etc-keeper-operator-confd-folder
               mountPath: /etc/clickhouse-operator/chk/conf.d
             - name: etc-keeper-operator-configd-folder
-              mountPath: /etc/clickhouse-operator/chk/config.d
+              mountPath: /etc/clickhouse-operator/chk/keeper_config.d
             - name: etc-keeper-operator-templatesd-folder
               mountPath: /etc/clickhouse-operator/chk/templates.d
             - name: etc-keeper-operator-usersd-folder
