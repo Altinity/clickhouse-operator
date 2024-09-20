@@ -625,11 +625,17 @@ func GetSectionFromPath(path string) (SettingsSection, error) {
 	// Check dir names to determine which section path points to
 	configDir := section
 	switch {
-	case strings.EqualFold(configDir, CommonConfigDir):
+	case strings.EqualFold(configDir, CommonConfigDirClickHouse):
 		return SectionCommon, nil
-	case strings.EqualFold(configDir, UsersConfigDir):
+	case strings.EqualFold(configDir, UsersConfigDirClickHouse):
 		return SectionUsers, nil
-	case strings.EqualFold(configDir, HostConfigDir):
+	case strings.EqualFold(configDir, HostConfigDirClickHouse):
+		return SectionHost, nil
+	case strings.EqualFold(configDir, CommonConfigDirKeeper):
+		return SectionCommon, nil
+	case strings.EqualFold(configDir, UsersConfigDirKeeper):
+		return SectionUsers, nil
+	case strings.EqualFold(configDir, HostConfigDirKeeper):
 		return SectionHost, nil
 	}
 
