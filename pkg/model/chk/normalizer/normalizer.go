@@ -19,16 +19,15 @@ import (
 
 	"github.com/google/uuid"
 
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/chop"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	crTemplatesNormalizer "github.com/altinity/clickhouse-operator/pkg/model/chi/normalizer/templates_cr"
-	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
-	chkLabeler "github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
+	"github.com/altinity/clickhouse-operator/pkg/model/chk/tags/labeler"
 	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 	commonMacro "github.com/altinity/clickhouse-operator/pkg/model/common/macro"
 	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
@@ -51,13 +50,13 @@ func New() *Normalizer {
 	return &Normalizer{
 		namer:   managers.NewNameManager(managers.NameManagerTypeKeeper),
 		macro:   commonMacro.New(macro.List),
-		labeler: chkLabeler.New(nil),
+		labeler: labeler.New(nil),
 	}
 }
 
 // CreateTemplated produces ready-to-use object
-func (n *Normalizer) CreateTemplated(subj *apiChk.ClickHouseKeeperInstallation, options *normalizer.Options) (
-	*apiChk.ClickHouseKeeperInstallation,
+func (n *Normalizer) CreateTemplated(subj *chk.ClickHouseKeeperInstallation, options *normalizer.Options) (
+	*chk.ClickHouseKeeperInstallation,
 	error,
 ) {
 	// Normalization starts with a new request
@@ -74,7 +73,7 @@ func (n *Normalizer) buildRequest(options *normalizer.Options) {
 	n.req = NewRequest(options)
 }
 
-func (n *Normalizer) buildTargetFromTemplates(subj *apiChk.ClickHouseKeeperInstallation) {
+func (n *Normalizer) buildTargetFromTemplates(subj *chk.ClickHouseKeeperInstallation) {
 	// Create new target that will be populated with data during normalization process
 	n.req.SetTarget(n.createTarget())
 
@@ -84,7 +83,7 @@ func (n *Normalizer) buildTargetFromTemplates(subj *apiChk.ClickHouseKeeperInsta
 	n.applyCRTemplatesOnTarget(subj)
 
 	// After all templates applied, place provided 'subject' on top of the whole stack (target)
-	n.req.GetTarget().MergeFrom(subj, api.MergeTypeOverrideByNonEmptyValues)
+	n.req.GetTarget().MergeFrom(subj, chi.MergeTypeOverrideByNonEmptyValues)
 }
 
 func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.TemplateSubject) {
@@ -93,11 +92,11 @@ func (n *Normalizer) applyCRTemplatesOnTarget(subj crTemplatesNormalizer.Templat
 	//}
 }
 
-func (n *Normalizer) newSubject() *apiChk.ClickHouseKeeperInstallation {
-	return managers.CreateCustomResource(managers.CustomResourceCHK).(*apiChk.ClickHouseKeeperInstallation)
+func (n *Normalizer) newSubject() *chk.ClickHouseKeeperInstallation {
+	return managers.CreateCustomResource(managers.CustomResourceCHK).(*chk.ClickHouseKeeperInstallation)
 }
 
-func (n *Normalizer) shouldCreateDefaultCluster(subj *apiChk.ClickHouseKeeperInstallation) bool {
+func (n *Normalizer) shouldCreateDefaultCluster(subj *chk.ClickHouseKeeperInstallation) bool {
 	if subj == nil {
 		// No subject specified - meaning we are normalizing non-existing subject and it should have no clusters inside
 		return false
@@ -107,7 +106,7 @@ func (n *Normalizer) shouldCreateDefaultCluster(subj *apiChk.ClickHouseKeeperIns
 	}
 }
 
-func (n *Normalizer) ensureSubject(subj *apiChk.ClickHouseKeeperInstallation) *apiChk.ClickHouseKeeperInstallation {
+func (n *Normalizer) ensureSubject(subj *chk.ClickHouseKeeperInstallation) *chk.ClickHouseKeeperInstallation {
 	n.req.Options().WithDefaultCluster = n.shouldCreateDefaultCluster(subj)
 
 	if subj == nil {
@@ -119,7 +118,7 @@ func (n *Normalizer) ensureSubject(subj *apiChk.ClickHouseKeeperInstallation) *a
 	}
 }
 
-func (n *Normalizer) getTargetTemplate() *apiChk.ClickHouseKeeperInstallation {
+func (n *Normalizer) getTargetTemplate() *chk.ClickHouseKeeperInstallation {
 	return nil // return chop.Config().Template.CHI.Runtime.Template
 }
 
@@ -127,7 +126,7 @@ func (n *Normalizer) hasTargetTemplate() bool {
 	return n.getTargetTemplate() != nil
 }
 
-func (n *Normalizer) createTarget() *apiChk.ClickHouseKeeperInstallation {
+func (n *Normalizer) createTarget() *chk.ClickHouseKeeperInstallation {
 	if n.hasTargetTemplate() {
 		// Template specified - start with template
 		return n.getTargetTemplate().DeepCopy()
@@ -138,7 +137,7 @@ func (n *Normalizer) createTarget() *apiChk.ClickHouseKeeperInstallation {
 }
 
 // normalizeTarget normalizes target
-func (n *Normalizer) normalizeTarget() (*apiChk.ClickHouseKeeperInstallation, error) {
+func (n *Normalizer) normalizeTarget() (*chk.ClickHouseKeeperInstallation, error) {
 	n.normalizeSpec()
 	n.finalize()
 	n.fillStatus()
@@ -160,7 +159,7 @@ func (n *Normalizer) normalizeSpec() {
 // finalize performs some finalization tasks, which should be done after CHI is normalized
 func (n *Normalizer) finalize() {
 	n.req.GetTarget().Fill()
-	n.req.GetTarget().WalkHosts(func(host *api.Host) error {
+	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
 		n.hostApplyHostTemplateSpecifiedOrDefault(host)
 		return nil
 	})
@@ -169,7 +168,7 @@ func (n *Normalizer) finalize() {
 
 // fillCRAddressInfo
 func (n *Normalizer) fillCRAddressInfo() {
-	n.req.GetTarget().WalkHosts(func(host *api.Host) error {
+	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
 		host.Runtime.Address.StatefulSet = n.namer.Name(interfaces.NameStatefulSet, host)
 		host.Runtime.Address.FQDN = n.namer.Name(interfaces.NameFQDN, host)
 		return nil
@@ -181,7 +180,7 @@ func (n *Normalizer) fillStatus() {
 	endpoint := n.namer.Name(interfaces.NameCRServiceFQDN, n.req.GetTarget(), n.req.GetTarget().GetSpec().GetNamespaceDomainPattern())
 	pods := make([]string, 0)
 	fqdns := make([]string, 0)
-	n.req.GetTarget().WalkHosts(func(host *api.Host) error {
+	n.req.GetTarget().WalkHosts(func(host *chi.Host) error {
 		pods = append(pods, n.namer.Name(interfaces.NamePod, host))
 		fqdns = append(fqdns, n.namer.Name(interfaces.NameFQDN, host))
 		return nil
@@ -217,9 +216,9 @@ func (n *Normalizer) normalizeNamespaceDomainPattern(namespaceDomainPattern *typ
 }
 
 // normalizeDefaults normalizes .spec.defaults
-func (n *Normalizer) normalizeDefaults(defaults *api.Defaults) *api.Defaults {
+func (n *Normalizer) normalizeDefaults(defaults *chi.Defaults) *chi.Defaults {
 	if defaults == nil {
-		defaults = api.NewDefaults()
+		defaults = chi.NewDefaults()
 	}
 	// Set defaults for CHI object properties
 	defaults.ReplicasUseFQDN = defaults.ReplicasUseFQDN.Normalize(false)
@@ -229,7 +228,7 @@ func (n *Normalizer) normalizeDefaults(defaults *api.Defaults) *api.Defaults {
 	}
 	// Ensure field
 	if defaults.StorageManagement == nil {
-		defaults.StorageManagement = api.NewStorageManagement()
+		defaults.StorageManagement = chi.NewStorageManagement()
 	}
 	// Ensure field
 	if defaults.Templates == nil {
@@ -240,9 +239,9 @@ func (n *Normalizer) normalizeDefaults(defaults *api.Defaults) *api.Defaults {
 }
 
 // normalizeConfiguration normalizes .spec.configuration
-func (n *Normalizer) normalizeConfiguration(conf *apiChk.Configuration) *apiChk.Configuration {
+func (n *Normalizer) normalizeConfiguration(conf *chk.Configuration) *chk.Configuration {
 	if conf == nil {
-		conf = apiChk.NewConfiguration()
+		conf = chk.NewConfiguration()
 	}
 
 	n.normalizeConfigurationAllSettingsBasedSections(conf)
@@ -251,13 +250,13 @@ func (n *Normalizer) normalizeConfiguration(conf *apiChk.Configuration) *apiChk.
 }
 
 // normalizeConfigurationAllSettingsBasedSections normalizes Settings-based configuration
-func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *apiChk.Configuration) {
+func (n *Normalizer) normalizeConfigurationAllSettingsBasedSections(conf *chk.Configuration) {
 	conf.Settings = n.normalizeConfigurationSettings(conf.Settings)
 	conf.Files = n.normalizeConfigurationFiles(conf.Files)
 }
 
 // normalizeTemplates normalizes .spec.templates
-func (n *Normalizer) normalizeTemplates(templates *api.Templates) *api.Templates {
+func (n *Normalizer) normalizeTemplates(templates *chi.Templates) *chi.Templates {
 	if templates == nil {
 		return nil
 	}
@@ -270,45 +269,45 @@ func (n *Normalizer) normalizeTemplates(templates *api.Templates) *api.Templates
 }
 
 // normalizeReconciling normalizes .spec.reconciling
-func (n *Normalizer) normalizeReconciling(reconciling *api.Reconciling) *api.Reconciling {
+func (n *Normalizer) normalizeReconciling(reconciling *chi.Reconciling) *chi.Reconciling {
 	if reconciling == nil {
-		reconciling = api.NewReconciling().SetDefaults()
+		reconciling = chi.NewReconciling().SetDefaults()
 	}
 	switch strings.ToLower(reconciling.GetPolicy()) {
-	case strings.ToLower(api.ReconcilingPolicyWait):
+	case strings.ToLower(chi.ReconcilingPolicyWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(api.ReconcilingPolicyWait)
-	case strings.ToLower(api.ReconcilingPolicyNoWait):
+		reconciling.SetPolicy(chi.ReconcilingPolicyWait)
+	case strings.ToLower(chi.ReconcilingPolicyNoWait):
 		// Known value, overwrite it to ensure case-ness
-		reconciling.SetPolicy(api.ReconcilingPolicyNoWait)
+		reconciling.SetPolicy(chi.ReconcilingPolicyNoWait)
 	default:
 		// Unknown value, fallback to default
-		reconciling.SetPolicy(api.ReconcilingPolicyUnspecified)
+		reconciling.SetPolicy(chi.ReconcilingPolicyUnspecified)
 	}
 	reconciling.SetCleanup(n.normalizeReconcilingCleanup(reconciling.GetCleanup()))
 	return reconciling
 }
 
-func (n *Normalizer) normalizeReconcilingCleanup(cleanup *api.Cleanup) *api.Cleanup {
+func (n *Normalizer) normalizeReconcilingCleanup(cleanup *chi.Cleanup) *chi.Cleanup {
 	if cleanup == nil {
-		cleanup = api.NewCleanup()
+		cleanup = chi.NewCleanup()
 	}
 
 	if cleanup.UnknownObjects == nil {
 		cleanup.UnknownObjects = cleanup.DefaultUnknownObjects()
 	}
-	n.normalizeCleanup(&cleanup.UnknownObjects.StatefulSet, api.ObjectsCleanupDelete)
-	n.normalizeCleanup(&cleanup.UnknownObjects.PVC, api.ObjectsCleanupDelete)
-	n.normalizeCleanup(&cleanup.UnknownObjects.ConfigMap, api.ObjectsCleanupDelete)
-	n.normalizeCleanup(&cleanup.UnknownObjects.Service, api.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.StatefulSet, chi.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.PVC, chi.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.ConfigMap, chi.ObjectsCleanupDelete)
+	n.normalizeCleanup(&cleanup.UnknownObjects.Service, chi.ObjectsCleanupDelete)
 
 	if cleanup.ReconcileFailedObjects == nil {
 		cleanup.ReconcileFailedObjects = cleanup.DefaultReconcileFailedObjects()
 	}
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.StatefulSet, api.ObjectsCleanupRetain)
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.PVC, api.ObjectsCleanupRetain)
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.ConfigMap, api.ObjectsCleanupRetain)
-	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.Service, api.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.StatefulSet, chi.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.PVC, chi.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.ConfigMap, chi.ObjectsCleanupRetain)
+	n.normalizeCleanup(&cleanup.ReconcileFailedObjects.Service, chi.ObjectsCleanupRetain)
 	return cleanup
 }
 
@@ -317,51 +316,51 @@ func (n *Normalizer) normalizeCleanup(str *string, value string) {
 		return
 	}
 	switch strings.ToLower(*str) {
-	case strings.ToLower(api.ObjectsCleanupRetain):
+	case strings.ToLower(chi.ObjectsCleanupRetain):
 		// Known value, overwrite it to ensure case-ness
-		*str = api.ObjectsCleanupRetain
-	case strings.ToLower(api.ObjectsCleanupDelete):
+		*str = chi.ObjectsCleanupRetain
+	case strings.ToLower(chi.ObjectsCleanupDelete):
 		// Known value, overwrite it to ensure case-ness
-		*str = api.ObjectsCleanupDelete
+		*str = chi.ObjectsCleanupDelete
 	default:
 		// Unknown value, fallback to default
 		*str = value
 	}
 }
 
-func (n *Normalizer) normalizeHostTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizeHostTemplates(templates *chi.Templates) {
 	for i := range templates.HostTemplates {
 		n.normalizeHostTemplate(&templates.HostTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizePodTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizePodTemplates(templates *chi.Templates) {
 	for i := range templates.PodTemplates {
 		n.normalizePodTemplate(&templates.PodTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeVolumeClaimTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizeVolumeClaimTemplates(templates *chi.Templates) {
 	for i := range templates.VolumeClaimTemplates {
 		n.normalizeVolumeClaimTemplate(&templates.VolumeClaimTemplates[i])
 	}
 }
 
-func (n *Normalizer) normalizeServiceTemplates(templates *api.Templates) {
+func (n *Normalizer) normalizeServiceTemplates(templates *chi.Templates) {
 	for i := range templates.ServiceTemplates {
 		n.normalizeServiceTemplate(&templates.ServiceTemplates[i])
 	}
 }
 
 // normalizeHostTemplate normalizes .spec.templates.hostTemplates
-func (n *Normalizer) normalizeHostTemplate(template *api.HostTemplate) {
+func (n *Normalizer) normalizeHostTemplate(template *chi.HostTemplate) {
 	templates.NormalizeHostTemplate(template)
 	// Introduce HostTemplate into Index
 	n.req.GetTarget().GetSpecT().GetTemplates().EnsureHostTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizePodTemplate normalizes .spec.templates.podTemplates
-func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
+func (n *Normalizer) normalizePodTemplate(template *chi.PodTemplate) {
 	// TODO need to support multi-cluster
 	replicasCount := 1
 	if len(n.req.GetTarget().GetSpecT().Configuration.Clusters) > 0 {
@@ -373,21 +372,21 @@ func (n *Normalizer) normalizePodTemplate(template *api.PodTemplate) {
 }
 
 // normalizeVolumeClaimTemplate normalizes .spec.templates.volumeClaimTemplates
-func (n *Normalizer) normalizeVolumeClaimTemplate(template *api.VolumeClaimTemplate) {
+func (n *Normalizer) normalizeVolumeClaimTemplate(template *chi.VolumeClaimTemplate) {
 	templates.NormalizeVolumeClaimTemplate(template)
 	// Introduce VolumeClaimTemplate into Index
 	n.req.GetTarget().GetSpecT().GetTemplates().EnsureVolumeClaimTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeServiceTemplate normalizes .spec.templates.serviceTemplates
-func (n *Normalizer) normalizeServiceTemplate(template *api.ServiceTemplate) {
+func (n *Normalizer) normalizeServiceTemplate(template *chi.ServiceTemplate) {
 	templates.NormalizeServiceTemplate(template)
 	// Introduce ServiceClaimTemplate into Index
 	n.req.GetTarget().GetSpecT().GetTemplates().EnsureServiceTemplatesIndex().Set(template.Name, template)
 }
 
 // normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters(clusters []*apiChk.ChkCluster) []*apiChk.ChkCluster {
+func (n *Normalizer) normalizeClusters(clusters []*chk.ChkCluster) []*chk.ChkCluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
 	// Normalize all clusters
@@ -398,7 +397,7 @@ func (n *Normalizer) normalizeClusters(clusters []*apiChk.ChkCluster) []*apiChk.
 }
 
 // ensureClusters
-func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.ChkCluster {
+func (n *Normalizer) ensureClusters(clusters []*chk.ChkCluster) []*chk.ChkCluster {
 	// May be we have cluster(s) available
 	if len(clusters) > 0 {
 		return clusters
@@ -406,8 +405,8 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 
 	// In case no clusters available, we may want to create a default one
 	if n.req.Options().WithDefaultCluster {
-		return []*apiChk.ChkCluster{
-			commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*apiChk.ChkCluster),
+		return []*chk.ChkCluster{
+			commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.ChkCluster),
 		}
 	}
 
@@ -415,38 +414,45 @@ func (n *Normalizer) ensureClusters(clusters []*apiChk.ChkCluster) []*apiChk.Chk
 	return nil
 }
 
+const envVarNamePrefixConfigurationSettings = "CONFIGURATION_SETTINGS"
+
 // normalizeConfigurationSettings normalizes .spec.configuration.settings
-func (n *Normalizer) normalizeConfigurationSettings(settings *api.Settings) *api.Settings {
-	return settings.
-		Ensure().
-		MergeFrom(config.DefaultSettings()).
-		Normalize()
+func (n *Normalizer) normalizeConfigurationSettings(settings *chi.Settings) *chi.Settings {
+	if settings == nil {
+		return nil
+	}
+	settings.Normalize()
+
+	settings.WalkSafe(func(name string, setting *chi.Setting) {
+		subst.ReplaceSettingsFieldWithEnvRefToSecretField(n.req, settings, name, name, envVarNamePrefixConfigurationSettings, false)
+	})
+	return settings
 }
 
 // normalizeConfigurationFiles normalizes .spec.configuration.files
-func (n *Normalizer) normalizeConfigurationFiles(files *api.Settings) *api.Settings {
+func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Settings {
 	if files == nil {
 		return nil
 	}
 	files.Normalize()
 
-	files.WalkSafe(func(key string, setting *api.Setting) {
+	files.WalkSafe(func(key string, setting *chi.Setting) {
 		subst.ReplaceSettingsFieldWithMountedFile(n.req, files, key)
 	})
 
 	return files
 }
 
-func ensureCluster(cluster *apiChk.ChkCluster) *apiChk.ChkCluster {
+func ensureCluster(cluster *chk.ChkCluster) *chk.ChkCluster {
 	if cluster == nil {
-		return commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*apiChk.ChkCluster)
+		return commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.ChkCluster)
 	} else {
 		return cluster
 	}
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkCluster {
+func (n *Normalizer) normalizeCluster(cluster *chk.ChkCluster) *chk.ChkCluster {
 	cluster = ensureCluster(cluster)
 
 	// Runtime has to be prepared first
@@ -464,7 +470,7 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 
 	// Ensure layout
 	if cluster.Layout == nil {
-		cluster.Layout = apiChk.NewChkClusterLayout()
+		cluster.Layout = chk.NewChkClusterLayout()
 	}
 	cluster.FillShardReplicaSpecified()
 	cluster.Layout = n.normalizeClusterLayoutShardsCountAndReplicasCount(cluster.Layout)
@@ -475,17 +481,17 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 	//n.appendClusterSecretEnvVar(cluster)
 
 	// Loop over all shards and replicas inside shards and fill structure
-	cluster.WalkShards(func(index int, shard api.IShard) error {
-		n.normalizeShard(shard.(*apiChk.ChkShard), cluster, index)
+	cluster.WalkShards(func(index int, shard chi.IShard) error {
+		n.normalizeShard(shard.(*chk.ChkShard), cluster, index)
 		return nil
 	})
 
-	cluster.WalkReplicas(func(index int, replica *apiChk.ChkReplica) error {
+	cluster.WalkReplicas(func(index int, replica *chk.ChkReplica) error {
 		n.normalizeReplica(replica, cluster, index)
 		return nil
 	})
 
-	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *api.Host) error {
+	cluster.Layout.HostsField.WalkHosts(func(shard, replica int, host *chi.Host) error {
 		n.normalizeHost(host, cluster.GetShard(shard), cluster.GetReplica(replica), cluster, shard, replica)
 		return nil
 	})
@@ -494,10 +500,10 @@ func (n *Normalizer) normalizeCluster(cluster *apiChk.ChkCluster) *apiChk.ChkClu
 }
 
 // normalizeClusterLayoutShardsCountAndReplicasCount ensures at least 1 shard and 1 replica counters
-func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *apiChk.ChkClusterLayout) *apiChk.ChkClusterLayout {
+func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLayout *chk.ChkClusterLayout) *chk.ChkClusterLayout {
 	// Ensure layout
 	if clusterLayout == nil {
-		clusterLayout = apiChk.NewChkClusterLayout()
+		clusterLayout = chk.NewChkClusterLayout()
 	}
 
 	// clusterLayout.ShardsCount
@@ -572,31 +578,31 @@ func (n *Normalizer) normalizeClusterLayoutShardsCountAndReplicasCount(clusterLa
 }
 
 // ensureClusterLayoutShards ensures slice layout.Shards is in place
-func (n *Normalizer) ensureClusterLayoutShards(layout *apiChk.ChkClusterLayout) {
+func (n *Normalizer) ensureClusterLayoutShards(layout *chk.ChkClusterLayout) {
 	// Disposition of shards in slice would be
 	// [explicitly specified shards 0..N, N+1..layout.ShardsCount-1 empty slots for to-be-filled shards]
 
 	// Some (may be all) shards specified, need to append assumed (unspecified, but expected to exist) shards
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Shards) < layout.ShardsCount {
-		layout.Shards = append(layout.Shards, &apiChk.ChkShard{})
+		layout.Shards = append(layout.Shards, &chk.ChkShard{})
 	}
 }
 
 // ensureClusterLayoutReplicas ensures slice layout.Replicas is in place
-func (n *Normalizer) ensureClusterLayoutReplicas(layout *apiChk.ChkClusterLayout) {
+func (n *Normalizer) ensureClusterLayoutReplicas(layout *chk.ChkClusterLayout) {
 	// Disposition of replicas in slice would be
 	// [explicitly specified replicas 0..N, N+1..layout.ReplicasCount-1 empty slots for to-be-filled replicas]
 
 	// Some (may be all) replicas specified, need to append assumed (unspecified, but expected to exist) replicas
 	// TODO may be there is better way to append N slots to a slice
 	for len(layout.Replicas) < layout.ReplicasCount {
-		layout.Replicas = append(layout.Replicas, &apiChk.ChkReplica{})
+		layout.Replicas = append(layout.Replicas, &chk.ChkReplica{})
 	}
 }
 
 // normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *apiChk.ChkShard, cluster *apiChk.ChkCluster, shardIndex int) {
+func (n *Normalizer) normalizeShard(shard *chk.ChkShard, cluster *chk.ChkCluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
@@ -613,7 +619,7 @@ func (n *Normalizer) normalizeShard(shard *apiChk.ChkShard, cluster *apiChk.ChkC
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *apiChk.ChkReplica, cluster *apiChk.ChkCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplica(replica *chk.ChkReplica, cluster *chk.ChkCluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
@@ -627,7 +633,7 @@ func (n *Normalizer) normalizeReplica(replica *apiChk.ChkReplica, cluster *apiCh
 }
 
 // normalizeShardReplicasCount ensures shard.ReplicasCount filled properly
-func (n *Normalizer) normalizeShardReplicasCount(shard *apiChk.ChkShard, layoutReplicasCount int) {
+func (n *Normalizer) normalizeShardReplicasCount(shard *chk.ChkShard, layoutReplicasCount int) {
 	if shard.ReplicasCount > 0 {
 		// Shard has explicitly specified number of replicas
 		return
@@ -651,7 +657,7 @@ func (n *Normalizer) normalizeShardReplicasCount(shard *apiChk.ChkShard, layoutR
 }
 
 // normalizeReplicaShardsCount ensures replica.ShardsCount filled properly
-func (n *Normalizer) normalizeReplicaShardsCount(replica *apiChk.ChkReplica, layoutShardsCount int) {
+func (n *Normalizer) normalizeReplicaShardsCount(replica *chk.ChkReplica, layoutShardsCount int) {
 	if replica.ShardsCount > 0 {
 		// Replica has explicitly specified number of shards
 		return
@@ -674,7 +680,7 @@ func (n *Normalizer) normalizeReplicaShardsCount(replica *apiChk.ChkReplica, lay
 }
 
 // normalizeShardName normalizes shard name
-func (n *Normalizer) normalizeShardName(shard *apiChk.ChkShard, index int) {
+func (n *Normalizer) normalizeShardName(shard *chk.ChkShard, index int) {
 	if (len(shard.GetName()) > 0) && !commonNamer.IsAutoGeneratedShardName(shard.GetName(), shard, index) {
 		// Has explicitly specified name already
 		return
@@ -684,7 +690,7 @@ func (n *Normalizer) normalizeShardName(shard *apiChk.ChkShard, index int) {
 }
 
 // normalizeReplicaName normalizes replica name
-func (n *Normalizer) normalizeReplicaName(replica *apiChk.ChkReplica, index int) {
+func (n *Normalizer) normalizeReplicaName(replica *chk.ChkReplica, index int) {
 	if (len(replica.Name) > 0) && !commonNamer.IsAutoGeneratedReplicaName(replica.Name, replica, index) {
 		// Has explicitly specified name already
 		return
@@ -694,11 +700,11 @@ func (n *Normalizer) normalizeReplicaName(replica *apiChk.ChkReplica, index int)
 }
 
 // normalizeShardName normalizes shard weight
-func (n *Normalizer) normalizeShardWeight(shard *apiChk.ChkShard) {
+func (n *Normalizer) normalizeShardWeight(shard *chk.ChkShard) {
 }
 
 // normalizeShardHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardHosts(shard *apiChk.ChkShard, cluster *apiChk.ChkCluster, shardIndex int) {
+func (n *Normalizer) normalizeShardHosts(shard *chk.ChkShard, cluster *chk.ChkCluster, shardIndex int) {
 	// Use hosts from HostsField
 	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
@@ -711,7 +717,7 @@ func (n *Normalizer) normalizeShardHosts(shard *apiChk.ChkShard, cluster *apiChk
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaHosts(replica *apiChk.ChkReplica, cluster *apiChk.ChkCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplicaHosts(replica *chk.ChkReplica, cluster *chk.ChkCluster, replicaIndex int) {
 	// Use hosts from HostsField
 	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {
