@@ -15,17 +15,31 @@
 package v1
 
 const (
-	// CommonConfigDir specifies folder's name, where generated common XML files for ClickHouse would be placed
-	CommonConfigDir = "config.d"
+	// CommonConfigDirClickHouse specifies folder's name, where generated common XML files for ClickHouse would be placed
+	CommonConfigDirClickHouse = "config.d"
 
-	// UsersConfigDir specifies folder's name, where generated users XML files for ClickHouse would be placed
-	UsersConfigDir = "users.d"
+	// UsersConfigDirClickHouse specifies folder's name, where generated users XML files for ClickHouse would be placed
+	UsersConfigDirClickHouse = "users.d"
 
-	// HostConfigDir specifies folder's name, where generated host XML files for ClickHouse would be placed
-	HostConfigDir = "conf.d"
+	// HostConfigDirClickHouse specifies folder's name, where generated host XML files for ClickHouse would be placed
+	HostConfigDirClickHouse = "conf.d"
 
-	// TemplatesDir specifies folder's name where ClickHouseInstallationTemplates are located
-	TemplatesDir = "templates.d"
+	// TemplatesDirClickHouse specifies folder's name where ClickHouseInstallationTemplates are located
+	TemplatesDirClickHouse = "templates.d"
+)
+
+const (
+	// CommonConfigDirKeeper specifies folder's name, where generated common XML files for ClickHouse would be placed
+	CommonConfigDirKeeper = "keeper_config.d"
+
+	// UsersConfigDirKeeper specifies folder's name, where generated users XML files for ClickHouse would be placed
+	UsersConfigDirKeeper = "users.d"
+
+	// HostConfigDirKeeper specifies folder's name, where generated host XML files for ClickHouse would be placed
+	HostConfigDirKeeper = "conf.d"
+
+	// TemplatesDirKeeper specifies folder's name where ClickHouseInstallationTemplates are located
+	TemplatesDirKeeper = "templates.d"
 )
 
 // Configuration defines configuration section of .spec
