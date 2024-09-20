@@ -4124,7 +4124,7 @@ data:
     #   CH_PASSWORD_PLAIN=
     #   CH_CREDENTIALS_SECRET_NAMESPACE=
     #   CH_CREDENTIALS_SECRET_NAME=clickhouse-operator
-    #   VERBOSITY=2
+    #   VERBOSITY=1
     
     ################################################
     ##
@@ -4492,7 +4492,7 @@ data:
     logger:
       logtostderr: "true"
       alsologtostderr: "false"
-      v: "2"
+      v: "1"
       stderrthreshold: ""
       vmodule: ""
       log_backtrace_at: ""
