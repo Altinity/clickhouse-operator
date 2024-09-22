@@ -26,7 +26,6 @@ type FilesGenerator struct {
 	configGenerator *Generator
 	// clickhouse-operator configuration
 	chopConfig *chi.OperatorConfig
-	namer      interfaces.INameManager
 }
 
 // NewFilesGenerator creates new configuration files generator object
@@ -34,7 +33,6 @@ func NewFilesGenerator(cr chi.ICustomResource, namer interfaces.INameManager, op
 	return &FilesGenerator{
 		configGenerator: newGenerator(cr, namer, opts),
 		chopConfig:      chop.Config(),
-		namer:           namer,
 	}
 }
 
