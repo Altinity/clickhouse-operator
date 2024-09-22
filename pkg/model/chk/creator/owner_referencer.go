@@ -14,14 +14,14 @@
 package creator
 
 import (
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
 )
 
 func NewOwnerReferencer() interfaces.IOwnerReferencesManager {
 	return creator.NewOwnerReferencer(
-		apiChk.SchemeGroupVersion.String(),
-		apiChk.ClickHouseKeeperInstallationCRDResourceKind,
+		chk.SchemeGroupVersion.String(),
+		chk.ClickHouseKeeperInstallationCRDResourceKind,
 	)
 }

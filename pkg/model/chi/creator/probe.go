@@ -32,15 +32,15 @@ func NewProbeManager() *ProbeManager {
 func (m *ProbeManager) CreateProbe(what interfaces.ProbeType, host *api.Host) *core.Probe {
 	switch what {
 	case interfaces.ProbeDefaultLiveness:
-		return m.createDefaultClickHouseLivenessProbe(host)
+		return m.createDefaultLivenessProbe(host)
 	case interfaces.ProbeDefaultReadiness:
-		return m.createDefaultClickHouseReadinessProbe(host)
+		return m.createDefaultReadinessProbe(host)
 	}
 	panic("unknown probe type")
 }
 
-// createDefaultClickHouseLivenessProbe returns default ClickHouse liveness probe
-func (m *ProbeManager) createDefaultClickHouseLivenessProbe(host *api.Host) *core.Probe {
+// createDefaultLivenessProbe returns default liveness probe
+func (m *ProbeManager) createDefaultLivenessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{
@@ -76,8 +76,8 @@ func (m *ProbeManager) createDefaultClickHouseLivenessProbe(host *api.Host) *cor
 	return nil
 }
 
-// createDefaultClickHouseReadinessProbe returns default ClickHouse readiness probe
-func (m *ProbeManager) createDefaultClickHouseReadinessProbe(host *api.Host) *core.Probe {
+// createDefaultReadinessProbe returns default readiness probe
+func (m *ProbeManager) createDefaultReadinessProbe(host *api.Host) *core.Probe {
 	// Introduce http probe in case http port is specified
 	if host.HTTPPort.HasValue() {
 		return &core.Probe{

@@ -18,7 +18,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
@@ -33,7 +33,7 @@ func NewContainerManager(probe *ProbeManager) *ContainerManager {
 	}
 }
 
-func (cm *ContainerManager) NewDefaultAppContainer(host *apiChi.Host) core.Container {
+func (cm *ContainerManager) NewDefaultAppContainer(host *chi.Host) core.Container {
 	return cm.newDefaultContainerKeeper(host)
 }
 
@@ -41,7 +41,7 @@ func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*cor
 	return cm.getContainerKeeper(statefulSet)
 }
 
-func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *apiChi.Host) {
+func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
 	cm.ensureContainerSpecifiedKeeper(statefulSet, host)
 }
 
@@ -52,24 +52,28 @@ func (cm *ContainerManager) getContainerKeeper(statefulSet *apps.StatefulSet) (*
 	return k8s.StatefulSetContainerGet(statefulSet, config.KeeperContainerName)
 }
 
-func (cm *ContainerManager) ensureContainerSpecifiedKeeper(statefulSet *apps.StatefulSet, host *apiChi.Host) {
+// ensureContainerSpecifiedKeeper
+func (cm *ContainerManager) ensureContainerSpecifiedKeeper(statefulSet *apps.StatefulSet, host *chi.Host) {
 	_, ok := cm.getContainerKeeper(statefulSet)
 	if ok {
 		return
 	}
 
-	// No ClickHouse container available, let's add one
+	// No container available, let's add one
 	k8s.PodSpecAddContainer(
 		&statefulSet.Spec.Template.Spec,
 		cm.newDefaultContainerKeeper(host),
 	)
 }
 
-func (cm *ContainerManager) newDefaultContainerKeeper(host *apiChi.Host) core.Container {
+// newDefaultContainerKeeper returns default ClickHouse Container
+func (cm *ContainerManager) newDefaultContainerKeeper(host *chi.Host) core.Container {
 	container := core.Container{
-		Name:          config.KeeperContainerName,
-		Image:         config.DefaultKeeperDockerImage,
-		LivenessProbe: cm.probe.createDefaultLivenessProbe(host),
+		Name:           config.KeeperContainerName,
+		Image:          config.DefaultKeeperDockerImage,
+		LivenessProbe:  cm.probe.createDefaultLivenessProbe(host),
+		ReadinessProbe: cm.probe.createDefaultReadinessProbe(host),
 	}
+	host.AppendSpecifiedPortsToContainer(&container)
 	return container
 }

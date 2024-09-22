@@ -19,7 +19,7 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	apiChi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/macro"
 	"github.com/altinity/clickhouse-operator/pkg/model/chk/namer"
@@ -34,7 +34,7 @@ const (
 )
 
 type ServiceManager struct {
-	cr      apiChi.ICustomResource
+	cr      chi.ICustomResource
 	or      interfaces.IOwnerReferencesManager
 	tagger  interfaces.ITagger
 	macro   interfaces.IMacro
@@ -56,22 +56,22 @@ func (m *ServiceManager) CreateService(what interfaces.ServiceType, params ...an
 	case interfaces.ServiceCR:
 		return m.createServiceCR()
 	case interfaces.ServiceCluster:
-		var cluster apiChi.ICluster
+		var cluster chi.ICluster
 		if len(params) > 0 {
-			cluster = params[0].(apiChi.ICluster)
+			cluster = params[0].(chi.ICluster)
 			return m.createServiceCluster(cluster)
 		}
 	case interfaces.ServiceHost:
-		var host *apiChi.Host
+		var host *chi.Host
 		if len(params) > 0 {
-			host = params[0].(*apiChi.Host)
+			host = params[0].(*chi.Host)
 			return m.createServiceHost(host)
 		}
 	}
 	panic("unknown service type")
 }
 
-func (m *ServiceManager) SetCR(cr apiChi.ICustomResource) {
+func (m *ServiceManager) SetCR(cr chi.ICustomResource) {
 	m.cr = cr
 	m.labeler = labeler.New(cr)
 }
@@ -110,16 +110,16 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 			ClusterIP: TemplateDefaultsServiceClusterIP,
 			Ports: []core.ServicePort{
 				{
-					Name:       apiChi.KpDefaultZKPortName,
+					Name:       chi.KpDefaultZKPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       apiChi.KpDefaultZKPortNumber,
-					TargetPort: intstr.FromString(apiChi.KpDefaultZKPortName),
+					Port:       chi.KpDefaultZKPortNumber,
+					TargetPort: intstr.FromString(chi.KpDefaultZKPortName),
 				},
 				{
-					Name:       apiChi.KpDefaultRaftPortName,
+					Name:       chi.KpDefaultRaftPortName,
 					Protocol:   core.ProtocolTCP,
-					Port:       apiChi.KpDefaultRaftPortNumber,
-					TargetPort: intstr.FromString(apiChi.KpDefaultRaftPortName),
+					Port:       chi.KpDefaultRaftPortNumber,
+					TargetPort: intstr.FromString(chi.KpDefaultRaftPortName),
 				},
 			},
 			Selector: m.tagger.Selector(interfaces.SelectorCRScopeReady),
@@ -132,7 +132,7 @@ func (m *ServiceManager) createServiceCR() *core.Service {
 }
 
 // createServiceCluster creates new core.Service for specified Cluster
-func (m *ServiceManager) createServiceCluster(cluster apiChi.ICluster) *core.Service {
+func (m *ServiceManager) createServiceCluster(cluster chi.ICluster) *core.Service {
 	serviceName := m.namer.Name(interfaces.NameClusterService, cluster)
 	ownerReferences := m.or.CreateOwnerReferences(m.cr)
 
@@ -155,7 +155,7 @@ func (m *ServiceManager) createServiceCluster(cluster apiChi.ICluster) *core.Ser
 }
 
 // createServiceHost creates new core.Service for specified host
-func (m *ServiceManager) createServiceHost(host *apiChi.Host) *core.Service {
+func (m *ServiceManager) createServiceHost(host *chi.Host) *core.Service {
 	if template, ok := host.GetServiceTemplate(); ok {
 		// .templates.ServiceTemplate specified
 		return creator.CreateServiceFromTemplate(

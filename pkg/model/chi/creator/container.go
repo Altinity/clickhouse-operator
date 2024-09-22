@@ -18,7 +18,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
@@ -33,7 +33,7 @@ func NewContainerManager(probe *ProbeManager) *ContainerManager {
 	}
 }
 
-func (cm *ContainerManager) NewDefaultAppContainer(host *api.Host) core.Container {
+func (cm *ContainerManager) NewDefaultAppContainer(host *chi.Host) core.Container {
 	return cm.newDefaultContainerClickHouse(host)
 }
 
@@ -41,7 +41,7 @@ func (cm *ContainerManager) GetAppContainer(statefulSet *apps.StatefulSet) (*cor
 	return cm.getContainerClickHouse(statefulSet)
 }
 
-func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *api.Host) {
+func (cm *ContainerManager) EnsureAppContainer(statefulSet *apps.StatefulSet, host *chi.Host) {
 	cm.ensureContainerSpecifiedClickHouse(statefulSet, host)
 }
 
@@ -60,17 +60,29 @@ func (cm *ContainerManager) getContainerClickHouseLog(statefulSet *apps.Stateful
 }
 
 // ensureContainerSpecifiedClickHouse
-func (cm *ContainerManager) ensureContainerSpecifiedClickHouse(statefulSet *apps.StatefulSet, host *api.Host) {
+func (cm *ContainerManager) ensureContainerSpecifiedClickHouse(statefulSet *apps.StatefulSet, host *chi.Host) {
 	_, ok := cm.getContainerClickHouse(statefulSet)
 	if ok {
 		return
 	}
 
-	// No ClickHouse container available, let's add one
+	// No container available, let's add one
 	k8s.PodSpecAddContainer(
 		&statefulSet.Spec.Template.Spec,
 		cm.newDefaultContainerClickHouse(host),
 	)
+}
+
+// newDefaultContainerClickHouse returns default ClickHouse Container
+func (cm *ContainerManager) newDefaultContainerClickHouse(host *chi.Host) core.Container {
+	container := core.Container{
+		Name:           config.ClickHouseContainerName,
+		Image:          config.DefaultClickHouseDockerImage,
+		LivenessProbe:  cm.probe.createDefaultLivenessProbe(host),
+		ReadinessProbe: cm.probe.createDefaultReadinessProbe(host),
+	}
+	host.AppendSpecifiedPortsToContainer(&container)
+	return container
 }
 
 // ensureContainerSpecifiedClickHouseLog
@@ -86,18 +98,6 @@ func (cm *ContainerManager) ensureContainerSpecifiedClickHouseLog(statefulSet *a
 		&statefulSet.Spec.Template.Spec,
 		cm.newDefaultContainerLog(),
 	)
-}
-
-// newDefaultContainerClickHouse returns default ClickHouse Container
-func (cm *ContainerManager) newDefaultContainerClickHouse(host *api.Host) core.Container {
-	container := core.Container{
-		Name:           config.ClickHouseContainerName,
-		Image:          config.DefaultClickHouseDockerImage,
-		LivenessProbe:  cm.probe.createDefaultClickHouseLivenessProbe(host),
-		ReadinessProbe: cm.probe.createDefaultClickHouseReadinessProbe(host),
-	}
-	host.AppendSpecifiedPortsToContainer(&container)
-	return container
 }
 
 // newDefaultContainerLog returns default ClickHouse Log Container
