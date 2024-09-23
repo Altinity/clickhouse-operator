@@ -11,9 +11,6 @@ spec:
             - name: clickhouse-keeper
               imagePullPolicy: IfNotPresent
               image: "clickhouse/clickhouse-keeper:24.3.5.46"
-              # volumeMounts:
-              #  - name: default
-              #    mountPath: /var/lib/clickhouse
     volumeClaimTemplates:
       - name: default
         metadata:
@@ -28,9 +25,7 @@ spec:
     clusters:
       - name: single
     settings:
-      logger/level: "trace"
       logger/console: "true"
       # listen_host: "0.0.0.0"
-      # keeper_server/storage_path: /var/lib/clickhouse
       keeper_server/tcp_port: "2181"
 
