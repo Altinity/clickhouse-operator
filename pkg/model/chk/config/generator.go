@@ -59,16 +59,16 @@ func (c *Generator) generateXMLConfig(settings *chi.Settings, prefix string) str
 	return b.String()
 }
 
-// getSettingsGlobal creates data for global section of "settings.xml"
-func (c *Generator) getSettingsGlobal() string {
+// getGlobalSettings creates data for global section of "settings.xml"
+func (c *Generator) getGlobalSettings() string {
 	// No host specified means request to generate common config
 	return c.generateXMLConfig(c.opts.Settings, "")
 }
 
-// getSettingsHost creates data for host section of "settings.xml"
-func (c *Generator) getSettingsHost(host *chi.Host) string {
+// getHostSettings creates data for host section of "settings.xml"
+func (c *Generator) getHostSettings(host *chi.Host) string {
 	// Generate config for the specified host
-	return c.getHostConfig(host, host.Settings.MergeFrom(defaultSettings()))
+	return c.generateXMLConfig(host.Settings, "")
 }
 
 // getSectionFromFiles creates data for custom common config files
@@ -87,11 +87,9 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 	return files.GetSection(section, includeUnspecified)
 }
 
-// getHostConfig builds string host config based on provided `settings`
-func (c *Generator) getHostConfig(host *chi.Host, settings *chi.Settings) string {
-	if settings.Len() == 0 {
-		return ""
-	}
+// getHostRaft builds host raft config
+func (c *Generator) getHostRaft(host *chi.Host) string {
+	settings := chi.NewSettings()
 
 	// Init container will replace this macro with real value on bootstrap
 	serverId, _ := chi.NewSettingScalarFromAny(getServerId(host))
