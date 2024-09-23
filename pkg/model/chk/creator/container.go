@@ -71,6 +71,12 @@ func (cm *ContainerManager) newDefaultContainerKeeper(host *chi.Host) core.Conta
 	container := core.Container{
 		Name:           config.KeeperContainerName,
 		Image:          config.DefaultKeeperDockerImage,
+		Env: []core.EnvVar{
+			{
+				Name: "CLICKHOUSE_DATA_DIR",
+				Value: "/var/lib/clickhouse-keeper",
+			},
+		},
 		LivenessProbe:  cm.probe.createDefaultLivenessProbe(host),
 		ReadinessProbe: cm.probe.createDefaultReadinessProbe(host),
 	}
