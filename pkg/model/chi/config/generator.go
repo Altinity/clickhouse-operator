@@ -76,14 +76,14 @@ func (c *Generator) generateXMLConfig(settings *chi.Settings, prefix string) str
 	return b.String()
 }
 
-// getSettingsGlobal creates data for global section of "settings.xml"
-func (c *Generator) getSettingsGlobal() string {
+// getGlobalSettings creates data for global section of "settings.xml"
+func (c *Generator) getGlobalSettings() string {
 	// No host specified means request to generate common config
 	return c.generateXMLConfig(c.opts.Settings, "")
 }
 
-// getSettingsHost creates data for host section of "settings.xml"
-func (c *Generator) getSettingsHost(host *chi.Host) string {
+// getHostSettings creates data for host section of "settings.xml"
+func (c *Generator) getHostSettings(host *chi.Host) string {
 	// Generate config for the specified host
 	return c.generateXMLConfig(host.Settings, "")
 }
