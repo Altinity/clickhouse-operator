@@ -148,6 +148,13 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
     # state_field = ".status.taskID"
     # prev_state = get_field("chi", chi_name, state_field, ns)
 
+    if kind == "chi":
+        label = f"-l clickhouse.altinity.com/chi={chi_name}"
+    elif kind == "chk":
+        label = f"-l clickhouse-keeper.altinity.com/chk={chi_name}"
+    else:
+        assert False, error(f"Unknown kind {kind}")
+
     if "apply_templates" in check:
         debug("Need to apply additional templates")
         for t in check["apply_templates"]:
@@ -174,7 +181,7 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
         wait_object(
             "pod",
             "",
-            label=f"-l clickhouse.altinity.com/{kind}={chi_name}",
+            label=label,
             count=check["pod_count"],
             ns=ns,
             shell=shell

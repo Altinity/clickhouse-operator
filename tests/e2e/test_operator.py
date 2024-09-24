@@ -4793,14 +4793,12 @@ def test_050(self):
 
 @TestScenario
 @Name("test_051. Test CHK upgrade from 0.23.x operator version")
+@Tags("NO_PARALLEL")
 def test_051(self):
     version_from = "0.23.7"
     version_to = current().context.operator_version # "0.24.0"
+    current().context.operator_version = version_from
     create_shell_namespace_clickhouse_template()
-
-    with Given(f"clickhouse-operator from {version_from}"):
-        util.install_operator_version(version_from)
-        time.sleep(15)
 
     chi_manifest = f"manifests/chi/test-051-chk-chop-upgrade.yaml"
     chk_manifest = f"manifests/chk/test-051-chk-chop-upgrade.yaml"
@@ -4858,10 +4856,15 @@ def test_051(self):
         kubectl.create_and_check(
             manifest="manifests/chk/test-051-chk-chop-upgrade-2.yaml", kind="chk",
             check={
-                # "pod_count": 1,
+                "pod_count": 1,
                 "do_not_delete": 1,
             },
         )
+    with Then("CLICKHOUSE_DATA_DIR should be properly set"):
+        pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
+        env = pod["containers"][0]["env"][0]
+        assert env["name"] == "CLICKHOUSE_DATA_DIR"
+        assert env["value"] == "/var/lib/clickhouse-keeper"
 
     with Then("Wiat until Keeper connection is established"):
         out = 0
@@ -4875,7 +4878,7 @@ def test_051(self):
 
     with Then("Check if there are read-only replicas"):
         out = clickhouse.query(chi, "SELECT count(*) from system.replicas where is_readonly")
-        if out == "1":
+        if out != "0":
             with Then("Found readonly replica. Trying to restore"):
                 for replica in [0, 1]:
                     host=f"chi-{chi}-{cluster}-0-{replica}-0"
@@ -4894,11 +4897,10 @@ def test_051(self):
             assert out == "2", error()
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
-
+       with By("deleting chi"):
+           kubectl.delete_chi(chi)
+       with And("deleting test namespace"):
+           delete_test_namespace()
 
 @TestModule
 @Name("e2e.test_operator")
