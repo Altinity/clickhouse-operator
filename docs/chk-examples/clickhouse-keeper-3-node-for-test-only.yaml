@@ -26,30 +26,13 @@ metadata:
 spec:
   defaults:
     templates:
-      dataVolumeClaimTemplate: data-volume
-      logVolumeClaimTemplate: log-volume
+      volumeClaimTemplate: data-volume
       podTemplate: latest-with-volume-mounts
   configuration:
     clusters:
       - name: "test-only"
         layout:
           replicasCount: 3
-    settings:
-      logger/level: "trace"
-      logger/console: "true"
-      listen_host: "0.0.0.0"
-      http_control/port: 9182
-      http_control/readiness/endpoint: /ready
-      keeper_server/tcp_port: "2181"
-      keeper_server/four_letter_word_white_list: "*"
-      keeper_server/coordination_settings/raft_logs_level: "information"
-      keeper_server/raft_configuration/server/port: "9444"
-      prometheus/endpoint: "/metrics"
-      prometheus/port: "7000"
-      prometheus/metrics: "true"
-      prometheus/events: "true"
-      prometheus/asynchronous_metrics: "true"
-      prometheus/status_info: "false"
   templates:
     podTemplates:
       - name: latest-with-volume-mounts
@@ -58,18 +41,8 @@ spec:
             - name: clickhouse-keeper
               imagePullPolicy: Always
               image: "clickhouse/clickhouse-keeper:latest-alpine"
-              volumeMounts:
-                - name: data-volume
-                  mountPath: /var/lib/clickhouse
     volumeClaimTemplates:
       - name: data-volume
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
-      - name: log-volume
         spec:
           accessModes:
             - ReadWriteOnce
