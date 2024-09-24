@@ -64,17 +64,17 @@ func (shard *ChkShard) GetInternalReplication() *types.StringBool {
 }
 
 // InheritSettingsFrom inherits settings from specified cluster
-func (shard *ChkShard) InheritSettingsFrom(cluster *ChkCluster) {
+func (shard *ChkShard) InheritSettingsFrom(cluster *Cluster) {
 	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
 }
 
 // InheritFilesFrom inherits files from specified cluster
-func (shard *ChkShard) InheritFilesFrom(cluster *ChkCluster) {
+func (shard *ChkShard) InheritFilesFrom(cluster *Cluster) {
 	shard.Files = shard.Files.MergeFrom(cluster.Files)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
-func (shard *ChkShard) InheritTemplatesFrom(cluster *ChkCluster) {
+func (shard *ChkShard) InheritTemplatesFrom(cluster *Cluster) {
 	shard.Templates = shard.Templates.MergeFrom(cluster.Templates, apiChi.MergeTypeFillEmptyValues)
 	shard.Templates.HandleDeprecatedFields()
 }
@@ -176,7 +176,7 @@ func (shard *ChkShard) GetCHK() *ClickHouseKeeperInstallation {
 }
 
 // GetCluster gets cluster of the shard
-func (shard *ChkShard) GetCluster() *ChkCluster {
+func (shard *ChkShard) GetCluster() *Cluster {
 	return shard.Runtime.CHK.GetSpecT().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 

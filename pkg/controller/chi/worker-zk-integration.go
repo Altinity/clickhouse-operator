@@ -19,7 +19,7 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/model/zookeeper"
 )
 
-func reconcileZookeeperRootPath(cluster *api.ChiCluster) {
+func reconcileZookeeperRootPath(cluster *api.Cluster) {
 	if cluster.Zookeeper.IsEmpty() {
 		// Nothing to reconcile
 		return

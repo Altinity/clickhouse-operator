@@ -32,15 +32,15 @@ func CreateCluster(what interfaces.ClusterType) any {
 }
 
 // createDefaultClusterCHI
-func createDefaultClusterCHI() *api.ChiCluster {
-	return &api.ChiCluster{
+func createDefaultClusterCHI() *api.Cluster {
+	return &api.Cluster{
 		Name: "cluster",
 	}
 }
 
 // createDefaultClusterCHK
-func createDefaultClusterCHK() *apiChk.ChkCluster {
-	return &apiChk.ChkCluster{
+func createDefaultClusterCHK() *apiChk.Cluster {
+	return &apiChk.Cluster{
 		Name: "cluster",
 	}
 }

@@ -19,8 +19,8 @@ import (
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 )
 
-// ChkCluster defines item of a clusters section of .configuration
-type ChkCluster struct {
+// Cluster defines item of a clusters section of .configuration
+type Cluster struct {
 	Name string `json:"name,omitempty"         yaml:"name,omitempty"`
 
 	Settings  *apiChi.Settings      `json:"settings,omitempty"          yaml:"settings,omitempty"`
@@ -88,42 +88,42 @@ func (a *ChkClusterAddress) SetClusterIndex(index int) {
 	a.ClusterIndex = index
 }
 
-func (cluster *ChkCluster) GetName() string {
+func (cluster *Cluster) GetName() string {
 	return cluster.Name
 }
 
-func (c *ChkCluster) GetZookeeper() *apiChi.ZookeeperConfig {
+func (c *Cluster) GetZookeeper() *apiChi.ZookeeperConfig {
 	return nil
 }
 
-func (c *ChkCluster) GetSchemaPolicy() *apiChi.SchemaPolicy {
+func (c *Cluster) GetSchemaPolicy() *apiChi.SchemaPolicy {
 	return nil
 }
 
 // GetInsecure is a getter
-func (cluster *ChkCluster) GetInsecure() *types.StringBool {
+func (cluster *Cluster) GetInsecure() *types.StringBool {
 	return nil
 }
 
 // GetSecure is a getter
-func (cluster *ChkCluster) GetSecure() *types.StringBool {
+func (cluster *Cluster) GetSecure() *types.StringBool {
 	return nil
 }
 
-func (c *ChkCluster) GetSecret() *apiChi.ClusterSecret {
+func (c *Cluster) GetSecret() *apiChi.ClusterSecret {
 	return nil
 }
 
-func (cluster *ChkCluster) GetRuntime() apiChi.IClusterRuntime {
+func (cluster *Cluster) GetRuntime() apiChi.IClusterRuntime {
 	return &cluster.Runtime
 }
 
-func (cluster *ChkCluster) GetPDBMaxUnavailable() *types.Int32 {
+func (cluster *Cluster) GetPDBMaxUnavailable() *types.Int32 {
 	return types.NewInt32(1)
 }
 
 // FillShardReplicaSpecified fills whether shard or replicas are explicitly specified
-func (cluster *ChkCluster) FillShardReplicaSpecified() {
+func (cluster *Cluster) FillShardReplicaSpecified() {
 	if len(cluster.Layout.Shards) > 0 {
 		cluster.Layout.ShardsSpecified = true
 	}
@@ -133,17 +133,17 @@ func (cluster *ChkCluster) FillShardReplicaSpecified() {
 }
 
 // isShardSpecified checks whether shard is explicitly specified
-func (cluster *ChkCluster) isShardSpecified() bool {
+func (cluster *Cluster) isShardSpecified() bool {
 	return cluster.Layout.ShardsSpecified == true
 }
 
 // isReplicaSpecified checks whether replica is explicitly specified
-func (cluster *ChkCluster) isReplicaSpecified() bool {
+func (cluster *Cluster) isReplicaSpecified() bool {
 	return (cluster.Layout.ShardsSpecified == false) && (cluster.Layout.ReplicasSpecified == true)
 }
 
 // IsShardSpecified checks whether shard is explicitly specified
-func (cluster *ChkCluster) IsShardSpecified() bool {
+func (cluster *Cluster) IsShardSpecified() bool {
 	if !cluster.isShardSpecified() && !cluster.isReplicaSpecified() {
 		return true
 	}
@@ -152,7 +152,7 @@ func (cluster *ChkCluster) IsShardSpecified() bool {
 }
 
 // InheritFilesFrom inherits files from CHI
-func (cluster *ChkCluster) InheritFilesFrom(chk *ClickHouseKeeperInstallation) {
+func (cluster *Cluster) InheritFilesFrom(chk *ClickHouseKeeperInstallation) {
 	if chk.GetSpecT().Configuration == nil {
 		return
 	}
@@ -173,7 +173,7 @@ func (cluster *ChkCluster) InheritFilesFrom(chk *ClickHouseKeeperInstallation) {
 }
 
 // InheritTemplatesFrom inherits templates from CHI
-func (cluster *ChkCluster) InheritTemplatesFrom(chk *ClickHouseKeeperInstallation) {
+func (cluster *Cluster) InheritTemplatesFrom(chk *ClickHouseKeeperInstallation) {
 	if chk.GetSpec().GetDefaults() == nil {
 		return
 	}
@@ -185,28 +185,28 @@ func (cluster *ChkCluster) InheritTemplatesFrom(chk *ClickHouseKeeperInstallatio
 }
 
 // GetServiceTemplate returns service template, if exists
-func (cluster *ChkCluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
+func (cluster *Cluster) GetServiceTemplate() (*apiChi.ServiceTemplate, bool) {
 	return nil, false
 }
 
 // GetShard gets shard with specified index
-func (cluster *ChkCluster) GetShard(shard int) *ChkShard {
+func (cluster *Cluster) GetShard(shard int) *ChkShard {
 	return cluster.Layout.Shards[shard]
 }
 
 // GetOrCreateHost gets or creates host on specified coordinates
-func (cluster *ChkCluster) GetOrCreateHost(shard, replica int) *apiChi.Host {
+func (cluster *Cluster) GetOrCreateHost(shard, replica int) *apiChi.Host {
 	return cluster.Layout.HostsField.GetOrCreate(shard, replica)
 }
 
 // GetReplica gets replica with specified index
-func (cluster *ChkCluster) GetReplica(replica int) *ChkReplica {
+func (cluster *Cluster) GetReplica(replica int) *ChkReplica {
 	return cluster.Layout.Replicas[replica]
 }
 
 // FindShard finds shard by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (cluster *ChkCluster) FindShard(needle interface{}) apiChi.IShard {
+func (cluster *Cluster) FindShard(needle interface{}) apiChi.IShard {
 	var resultShard *ChkShard
 	cluster.WalkShards(func(index int, shard apiChi.IShard) error {
 		switch v := needle.(type) {
@@ -226,12 +226,12 @@ func (cluster *ChkCluster) FindShard(needle interface{}) apiChi.IShard {
 
 // FindHost finds host by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
-func (cluster *ChkCluster) FindHost(needleShard interface{}, needleHost interface{}) *apiChi.Host {
+func (cluster *Cluster) FindHost(needleShard interface{}, needleHost interface{}) *apiChi.Host {
 	return cluster.FindShard(needleShard).FindHost(needleHost)
 }
 
 // FirstHost finds first host in the cluster
-func (cluster *ChkCluster) FirstHost() *apiChi.Host {
+func (cluster *Cluster) FirstHost() *apiChi.Host {
 	var result *apiChi.Host
 	cluster.WalkHosts(func(host *apiChi.Host) error {
 		if result == nil {
@@ -243,7 +243,7 @@ func (cluster *ChkCluster) FirstHost() *apiChi.Host {
 }
 
 // WalkShards walks shards
-func (cluster *ChkCluster) WalkShards(f func(index int, shard apiChi.IShard) error) []error {
+func (cluster *Cluster) WalkShards(f func(index int, shard apiChi.IShard) error) []error {
 	if cluster == nil {
 		return nil
 	}
@@ -258,7 +258,7 @@ func (cluster *ChkCluster) WalkShards(f func(index int, shard apiChi.IShard) err
 }
 
 // WalkReplicas walks replicas
-func (cluster *ChkCluster) WalkReplicas(f func(index int, replica *ChkReplica) error) []error {
+func (cluster *Cluster) WalkReplicas(f func(index int, replica *ChkReplica) error) []error {
 	res := make([]error, 0)
 
 	for replicaIndex := range cluster.Layout.Replicas {
@@ -270,7 +270,7 @@ func (cluster *ChkCluster) WalkReplicas(f func(index int, replica *ChkReplica) e
 }
 
 // WalkHosts walks hosts
-func (cluster *ChkCluster) WalkHosts(f func(host *apiChi.Host) error) []error {
+func (cluster *Cluster) WalkHosts(f func(host *apiChi.Host) error) []error {
 	res := make([]error, 0)
 
 	for shardIndex := range cluster.Layout.Shards {
@@ -285,7 +285,7 @@ func (cluster *ChkCluster) WalkHosts(f func(host *apiChi.Host) error) []error {
 }
 
 // WalkHostsByShards walks hosts by shards
-func (cluster *ChkCluster) WalkHostsByShards(f func(shard, replica int, host *apiChi.Host) error) []error {
+func (cluster *Cluster) WalkHostsByShards(f func(shard, replica int, host *apiChi.Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -300,12 +300,12 @@ func (cluster *ChkCluster) WalkHostsByShards(f func(shard, replica int, host *ap
 	return res
 }
 
-func (cluster *ChkCluster) GetLayout() *ChkClusterLayout {
+func (cluster *Cluster) GetLayout() *ChkClusterLayout {
 	return cluster.Layout
 }
 
 // WalkHostsByReplicas walks hosts by replicas
-func (cluster *ChkCluster) WalkHostsByReplicas(f func(shard, replica int, host *apiChi.Host) error) []error {
+func (cluster *Cluster) WalkHostsByReplicas(f func(shard, replica int, host *apiChi.Host) error) []error {
 
 	res := make([]error, 0)
 
@@ -321,7 +321,7 @@ func (cluster *ChkCluster) WalkHostsByReplicas(f func(shard, replica int, host *
 }
 
 // HostsCount counts hosts
-func (cluster *ChkCluster) HostsCount() int {
+func (cluster *Cluster) HostsCount() int {
 	count := 0
 	cluster.WalkHosts(func(host *apiChi.Host) error {
 		count++

@@ -234,8 +234,8 @@ func (cr *ClickHouseKeeperInstallation) MergeFrom(from *ClickHouseKeeperInstalla
 // FindCluster finds cluster by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
 func (cr *ClickHouseKeeperInstallation) FindCluster(needle interface{}) apiChi.ICluster {
-	var resultCluster *ChkCluster
-	cr.WalkClustersFullPath(func(chk *ClickHouseKeeperInstallation, clusterIndex int, cluster *ChkCluster) error {
+	var resultCluster *Cluster
+	cr.WalkClustersFullPath(func(chk *ClickHouseKeeperInstallation, clusterIndex int, cluster *Cluster) error {
 		switch v := needle.(type) {
 		case string:
 			if cluster.Name == v {
@@ -515,7 +515,7 @@ func (cr *ClickHouseKeeperInstallation) GetAnnotations() map[string]string {
 
 // WalkClustersFullPath walks clusters with full path
 func (cr *ClickHouseKeeperInstallation) WalkClustersFullPath(
-	f func(chi *ClickHouseKeeperInstallation, clusterIndex int, cluster *ChkCluster) error,
+	f func(chi *ClickHouseKeeperInstallation, clusterIndex int, cluster *Cluster) error,
 ) []error {
 	if cr == nil {
 		return nil
@@ -624,7 +624,7 @@ func (cr *ClickHouseKeeperInstallation) WalkHosts(f func(host *apiChi.Host) erro
 func (cr *ClickHouseKeeperInstallation) WalkTillError(
 	ctx context.Context,
 	fCRPreliminary func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
-	fCluster func(ctx context.Context, cluster *ChkCluster) error,
+	fCluster func(ctx context.Context, cluster *Cluster) error,
 	fShards func(ctx context.Context, shards []*ChkShard) error,
 	fCRFinal func(ctx context.Context, chi *ClickHouseKeeperInstallation) error,
 ) error {

@@ -22,7 +22,7 @@ import (
 type Configuration struct {
 	Settings *apiChi.Settings `json:"settings,omitempty"  yaml:"settings,omitempty"`
 	Files    *apiChi.Settings `json:"files,omitempty"     yaml:"files,omitempty"`
-	Clusters []*ChkCluster    `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
+	Clusters []*Cluster       `json:"clusters,omitempty"  yaml:"clusters,omitempty"`
 }
 
 // NewConfiguration creates new ChkConfiguration objects
@@ -50,7 +50,7 @@ func (c *Configuration) GetFiles() *apiChi.Settings {
 	return c.Files
 }
 
-func (c *Configuration) GetClusters() []*ChkCluster {
+func (c *Configuration) GetClusters() []*Cluster {
 	if c == nil {
 		return nil
 	}
@@ -58,7 +58,7 @@ func (c *Configuration) GetClusters() []*ChkCluster {
 	return c.Clusters
 }
 
-func (c *Configuration) GetCluster(i int) *ChkCluster {
+func (c *Configuration) GetCluster(i int) *Cluster {
 	clusters := c.GetClusters()
 	if clusters == nil {
 		return nil

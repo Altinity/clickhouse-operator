@@ -25,7 +25,7 @@ import (
 
 // shouldCreateDistributedObjects determines whether distributed objects should be created
 func (s *ClusterSchemer) shouldCreateDistributedObjects(host *api.Host) bool {
-	hosts := s.Names(interfaces.NameFQDNs, host, api.ChiCluster{}, false)
+	hosts := s.Names(interfaces.NameFQDNs, host, api.Cluster{}, false)
 
 	if host.GetCluster().GetSchemaPolicy().Shard == SchemaPolicyShardNone {
 		log.V(1).M(host).F().Info("SchemaPolicy.Shard says there is no need to distribute objects")

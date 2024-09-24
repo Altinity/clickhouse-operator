@@ -233,8 +233,8 @@ func (cr *ClickHouseInstallation) MergeFrom(from *ClickHouseInstallation, _type 
 // FindCluster finds cluster by name or index.
 // Expectations: name is expected to be a string, index is expected to be an int.
 func (cr *ClickHouseInstallation) FindCluster(needle interface{}) ICluster {
-	var resultCluster *ChiCluster
-	cr.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error {
+	var resultCluster *Cluster
+	cr.WalkClustersFullPath(func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error {
 		switch v := needle.(type) {
 		case string:
 			if cluster.Name == v {
@@ -543,7 +543,7 @@ func (cr *ClickHouseInstallation) GetAnnotations() map[string]string {
 
 // WalkClustersFullPath walks clusters with full path
 func (cr *ClickHouseInstallation) WalkClustersFullPath(
-	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *ChiCluster) error,
+	f func(chi *ClickHouseInstallation, clusterIndex int, cluster *Cluster) error,
 ) []error {
 	if cr == nil {
 		return nil
@@ -652,7 +652,7 @@ func (cr *ClickHouseInstallation) WalkHosts(f func(host *Host) error) []error {
 func (cr *ClickHouseInstallation) WalkTillError(
 	ctx context.Context,
 	fCRPreliminary func(ctx context.Context, chi *ClickHouseInstallation) error,
-	fCluster func(ctx context.Context, cluster *ChiCluster) error,
+	fCluster func(ctx context.Context, cluster *Cluster) error,
 	fShards func(ctx context.Context, shards []*ChiShard) error,
 	fCRFinal func(ctx context.Context, chi *ClickHouseInstallation) error,
 ) error {

@@ -177,7 +177,7 @@ func hostEnsurePortValuesFromSettings(host *chi.Host, settings *chi.Settings, fi
 }
 
 // createHostsField
-func createHostsField(cluster *chi.ChiCluster) {
+func createHostsField(cluster *chi.Cluster) {
 	// Create HostsField of required size
 	cluster.Layout.HostsField = chi.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 

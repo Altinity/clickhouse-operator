@@ -386,7 +386,7 @@ func (n *Normalizer) normalizeServiceTemplate(template *chi.ServiceTemplate) {
 }
 
 // normalizeClusters normalizes clusters
-func (n *Normalizer) normalizeClusters(clusters []*chk.ChkCluster) []*chk.ChkCluster {
+func (n *Normalizer) normalizeClusters(clusters []*chk.Cluster) []*chk.Cluster {
 	// We need to have at least one cluster available
 	clusters = n.ensureClusters(clusters)
 	// Normalize all clusters
@@ -397,7 +397,7 @@ func (n *Normalizer) normalizeClusters(clusters []*chk.ChkCluster) []*chk.ChkClu
 }
 
 // ensureClusters
-func (n *Normalizer) ensureClusters(clusters []*chk.ChkCluster) []*chk.ChkCluster {
+func (n *Normalizer) ensureClusters(clusters []*chk.Cluster) []*chk.Cluster {
 	// May be we have cluster(s) available
 	if len(clusters) > 0 {
 		return clusters
@@ -405,8 +405,8 @@ func (n *Normalizer) ensureClusters(clusters []*chk.ChkCluster) []*chk.ChkCluste
 
 	// In case no clusters available, we may want to create a default one
 	if n.req.Options().WithDefaultCluster {
-		return []*chk.ChkCluster{
-			commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.ChkCluster),
+		return []*chk.Cluster{
+			commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.Cluster),
 		}
 	}
 
@@ -443,16 +443,16 @@ func (n *Normalizer) normalizeConfigurationFiles(files *chi.Settings) *chi.Setti
 	return files
 }
 
-func ensureCluster(cluster *chk.ChkCluster) *chk.ChkCluster {
+func ensureCluster(cluster *chk.Cluster) *chk.Cluster {
 	if cluster == nil {
-		return commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.ChkCluster)
+		return commonCreator.CreateCluster(interfaces.ClusterCHKDefault).(*chk.Cluster)
 	} else {
 		return cluster
 	}
 }
 
 // normalizeCluster normalizes cluster and returns deployments usage counters for this cluster
-func (n *Normalizer) normalizeCluster(cluster *chk.ChkCluster) *chk.ChkCluster {
+func (n *Normalizer) normalizeCluster(cluster *chk.Cluster) *chk.Cluster {
 	cluster = ensureCluster(cluster)
 
 	// Runtime has to be prepared first
@@ -602,7 +602,7 @@ func (n *Normalizer) ensureClusterLayoutReplicas(layout *chk.ChkClusterLayout) {
 }
 
 // normalizeShard normalizes a shard - walks over all fields
-func (n *Normalizer) normalizeShard(shard *chk.ChkShard, cluster *chk.ChkCluster, shardIndex int) {
+func (n *Normalizer) normalizeShard(shard *chk.ChkShard, cluster *chk.Cluster, shardIndex int) {
 	n.normalizeShardName(shard, shardIndex)
 	n.normalizeShardWeight(shard)
 	// For each shard of this normalized cluster inherit from cluster
@@ -619,7 +619,7 @@ func (n *Normalizer) normalizeShard(shard *chk.ChkShard, cluster *chk.ChkCluster
 }
 
 // normalizeReplica normalizes a replica - walks over all fields
-func (n *Normalizer) normalizeReplica(replica *chk.ChkReplica, cluster *chk.ChkCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplica(replica *chk.ChkReplica, cluster *chk.Cluster, replicaIndex int) {
 	n.normalizeReplicaName(replica, replicaIndex)
 	// For each replica of this normalized cluster inherit from cluster
 	replica.InheritSettingsFrom(cluster)
@@ -704,7 +704,7 @@ func (n *Normalizer) normalizeShardWeight(shard *chk.ChkShard) {
 }
 
 // normalizeShardHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeShardHosts(shard *chk.ChkShard, cluster *chk.ChkCluster, shardIndex int) {
+func (n *Normalizer) normalizeShardHosts(shard *chk.ChkShard, cluster *chk.Cluster, shardIndex int) {
 	// Use hosts from HostsField
 	shard.Hosts = nil
 	for len(shard.Hosts) < shard.ReplicasCount {
@@ -717,7 +717,7 @@ func (n *Normalizer) normalizeShardHosts(shard *chk.ChkShard, cluster *chk.ChkCl
 }
 
 // normalizeReplicaHosts normalizes all replicas of specified shard
-func (n *Normalizer) normalizeReplicaHosts(replica *chk.ChkReplica, cluster *chk.ChkCluster, replicaIndex int) {
+func (n *Normalizer) normalizeReplicaHosts(replica *chk.ChkReplica, cluster *chk.Cluster, replicaIndex int) {
 	// Use hosts from HostsField
 	replica.Hosts = nil
 	for len(replica.Hosts) < replica.ShardsCount {

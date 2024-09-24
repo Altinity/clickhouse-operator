@@ -266,7 +266,7 @@ func (n *Namer) createFQDNs(obj interface{}, scope interface{}, excludeSelf bool
 			return util.RemoveFromArray(self, []string{n.createPodFQDN(typed)})
 		case api.ChiShard:
 			return util.RemoveFromArray(self, n.createPodFQDNsOfShard(any(typed.GetShard()).(api.IShard)))
-		case api.ChiCluster:
+		case api.Cluster:
 			return util.RemoveFromArray(self, n.createPodFQDNsOfCluster(any(typed.GetCluster()).(api.ICluster)))
 		case api.ClickHouseInstallation:
 			return util.RemoveFromArray(self, n.createPodFQDNsOfCHI(any(typed.GetCR()).(api.ICustomResource)))

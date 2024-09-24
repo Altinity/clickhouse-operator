@@ -352,7 +352,7 @@ func (w *worker) reconcileHostService(ctx context.Context, host *api.Host) error
 }
 
 // reconcileCluster reconciles ChkCluster, excluding nested shards
-func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.ChkCluster) error {
+func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

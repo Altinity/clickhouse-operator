@@ -314,7 +314,7 @@ func (w *worker) deleteCHIProtocol(ctx context.Context, chi *api.ClickHouseInsta
 
 	// Delete all clusters
 	chi.WalkClusters(func(cluster api.ICluster) error {
-		return w.deleteCluster(ctx, chi, cluster.(*api.ChiCluster))
+		return w.deleteCluster(ctx, chi, cluster.(*api.Cluster))
 	})
 
 	if util.IsContextDone(ctx) {
@@ -554,7 +554,7 @@ func (w *worker) deleteShard(ctx context.Context, chi *api.ClickHouseInstallatio
 
 // deleteCluster deletes all kubernetes resources related to cluster *chop.ChiCluster
 // chi is the new CHI in which there will be no more this cluster
-func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallation, cluster *api.ChiCluster) error {
+func (w *worker) deleteCluster(ctx context.Context, chi *api.ClickHouseInstallation, cluster *api.Cluster) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil

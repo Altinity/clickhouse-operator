@@ -63,17 +63,17 @@ func (shard *ChiShard) GetInternalReplication() *types.StringBool {
 }
 
 // InheritSettingsFrom inherits settings from specified cluster
-func (shard *ChiShard) InheritSettingsFrom(cluster *ChiCluster) {
+func (shard *ChiShard) InheritSettingsFrom(cluster *Cluster) {
 	shard.Settings = shard.Settings.MergeFrom(cluster.Settings)
 }
 
 // InheritFilesFrom inherits files from specified cluster
-func (shard *ChiShard) InheritFilesFrom(cluster *ChiCluster) {
+func (shard *ChiShard) InheritFilesFrom(cluster *Cluster) {
 	shard.Files = shard.Files.MergeFrom(cluster.Files)
 }
 
 // InheritTemplatesFrom inherits templates from specified cluster
-func (shard *ChiShard) InheritTemplatesFrom(cluster *ChiCluster) {
+func (shard *ChiShard) InheritTemplatesFrom(cluster *Cluster) {
 	shard.Templates = shard.Templates.MergeFrom(cluster.Templates, MergeTypeFillEmptyValues)
 	shard.Templates.HandleDeprecatedFields()
 }
@@ -175,7 +175,7 @@ func (shard *ChiShard) GetCHI() *ClickHouseInstallation {
 }
 
 // GetCluster gets cluster of the shard
-func (shard *ChiShard) GetCluster() *ChiCluster {
+func (shard *ChiShard) GetCluster() *Cluster {
 	return shard.Runtime.CHI.GetSpecT().Configuration.Clusters[shard.Runtime.Address.ClusterIndex]
 }
 
