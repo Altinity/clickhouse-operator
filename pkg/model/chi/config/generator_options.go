@@ -26,8 +26,9 @@ type GeneratorOptions struct {
 	Users          *api.Settings
 	Profiles       *api.Settings
 	Quotas         *api.Settings
-	Settings       *api.Settings
-	Files          *api.Settings
+
+	Settings *api.Settings
+	Files    *api.Settings
 }
 
 // RemoteServersOptions specifies options for remote-servers generator

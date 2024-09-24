@@ -38,20 +38,26 @@ type ClickHouseKeeperInstallation struct {
 }
 
 type ClickHouseKeeperInstallationRuntime struct {
+	attributes        *apiChi.ComparableAttributes `json:"-" yaml:"-"`
+	commonConfigMutex sync.Mutex                   `json:"-" yaml:"-"`
 }
 
 func newClickHouseKeeperInstallationRuntime() *ClickHouseKeeperInstallationRuntime {
-	return &ClickHouseKeeperInstallationRuntime{}
+	return &ClickHouseKeeperInstallationRuntime{
+		attributes: &apiChi.ComparableAttributes{},
+	}
 }
 
 func (runtime *ClickHouseKeeperInstallationRuntime) GetAttributes() *apiChi.ComparableAttributes {
-	return nil
+	return runtime.attributes
 }
 
 func (runtime *ClickHouseKeeperInstallationRuntime) LockCommonConfig() {
+	runtime.commonConfigMutex.Lock()
 }
 
 func (runtime *ClickHouseKeeperInstallationRuntime) UnlockCommonConfig() {
+	runtime.commonConfigMutex.Unlock()
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -188,6 +188,7 @@ func (n *Normalizer) normalizeHost(
 }
 
 func (n *Normalizer) normalizeHostEnvVars() {
+	log.V(2).F().Info("going to add env var CLICKHOUSE_DATA_DIR")
 	n.req.AppendAdditionalEnvVar(
 		core.EnvVar{
 			Name:  "CLICKHOUSE_DATA_DIR",

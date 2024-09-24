@@ -17,6 +17,7 @@ package normalizer
 import (
 	core "k8s.io/api/core/v1"
 
+	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 )
 
@@ -65,7 +66,9 @@ func (c *Request) AppendAdditionalEnvVar(envVar core.EnvVar) {
 	if c == nil {
 		return
 	}
+	log.V(2).F().Info("going to add env var %s len()=%d", envVar.Name, len(c.GetTarget().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 	c.GetTarget().GetRuntime().GetAttributes().AppendAdditionalEnvVarIfNotExists(envVar)
+	log.V(2).F().Info("added env var %s len()=%d", envVar.Name, len(c.GetTarget().GetRuntime().GetAttributes().GetAdditionalEnvVars()))
 }
 
 func (c *Request) AppendAdditionalVolume(volume core.Volume) {
