@@ -15,6 +15,7 @@
 package util
 
 import (
+	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -55,4 +56,25 @@ func IsAnnotationToBeSkipped(annotation string) bool {
 // ListSkippedAnnotations provides list of annotations that should be skipped
 func ListSkippedAnnotations() []string {
 	return AnnotationsToBeSkipped
+}
+
+func MergeEnvVars(to []core.EnvVar, from ...core.EnvVar) []core.EnvVar {
+	// Prepare dst as a copy
+	dst := append([]core.EnvVar{}, to...)
+
+	// Append to `dst` all elements from `from` which are not found in `dst`
+	for _, f := range from {
+		found := false
+		for _, d := range dst {
+			if f.Name == d.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			dst = append(dst, f)
+		}
+	}
+
+	return dst
 }

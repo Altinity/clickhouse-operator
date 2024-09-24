@@ -76,6 +76,6 @@ const (
 )
 
 const (
-	configRaft = "raft"
+	configRaft     = "raft"
 	configSettings = "settings"
 )

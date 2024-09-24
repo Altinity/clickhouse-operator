@@ -77,12 +77,12 @@ func (n *Normalizer) buildTargetFromTemplates(subj *chk.ClickHouseKeeperInstalla
 	// Create new target that will be populated with data during normalization process
 	n.req.SetTarget(n.createTarget())
 
-	// At this moment we have target available - is either newly created or a system-wide template
+	// At this moment we have target available - it is either newly created or a system-wide template
 
 	// Apply CR templates - both auto and explicitly requested - on top of target
 	n.applyCRTemplatesOnTarget(subj)
 
-	// After all templates applied, place provided 'subject' on top of the whole stack (target)
+	// After all CR templates applied, place provided 'subject' on top of the whole stack (target)
 	n.req.GetTarget().MergeFrom(subj, chi.MergeTypeOverrideByNonEmptyValues)
 }
 

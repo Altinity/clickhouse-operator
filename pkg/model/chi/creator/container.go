@@ -19,15 +19,16 @@ import (
 	core "k8s.io/api/core/v1"
 
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/model/chi/config"
 	"github.com/altinity/clickhouse-operator/pkg/model/k8s"
 )
 
 type ContainerManager struct {
-	probe *ProbeManager
+	probe interfaces.IProbeManager
 }
 
-func NewContainerManager(probe *ProbeManager) *ContainerManager {
+func NewContainerManager(probe interfaces.IProbeManager) interfaces.IContainerManager {
 	return &ContainerManager{
 		probe: probe,
 	}
@@ -78,8 +79,8 @@ func (cm *ContainerManager) newDefaultContainerClickHouse(host *chi.Host) core.C
 	container := core.Container{
 		Name:           config.ClickHouseContainerName,
 		Image:          config.DefaultClickHouseDockerImage,
-		LivenessProbe:  cm.probe.createDefaultLivenessProbe(host),
-		ReadinessProbe: cm.probe.createDefaultReadinessProbe(host),
+		LivenessProbe:  cm.probe.CreateProbe(interfaces.ProbeDefaultLiveness, host),
+		ReadinessProbe: cm.probe.CreateProbe(interfaces.ProbeDefaultReadiness, host),
 	}
 	host.AppendSpecifiedPortsToContainer(&container)
 	return container

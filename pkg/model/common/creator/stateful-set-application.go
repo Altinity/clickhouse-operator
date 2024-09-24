@@ -15,6 +15,7 @@
 package creator
 
 import (
+	"github.com/altinity/clickhouse-operator/pkg/util"
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 
@@ -65,7 +66,7 @@ func (c *Creator) stsAppContainerSetupEnvVars(statefulSet *apps.StatefulSet, hos
 		return
 	}
 
-	container.Env = append(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
+	container.Env = util.MergeEnvVars(container.Env, host.GetCR().GetRuntime().GetAttributes().GetAdditionalEnvVars()...)
 }
 
 // stsEnsureAppContainerProbesSpecified

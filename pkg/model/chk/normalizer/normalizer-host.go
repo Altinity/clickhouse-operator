@@ -15,23 +15,25 @@
 package normalizer
 
 import (
+	core "k8s.io/api/core/v1"
+
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
-	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
-	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
+	chk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/apis/common/types"
 	"github.com/altinity/clickhouse-operator/pkg/apis/deployment"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
-	commonCreator "github.com/altinity/clickhouse-operator/pkg/model/common/creator"
-	commonNamer "github.com/altinity/clickhouse-operator/pkg/model/common/namer"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/creator"
+	"github.com/altinity/clickhouse-operator/pkg/model/common/namer"
 )
 
-func (n *Normalizer) hostApplyHostTemplateSpecifiedOrDefault(host *api.Host) {
+func (n *Normalizer) hostApplyHostTemplateSpecifiedOrDefault(host *chi.Host) {
 	hostTemplate := n.hostGetHostTemplate(host)
 	hostApplyHostTemplate(host, hostTemplate)
 }
 
 // hostGetHostTemplate gets Host Template to be used to normalize Host
-func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
+func (n *Normalizer) hostGetHostTemplate(host *chi.Host) *chi.HostTemplate {
 	// Which host template would be used - either explicitly defined in or a default one
 	if hostTemplate, ok := host.GetHostTemplate(); ok {
 		// Host explicitly references known HostTemplate
@@ -47,17 +49,17 @@ func (n *Normalizer) hostGetHostTemplate(host *api.Host) *api.HostTemplate {
 		if podTemplate.Spec.HostNetwork {
 			// HostNetwork
 			log.V(3).M(host).F().Info("host: %s uses default hostTemplate for HostNetwork", host.Name)
-			return commonCreator.CreateHostTemplate(interfaces.HostTemplateHostNetwork, n.namer.Name(interfaces.NameHostTemplate, host))
+			return creator.CreateHostTemplate(interfaces.HostTemplateHostNetwork, n.namer.Name(interfaces.NameHostTemplate, host))
 		}
 	}
 
 	// Pick default host template
 	log.V(3).M(host).F().Info("host: %s uses default hostTemplate", host.Name)
-	return commonCreator.CreateHostTemplate(interfaces.HostTemplateCommon, n.namer.Name(interfaces.NameHostTemplate, host))
+	return creator.CreateHostTemplate(interfaces.HostTemplateCommon, n.namer.Name(interfaces.NameHostTemplate, host))
 }
 
 // hostApplyHostTemplate
-func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
+func hostApplyHostTemplate(host *chi.Host, template *chi.HostTemplate) {
 	if host.GetName() == "" {
 		host.Name = template.Spec.Name
 		log.V(3).M(host).F().Info("host has no name specified thus assigning name from Spec: %s", host.GetName())
@@ -66,6 +68,13 @@ func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 	host.Insecure = host.Insecure.MergeFrom(template.Spec.Insecure)
 	host.Secure = host.Secure.MergeFrom(template.Spec.Secure)
 
+	hostApplyHostTemplatePortDistribution(host, template)
+	hostApplyPortsFromSettings(host)
+
+	host.InheritTemplatesFrom(template)
+}
+
+func hostApplyHostTemplatePortDistribution(host *chi.Host, template *chi.HostTemplate) {
 	for _, portDistribution := range template.PortDistribution {
 		switch portDistribution.Type {
 		case deployment.PortDistributionUnspecified:
@@ -77,14 +86,14 @@ func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 			}
 		case deployment.PortDistributionClusterScopeIndex:
 			if !host.ZKPort.HasValue() {
-				base := api.KpDefaultZKPortNumber
+				base := chi.KpDefaultZKPortNumber
 				if template.Spec.ZKPort.HasValue() {
 					base = template.Spec.ZKPort.Value()
 				}
 				host.ZKPort = types.NewInt32(base + int32(host.Runtime.Address.ClusterScopeIndex))
 			}
 			if !host.RaftPort.HasValue() {
-				base := api.KpDefaultRaftPortNumber
+				base := chi.KpDefaultRaftPortNumber
 				if template.Spec.RaftPort.HasValue() {
 					base = template.Spec.RaftPort.Value()
 				}
@@ -92,14 +101,10 @@ func hostApplyHostTemplate(host *api.Host, template *api.HostTemplate) {
 			}
 		}
 	}
-
-	hostApplyPortsFromSettings(host)
-
-	host.InheritTemplatesFrom(template)
 }
 
 // hostApplyPortsFromSettings
-func hostApplyPortsFromSettings(host *api.Host) {
+func hostApplyPortsFromSettings(host *chi.Host) {
 	// Use host personal settings at first
 	hostEnsurePortValuesFromSettings(host, host.GetSettings(), false)
 	// Fallback to common settings
@@ -107,7 +112,7 @@ func hostApplyPortsFromSettings(host *api.Host) {
 }
 
 // hostEnsurePortValuesFromSettings fetches port spec from settings, if any provided
-func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, final bool) {
+func hostEnsurePortValuesFromSettings(host *chi.Host, settings *chi.Settings, final bool) {
 	//
 	// 1. Setup fallback/default ports
 	//
@@ -120,8 +125,8 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 
 	// On the other hand, for final setup we need to assign real numbers to ports
 	if final {
-		fallbackZKPort = types.NewInt32(api.KpDefaultZKPortNumber)
-		fallbackRaftPort = types.NewInt32(api.KpDefaultRaftPortNumber)
+		fallbackZKPort = types.NewInt32(chi.KpDefaultZKPortNumber)
+		fallbackRaftPort = types.NewInt32(chi.KpDefaultRaftPortNumber)
 	}
 
 	//
@@ -132,15 +137,15 @@ func hostEnsurePortValuesFromSettings(host *api.Host, settings *api.Settings, fi
 }
 
 // createHostsField
-func createHostsField(cluster *apiChk.ChkCluster) {
+func createHostsField(cluster *chk.ChkCluster) {
 	// Create HostsField of required size
-	cluster.Layout.HostsField = api.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
+	cluster.Layout.HostsField = chi.NewHostsField(cluster.Layout.ShardsCount, cluster.Layout.ReplicasCount)
 
 	//
 	// Migrate hosts from Shards and Replicas into HostsField.
 	// Hosts which are explicitly specified in Shards and Replicas are migrated into HostsField for further use
 	//
-	hostMigrationFunc := func(shard, replica int, host *api.Host) error {
+	hostMigrationFunc := func(shard, replica int, host *chi.Host) error {
 		if curHost := cluster.Layout.HostsField.Get(shard, replica); curHost == nil {
 			cluster.Layout.HostsField.Set(shard, replica, host)
 		} else {
@@ -156,18 +161,18 @@ func createHostsField(cluster *apiChk.ChkCluster) {
 
 // normalizeHost normalizes a host
 func (n *Normalizer) normalizeHost(
-	host *api.Host,
-	shard api.IShard,
-	replica api.IReplica,
-	cluster api.ICluster,
+	host *chi.Host,
+	shard chi.IShard,
+	replica chi.IReplica,
+	cluster chi.ICluster,
 	shardIndex int,
 	replicaIndex int,
 ) {
 
 	n.normalizeHostName(host, shard, shardIndex, replica, replicaIndex)
 	// Inherit from either Shard or Replica
-	var s api.IShard
-	var r api.IReplica
+	var s chi.IShard
+	var r chi.IReplica
 	if cluster.IsShardSpecified() {
 		s = shard
 	} else {
@@ -178,18 +183,29 @@ func (n *Normalizer) normalizeHost(
 	host.InheritFilesFrom(s, r)
 	host.Files = n.normalizeConfigurationFiles(host.Files)
 	host.InheritTemplatesFrom(s, r)
+
+	n.normalizeHostEnvVars()
+}
+
+func (n *Normalizer) normalizeHostEnvVars() {
+	n.req.AppendAdditionalEnvVar(
+		core.EnvVar{
+			Name:  "CLICKHOUSE_DATA_DIR",
+			Value: "/var/lib/clickhouse-keeper",
+		},
+	)
 }
 
 // normalizeHostName normalizes host's name
 func (n *Normalizer) normalizeHostName(
-	host *api.Host,
-	shard api.IShard,
+	host *chi.Host,
+	shard chi.IShard,
 	shardIndex int,
-	replica api.IReplica,
+	replica chi.IReplica,
 	replicaIndex int,
 ) {
 	hasHostName := len(host.GetName()) > 0
-	explicitlySpecifiedHostName := !commonNamer.IsAutoGeneratedHostName(host.GetName(), host, shard, shardIndex, replica, replicaIndex)
+	explicitlySpecifiedHostName := !namer.IsAutoGeneratedHostName(host.GetName(), host, shard, shardIndex, replica, replicaIndex)
 	if hasHostName && explicitlySpecifiedHostName {
 		// Has explicitly specified name already, normalization is not required
 		return
