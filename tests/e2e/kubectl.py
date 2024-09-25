@@ -61,16 +61,19 @@ def run_shell(cmd, timeout=600, ok_to_fail=False, shell=None):
     return res_cmd.output if (code == 0) or ok_to_fail else ""
 
 
-def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
-    with When(f"Delete chi {chi}"):
+def delete_kind(kind, name, ns=None, ok_to_fail=False, shell=None):
+    with When(f"Delete {kind} {name}"):
         launch(
-            f"delete chi {chi} -v 5 --now --timeout=600s",
+            f"delete {kind} {name} -v 5 --now --timeout=600s",
             ns=ns,
             timeout=600,
             ok_to_fail=ok_to_fail,
             shell=shell
         )
-        if wait:
+
+def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
+    delete_kind("chi", chi, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
+    if wait:
             wait_objects(
                 chi,
                 {
@@ -84,40 +87,25 @@ def delete_chi(chi, ns=None, wait=True, ok_to_fail=False, shell=None):
 
 
 def delete_chk(chk, ns=None, wait=True, ok_to_fail=False, shell=None):
-    with When(f"Delete chk {chk}"):
-        launch(
-            f"delete chk {chk} -v 5 --now --timeout=600s",
-            ns=ns,
-            timeout=600,
-            ok_to_fail=ok_to_fail,
-            shell=shell
-        )
-        if wait:
-            wait_objects(
-                chk,
-                {
-                    "statefulset": 0,
-                    "pod": 0,
-                    "service": 0,
-                },
-                ns,
-                shell=shell
-            )
-
+    delete_kind("chk", chk, ns=ns, ok_to_fail=ok_to_fail, shell=shell)
 
 def delete_all_chi(ns=None):
-    crds = launch("get crds -o=custom-columns=name:.metadata.name", ns=ns).splitlines()
-    if "clickhouseinstallations.clickhouse.altinity.com" in crds:
+    delete_all("chi", ns=ns)
+
+def delete_all_chk(ns=None):
+    delete_all("chk", ns=ns)
+
+def delete_all(kind, ns=None):
+    crds = launch("get crds -o=custom-columns=name:.spec.names.shortNames[0]", ns=ns).splitlines()
+    if kind in crds:
         try:
-            chis = get("chi", "", ns=ns, ok_to_fail=True)
+            to_delete = get(kind, "", ns=ns, ok_to_fail=True)
         except Exception:
-            chis = {}
-        if "items" in chis:
-            for chi in chis["items"]:
-                # kubectl(f"patch chi {chi} --type=merge -p '\{\"metadata\":\{\"finalizers\": [null]\}\}'", ns = ns)
-                delete_chi(chi["metadata"]["name"], ns, wait = False)
-            for chi in chis["items"]:
-                wait_object("chi", chi["metadata"]["name"], ns=ns, count=0)
+            to_delete = {}
+        if "items" in to_delete:
+            for i in to_delete["items"]:
+                delete_kind(kind, i["metadata"]["name"], ns=ns)
+                wait_object(kind, i["metadata"]["name"], ns=ns, count=0)
 
 
 def delete_all_keeper(ns=None):
@@ -143,10 +131,7 @@ def delete_all_keeper(ns=None):
 
 
 def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1800):
-    chi_name = yaml_manifest.get_chi_name(util.get_full_path(f"{manifest}"))
-
-    # state_field = ".status.taskID"
-    # prev_state = get_field("chi", chi_name, state_field, ns)
+    chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
 
     if kind == "chi":
         label = f"-l clickhouse.altinity.com/chi={chi_name}"
@@ -231,6 +216,7 @@ def delete_ns(ns = None, delete_chi=False, ok_to_fail=False, timeout=1000):
         ns = current().context.test_namespace
     if delete_chi:
         delete_all_chi(ns)
+        delete_all_chk(ns)
     launch(
         f"delete ns {ns} -v 5 --now --timeout={timeout}s",
         ns=None,
@@ -293,7 +279,7 @@ def apply(manifest, ns=None, validate=True, timeout=600, shell=None):
 def apply_chi(manifest, ns=None, validate=True, timeout=600, shell=None):
     if ns is None:
         ns = current().context.test_namespace
-    chi_name = yaml_manifest.get_chi_name(manifest)
+    chi_name = yaml_manifest.get_name(manifest)
     with When(f"CHI {chi_name} is applied"):
         if current().context.kubectl_mode == "replace":
             if get_count("chi", chi_name, ns=ns) == 0:
