@@ -58,23 +58,22 @@ func ListSkippedAnnotations() []string {
 	return AnnotationsToBeSkipped
 }
 
+// MergeEnvVars appends to `to` elements from `from` which are not found in `to`
 func MergeEnvVars(to []core.EnvVar, from ...core.EnvVar) []core.EnvVar {
-	// Prepare dst as a copy
-	dst := append([]core.EnvVar{}, to...)
-
-	// Append to `dst` all elements from `from` which are not found in `dst`
-	for _, f := range from {
-		found := false
-		for _, d := range dst {
-			if f.Name == d.Name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			dst = append(dst, f)
+	for _, candidate := range from {
+		if !HasEnvVar(to, candidate) {
+			to = append(to, candidate)
 		}
 	}
+	return to
+}
 
-	return dst
+// HasEnvVar checks whether a haystack has a needle
+func HasEnvVar(haystack []core.EnvVar, needle core.EnvVar) bool {
+	for _, envVar := range haystack {
+		if needle.Name == envVar.Name {
+			return true
+		}
+	}
+	return false
 }
