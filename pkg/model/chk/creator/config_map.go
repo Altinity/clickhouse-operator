@@ -61,8 +61,7 @@ func (m *ConfigMapManager) CreateConfigMap(what interfaces.ConfigMapType, params
 		var options *config.FilesGeneratorOptions
 		if len(params) > 0 {
 			host = params[0].(*api.Host)
-			options = config.NewFilesGeneratorOptions().SetHost(host).
-				SetSettings(host.GetCR().GetSpec().GetConfiguration().GetSettings())
+			options = config.NewFilesGeneratorOptions().SetHost(host)
 			return m.createConfigMapHost(host, options)
 		}
 	}

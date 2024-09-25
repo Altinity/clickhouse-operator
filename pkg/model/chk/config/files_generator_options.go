@@ -18,8 +18,7 @@ import api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity
 
 // FilesGeneratorOptions specifies options for configuration files generator
 type FilesGeneratorOptions struct {
-	settings *api.Settings
-	host     *api.Host
+	host *api.Host
 }
 
 // defaultFilesGeneratorOptions creates new default options for files generator
@@ -44,22 +43,6 @@ func (o *FilesGeneratorOptions) SetHost(host *api.Host) *FilesGeneratorOptions {
 		return nil
 	}
 	o.host = host
-
-	return o
-}
-
-func (o *FilesGeneratorOptions) GetSettings() *api.Settings {
-	if o == nil {
-		return nil
-	}
-	return o.settings
-}
-
-func (o *FilesGeneratorOptions) SetSettings(settings *api.Settings) *FilesGeneratorOptions {
-	if o == nil {
-		return nil
-	}
-	o.settings = settings
 
 	return o
 }
