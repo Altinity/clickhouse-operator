@@ -56,11 +56,11 @@ const (
 	// 5. operator-provided additional config files
 	DirPathConfigHost = DirPathConfigRoot + "/" + HostConfigDir + "/"
 
-	// DirPathClickHouseKeeperData specifies full path of data folder where ClickHouse would place its data storage
-	DirPathClickHouseKeeperData = "/var/lib/clickhouse-keeper"
+	// DirPathDataStorage specifies full path of data folder where ClickHouse would place its data storage
+	DirPathDataStorage = "/var/lib/clickhouse-keeper"
 
-	// DirPathClickHouseLog  specifies full path of data folder where ClickHouse would place its log files
-	DirPathClickHouseKeeperLog = "/var/log/clickhouse-keeper-log"
+	// DirPathLogStorage  specifies full path of data folder where ClickHouse would place its log files
+	DirPathLogStorage = "/var/log/clickhouse-keeper-log"
 )
 
 const (

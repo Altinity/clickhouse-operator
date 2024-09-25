@@ -59,11 +59,11 @@ const (
 	// DirPathSecretFilesConfig specifies full path to folder, where secrets are mounted
 	DirPathSecretFilesConfig = DirPathConfigRoot + "/" + "secrets.d" + "/"
 
-	// DirPathClickHouseData specifies full path of data folder where ClickHouse would place its data storage
-	DirPathClickHouseData = "/var/lib/clickhouse"
+	// DirPathDataStorage specifies full path of data folder where ClickHouse would place its data storage
+	DirPathDataStorage = "/var/lib/clickhouse"
 
-	// DirPathClickHouseLog  specifies full path of data folder where ClickHouse would place its log files
-	DirPathClickHouseLog = "/var/log/clickhouse-server"
+	// DirPathLogStorage  specifies full path of data folder where ClickHouse would place its log files
+	DirPathLogStorage = "/var/log/clickhouse-server"
 )
 
 const (

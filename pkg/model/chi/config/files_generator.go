@@ -63,8 +63,7 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 	}
 	// Common ConfigSections maps section name to section XML
 	configSections := make(map[string]string)
-	// remote servers
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRemoteServers), c.configGenerator.getRemoteServers(options.GetRemoteServersOptions()))
+	c.createConfigFilesGroupCommonDomain(configSections, options)
 	// common settings
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getGlobalSettings())
 	// common files
@@ -75,16 +74,16 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 	return configSections
 }
 
+func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[string]string, options *FilesGeneratorOptions) {
+	// remote servers
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRemoteServers), c.configGenerator.getRemoteServers(options.GetRemoteServersOptions()))
+}
+
 // createConfigFilesGroupUsers creates users config files
 func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
 	// CommonUsers ConfigSections maps section name to section XML
 	configSections := make(map[string]string)
-	// users
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configUsers), c.configGenerator.getUsers())
-	// quotas
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configQuotas), c.configGenerator.getQuotas())
-	// profiles
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configProfiles), c.configGenerator.getProfiles())
+	c.createConfigFilesGroupUsersDomain(configSections)
 	// user files
 	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionUsers, false, nil))
 	// Extra user-specified config files
@@ -93,19 +92,32 @@ func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
 	return configSections
 }
 
+func (c *FilesGenerator) createConfigFilesGroupUsersDomain(configSections map[string]string) {
+	// users
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configUsers), c.configGenerator.getUsers())
+	// quotas
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configQuotas), c.configGenerator.getQuotas())
+	// profiles
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configProfiles), c.configGenerator.getProfiles())
+}
+
 // createConfigFilesGroupHost creates host config files
 func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptions) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	configSections := make(map[string]string)
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(options.GetHost()))
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configHostnamePorts), c.configGenerator.getHostHostnameAndPorts(options.GetHost()))
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configZookeeper), c.configGenerator.getHostZookeeper(options.GetHost()))
+	c.createConfigFilesGroupHostDomain(configSections, options)
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getHostSettings(options.GetHost()))
 	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionHost, true, options.GetHost()))
 	// Extra user-specified config files
 	util.MergeStringMapsOverwrite(configSections, c.chopConfig.ClickHouse.Config.File.Runtime.HostConfigFiles)
 
 	return configSections
+}
+
+func (c *FilesGenerator) createConfigFilesGroupHostDomain(configSections map[string]string, options *FilesGeneratorOptions) {
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configMacros), c.configGenerator.getHostMacros(options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configHostnamePorts), c.configGenerator.getHostHostnameAndPorts(options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configZookeeper), c.configGenerator.getHostZookeeper(options.GetHost()))
 }
 
 // createConfigSectionFilename creates filename of a configuration file.
