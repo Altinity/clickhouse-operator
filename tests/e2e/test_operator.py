@@ -37,8 +37,7 @@ def test_001(self):
         },
     )
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -67,8 +66,7 @@ def test_002(self):
         },
     )
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -94,8 +92,7 @@ def test_003(self):
         },
     )
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -140,8 +137,7 @@ def test_005(self):
     )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -180,8 +176,7 @@ def test_006(self):
         )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -202,8 +197,7 @@ def test_007(self):
         },
     )
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestCheck
@@ -214,7 +208,7 @@ def test_operator_upgrade(self, manifest, service, version_from, version_to=None
         util.install_operator_version(version_from)
         time.sleep(15)
 
-        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest, True))
+        chi = yaml_manifest.get_name(util.get_full_path(manifest, True))
         cluster = chi
 
         kubectl.create_and_check(
@@ -331,7 +325,7 @@ def test_operator_restart(self, manifest, service, version=None):
         version = current().context.operator_version
     with Given(f"clickhouse-operator {version}"):
         util.set_operator_version(version)
-        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+        chi = yaml_manifest.get_name(util.get_full_path(manifest))
         cluster = chi
 
         kubectl.create_and_check(
@@ -473,8 +467,7 @@ def test_008_1(self):
         )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -489,8 +482,7 @@ def test_008_2(self):
         )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -500,7 +492,7 @@ def test_008_3(self):
 
     manifest = "manifests/chi/test-008-operator-restart-3-1.yaml"
     manifest_2 = "manifests/chi/test-008-operator-restart-3-2.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = chi
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -558,8 +550,7 @@ def test_008_3(self):
     join()
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -581,8 +572,7 @@ def test_009_1(self, version_from="0.23.7", version_to=None):
         )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -603,8 +593,7 @@ def test_009_2(self, version_from="0.23.7", version_to=None):
         )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -631,7 +620,8 @@ def test_010(self):
         out = clickhouse.query_with_error("test-010-zkroot", "select path from system.zookeeper where path = '/' limit 1")
         assert "/" == out
 
-    delete_test_namespace()
+    with Finally("I clean up"):
+        delete_test_namespace()
 
 
 def get_user_xml_from_configmap(chi, user):
@@ -811,8 +801,7 @@ def test_011_1(self):
             assert out != "OK"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -862,8 +851,7 @@ def test_011_2(self):
                 assert out == "OK", error()
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -950,8 +938,7 @@ def test_011_3(self):
         )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -1018,8 +1005,7 @@ def test_012(self):
             assert service_default_created != kubectl.get_field("service", "service-default", ".metadata.creationTimestamp")
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -1034,7 +1020,7 @@ def test_013_1(self):
 
     cluster = "simple"
     manifest = f"manifests/chi/test-013-1-1-schema-propagation.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     n_shards = 2
 
     util.require_keeper(keeper_type=self.context.keeper_type)
@@ -1240,8 +1226,7 @@ def test_013_1(self):
         assert len(tables_on_second_shard) == 0, error()
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 def get_shards_from_remote_servers(chi, cluster, shell=None):
@@ -1319,7 +1304,7 @@ def test_014_0(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-014-0-replication-1.yaml"
-    chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
     shards = [0, 1]
     n_shards = len(shards)
@@ -1480,7 +1465,7 @@ def test_014_0(self):
     replicas = [1, 2]
     with When(f"Add {len(replicas)} more replicas"):
         manifest = f"manifests/chi/test-014-0-replication-{1+len(replicas)}.yaml"
-        chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -1500,7 +1485,7 @@ def test_014_0(self):
 
     with When("Remove replicas"):
         manifest = "manifests/chi/test-014-0-replication-1.yaml"
-        chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
         chi = yaml_manifest.get_manifest_data(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
@@ -1548,7 +1533,7 @@ def test_014_0(self):
 
     with When("Add replica one more time"):
         manifest = "manifests/chi/test-014-0-replication-2.yaml"
-        chi_name = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+        chi_name = yaml_manifest.get_name(util.get_full_path(manifest))
         kubectl.create_and_check(
             manifest=manifest,
             check={
@@ -1586,8 +1571,7 @@ def test_014_0(self):
                 assert "DB::Exception: No node" in out or out == "0"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -1598,7 +1582,7 @@ def test_014_1(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-014-1-replication-1.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
 
     kubectl.create_and_check(
@@ -1677,8 +1661,7 @@ def test_014_1(self):
         check_data_is_replicated(replicas, 2)
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -1729,8 +1712,7 @@ def test_015(self):
         assert out == "2"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -1903,8 +1885,7 @@ def test_016(self):
             assert start_time == new_start_time
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -1945,8 +1926,7 @@ def test_017(self):
         note(f"version: {ver}, result: {out}")
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -1987,15 +1967,14 @@ def test_018(self):
                 assert "new_test" == macros
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestCheck
 def test_019(self, step=1):
     util.require_keeper(keeper_type=self.context.keeper_type)
     manifest = f"manifests/chi/test-019-{step}-retain-volume-1.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -2166,8 +2145,7 @@ def test_019(self, step=1):
                 kubectl.launch(f"delete pvc {pvc}")
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2191,7 +2169,7 @@ def test_019_2(self):
 @TestCheck
 def test_020(self, step=1):
     manifest = f"manifests/chi/test-020-{step}-multi-volume.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -2229,8 +2207,7 @@ def test_020(self, step=1):
             assert disk == "disk2" or True
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2259,7 +2236,7 @@ def pause():
 @TestCheck
 def test_021(self, step=1):
     manifest = f"manifests/chi/test-021-{step}-rescale-volume-01.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "simple"
 
     with Given("Default storage class is expandable"):
@@ -2465,8 +2442,7 @@ def test_021(self, step=1):
             assert status != "Terminating"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2494,7 +2470,7 @@ def test_022(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-022-broken-image.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -2515,8 +2491,7 @@ def test_022(self):
             assert kubectl.get_count("chi", f"{chi}") == 0
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2526,7 +2501,7 @@ def test_023(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-023-auto-templates.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("Auto templates are deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-clickhouse-auto-1.yaml"))
@@ -2584,8 +2559,7 @@ def test_023(self):
         assert kubectl.get_field("pod", f"chi-{chi}-single-0-0-0", ".metadata.annotations.selector-test-2") == "<none>"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2595,7 +2569,7 @@ def test_024(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-024-template-annotations.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -2669,8 +2643,7 @@ def test_024(self):
         #    checkAnnotations("test-2", "<none>")
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2693,7 +2666,7 @@ def test_025(self):
     )
 
     manifest = "manifests/chi/test-025-rescaling.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -2788,8 +2761,7 @@ def test_025(self):
             assert round(lb_error_time - start_time) == 0
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2801,7 +2773,7 @@ def test_026(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-026-mixed-replicas.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -2869,8 +2841,7 @@ def test_026(self):
             assert out == "['disk2']"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2881,7 +2852,7 @@ def test_027(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-027-troubleshooting-1-bad-config.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -2922,8 +2893,7 @@ def test_027(self):
             )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -2935,7 +2905,7 @@ def test_028(self):
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     manifest = "manifests/chi/test-028-replication.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -3059,8 +3029,7 @@ def test_028(self):
             })
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -3077,7 +3046,7 @@ def test_029(self):
 
     manifest = "manifests/chi/test-029-distribution.yaml"
 
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     kubectl.create_and_check(
         manifest=manifest,
         check={
@@ -3104,8 +3073,7 @@ def test_029(self):
     )
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -3115,7 +3083,7 @@ def test_030(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-030.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     object_counts = {"statefulset": 2, "pod": 2, "service": 3}
 
     kubectl.create_and_check(
@@ -3173,8 +3141,7 @@ def test_030(self):
         self.context.shell = shell
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -3344,7 +3311,7 @@ def test_032(self):
 
     manifest = "manifests/chi/test-032-rescaling.yaml"
 
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     kubectl.create_and_check(
         manifest=manifest,
@@ -3442,8 +3409,7 @@ def test_032(self):
         self.context.shell = shell
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -3461,7 +3427,7 @@ def test_034(self):
 
     with When("create the chi without secure connection"):
         manifest = "manifests/chi/test-034-http.yaml"
-        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+        chi = yaml_manifest.get_name(util.get_full_path(manifest))
         cluster = "default"
 
         kubectl.create_and_check(
@@ -3528,7 +3494,7 @@ def test_034(self):
 
     with When("create the chi with secure connection"):
         manifest = "manifests/chi/test-034-https.yaml"
-        chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+        chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
         kubectl.create_and_check(
             manifest=manifest,
@@ -3600,8 +3566,6 @@ def test_034(self):
     with Finally("I clean up"):
         with By("deleting pod"):
             kubectl.launch(f"delete pod {client_pod}")
-        with And("deleting chi"):
-            kubectl.delete_chi(chi)
         with And("deleting test namespace"):
             delete_test_namespace()
 
@@ -3619,7 +3583,7 @@ def test_036(self):
         shell_2 = get_shell()
 
     manifest = f"manifests/chi/test-036-volume-re-provisioning-1.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "simple"
     util.require_keeper(keeper_type=self.context.keeper_type)
 
@@ -3792,8 +3756,7 @@ def test_036(self):
     check_data_is_recovered("reconcile-after-PV-deleted")
 
     with Finally("I clean up"):
-       with By("deleting test namespace"):
-           delete_test_namespace()
+       delete_test_namespace()
 
 
 @TestScenario
@@ -3806,7 +3769,7 @@ def test_037(self):
 
     cluster = "default"
     manifest = f"manifests/chi/test-037-1-storagemanagement-switch.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     with Given("chi exists"):
@@ -3890,8 +3853,7 @@ def test_037(self):
         assert r == "10000"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestCheck
@@ -3900,7 +3862,7 @@ def test_039(self, step=0, delete_chi=0):
     """Check clickhouse-operator support inter-cluster communications with secrets."""
     cluster = "default"
     manifest = f"manifests/chi/test-039-{step}-communications-with-secret.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
 
     with Given("clickhouse-certs.yaml secret is installed"):
@@ -3963,10 +3925,7 @@ def test_039(self, step=0, delete_chi=0):
             )
 
     with Finally("I delete namespace"):
-        shell = get_shell()
-        self.context.shell = shell
-        util.delete_namespace(namespace=self.context.test_namespace, delete_chi=1)
-        shell.close()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4025,7 +3984,7 @@ def test_040(self):
     create_shell_namespace_clickhouse_template()
 
     manifest = "manifests/chi/test-005-acm.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("Auto template with a startup probe is deployed"):
         kubectl.apply(util.get_full_path("manifests/chit/tpl-startup-probe.yaml"))
@@ -4054,8 +4013,7 @@ def test_040(self):
         assert int(out) > 120
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4067,7 +4025,7 @@ def test_041(self):
 
     cluster = "default"
     manifest = f"manifests/chi/test-041-secure-zookeeper.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type, keeper_manifest="zookeeper-1-node-1GB-for-tests-only-scaleout-pvc-secure.yaml")
 
     with Given("clickhouse-certs.yaml secret is installed"):
@@ -4119,8 +4077,7 @@ def test_041(self):
             assert r == "1"
 
     with Finally("I clean up"):
-        with By("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4132,7 +4089,7 @@ def test_042(self):
 
     cluster = "default"
     manifest = f"manifests/chi/test-042-rollback-1.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("CHI is installed"):
         kubectl.create_and_check(
@@ -4217,10 +4174,7 @@ def test_042(self):
             assert res == "2"
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestCheck
@@ -4229,7 +4183,7 @@ def test_043(self, manifest):
     """Check that clickhouse-operator support logs container customizing."""
 
     cluster = "cluster"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("CHI is installed"):
         kubectl.create_and_check(
@@ -4260,10 +4214,7 @@ def test_043(self, manifest):
         assert "clickhouse-server.log" in r, error()
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4295,7 +4246,7 @@ def test_044(self):
     create_shell_namespace_clickhouse_template()
     cluster = "default"
     manifest = f"manifests/chi/test-044-0-slow-propagation.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     util.require_keeper(keeper_type=self.context.keeper_type)
     operator_namespace = current().context.operator_namespace
 
@@ -4356,10 +4307,7 @@ def test_044(self):
             assert "test_local" in r, error()
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestCheck
@@ -4368,7 +4316,7 @@ def test_045(self, manifest):
     """Check that operator support does not wait for the query
      to finish before operator commences restart."""
 
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("CHI is installed"):
         kubectl.create_and_check(
@@ -4394,10 +4342,7 @@ def test_045(self, manifest):
         assert out != counter, error()
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4433,7 +4378,7 @@ def test_046(self):
     create_shell_namespace_clickhouse_template()
     cluster = "default"
     manifest = f"manifests/chi/test-046-0-clickhouse-operator-metrics.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     operator_namespace = current().context.operator_namespace
     out = kubectl.launch("get pods -l app=clickhouse-operator", ns=current().context.operator_namespace).splitlines()[1]
     operator_pod = re.split(r"[\t\r\n\s]+", out)[0]
@@ -4533,10 +4478,7 @@ def test_046(self):
             ])
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4549,7 +4491,7 @@ def test_047(self):
     create_shell_namespace_clickhouse_template()
     util.require_keeper(keeper_type=self.context.keeper_type)
     manifest = f"manifests/chi/test-047-zero-weighted-shard.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
     with Given("CHI with 2 shards is installed"):
         kubectl.create_and_check(
@@ -4604,10 +4546,7 @@ def test_047(self):
         assert "<weight>1</weight>" in r
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4621,7 +4560,7 @@ def test_048(self):
     util.require_keeper(keeper_type="CHK",
                         keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
     manifest = f"manifests/chi/test-048-clickhouse-keeper.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
     with Given("CHI with 2 replicas"):
         kubectl.create_and_check(
@@ -4656,12 +4595,7 @@ def test_048(self):
         assert out == f"{numbers}", error()
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with By("deleting chk"):
-            kubectl.delete_chk("clickhouse-keeper")
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4674,7 +4608,7 @@ def test_049(self):
     util.require_keeper(keeper_type="CHK",
                         keeper_manifest="clickhouse-keeper-3-node-for-test-only-version-24.yaml")
     manifest = f"manifests/chi/test-049-clickhouse-keeper-upgrade.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
     cluster = "default"
     keeper_version_from = "24.3.5.46"
     keeper_version_to = "24.5"
@@ -4738,12 +4672,7 @@ def test_049(self):
             assert out == "2", error()
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with By("deleting chk"):
-            kubectl.delete_chk("clickhouse-keeper")
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4754,7 +4683,7 @@ def test_050(self):
         util.apply_operator_config("manifests/chopconf/test-050-chopconf.yaml")
 
     manifest = f"manifests/chi/test-050-labels.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(manifest))
 
     with Given("CHI is installed"):
         kubectl.create_and_check(
@@ -4785,10 +4714,7 @@ def test_050(self):
     test_labels(chi, "exclude_this_label", "<none>")
 
     with Finally("I clean up"):
-        with By("deleting chi"):
-            kubectl.delete_chi(chi)
-        with And("deleting test namespace"):
-            delete_test_namespace()
+        delete_test_namespace()
 
 
 @TestScenario
@@ -4802,8 +4728,8 @@ def test_051(self):
 
     chi_manifest = f"manifests/chi/test-051-chk-chop-upgrade.yaml"
     chk_manifest = f"manifests/chk/test-051-chk-chop-upgrade.yaml"
-    chi = yaml_manifest.get_chi_name(util.get_full_path(chi_manifest))
-    chk = yaml_manifest.get_chi_name(util.get_full_path(chk_manifest))
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
     cluster = "default"
 
     with Given("Install CHK"):
@@ -4897,10 +4823,7 @@ def test_051(self):
             assert out == "2", error()
 
     with Finally("I clean up"):
-       with By("deleting chi"):
-           kubectl.delete_chi(chi)
-       with And("deleting test namespace"):
-           delete_test_namespace()
+        delete_test_namespace()
 
 @TestModule
 @Name("e2e.test_operator")
@@ -4919,7 +4842,7 @@ def test(self):
         if "items" in ns:
             for n in ns["items"]:
                 ns_name = n["metadata"]["name"]
-                if ns_name.startswith("test-"):
+                if ns_name.startswith("test"):
                     with Then(f"Delete ns {ns_name}"):
                         util.delete_namespace(namespace = ns_name, delete_chi=True)
 
