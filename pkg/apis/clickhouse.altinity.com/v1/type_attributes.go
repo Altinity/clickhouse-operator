@@ -18,24 +18,24 @@ import core "k8s.io/api/core/v1"
 
 // ComparableAttributes specifies CHI attributes that are comparable
 type ComparableAttributes struct {
-	AdditionalEnvVars      []core.EnvVar      `json:"-" yaml:"-"`
-	AdditionalVolumes      []core.Volume      `json:"-" yaml:"-"`
-	AdditionalVolumeMounts []core.VolumeMount `json:"-" yaml:"-"`
-	SkipOwnerRef           bool               `json:"-" yaml:"-"`
+	additionalEnvVars      []core.EnvVar      `json:"-" yaml:"-"`
+	additionalVolumes      []core.Volume      `json:"-" yaml:"-"`
+	additionalVolumeMounts []core.VolumeMount `json:"-" yaml:"-"`
+	skipOwnerRef           bool               `json:"-" yaml:"-"`
 }
 
 func (a *ComparableAttributes) GetAdditionalEnvVars() []core.EnvVar {
 	if a == nil {
 		return nil
 	}
-	return a.AdditionalEnvVars
+	return a.additionalEnvVars
 }
 
 func (a *ComparableAttributes) AppendAdditionalEnvVar(envVar core.EnvVar) {
 	if a == nil {
 		return
 	}
-	a.AdditionalEnvVars = append(a.AdditionalEnvVars, envVar)
+	a.additionalEnvVars = append(a.additionalEnvVars, envVar)
 }
 
 func (a *ComparableAttributes) AppendAdditionalEnvVarIfNotExists(envVar core.EnvVar) {
@@ -63,14 +63,14 @@ func (a *ComparableAttributes) GetAdditionalVolumes() []core.Volume {
 	if a == nil {
 		return nil
 	}
-	return a.AdditionalVolumes
+	return a.additionalVolumes
 }
 
 func (a *ComparableAttributes) AppendAdditionalVolume(volume core.Volume) {
 	if a == nil {
 		return
 	}
-	a.AdditionalVolumes = append(a.AdditionalVolumes, volume)
+	a.additionalVolumes = append(a.additionalVolumes, volume)
 }
 
 func (a *ComparableAttributes) AppendAdditionalVolumeIfNotExists(volume core.Volume) {
@@ -99,14 +99,14 @@ func (a *ComparableAttributes) GetAdditionalVolumeMounts() []core.VolumeMount {
 	if a == nil {
 		return nil
 	}
-	return a.AdditionalVolumeMounts
+	return a.additionalVolumeMounts
 }
 
 func (a *ComparableAttributes) AppendAdditionalVolumeMount(volumeMount core.VolumeMount) {
 	if a == nil {
 		return
 	}
-	a.AdditionalVolumeMounts = append(a.AdditionalVolumeMounts, volumeMount)
+	a.additionalVolumeMounts = append(a.additionalVolumeMounts, volumeMount)
 }
 
 func (a *ComparableAttributes) AppendAdditionalVolumeMountIfNotExists(volumeMount core.VolumeMount) {
@@ -133,12 +133,12 @@ func (a *ComparableAttributes) GetSkipOwnerRef() bool {
 	if a == nil {
 		return false
 	}
-	return a.SkipOwnerRef
+	return a.skipOwnerRef
 }
 
 func (a *ComparableAttributes) SetSkipOwnerRef(skip bool) {
 	if a == nil {
 		return
 	}
-	a.SkipOwnerRef = skip
+	a.skipOwnerRef = skip
 }
