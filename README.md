@@ -9,6 +9,9 @@ Altinity Kubernetes Operator for ClickHouse creates, configures and manages Clic
 [![Go version](https://img.shields.io/github/go-mod/go-version/altinity/clickhouse-operator)](https://img.shields.io/github/go-mod/go-version/altinity/clickhouse-operator)
 [![Go Report Card](https://goreportcard.com/badge/github.com/altinity/clickhouse-operator)](https://goreportcard.com/report/github.com/altinity/clickhouse-operator)
 [![issues](https://img.shields.io/github/issues/altinity/clickhouse-operator.svg)](https://github.com/altinity/clickhouse-operator/issues)
+<a href="https://altinity.com/slack">
+  <img src="https://img.shields.io/static/v1?logo=slack&logoColor=959DA5&label=Slack&labelColor=333a41&message=join%20conversation&color=3AC358" alt="AltinityDB Slack" />
+</a>
 
 ## Features
 
@@ -75,7 +78,7 @@ services related to ClickHouse and analytic applications on Kubernetes.
 - [Official website](https://altinity.com/) - Get a high level overview of Altinity and our offerings.
 - [Altinity.Cloud](https://altinity.com/cloud-database/) - Run ClickHouse in our cloud or yours.
 - [Altinity Support](https://altinity.com/support/) - Get Enterprise-class support for ClickHouse.
-- [Slack](https://altinitydbworkspace.slack.com/join/shared_invite/zt-1togw9b4g-N0ZOXQyEyPCBh_7IEHUjdw#/shared-invite/email) - Talk directly with ClickHouse users and Altinity devs.
+- [Slack](https://altinity.com/slack) - Talk directly with ClickHouse users and Altinity devs.
 - [Contact us](https://hubs.la/Q020sH3Z0) - Contact Altinity with your questions or issues.
 - [Free consultation](https://hubs.la/Q020sHkv0) - Get a free consultation with a ClickHouse expert today.
  
