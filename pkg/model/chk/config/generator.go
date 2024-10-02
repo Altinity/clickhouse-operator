@@ -133,5 +133,5 @@ func (c *Generator) getHostRaft(host *chi.Host) string {
 }
 
 func getServerId(host *chi.Host) int {
-	return host.GetRuntime().GetAddress().GetReplicaIndex() + 1
+	return host.GetRuntime().GetAddress().GetReplicaIndex()
 }
