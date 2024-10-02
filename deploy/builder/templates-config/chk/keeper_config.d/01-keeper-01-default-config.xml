@@ -11,6 +11,7 @@
         <snapshot_storage_path>/var/lib/clickhouse-keeper/coordination/snapshots</snapshot_storage_path>
         <storage_path>/var/lib/clickhouse-keeper</storage_path>
         <tcp_port>2181</tcp_port>
+        <enable_reconfiguration>true</enable_reconfiguration>
     </keeper_server>
     <listen_host>::</listen_host>
     <listen_host>0.0.0.0</listen_host>
