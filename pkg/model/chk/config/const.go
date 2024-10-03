@@ -72,10 +72,11 @@ const (
 )
 
 const (
-	xmlTagYandex = "yandex"
+	xmlTagClickHouse = "clickhouse"
 )
 
 const (
+	configServerId = "server-id"
 	configRaft     = "raft"
 	configSettings = "settings"
 )

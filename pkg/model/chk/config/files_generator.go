@@ -71,6 +71,7 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[string]string, options *FilesGeneratorOptions) {
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRaft), c.configGenerator.getRaftConfig())
 }
 
 func (c *FilesGenerator) createConfigFilesGroupCommonGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
@@ -115,7 +116,7 @@ func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptio
 }
 
 func (c *FilesGenerator) createConfigFilesGroupHostDomain(configSections map[string]string, options *FilesGeneratorOptions) {
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRaft), c.configGenerator.getHostRaft(options.GetHost()))
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configServerId), c.configGenerator.getHostServerId(options.GetHost()))
 }
 
 func (c *FilesGenerator) createConfigFilesGroupHostGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
