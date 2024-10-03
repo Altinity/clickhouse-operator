@@ -63,13 +63,9 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 	}
 	// Common ConfigSections maps section name to section XML
 	configSections := make(map[string]string)
+
 	c.createConfigFilesGroupCommonDomain(configSections, options)
-	// common settings
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getGlobalSettings())
-	// common files
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionCommon, true, nil))
-	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.CommonConfigFiles)
+	c.createConfigFilesGroupCommonGeneric(configSections, options)
 
 	return configSections
 }
@@ -77,15 +73,22 @@ func (c *FilesGenerator) createConfigFilesGroupCommon(options *FilesGeneratorOpt
 func (c *FilesGenerator) createConfigFilesGroupCommonDomain(configSections map[string]string, options *FilesGeneratorOptions) {
 }
 
+func (c *FilesGenerator) createConfigFilesGroupCommonGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
+	// common settings
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getGlobalSettings())
+	// common files
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionCommon, true, nil))
+	// Extra user-specified config files
+	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.CommonConfigFiles)
+}
+
 // createConfigFilesGroupUsers creates users config files
 func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
 	// CommonUsers ConfigSections maps section name to section XML
 	configSections := make(map[string]string)
+
 	c.createConfigFilesGroupUsersDomain(configSections)
-	// user files
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionUsers, false, nil))
-	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.UsersConfigFiles)
+	c.createConfigFilesGroupUsersGeneric(configSections)
 
 	return configSections
 }
@@ -93,21 +96,33 @@ func (c *FilesGenerator) createConfigFilesGroupUsers() map[string]string {
 func (c *FilesGenerator) createConfigFilesGroupUsersDomain(configSections map[string]string) {
 }
 
+func (c *FilesGenerator) createConfigFilesGroupUsersGeneric(configSections map[string]string) {
+	// user files
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionUsers, false, nil))
+	// Extra user-specified config files
+	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.UsersConfigFiles)
+}
+
 // createConfigFilesGroupHost creates host config files
 func (c *FilesGenerator) createConfigFilesGroupHost(options *FilesGeneratorOptions) map[string]string {
 	// Prepare for this replica deployment chopConfig files map as filename->content
 	configSections := make(map[string]string)
+
 	c.createConfigFilesGroupHostDomain(configSections, options)
-	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getHostSettings(options.GetHost()))
-	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionHost, true, options.GetHost()))
-	// Extra user-specified config files
-	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.HostConfigFiles)
+	c.createConfigFilesGroupHostGeneric(configSections, options)
 
 	return configSections
 }
 
 func (c *FilesGenerator) createConfigFilesGroupHostDomain(configSections map[string]string, options *FilesGeneratorOptions) {
 	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configRaft), c.configGenerator.getHostRaft(options.GetHost()))
+}
+
+func (c *FilesGenerator) createConfigFilesGroupHostGeneric(configSections map[string]string, options *FilesGeneratorOptions) {
+	util.IncludeNonEmpty(configSections, createConfigSectionFilename(configSettings), c.configGenerator.getHostSettings(options.GetHost()))
+	util.MergeStringMapsOverwrite(configSections, c.configGenerator.getSectionFromFiles(chi.SectionHost, true, options.GetHost()))
+	// Extra user-specified config files
+	util.MergeStringMapsOverwrite(configSections, c.chopConfig.Keeper.Config.File.Runtime.HostConfigFiles)
 }
 
 // createConfigSectionFilename creates filename of a configuration file.
