@@ -99,13 +99,12 @@ func (c *Generator) getHostRaft(host *chi.Host) string {
 		return nil
 	})
 
+	// Write xml as:
 	// <clickhouse>
-	// 		CONFIG
+	// 		settings as xml
 	// </clickhouse>
 	config := &bytes.Buffer{}
-	util.Iline(config, 0, "<clickhouse>")
-	xml.GenerateFromSettings(config, settings, "")
-	util.Iline(config, 0, "</clickhouse>")
+	xml.GenerateFromSettings(config, settings, "clickhouse")
 
 	return config.String()
 }
