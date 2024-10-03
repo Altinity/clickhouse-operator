@@ -40,6 +40,15 @@ func NewSettingScalarFromAny(untyped any) (*Setting, bool) {
 	return nil, false
 }
 
+// MustNewSettingScalarFromAny makes new scalar Setting from untyped
+func MustNewSettingScalarFromAny(untyped any) *Setting {
+	if scalar, ok := parseSettingScalarValue(untyped); ok {
+		return NewSettingScalar(scalar)
+	}
+
+	return nil
+}
+
 const (
 	// Float with fractional part less than ignoreThreshold is considered to be int and is casted to int
 	ignoreThreshold = 0.001
