@@ -16,7 +16,7 @@ package config
 
 import (
 	"bytes"
-	"fmt"
+
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -90,13 +90,12 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 func (c *Generator) getHostRaft(host *chi.Host) string {
 	settings := chi.NewSettings()
 
-	serverId, _ := chi.NewSettingScalarFromAny(getServerId(host))
-	settings.Set("keeper_server/server_id", serverId)
+	settings.Set("keeper_server/server_id", chi.MustNewSettingScalarFromAny(getServerId(host)))
 
 	host.GetCR().WalkHosts(func(_host *chi.Host) error {
-		settings.Set("keeper_server/raft_configuration/server/id", chi.NewSettingScalar(fmt.Sprintf("%d", getServerId(_host))))
+		settings.Set("keeper_server/raft_configuration/server/id", chi.MustNewSettingScalarFromAny(getServerId(_host)))
 		settings.Set("keeper_server/raft_configuration/server/hostname", chi.NewSettingScalar(c.namer.Name(interfaces.NameInstanceHostname, _host)))
-		settings.Set("keeper_server/raft_configuration/server/port", chi.NewSettingScalar(fmt.Sprintf("%d", _host.RaftPort.Value())))
+		settings.Set("keeper_server/raft_configuration/server/port", chi.MustNewSettingScalarFromAny(_host.RaftPort.Value()))
 		return nil
 	})
 
