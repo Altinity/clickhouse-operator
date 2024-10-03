@@ -16,8 +16,7 @@ package config
 
 import (
 	"bytes"
-	"strings"
-
+	"fmt"
 	chi "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/interfaces"
 	"github.com/altinity/clickhouse-operator/pkg/util"
@@ -91,25 +90,13 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 func (c *Generator) getHostRaft(host *chi.Host) string {
 	settings := chi.NewSettings()
 
-	// Init container will replace this macro with real value on bootstrap
 	serverId, _ := chi.NewSettingScalarFromAny(getServerId(host))
 	settings.Set("keeper_server/server_id", serverId)
 
-	// Prepare empty placeholder for RAFT config and will be replaced later in this function:
-	// <raft_configuration>
-	//     <server></server>
-	// </raft_configuration>
-	settings.Set("keeper_server/raft_configuration/server", chi.NewSettingScalar(""))
-	// 3-rd level (keeper_server/raft_configuration/server) by 4 spaces
-	raftIndent := 12
-	// Prepare RAFT config for injection into main config
-	raft := &bytes.Buffer{}
-	host.GetShard().WalkHosts(func(_host *chi.Host) error {
-		util.Iline(raft, raftIndent, "<server>")
-		util.Iline(raft, raftIndent, "    <id>%d</id>", getServerId(_host))
-		util.Iline(raft, raftIndent, "    <hostname>%s</hostname>", c.namer.Name(interfaces.NameInstanceHostname, _host))
-		util.Iline(raft, raftIndent, "    <port>%d</port>", _host.RaftPort.Value())
-		util.Iline(raft, raftIndent, "</server>")
+	host.GetCR().WalkHosts(func(_host *chi.Host) error {
+		settings.Set("keeper_server/raft_configuration/server/id", chi.NewSettingScalar(fmt.Sprintf("%d", getServerId(_host))))
+		settings.Set("keeper_server/raft_configuration/server/hostname", chi.NewSettingScalar(c.namer.Name(interfaces.NameInstanceHostname, _host)))
+		settings.Set("keeper_server/raft_configuration/server/port", chi.NewSettingScalar(fmt.Sprintf("%d", _host.RaftPort.Value())))
 		return nil
 	})
 
@@ -121,15 +108,7 @@ func (c *Generator) getHostRaft(host *chi.Host) string {
 	xml.GenerateFromSettings(config, settings, "")
 	util.Iline(config, 0, "</clickhouse>")
 
-	// tmp = strings.Replace(tmp, "<server_id></server_id>", "<server_id from_env=\"KEEPER_ID\" />", 1)
-
-	// Inject RAFT config
-	// Replace empty placeholder for RAFT config with actual RAFT config value
-	// <raft_configuration>
-	//     <server></server>
-	// </raft_configuration>
-	// TODO use raftIndent value here instead of spaces
-	return strings.Replace(config.String(), "            <server></server>\n", raft.String(), 1)
+	return config.String()
 }
 
 func getServerId(host *chi.Host) int {
