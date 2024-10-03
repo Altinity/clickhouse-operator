@@ -577,7 +577,7 @@ spec:
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                         volumeClaimTemplate:
                           type: string
-                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                 configuration:
                   type: object
                   description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
@@ -824,7 +824,7 @@ spec:
                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                               volumeClaimTemplate:
                                 type: string
-                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                             description: |
                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
                               override top-level `chi.spec.configuration.templates`
@@ -1095,7 +1095,7 @@ spec:
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                         volumeClaimTemplate:
                                           type: string
-                                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected shard
                                         override top-level `chi.spec.configuration.templates` and cluster-level `chi.spec.configuration.clusters.templates`
@@ -1254,7 +1254,7 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                               volumeClaimTemplate:
                                                 type: string
-                                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates` and shard-level `chi.spec.configuration.clusters.layout.shards.templates`
@@ -1317,7 +1317,7 @@ spec:
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                         volumeClaimTemplate:
                                           type: string
-                                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                         override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
@@ -1472,7 +1472,7 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                               volumeClaimTemplate:
                                                 type: string
-                                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
@@ -1654,7 +1654,7 @@ spec:
                                     description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                   volumeClaimTemplate:
                                     type: string
-                                    description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                    description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                 description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
                     podTemplates:
                       type: array
@@ -2455,7 +2455,7 @@ spec:
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                         volumeClaimTemplate:
                           type: string
-                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                 configuration:
                   type: object
                   description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
@@ -2702,7 +2702,7 @@ spec:
                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                               volumeClaimTemplate:
                                 type: string
-                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                             description: |
                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
                               override top-level `chi.spec.configuration.templates`
@@ -2973,7 +2973,7 @@ spec:
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                         volumeClaimTemplate:
                                           type: string
-                                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected shard
                                         override top-level `chi.spec.configuration.templates` and cluster-level `chi.spec.configuration.clusters.templates`
@@ -3132,7 +3132,7 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                               volumeClaimTemplate:
                                                 type: string
-                                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates` and shard-level `chi.spec.configuration.clusters.layout.shards.templates`
@@ -3195,7 +3195,7 @@ spec:
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                         volumeClaimTemplate:
                                           type: string
-                                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                         override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
@@ -3350,7 +3350,7 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                               volumeClaimTemplate:
                                                 type: string
-                                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
@@ -3532,7 +3532,7 @@ spec:
                                     description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                   volumeClaimTemplate:
                                     type: string
-                                    description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                    description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                 description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
                     podTemplates:
                       type: array
@@ -4757,7 +4757,7 @@ spec:
                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                         volumeClaimTemplate:
                           type: string
-                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                 configuration:
                   type: object
                   description: "allows configure multiple aspects and behavior for `clickhouse-server` instance and also allows describe multiple `clickhouse-server` clusters inside one `chi` resource"
@@ -4837,7 +4837,7 @@ spec:
                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                               volumeClaimTemplate:
                                 type: string
-                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                             description: |
                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected cluster
                               override top-level `chi.spec.configuration.templates`
@@ -4913,7 +4913,7 @@ spec:
                                           description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                         volumeClaimTemplate:
                                           type: string
-                                          description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                          description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                       description: |
                                         optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                         override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`
@@ -4989,7 +4989,7 @@ spec:
                                                 description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                               volumeClaimTemplate:
                                                 type: string
-                                                description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                                description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                             description: |
                                               optional, configuration of the templates names which will use for generate Kubernetes resources according to selected replica
                                               override top-level `chi.spec.configuration.templates`, cluster-level `chi.spec.configuration.clusters.templates`, replica-level `chi.spec.configuration.clusters.layout.replicas.templates`
@@ -5089,7 +5089,7 @@ spec:
                                     description: "optional, template name from chi.spec.templates.serviceTemplates, allows customization for each `Service` resource which will created by `clickhouse-operator` which cover each replica inside each shard inside each clickhouse cluster described in `chi.spec.configuration.clusters`"
                                   volumeClaimTemplate:
                                     type: string
-                                    description: "DEPRECATED, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`, volumeClaimTemplate is deprecated in favor of dataVolumeClaimTemplate and logVolumeClaimTemplate. It is not recommended to use, because it is not clear what volume claim template it is referring to."
+                                    description: "optional, alias for dataVolumeClaimTemplate, template name from chi.spec.templates.volumeClaimTemplates, allows customization each `PVC` which will mount for clickhouse data directory in each `Pod` during render and reconcile every StatefulSet.spec resource described in `chi.spec.configuration.clusters`"
                                 description: "be careful, this part of CRD allows override template inside template, don't use it if you don't understand what you do"
                     podTemplates:
                       type: array
