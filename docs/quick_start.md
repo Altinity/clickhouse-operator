@@ -15,7 +15,7 @@
 # Prerequisites
 
 1. Kubernetes cluster that observes the following version considerations:
-    1. `clickhouse-operator` versions **before** `0.16.0` are compatible with [Kubenetes after `1.16` and prior `1.22`](https://kubernetes.io/releases/).
+    1. `clickhouse-operator` versions **before** `0.16.0` are compatible with [Kubernetes after `1.16` and prior `1.22`](https://kubernetes.io/releases/).
     1. `clickhouse-operator` versions `0.16.0` **and after** are compatible [Kubernetes version `1.16` and after](https://kubernetes.io/releases/).
 1. Properly configured `kubectl`
 1. `curl`
