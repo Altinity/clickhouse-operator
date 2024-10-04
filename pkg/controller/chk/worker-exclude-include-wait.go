@@ -20,6 +20,7 @@ import (
 
 	log "github.com/altinity/clickhouse-operator/pkg/announcer"
 	apiChk "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse-keeper.altinity.com/v1"
+	api "github.com/altinity/clickhouse-operator/pkg/apis/clickhouse.altinity.com/v1"
 	"github.com/altinity/clickhouse-operator/pkg/util"
 )
 
@@ -57,4 +58,58 @@ func (w *worker) waitForIPAddresses(ctx context.Context, chk *apiChk.ClickHouseK
 		w.a.V(1).M(c).Warning("still waiting - not all IP addresses are in place yet")
 		return true
 	})
+}
+
+// shouldIncludeHost determines whether host to be included into cluster after reconciling
+func (w *worker) shouldIncludeHost(host *api.Host) bool {
+	switch {
+	case host.IsStopped():
+		// No need to include stopped host
+		return false
+	}
+	return true
+}
+
+// includeHost includes host back back into ClickHouse clusters
+func (w *worker) includeHost(ctx context.Context, host *api.Host) error {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return nil
+	}
+
+	if !w.shouldIncludeHost(host) {
+		w.a.V(1).
+			M(host).F().
+			Info("No need to include host into cluster. Host/shard/cluster: %d/%d/%s",
+				host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+		return nil
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("Include host into cluster. Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	w.includeHostIntoRaftCluster(ctx, host)
+
+	return nil
+}
+
+// includeHostIntoRaftCluster includes host into raft configuration
+func (w *worker) includeHostIntoRaftCluster(ctx context.Context, host *api.Host) {
+	if util.IsContextDone(ctx) {
+		log.V(2).Info("task is done")
+		return
+	}
+
+	w.a.V(1).
+		M(host).F().
+		Info("going to include host. Host/shard/cluster: %d/%d/%s",
+			host.Runtime.Address.ReplicaIndex, host.Runtime.Address.ShardIndex, host.Runtime.Address.ClusterName)
+
+	// Specify in options to add this host into ClickHouse config file
+	host.GetCR().GetRuntime().LockCommonConfig()
+	host.GetReconcileAttributes().UnsetExclude()
+	_ = w.reconcileConfigMapCommon(ctx, host.GetCR(), w.options())
+	host.GetCR().GetRuntime().UnlockCommonConfig()
 }

@@ -79,20 +79,20 @@ func (c *Controller) newWorker() *worker {
 	}
 }
 
-func configGeneratorOptions(chk *apiChk.ClickHouseKeeperInstallation) *config.GeneratorOptions {
+func configGeneratorOptions(cr *apiChk.ClickHouseKeeperInstallation) *config.GeneratorOptions {
 	return &config.GeneratorOptions{
-		Settings: chk.GetSpecT().Configuration.Settings,
-		Files:    chk.GetSpecT().Configuration.Files,
+		Settings: cr.GetSpecT().Configuration.Settings,
+		Files:    cr.GetSpecT().Configuration.Files,
 	}
 }
 
-func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
+func (w *worker) newTask(cr *apiChk.ClickHouseKeeperInstallation) {
 	w.task = common.NewTask(
 		commonCreator.NewCreator(
-			chk,
-			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeKeeper, chk, configGeneratorOptions(chk)),
+			cr,
+			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeKeeper, cr, configGeneratorOptions(cr)),
 			managers.NewContainerManager(managers.ContainerManagerTypeKeeper),
-			managers.NewTagManager(managers.TagManagerTypeKeeper, chk),
+			managers.NewTagManager(managers.TagManagerTypeKeeper, cr),
 			managers.NewProbeManager(managers.ProbeManagerTypeKeeper),
 			managers.NewServiceManager(managers.ServiceManagerTypeKeeper),
 			managers.NewVolumeManager(managers.VolumeManagerTypeKeeper),
@@ -101,7 +101,7 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeKeeper),
 			namer.New(),
 			commonMacro.New(macro.List),
-			labeler.New(chk),
+			labeler.New(cr),
 		),
 	)
 
@@ -111,7 +111,7 @@ func (w *worker) newTask(chk *apiChk.ClickHouseKeeperInstallation) {
 		//poller.NewHostStatefulSetPoller(poller.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.labeler),
 		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, nil),
 		w.c.namer,
-		labeler.New(chk),
+		labeler.New(cr),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		statefulset.NewDefaultFallback(),

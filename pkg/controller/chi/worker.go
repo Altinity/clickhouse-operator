@@ -19,7 +19,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/altinity/queue"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -46,6 +45,7 @@ import (
 	commonNormalizer "github.com/altinity/clickhouse-operator/pkg/model/common/normalizer"
 	"github.com/altinity/clickhouse-operator/pkg/model/managers"
 	"github.com/altinity/clickhouse-operator/pkg/util"
+	"github.com/altinity/queue"
 )
 
 // FinalizerName specifies name of the finalizer to be used with CHI
@@ -68,7 +68,6 @@ type worker struct {
 }
 
 // newWorker
-// func (c *Controller) newWorker(q workqueue.RateLimitingInterface) *worker {
 func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	start := time.Now()
 	if !sys {
@@ -103,25 +102,25 @@ func (c *Controller) newWorker(q queue.PriorityQueue, sys bool) *worker {
 	}
 }
 
-func configGeneratorOptions(chi *api.ClickHouseInstallation) *config.GeneratorOptions {
+func configGeneratorOptions(cr *api.ClickHouseInstallation) *config.GeneratorOptions {
 	return &config.GeneratorOptions{
-		Users:          chi.GetSpecT().Configuration.Users,
-		Profiles:       chi.GetSpecT().Configuration.Profiles,
-		Quotas:         chi.GetSpecT().Configuration.Quotas,
-		Settings:       chi.GetSpecT().Configuration.Settings,
-		Files:          chi.GetSpecT().Configuration.Files,
-		DistributedDDL: chi.GetSpecT().Defaults.DistributedDDL,
+		Users:          cr.GetSpecT().Configuration.Users,
+		Profiles:       cr.GetSpecT().Configuration.Profiles,
+		Quotas:         cr.GetSpecT().Configuration.Quotas,
+		Settings:       cr.GetSpecT().Configuration.Settings,
+		Files:          cr.GetSpecT().Configuration.Files,
+		DistributedDDL: cr.GetSpecT().Defaults.DistributedDDL,
 	}
 }
 
 // newContext creates new reconcile task
-func (w *worker) newTask(chi *api.ClickHouseInstallation) {
+func (w *worker) newTask(cr *api.ClickHouseInstallation) {
 	w.task = common.NewTask(
 		commonCreator.NewCreator(
-			chi,
-			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeClickHouse, chi, configGeneratorOptions(chi)),
+			cr,
+			managers.NewConfigFilesGenerator(managers.FilesGeneratorTypeClickHouse, cr, configGeneratorOptions(cr)),
 			managers.NewContainerManager(managers.ContainerManagerTypeClickHouse),
-			managers.NewTagManager(managers.TagManagerTypeClickHouse, chi),
+			managers.NewTagManager(managers.TagManagerTypeClickHouse, cr),
 			managers.NewProbeManager(managers.ProbeManagerTypeClickHouse),
 			managers.NewServiceManager(managers.ServiceManagerTypeClickHouse),
 			managers.NewVolumeManager(managers.VolumeManagerTypeClickHouse),
@@ -130,7 +129,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 			managers.NewOwnerReferencesManager(managers.OwnerReferencesManagerTypeClickHouse),
 			namer.New(),
 			commonMacro.New(macro.List),
-			labeler.New(chi),
+			labeler.New(cr),
 		),
 	)
 
@@ -139,7 +138,7 @@ func (w *worker) newTask(chi *api.ClickHouseInstallation) {
 		w.task,
 		domain.NewHostStatefulSetPoller(domain.NewStatefulSetPoller(w.c.kube), w.c.kube, w.c.ctrlLabeler),
 		w.c.namer,
-		labeler.New(chi),
+		labeler.New(cr),
 		storage.NewStorageReconciler(w.task, w.c.namer, w.c.kube.Storage()),
 		w.c.kube,
 		w.c,

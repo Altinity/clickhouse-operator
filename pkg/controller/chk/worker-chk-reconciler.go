@@ -115,29 +115,29 @@ func (w *worker) reconcileCR(ctx context.Context, old, new *apiChk.ClickHouseKee
 }
 
 // reconcile reconciles Custom Resource
-func (w *worker) reconcile(ctx context.Context, ch *apiChk.ClickHouseKeeperInstallation) error {
+func (w *worker) reconcile(ctx context.Context, cr *apiChk.ClickHouseKeeperInstallation) error {
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
 	}
 
-	w.a.V(2).M(ch).S().P()
-	defer w.a.V(2).M(ch).E().P()
+	w.a.V(2).M(cr).S().P()
+	defer w.a.V(2).M(cr).E().P()
 
 	counters := api.NewHostReconcileAttributesCounters()
-	ch.WalkHosts(func(host *api.Host) error {
+	cr.WalkHosts(func(host *api.Host) error {
 		counters.Add(host.GetReconcileAttributes())
 		return nil
 	})
 
 	if counters.AddOnly() {
-		w.a.V(1).M(ch).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(ch))
+		w.a.V(1).M(cr).Info("Enabling full fan-out mode. CHI: %s", util.NamespaceNameString(cr))
 		ctx = context.WithValue(ctx, common.ReconcileShardsAndHostsOptionsCtxKey, &common.ReconcileShardsAndHostsOptions{
 			FullFanOut: true,
 		})
 	}
 
-	return ch.WalkTillError(
+	return cr.WalkTillError(
 		ctx,
 		w.reconcileCRAuxObjectsPreliminary,
 		w.reconcileCluster,
@@ -290,7 +290,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version := w. getHostSoftwareVersion(ctx, host)
+	version := w.getHostSoftwareVersion(ctx, host)
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
@@ -374,7 +374,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 		}
 	}
 
-	w.reconcileClusterSecret(ctx , cluster)
+	w.reconcileClusterSecret(ctx, cluster)
 
 	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
@@ -385,7 +385,6 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 
 	return nil
 }
-
 
 func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *apiChk.Cluster) {
 }
@@ -503,10 +502,6 @@ func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) er
 
 // reconcileHost reconciles specified ClickHouse host
 func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
-	var (
-		reconcileStatefulSetOpts *statefulset.ReconcileOptions
-	)
-
 	if util.IsContextDone(ctx) {
 		log.V(2).Info("task is done")
 		return nil
@@ -522,6 +517,45 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	// Create artifacts
 	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+
+	w.reconcileHostPrepare(ctx, host)
+	w.reconcileHostMain(ctx, host)
+	// Host is now added and functional
+	host.GetReconcileAttributes().UnsetAdd()
+	w.reconcileHostBootstrap(ctx, host)
+
+	now := time.Now()
+	hostsCompleted := 0
+	hostsCount := 0
+	host.GetCR().IEnsureStatus().HostCompleted()
+	if host.GetCR() != nil && host.GetCR().GetStatus() != nil {
+		hostsCompleted = host.GetCR().GetStatus().GetHostsCompletedCount()
+		hostsCount = host.GetCR().GetStatus().GetHostsCount()
+	}
+	w.a.V(1).
+		WithEvent(host.GetCR(), common.EventActionProgress, common.EventReasonProgressHostsCompleted).
+		WithStatusAction(host.GetCR()).
+		M(host).F().
+		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
+
+	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
+		CopyStatusOptions: types.CopyStatusOptions{
+			MainFields: true,
+		},
+	})
+	return nil
+}
+
+// reconcileHostPrepare reconciles specified ClickHouse host
+func (w *worker) reconcileHostPrepare(ctx context.Context, host *api.Host) error {
+	return nil
+}
+
+// reconcileHostMain reconciles specified ClickHouse host
+func (w *worker) reconcileHostMain(ctx context.Context, host *api.Host) error {
+	var (
+		reconcileStatefulSetOpts *statefulset.ReconcileOptions
+	)
 
 	if err := w.reconcileConfigMapHost(ctx, host); err != nil {
 		w.a.V(1).
@@ -564,26 +598,18 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 
 	_ = w.reconcileHostService(ctx, host)
 
-	host.GetReconcileAttributes().UnsetAdd()
+	return nil
+}
 
-	now := time.Now()
-	hostsCompleted := 0
-	hostsCount := 0
-	host.GetCR().IEnsureStatus().HostCompleted()
-	if host.GetCR() != nil && host.GetCR().GetStatus() != nil {
-		hostsCompleted = host.GetCR().GetStatus().GetHostsCompletedCount()
-		hostsCount = host.GetCR().GetStatus().GetHostsCount()
+// reconcileHostBootstrap reconciles specified ClickHouse host
+func (w *worker) reconcileHostBootstrap(ctx context.Context, host *api.Host) error {
+	if err := w.includeHost(ctx, host); err != nil {
+		metrics.HostReconcilesErrors(ctx, host.GetCR())
+		w.a.V(1).
+			M(host).F().
+			Warning("Reconcile Host interrupted with an error 4. Host: %s Err: %v", host.GetName(), err)
+		return err
 	}
-	w.a.V(1).
-		WithEvent(host.GetCR(), common.EventActionProgress, common.EventReasonProgressHostsCompleted).
-		WithStatusAction(host.GetCR()).
-		M(host).F().
-		Info("[now: %s] %s: %d of %d", now, common.EventReasonProgressHostsCompleted, hostsCompleted, hostsCount)
 
-	_ = w.c.updateCRObjectStatus(ctx, host.GetCR(), types.UpdateStatusOptions{
-		CopyStatusOptions: types.CopyStatusOptions{
-			MainFields: true,
-		},
-	})
 	return nil
 }
