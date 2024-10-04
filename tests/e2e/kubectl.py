@@ -151,6 +151,8 @@ def create_and_check(manifest, check, kind="chi", ns=None, shell=None, timeout=1
 
     if "chi_status" in check:
         wait_chi_status(chi_name, check["chi_status"], ns=ns, shell=shell)
+    elif "chk_status" in check:
+        wait_chk_status(chi_name, check["chk_status"], ns=ns, shell=shell)
     else:
         # Wait for reconcile to start before performing other checks. In some cases it does not start, so we can pass
         # wait_field_changed("chi", chi_name, state_field, prev_state, ns)
@@ -431,9 +433,7 @@ def wait_jsonpath(kind, name, field, value, ns=None, retries=max_retries):
 
 
 def get_field(kind, name, field, ns=None, shell=None):
-    out = ""
-    if get_count(kind, name=name, ns=ns, shell=shell) > 0:
-        out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns, shell=shell).splitlines()
+    out = launch(f"get {kind} {name} -o=custom-columns=field:{field}", ns=ns, ok_to_fail=True, shell=shell).splitlines()
     if len(out) > 1:
         return out[1]
     else:

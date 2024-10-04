@@ -26,6 +26,5 @@ spec:
       - name: single
     settings:
       logger/console: "true"
-      # listen_host: "0.0.0.0"
       keeper_server/tcp_port: "2181"
 

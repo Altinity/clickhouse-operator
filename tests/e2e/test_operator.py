@@ -4721,6 +4721,9 @@ def test_050(self):
 @Name("test_051. Test CHK upgrade from 0.23.x operator version")
 @Tags("NO_PARALLEL")
 def test_051(self):
+    with Then("Skip it. test_051_1 does a better job"):
+        return
+
     version_from = "0.23.7"
     version_to = current().context.operator_version # "0.24.0"
     current().context.operator_version = version_from
@@ -4751,16 +4754,7 @@ def test_051(self):
         )
 
     with When("I create replicated table"):
-        create_table = """
-            CREATE TABLE test_local_051 ON CLUSTER 'default' (a UInt32)
-            Engine = ReplicatedMergeTree('/clickhouse/{installation}/tables/{shard}/{database}/{table}', '{replica}')
-            PARTITION BY tuple()
-            ORDER BY a
-            """.replace(
-            "\r", ""
-        ).replace(
-            "\n", ""
-        )
+        create_table = "CREATE TABLE test_local_051 ON CLUSTER 'default' (a UInt32) Engine = ReplicatedMergeTree ORDER BY a"
         clickhouse.query(chi, create_table)
 
     with And("I insert data in the replicated table"):
@@ -4813,6 +4807,108 @@ def test_051(self):
                     with Then("Check if there are read-only replicas after restore"):
                         out = clickhouse.query(chi, host=host, sql="SELECT count(*) from system.replicas where is_readonly")
                         assert out == "0", error()
+
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_local_051 select 2")
+
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "2", error()
+
+    with Finally("I clean up"):
+        delete_test_namespace()
+
+
+@TestScenario
+@Name("test_051_1. Test CHK upgrade from 0.23.x operator version")
+@Tags("NO_PARALLEL")
+def test_051_1(self):
+    version_from = "0.23.7"
+    version_to = current().context.operator_version # "0.24.0"
+    current().context.operator_version = version_from
+    create_shell_namespace_clickhouse_template()
+
+    chi_manifest = "manifests/chi/test-051-chk-chop-upgrade.yaml"
+    chk_manifest = "manifests/chk/test-051-chk-chop-upgrade.yaml"
+    chi = yaml_manifest.get_name(util.get_full_path(chi_manifest))
+    chk = yaml_manifest.get_name(util.get_full_path(chk_manifest))
+    cluster = "default"
+
+    with Given("Install CHK"):
+        kubectl.create_and_check(
+            manifest=chk_manifest, kind="chk",
+            check={
+                # "pod_count": 1, # do not work in 0.23.7
+                "do_not_delete": 1,
+            },
+        )
+
+    with Given("CHI with 2 replicas"):
+        kubectl.create_and_check(
+            manifest=chi_manifest,
+            check={
+                "pod_count": 2,
+                "do_not_delete": 1,
+            },
+        )
+
+    with When("I create replicated table"):
+        create_table = "CREATE TABLE test_local_051 ON CLUSTER 'default' (a UInt32) Engine = ReplicatedMergeTree ORDER BY a"
+        clickhouse.query(chi, create_table)
+
+    with And("I insert data in the replicated table"):
+        clickhouse.query(chi, f"INSERT INTO test_local_051 select 1")
+
+    with Then("Check replicated table has data on both nodes"):
+        for replica in {0,1}:
+            out = clickhouse.query(chi, "SELECT count(*) from test_local_051", host=f"chi-{chi}-{cluster}-0-{replica}-0")
+            assert out == "1", error()
+
+    old_pvc = "both-paths-test-051-chk-0"
+    pv = kubectl.get_pv_name(old_pvc)
+    new_pvc = "default-chk-test-051-chk-single-0-0-0"
+
+    with Then("Set PV persistentVolumeReclaimPolicy to Retain"):
+        kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}\'""")
+
+    with Then("Delete old Keeper resources"):
+        kubectl.delete_kind("chk", chk)
+        kubectl.delete_kind("pvc", old_pvc)
+
+    with Then("Unmount PV from old PVC"):
+        kubectl.launch(f"patch pv {pv}" + """ -p \'{"spec":{"claimRef":null}}\'""")
+
+    with When(f"upgrade operator to {version_to}"):
+        util.install_operator_version(version_to)
+        time.sleep(30)
+
+        kubectl.wait_chi_status(chi, "Completed")
+
+    with Given("Re-deploy CHK, substituting PV in PVC template"):
+        volumeNamePlaceHolder = "{volumeNamePlaceHolder}"
+        manifest = util.get_full_path("manifests/chk/test-051-chk-chop-upgrade-3.yaml")
+        cmd = f"""cat {manifest} | sed "s/{volumeNamePlaceHolder}/{pv}/g" | kubectl apply -n {current().context.test_namespace} -f -"""
+        kubectl.run_shell(cmd, 300)
+
+        kubectl.wait_chk_status(chk, "Completed")
+
+
+    with Then("CLICKHOUSE_DATA_DIR should be properly set"):
+        pod = kubectl.get_pod_spec("", "chk-test-051-chk-single-0-0-0")
+        env = pod["containers"][0]["env"][0]
+        assert env["name"] == "CLICKHOUSE_DATA_DIR"
+        assert env["value"] == "/var/lib/clickhouse-keeper"
+
+    with Then("Wiat until Keeper connection is established"):
+        out = 0
+        for i in range(1, 10):
+            out = clickhouse.query_with_error(chi, "SELECT count(*) from system.zookeeper_connection")
+            if out == "1":
+                break
+            with Then("Waiting 10 seconds"):
+                time.sleep(10)
+        assert out == "1", error()
 
     with And("I insert data in the replicated table"):
         clickhouse.query(chi, f"INSERT INTO test_local_051 select 2")

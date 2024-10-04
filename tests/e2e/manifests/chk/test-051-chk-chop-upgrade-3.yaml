@@ -24,6 +24,7 @@ spec:
           resources:
             requests:
               storage: 1Gi
+          volumeName: {volumeNamePlaceHolder}
     serviceTemplates:
       - name: backwards-compatible # operator 0.24 default service name is keeper-test-051-chk
         generateName: "test-051-chk"
@@ -40,3 +41,7 @@ spec:
       # can be skipped, this is default
       logger/console: "true"
       keeper_server/tcp_port: "2181"
+      # Required for backwards compatibility with operator 0.23.x
+      keeper_server/log_storage_path: /var/lib/clickhouse-keeper/logs
+      keeper_server/snapshot_storage_path: /var/lib/clickhouse-keeper/snapshots
+
