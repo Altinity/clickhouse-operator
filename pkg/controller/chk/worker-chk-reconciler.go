@@ -290,7 +290,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version := "undefined"
+	version := w. getHostSoftwareVersion(ctx, host)
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
@@ -327,6 +327,10 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	}
 
 	return err
+}
+
+func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
+	return "undefined"
 }
 
 // reconcileHostService reconciles host's Service
@@ -370,6 +374,8 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 		}
 	}
 
+	w.reconcileClusterSecret(ctx , cluster)
+
 	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
 		w.task.RegistryReconciled().RegisterPDB(pdb.GetObjectMeta())
@@ -378,6 +384,10 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *apiChk.Cluster) 
 	}
 
 	return nil
+}
+
+
+func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *apiChk.Cluster) {
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
@@ -482,6 +492,12 @@ func (w *worker) reconcileShard(ctx context.Context, shard api.IShard) error {
 	w.a.V(2).M(shard).S().P()
 	defer w.a.V(2).M(shard).E().P()
 
+	err := w.reconcileShardService(ctx, shard)
+
+	return err
+}
+
+func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) error {
 	return nil
 }
 

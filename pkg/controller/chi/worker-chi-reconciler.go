@@ -307,7 +307,7 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	log.V(1).M(host).F().S().Info("reconcile StatefulSet start")
 	defer log.V(1).M(host).F().E().Info("reconcile StatefulSet end")
 
-	version, _ := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true})
+	version := w. getHostSoftwareVersion(ctx, host)
 	host.Runtime.CurStatefulSet, _ = w.c.kube.STS().Get(ctx, host)
 
 	w.a.V(1).M(host).F().Info("Reconcile host: %s. App version: %s", host.GetName(), version)
@@ -344,6 +344,18 @@ func (w *worker) reconcileHostStatefulSet(ctx context.Context, host *api.Host, o
 	}
 
 	return err
+}
+
+func (w *worker) getHostSoftwareVersion(ctx context.Context, host *api.Host) string {
+	version, _ := w.getHostClickHouseVersion(
+		ctx,
+		host,
+		versionOptions{
+			skipNew: true,
+			skipStoppedAncestor: true,
+		},
+	)
+	return version
 }
 
 // reconcileHostService reconciles host's Service
@@ -387,16 +399,7 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 		}
 	}
 
-	// Add cluster's Auto Secret
-	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
-		if secret := w.task.Creator().CreateClusterSecret(w.c.namer.Name(interfaces.NameClusterAutoSecret, cluster)); secret != nil {
-			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
-				w.task.RegistryReconciled().RegisterSecret(secret.GetObjectMeta())
-			} else {
-				w.task.RegistryFailed().RegisterSecret(secret.GetObjectMeta())
-			}
-		}
-	}
+	w.reconcileClusterSecret(ctx , cluster)
 
 	pdb := w.task.Creator().CreatePodDisruptionBudget(cluster)
 	if err := w.reconcilePDB(ctx, cluster, pdb); err == nil {
@@ -407,6 +410,20 @@ func (w *worker) reconcileCluster(ctx context.Context, cluster *api.Cluster) err
 
 	reconcileZookeeperRootPath(cluster)
 	return nil
+}
+
+
+func (w *worker) reconcileClusterSecret(ctx context.Context, cluster *api.Cluster) {
+	// Add cluster's Auto Secret
+	if cluster.Secret.Source() == api.ClusterSecretSourceAuto {
+		if secret := w.task.Creator().CreateClusterSecret(w.c.namer.Name(interfaces.NameClusterAutoSecret, cluster)); secret != nil {
+			if err := w.reconcileSecret(ctx, cluster.Runtime.CHI, secret); err == nil {
+				w.task.RegistryReconciled().RegisterSecret(secret.GetObjectMeta())
+			} else {
+				w.task.RegistryFailed().RegisterSecret(secret.GetObjectMeta())
+			}
+		}
+	}
 }
 
 // getReconcileShardsWorkersNum calculates how many workers are allowed to be used for concurrent shard reconcile
@@ -525,6 +542,12 @@ func (w *worker) reconcileShard(ctx context.Context, shard api.IShard) error {
 	w.a.V(2).M(shard).S().P()
 	defer w.a.V(2).M(shard).E().P()
 
+	err := w.reconcileShardService(ctx, shard)
+
+	return err
+}
+
+func (w *worker) reconcileShardService(ctx context.Context, shard api.IShard) error {
 	// Add Shard's Service
 	service := w.task.Creator().CreateService(interfaces.ServiceShard, shard)
 	if service == nil {
@@ -563,6 +586,9 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 		defer w.reconcileCRServiceFinal(ctx, host.GetCR())
 	}
 
+	// Create artifacts
+	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
+
 	// Check whether ClickHouse is running and accessible and what version is available
 	if version, err := w.getHostClickHouseVersion(ctx, host, versionOptions{skipNew: true, skipStoppedAncestor: true}); err == nil {
 		w.a.V(1).
@@ -577,9 +603,6 @@ func (w *worker) reconcileHost(ctx context.Context, host *api.Host) error {
 			M(host).F().
 			Warning("Reconcile Host start. Host: %s Failed to get ClickHouse version: %s", host.GetName(), version)
 	}
-
-	// Create artifacts
-	w.stsReconciler.PrepareHostStatefulSetWithStatus(ctx, host, false)
 
 	if w.excludeHost(ctx, host) {
 		// Need to wait to complete queries only in case host is excluded from the cluster
