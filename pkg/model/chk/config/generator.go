@@ -48,9 +48,9 @@ func (c *Generator) generateXMLConfig(settings *chi.Settings, prefix string) str
 	}
 
 	b := &bytes.Buffer{}
-	// <yandex>
-	// XML code
-	// </yandex>
+	// <clickhouse>
+	//   XML code
+	// </clickhouse>
 	util.Iline(b, 0, "<"+xmlTagClickHouse+">")
 	xml.GenerateFromSettings(b, settings, prefix)
 	util.Iline(b, 0, "</"+xmlTagClickHouse+">")
@@ -89,38 +89,20 @@ func (c *Generator) getSectionFromFiles(section chi.SettingsSection, includeUnsp
 // getRaftConfig builds raft config for the chk
 func (c *Generator) getRaftConfig() string {
 	settings := chi.NewSettings()
-
 	c.cr.WalkHosts(func(_host *chi.Host) error {
 		settings.Set("keeper_server/raft_configuration/server/id", chi.MustNewSettingScalarFromAny(getServerId(_host)))
 		settings.Set("keeper_server/raft_configuration/server/hostname", chi.NewSettingScalar(c.namer.Name(interfaces.NameInstanceHostname, _host)))
 		settings.Set("keeper_server/raft_configuration/server/port", chi.MustNewSettingScalarFromAny(_host.RaftPort.Value()))
 		return nil
 	})
-
-	// Write xml as:
-	// <clickhouse>
-	// 		settings as xml
-	// </clickhouse>
-	config := &bytes.Buffer{}
-	xml.GenerateFromSettings(config, settings, xmlTagClickHouse)
-
-	return config.String()
+	return c.generateXMLConfig(settings, "")
 }
 
 // getHostServerId builds server id config for the host
 func (c *Generator) getHostServerId(host *chi.Host) string {
 	settings := chi.NewSettings()
-
 	settings.Set("keeper_server/server_id", chi.MustNewSettingScalarFromAny(getServerId(host)))
-
-	// Write xml as:
-	// <clickhouse>
-	// 		settings as xml
-	// </clickhouse>
-	config := &bytes.Buffer{}
-	xml.GenerateFromSettings(config, settings, xmlTagClickHouse)
-
-	return config.String()
+	return c.generateXMLConfig(settings, "")
 }
 
 func getServerId(host *chi.Host) int {
